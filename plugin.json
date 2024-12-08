@@ -1,0 +1,44 @@
+{
+  "name": "plugin-sample-vite",
+  "author": "frostime",
+  "url": "https://github.com/frostime/plugin-sample-vite",
+  "version": "0.3.6",
+  "minAppVersion": "3.0.12",
+  "backends": [
+    "windows",
+    "linux",
+    "darwin",
+    "docker",
+    "ios",
+    "android"
+  ],
+  "frontends": [
+    "desktop",
+    "mobile",
+    "browser-desktop",
+    "browser-mobile",
+    "desktop-window"
+  ],
+  "displayName": {
+    "en_US": "Plugin sample with vite",
+    "zh_CN": "插件样例 vite 版"
+  },
+  "description": {
+    "en_US": "SiYuan plugin sample with vite",
+    "zh_CN": "使用 vite 开发的思源插件样例"
+  },
+  "readme": {
+    "en_US": "README.md",
+    "zh_CN": "README_zh_CN.md"
+  },
+  "funding": {
+    "custom": [
+      ""
+    ]
+  },
+  "keywords": [
+    "plugin",
+    "sample",
+    "插件样例"
+  ]
+}
