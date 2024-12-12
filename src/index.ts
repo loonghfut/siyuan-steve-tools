@@ -23,7 +23,7 @@ import "@/index.scss";
 import { ModuleA } from "./libs/moduleA";
 import { M_calendar } from "./libs/module-calendar";
 
-
+let islog = true;
 // import { SettingUtils } from "./libs/setting-utils";
 // const STORAGE_NAME = "menu-config";
 // const TAB_TYPE = "custom_tab";
@@ -58,20 +58,10 @@ export default class steveTools extends Plugin {
         console.log("uninstall");
         this.modules.forEach(module => module.onunload());
     }
-
-    test() {
-        console.log("test");
+    outlog(mag: any) {
+        if (islog) {
+            console.log(mag);
+            console.trace(); // 输出堆栈跟踪
+        }
     }
-
-    useModules() {
-        this.modules.forEach(module => {
-            if (module.doSomething) {
-                module.doSomething();
-            }
-            if (module.doSomethingElse) {
-                module.doSomethingElse();
-            }
-        });
-    }
-
 }

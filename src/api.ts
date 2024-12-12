@@ -11,7 +11,7 @@ import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
 
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
-    let res = response.code === 0 ? response.data : null;
+    let res = response.code === 0 ? response.data : `${url}error`;
     return res;
 }
 
@@ -363,7 +363,7 @@ export async function putFile(path: string, isDir: boolean, file: any) {
     form.append('isDir', isDir.toString());
     // Copyright (c) 2023, terwer.
     // https://github.com/terwer/siyuan-plugin-importer/blob/v1.4.1/src/api/kernel-api.ts
-    form.append('modTime', Math.floor(Date.now() / 1000).toString());
+    // form.append('modTime', Math.floor(Date.now() / 1000).toString());
     form.append('file', file);
     let url = '/api/file/putFile';
     return request(url, form);

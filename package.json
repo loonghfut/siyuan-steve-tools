@@ -32,6 +32,9 @@
     "vite-plugin-zip-pack": "^1.0.5"
   },
   "dependencies": {
+    "ical": "^0.8.0",
+    "ical-generator": "^8.0.1",
+    "ical.js": "^2.1.0",
     "ics": "^3.8.1"
   }
 }
