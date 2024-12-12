@@ -1,8 +1,8 @@
 {
-  "name": "plugin-sample-vite",
-  "author": "frostime",
-  "url": "https://github.com/frostime/plugin-sample-vite",
-  "version": "0.3.6",
+  "name": "siyuan-steve-tools",
+  "author": "steve",
+  "url": "https://github.com/loonghfut/siyuan-steve-tools",
+  "version": "0.0.1",
   "minAppVersion": "3.0.12",
   "backends": [
     "windows",
@@ -20,12 +20,12 @@
     "desktop-window"
   ],
   "displayName": {
-    "en_US": "Plugin sample with vite",
-    "zh_CN": "插件样例 vite 版"
+    "en_US": "steve tools",
+    "zh_CN": "steve工具箱"
   },
   "description": {
-    "en_US": "SiYuan plugin sample with vite",
-    "zh_CN": "使用 vite 开发的思源插件样例"
+    "en_US": "personal tools",
+    "zh_CN": "个人使用的工具箱"
   },
   "readme": {
     "en_US": "README.md",
@@ -37,8 +37,6 @@
     ]
   },
   "keywords": [
-    "plugin",
-    "sample",
-    "插件样例"
+    "plugin"
   ]
 }
