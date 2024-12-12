@@ -61,7 +61,7 @@ export default class steveTools extends Plugin {
     outlog(mag: any) {
         if (islog) {
             console.log(mag);
-            console.trace(); // 输出堆栈跟踪
+            // console.trace(); // 输出堆栈跟踪
         }
     }
 }
