@@ -22,6 +22,7 @@ import {
 import "@/index.scss";
 import { ModuleA } from "./libs/moduleA";
 import { M_calendar } from "./libs/module-calendar";
+import { SettingUtils } from "./libs/setting-utils";
 
 let islog = true;
 // import { SettingUtils } from "./libs/setting-utils";
@@ -36,11 +37,14 @@ export default class steveTools extends Plugin {
         this.modules.push(moduleInstance);
     }
     // private isMobile: boolean;
-
+    settingUtils: SettingUtils;
     // private settingUtils: SettingUtils;
     async onload() {
         this.modules = [];
         // 按需加载模块
+        this.settingUtils = new SettingUtils({
+            plugin: this, name: "steveTools"
+        });
         this.loadModule(ModuleA);
         this.loadModule(M_calendar);//日历模块
     }

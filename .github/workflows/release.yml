@@ -1,26 +1,60 @@
-name: Create Release on Tag Push
+name: Tag and Release on Push to Main
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 jobs:
-  build:
+  tag:
     runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.create_tag.outputs.tag_name }}
     steps:
-      # Checkout
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Install Node.js
+      - name: Set up Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Check commit message for tag
+        id: check_message
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          if [[ "$COMMIT_MESSAGE" == *"v"* ]]; then
+            echo "::set-output name=tag_message::$COMMIT_MESSAGE"
+          else
+            echo "No tag found in commit message"
+            exit 0
+          fi
+
+      - name: Create new tag
+        id: create_tag
+        if: steps.check_message.outputs.tag_message
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_TAG=$(echo ${{ steps.check_message.outputs.tag_message }} | grep -o 'v[^ ]*')
+          git tag -a $NEW_TAG -m "${{ steps.check_message.outputs.tag_message }}"
+          git push origin $NEW_TAG
+          echo "::set-output name=tag_name::$NEW_TAG"
+
+  release:
+    needs: tag
+    if: needs.tag.outputs.tag_name != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
 
-        # Install pnpm
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         id: pnpm-install
@@ -28,14 +62,12 @@ jobs:
           version: 8
           run_install: false
 
-      # Get pnpm store directory
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
         run: |
           echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
-      # Setup pnpm cache
       - name: Setup pnpm cache
         uses: actions/cache@v3
         with:
@@ -44,11 +76,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      # Install dependencies
       - name: Install dependencies
         run: pnpm install
 
-      # Build for production, 这一步会生成一个 package.zip
       - name: Build for production
         run: pnpm build
 
@@ -60,3 +90,4 @@ jobs:
           artifacts: "package.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
+          tag: ${{ needs.tag.outputs.tag_name }}

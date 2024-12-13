@@ -2,31 +2,12 @@ import steveTools from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage } from "siyuan";
+import { addSettings } from './calsettings';
 
 export const calendarpath = 'data/public/stevetools/calendar.ics';
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 let allEvents: EventAttributes[] = [];
-// const Mevents: EventAttributes =
-// {
-//     start: [2024, 12, 13, 11, 0],
-//     startInputType: 'local',
-//     startOutputType: 'local',
-//     end: [2024, 12, 13, 12, 30], // 指定结束时间
-//     endInputType: 'local',
-//     endOutputType: 'local',
-//     title: 'Meeting with Bob',
-//     description: 'Discuss project updates',
-//     location: 'Office'
-//     // url: 'http://example.com',
-//     // status: 'CONFIRMED',
-//     // busyStatus: 'BUSY',
-//     // organizer: { name: 'Alice', email: 'alice@example.com' },
-//     // attendees: [
-//     //     { name: 'Bob', email: 'bob@example.com' }
-//     // ]
-// }
-
 
 export class M_calendar {
     private plugin: steveTools;
@@ -34,6 +15,7 @@ export class M_calendar {
         this.plugin = plugin;
     }
     init() {
+        addSettings(this.plugin.settingUtils);
         console.log("ModuleB initialized");
         //         this.plugin.addIcons(`<symbol id="iconFace" viewBox="0 0 32 32">
         //             <path d="M13.667 "></path>

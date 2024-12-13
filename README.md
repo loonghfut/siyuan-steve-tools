@@ -1,1 +1,1 @@
-Self-use plugin
+Self-use plugin，Test preview, currently not recommended
