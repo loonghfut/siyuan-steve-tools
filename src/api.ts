@@ -288,6 +288,23 @@ export async function getBlockAttrs(id: BlockId): Promise<{ [key: string]: strin
     return request(url, data);
 }
 
+export async function getAttributeViewKeys(id: BlockId) {
+    const data = {
+        id: id
+    }
+    const url = '/api/av/getAttributeViewKeys';
+    return request(url, data);
+}
+
+export async function getAttributeViewKeysByAvID(avid: BlockId) {
+    const data = {
+        avID: avid
+    }
+    const url = '/api/av/getAttributeViewKeysByAvID';
+    return request(url, data);
+}
+
+
 // **************************************** SQL ****************************************
 
 export async function sql(sql: string): Promise<any[]> {

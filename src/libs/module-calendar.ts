@@ -4,21 +4,26 @@ import * as api from "@/api"
 
 export const calendarpath = 'data/public/stevetools/calendar.ics';
 export const eventsPath = 'data/public/stevetools/events.json';
+export const cal_id = '';
 
 const Mevents: EventAttributes =
 {
-    start: [2024, 12, 22, 10, 0],
-    duration: { hours: 1, minutes: 30 },
+    start: [2024, 12, 13, 11, 0],
+    startInputType: 'local',
+    startOutputType: 'local',
+    end: [2024, 12, 13, 12, 30], // 指定结束时间
+    endInputType: 'local',
+    endOutputType: 'local',
     title: 'Meeting with Bob',
     description: 'Discuss project updates',
-    location: 'Office',
+    location: 'Office'
     // url: 'http://example.com',
-    status: 'CONFIRMED',
-    busyStatus: 'BUSY',
+    // status: 'CONFIRMED',
+    // busyStatus: 'BUSY',
     // organizer: { name: 'Alice', email: 'alice@example.com' },
-    attendees: [
-        { name: 'Bob', email: 'bob@example.com' }
-    ]
+    // attendees: [
+    //     { name: 'Bob', email: 'bob@example.com' }
+    // ]
 }
 
 
@@ -39,8 +44,9 @@ export class M_calendar {
             title: "SteveTools",
             position: "right",
             callback: async () => {
-                await this.addEvent(Mevents, eventsPath);
-                await this.generateICSFromEventsFile(eventsPath, calendarpath);
+                await this.getEventsFromSiYuanDatabase()
+                // await this.addEvent(Mevents, eventsPath);
+                // await this.generateICSFromEventsFile(eventsPath, calendarpath);
             }
         });
     }
@@ -159,4 +165,47 @@ export class M_calendar {
             console.error('检查或创建 events.json 文件时出错：', error);
         }
     }
+
+    // 从思源数据库中获取日程信息数据库的av-id
+    async getAVreferenceid() {
+        const sqlStr = `SELECT markdown
+        FROM blocks
+        WHERE name = '日程'
+        AND markdown LIKE '%NodeAttributeView%data-av-id%';`
+        ;
+        const res = await api.sql(sqlStr);
+        console.log(res);
+        const avIds = res.map(item => extractDataAvId(item.markdown)).filter(id => id !== null);
+        console.log(avIds); // 输出: ['20241213113357-m9b143e', ...]
+        return avIds;
+    }
+
+    // 从思源数据库中获取日程信息
+    async getEventsFromSiYuanDatabase() {
+        const avIds = await this.getAVreferenceid();
+        const events: EventAttributes[] = [];
+        for (const avId of avIds) {
+            const response = await api.getFile(`data/storage/av/${avId}.json`);
+            console.log(response);
+
+        }
+        // console.log(events);
+        
+        // return events;
+    }
+
+    // 从思源数据库中获取日程信息并保存到JSON文件
+    // async saveEventsFromSiYuanDatabase() {
+    //     const events = await this.getEventsFromSiYuanDatabase();
+    //     await this.saveEvents(events, eventsPath);
+    // }
+
+}
+
+
+
+function extractDataAvId(markdown: string): string | null {
+    const regex = /data-av-id="([^"]+)"/;
+    const match = markdown.match(regex);
+    return match ? match[1] : null;
 }
