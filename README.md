@@ -16,3 +16,5 @@
 
 使用thunderbird订阅的效果如下
 ![alt text](image-4.png)
+
+小米日历也支持订阅此日历文件
