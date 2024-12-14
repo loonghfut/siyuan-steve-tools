@@ -6,7 +6,7 @@
  * @LastEditTime : 2024-05-21 16:57:53
  * @Description  : 
  */
-
+import * as api from "@/api"
 import { Plugin, Setting } from 'siyuan';
 
 
@@ -132,6 +132,7 @@ export class SettingUtils {
         data = data ?? this.dump();
         await this.plugin.saveData(this.file, this.dump());
         console.debug('Save config:', data);
+        api.refresh();
         return data;
     }
 

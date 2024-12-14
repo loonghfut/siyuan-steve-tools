@@ -3,11 +3,11 @@ import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage } from "siyuan";
 import { addSettings } from './calsettings';
-
 export const calendarpath = 'data/public/stevetools/calendar.ics';
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 let allEvents: EventAttributes[] = [];
+
 
 export class M_calendar {
     private plugin: steveTools;
@@ -15,7 +15,7 @@ export class M_calendar {
         this.plugin = plugin;
     }
     init() {
-        addSettings(this.plugin.settingUtils);
+        addSettings(this.plugin.Tools_settingUtils);
         console.log("ModuleB initialized");
         //         this.plugin.addIcons(`<symbol id="iconFace" viewBox="0 0 32 32">
         //             <path d="M13.667 "></path>

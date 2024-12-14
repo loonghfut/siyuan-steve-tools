@@ -509,3 +509,16 @@ export async function version(): Promise<string> {
 export async function currentTime(): Promise<number> {
     return request('/api/system/currentTime', {});
 }
+
+
+
+// **************************************** User ****************************************
+export async function refresh() {
+    await fetch(`/api/filetree/refreshFiletree`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // 'Authorization': `token ${token}`
+        }
+    });
+}

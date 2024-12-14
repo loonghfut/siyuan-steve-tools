@@ -21,8 +21,9 @@ import {
 } from "siyuan";
 import "@/index.scss";
 import { ModuleA } from "./libs/moduleA";
-import { M_calendar } from "./libs/module-calendar";
+import { M_calendar } from "./calendar/module-calendar";
 import { SettingUtils } from "./libs/setting-utils";
+import * as api from "@/api"
 
 let islog = true;
 // import { SettingUtils } from "./libs/setting-utils";
@@ -36,20 +37,45 @@ export default class steveTools extends Plugin {
         const moduleInstance = new ModuleClass(this);//解释：new ModuleClass(this)相当于new ModuleClass(steveTools)
         this.modules.push(moduleInstance);
     }
+    private runloadModule(ctools) {
+        if (ctools.includes("日程订阅")) {
+            this.loadModule(M_calendar);
+            console.log("日程订阅");
+        }
+    }
     // private isMobile: boolean;
-    settingUtils: SettingUtils;
+    Tools_settingUtils: SettingUtils;
     // private settingUtils: SettingUtils;
     async onload() {
         this.modules = [];
         // 按需加载模块
-        this.settingUtils = new SettingUtils({
+        this.Tools_settingUtils = new SettingUtils({
             plugin: this, name: "steveTools"
         });
-        this.loadModule(ModuleA);
-        this.loadModule(M_calendar);//日历模块
+
+        this.Tools_settingUtils.addItem({
+            key: "Stools",
+            value: "",
+            type: "textarea",
+            title: "选择工具",
+            description: "输入要设置的工具，多个工具用英文逗号分开(1.日程订阅)",
+            action: {
+                // Called when focus is lost and content changes
+                callback: async () => {
+                    let tool = await this.Tools_settingUtils.take("Stools");
+                    console.log(tool);
+                }
+            }
+        });
+        await this.Tools_settingUtils.load();
+        const c_tools = this.Tools_settingUtils.get("Stools")
+        this.runloadModule(c_tools);
+
     }
 
-    onLayoutReady() {
+    onLayoutReady () {
+
+
         this.modules.forEach(module => module.init());
     }
 
