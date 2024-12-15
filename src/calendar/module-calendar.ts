@@ -16,7 +16,7 @@ export class M_calendar {
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
-    init(settingdata) {
+    async init(settingdata) {
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
@@ -37,6 +37,18 @@ export class M_calendar {
                 // await this.generateICSFromEventsFile(eventsPath, calendarpath);
             }
         });
+
+        if (this_settingdata["cal-auto-update"] == true) {
+            console.log("自动更新日历文件");
+            //监听destroy-protyle
+            // this.plugin.eventBus.on("destroy-protyle", await this.getEventsFromSiYuanDatabase.bind(this));
+
+            //每15分钟调用一次await this.getEventsFromSiYuanDatabase()
+            setInterval(async () => {
+                await this.getEventsFromSiYuanDatabase()
+               console.log("自动更新日历文件1");
+            }, 900000);
+        }
     }
 
     onunload() {
@@ -178,9 +190,10 @@ export class M_calendar {
 
     // 从思源数据库中获取日程信息
     async getEventsFromSiYuanDatabase() {
+        console.log('开始生成ics文件');
         //删除多余的ics文件
         const listfiles = await api.readDir('data/public/stevetools/');
-        console.log(listfiles);
+        // console.log(listfiles);
         for (const file of Object.values(listfiles)) {
             if (!file.isDir && file.name.endsWith('.ics')) {
                 await api.removeFile('data/public/stevetools/' + file.name);

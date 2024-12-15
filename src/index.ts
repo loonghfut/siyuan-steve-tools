@@ -61,10 +61,12 @@ export default class steveTools extends Plugin {
 
     }
 
-    onLayoutReady() {
+    async onLayoutReady() {
 
 
-        this.modules.forEach(module => module.init(settingdata));
+        for (const module of this.modules) {
+            await module.init(settingdata);
+        }
     }
 
     async onunload() {

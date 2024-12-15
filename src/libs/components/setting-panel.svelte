@@ -16,11 +16,11 @@
 
     const dispatch = createEventDispatcher();
 
-    function onClick( {detail}) {
+    function onClick({ detail }) {
         dispatch("click", { key: detail.key });
     }
-    function onChanged( {detail}) {
-        dispatch("changed", {group: group, ...detail});
+    function onChanged({ detail }) {
+        dispatch("changed", { group: group, ...detail });
     }
 
     $: fn__none = display ? "" : "fn__none";
@@ -28,6 +28,7 @@
 </script>
 
 <div class="config__tab-container {fn__none}" data-name={group}>
+    <!-- 将插槽内容放在最前面 -->
     <slot />
     {#each settingItems as item (item.key)}
         <Form.Wrap

@@ -3,7 +3,7 @@
     import { showMessage } from "siyuan";
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
-    import * as myapi from "@/api"
+    import * as myapi from "@/api";
     export let plugin;
     export let myfile;
     export let setdialog;
@@ -12,12 +12,14 @@
         ["cal-url", { value: "calendar.ics" }],
         ["cal-get-url", { value: "Click Button" }],
         ["cal-reset", { value: "Click Button" }],
+        ["cal-auto-update", { value: false }],
     ]);
     let settings = new Map([
         ["cal-enable", { value: false }],
         ["cal-url", { value: "calendar.ics" }],
         ["cal-get-url", { value: "Click Button" }],
         ["cal-reset", { value: "Click Button" }],
+        ["cal-auto-update", { value: false }],
     ]);
     function resetToDefault() {
         settings = new Map(defaultSettings);
@@ -57,6 +59,13 @@
             },
         },
         {
+            type: "checkbox",
+            title: "自动更新日程",
+            description: "启用后每15分钟更新一次（需保证前端运行）",
+            key: "cal-auto-update",
+            value: false,
+        },
+        {
             type: "button",
             title: "恢复默认配置",
             description: "遇到问题先恢复默认配置",
@@ -72,7 +81,7 @@
         {
             type: "button",
             title: "刷新",
-            description: "刷新思源笔记",
+            description: "若部分设置未生效请刷新思源笔记",
             key: "reset",
             value: "error",
             button: {
@@ -172,7 +181,6 @@
         {/each}
     </ul>
     <div class="config__tab-wrap">
-
         <SettingPanel
             group={groups[0]}
             settingItems={group1Items}
@@ -183,7 +191,22 @@
             }}
         >
             <div class="fn__flex b3-label">
-                若部分设置未生效请刷新思源笔记
+                <ol>
+                    <li>添加一个数据库（前三列格式如图）</li>
+                    <img
+                        src="plugins/siyuan-steve-tools/asset/1734265371736.png"
+                        alt="数据库格式示例"
+                        style="max-height: 200px;"
+                    />
+                    <li>再给此数据库添加命名属性，内容为“日程” （如图）</li>
+                    <img
+                        src="plugins/siyuan-steve-tools/asset/1734265426843.png"
+                        alt="命名属性示例"
+                        style="max-height: 200px;"
+                    />
+                    <li>最后点击右上角的日历图标</li>
+                    <li>即可生成日历文件，订阅链接在设置里获取</li>
+                </ol>
             </div>
         </SettingPanel>
         <SettingPanel
