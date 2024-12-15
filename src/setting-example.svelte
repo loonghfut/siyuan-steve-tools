@@ -7,7 +7,7 @@
     export let plugin;
     export let myfile;
     export let setdialog;
-    const defaultSettings = new Map([
+    const defaultSettings = new Map([//TODO: 之后重构代码，分文件存储
         ["cal-enable", { value: false }],
         ["cal-url", { value: "calendar.ics" }],
         ["cal-get-url", { value: "Click Button" }],
@@ -90,6 +90,30 @@
                     myapi.refresh();
                 },
             },
+        },
+        {
+            type: "hint",
+            title: "使用方法",
+            description: `            <div class="fn__flex b3-label">
+                <ol>
+                    <li>添加一个数据库（前三列格式如图）</li>
+                    <img
+                        src="plugins/siyuan-steve-tools/asset/1734265371736.png"
+                        alt="数据库格式示例"
+                        style="max-height: 200px;"
+                    />
+                    <li>再给此数据库添加命名属性，内容为“日程” （如图）</li>
+                    <img
+                        src="plugins/siyuan-steve-tools/asset/1734265426843.png"
+                        alt="命名属性示例"
+                        style="max-height: 200px;"
+                    />
+                    <li>最后点击右上角的日历图标</li>
+                    <li>即可生成日历文件，订阅链接在设置里获取</li>
+                </ol>
+            </div>`,
+            key: "hint",
+            value: "error",
         },
     ];
 
@@ -190,24 +214,9 @@
                 console.debug("Click:", detail.key);
             }}
         >
-            <div class="fn__flex b3-label">
-                <ol>
-                    <li>添加一个数据库（前三列格式如图）</li>
-                    <img
-                        src="plugins/siyuan-steve-tools/asset/1734265371736.png"
-                        alt="数据库格式示例"
-                        style="max-height: 200px;"
-                    />
-                    <li>再给此数据库添加命名属性，内容为“日程” （如图）</li>
-                    <img
-                        src="plugins/siyuan-steve-tools/asset/1734265426843.png"
-                        alt="命名属性示例"
-                        style="max-height: 200px;"
-                    />
-                    <li>最后点击右上角的日历图标</li>
-                    <li>即可生成日历文件，订阅链接在设置里获取</li>
-                </ol>
-            </div>
+            <!-- <div class="fn__flex b3-label">
+
+            </div> -->
         </SettingPanel>
         <SettingPanel
             group={groups[1]}

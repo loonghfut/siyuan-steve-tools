@@ -29,6 +29,7 @@ interface ISettingItem extends ISettingItemCore {
     title: string;
     description: string;
     direction?: "row" | "column";
+    createElement?: (currentVal: any) => HTMLElement;
 }
 
 
