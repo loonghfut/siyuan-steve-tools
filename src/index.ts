@@ -20,7 +20,7 @@ import {
     // fetchPost
 } from "siyuan";
 import "@/index.scss";
-import { ModuleA } from "./libs/moduleA";
+// import { ModuleA } from "./libs/moduleA";
 import { M_calendar } from "./calendar/module-calendar";
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";

@@ -4,10 +4,12 @@ import * as api from "@/api"
 import { showMessage } from "siyuan";
 
 export let calendarpath = 'data/public/stevetools/calendar.ics';
+let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 let allEvents: EventAttributes[] = [];
 
+let this_settingdata: any = {};
 
 export class M_calendar {
     private plugin: steveTools;
@@ -15,36 +17,40 @@ export class M_calendar {
         this.plugin = plugin;
     }
     init(settingdata) {
+        this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
+        calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
         console.log(calendarpath);
-        console.log("ModuleB initialized");
-        //         this.plugin.addIcons(`<symbol id="iconFace" viewBox="0 0 32 32">
+        // this.plugin.addIcons(`<symbol id="iconcalendar" viewBox="0 0 32 32">
         //             <path d="M13.667 "></path>
         //             </symbol>
         // `);
         this.checkAndCreateEventsFile(eventsPath);
         this.plugin.addTopBar({
-            icon: "iconSearch",
-            title: "SteveTools",
+            icon: "iconCalendar",
+            title: "立刻生成ics文件",
             position: "right",
             callback: async () => {
                 await this.getEventsFromSiYuanDatabase()
+                showMessage("日历文件生成结束", 3000, "info");
                 // await this.addEvent(Mevents, eventsPath);
                 // await this.generateICSFromEventsFile(eventsPath, calendarpath);
             }
         });
     }
 
-    doSomethingElse() {
-        console.log("ModuleB is doing something else");
-    }
     onunload() {
         console.log("M_calendar unloaded");
     }
 
     getCalUrl() {
-        const currentHost = window.location.host;
-        showMessage(currentHost+"/"+calendarpath);
+        // console.log(this_settingdata["cal-enable"]);
+        if (this_settingdata["cal-enable"] == true) {
+            const currentHost = window.location.host;
+            showMessage("日历订阅链接：" + currentHost + "/" + calendarpath2, 0, "info");
+            return
+        }
+        showMessage("请先启用日历订阅模块", 6000, "info");
     }
     // 生成ICS文件
     async generateICS(events: EventAttributes[], filePath: string) {
@@ -142,6 +148,7 @@ export class M_calendar {
             // this.plugin.outlog(response);
             if (response.code === 404) {//TODO待改进判断
                 // 如果文件不存在，创建一个空的events.json文件
+                //删除其他.ics文件
                 const emptyEvents: EventAttributes[] = [];
                 const eventsJson = JSON.stringify(emptyEvents);
                 const fileBlob = new Blob([eventsJson], { type: 'application/json' });
@@ -171,6 +178,15 @@ export class M_calendar {
 
     // 从思源数据库中获取日程信息
     async getEventsFromSiYuanDatabase() {
+        //删除多余的ics文件
+        const listfiles = await api.readDir('data/public/stevetools/');
+        console.log(listfiles);
+        for (const file of Object.values(listfiles)) {
+            if (!file.isDir && file.name.endsWith('.ics')) {
+                await api.removeFile('data/public/stevetools/' + file.name);
+            }
+        }
+        //获取av-id
         const avIds = await this.getAVreferenceid();
         allEvents = [];
         for (const avId of avIds) {
@@ -196,6 +212,7 @@ export class M_calendar {
         // console.log(events);
         await this.uploadAllEventsToFile(eventsPath);
         await this.generateICSFromEventsFile(eventsPath, calendarpath);
+      
     }
 
     async runAddEvent(result: any) {
