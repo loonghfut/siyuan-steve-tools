@@ -2,8 +2,8 @@ import steveTools from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage } from "siyuan";
-import { addSettings } from './calsettings';
-export const calendarpath = 'data/public/stevetools/calendar.ics';
+
+export let calendarpath = 'data/public/stevetools/calendar.ics';
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 let allEvents: EventAttributes[] = [];
@@ -14,8 +14,9 @@ export class M_calendar {
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
-    init() {
-        addSettings(this.plugin.Tools_settingUtils);
+    init(settingdata) {
+        calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
+        console.log(calendarpath);
         console.log("ModuleB initialized");
         //         this.plugin.addIcons(`<symbol id="iconFace" viewBox="0 0 32 32">
         //             <path d="M13.667 "></path>
@@ -41,6 +42,10 @@ export class M_calendar {
         console.log("M_calendar unloaded");
     }
 
+    getCalUrl() {
+        const currentHost = window.location.host;
+        showMessage(currentHost+"/"+calendarpath);
+    }
     // 生成ICS文件
     async generateICS(events: EventAttributes[], filePath: string) {
         try {
@@ -200,7 +205,7 @@ export class M_calendar {
             if (!item.dateContent || !item.dateContent2 || !item.textContent || !item.blockContent) {
                 console.log('Invalid event data:', item);
                 i++;
-                showMessage('存在不符合要求的数据（请检查数据库格式），已跳过'+i+'条数据',6000,"info","tiao");
+                showMessage('存在不符合要求的数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
                 continue;
             }
             const endtime = convertTimestampToArray(item.dateContent2);

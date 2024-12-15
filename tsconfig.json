@@ -33,7 +33,8 @@
         "checkJs": true,
         "types": [
             "node",
-            "vite/client"
+            "vite/client",
+            "svelte"
         ],
         // "baseUrl": "./src",
         "paths": {
