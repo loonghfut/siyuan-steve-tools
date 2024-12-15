@@ -2,7 +2,7 @@
   "name": "siyuan-steve-tools",
   "author": "steve",
   "url": "https://github.com/loonghfut/siyuan-steve-tools",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "minAppVersion": "3.0.12",
   "backends": [
     "windows",
@@ -20,12 +20,12 @@
     "desktop-window"
   ],
   "displayName": {
-    "en_US": "steve tools",
+    "en_US": "STtools",
     "zh_CN": "STtools"
   },
   "description": {
     "en_US": "personal tools",
-    "zh_CN": "个人使用的工具箱"
+    "zh_CN": "个人使用的工具箱,持续更新..."
   },
   "readme": {
     "en_US": "README.md",
@@ -37,6 +37,7 @@
     ]
   },
   "keywords": [
-    "plugin"
+    "plugin",
+    "tools"
   ]
 }

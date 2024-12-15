@@ -1,6 +1,5 @@
 STEVETOOLS
 ==========
-这是一个工具集合，目前只有一个工具，用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历等。
-
-具体使用方法请到插件设置页查看
+This is a collection of tools. Currently, there is only one tool used to generate calendar files ics and synchronize schedules to calendar software that supports url subscriptions, such as thunderbird, Xiaomi Calendar, etc.
+Please visit the plug-in settings page for specific usage methods
 
