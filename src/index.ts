@@ -28,7 +28,7 @@ import SettingExample from "@/setting-example.svelte";
 
 
 
-let islog = true;
+let islog = false;
 const myfile = "steveTools.json";
 let settingdata: any = {};
 let setdialog: any;

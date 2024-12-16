@@ -7,19 +7,21 @@
     export let plugin;
     export let myfile;
     export let setdialog;
-    const defaultSettings = new Map([//TODO: 之后重构代码，分文件存储
+    const defaultSettings = new Map([//TODO: 设置逻辑有问题，之后重构代码，分文件存储
         ["cal-enable", { value: false }],
         ["cal-url", { value: "calendar.ics" }],
         ["cal-get-url", { value: "Click Button" }],
         ["cal-reset", { value: "Click Button" }],
-        ["cal-auto-update", { value: false }],
+        ["cal-auto-update", { value: true }],
+        ["cal-hand-update", { value: true }],
     ]);
     let settings = new Map([
         ["cal-enable", { value: false }],
         ["cal-url", { value: "calendar.ics" }],
         ["cal-get-url", { value: "Click Button" }],
         ["cal-reset", { value: "Click Button" }],
-        ["cal-auto-update", { value: false }],
+        ["cal-auto-update", { value: true }],
+        ["cal-hand-update", { value: true }],
     ]);
     function resetToDefault() {
         settings = new Map(defaultSettings);
@@ -61,9 +63,16 @@
         {
             type: "checkbox",
             title: "自动更新日程",
-            description: "启用后每15分钟更新一次（需保证前端运行）",
+            description: "启用后每10分钟更新一次（需保证前端运行），且每次编辑日程数据后自动更新",
             key: "cal-auto-update",
-            value: false,
+            value: true,
+        },
+        {
+            type: "checkbox",
+            title: "手动更新",
+            description: "启用后在topbar右侧会出现更新按钮",
+            key: "cal-hand-update",
+            value: true,
         },
         {
             type: "button",
@@ -94,7 +103,8 @@
         {
             type: "hint",
             title: "使用方法",
-            description: `            <div class="fn__flex b3-label">
+            description: `            
+            <div class="fn__flex b3-label">
                 <ol>
                     <li>添加一个数据库（前三列格式如图）</li>
                     <img
@@ -110,6 +120,7 @@
                     />
                     <li>最后点击右上角的日历图标</li>
                     <li>即可生成日历文件，订阅链接在设置里获取</li>
+                    <li>打开可以订阅ics文件的日历软件（如小米日历），输入订阅链接即可（要保证手机能网络连接到思源）</li>
                 </ol>
             </div>`,
             key: "hint",

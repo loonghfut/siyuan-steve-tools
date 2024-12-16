@@ -3,6 +3,7 @@ import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage } from "siyuan";
 import * as ic from "@/icon"
+declare const siyuan: any;
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -16,6 +17,7 @@ export class M_calendar {
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
+    private isUpdating: boolean = false;
     async init(settingdata) {
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
@@ -27,28 +29,56 @@ export class M_calendar {
     </symbol>  
         `);
         this.checkAndCreateEventsFile(eventsPath);
-        this.plugin.addTopBar({
-            icon: "iconSTcal",
-            title: "立刻生成ics文件",
-            position: "right",
-            callback: async () => {
-                await this.getEventsFromSiYuanDatabase()
-                showMessage("日历文件生成结束", 3000, "info");
-                // await this.addEvent(Mevents, eventsPath);
-                // await this.generateICSFromEventsFile(eventsPath, calendarpath);
-            }
-        });
+        // console.log(this_settingdata["cal-hand-update"]);
+        if (this_settingdata["cal-hand-update"] == true) {
+            this.plugin.addTopBar({
+                icon: "iconSTcal",
+                title: "立刻生成ics文件",
+                position: "right",
+                callback: async () => {
+                    await this.getEventsFromSiYuanDatabase()
+                    showMessage("日历文件生成结束", 3000, "info");
+                    // await this.addEvent(Mevents, eventsPath);
+                    // await this.generateICSFromEventsFile(eventsPath, calendarpath);
+                }
+            });
+        }
 
         if (this_settingdata["cal-auto-update"] == true) {
             console.log("自动更新日历文件");
-            //监听destroy-protyle
-            // this.plugin.eventBus.on("destroy-protyle", await this.getEventsFromSiYuanDatabase.bind(this));
+            //监听
+            siyuan.ws.ws.addEventListener('message', async (e) => {
+                const msg = JSON.parse(e.data);
+                if (msg.cmd === "transactions") {
+                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {
+                        // console.log("更新了一个属性视图");
+                        const avids = await this.getAVreferenceid();
+                        console.log(avids);
+                        if (avids.includes(msg.data[0].doOperations[0].avID)) {
+                            console.log("更新了日程信息");
+                            //延时执行
+                            if (!this.isUpdating) {
+                                this.isUpdating = true;
+                                setTimeout(async () => {
+                                    await this.getEventsFromSiYuanDatabase();
+                                    console.log("更新日历文件<2>");
+                                    this.isUpdating = false;
+                                }, 3000);
+                            }
+                        } else {
+                            // console.log("avID 不在 avids 数组中");
+                        }
+                    }
+
+                }
+                // console.log(msg);
+            });
 
             //每15分钟调用一次await this.getEventsFromSiYuanDatabase()
             setInterval(async () => {
                 await this.getEventsFromSiYuanDatabase()
-               console.log("自动更新日历文件1");
-            }, 900000);
+                console.log("自动更新日历文件<1>");
+            }, 600000);
         }
     }
 
@@ -183,9 +213,9 @@ export class M_calendar {
         AND markdown LIKE '%NodeAttributeView%data-av-id%';`
             ;
         const res = await api.sql(sqlStr);
-        console.log(res);
+        this.plugin.outlog(res);
         const avIds = res.map(item => extractDataAvId(item.markdown)).filter(id => id !== null);
-        console.log(avIds); // 输出: ['20241213113357-m9b143e', ...]
+        this.plugin.outlog(avIds); // 输出: ['20241213113357-m9b143e', ...]
         return avIds;
     }
 
@@ -217,7 +247,7 @@ export class M_calendar {
                     };
                 });
                 await this.runAddEvent(result);
-                console.log(result);
+                this.plugin.outlog(result);
 
             } else {
                 console.error(`Invalid response for avId ${avId}:`, response);
@@ -226,7 +256,7 @@ export class M_calendar {
         // console.log(events);
         await this.uploadAllEventsToFile(eventsPath);
         await this.generateICSFromEventsFile(eventsPath, calendarpath);
-      
+
     }
 
     async runAddEvent(result: any) {
