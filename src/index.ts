@@ -21,6 +21,7 @@ import {
 } from "siyuan";
 import "@/index.scss";
 // import { ModuleA } from "./libs/moduleA";
+import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";
@@ -44,14 +45,20 @@ export default class steveTools extends Plugin {
             console.log("日历模块加载");
         }
     }
+
     // private isMobile: boolean;
     // private settingUtils: SettingUtils;
     async onload() {
+        this.addIcons(`
+    <symbol id="iconST" viewBox="0 0 512 512">
+       ${ic.steveTools_icon}
+    </symbol>  
+        `);
         this.modules = [];
         this.addTopBar({
-            icon: "iconSettings",
+            icon: "iconST",
             title: "SteveTools",
-            position: "right",
+            position: "left",
             callback: () => {
                 this.openDIYSetting();
             }

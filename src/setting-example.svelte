@@ -43,7 +43,7 @@
             title: "日程文件名",
             description: "建议越复杂越好，记得加上.ics后缀",
             key: "cal-url",
-            value: "error",
+            value: "calendar.ics",
         },
         {
             type: "button",

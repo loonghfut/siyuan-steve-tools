@@ -2,7 +2,7 @@ import steveTools from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage } from "siyuan";
-
+import * as ic from "@/icon"
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -21,13 +21,14 @@ export class M_calendar {
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
         console.log(calendarpath);
-        // this.plugin.addIcons(`<symbol id="iconcalendar" viewBox="0 0 32 32">
-        //             <path d="M13.667 "></path>
-        //             </symbol>
-        // `);
+        this.plugin.addIcons(`
+    <symbol id="iconSTcal" viewBox="0 0 500 500">
+       ${ic.steveTools_cal}
+    </symbol>  
+        `);
         this.checkAndCreateEventsFile(eventsPath);
         this.plugin.addTopBar({
-            icon: "iconCalendar",
+            icon: "iconSTcal",
             title: "立刻生成ics文件",
             position: "right",
             callback: async () => {
