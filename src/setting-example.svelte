@@ -4,31 +4,21 @@
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
     import * as myapi from "@/api";
+    import { getSettings, resetSettings } from "./calsettings";
+
     export let plugin;
     export let myfile;
     export let setdialog;
-    const defaultSettings = new Map([//TODO: 设置逻辑有问题，之后重构代码，分文件存储
-        ["cal-enable", { value: false }],
-        ["cal-url", { value: "calendar.ics" }],
-        ["cal-get-url", { value: "Click Button" }],
-        ["cal-reset", { value: "Click Button" }],
-        ["cal-auto-update", { value: true }],
-        ["cal-hand-update", { value: true }],
-    ]);
-    let settings = new Map([
-        ["cal-enable", { value: false }],
-        ["cal-url", { value: "calendar.ics" }],
-        ["cal-get-url", { value: "Click Button" }],
-        ["cal-reset", { value: "Click Button" }],
-        ["cal-auto-update", { value: true }],
-        ["cal-hand-update", { value: true }],
-    ]);
+
+    let settings = getSettings();
+
     function resetToDefault() {
-        settings = new Map(defaultSettings);
+        settings = resetSettings();
         console.log("resetToDefault", settings);
         saveSettings();
         setdialog.destroy();
     }
+
     let groups: string[] = ["日程分享", "✨开发中。。"];
     let focusGroup = groups[0];
 
@@ -38,21 +28,21 @@
             title: "启用日程分享",
             description: "启用日程分享(刷新后生效)",
             key: "cal-enable",
-            value: false,
+            value: settings["cal-enable"],
         },
         {
             type: "textinput",
             title: "日程文件名",
             description: "建议越复杂越好，记得加上.ics后缀",
             key: "cal-url",
-            value: "calendar.ics",
+            value: settings["cal-url"],
         },
         {
             type: "button",
             title: "获取订阅连接",
             description: "更改日程文件名后请重新获取日程订阅连接",
             key: "cal-get-url",
-            value: "error",
+            value: settings["cal-get-url"],
             button: {
                 label: "获取",
                 callback: () => {
@@ -65,21 +55,21 @@
             title: "自动更新日程",
             description: "启用后每10分钟更新一次（需保证前端运行），且每次编辑日程数据后自动更新",
             key: "cal-auto-update",
-            value: true,
+            value: settings["cal-auto-update"],
         },
         {
             type: "checkbox",
             title: "手动更新",
             description: "启用后在topbar右侧会出现更新按钮",
             key: "cal-hand-update",
-            value: true,
+            value: settings["cal-hand-update"],
         },
         {
             type: "button",
             title: "恢复默认配置",
             description: "遇到问题先恢复默认配置",
             key: "cal-reset",
-            value: "error",
+            value: settings["cal-reset"],
             button: {
                 label: "恢复",
                 callback: () => {
@@ -153,21 +143,17 @@
 
     const onChanged = ({ detail }: CustomEvent<ChangeEvent>) => {
         console.log(detail.key, detail.value);
-        const setting = settings.get(detail.key);
-        if (setting) {
-            setting.value = detail.value;
+        const setting = settings[detail.key];
+        if (setting !== undefined) {
+            settings[detail.key] = detail.value;
             saveSettings();
         }
         console.log(detail.key, detail.value);
     };
 
     async function saveSettings() {
-        let data = {};
-        for (let [key, item] of settings) {
-            data[key] = item.value;
-        }
-        await plugin.saveData(myfile, data);
-        console.debug("Settings saved:", data);
+        await plugin.saveData(myfile, settings);
+        console.debug("Settings saved:", settings);
     }
 
     onMount(async () => {
@@ -179,22 +165,24 @@
         let data = await plugin.loadData(myfile);
         console.debug("Load config:", data);
         if (data) {
-            for (let [key, item] of settings) {
-                item.value = data?.[key] ?? item.value;
-            }
-            group1Items = group1Items.map((item) => ({
-                ...item,
-                value: settings.get(item.key)?.value || item.value,
-            }));
-            group2Items = group2Items.map((item) => ({
-                ...item,
-                value: settings.get(item.key)?.value || item.value,
-            }));
+            settings = { ...settings, ...data };
+            updateGroupItems();
+            await saveSettings()
         } else {
-            saveSettings();
+            await saveSettings();
             console.debug("初始化配置文件");
         }
-        return data;
+    }
+
+    function updateGroupItems() {
+        group1Items = group1Items.map((item) => ({
+            ...item,
+            value: settings[item.key] ?? item.value,
+        }));
+        group2Items = group2Items.map((item) => ({
+            ...item,
+            value: settings[item.key] ?? item.value,
+        }));
     }
 </script>
 
