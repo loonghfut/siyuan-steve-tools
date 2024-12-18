@@ -44,6 +44,7 @@ export default class steveTools extends Plugin {
             this.loadModule(M_calendar);
             console.log("日历模块加载");
         }
+
     }
 
     // private isMobile: boolean;
