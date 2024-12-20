@@ -1,5 +1,6 @@
 <script lang="ts">
     import { M_calendar } from "./calendar/module-calendar";
+    import { M_sync } from "./sync/module-sync";
     import { showMessage } from "siyuan";
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
@@ -19,7 +20,7 @@
         setdialog.destroy();
     }
 
-    let groups: string[] = ["日程分享", "✨开发中。。"];
+    let groups: string[] = ["日程分享", "docker同步感知", "✨开发中。。"];
     let focusGroup = groups[0];
 
     let group1Items: ISettingItem[] = [
@@ -52,8 +53,9 @@
         },
         {
             type: "checkbox",
-            title: "自动更新日程",
-            description: "启用后每10分钟更新一次（需保证前端运行），且每次编辑日程数据后自动更新",
+            title: "自动更新日程(注意：开启后不要批量添加块到数据库)",
+            description:
+                "启用后每10分钟更新一次（需保证前端运行），且每次编辑日程数据后自动更新(注意：不要批量添加块到数据库)",
             key: "cal-auto-update",
             value: settings["cal-auto-update"],
         },
@@ -120,6 +122,43 @@
 
     let group2Items: ISettingItem[] = [
         {
+            type: "checkbox",
+            title: "启用docker同步感知",
+            description: "启用docker同步感知(刷新后生效)",
+            key: "sync-enable",
+            value: settings["sync-enable"],
+        },
+        {
+            type: "textinput",
+            title: "docker思源服务地址",
+            description: "docker思源服务地址，如http://localhost:6806（后面不要加/）",
+            key: "sync-url",
+            value: settings["sync-url"],
+        },
+        {
+            type: "textinput",
+            title: "docker思源服务token",
+            description: "docker思源服务token",
+            key: "sync-token",
+            value: settings["sync-token"],
+        },
+        {
+            type: "button",
+            title: "测试连接",
+            description: "测试docker思源服务连接",
+            key: "sync-test",
+            value: settings["sync-test"],
+            button: {
+                label: "测试",
+                callback: () => {
+                    M_sync.prototype.testSync();
+                },
+            },
+        }
+    ];
+
+    let group3Items: ISettingItem[] = [
+        {
             type: "button",
             title: "button",
             description: "This is a button",
@@ -167,7 +206,7 @@
         if (data) {
             settings = { ...settings, ...data };
             updateGroupItems();
-            await saveSettings()
+            await saveSettings();
         } else {
             await saveSettings();
             console.debug("初始化配置文件");
@@ -221,6 +260,15 @@
             group={groups[1]}
             settingItems={group2Items}
             display={focusGroup === groups[1]}
+            on:changed={onChanged}
+            on:click={({ detail }) => {
+                console.debug("Click:", detail.key);
+            }}
+        ></SettingPanel>
+        <SettingPanel
+            group={groups[2]}
+            settingItems={group3Items}
+            display={focusGroup === groups[2]}
             on:changed={onChanged}
             on:click={({ detail }) => {
                 console.debug("Click:", detail.key);

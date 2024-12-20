@@ -316,9 +316,9 @@ export async function renderAttributeView(avid: BlockId) {
 }
 
 
-    
-    // const blockIDs = res.data.view.rows.map(item => item.id);
-    
+
+// const blockIDs = res.data.view.rows.map(item => item.id);
+
 
 
 // **************************************** SQL ****************************************
@@ -521,4 +521,58 @@ export async function refresh() {
             // 'Authorization': `token ${token}`
         }
     });
+}
+
+export async function sync() {
+    await fetch(`/api/sync/performSync`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            // 'Authorization': `token ${token}`
+        },
+        body: JSON.stringify({
+        })
+    });
+}
+
+export async function URLsync(myurl: string, token: string) {
+    const response = await fetch(`${myurl}/api/sync/performSync`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${token}`
+        },
+        body: JSON.stringify({
+        })
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.code === 0) {
+        return true;
+    }
+    return false;
+}
+
+export async function testSync(myurl: string, token: string) {
+    const response = await fetch(`${myurl}/api/notebook/lsNotebooks`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `token ${token}`
+        },
+        body: JSON.stringify({
+        })
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.code === 0) {
+        return true;
+    }
+    return false;
 }

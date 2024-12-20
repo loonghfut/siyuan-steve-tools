@@ -23,12 +23,13 @@ import "@/index.scss";
 // import { ModuleA } from "./libs/moduleA";
 import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";
+import { M_sync } from "./sync/module-sync";
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";
 
 
 
-let islog = false;
+let islog = true;
 const myfile = "steveTools.json";
 let settingdata: any = {};
 let setdialog: any;
@@ -43,6 +44,10 @@ export default class steveTools extends Plugin {
         if (data["cal-enable"] == true) {
             this.loadModule(M_calendar);
             console.log("日历模块加载");
+        }
+        if (data["sync-enable"] == true) {
+            this.loadModule(M_sync);
+            console.log("同步模块加载");
         }
 
     }
