@@ -154,7 +154,19 @@
                     M_sync.prototype.testSync();
                 },
             },
-        }
+        },        {
+            type: "button",
+            title: "刷新",
+            description: "若部分设置未生效请刷新思源笔记",
+            key: "reset",
+            value: "error",
+            button: {
+                label: "刷新",
+                callback: () => {
+                    myapi.refresh();
+                },
+            },
+        },
     ];
 
     let group3Items: ISettingItem[] = [

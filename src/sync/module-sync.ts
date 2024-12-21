@@ -27,15 +27,20 @@ export class M_sync {
                 if (msg.msg && msg.msg.startsWith('上传')) {
                     console.log("同步结束");
                     //延时1s再同步
-                    setTimeout(async () => {
-                        const state = await api.URLsync(url, token);
-                        // console.log("state: ", state);
-                        if (state) {
-                            console.log("docker感知成功");
-                        } else {
-                            showMessage("docker同步感知失败");
-                        }
-                    }, 1000);
+                    const currentHost = window.location.host;
+                    if (url.includes(currentHost)) {
+                        console.log("取消感知");
+                    } else {
+                        setTimeout(async () => {
+                            const state = await api.URLsync(url, token);
+                            // console.log("state: ", state);
+                            if (state) {
+                                console.log("docker感知成功");//TODO：后面改为图标交互
+                            } else {
+                                showMessage("docker同步感知失败");
+                            }
+                        }, 1000);
+                    }
 
                 }
 

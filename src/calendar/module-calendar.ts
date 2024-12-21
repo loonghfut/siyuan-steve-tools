@@ -50,7 +50,7 @@ export class M_calendar {
             siyuan.ws.ws.addEventListener('message', async (e) => {
                 const msg = JSON.parse(e.data);
                 if (msg.cmd === "transactions") {
-                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {
+                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃
                         // console.log("更新了一个属性视图");
                         const avids = await this.getAVreferenceid();
                         console.log(avids);
