@@ -12,6 +12,9 @@ export const defaultSettings = {
     "sync-enable": false,
     "sync-url": "http://localhost:8080",
     "sync-token": "token",
+    // ai模块
+    "ai-enable": false,
+    "ai-url": "https://www.doubao.com/chat/",
 };
 
 export function getSettings() {

@@ -6,6 +6,8 @@ STEVETOOLS
 用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历等。
 2. docker同步感知：  
 win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
+3. ai网页侧边栏：
+嵌入了一些ai的网页，方便使用。
 
 具体使用方法请到插件设置页查看
 

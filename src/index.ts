@@ -24,6 +24,7 @@ import "@/index.scss";
 import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";
 import { M_sync } from "./sync/module-sync";
+import { M_ai  } from "./ai/ai";
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";
 
@@ -49,6 +50,11 @@ export default class steveTools extends Plugin {
             this.loadModule(M_sync);
             console.log("同步模块加载");
         }
+        if (data["ai-enable"] == true) {
+            this.loadModule(M_ai);
+            console.log("ai模块加载");
+        //    initdock();
+        }
 
     }
 
@@ -71,20 +77,21 @@ export default class steveTools extends Plugin {
         });
         settingdata = await this.loadData(myfile);
         this.runloadModule(settingdata);
+        for (const module of this.modules) {
+            await module.init(settingdata);
+        }
 
     }
 
     async onLayoutReady() {
 
 
-        for (const module of this.modules) {
-            await module.init(settingdata);
-        }
+
     }
 
     async onunload() {
         // 卸载模块
-        this.modules.forEach(module => module.onunload());
+        // this.modules.forEach(module => module.onunload());
     }
 
     openDIYSetting() {

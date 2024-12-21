@@ -20,7 +20,12 @@
         setdialog.destroy();
     }
 
-    let groups: string[] = ["日程分享", "docker同步感知", "✨开发中。。"];
+    let groups: string[] = [
+        "日程分享",
+        "docker同步感知",
+        "ai侧边栏",
+        "✨开发中。。",
+    ];
     let focusGroup = groups[0];
 
     let group1Items: ISettingItem[] = [
@@ -131,7 +136,8 @@
         {
             type: "textinput",
             title: "docker思源服务地址",
-            description: "docker思源服务地址，如http://localhost:6806（后面不要加/）",
+            description:
+                "docker思源服务地址，如http://localhost:6806（后面不要加/）",
             key: "sync-url",
             value: settings["sync-url"],
         },
@@ -154,7 +160,8 @@
                     M_sync.prototype.testSync();
                 },
             },
-        },        {
+        },
+        {
             type: "button",
             title: "刷新",
             description: "若部分设置未生效请刷新思源笔记",
@@ -170,6 +177,41 @@
     ];
 
     let group3Items: ISettingItem[] = [
+        {
+            type: "checkbox",
+            title: "启用ai网页侧边栏",
+            description: "启用ai网页侧边栏",
+            key: "ai-enable",
+            value: settings["ai-enable"],
+        },
+        {
+            type: "select",
+            title: "ai网页地址",
+            description: "选择ai网页地址",
+            key: "ai-url",
+            value: settings["ai-url-type"],
+            options: {
+                "https://www.doubao.com/chat/": "豆包AI",
+                "https://kimi.moonshot.cn/": "kimi",
+                "https://metaso.cn/": "密塔",
+            },
+        },
+        {
+            type: "button",
+            title: "刷新",
+            description: "若部分设置未生效请刷新思源笔记",
+            key: "reset",
+            value: "error",
+            button: {
+                label: "刷新",
+                callback: () => {
+                    myapi.refresh();
+                },
+            },
+        },
+    ];
+
+    let group4Items: ISettingItem[] = [
         {
             type: "button",
             title: "button",
@@ -225,12 +267,16 @@
         }
     }
 
-    function updateGroupItems() {
+    function updateGroupItems() {//更新配置文件
         group1Items = group1Items.map((item) => ({
             ...item,
             value: settings[item.key] ?? item.value,
         }));
         group2Items = group2Items.map((item) => ({
+            ...item,
+            value: settings[item.key] ?? item.value,
+        }));
+        group3Items = group3Items.map((item) => ({
             ...item,
             value: settings[item.key] ?? item.value,
         }));
@@ -281,6 +327,15 @@
             group={groups[2]}
             settingItems={group3Items}
             display={focusGroup === groups[2]}
+            on:changed={onChanged}
+            on:click={({ detail }) => {
+                console.debug("Click:", detail.key);
+            }}
+        ></SettingPanel>
+        <SettingPanel
+            group={groups[3]}
+            settingItems={group4Items}
+            display={focusGroup === groups[3]}
             on:changed={onChanged}
             on:click={({ detail }) => {
                 console.debug("Click:", detail.key);
