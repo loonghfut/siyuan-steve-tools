@@ -1,13 +1,14 @@
 import steveTools from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
-import { showMessage } from "siyuan";
+import { showMessage, openTab } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
+export let linkToCalendar = '';
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
@@ -18,6 +19,7 @@ export class M_calendar {
         this.plugin = plugin;
     }
     private isUpdating: boolean = false;
+
     async init(settingdata) {
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
@@ -29,6 +31,10 @@ export class M_calendar {
     </symbol>  
         `);
         this.checkAndCreateEventsFile(eventsPath);
+
+        const currentHost = window.location.host;
+        linkToCalendar =  calendarpath2;
+
         // console.log(this_settingdata["cal-hand-update"]);
         if (this_settingdata["cal-hand-update"] == true) {
             this.plugin.addTopBar({
@@ -43,6 +49,14 @@ export class M_calendar {
                 }
             });
         }
+        this.plugin.addTopBar({
+            icon: "iconCalendar",
+            title: "日程视图",
+            position: "left",
+            callback: async () => {
+                await this.openRiChengView();
+            }
+        });
 
         if (this_settingdata["cal-auto-update"] == true) {
             console.log("自动更新日历文件");
@@ -82,6 +96,33 @@ export class M_calendar {
         }
     }
 
+    async openRiChengView() {
+        const tab = await openTab({
+            app: this.plugin.app,
+            custom: {
+                icon: "iconSTcal",
+                title: `日程视图`,
+                data: {
+                    text: "This is my custom tab",
+                },
+                id: this.plugin.name + 'alist'
+            },
+            // position: "right",
+            keepCursor: false
+        });
+        console.log(tab.panelElement);
+        tab.panelElement.innerHTML = `
+            <div style="width: 100%; height: 100%; transform: scale(0.95); transform-origin: 0 0;">
+                <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?fileUrl=../../../../${linkToCalendar}" 
+                        width="105%" height="105.59999%" 
+                        frameborder="0">
+                </iframe>
+            </div>`;
+
+    }
+
+
+
     onunload() {
         console.log("M_calendar unloaded");
     }
@@ -90,6 +131,7 @@ export class M_calendar {
         // console.log(this_settingdata["cal-enable"]);
         if (this_settingdata["cal-enable"] == true) {
             const currentHost = window.location.host;
+            // linkToCalendar = currentHost + "/" + calendarpath2;
             showMessage("日历订阅链接：" + currentHost + "/" + calendarpath2, 0, "info");
             return
         }

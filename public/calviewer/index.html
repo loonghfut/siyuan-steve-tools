@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8' />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="keywords" content="Kalender, Calendar, ics, viewer">
+  <meta name="author" content="Sebastian Espei">
+  <meta name="robots" content="index, follow">
+
+  <!-- Primary Meta Tags -->
+  <title>ICS-Viewer</title>
+  <meta name="title" content="ICS-Viewer">
+  <meta name="description" content="View the contents of the ics file in the browser">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://viewer.ics.tools">
+  <meta property="og:title" content="ICS-Viewer">
+  <meta property="og:description" content="View the contents of the ics file in the browser">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://viewer.ics.tools">
+  <meta property="twitter:title" content="ICS-Viewer">
+  <meta property="twitter:description" content="View the contents of the ics file in the browser">
+
+
+</head>
+
+<body>
+  <!-- <div class="container-md mb-3">
+    <input class="form-control" type="file" id="fileInput" accept=".ics" multiple>
+  </div> -->
+
+  <div class="d-flex justify-content-center">
+    <div class="spinner-border mb-3 collapse" role="status" id="spinner" style="width: 4rem; height: 4rem;">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <h1 class="mb-3 text-danger collapse" role="status" id="errorText">Error loading files!</h1>
+  </div>
+
+  <div class="text-center container-md mb-3" id="fileList"></div>
+  <div id='calendar' class="mb-3"></div>
+
+<script src="index.js"></script></body>
+
+</html>
