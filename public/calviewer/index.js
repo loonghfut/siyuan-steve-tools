@@ -75,7 +75,7 @@ __webpack_require__.r(__webpack_exports__);
 
 var ___CSS_LOADER_EXPORT___ = _node_modules_css_loader_dist_runtime_api_js__WEBPACK_IMPORTED_MODULE_0___default()(true);
 // Module
-___CSS_LOADER_EXPORT___.push([module.id, "body.dark-mode {\r\n  background-color: #121212;\r\n  color: #ffffff;\r\n}\r\n\r\n.dark-mode .fc {\r\n  background-color: #121212;\r\n  color: #ffffff;\r\n}\r\n\r\n/* 其他需要适配黑暗模式的样式 */\r\nbody {\r\n  margin: 40px 0px 0px;\r\n  padding: 0;\r\n  font-family: Arial, Helvetica Neue, Helvetica, sans-serif;\r\n  font-size: 14px;\r\n}\r\n\r\n#calendar {\r\n  max-width: 1000px;\r\n  margin: 0 auto;\r\n}", "",{"version":3,"sources":["webpack://src/index.css"],"names":[],"mappings":"AAAA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA,kBAAkB;AAClB;EACE,oBAAoB;EACpB,UAAU;EACV,yDAAyD;EACzD,eAAe;AACjB;;AAEA;EACE,iBAAiB;EACjB,cAAc;AAChB","sourcesContent":["body.dark-mode {\r\n  background-color: #121212;\r\n  color: #ffffff;\r\n}\r\n\r\n.dark-mode .fc {\r\n  background-color: #121212;\r\n  color: #ffffff;\r\n}\r\n\r\n/* 其他需要适配黑暗模式的样式 */\r\nbody {\r\n  margin: 40px 0px 0px;\r\n  padding: 0;\r\n  font-family: Arial, Helvetica Neue, Helvetica, sans-serif;\r\n  font-size: 14px;\r\n}\r\n\r\n#calendar {\r\n  max-width: 1000px;\r\n  margin: 0 auto;\r\n}"],"sourceRoot":""}]);
+___CSS_LOADER_EXPORT___.push([module.id, "body.dark-mode {\r\n  background-color: #1e1e1e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc {\r\n  background-color: #1e1e1e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-toolbar {\r\n  background-color: #2e2e2e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-daygrid-day {\r\n  background-color: #2e2e2e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-daygrid-day:hover {\r\n  background-color: #3e3e3e;\r\n}\r\n\r\n.dark-mode .fc-event {\r\n  background-color: #3a3a3a;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-event:hover {\r\n  background-color: #4a4a4a;\r\n}\r\n\r\n/* 针对 list 视图的样式 */\r\n.dark-mode .fc-list {\r\n  background-color: #1e1e1e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-list-item {\r\n  background-color: #2e2e2e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-list-item:hover {\r\n  background-color: #3e3e3e;\r\n}\r\n\r\n.dark-mode .fc-list-item-title {\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-list-item-time {\r\n  color: #cfcfcf;\r\n}\r\n.dark-mode .fc-theme-bootstrap5-shaded {\r\n  background-color: #000000;\r\n}\r\n.dark-mode .fc-list-event a:hover {\r\n  color: #ffffff; /* 设置文字颜色 */\r\n  /* 背景改为黑色 */\r\n  \r\n  text-decoration: underline; /* 设置下划线 */\r\n}\r\n\r\n.fc .fc-list-event:hover td {\r\n  background-color: #2d2d2d;\r\n}\r\n/* 适配深色模式的 .popover 样式 */\r\n.dark-mode .popover {\r\n  background-color: #333333; /* 设置背景颜色 */\r\n  color: #ffffff; /* 设置文字颜色 */\r\n  border-color: #444444; /* 设置边框颜色 */\r\n}\r\n\r\n.dark-mode .popover .popover-header {\r\n  background-color: #444444; /* 设置标题背景颜色 */\r\n  color: #ffffff; /* 设置标题文字颜色 */\r\n}\r\n\r\n.dark-mode .popover .popover-body {\r\n  background-color: #333333; /* 设置主体背景颜色 */\r\n  color: #ffffff; /* 设置主体文字颜色 */\r\n}\r\n\r\n\r\n\r\n/* 其他需要适配黑暗模式的样式 */\r\n/* 隐藏滚动条 */\r\nbody {\r\n  margin: 40px 0px 0px;\r\n  padding: 0;\r\n  font-family: Arial, Helvetica Neue, Helvetica, sans-serif;\r\n  font-size: 14px;\r\n  overflow: hidden; /* 隐藏滚动条 */\r\n}\r\n\r\n#calendar {\r\n  max-width: 1000px;\r\n  margin: 0 auto;\r\n  height: calc(100vh - 80px); /* 调整高度以适应页面 */\r\n  overflow: hidden; /* 隐藏滚动条 */\r\n}\r\n\r\n/* 适配深色模式的 .fc-multimonth-singlecol 样式 */\r\n.dark-mode .fc-multimonth-singlecol {\r\n  background-color: #1e1e1e; /* 设置背景颜色 */\r\n  color: #cfcfcf; /* 设置文字颜色 */\r\n  border-color: #444444; /* 设置边框颜色 */\r\n}\r\n\r\n.dark-mode .fc-multimonth-singlecol .fc-day {\r\n  background-color: #2e2e2e; /* 设置单个日期单元格的背景颜色 */\r\n  color: #cfcfcf; /* 设置单个日期单元格的文字颜色 */\r\n}\r\n\r\n.dark-mode .fc-multimonth-singlecol .fc-day:hover {\r\n  background-color: #3e3e3e; /* 设置单个日期单元格在鼠标悬停时的背景颜色 */\r\n  color: #ffffff; /* 设置单个日期单元格在鼠标悬停时的文字颜色 */\r\n}\r\n.dark-mode .fc-multimonth-title {\r\n  background-color: #1e1e1e; /* 设置背景颜色 */\r\n  color: #cfcfcf; /* 设置文字颜色 */\r\n  border-color: #444444; /* 设置边框颜色 */\r\n}", "",{"version":3,"sources":["webpack://src/index.css"],"names":[],"mappings":"AAAA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;AAC3B;;AAEA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;AAC3B;;AAEA,kBAAkB;AAClB;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;EACzB,cAAc;AAChB;;AAEA;EACE,yBAAyB;AAC3B;;AAEA;EACE,cAAc;AAChB;;AAEA;EACE,cAAc;AAChB;AACA;EACE,yBAAyB;AAC3B;AACA;EACE,cAAc,EAAE,WAAW;EAC3B,WAAW;;EAEX,0BAA0B,EAAE,UAAU;AACxC;;AAEA;EACE,yBAAyB;AAC3B;AACA,wBAAwB;AACxB;EACE,yBAAyB,EAAE,WAAW;EACtC,cAAc,EAAE,WAAW;EAC3B,qBAAqB,EAAE,WAAW;AACpC;;AAEA;EACE,yBAAyB,EAAE,aAAa;EACxC,cAAc,EAAE,aAAa;AAC/B;;AAEA;EACE,yBAAyB,EAAE,aAAa;EACxC,cAAc,EAAE,aAAa;AAC/B;;;;AAIA,kBAAkB;AAClB,UAAU;AACV;EACE,oBAAoB;EACpB,UAAU;EACV,yDAAyD;EACzD,eAAe;EACf,gBAAgB,EAAE,UAAU;AAC9B;;AAEA;EACE,iBAAiB;EACjB,cAAc;EACd,0BAA0B,EAAE,cAAc;EAC1C,gBAAgB,EAAE,UAAU;AAC9B;;AAEA,wCAAwC;AACxC;EACE,yBAAyB,EAAE,WAAW;EACtC,cAAc,EAAE,WAAW;EAC3B,qBAAqB,EAAE,WAAW;AACpC;;AAEA;EACE,yBAAyB,EAAE,mBAAmB;EAC9C,cAAc,EAAE,mBAAmB;AACrC;;AAEA;EACE,yBAAyB,EAAE,yBAAyB;EACpD,cAAc,EAAE,yBAAyB;AAC3C;AACA;EACE,yBAAyB,EAAE,WAAW;EACtC,cAAc,EAAE,WAAW;EAC3B,qBAAqB,EAAE,WAAW;AACpC","sourcesContent":["body.dark-mode {\r\n  background-color: #1e1e1e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc {\r\n  background-color: #1e1e1e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-toolbar {\r\n  background-color: #2e2e2e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-daygrid-day {\r\n  background-color: #2e2e2e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-daygrid-day:hover {\r\n  background-color: #3e3e3e;\r\n}\r\n\r\n.dark-mode .fc-event {\r\n  background-color: #3a3a3a;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-event:hover {\r\n  background-color: #4a4a4a;\r\n}\r\n\r\n/* 针对 list 视图的样式 */\r\n.dark-mode .fc-list {\r\n  background-color: #1e1e1e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-list-item {\r\n  background-color: #2e2e2e;\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-list-item:hover {\r\n  background-color: #3e3e3e;\r\n}\r\n\r\n.dark-mode .fc-list-item-title {\r\n  color: #cfcfcf;\r\n}\r\n\r\n.dark-mode .fc-list-item-time {\r\n  color: #cfcfcf;\r\n}\r\n.dark-mode .fc-theme-bootstrap5-shaded {\r\n  background-color: #000000;\r\n}\r\n.dark-mode .fc-list-event a:hover {\r\n  color: #ffffff; /* 设置文字颜色 */\r\n  /* 背景改为黑色 */\r\n  \r\n  text-decoration: underline; /* 设置下划线 */\r\n}\r\n\r\n.fc .fc-list-event:hover td {\r\n  background-color: #2d2d2d;\r\n}\r\n/* 适配深色模式的 .popover 样式 */\r\n.dark-mode .popover {\r\n  background-color: #333333; /* 设置背景颜色 */\r\n  color: #ffffff; /* 设置文字颜色 */\r\n  border-color: #444444; /* 设置边框颜色 */\r\n}\r\n\r\n.dark-mode .popover .popover-header {\r\n  background-color: #444444; /* 设置标题背景颜色 */\r\n  color: #ffffff; /* 设置标题文字颜色 */\r\n}\r\n\r\n.dark-mode .popover .popover-body {\r\n  background-color: #333333; /* 设置主体背景颜色 */\r\n  color: #ffffff; /* 设置主体文字颜色 */\r\n}\r\n\r\n\r\n\r\n/* 其他需要适配黑暗模式的样式 */\r\n/* 隐藏滚动条 */\r\nbody {\r\n  margin: 40px 0px 0px;\r\n  padding: 0;\r\n  font-family: Arial, Helvetica Neue, Helvetica, sans-serif;\r\n  font-size: 14px;\r\n  overflow: hidden; /* 隐藏滚动条 */\r\n}\r\n\r\n#calendar {\r\n  max-width: 1000px;\r\n  margin: 0 auto;\r\n  height: calc(100vh - 80px); /* 调整高度以适应页面 */\r\n  overflow: hidden; /* 隐藏滚动条 */\r\n}\r\n\r\n/* 适配深色模式的 .fc-multimonth-singlecol 样式 */\r\n.dark-mode .fc-multimonth-singlecol {\r\n  background-color: #1e1e1e; /* 设置背景颜色 */\r\n  color: #cfcfcf; /* 设置文字颜色 */\r\n  border-color: #444444; /* 设置边框颜色 */\r\n}\r\n\r\n.dark-mode .fc-multimonth-singlecol .fc-day {\r\n  background-color: #2e2e2e; /* 设置单个日期单元格的背景颜色 */\r\n  color: #cfcfcf; /* 设置单个日期单元格的文字颜色 */\r\n}\r\n\r\n.dark-mode .fc-multimonth-singlecol .fc-day:hover {\r\n  background-color: #3e3e3e; /* 设置单个日期单元格在鼠标悬停时的背景颜色 */\r\n  color: #ffffff; /* 设置单个日期单元格在鼠标悬停时的文字颜色 */\r\n}\r\n.dark-mode .fc-multimonth-title {\r\n  background-color: #1e1e1e; /* 设置背景颜色 */\r\n  color: #cfcfcf; /* 设置文字颜色 */\r\n  border-color: #444444; /* 设置边框颜色 */\r\n}"],"sourceRoot":""}]);
 // Exports
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (___CSS_LOADER_EXPORT___);
 
@@ -20192,6 +20192,47 @@ class CustomRenderingStore extends Store {
 
 /***/ }),
 
+/***/ "./node_modules/@fullcalendar/core/locales/zh-cn.js":
+/*!**********************************************************!*\
+  !*** ./node_modules/@fullcalendar/core/locales/zh-cn.js ***!
+  \**********************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ l77)
+/* harmony export */ });
+var l77 = {
+    code: 'zh-cn',
+    week: {
+        // GB/T 7408-1994《数据元和交换格式·信息交换·日期和时间表示法》与ISO 8601:1988等效
+        dow: 1,
+        doy: 4, // The week that contains Jan 4th is the first week of the year.
+    },
+    buttonText: {
+        prev: '上月',
+        next: '下月',
+        today: '今天',
+        year: '年',
+        month: '月',
+        week: '周',
+        day: '日',
+        list: '日程',
+    },
+    weekText: '周',
+    allDayText: '全天',
+    moreLinkText(n) {
+        return '另外 ' + n + ' 个';
+    },
+    noEventsText: '没有事件显示',
+};
+
+
+
+
+/***/ }),
+
 /***/ "./node_modules/@fullcalendar/daygrid/index.js":
 /*!*****************************************************!*\
   !*** ./node_modules/@fullcalendar/daygrid/index.js ***!
@@ -25511,10 +25552,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _fullcalendar_multimonth__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @fullcalendar/multimonth */ "./node_modules/@fullcalendar/multimonth/index.js");
 /* harmony import */ var _fullcalendar_bootstrap5__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! @fullcalendar/bootstrap5 */ "./node_modules/@fullcalendar/bootstrap5/index.js");
 /* harmony import */ var _fullcalendar_icalendar__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! @fullcalendar/icalendar */ "./node_modules/@fullcalendar/icalendar/index.js");
+/* harmony import */ var _fullcalendar_core_locales_zh_cn__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! @fullcalendar/core/locales/zh-cn */ "./node_modules/@fullcalendar/core/locales/zh-cn.js");
 /* harmony import */ var bootstrap_dist_css_bootstrap_css__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! bootstrap/dist/css/bootstrap.css */ "./node_modules/bootstrap/dist/css/bootstrap.css");
 /* harmony import */ var bootstrap_icons_font_bootstrap_icons_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! bootstrap-icons/font/bootstrap-icons.css */ "./node_modules/bootstrap-icons/font/bootstrap-icons.css");
 /* harmony import */ var _index_css__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./index.css */ "./src/index.css");
 var _a;
+
 
 
 
@@ -25619,14 +25662,33 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     calendar = new _fullcalendar_core__WEBPACK_IMPORTED_MODULE_3__.Calendar(calendarEl, {
         plugins: [_fullcalendar_interaction__WEBPACK_IMPORTED_MODULE_4__["default"], _fullcalendar_daygrid__WEBPACK_IMPORTED_MODULE_5__["default"], _fullcalendar_timegrid__WEBPACK_IMPORTED_MODULE_6__["default"], _fullcalendar_list__WEBPACK_IMPORTED_MODULE_7__["default"], _fullcalendar_multimonth__WEBPACK_IMPORTED_MODULE_8__["default"], _fullcalendar_bootstrap5__WEBPACK_IMPORTED_MODULE_9__["default"], _fullcalendar_icalendar__WEBPACK_IMPORTED_MODULE_10__["default"]],
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,listMonth'
-        },
         themeSystem: 'bootstrap5',
         navLinks: true,
         dayMaxEvents: true,
+        height: 'parent',
+        locale: _fullcalendar_core_locales_zh_cn__WEBPACK_IMPORTED_MODULE_11__["default"],
+        // 添加暗色主题支持
+        // 添加暗色主题支持
+        bootstrapFontAwesome: {
+            close: 'fa-times',
+            prev: 'fa-chevron-left',
+            next: 'fa-chevron-right',
+            prevYear: 'fa-angle-double-left',
+            nextYear: 'fa-angle-double-right'
+        },
+        customButtons: {
+            darkMode: {
+                text: 'Dark Mode',
+                click: function () {
+                    document.body.classList.toggle('dark-mode');
+                }
+            }
+        },
+        headerToolbar: {
+            left: 'prev,next today darkMode',
+            center: 'title',
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+        }
     });
     calendar.render();
 });

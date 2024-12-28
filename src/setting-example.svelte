@@ -58,7 +58,7 @@
         },
         {
             type: "checkbox",
-            title: "自动更新日程(注意：开启后不要批量添加块到数据库)",
+            title: "自动更新日程",
             description:
                 "启用后每10分钟更新一次（需保证前端运行），且每次编辑日程数据后自动更新(注意：不要批量添加块到数据库)",
             key: "cal-auto-update",
@@ -70,6 +70,13 @@
             description: "启用后在topbar右侧会出现更新按钮",
             key: "cal-hand-update",
             value: settings["cal-hand-update"],
+        },
+        {
+            type: "checkbox",
+            title: "日历视图夜间模式",
+            description: "启用日历视图夜间模式",
+            key: "cal-view-night",
+            value: settings["cal-view-night"],
         },
         {
             type: "button",
@@ -267,7 +274,8 @@
         }
     }
 
-    function updateGroupItems() {//更新配置文件
+    function updateGroupItems() {
+        //更新配置文件
         group1Items = group1Items.map((item) => ({
             ...item,
             value: settings[item.key] ?? item.value,

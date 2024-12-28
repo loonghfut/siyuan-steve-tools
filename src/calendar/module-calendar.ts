@@ -105,7 +105,7 @@ export class M_calendar {
                 data: {
                     text: "This is my custom tab",
                 },
-                id: this.plugin.name + 'alist'
+                id: this.plugin.name + 'calview',
             },
             // position: "right",
             keepCursor: false
@@ -113,7 +113,7 @@ export class M_calendar {
         console.log(tab.panelElement);
         tab.panelElement.innerHTML = `
             <div style="width: 100%; height: 100%; transform: scale(0.95); transform-origin: 0 0;">
-                <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?fileUrl=../../../../${linkToCalendar}" 
+                <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?darkMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" 
                         width="105%" height="105.59999%" 
                         frameborder="0">
                 </iframe>

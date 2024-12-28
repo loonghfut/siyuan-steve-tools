@@ -6,8 +6,10 @@ export const defaultSettings = {
     "cal-reset": "Click Button",
     "cal-auto-update": true,
     "cal-hand-update": true,
+    "cal-view-night": false,
     "cal-hand": "ces",
     "cal-ur": "calendar2.ics",
+
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

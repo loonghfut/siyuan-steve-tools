@@ -35,9 +35,12 @@
     "vite-plugin-zip-pack": "^1.0.5"
   },
   "dependencies": {
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/vue3": "^6.1.15",
     "ical": "^0.8.0",
     "ical-generator": "^8.0.1",
     "ical.js": "^2.1.0",
-    "ics": "^3.8.1"
+    "ics": "^3.8.1",
+    "vue": "3"
   }
 }
