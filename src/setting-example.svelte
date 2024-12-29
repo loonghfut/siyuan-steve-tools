@@ -1,6 +1,5 @@
 <script lang="ts">
-    import { M_calendar } from "./calendar/module-calendar";
-    import { M_sync } from "./sync/module-sync";
+    import { moduleInstances } from './index';
     import { showMessage } from "siyuan";
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
@@ -52,7 +51,7 @@
             button: {
                 label: "获取",
                 callback: () => {
-                    M_calendar.prototype.getCalUrl();
+                    moduleInstances['M_calendar'].getCalUrl();
                 },
             },
         },
@@ -60,7 +59,7 @@
             type: "checkbox",
             title: "自动更新日程",
             description:
-                "启用后每10分钟更新一次（需保证前端运行），且每次编辑日程数据后自动更新(注意：不要批量添加块到数据库)",
+                "启用后每10分钟更新一次(需保证前端运行)，且每次编辑日程数据后自动更新(插件出问题首先关闭此选项）",
             key: "cal-auto-update",
             value: settings["cal-auto-update"],
         },
@@ -164,7 +163,7 @@
             button: {
                 label: "测试",
                 callback: () => {
-                    M_sync.prototype.testSync();
+                    moduleInstances['M_sync'].testSync();
                 },
             },
         },

@@ -153,7 +153,7 @@ export class M_calendar {
 
             // 使用api.putFile上传文件
             const response = await api.putFile(filePath, false, fileBlob);
-            this.plugin.outlog(response);
+            steveTools.outlog(response);
         } catch (error) {
             console.error('上传ICS文件时出错：', error);
         }
@@ -165,7 +165,7 @@ export class M_calendar {
             const eventsJson = JSON.stringify(events);
             const fileBlob = new Blob([eventsJson], { type: 'application/json' });
             await api.putFile(filePath, false, fileBlob);
-            this.plugin.outlog('事件数据已保存到' + filePath);
+            steveTools.outlog('事件数据已保存到' + filePath);
         } catch (error) {
             console.error('保存事件数据时出错：', error);
         }
@@ -195,7 +195,7 @@ export class M_calendar {
 
             // 使用api.putFile上传ICS文件
             await api.putFile(icsFilePath, false, fileBlob);
-            this.plugin.outlog('ICS文件已生成到' + icsFilePath);
+            steveTools.outlog('ICS文件已生成到' + icsFilePath);
         } catch (error) {
             console.error('生成ICS文件时出错：', error);
         }
@@ -220,7 +220,7 @@ export class M_calendar {
             const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
             await api.putFile(jsonFilePath, false, fileBlob);
             // console.log(await fileBlob.text());
-            this.plugin.outlog('新事件已添加并保存到' + jsonFilePath);
+            steveTools.outlog('新事件已添加并保存到' + jsonFilePath);
         } catch (error) {
             console.error('添加事件时出错：', error);
         }
@@ -230,7 +230,7 @@ export class M_calendar {
     async checkAndCreateEventsFile(filePath: string) {
         try {
             const response = await api.getFile(filePath);
-            // this.plugin.outlog(response);
+            // steveTools.outlog(response);
             if (response.code === 404) {//TODO待改进判断
                 // 如果文件不存在，创建一个空的events.json文件
                 //删除其他.ics文件
@@ -238,9 +238,9 @@ export class M_calendar {
                 const eventsJson = JSON.stringify(emptyEvents);
                 const fileBlob = new Blob([eventsJson], { type: 'application/json' });
                 await api.putFile(filePath, false, fileBlob);
-                this.plugin.outlog('已创建空的 ' + filePath);
+                steveTools.outlog('已创建空的 ' + filePath);
             } else {
-                this.plugin.outlog(filePath + ' 文件已存在');
+                steveTools.outlog(filePath + ' 文件已存在');
             }
         } catch (error) {
             console.error('检查或创建 events.json 文件时出错：', error);
@@ -255,9 +255,9 @@ export class M_calendar {
         AND markdown LIKE '%NodeAttributeView%data-av-id%';`
             ;
         const res = await api.sql(sqlStr);
-        this.plugin.outlog(res);
+        steveTools.outlog(res);
         const avIds = res.map(item => extractDataAvId(item.markdown)).filter(id => id !== null);
-        this.plugin.outlog(avIds); // 输出: ['20241213113357-m9b143e', ...]
+        steveTools.outlog(avIds); // 输出: ['20241213113357-m9b143e', ...]
         return avIds;
     }
 
@@ -289,7 +289,7 @@ export class M_calendar {
                     };
                 });
                 await this.runAddEvent(result);
-                this.plugin.outlog(result);
+                steveTools.outlog(result);
 
             } else {
                 console.error(`Invalid response for avId ${avId}:`, response);
@@ -337,7 +337,7 @@ export class M_calendar {
         try {
             // 将新事件添加到全局事件数组
             allEvents.push(newEvent);
-            this.plugin.outlog('新事件已添加到全局变量');
+            steveTools.outlog('新事件已添加到全局变量');
         } catch (error) {
             console.error('添加事件到全局变量时出错：', error);
         }
@@ -350,7 +350,7 @@ export class M_calendar {
             const updatedEventsJson = JSON.stringify(allEvents);
             const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
             await api.putFile(jsonFilePath, false, fileBlob);
-            this.plugin.outlog('所有事件已保存到' + jsonFilePath);
+            steveTools.outlog('所有事件已保存到' + jsonFilePath);
         } catch (error) {
             console.error('上传事件到文件时出错：', error);
         }

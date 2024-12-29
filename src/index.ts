@@ -34,24 +34,25 @@ let islog = true;
 const myfile = "steveTools.json";
 let settingdata: any = {};
 let setdialog: any;
+export let moduleInstances: { [key: string]: any } = {};
 
 export default class steveTools extends Plugin {
-    private modules: any[];
-    private loadModule(ModuleClass: any) {
+    // private modules: any[];
+    private loadModule(ModuleClass: any, moduleName: string) {
         const moduleInstance = new ModuleClass(this);//解释：new ModuleClass(this)相当于new ModuleClass(steveTools)
-        this.modules.push(moduleInstance);
+        moduleInstances[moduleName] = moduleInstance; // 同时存储到全局对象中
     }
     private runloadModule(data: any) {
         if (data["cal-enable"] == true) {
-            this.loadModule(M_calendar);
+            this.loadModule(M_calendar, 'M_calendar');
             console.log("日历模块加载");
         }
         if (data["sync-enable"] == true) {
-            this.loadModule(M_sync);
+            this.loadModule(M_sync, 'M_sync');
             console.log("同步模块加载");
         }
         if (data["ai-enable"] == true) {
-            this.loadModule(M_ai);
+            this.loadModule(M_ai, 'M_ai');
             console.log("ai模块加载");
         //    initdock();
         }
@@ -66,7 +67,7 @@ export default class steveTools extends Plugin {
        ${ic.steveTools_icon}
     </symbol>  
         `);
-        this.modules = [];
+        
         this.addTopBar({
             icon: "iconST",
             title: "SteveTools",
@@ -77,8 +78,9 @@ export default class steveTools extends Plugin {
         });
         settingdata = await this.loadData(myfile);
         this.runloadModule(settingdata);
-        for (const module of this.modules) {
-            await module.init(settingdata);
+        for (const moduleName in moduleInstances) {
+            steveTools.outlog("init"+moduleName);
+            await moduleInstances[moduleName].init(settingdata);
         }
 
     }
@@ -117,9 +119,11 @@ export default class steveTools extends Plugin {
 
     uninstall() {
         console.log("uninstall");
-        this.modules.forEach(module => module.onunload());
+        for (const moduleName in moduleInstances) {
+            moduleInstances[moduleName].onunload();
+        }
     }
-    outlog(mag: any) {
+    static outlog(mag: any) {
         if (islog) {
             console.log(mag);
             // console.trace(); // 输出堆栈跟踪
