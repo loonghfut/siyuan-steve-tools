@@ -15,6 +15,7 @@ For specific usage instructions, please refer to the plugin settings page.
 #### Acknowledgments:  
 - [wilsons](https://ld246.com/member/wilsons): Guidance on developing the "Generate `.ics` Calendar File" feature.  
 - [Frostime](https://ld246.com/member/Frostime): Provided the plugin development template.  
+- [seanduo](https://github.com/seanduo)
 
 #### Notes:  
 - This project uses code licensed under the MIT License.  
