@@ -20,6 +20,7 @@ import {
     // fetchPost
 } from "siyuan";
 import "@/index.scss";
+import * as api from "@/api";
 // import { ModuleA } from "./libs/moduleA";
 import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";
@@ -30,7 +31,7 @@ import SettingExample from "@/setting-example.svelte";
 
 
 
-let islog = true;
+let islog = false;
 const myfile = "steveTools.json";
 let settingdata: any = {};
 let setdialog: any;
@@ -79,20 +80,21 @@ export default class steveTools extends Plugin {
         settingdata = await this.loadData(myfile);
         this.runloadModule(settingdata);
         for (const moduleName in moduleInstances) {
-            steveTools.outlog("init"+moduleName);
+            steveTools.outlog("init--"+moduleName);
             await moduleInstances[moduleName].init(settingdata);
         }
 
     }
 
     async onLayoutReady() {
-
-
-
+        for (const moduleName in moduleInstances) {
+            steveTools.outlog("onLayoutReady--"+moduleName);
+            await moduleInstances[moduleName]?.onLayoutReady?.();
+        }
     }
-
     async onunload() {
         // 卸载模块
+        api.refresh();
         // this.modules.forEach(module => module.onunload());
     }
 
@@ -120,7 +122,7 @@ export default class steveTools extends Plugin {
     uninstall() {
         console.log("uninstall");
         for (const moduleName in moduleInstances) {
-            moduleInstances[moduleName].onunload();
+            moduleInstances[moduleName]?.onunload?.();
         }
     }
     static outlog(mag: any) {

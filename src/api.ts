@@ -514,13 +514,7 @@ export async function currentTime(): Promise<number> {
 
 // **************************************** User ****************************************
 export async function refresh() {
-    await fetch(`/api/filetree/refreshFiletree`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            // 'Authorization': `token ${token}`
-        }
-    });
+    location.reload()
 }
 
 export async function sync() {

@@ -1,7 +1,7 @@
 import steveTools from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
-import { showMessage, openTab } from "siyuan";
+import { showMessage, openTab, Dialog } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
 export let calendarpath = 'data/public/stevetools/calendar.ics';
@@ -12,6 +12,7 @@ export let linkToCalendar = '';
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
+let islisten = true;
 
 export class M_calendar {
     private plugin: steveTools;
@@ -34,6 +35,9 @@ export class M_calendar {
 
         const currentHost = window.location.host;
         linkToCalendar = calendarpath2;
+        this.plugin.eventBus.on("loaded-protyle-dynamic", this.avButton.bind(this));
+        // this.plugin.eventBus.on("loaded-protyle-static", this.avButton.bind(this));
+        this.plugin.eventBus.on("switch-protyle", this.avButton.bind(this));
 
         // console.log(this_settingdata["cal-hand-update"]);
         if (this_settingdata["cal-hand-update"] == true) {
@@ -49,31 +53,38 @@ export class M_calendar {
                 }
             });
         }
-        this.plugin.addTopBar({
-            icon: "iconCalendar",
-            title: "日程视图",
-            position: "left",
-            callback: async () => {
-                await this.openRiChengView();
-                //测试
-                // 获取特定的元素
-                //测试
-            }
-        });
+        if (this_settingdata["cal-show-view"] == true) {
+            this.plugin.addTopBar({
+                icon: "iconCalendar",
+                title: "日程视图",
+                position: "left",
+                callback: async () => {
+                    await this.openRiChengView();
+                    //测试
+                    // 获取特定的元素
+                    //测试
+                }
+            });
+        }
 
         if (this_settingdata["cal-auto-update"] == true) {
             console.log("自动更新日历文件");
             //监听
             siyuan.ws.ws.addEventListener('message', async (e) => {
+                if (!islisten) {
+                    return;
+                }
                 const msg = JSON.parse(e.data);
                 if (msg.cmd === "transactions") {
-                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃
+                    // console.log(msg);
+                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃，无法稳定复现
                         // console.log("更新了一个属性视图");
                         const avids = await this.getAVreferenceid();
                         console.log(avids);
                         if (avids.includes(msg.data[0].doOperations[0].avID)) {
                             console.log("更新了日程信息");
                             //延时执行
+                            this.avButton();//数据库每次更新都会重新加载页面
                             if (!this.isUpdating) {
                                 this.isUpdating = true;
                                 setTimeout(async () => {
@@ -97,6 +108,71 @@ export class M_calendar {
                 console.log("自动更新日历文件<1>");
             }, 600000);
         }
+    }
+
+    async onLayoutReady() {
+        const targetNode = document.body;
+        const config = { childList: true, subtree: true };
+        const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
+        observer.observe(targetNode, config);
+    }
+
+    async callback(mutationsList: MutationRecord[]) {
+        for (const mutation of mutationsList) {
+            if (mutation.type === 'childList') {
+                mutation.removedNodes.forEach(async (node) => {
+                    if (node instanceof HTMLElement && node.matches('div[data-key="dialog-attr"].b3-dialog--open')) {
+                        // console.log('Dialog closed');
+                        await this.getEventsFromSiYuanDatabase();
+                        islisten = true;
+                    }
+                });
+                mutation.addedNodes.forEach(async (node) => {
+                    if (node instanceof HTMLElement && node.matches('div[data-key="dialog-attr"]')) {
+                        // console.log('Dialog opened');
+                        islisten = false;
+                    }
+                });
+            }
+        }
+    };
+
+
+    private avButton() {
+        setTimeout(() => {
+            const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
+                .filter(span => span.closest('[name="日程"]'));
+            // console.log(targetSpans, "targetSpans");
+
+            targetSpans.forEach(targetSpan => {
+                // 检查目标元素的右边是否已经存在按钮
+                if (!targetSpan.nextSibling || !(targetSpan.nextSibling instanceof HTMLElement) || !targetSpan.nextSibling.classList.contains('my-plugin-button')) {
+                    // 创建一个新的按钮元素
+                    const button = document.createElement('button');
+                    button.innerText = '日程视图';
+                    button.className = 'block__icon ariaLabel my-plugin-button'; // 确保样式统一，并添加一个标识类
+
+                    // 添加按钮点击事件
+                    button.addEventListener('click', () => {
+                        console.log('按钮被点击了');
+                        this.openRiChengViewDialog();
+                    });
+                    // 将按钮插入到目标 <span> 元素的右边
+                    targetSpan.parentNode.insertBefore(button, targetSpan.nextSibling);
+                }
+            });
+        }, 500); // 延迟 500 毫秒
+    }
+
+    openRiChengViewDialog() {
+        const dialog = new Dialog({
+            title: null,
+            content: `<iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?darkMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" width="100%" height="100%" frameborder="0"></iframe>`,
+            width: '80%',
+            height: '80%',
+            disableClose: false,
+            hideCloseIcon: true,
+        });
     }
 
     async openRiChengView() {

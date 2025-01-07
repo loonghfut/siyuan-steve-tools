@@ -9,7 +9,7 @@ export const defaultSettings = {
     "cal-view-night": false,
     "cal-hand": "ces",
     "cal-ur": "calendar2.ics",
-
+    "cal-show-view": true,
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",
