@@ -200,6 +200,8 @@
                 "https://www.doubao.com/chat/": "豆包AI",
                 "https://kimi.moonshot.cn/": "kimi",
                 "https://metaso.cn/": "密塔",
+                "https://chat.deepseek.com/": "deepseek",
+                "https://chatgpt.com/": "chatgpt"
             },
         },
         {
