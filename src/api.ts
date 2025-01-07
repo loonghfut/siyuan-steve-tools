@@ -309,7 +309,7 @@ export async function renderAttributeView(avid: BlockId) {
         id: avid, // avID,
         // viewID: '20241003141312-30yk3cr',//测试可以不用这个参数 //TODO：多视图的情况下需要
         // pageSize:9999999
-        // page:1
+        // page:2
     }
     const url = '/api/av/renderAttributeView';
     return request(url, data);

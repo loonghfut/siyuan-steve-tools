@@ -33,7 +33,7 @@ export class M_calendar {
         this.checkAndCreateEventsFile(eventsPath);
 
         const currentHost = window.location.host;
-        linkToCalendar =  calendarpath2;
+        linkToCalendar = calendarpath2;
 
         // console.log(this_settingdata["cal-hand-update"]);
         if (this_settingdata["cal-hand-update"] == true) {
@@ -55,6 +55,9 @@ export class M_calendar {
             position: "left",
             callback: async () => {
                 await this.openRiChengView();
+                //测试
+                // 获取特定的元素
+                //测试
             }
         });
 
@@ -382,3 +385,33 @@ function convertTimestampToArray(timestamp: number): [number, number, number, nu
 
 
 
+
+// const targetElement = document.querySelector('div[contenteditable="false"][data-av-id="20241213113357-m9b143e"][data-av-type="table"][data-node-id="20241003141312-30yk3cr"][data-type="NodeAttributeView"][class="av"][custom-sy-av-view="20241213113357-tuugpcw"][name="日程"]');
+// console.log(targetElement);
+// if (targetElement) {
+//     // 创建新的元素
+//     const newElement = document.createElement('span');
+//     // newElement.setAttribute('data-type', 'av-switcher');
+//     newElement.classList.add('block__icon');
+//     newElement.setAttribute('data-position', '8bottom');
+//     newElement.setAttribute('aria-label', '日历视图');
+
+//     const svgElement = document.createElement('svg');
+//     const useElement = document.createElement('use');
+//     useElement.setAttribute('xlink:href', '#iconCalendar');
+//     svgElement.appendChild(useElement);
+
+//     newElement.appendChild(svgElement);
+
+
+
+//     // 插入新的元素到目标元素中
+//     const targetSubElement = targetElement.querySelector('.fn__flex .av__views');
+//     if (targetSubElement) {
+//         targetSubElement.appendChild(newElement);
+//         // 添加点击事件处理
+//         newElement.addEventListener('click', function () {
+
+//         });
+//     }
+// }
