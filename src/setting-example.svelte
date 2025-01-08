@@ -77,13 +77,13 @@
             key: "cal-show-view",
             value: settings["cal-show-view"],
         },
-        {
-            type: "checkbox",
-            title: "日历视图夜间模式",
-            description: "启用日历视图夜间模式",
-            key: "cal-view-night",
-            value: settings["cal-view-night"],
-        },
+        // {
+        //     type: "checkbox",
+        //     title: "日历视图夜间模式",
+        //     description: "启用日历视图夜间模式",
+        //     key: "cal-view-night",
+        //     value: settings["cal-view-night"],
+        // },
         {
             type: "button",
             title: "恢复默认配置",
