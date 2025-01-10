@@ -140,7 +140,7 @@ export class M_calendar {
 
 
     private avButton() {
-        setTimeout(() => {
+        setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
                 .filter(span => span.closest('[name="日程"]'));
             // console.log(targetSpans, "targetSpans");
@@ -154,9 +154,9 @@ export class M_calendar {
                     button.className = 'block__icon ariaLabel my-plugin-button'; // 确保样式统一，并添加一个标识类
 
                     // 添加按钮点击事件
-                    button.addEventListener('click', () => {
+                    button.addEventListener('click', async () => {
                         console.log('按钮被点击了');
-                        this.openRiChengViewDialog();
+                        await this.openRiChengViewDialog();
                     });
                     // 将按钮插入到目标 <span> 元素的右边
                     targetSpan.parentNode.insertBefore(button, targetSpan.nextSibling);
@@ -165,20 +165,34 @@ export class M_calendar {
         }, 500); // 延迟 500 毫秒
     }
 
-    openRiChengViewDialog() {
+    async openRiChengViewDialog() {
+        
+        const id =  new Date().getTime().toString();
+        let calendar: any;
         const dialog = new Dialog({
             title: null,
-            content: `<iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?darkMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" width="100%" height="100%" frameborder="0"></iframe>`,
-            width: '80%',
-            height: '80%',
+            content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
+            width: '45%',
+            height: '90%',
             disableClose: false,
             hideCloseIcon: true,
+            resizeCallback: () => {
+                calendar.updateSize();
+            },
         });
+        // dialog.data = `<div id='calendar-${id}' class="mb-3"></div>`;
+        // calendar = await run(ics,id);
+        const ics = await api.getFileBlob(calendarpath);
+        setTimeout(async () => {
+            calendar = await run(ics, id);
+        }, 100);
     }
 
     async openRiChengView() {
         const ics = await api.getFileBlob(calendarpath);
         console.log(ics);
+        //时间戳
+        const id =  new Date().getTime().toString();
         const tab = await openTab({
             app: this.plugin.app,
             custom: {
@@ -194,8 +208,8 @@ export class M_calendar {
         });
         console.log(tab.panelElement);
         tab.panelElement.innerHTML = `
-  <div id='calendar' class="mb-3"></div>`;
-        await run(ics);
+  <div><div id='calendar-${id}' ></div></div>`;
+        await run(ics,id);
     }
 
 

@@ -2,65 +2,36 @@ import { Calendar } from '@fullcalendar/core';
 import interactionPlugin from '@fullcalendar/interaction';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
-
 import listPlugin from '@fullcalendar/list';
 import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 
 import ICAL from 'ical.js';
-// import 'bootstrap/dist/css/bootstrap.css';
-// import 'bootstrap-icons/font/bootstrap-icons.css'; // webpack uses file-loader to handle font files
-// import './index.css';
-
 
 let calendar: Calendar;
-let fileList: HTMLElement;
 
-
-
-
-
-// function enableSpinner() {
-//     if (spinner.classList.contains('show')) return;
-//     spinner.classList.add('show');
-// }
-
-// function disableSpinner() {
-//     if (spinner.classList.contains('show')) {
-//         spinner.classList.remove('show');
-//     }
-// }
-
-// function showLoadingError() {
-//     if (errorElement.classList.contains('show')) return;
-//     errorElement.classList.add('show');
-// }
-
-// function hideLoadingError() {
-//     if (errorElement.classList.contains('show')) errorElement.classList.remove('show');
-// }
-
-function addFile(fileName: string, backgroundColor: string, textColor: string) {
-    fileList.insertAdjacentHTML('beforeend', `<div class="rounded" style="background-color: ${backgroundColor}; color: ${textColor};">${fileName}</div>`);
-}
-
-function clearListElements() {
-    while (fileList.hasChildNodes()) {
-        fileList.removeChild(fileList.firstChild!);
-    }
-}
-
- export async function run(blob: Blob) {
-    const calendarEl = document.getElementById('calendar')!;
+export async function run(blob: Blob, id: string) {
+    const calendarEl = document.getElementById(`calendar-${id}`)!;
     calendar = new Calendar(calendarEl, {
         plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin],
         themeSystem: 'bootstrap5',
         navLinks: true,
         dayMaxEvents: true,
-        height: 'parent', // 使日历高度适应父元素
         locale: zhCnLocale, // 设置语言为中文
+        slotDuration: '01:00:00', // 设置时间槽的间隔为1小时
         // 添加暗色主题支持
-        // 添加暗色主题支持
+        views: {
+            timeGridThreeDays: {
+                type: 'timeGrid',
+                duration: { days: 3 },
+                buttonText: '3天'
+            },
+            timeGridFiveDays: {
+                type: 'timeGrid',
+                duration: { days: 5 },
+                buttonText: '5天'
+            }
+        },
         bootstrapFontAwesome: {
             close: 'fa-times',
             prev: 'fa-chevron-left',
@@ -71,39 +42,51 @@ function clearListElements() {
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridFiveDays,listMonth'
         },
-        events: function(fetchInfo, successCallback, failureCallback) {
+        events: function (fetchInfo, successCallback, failureCallback) {
             console.log('Fetching events from ICS file');
             const reader = new FileReader();
-            reader.onload = function(event) {
+            reader.onload = function (event) {
                 const icsData = event.target?.result as string;
                 const jcalData = ICAL.parse(icsData);
                 const comp = new ICAL.Component(jcalData);
                 const vevents = comp.getAllSubcomponents('vevent');
-                const events = vevents.map(vevent => {
+                const events = vevents.map((vevent, index) => {
                     const event = new ICAL.Event(vevent);
+                    const [backgroundColor, textColor] = getColors(index);
+                    const completed = vevent.getFirstPropertyValue('status') === 'COMPLETED'; // 假设 ICS 文件中的状态为 'COMPLETED' 表示已完成
                     return {
-                        title: event.summary,
+                        title: `${event.summary} ${completed ? '(已完成)' : ''}`, // 在标题中显示是否已完成
                         start: event.startDate.toJSDate(),
                         end: event.endDate.toJSDate(),
                         location: event.location,
-                        description: event.description,
+                        description: `${event.description} ${completed ? '已完成' : '未完成'}`, // 在描述中显示是否已完成
+                        backgroundColor,
+                        textColor,
+                        completed
                     };
                 });
                 successCallback(events);
             };
-            reader.onerror = function() {
+            reader.onerror = function () {
                 failureCallback(new Error('Failed to read ICS file'));
             };
-            reader.readAsText(blob); 
+            reader.readAsText(blob);
+            // 添加窗口resize事件处理
+        },
+        eventDidMount: function (info) {
+            info.el.style.backgroundColor = info.event.extendedProps.backgroundColor;
+            info.el.style.color = info.event.extendedProps.textColor;
+            if (info.event.extendedProps.completed) {
+                info.el.style.textDecoration = 'line-through'; // 已完成的事件添加删除线
+            }
         }
     });
 
     calendar.render();
+    return calendar;
 };
-
-
 
 function getColors(index: number): string[] {
     const hue = index * 137.508; // use golden angle approximation // Copied from https://stackoverflow.com/a/20129594/13231742

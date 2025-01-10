@@ -97,13 +97,9 @@ $border-color: var(--b3-border-color);
 /* 其他需要适配黑暗模式的样式 */
 /* 隐藏滚动条 */
 
-#calendar {
-    max-width: 1000px;
+[id^="calendar-"] {
     margin: 0 auto;
-    height: calc(100vh - 80px);
-    /* 调整高度以适应页面 */
-    overflow: hidden;
-    /* 隐藏滚动条 */
+    height: calc(100vh - 110px);
 }
 
 /* 适配深色模式的 .fc-multimonth-singlecol 样式 */
@@ -115,7 +111,10 @@ $border-color: var(--b3-border-color);
     border-color: $border-color;
     /* 设置边框颜色 */
 }
-
+.fc .fc-timegrid-slot {
+    border-bottom: 0px;
+    height: 3.111vh;
+}
 .fc-multimonth-singlecol .fc-day {
     background-color: $background-color;
     /* 设置单个日期单元格的背景颜色 */
