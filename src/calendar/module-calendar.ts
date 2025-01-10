@@ -4,6 +4,7 @@ import * as api from "@/api"
 import { showMessage, openTab, Dialog } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
+import{run} from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -176,6 +177,8 @@ export class M_calendar {
     }
 
     async openRiChengView() {
+        const ics = await api.getFileBlob(calendarpath);
+        console.log(ics);
         const tab = await openTab({
             app: this.plugin.app,
             custom: {
@@ -191,13 +194,8 @@ export class M_calendar {
         });
         console.log(tab.panelElement);
         tab.panelElement.innerHTML = `
-            <div style="width: 100%; height: 100%; transform: scale(0.95); transform-origin: 0 0;">
-                <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?lightMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" 
-                        width="105%" height="105.59999%" 
-                        frameborder="0">
-                </iframe>
-            </div>`;
-
+  <div id='calendar' class="mb-3"></div>`;
+        await run(ics);
     }
 
 
