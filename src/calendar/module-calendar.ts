@@ -3,6 +3,9 @@ import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage, openTab, Dialog } from "siyuan";
 import * as ic from "@/icon"
+import { createApp } from 'vue'
+import CalendarView_steve from './calendar.vue'
+
 declare const siyuan: any;
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
@@ -190,14 +193,17 @@ export class M_calendar {
             keepCursor: false
         });
         console.log(tab.panelElement);
-        tab.panelElement.innerHTML = `
-            <div style="width: 100%; height: 100%; transform: scale(0.95); transform-origin: 0 0;">
-                <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?lightMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" 
-                        width="105%" height="105.59999%" 
-                        frameborder="0">
-                </iframe>
-            </div>`;
-
+        // tab.panelElement.innerHTML = `
+        //     <div style="width: 100%; height: 100%; transform: scale(0.95); transform-origin: 0 0;">
+        //         <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?lightMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" 
+        //                 width="105%" height="105.59999%" 
+        //                 frameborder="0">
+        //         </iframe>
+        //     </div>`;
+        const mountPoint = document.createElement('div')
+        tab.panelElement.appendChild(mountPoint)
+        const app = createApp(CalendarView_steve)
+        app.mount(mountPoint)
     }
 
 

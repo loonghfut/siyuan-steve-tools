@@ -1,5 +1,6 @@
 import { resolve } from "path"
 import { defineConfig, loadEnv } from "vite"
+import vue from '@vitejs/plugin-vue'
 import { viteStaticCopy } from "vite-plugin-static-copy"
 import livereload from "rollup-plugin-livereload"
 import { svelte } from "@sveltejs/vite-plugin-svelte"
@@ -27,7 +28,7 @@ export default defineConfig({
 
     plugins: [
         svelte(),
-
+        vue(),
         vitePluginYamlI18n({
             inDir: 'public/i18n',
             outDir: `${outputDir}/i18n`
@@ -94,6 +95,7 @@ export default defineConfig({
             external: ["siyuan", "process"],
 
             output: {
+                exports: 'named',
                 entryFileNames: "[name].js",
                 assetFileNames: (assetInfo) => {
                     if (assetInfo.name === "style.css") {
