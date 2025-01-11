@@ -170,7 +170,7 @@ export class M_calendar {
         const dialog = new Dialog({
             title: null,
             content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
-            width: '70vh',
+            width: '70%',
             height: '80vh',
             disableClose: false,
             hideCloseIcon: true,
