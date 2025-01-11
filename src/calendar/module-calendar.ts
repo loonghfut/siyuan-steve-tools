@@ -7,6 +7,7 @@ import { createApp } from 'vue'
 import CalendarView_steve from './calendar.vue'
 
 declare const siyuan: any;
+import{run} from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -142,7 +143,7 @@ export class M_calendar {
 
 
     private avButton() {
-        setTimeout(() => {
+        setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
                 .filter(span => span.closest('[name="日程"]'));
             // console.log(targetSpans, "targetSpans");
@@ -156,9 +157,9 @@ export class M_calendar {
                     button.className = 'block__icon ariaLabel my-plugin-button'; // 确保样式统一，并添加一个标识类
 
                     // 添加按钮点击事件
-                    button.addEventListener('click', () => {
+                    button.addEventListener('click', async () => {
                         console.log('按钮被点击了');
-                        this.openRiChengViewDialog();
+                        await this.openRiChengViewDialog();
                     });
                     // 将按钮插入到目标 <span> 元素的右边
                     targetSpan.parentNode.insertBefore(button, targetSpan.nextSibling);
@@ -167,18 +168,35 @@ export class M_calendar {
         }, 500); // 延迟 500 毫秒
     }
 
-    openRiChengViewDialog() {
+    async openRiChengViewDialog() {
+        
+        const id =  new Date().getTime().toString();
+        let calendar: any;
         const dialog = new Dialog({
             title: null,
-            content: `<iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?darkMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" width="100%" height="100%" frameborder="0"></iframe>`,
-            width: '80%',
+            content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
+            width: '50%',
             height: '80%',
             disableClose: false,
             hideCloseIcon: true,
+            resizeCallback: () => {
+                calendar.updateSize();
+            },
         });
+        // dialog.data = `<div id='calendar-${id}' class="mb-3"></div>`;
+        // calendar = await run(ics,id);
+        const ics = await api.getFileBlob(calendarpath);
+        setTimeout(async () => {
+            calendar = await run(ics, id);
+        }, 100);
     }
 
     async openRiChengView() {
+        const ics = await api.getFileBlob(calendarpath);
+        console.log(ics);
+        //时间戳
+        const id =  new Date().getTime().toString();
+        let calendar: any;
         const tab = await openTab({
             app: this.plugin.app,
             custom: {
@@ -192,18 +210,29 @@ export class M_calendar {
             // position: "right",
             keepCursor: false
         });
-        console.log(tab.panelElement);
-        // tab.panelElement.innerHTML = `
-        //     <div style="width: 100%; height: 100%; transform: scale(0.95); transform-origin: 0 0;">
-        //         <iframe src="/plugins/siyuan-steve-tools/calviewer/index.html?lightMode=${this_settingdata["cal-view-night"]}&fileUrl=../../../../${linkToCalendar}" 
-        //                 width="105%" height="105.59999%" 
-        //                 frameborder="0">
-        //         </iframe>
-        //     </div>`;
-        const mountPoint = document.createElement('div')
-        tab.panelElement.appendChild(mountPoint)
-        const app = createApp(CalendarView_steve)
-        app.mount(mountPoint)
+        console.log(tab);
+        tab.panelElement.innerHTML = `
+  <div style="margin: 10px; padding: 10px"><div id='calendar-${id}' ></div></div>`;
+        calendar = await run(ics,id);
+        const calendarDiv = document.getElementById(`calendar-${id}`);
+        if (calendarDiv) {
+            const resizeObserver = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    const { width, height } = entry.contentRect;
+                    // console.log('Calendar container resized:', width, height);
+                    if(width==0||height==0){
+                        // resizeObserver.disconnect();
+                        console.log('ResizeObserver disconnected');
+                    }
+                    // 如果日历组件有 resize 方法，在这里调用
+                    calendar.updateSize();
+                }
+            });
+            //如果已存在resizeObserver则先断开
+            resizeObserver.disconnect();
+            resizeObserver.observe(calendarDiv);
+        }
+
     }
 
 
@@ -367,13 +396,15 @@ export class M_calendar {
             if (response && response.view) {
                 const result = response.view.rows.map(row => {
                     return {
-                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',
-                        dateContent2: row.cells[1]?.value?.date?.content2 || 0,
-                        dateContent: row.cells[1]?.value?.date?.content || 0,
-                        textContent: row.cells[2]?.value?.text?.content || 'N/A'
+                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',//标题
+                        dateContent2: row.cells[1]?.value?.date?.content2 || 0,//结束时间
+                        dateContent: row.cells[1]?.value?.date?.content || 0,//开始时间
+                        textContent: row.cells[2]?.value?.text?.content || 'N/A', //描述
+                        status: row.cells[3]?.value?.mSelect?.[0]?.content || '未完成2' //状态
                     };
                 });
                 await this.runAddEvent(result);
+                console.log("2222",result);
                 steveTools.outlog(result);
 
             } else {
@@ -400,6 +431,7 @@ export class M_calendar {
             const starttime = convertTimestampToArray(item.dateContent);
             const description = item.textContent;
             const title = item.blockContent;
+            const status = item.status === "完成" ? "CONFIRMED" : "TENTATIVE";
 
             const newEvent: EventAttributes = {
                 start: starttime,
@@ -409,7 +441,8 @@ export class M_calendar {
                 endInputType: 'local',
                 endOutputType: 'local',
                 title: title,
-                description: description
+                description: description,
+                status: status,
                 // location: 'Office'
             }
             await this.addEventToGlobal(newEvent);

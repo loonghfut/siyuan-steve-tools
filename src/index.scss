@@ -1,0 +1,205 @@
+$background-color: var(--b3-theme-background);
+$text-color: var(--b3-theme-on-background);
+$hover-background-color: var(--b3-list-hover);
+$border-color: var(--b3-border-color);
+$background-color-today: var(--b3-list-hover);
+
+.fc .fc-scrollgrid {
+    border-right-width: 1px;
+}
+
+.fc {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard {
+    border: 1px solid $border-color;
+}
+
+.fc-toolbar {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+.fc-daygrid-day {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+.fc .fc-multimonth-daygrid-table {
+    background: $background-color;
+}
+
+.fc-daygrid-day:hover {
+    background-color: $hover-background-color;
+}
+
+.fc-event {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+.fc-event:hover {
+    background-color: $hover-background-color;
+}
+
+.fc .fc-more-popover {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+/* 针对 list 视图的样式 */
+.fc-list {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+.fc-list-item {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+.fc-list-item:hover {
+    background-color: $hover-background-color;
+}
+
+.fc-list-item-title {
+    color: $text-color;
+}
+
+.fc-list-item-time {
+    color: $text-color;
+}
+
+.fc-theme-bootstrap5-shaded {
+    background-color: $background-color;
+}
+
+.fc-list-event a:hover {
+
+    text-decoration: underline;
+
+}
+
+.fc .fc-list-event:hover td {
+    background-color: $hover-background-color;
+}
+
+/* 适配深色模式的 .popover 样式 */
+.popover {
+    background-color: $background-color;
+    /* 设置背景颜色 */
+    color: $text-color;
+    /* 设置文字颜色 */
+    border-color: $border-color;
+    /* 设置边框颜色 */
+}
+
+.popover .popover-header {
+    background-color: $border-color;
+    /* 设置标题背景颜色 */
+    color: $text-color;
+    /* 设置标题文字颜色 */
+}
+
+.popover .popover-body {
+    background-color: $background-color;
+    /* 设置主体背景颜色 */
+    color: $text-color;
+    /* 设置主体文字颜色 */
+}
+
+/* 其他需要适配黑暗模式的样式 */
+/* 隐藏滚动条 */
+
+[id^="calendar-"] {
+    margin: 0 auto;
+    height: calc(100vh - 150px);
+}
+
+.fc .fc-multimonth-singlecol .fc-multimonth-daygrid-table,
+.fc .fc-multimonth-singlecol .fc-multimonth-header-table {
+    background-color: $background-color;
+    color: $text-color;
+}
+
+/* 适配深色模式的 .fc-multimonth-singlecol 样式 */
+.fc-multimonth-singlecol {
+    background-color: $background-color;
+    /* 设置背景颜色 */
+    color: $text-color;
+    /* 设置文字颜色 */
+    border-color: $border-color;
+    /* 设置边框颜色 */
+}
+
+.fc .fc-timegrid-slot {
+    border-bottom: 0px;
+    height: calc((100vh - 300px) / 24); // 减去顶部工具栏、标题等空间，平均分配给24个时间槽
+}
+
+.fc-multimonth-singlecol .fc-day {
+    background-color: $background-color;
+    /* 设置单个日期单元格的背景颜色 */
+    color: $text-color;
+    /* 设置单个日期单元格的文字颜色 */
+}
+
+.fc-multimonth-singlecol .fc-day:hover {
+    background-color: $hover-background-color;
+    /* 设置单个日期单元格在鼠标悬停时的背景颜色 */
+    color: $text-color;
+    /* 设置单个日期单元格在鼠标悬停时的文字颜色 */
+}
+
+.fc-multimonth-title {
+    background-color: $background-color;
+    /* 设置背景颜色 */
+    color: $text-color;
+    /* 设置文字颜色 */
+    border-color: $border-color;
+    /* 设置边框颜色 */
+}
+
+.fc .fc-cell-shaded,
+.fc .fc-day-disabled {
+    background: $background-color;
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+    background-color: $background-color-today;
+}
+
+
+//日程字体
+.fc-v-event {
+    .fc-event-title-container {
+        flex-grow: 1;
+        flex-shrink: 1;
+        min-height: 0;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    }
+}
+
+.fc-timegrid-event {
+    .fc-event-time {
+        //字体加大加粗
+        font-size: 1.3em;//em是相对于父元素的字体大小
+        font-weight: 600;
+    }
+
+    .fc-event-title {
+        font-size: 1.1em;
+        font-weight: 600;
+    }
+
+}
+
