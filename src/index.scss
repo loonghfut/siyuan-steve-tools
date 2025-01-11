@@ -2,9 +2,20 @@ $background-color: var(--b3-theme-background);
 $text-color: var(--b3-theme-on-background);
 $hover-background-color: var(--b3-list-hover);
 $border-color: var(--b3-border-color);
+$background-color-today: var(--b3-list-hover);
+
+.fc .fc-scrollgrid {
+    border-right-width: 1px;
+}
+
 .fc {
     background-color: $background-color;
     color: $text-color;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard {
+    border: 1px solid $border-color;
 }
 
 .fc-toolbar {
@@ -15,6 +26,10 @@ $border-color: var(--b3-border-color);
 .fc-daygrid-day {
     background-color: $background-color;
     color: $text-color;
+}
+
+.fc .fc-multimonth-daygrid-table {
+    background: $background-color;
 }
 
 .fc-daygrid-day:hover {
@@ -28,6 +43,11 @@ $border-color: var(--b3-border-color);
 
 .fc-event:hover {
     background-color: $hover-background-color;
+}
+
+.fc .fc-more-popover {
+    background-color: $background-color;
+    color: $text-color;
 }
 
 /* 针对 list 视图的样式 */
@@ -58,12 +78,9 @@ $border-color: var(--b3-border-color);
 }
 
 .fc-list-event a:hover {
-    color: $hover-background-color;
-    /* 设置文字颜色 */
-    /* 背景改为黑色 */
 
     text-decoration: underline;
-    /* 设置下划线 */
+
 }
 
 .fc .fc-list-event:hover td {
@@ -99,7 +116,13 @@ $border-color: var(--b3-border-color);
 
 [id^="calendar-"] {
     margin: 0 auto;
-    height: calc(100vh - 110px);
+    height: calc(100vh - 150px);
+}
+
+.fc .fc-multimonth-singlecol .fc-multimonth-daygrid-table,
+.fc .fc-multimonth-singlecol .fc-multimonth-header-table {
+    background-color: $background-color;
+    color: $text-color;
 }
 
 /* 适配深色模式的 .fc-multimonth-singlecol 样式 */
@@ -111,10 +134,12 @@ $border-color: var(--b3-border-color);
     border-color: $border-color;
     /* 设置边框颜色 */
 }
+
 .fc .fc-timegrid-slot {
     border-bottom: 0px;
-    height: 3.111vh;
+    height: calc((100vh - 300px) / 24); // 减去顶部工具栏、标题等空间，平均分配给24个时间槽
 }
+
 .fc-multimonth-singlecol .fc-day {
     background-color: $background-color;
     /* 设置单个日期单元格的背景颜色 */
@@ -144,5 +169,37 @@ $border-color: var(--b3-border-color);
 }
 
 .fc .fc-daygrid-day.fc-day-today {
-    background-color: $background-color;
+    background-color: $background-color-today;
 }
+
+
+//日程字体
+.fc-v-event {
+    .fc-event-title-container {
+        flex-grow: 1;
+        flex-shrink: 1;
+        min-height: 0;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+    }
+}
+
+.fc-timegrid-event {
+    .fc-event-time {
+        //字体加大加粗
+        font-size: 1.3em;//em是相对于父元素的字体大小
+        font-weight: 600;
+    }
+
+    .fc-event-title {
+        font-size: 1.1em;
+        font-weight: 600;
+    }
+
+}
+

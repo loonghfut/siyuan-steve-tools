@@ -172,8 +172,8 @@ export class M_calendar {
         const dialog = new Dialog({
             title: null,
             content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
-            width: '45%',
-            height: '90%',
+            width: '50%',
+            height: '80%',
             disableClose: false,
             hideCloseIcon: true,
             resizeCallback: () => {
@@ -193,6 +193,7 @@ export class M_calendar {
         console.log(ics);
         //时间戳
         const id =  new Date().getTime().toString();
+        let calendar: any;
         const tab = await openTab({
             app: this.plugin.app,
             custom: {
@@ -206,10 +207,29 @@ export class M_calendar {
             // position: "right",
             keepCursor: false
         });
-        console.log(tab.panelElement);
+        console.log(tab);
         tab.panelElement.innerHTML = `
-  <div><div id='calendar-${id}' ></div></div>`;
-        await run(ics,id);
+  <div style="margin: 10px; padding: 10px"><div id='calendar-${id}' ></div></div>`;
+        calendar = await run(ics,id);
+        const calendarDiv = document.getElementById(`calendar-${id}`);
+        if (calendarDiv) {
+            const resizeObserver = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    const { width, height } = entry.contentRect;
+                    // console.log('Calendar container resized:', width, height);
+                    if(width==0||height==0){
+                        // resizeObserver.disconnect();
+                        console.log('ResizeObserver disconnected');
+                    }
+                    // 如果日历组件有 resize 方法，在这里调用
+                    calendar.updateSize();
+                }
+            });
+            //如果已存在resizeObserver则先断开
+            resizeObserver.disconnect();
+            resizeObserver.observe(calendarDiv);
+        }
+
     }
 
 
@@ -373,13 +393,15 @@ export class M_calendar {
             if (response && response.view) {
                 const result = response.view.rows.map(row => {
                     return {
-                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',
-                        dateContent2: row.cells[1]?.value?.date?.content2 || 0,
-                        dateContent: row.cells[1]?.value?.date?.content || 0,
-                        textContent: row.cells[2]?.value?.text?.content || 'N/A'
+                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',//标题
+                        dateContent2: row.cells[1]?.value?.date?.content2 || 0,//结束时间
+                        dateContent: row.cells[1]?.value?.date?.content || 0,//开始时间
+                        textContent: row.cells[2]?.value?.text?.content || 'N/A', //描述
+                        status: row.cells[3]?.value?.mSelect?.[0]?.content || '未完成2' //状态
                     };
                 });
                 await this.runAddEvent(result);
+                console.log("2222",result);
                 steveTools.outlog(result);
 
             } else {
@@ -406,6 +428,7 @@ export class M_calendar {
             const starttime = convertTimestampToArray(item.dateContent);
             const description = item.textContent;
             const title = item.blockContent;
+            const status = item.status === "完成" ? "CONFIRMED" : "TENTATIVE";
 
             const newEvent: EventAttributes = {
                 start: starttime,
@@ -415,7 +438,8 @@ export class M_calendar {
                 endInputType: 'local',
                 endOutputType: 'local',
                 title: title,
-                description: description
+                description: description,
+                status: status,
                 // location: 'Office'
             }
             await this.addEventToGlobal(newEvent);

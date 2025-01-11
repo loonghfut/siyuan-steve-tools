@@ -10,11 +10,12 @@ import ICAL from 'ical.js';
 
 let calendar: Calendar;
 
-export async function run(blob: Blob, id: string) {
+export async function run(blob: Blob, id: string, initialView='dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     calendar = new Calendar(calendarEl, {
         plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin],
-        themeSystem: 'bootstrap5',
+        // themeSystem: 'bootstrap5',
+        initialView: initialView,
         navLinks: true,
         dayMaxEvents: true,
         locale: zhCnLocale, // 设置语言为中文
@@ -32,17 +33,17 @@ export async function run(blob: Blob, id: string) {
                 buttonText: '5天'
             }
         },
-        bootstrapFontAwesome: {
-            close: 'fa-times',
-            prev: 'fa-chevron-left',
-            next: 'fa-chevron-right',
-            prevYear: 'fa-angle-double-left',
-            nextYear: 'fa-angle-double-right'
-        },
+        // bootstrapFontAwesome: {
+        //     close: 'fa-times',
+        //     prev: 'fa-chevron-left',
+        //     next: 'fa-chevron-right',
+        //     prevYear: 'fa-angle-double-left',
+        //     nextYear: 'fa-angle-double-right'
+        // },
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridFiveDays,listMonth'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,timeGridThreeDays,timeGridFiveDays,listMonth'
         },
         events: function (fetchInfo, successCallback, failureCallback) {
             console.log('Fetching events from ICS file');
@@ -55,7 +56,7 @@ export async function run(blob: Blob, id: string) {
                 const events = vevents.map((vevent, index) => {
                     const event = new ICAL.Event(vevent);
                     const [backgroundColor, textColor] = getColors(index);
-                    const completed = vevent.getFirstPropertyValue('status') === 'COMPLETED'; // 假设 ICS 文件中的状态为 'COMPLETED' 表示已完成
+                    const completed = vevent.getFirstPropertyValue('status') === 'CONFIRMED'; // 假设 ICS 文件中的状态为 'COMPLETED' 表示已完成
                     return {
                         title: `${event.summary} ${completed ? '(已完成)' : ''}`, // 在标题中显示是否已完成
                         start: event.startDate.toJSDate(),
