@@ -35,12 +35,20 @@
     "vite-plugin-zip-pack": "^1.0.5"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.15",
     "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/icalendar": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/list": "^6.1.15",
+    "@fullcalendar/multimonth": "^6.1.15",
+    "@fullcalendar/timegrid": "^6.1.15",
     "@fullcalendar/vue3": "^6.1.15",
     "ical": "^0.8.0",
     "ical-generator": "^8.0.1",
     "ical.js": "^2.1.0",
     "ics": "^3.8.1",
+    "install": "^0.13.0",
+    "npm": "^11.0.0",
     "vue": "3"
   }
 }
