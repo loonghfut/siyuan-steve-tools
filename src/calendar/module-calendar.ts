@@ -4,7 +4,7 @@ import * as api from "@/api"
 import { showMessage, openTab, Dialog } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
-import{run} from "./calendar";
+import { run } from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -33,8 +33,6 @@ export class M_calendar {
     </symbol>  
         `);
         this.checkAndCreateEventsFile(eventsPath);
-
-        const currentHost = window.location.host;
         linkToCalendar = calendarpath2;
         this.plugin.eventBus.on("loaded-protyle-dynamic", this.avButton.bind(this));
         // this.plugin.eventBus.on("loaded-protyle-static", this.avButton.bind(this));
@@ -142,7 +140,7 @@ export class M_calendar {
     private avButton() {
         setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
-                .filter(span => span.closest('[name="日程"]'));
+            .filter(span => span.closest('[name="日程"]') || span.closest('[name="周期"]'));
             // console.log(targetSpans, "targetSpans");
 
             targetSpans.forEach(targetSpan => {
@@ -166,8 +164,8 @@ export class M_calendar {
     }
 
     async openRiChengViewDialog() {
-        
-        const id =  new Date().getTime().toString();
+
+        const id = new Date().getTime().toString();
         let calendar: any;
         const dialog = new Dialog({
             title: null,
@@ -192,7 +190,7 @@ export class M_calendar {
         const ics = await api.getFileBlob(calendarpath);
         console.log(ics);
         //时间戳
-        const id =  new Date().getTime().toString();
+        const id = new Date().getTime().toString();
         let calendar: any;
         const tab = await openTab({
             app: this.plugin.app,
@@ -210,14 +208,14 @@ export class M_calendar {
         console.log(tab);
         tab.panelElement.innerHTML = `
   <div style="margin: 10px; padding: 10px"><div id='calendar-${id}' ></div></div>`;
-        calendar = await run(ics,id);
+        calendar = await run(ics, id);
         const calendarDiv = document.getElementById(`calendar-${id}`);
         if (calendarDiv) {
             const resizeObserver = new ResizeObserver(entries => {
                 for (const entry of entries) {
                     const { width, height } = entry.contentRect;
                     // console.log('Calendar container resized:', width, height);
-                    if(width==0||height==0){
+                    if (width == 0 || height == 0) {
                         // resizeObserver.disconnect();
                         console.log('ResizeObserver disconnected');
                     }
@@ -359,10 +357,10 @@ export class M_calendar {
     }
 
     // 从思源数据库中获取日程信息数据库的av-id
-    async getAVreferenceid() {
+    async getAVreferenceid(forwhat: string = '日程') {
         const sqlStr = `SELECT markdown
         FROM blocks
-        WHERE name = '日程'
+        WHERE name = '${forwhat}'
         AND markdown LIKE '%NodeAttributeView%data-av-id%';`
             ;
         const res = await api.sql(sqlStr);
@@ -370,6 +368,7 @@ export class M_calendar {
         const avIds = res.map(item => extractDataAvId(item.markdown)).filter(id => id !== null);
         steveTools.outlog(avIds); // 输出: ['20241213113357-m9b143e', ...]
         return avIds;
+
     }
 
     // 从思源数据库中获取日程信息
@@ -401,49 +400,100 @@ export class M_calendar {
                     };
                 });
                 await this.runAddEvent(result);
-                console.log("2222",result);
+                console.log("2222", result);
                 steveTools.outlog(result);
-
             } else {
                 console.error(`Invalid response for avId ${avId}:`, response);
             }
         }
-        // console.log(events);
+        const avIds_zq = await this.getAVreferenceid('周期');
+        for (const avId of avIds_zq) {
+            const response = await api.renderAttributeView(avId);
+            console.log(response);
+            if (response && response.view) {
+                const result = response.view.rows.map(row => {
+                    return {
+                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',  //标题
+                        dateContent: row.cells[1]?.value?.date?.content || 0,           //日期
+                        textContent: row.cells[2]?.value?.text?.content || 'N/A',       //描述
+                        rule: row.cells[3]?.value?.text?.content || 'N/A',         //频率规则
+                        duration: row.cells[4]?.value?.number?.content || 1,         //持续时间  
+                    };
+                });
+                await this.runAddEvent(result, true);
+                console.log("22221111111", result);
+                steveTools.outlog(result);
+            } else {
+                console.error(`Invalid response for avId ${avId}:`, response);
+            }
+        }
+
+
         await this.uploadAllEventsToFile(eventsPath);
         await this.generateICSFromEventsFile(eventsPath, calendarpath);
 
     }
 
-    async runAddEvent(result: any) {
-        let i = 0;
-        for (const item of result) {
-            //检测item是否符合要求
-            if (!item.dateContent || !item.dateContent2 || !item.textContent || !item.blockContent) {
-                console.log('Invalid event data:', item);
-                i++;
-                showMessage('存在不符合要求的数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
-                continue;
-            }
-            const endtime = convertTimestampToArray(item.dateContent2);
-            const starttime = convertTimestampToArray(item.dateContent);
-            const description = item.textContent;
-            const title = item.blockContent;
-            const status = item.status === "完成" ? "CONFIRMED" : "TENTATIVE";
+    async runAddEvent(result: any, isZq: boolean = false) {
+        if (isZq == false) {
+            let i = 0;
+            for (const item of result) {
+                //检测item是否符合要求
+                if (!item.dateContent || !item.dateContent2 || !item.textContent || !item.blockContent) {
+                    console.log('Invalid event data:', item);
+                    i++;
+                    showMessage('存在不符合要求的数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
+                    continue;
+                }
+                const endtime = convertTimestampToArray(item.dateContent2);
+                const starttime = convertTimestampToArray(item.dateContent);
+                const description = item.textContent;
+                const title = item.blockContent;
+                const status = item.status === "完成" ? "CONFIRMED" : "TENTATIVE";
 
-            const newEvent: EventAttributes = {
-                start: starttime,
-                startInputType: 'local',
-                startOutputType: 'local',
-                end: endtime, // 指定结束时间
-                endInputType: 'local',
-                endOutputType: 'local',
-                title: title,
-                description: description,
-                status: status,
-                // location: 'Office'
+                const newEvent: EventAttributes = {
+                    start: starttime,
+                    startInputType: 'local',
+                    startOutputType: 'local',
+                    end: endtime, // 指定结束时间
+                    endInputType: 'local',
+                    endOutputType: 'local',
+                    title: title,
+                    description: description,
+                    status: status,
+                    // location: 'Office'
+                }
+                await this.addEventToGlobal(newEvent);
+                // console.log(newEvent,"ttttiaos");
             }
-            await this.addEventToGlobal(newEvent);
-            // console.log(newEvent,"ttttiaos");
+        } else {//周期事件
+            let i = 0;
+            for (const item of result) {
+                //检测item是否符合要求
+                if (!item.dateContent || !item.textContent || !item.blockContent || !item.rule) {
+                    console.log('Invalid event data:', item);
+                    i++;
+                    showMessage('存在不符合要求的周期数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
+                    continue;
+                }
+                const duration = { hours: item.duration };
+                const starttime = convertTimestampToArray(item.dateContent);
+                const description = item.textContent;
+                const title = item.blockContent;
+                // const frequency = mapFrequency(item.frequency);//TODO
+                const recurrenceRule = item.rule
+                const newEvent: EventAttributes = {
+                    start: starttime,
+                    startInputType: 'local',
+                    startOutputType: 'local',
+                    duration: duration, // 指定持续时间
+                    title: title,
+                    description: description,
+                    recurrenceRule: recurrenceRule,
+                }
+                await this.addEventToGlobal(newEvent);
+                // console.log(newEvent,"ttttiaos");
+            }
         }
     }
 
@@ -495,7 +545,16 @@ function convertTimestampToArray(timestamp: number): [number, number, number, nu
     ];
 }
 
-
+type FrequencyType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+const mapFrequency = (chinese: string): FrequencyType => {
+    const frequencyMap: Record<string, FrequencyType> = {
+        '每天': 'DAILY',
+        '每周': 'WEEKLY',
+        '每月': 'MONTHLY',
+        '每年': 'YEARLY'
+    };
+    return frequencyMap[chinese] || 'WEEKLY';
+};
 
 
 // const targetElement = document.querySelector('div[contenteditable="false"][data-av-id="20241213113357-m9b143e"][data-av-type="table"][data-node-id="20241003141312-30yk3cr"][data-type="NodeAttributeView"][class="av"][custom-sy-av-view="20241213113357-tuugpcw"][name="日程"]');

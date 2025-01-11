@@ -192,14 +192,51 @@ $background-color-today: var(--b3-list-hover);
 .fc-timegrid-event {
     .fc-event-time {
         //字体加大加粗
-        font-size: 1.3em;//em是相对于父元素的字体大小
+        font-size: 0.9em;//em是相对于父元素的字体大小
         font-weight: 600;
     }
 
     .fc-event-title {
-        font-size: 1.1em;
+        font-size: 0.8em;
         font-weight: 600;
     }
 
 }
 
+
+//悬浮
+
+.event-tooltip {
+    // z-index: 9999 !important;
+    padding: 12px;
+    min-width: 100px;
+    max-width: 400px;
+    background-color: var(--b3-font-background6);
+    color: $text-color;
+    border: 1px solid $border-color;
+    border-radius: 8px;
+    font-size: 0.8em;
+}
+
+.event-tooltip h4 {
+    margin: 0 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--b3-card-info-color);
+    font-weight: 600;
+    //自动换行
+    word-wrap: break-word;
+}
+
+.event-tooltip__content {
+    line-height: 1.5;
+}
+
+.event-tooltip__label {
+    font-weight: 400;
+    color: $text-color;
+    margin-right: 4px;
+}
+
+.event-tooltip p {
+    margin: 8px 0;
+}
