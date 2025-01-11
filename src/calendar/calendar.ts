@@ -31,11 +31,11 @@ export async function run(blob: Blob, id: string, initialView = 'dayGridMonth') 
                 const day = date.getDate();
                 
                 // 调试输出
-                console.log('Solar date:', year, month, day);
+                // console.log('Solar date:', year, month, day);
                 
                 // 转换为农历
                 const lunar = solarLunar.solar2lunar(year, month, day);
-                console.log('Lunar result:', lunar);
+                // console.log('Lunar result:', lunar);
                 
                 // 添加空值检查
                 if (!lunar) {

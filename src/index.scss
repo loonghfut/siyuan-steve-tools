@@ -4,6 +4,72 @@ $hover-background-color: var(--b3-list-hover);
 $border-color: var(--b3-border-color);
 $background-color-today: var(--b3-list-hover);
 
+.fc-header-toolbar {
+    padding: 1rem;
+    margin-bottom: 1rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  // 按钮基本样式
+  .fc-button-primary {
+    background-color: $background-color !important;
+    border-color: $border-color !important;
+    color: $text-color !important;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+  
+    &:hover {
+      background-color: $hover-background-color !important;
+    }
+  
+    &.fc-button-active {
+      background-color: $hover-background-color !important;
+      font-weight: bold;
+    }
+  
+    .fc-icon {
+      font-size: 1em;
+    }
+  }
+  
+  // 按钮组样式
+  .fc-button-group {
+    gap: 2px;
+    
+    .fc-button-primary {
+      border-radius: 4px;
+      
+      &:not(:last-child) {
+        margin-right: 2px;
+      }
+    }
+  }
+  
+  // 标题样式
+  .fc-toolbar-title {
+    font-size: 1.25rem !important;
+    font-weight: bold;
+    padding: 0 1rem;
+  }
+  
+  // 禁用按钮样式
+  .fc-button-primary:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed;
+  }
+  
+  // Today按钮特殊样式
+  .fc-today-button {
+    margin-left: 0.5rem !important;
+  }
+
+
+
+
+
 .fc .fc-scrollgrid {
     border-right-width: 1px;
 }
@@ -171,6 +237,7 @@ $background-color-today: var(--b3-list-hover);
 .fc .fc-daygrid-day.fc-day-today {
     background-color: $background-color-today;
 }
+
 
 
 //日程字体
