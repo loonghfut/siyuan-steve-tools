@@ -79,8 +79,10 @@ export class M_calendar {
                     if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃，无法稳定复现
                         // console.log("更新了一个属性视图");
                         const avids = await this.getAVreferenceid();
+                        //加上周期
+                        const avids_zq = await this.getAVreferenceid('周期');
                         console.log(avids);
-                        if (avids.includes(msg.data[0].doOperations[0].avID)) {
+                        if (avids.includes(msg.data[0].doOperations[0].avID)||avids_zq.includes(msg.data[0].doOperations[0].avID)) {
                             console.log("更新了日程信息");
                             //延时执行
                             this.avButton();//数据库每次更新都会重新加载页面
@@ -207,7 +209,7 @@ export class M_calendar {
         });
         console.log(tab);
         tab.panelElement.innerHTML = `
-  <div style="margin: 10px; padding: 10px"><div id='calendar-${id}' ></div></div>`;
+  <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
         calendar = await run(ics, id);
         const calendarDiv = document.getElementById(`calendar-${id}`);
         if (calendarDiv) {

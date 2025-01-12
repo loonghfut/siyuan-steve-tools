@@ -4,67 +4,114 @@ $hover-background-color: var(--b3-list-hover);
 $border-color: var(--b3-border-color);
 $background-color-today: var(--b3-list-hover);
 
+[id^="calendarfu-"] {
+    background-color: $background-color !important;
+    padding: 10px;
+
+}
+
+//圆点
+
+
+
+
+
+
+//边框问题
+.fc-scrollgrid-section-header,
+.fc-multimonth-header-table {
+    * {
+        border-color: $border-color ;
+        background-color: var(--b3-theme-surface);
+    }
+}
+
+.fc-view-harness {
+    .fc-scrollgrid  {
+        border-color: $border-color !important;
+
+    }
+}
+.fc-col-header {
+    *{
+        border-color: $border-color !important;
+    }
+
+}
+.fc-multimonth-header-table {
+    *{
+        border-color: $border-color !important;
+    }
+}
+.fc-scroller,.fc-view ,.fc-list-day{
+    border-color: $border-color !important;
+}
+.fc table {
+    border: none;
+}
+
+
 .fc-header-toolbar {
     padding: 1rem;
     margin-bottom: 1rem !important;
     display: flex;
     align-items: center;
     justify-content: space-between;
-  }
-  
-  // 按钮基本样式
-  .fc-button-primary {
+}
+
+// 按钮基本样式
+.fc-button-primary {
     background-color: $background-color !important;
     border-color: $border-color !important;
     color: $text-color !important;
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
     transition: all 0.2s ease;
-  
+
     &:hover {
-      background-color: $hover-background-color !important;
+        background-color: $hover-background-color !important;
     }
-  
+
     &.fc-button-active {
-      background-color: $hover-background-color !important;
-      font-weight: bold;
+        background-color: $hover-background-color !important;
+        font-weight: bold;
     }
-  
+
     .fc-icon {
-      font-size: 1em;
+        font-size: 1em;
     }
-  }
-  
-  // 按钮组样式
-  .fc-button-group {
+}
+
+// 按钮组样式
+.fc-button-group {
     gap: 2px;
-    
+
     .fc-button-primary {
-      border-radius: 4px;
-      
-      &:not(:last-child) {
-        margin-right: 2px;
-      }
+        border-radius: 4px;
+
+        &:not(:last-child) {
+            margin-right: 2px;
+        }
     }
-  }
-  
-  // 标题样式
-  .fc-toolbar-title {
+}
+
+// 标题样式
+.fc-toolbar-title {
     font-size: 1.25rem !important;
     font-weight: bold;
     padding: 0 1rem;
-  }
-  
-  // 禁用按钮样式
-  .fc-button-primary:disabled {
+}
+
+// 禁用按钮样式
+.fc-button-primary:disabled {
     opacity: 0.6 !important;
     cursor: not-allowed;
-  }
-  
-  // Today按钮特殊样式
-  .fc-today-button {
+}
+
+// Today按钮特殊样式
+.fc-today-button {
     margin-left: 0.5rem !important;
-  }
+}
 
 
 
@@ -182,7 +229,9 @@ $background-color-today: var(--b3-list-hover);
 
 [id^="calendar-"] {
     margin: 0 auto;
-    height: calc(100vh - 150px);
+    height: calc(100vh - 130px);
+    border: none;
+
 }
 
 .fc .fc-multimonth-singlecol .fc-multimonth-daygrid-table,
@@ -259,7 +308,7 @@ $background-color-today: var(--b3-list-hover);
 .fc-timegrid-event {
     .fc-event-time {
         //字体加大加粗
-        font-size: 0.9em;//em是相对于父元素的字体大小
+        font-size: 0.9em; //em是相对于父元素的字体大小
         font-weight: 600;
     }
 

@@ -86,7 +86,7 @@ export async function run(blob: Blob, id: string, initialView = 'dayGridMonth') 
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,timeGridThreeDays,timeGridFiveDays,listMonth'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,timeGridThreeDays,timeGridFiveDays'
         },
         events: function (fetchInfo, successCallback, failureCallback) {
             console.log('Fetching events from ICS file');
@@ -160,6 +160,7 @@ export async function run(blob: Blob, id: string, initialView = 'dayGridMonth') 
             };
             reader.readAsText(blob);
         },
+        eventClassNames: 'calendar-event-dot',
         eventDidMount: function (info) {
             info.el.style.backgroundColor = info.event.extendedProps.backgroundColor;
             info.el.style.color = info.event.extendedProps.textColor;
