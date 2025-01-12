@@ -78,11 +78,17 @@
             value: settings["cal-show-view"],
         },
         // {
-        //     type: "checkbox",
-        //     title: "日历视图夜间模式",
-        //     description: "启用日历视图夜间模式",
-        //     key: "cal-view-night",
-        //     value: settings["cal-view-night"],
+        //     type: "button",
+        //     title: "日程周期规则说明",
+        //     description: "日程周期规则说明",
+        //     key: "cal-rule",
+        //     value: settings["cal-rule"],
+        //     button: {
+        //         label: "查看",
+        //         callback: () => {
+        //             moduleInstances['M_calendar'].showhelp();
+        //         },
+        //     },
         // },
         {
             type: "button",

@@ -82,7 +82,7 @@ export class M_calendar {
                         //加上周期
                         const avids_zq = await this.getAVreferenceid('周期');
                         console.log(avids);
-                        if (avids.includes(msg.data[0].doOperations[0].avID)||avids_zq.includes(msg.data[0].doOperations[0].avID)) {
+                        if (avids.includes(msg.data[0].doOperations[0].avID) || avids_zq.includes(msg.data[0].doOperations[0].avID)) {
                             console.log("更新了日程信息");
                             //延时执行
                             this.avButton();//数据库每次更新都会重新加载页面
@@ -142,7 +142,7 @@ export class M_calendar {
     private avButton() {
         setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
-            .filter(span => span.closest('[name="日程"]') || span.closest('[name="周期"]'));
+                .filter(span => span.closest('[name="日程"]') || span.closest('[name="周期"]'));
             // console.log(targetSpans, "targetSpans");
 
             targetSpans.forEach(targetSpan => {
@@ -230,6 +230,18 @@ export class M_calendar {
             resizeObserver.observe(calendarDiv);
         }
 
+    }
+
+    showhelp() {
+        // new Dialog({
+        //     title: null,
+        //     content: ``,
+        //     width: '70%',
+        //     height: '80vh',
+        //     disableClose: false,
+        //     hideCloseIcon: true,
+        // });
+    
     }
 
 
@@ -408,6 +420,7 @@ export class M_calendar {
                 console.error(`Invalid response for avId ${avId}:`, response);
             }
         }
+        //周期部分
         const avIds_zq = await this.getAVreferenceid('周期');
         for (const avId of avIds_zq) {
             const response = await api.renderAttributeView(avId);
@@ -417,9 +430,9 @@ export class M_calendar {
                     return {
                         blockContent: row.cells[0]?.value?.block?.content || 'N/A',  //标题
                         dateContent: row.cells[1]?.value?.date?.content || 0,           //日期
-                        textContent: row.cells[2]?.value?.text?.content || 'N/A',       //描述
+                        textContent: row.cells[4]?.value?.text?.content || 'N/A',       //描述
                         rule: row.cells[3]?.value?.text?.content || 'N/A',         //频率规则
-                        duration: row.cells[4]?.value?.number?.content || 1,         //持续时间  
+                        duration: row.cells[2]?.value?.number?.content || 1,         //持续时间  
                     };
                 });
                 await this.runAddEvent(result, true);
