@@ -10,7 +10,44 @@ $background-color-today: var(--b3-list-hover);
 
 }
 
-//圆点
+//时间条
+.fc-timegrid-event-harness {
+    max-width: 50vh;
+    * {
+        border: none;
+    }
+    .fc-timegrid-event {
+        opacity: 0.60 !important;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        
+        &:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .fc-event-main {
+            padding: 4px 6px;
+
+            .fc-event-main-frame {
+                .fc-event-time {
+                    font-weight: 500;
+                    font-size: 0.9em;
+                    margin-bottom: 4px;
+                }
+
+                .fc-event-title-container {
+                    .fc-event-title {
+                        font-size: 0.95em;
+                        line-height: 1.4;
+                        word-break: break-word;
+                    }
+                }
+            }
+        }
+    }
+}
 
 
 
@@ -303,20 +340,6 @@ $background-color-today: var(--b3-list-hover);
             background-color: rgba(255, 255, 255, 0.1);
         }
     }
-}
-
-.fc-timegrid-event {
-    .fc-event-time {
-        //字体加大加粗
-        font-size: 0.9em; //em是相对于父元素的字体大小
-        font-weight: 600;
-    }
-
-    .fc-event-title {
-        font-size: 0.8em;
-        font-weight: 600;
-    }
-
 }
 
 

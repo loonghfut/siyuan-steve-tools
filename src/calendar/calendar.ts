@@ -74,19 +74,19 @@ export async function run(blob: Blob, id: string, initialView = 'dayGridMonth') 
         views: {
             timeGridThreeDays: {
                 type: 'timeGrid',
-                duration: { days: 3 },
-                buttonText: '3天'
+                duration: { days: 14 },
+                buttonText: '14日'
             },
             timeGridFiveDays: {
                 type: 'timeGrid',
                 duration: { days: 5 },
-                buttonText: '5天'
+                buttonText: '5日'
             }
         },
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay,timeGridThreeDays,timeGridFiveDays'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridFiveDays,timeGridDay'
         },
         events: function (fetchInfo, successCallback, failureCallback) {
             console.log('Fetching events from ICS file');
