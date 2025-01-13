@@ -536,9 +536,31 @@ export class M_calendar {
         }
     }
 
+    async importMoBan() {
+        let notebookId = getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
+        console.log("ceshi1", notebookId);
+        if (!notebookId) {
+            showMessage("已创建名为“ST日程管理”的笔记本", 3000, "info");
+            await api.createNotebook("ST日程管理");
+             notebookId =  getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
+        }
+        //获取模板zip文件
+        try{
+        const file = await api.getFileBlob("/data/plugins/siyuan-steve-tools/asset/日程.sy.zip");
+        await api.importSY(notebookId, file);
+        }catch(e){
+            console.log(e);
+        }
+        showMessage("已导入日程模板", 3000, "info");
+    }
+
 }
 
 
+function getSTCalendarNotebookId(notebooks): string | null {
+    const stCalendarNotebook = notebooks.find(notebook => notebook.name === "ST日程管理");
+    return stCalendarNotebook ? stCalendarNotebook.id : null;
+}
 
 function extractDataAvId(markdown: string): string | null {
     const regex = /data-av-id="([^"]+)"/;
@@ -560,16 +582,16 @@ function convertTimestampToArray(timestamp: number): [number, number, number, nu
     ];
 }
 
-type FrequencyType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
-const mapFrequency = (chinese: string): FrequencyType => {
-    const frequencyMap: Record<string, FrequencyType> = {
-        '每天': 'DAILY',
-        '每周': 'WEEKLY',
-        '每月': 'MONTHLY',
-        '每年': 'YEARLY'
-    };
-    return frequencyMap[chinese] || 'WEEKLY';
-};
+// type FrequencyType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+// const mapFrequency = (chinese: string): FrequencyType => {
+//     const frequencyMap: Record<string, FrequencyType> = {
+//         '每天': 'DAILY',
+//         '每周': 'WEEKLY',
+//         '每月': 'MONTHLY',
+//         '每年': 'YEARLY'
+//     };
+//     return frequencyMap[chinese] || 'WEEKLY';
+// };
 
 
 // const targetElement = document.querySelector('div[contenteditable="false"][data-av-id="20241213113357-m9b143e"][data-av-type="table"][data-node-id="20241003141312-30yk3cr"][data-type="NodeAttributeView"][class="av"][custom-sy-av-view="20241213113357-tuugpcw"][name="日程"]');

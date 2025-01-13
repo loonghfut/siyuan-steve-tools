@@ -570,3 +570,35 @@ export async function testSync(myurl: string, token: string) {
     }
     return false;
 }
+
+//导入思源文件.zip
+export async function importSY(notebookId: string, file: Blob) {
+    const formData = new FormData();
+    formData.append('file', file, '日程.sy.zip');
+    formData.append('notebook', notebookId);
+    formData.append('toPath', '/');
+
+    const response = await fetch('/api/import/importSY', {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.code === 0;
+}
+
+//触发网络下载
+export const downloadFile = (file: Blob) => {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '日程.sy.zip';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};

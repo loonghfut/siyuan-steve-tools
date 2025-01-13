@@ -77,19 +77,19 @@
             key: "cal-show-view",
             value: settings["cal-show-view"],
         },
-        // {
-        //     type: "button",
-        //     title: "日程周期规则说明",
-        //     description: "日程周期规则说明",
-        //     key: "cal-rule",
-        //     value: settings["cal-rule"],
-        //     button: {
-        //         label: "查看",
-        //         callback: () => {
-        //             moduleInstances['M_calendar'].showhelp();
-        //         },
-        //     },
-        // },
+        {
+            type: "button",
+            title: "日程周期模板",
+            description: "生成日程周期模板（注意：会创建一个笔记本）",
+            key: "cal-rule",
+            value: settings["cal-rule"],
+            button: {
+                label: "生成",
+                callback: () => {
+                    moduleInstances['M_calendar'].importMoBan();
+                },
+            },
+        },
         {
             type: "button",
             title: "恢复默认配置",
