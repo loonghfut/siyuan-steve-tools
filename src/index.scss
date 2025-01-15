@@ -17,7 +17,16 @@ $background-color-today: var(--b3-list-hover);
         border: none;
     }
     .fc-timegrid-event {
-        opacity: 0.60 !important;
+        opacity: 0.70 !important;
+        // :root[data-theme-mode="dark"] {
+        //     filter: brightness(30%);
+        //     transition: filter 0.3s ease;
+        // }
+        
+        // :root[data-theme-mode="light"] {
+        //     filter: brightness(100%);
+        //     transition: filter 0.3s ease;
+        // }
         border-radius: 6px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -268,7 +277,6 @@ $background-color-today: var(--b3-list-hover);
     margin: 0 auto;
     height: calc(100vh - 130px);
     border: none;
-
 }
 
 .fc .fc-multimonth-singlecol .fc-multimonth-daygrid-table,

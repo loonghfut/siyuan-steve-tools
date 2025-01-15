@@ -173,7 +173,7 @@ export class M_calendar {
             title: null,
             content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
             width: '70%',
-            height: '80vh',
+            height: '86.66%',
             disableClose: false,
             hideCloseIcon: true,
             resizeCallback: () => {
