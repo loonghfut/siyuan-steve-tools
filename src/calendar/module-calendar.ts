@@ -10,6 +10,7 @@ let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 export let linkToCalendar = '';
+import { ScheduleManager } from "./myF";
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
@@ -58,7 +59,7 @@ export class M_calendar {
                 title: "日程视图",
                 position: "left",
                 callback: async () => {
-                    await this.openRiChengView();
+                    // await this.openRiChengView();
                     //测试
                     // 获取特定的元素
                     //测试
@@ -182,55 +183,89 @@ export class M_calendar {
         });
         // dialog.data = `<div id='calendar-${id}' class="mb-3"></div>`;
         // calendar = await run(ics,id);
-        const ics = await api.getFileBlob(calendarpath);
+        const av_ids = await this.getAVreferenceid('日程'); //id数组
+        console.log('获取到的AV ID:', av_ids);
+
+        // 构造所有AV文件路径
+        const avFilePaths = av_ids.map(id => `data/storage/av/${id}.json`);
+        console.log('AV文件路径:', avFilePaths);
+
+        // 读取所有AV文件内容
+        const avContents = await Promise.all(
+            avFilePaths.map(async (filePath) => {
+                try {
+                    const content = await api.getFile(filePath);
+                    // 检查content是否已经是对象
+                    console.log('读取文件成功:', filePath, content);
+                    if (typeof content === 'object') {
+                        return content;
+                    }
+                    // 尝试解析JSON字符串
+                    return JSON.parse(content);
+                } catch (err) {
+                    console.error(`读取文件 ${filePath} 失败:`, err);
+                    return null;
+                }
+            })
+        );
+
+        // 过滤掉读取失败的文件
+        const validContents = avContents.filter(content => content !== null);
+        console.log('AV文件内容:', validContents);
+        console.log(validContents[0]);
+
+        //数据处理
+        const manager = new ScheduleManager(validContents);
+        const completedSchedules = manager.getAllSchedules();
+        console.log('已完成的日程:', completedSchedules);
         setTimeout(async () => {
-            calendar = await run(ics, id);
+            calendar = await run(completedSchedules, id);
         }, 100);
     }
 
-    async openRiChengView() {
-        const ics = await api.getFileBlob(calendarpath);
-        console.log(ics);
-        //时间戳
-        const id = new Date().getTime().toString();
-        let calendar: any;
-        const tab = await openTab({
-            app: this.plugin.app,
-            custom: {
-                icon: "iconSTcal",
-                title: `日程视图`,
-                data: {
-                    text: "This is my custom tab",
-                },
-                id: this.plugin.name + 'calview',
-            },
-            // position: "right",
-            keepCursor: false
-        });
-        console.log(tab);
-        tab.panelElement.innerHTML = `
-  <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-        calendar = await run(ics, id);
-        const calendarDiv = document.getElementById(`calendar-${id}`);
-        if (calendarDiv) {
-            const resizeObserver = new ResizeObserver(entries => {
-                for (const entry of entries) {
-                    const { width, height } = entry.contentRect;
-                    // console.log('Calendar container resized:', width, height);
-                    if (width == 0 || height == 0) {
-                        // resizeObserver.disconnect();
-                        console.log('ResizeObserver disconnected');
-                    }
-                    // 如果日历组件有 resize 方法，在这里调用
-                    calendar.updateSize();
-                }
-            });
-            //如果已存在resizeObserver则先断开
-            resizeObserver.disconnect();
-            resizeObserver.observe(calendarDiv);
-        }
+    //     async openRiChengView() {
+    //         const ics = await api.getFileBlob(calendarpath);
+    //         console.log(ics);
+    //         //时间戳
+    //         const id = new Date().getTime().toString();
+    //         let calendar: any;
+    //         const tab = await openTab({
+    //             app: this.plugin.app,
+    //             custom: {
+    //                 icon: "iconSTcal",
+    //                 title: `日程视图`,
+    //                 data: {
+    //                     text: "This is my custom tab",
+    //                 },
+    //                 id: this.plugin.name + 'calview',
+    //             },
+    //             // position: "right",
+    //             keepCursor: false
+    //         });
+    //         console.log(tab);
+    //         tab.panelElement.innerHTML = `
+    //   <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
+    //         calendar = await run(ics, id);
+    //         const calendarDiv = document.getElementById(`calendar-${id}`);
+    //         if (calendarDiv) {
+    //             const resizeObserver = new ResizeObserver(entries => {
+    //                 for (const entry of entries) {
+    //                     const { width, height } = entry.contentRect;
+    //                     // console.log('Calendar container resized:', width, height);
+    //                     if (width == 0 || height == 0) {
+    //                         // resizeObserver.disconnect();
+    //                         console.log('ResizeObserver disconnected');
+    //                     }
+    //                     // 如果日历组件有 resize 方法，在这里调用
+    //                     calendar.updateSize();
+    //                 }
+    //             });
+    //             //如果已存在resizeObserver则先断开
+    //             resizeObserver.disconnect();
+    //             resizeObserver.observe(calendarDiv);
+    //         }
 
-    }
+    //     }
 
     showhelp() {
         // new Dialog({
@@ -241,7 +276,7 @@ export class M_calendar {
         //     disableClose: false,
         //     hideCloseIcon: true,
         // });
-    
+
     }
 
 
@@ -542,13 +577,13 @@ export class M_calendar {
         if (!notebookId) {
             showMessage("已创建名为“ST日程管理”的笔记本", 3000, "info");
             await api.createNotebook("ST日程管理");
-             notebookId =  getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
+            notebookId = getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
         }
         //获取模板zip文件
-        try{
-        const file = await api.getFileBlob("/data/plugins/siyuan-steve-tools/asset/日程.sy.zip");
-        await api.importSY(notebookId, file);
-        }catch(e){
+        try {
+            const file = await api.getFileBlob("/data/plugins/siyuan-steve-tools/asset/日程.sy.zip");
+            await api.importSY(notebookId, file);
+        } catch (e) {
             console.log(e);
         }
         showMessage("已导入日程模板", 3000, "info");

@@ -356,7 +356,7 @@ $background-color-today: var(--b3-list-hover);
 .event-tooltip {
     // z-index: 9999 !important;
     padding: 12px;
-    min-width: 100px;
+    min-width: 150px;
     max-width: 400px;
     background-color: var(--b3-font-background6);
     color: $text-color;
@@ -374,16 +374,44 @@ $background-color-today: var(--b3-list-hover);
     word-wrap: break-word;
 }
 
-.event-tooltip__content {
-    line-height: 1.5;
-}
+// .event-tooltip__content {
+//     line-height: 1.5;
+// }
 
-.event-tooltip__label {
-    font-weight: 400;
-    color: $text-color;
-    margin-right: 4px;
-}
+// .event-tooltip__label {
+//     font-weight: 400;
+//     color: $text-color;
+//     margin-right: 4px;
+// }
 
 .event-tooltip p {
     margin: 8px 0;
+}
+
+.event-tooltip__title {
+    font-size: 1.5em;
+    font-weight: 600;
+    margin: 8px 0;
+    padding: 4px 8px;
+    text-align: center;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    
+    // 添加边框和背景
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    
+    // 悬浮效果
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-decoration: none;
+    }
+    
+    // 文本溢出处理
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
