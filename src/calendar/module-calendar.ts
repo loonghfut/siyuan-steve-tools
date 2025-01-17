@@ -10,7 +10,7 @@ let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 export let linkToCalendar = '';
-import { ScheduleManager } from "./myF";
+import * as myF from "./myF";
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
@@ -181,45 +181,13 @@ export class M_calendar {
                 calendar.updateSize();
             },
         });
-        // dialog.data = `<div id='calendar-${id}' class="mb-3"></div>`;
-        // calendar = await run(ics,id);
-        const av_ids = await this.getAVreferenceid('日程'); //id数组
-        console.log('获取到的AV ID:', av_ids);
+        const av_ids = await this.getAVreferenceid();
+        const viewIDs=await myF.getViewId(av_ids);
+        const viewValue=await myF.getViewValue(viewIDs);
 
-        // 构造所有AV文件路径
-        const avFilePaths = av_ids.map(id => `data/storage/av/${id}.json`);
-        console.log('AV文件路径:', avFilePaths);
 
-        // 读取所有AV文件内容
-        const avContents = await Promise.all(
-            avFilePaths.map(async (filePath) => {
-                try {
-                    const content = await api.getFile(filePath);
-                    // 检查content是否已经是对象
-                    console.log('读取文件成功:', filePath, content);
-                    if (typeof content === 'object') {
-                        return content;
-                    }
-                    // 尝试解析JSON字符串
-                    return JSON.parse(content);
-                } catch (err) {
-                    console.error(`读取文件 ${filePath} 失败:`, err);
-                    return null;
-                }
-            })
-        );
-
-        // 过滤掉读取失败的文件
-        const validContents = avContents.filter(content => content !== null);
-        console.log('AV文件内容:', validContents);
-        console.log(validContents[0]);
-
-        //数据处理
-        const manager = new ScheduleManager(validContents);
-        const completedSchedules = manager.getAllSchedules();
-        console.log('已完成的日程:', completedSchedules);
         setTimeout(async () => {
-            calendar = await run(completedSchedules, id);
+            // calendar = await run(, id);
         }, 100);
     }
 

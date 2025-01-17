@@ -304,13 +304,24 @@ export async function getAttributeViewKeysByAvID(avid: BlockId) {
     return request(url, data);
 }
 
-export async function renderAttributeView(avid: BlockId) {
-    const data = {
-        id: avid, // avID,
-        // viewID: '20241003141312-30yk3cr',//测试可以不用这个参数 //TODO：多视图的情况下需要
-        // pageSize:9999999
-        // page:2
+export async function renderAttributeView(avid: BlockId, viewID?: string) {
+    let data: any;
+    if (viewID === undefined) {
+        data = {
+            id: avid, // avID,
+            // viewID: '20241003141312-30yk3cr',//测试可以不用这个参数 //TODO：多视图的情况下需要
+            // pageSize:9999999
+            // page:2
+        }
+    }else{
+        data = {
+            id: avid, // avID,
+            viewID: viewID,
+            // pageSize:9999999
+            // page:2
+        }
     }
+
     const url = '/api/av/renderAttributeView';
     return request(url, data);
 }

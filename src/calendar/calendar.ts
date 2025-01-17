@@ -9,15 +9,14 @@ import tippy from 'tippy.js';
 // import 'tippy.js/dist/tippy.css';
 import ICAL from 'ical.js';
 import solarLunar from 'solarlunar';
-import { ToEventNote } from './myF';
-import { ScheduleItem } from "./myF";
+
 
 let calendar: Calendar;
 
 
 
 
-export async function run(scheduleData: ScheduleItem[], id: string, initialView = 'dayGridMonth') {
+export async function run(scheduleData, id: string, initialView = 'dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
         plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin],
@@ -30,7 +29,7 @@ export async function run(scheduleData: ScheduleItem[], id: string, initialView 
 
         // 事件点击处理
         eventClick: function (info) {
-            ToEventNote(info);
+            // ToEventNote(info);
         },
 
         // 日期点击处理
