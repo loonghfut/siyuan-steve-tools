@@ -1,5 +1,8 @@
 import * as api from '@/api';
 import { ViewItem } from '@/calendar/interface';
+import * as sy from 'siyuan'
+import { settingdata } from '@/index';
+import { Calendar } from '@fullcalendar/core';
 // Define interfaces for better type safety
 
 
@@ -38,18 +41,20 @@ export async function getViewValue(viewIds_Data: ViewItem[]) {
     for (const viewId_Data of viewIds_Data) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
-            viewValue_Data.push({
-
-            });
             const data = extractDataFromTable(viewValue.view);
-            console.log(viewValue);
-            console.log("ceshi1", data);
+            viewValue_Data.push({
+                from: viewId_Data,
+                data: data,
+            });
+            // console.log(viewValue);
+            // console.log("ceshi1", data);
+
 
         } catch (error) {
             console.error(`Error processing view ${viewId_Data.viewId}:`, error);
         }
     }
-
+    console.log("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
 
@@ -84,7 +89,8 @@ function extractDataFromTable(data: any) {
                     const eventCell = row.cells[columnMap.get('事件').index];
                     rowData['事件'] = {
                         content: eventCell?.value?.block?.content || '',
-                        id: eventCell?.value?.block?.id || ''
+                        id: eventCell?.value?.block?.id || '',
+                        keyID: eventCell?.value?.keyID || ''
                     };
                 }
 
@@ -93,20 +99,27 @@ function extractDataFromTable(data: any) {
                     const timeCell = row.cells[columnMap.get('开始时间').index];
                     rowData['开始时间'] = {
                         start: timeCell?.value?.date?.content || null,
-                        end: timeCell?.value?.date?.content2 || null
+                        end: timeCell?.value?.date?.content2 || null,
+                        keyID: timeCell?.value?.keyID || ''
                     };
                 }
 
                 // 提取状态
                 if (columnMap.has('状态') && row.cells) {
                     const statusCell = row.cells[columnMap.get('状态').index];
-                    rowData['状态'] = statusCell?.value?.mSelect?.[0]?.content || '';
+                    rowData['状态'] = {
+                        content: statusCell?.value?.mSelect?.[0]?.content || '',
+                        keyID: statusCell?.value?.keyID || ''
+                    };
                 }
 
                 // 提取描述
                 if (columnMap.has('描述') && row.cells) {
                     const descCell = row.cells[columnMap.get('描述').index];
-                    rowData['描述'] = descCell?.value?.text?.content || '';
+                    rowData['描述'] = {
+                        content: descCell?.value?.text?.content || '',
+                        keyID: descCell?.value?.keyID || ''
+                    };
                 }
 
                 return rowData;
@@ -123,353 +136,118 @@ function extractDataFromTable(data: any) {
     }
 }
 
-const testjson = {
-    "id": "20241213113357-tuugpcw",
-    "icon": "",
-    "name": "表格",
-    "desc": "",
-    "hideAttrViewName": false,
-    "filters": [],
-    "sorts": [],
-    "columns": [
-        {
-            "id": "20241213113357-svieuq5",
-            "name": "事件",
-            "type": "block",
-            "icon": "",
-            "wrap": false,
-            "hidden": false,
-            "pin": false,
-            "width": "146px",
-            "desc": "",
-            "calc": null,
-            "numberFormat": "",
-            "template": ""
-        },
-        {
-            "id": "20241213113357-mw9230g",
-            "name": "开始时间",
-            "type": "date",
-            "icon": "",
-            "wrap": false,
-            "hidden": false,
-            "pin": false,
-            "width": "279px",
-            "desc": "",
-            "calc": null,
-            "numberFormat": "",
-            "template": ""
-        },
-        {
-            "id": "20250111123406-3epoj13",
-            "name": "状态",
-            "type": "select",
-            "icon": "",
-            "wrap": false,
-            "hidden": false,
-            "pin": false,
-            "width": "82px",
-            "desc": "",
-            "calc": null,
-            "options": [
-                {
-                    "name": "完成",
-                    "color": "1",
-                    "desc": ""
-                },
-                {
-                    "name": "未完成",
-                    "color": "2",
-                    "desc": ""
-                },
-                {
-                    "name": "232324",
-                    "color": "3",
-                    "desc": ""
-                }
-            ],
-            "numberFormat": "",
-            "template": ""
-        },
-        {
-            "id": "20241213113836-oyoy83j",
-            "name": "描述",
-            "type": "text",
-            "icon": "",
-            "wrap": false,
-            "hidden": false,
-            "pin": false,
-            "width": "154px",
-            "desc": "",
-            "calc": null,
-            "numberFormat": "",
-            "template": ""
-        }
-    ],
-    "rows": [
-        {
-            "id": "20250108230155-hnrc91q",
-            "cells": [
-                {
-                    "id": "20250108230156-en3rs7u",
-                    "value": {
-                        "id": "20250108230156-en3rs7u",
-                        "keyID": "20241213113357-svieuq5",
-                        "blockID": "20250108230155-hnrc91q",
-                        "type": "block",
-                        "isDetached": true,
-                        "createdAt": 1736348516401,
-                        "updatedAt": 1737089198598,
-                        "block": {
-                            "id": "20250108230155-hnrc91q",
-                            "icon": "",
-                            "content": "21313333333333",
-                            "created": 1736348516401,
-                            "updated": 1737089198598
-                        }
-                    },
-                    "valueType": "block",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250108230159-pssgj23",
-                    "value": {
-                        "id": "20250108230159-pssgj23",
-                        "keyID": "20241213113357-mw9230g",
-                        "blockID": "20250108230155-hnrc91q",
-                        "type": "date",
-                        "createdAt": 1736348529069,
-                        "updatedAt": 1737089198598,
-                        "date": {
-                            "content": 1736316060000,
-                            "isNotEmpty": true,
-                            "hasEndDate": true,
-                            "isNotTime": false,
-                            "content2": 1736436540000,
-                            "isNotEmpty2": true,
-                            "formattedContent": ""
-                        }
-                    },
-                    "valueType": "date",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250111124906-cyfnhfm",
-                    "value": {
-                        "id": "20250111124906-cyfnhfm",
-                        "keyID": "20250111123406-3epoj13",
-                        "blockID": "20250108230155-hnrc91q",
-                        "type": "select",
-                        "createdAt": 1736570973346,
-                        "updatedAt": 1737040255548,
-                        "mSelect": [
-                            {
-                                "content": "未完成",
-                                "color": "2"
-                            }
-                        ]
-                    },
-                    "valueType": "select",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250108230209-twei07g",
-                    "value": {
-                        "id": "20250108230209-twei07g",
-                        "keyID": "20241213113836-oyoy83j",
-                        "blockID": "20250108230155-hnrc91q",
-                        "type": "text",
-                        "createdAt": 1736348530739,
-                        "updatedAt": 1736348531739,
-                        "text": {
-                            "content": "2131"
-                        }
-                    },
-                    "valueType": "text",
-                    "color": "",
-                    "bgColor": ""
-                }
-            ]
-        },
-        {
-            "id": "20250116222554-yahqj0a",
-            "cells": [
-                {
-                    "id": "20250116222554-wca1oh2",
-                    "value": {
-                        "id": "20250116222554-wca1oh2",
-                        "keyID": "20241213113357-svieuq5",
-                        "blockID": "20250116222554-yahqj0a",
-                        "type": "block",
-                        "isDetached": true,
-                        "createdAt": 1737037554843,
-                        "updatedAt": 1737089207943,
-                        "block": {
-                            "id": "20250116222554-yahqj0a",
-                            "icon": "",
-                            "content": "3242342",
-                            "created": 1737037554843,
-                            "updated": 1737089207943
-                        }
-                    },
-                    "valueType": "block",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250116222558-3njefey",
-                    "value": {
-                        "id": "20250116222558-3njefey",
-                        "keyID": "20241213113357-mw9230g",
-                        "blockID": "20250116222554-yahqj0a",
-                        "type": "date",
-                        "createdAt": 1737037561257,
-                        "updatedAt": 1737089207943,
-                        "date": {
-                            "content": 1744732800000,
-                            "isNotEmpty": true,
-                            "hasEndDate": true,
-                            "isNotTime": false,
-                            "content2": 1748107560000,
-                            "isNotEmpty2": true,
-                            "formattedContent": ""
-                        }
-                    },
-                    "valueType": "date",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250116222632-q1wknml",
-                    "value": {
-                        "id": "20250116222632-q1wknml",
-                        "keyID": "20250111123406-3epoj13",
-                        "blockID": "20250116222554-yahqj0a",
-                        "type": "select",
-                        "createdAt": 1737037597491,
-                        "updatedAt": 1737037598491,
-                        "mSelect": [
-                            {
-                                "content": "未完成",
-                                "color": "2"
-                            }
-                        ]
-                    },
-                    "valueType": "select",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250116222632-8pgexgm",
-                    "value": {
-                        "id": "20250116222632-8pgexgm",
-                        "keyID": "20241213113836-oyoy83j",
-                        "blockID": "20250116222554-yahqj0a",
-                        "type": "text",
-                        "createdAt": 1737037595232,
-                        "updatedAt": 1737037596232,
-                        "text": {
-                            "content": "2131231"
-                        }
-                    },
-                    "valueType": "text",
-                    "color": "",
-                    "bgColor": ""
-                }
-            ]
-        },
-        {
-            "id": "20250116222124-vie01gh",
-            "cells": [
-                {
-                    "id": "20250116222124-o1nd0ei",
-                    "value": {
-                        "id": "20250116222124-o1nd0ei",
-                        "keyID": "20241213113357-svieuq5",
-                        "blockID": "20250116222124-vie01gh",
-                        "type": "block",
-                        "isDetached": true,
-                        "createdAt": 1737037284856,
-                        "updatedAt": 1737089202451,
-                        "block": {
-                            "id": "20250116222124-vie01gh",
-                            "icon": "",
-                            "content": "qewqrqer",
-                            "created": 1737037284856,
-                            "updated": 1737089202451
-                        }
-                    },
-                    "valueType": "block",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250116222538-wr5j8if",
-                    "value": {
-                        "id": "20250116222538-wr5j8if",
-                        "keyID": "20241213113357-mw9230g",
-                        "blockID": "20250116222124-vie01gh",
-                        "type": "date",
-                        "createdAt": 1737037541270,
-                        "updatedAt": 1737089202451,
-                        "date": {
-                            "content": 1737037500000,
-                            "isNotEmpty": true,
-                            "hasEndDate": true,
-                            "isNotTime": false,
-                            "content2": 1737296700000,
-                            "isNotEmpty2": true,
-                            "formattedContent": ""
-                        }
-                    },
-                    "valueType": "date",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250116222545-5h4orc3",
-                    "value": {
-                        "id": "20250116222545-5h4orc3",
-                        "keyID": "20250111123406-3epoj13",
-                        "blockID": "20250116222124-vie01gh",
-                        "type": "select",
-                        "createdAt": 1737037547007,
-                        "updatedAt": 1737037599410,
-                        "mSelect": [
-                            {
-                                "content": "未完成",
-                                "color": "2"
-                            }
-                        ]
-                    },
-                    "valueType": "select",
-                    "color": "",
-                    "bgColor": ""
-                },
-                {
-                    "id": "20250116222541-2u2u09x",
-                    "value": {
-                        "id": "20250116222541-2u2u09x",
-                        "keyID": "20241213113836-oyoy83j",
-                        "blockID": "20250116222124-vie01gh",
-                        "type": "text",
-                        "createdAt": 1737037544860,
-                        "updatedAt": 1737037545860,
-                        "text": {
-                            "content": "33333333"
-                        }
-                    },
-                    "valueType": "text",
-                    "color": "",
-                    "bgColor": ""
-                }
-            ]
-        }
-    ],
-    "rowCount": 3,
-    "pageSize": 50
-};
+//OK解决事件重复问题
+//转换数据格式
+export async function convertToFullCalendarEvents(viewData: any[]) {
+    const events = [];
+    const addedEventIds = new Set();
 
+    for (const view of viewData) {
+        for (const item of view.data) {
+            if (item['开始时间']?.start) {
+                const eventId = item['事件']?.id || '';
+
+                if (eventId && !addedEventIds.has(eventId)) {
+                    addedEventIds.add(eventId);
+
+                    const startDate = new Date(parseInt(item['开始时间'].start));
+                    const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
+                    
+                    // 判断是否为全天事件
+                    const isAllDay = endDate && 
+                        startDate.getHours() === 0 && 
+                        startDate.getMinutes() === 0 &&
+                        endDate.getHours() === 23 && 
+                        endDate.getMinutes() === 59 &&
+                        startDate.toDateString() === endDate.toDateString();
+
+                    events.push({
+                        id: eventId,
+                        title: item['事件']?.content || '',
+                        start: startDate,
+                        end: endDate,
+                        allDay: isAllDay, // 添加全天事件标记
+                        extendedProps: {
+                            blockId: eventId,
+                            status: item['状态'].content || '',
+                            description: item['描述'].content || '',
+                        }
+                    });
+                }
+            }
+        }
+    }
+    return events;
+}
+
+
+
+// 添加数据到思源数据库
+//// 调用思源API创建块，块的内容为用户添加事件的面板
+//// 将新创建的块添加到数据库中
+//// 并设置此块的数据库属性，属性的值来源于用户添加事件的面板
+//// 尽量使用思源的api实现
+export async function createEventInDatabase(
+    dateStr: string,
+    // databaseId?: string,
+    calendar: Calendar,
+    viewValue
+) {
+    // 1. 创建面板HTML
+    //// 获取当前日期的日记块ID
+    // console.log(settingdata);
+    // console.log(window.siyuan.ws.app);
+    const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
+    //// 创建一个新块
+    console.log("daynote_id:::", daynote_id.id);
+
+    const iddata = await api.appendBlock("markdown", "- ", daynote_id.id);
+    const id = iddata[0].doOperations[0].id;
+    // console.log("iddata:::", iddata[0].doOperations[0].id);
+    console.log("dateStr:::", dateStr, "databaseId:::", settingdata["cal-db-id"]);
+    const dialog = new sy.Dialog({
+        title: '添加事件',
+        content: '<div id="eventPanel"></div>',
+        width: '500px',
+        destroyCallback: async (options) => {
+            // 删除空白块
+            //// 获取块内容
+            const block = await api.getBlockByID(id);
+            //// 如果块内容为空，则删除块
+            if (!block?.markdown?.trim() || block?.markdown === '- ') {
+                await api.deleteBlock(id);
+                console.log('删除空白块');
+                return;
+            }
+            // 添加到日历
+            //// 将块加入到数据库
+            // console.log("dasdsssssssssss::::::111111", panel);
+            await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"], panel);
+            console.log('添加到日历');
+
+            // 添加数据库属性
+            //// 添加时间和状态属性
+            console.log("viewValue:::", viewValue[0].data[0]['事件'].keyID);
+            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], viewValue[0].data[0]['开始时间'].keyID, dateStr, panel);
+
+            console.log('destroyCallback', datata);
+            setTimeout(() => calendar?.refetchEvents(), 1000);//TODO优化点
+        },
+        hideCloseIcon: true,
+    })
+    const eventPanel = document.getElementById('eventPanel');
+    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+        blockId: id,
+        render: {
+            breadcrumb: false,
+        },
+
+    });
+    panel.focus();
+
+    console.log("dasdsssssssssss::::::", panel);
+    // 2. 添加到文档并显示
+
+    // 3. 等待用户提交
+
+}

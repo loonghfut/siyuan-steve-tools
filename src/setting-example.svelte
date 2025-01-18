@@ -11,7 +11,6 @@
     export let setdialog;
 
     let settings = getSettings();
-
     function resetToDefault() {
         settings = resetSettings();
         console.log("resetToDefault", settings);
@@ -76,6 +75,26 @@
             description: "启用后再左上角加一个日历视图的入口",
             key: "cal-show-view",
             value: settings["cal-show-view"],
+        },
+        {
+            type: "select",
+            title: "日程创建位置",
+            description: "选择日记本",
+            key: "cal-create-pos",
+            value: settings["cal-create-pos"],
+            options: Object.fromEntries(
+                window.siyuan.notebooks.map(notebook => [notebook.id, notebook.name])
+            ),
+        },
+        {
+            type: "select",
+            title: "日程数据库选择",
+            description: "选择默认添加事件的数据库",
+            key: "cal-db-id",
+            value: settings["cal-db-id"],
+            options: moduleInstances['M_calendar'].av_ids.length > 0 ? Object.fromEntries(
+                moduleInstances['M_calendar'].av_ids.map(database => [database.id, database.name])
+            ) : {"": "无可用数据库"},
         },
         {
             type: "button",
@@ -269,11 +288,12 @@
         await plugin.saveData(myfile, settings);
         console.debug("Settings saved:", settings);
     }
-
     onMount(async () => {
         console.log("plugin-load");
         await runload();
+        // console.log("MMMMMMMMMMMM",moduleInstances['M_calendar'].av_ids);
     });
+
 
     async function runload() {
         let data = await plugin.loadData(myfile);

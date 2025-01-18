@@ -10,6 +10,8 @@ export const defaultSettings = {
     "cal-hand": "ces",
     "cal-ur": "calendar2.ics",
     "cal-show-view": true,
+    "cal-create-pos": null,
+    "cal-db-id": null,
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

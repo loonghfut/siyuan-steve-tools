@@ -415,3 +415,8 @@ $background-color-today: var(--b3-list-hover);
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.tippy-box {
+    position: relative;
+    z-index: 99999 !important;
+}

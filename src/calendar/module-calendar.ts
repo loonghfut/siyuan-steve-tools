@@ -22,7 +22,7 @@ export class M_calendar {
         this.plugin = plugin;
     }
     private isUpdating: boolean = false;
-
+    public av_ids: any;
     async init(settingdata) {
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
@@ -59,7 +59,7 @@ export class M_calendar {
                 title: "日程视图",
                 position: "left",
                 callback: async () => {
-                    // await this.openRiChengView();
+                    await this.openRiChengView();
                     //测试
                     // 获取特定的元素
                     //测试
@@ -74,6 +74,7 @@ export class M_calendar {
                 if (!islisten) {
                     return;
                 }
+                if(1){return;}
                 const msg = JSON.parse(e.data);
                 if (msg.cmd === "transactions") {
                     // console.log(msg);
@@ -113,6 +114,7 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
+        this.av_ids = await this.getAVreferenceid_pro();
         const targetNode = document.body;
         const config = { childList: true, subtree: true };
         const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
@@ -181,59 +183,55 @@ export class M_calendar {
                 calendar.updateSize();
             },
         });
-        const av_ids = await this.getAVreferenceid();
-        const viewIDs=await myF.getViewId(av_ids);
-        const viewValue=await myF.getViewValue(viewIDs);
-
 
         setTimeout(async () => {
-            // calendar = await run(, id);
+            calendar = await run(id);
         }, 100);
     }
 
-    //     async openRiChengView() {
-    //         const ics = await api.getFileBlob(calendarpath);
-    //         console.log(ics);
-    //         //时间戳
-    //         const id = new Date().getTime().toString();
-    //         let calendar: any;
-    //         const tab = await openTab({
-    //             app: this.plugin.app,
-    //             custom: {
-    //                 icon: "iconSTcal",
-    //                 title: `日程视图`,
-    //                 data: {
-    //                     text: "This is my custom tab",
-    //                 },
-    //                 id: this.plugin.name + 'calview',
-    //             },
-    //             // position: "right",
-    //             keepCursor: false
-    //         });
-    //         console.log(tab);
-    //         tab.panelElement.innerHTML = `
-    //   <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-    //         calendar = await run(ics, id);
-    //         const calendarDiv = document.getElementById(`calendar-${id}`);
-    //         if (calendarDiv) {
-    //             const resizeObserver = new ResizeObserver(entries => {
-    //                 for (const entry of entries) {
-    //                     const { width, height } = entry.contentRect;
-    //                     // console.log('Calendar container resized:', width, height);
-    //                     if (width == 0 || height == 0) {
-    //                         // resizeObserver.disconnect();
-    //                         console.log('ResizeObserver disconnected');
-    //                     }
-    //                     // 如果日历组件有 resize 方法，在这里调用
-    //                     calendar.updateSize();
-    //                 }
-    //             });
-    //             //如果已存在resizeObserver则先断开
-    //             resizeObserver.disconnect();
-    //             resizeObserver.observe(calendarDiv);
-    //         }
+    async openRiChengView() {
 
-    //     }
+        // console.log(viewValue);
+        //时间戳
+        const id = new Date().getTime().toString();
+        let calendar: any;
+        const tab = await openTab({
+            app: window.siyuan.ws.app,
+            custom: {
+                icon: "iconSTcal",
+                title: `日程视图`,
+                // data: {
+                //     text: "This is my custom tab",
+                // },
+                id: this.plugin.name + 'calview',
+            },
+            // position: "right",
+            keepCursor: false
+        });
+        console.log(tab);
+        tab.panelElement.innerHTML = `
+      <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
+        calendar = await run(id);
+        const calendarDiv = document.getElementById(`calendar-${id}`);
+        if (calendarDiv) {
+            const resizeObserver = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    const { width, height } = entry.contentRect;
+                    // console.log('Calendar container resized:', width, height);
+                    if (width == 0 || height == 0) {
+                        // resizeObserver.disconnect();
+                        console.log('ResizeObserver disconnected');
+                    }
+                    // 如果日历组件有 resize 方法，在这里调用
+                    calendar.updateSize();
+                }
+            });
+            //如果已存在resizeObserver则先断开
+            resizeObserver.disconnect();
+            resizeObserver.observe(calendarDiv);
+        }
+
+    }
 
     showhelp() {
         // new Dialog({
@@ -387,7 +385,25 @@ export class M_calendar {
         return avIds;
 
     }
-
+    async getAVreferenceid_pro(forwhat: string = '日程') {
+        const sqlStr = `SELECT markdown, content 
+        FROM blocks 
+        WHERE name = '${forwhat}'
+        AND markdown LIKE '%NodeAttributeView%data-av-id%';`;
+            
+        const res = await api.sql(sqlStr);
+        // console.log("RES:::::::::",res);
+        steveTools.outlog(res);
+        
+        const avIds = res.map(item => ({
+            id: extractDataAvId(item.markdown),
+            name: item.content?.substring(0, 3)||'N/A'
+        })).filter(item => item.id !== null);
+        
+        steveTools.outlog(avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+        console.log("avIds",avIds);
+        return avIds;
+    }
     // 从思源数据库中获取日程信息
     async getEventsFromSiYuanDatabase() {
         console.log('开始生成ics文件');

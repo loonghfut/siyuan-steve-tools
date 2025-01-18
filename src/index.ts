@@ -33,7 +33,7 @@ import SettingExample from "@/setting-example.svelte";
 
 let islog = false;
 const myfile = "steveTools.json";
-let settingdata: any = {};
+export let settingdata: any = {};
 let setdialog: any;
 export let moduleInstances: { [key: string]: any } = {};
 

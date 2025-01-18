@@ -101,6 +101,9 @@ interface Window {
         ws: any;
         languages: any;
         emojis: any;
+        zIndex: number;
+        backStack: any;
     };
     Lute: any;
+
 }

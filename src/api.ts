@@ -7,7 +7,7 @@
  */
 
 import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
-
+import { IOperation, Protyle } from "siyuan";
 
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
@@ -313,7 +313,7 @@ export async function renderAttributeView(avid: BlockId, viewID?: string) {
             // pageSize:9999999
             // page:2
         }
-    }else{
+    } else {
         data = {
             id: avid, // avID,
             viewID: viewID,
@@ -613,3 +613,179 @@ export const downloadFile = (file: Blob) => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 };
+
+export async function createDailyNote(app: string, notebookID: string) {
+    let data = {
+        app: app,
+        notebook: notebookID
+    }
+    let url = '/api/filetree/createDailyNote';
+    return request(url, data);
+};
+
+
+export async function addBlockToDatabase(id: string, databaseId: string) {
+    const data = {
+        session: window.siyuan?.backStack[0].protyle.id,
+        app: window.siyuan.ws.app.appId,
+        transactions: [
+            {
+                doOperations: [
+                    {
+                        action: "insertAttrViewBlock",
+                        avID: databaseId,
+                        ignoreFillFilter: true,
+                        srcs: [
+                            {
+                                id: id,
+                                isDetached: false
+                            }
+                        ],
+                        blockID: databaseId.split("-")[0]
+                    },
+                    {
+                        action: "doUpdateUpdated",
+                        id: databaseId.split("-")[0],
+                        data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
+                    }
+                ],
+                undoOperations: [
+                    {
+                        action: "removeAttrViewBlock",
+                        srcIDs: [id],
+                        avID: databaseId
+                    }
+                ]
+            }
+        ],
+        reqId: Date.now()
+    };
+
+    try {
+        const response = await fetch('/api/transactions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error adding block to database:', error);
+        throw error;
+    }
+}
+
+export async function addBlockToDatabase_pro(id: string, avID: string, protyle: Protyle) {
+    let doOperations: IOperation[] = [];
+    let undoOperations: IOperation[] = [];
+    doOperations.push(
+        {
+            action: "insertAttrViewBlock",
+            avID: avID,
+            ignoreFillFilter: true,
+            srcs: [{
+                id: id,
+                isDetached: false
+            }],
+            blockID: avID
+        },
+    );
+    doOperations.push(
+        {
+            action: "doUpdateUpdated",
+            id: id,
+            data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
+        }
+    );
+    undoOperations.push(
+        {
+            action: "removeAttrViewBlock",
+            srcIDs: [id],
+            avID: avID
+        }
+    );
+    protyle.transaction(doOperations, undoOperations);
+}
+
+export async function updateAttrViewCell_pro(id, avID, keyID, time, protyle: Protyle) {
+    let doOperations: IOperation[] = [];
+    let undoOperations: IOperation[] = [];
+    const { start, end } = await getDateTimestamps(time);
+    doOperations.push(
+        {
+            action: "updateAttrViewCell",
+            id: await generateSiyuanID(),
+            avID: avID,
+            keyID: keyID,
+            rowID: id,
+            data: {
+                type: "date",
+                date: {
+                    content: start, //TODO
+                    isNotEmpty: true,
+                    content2: end, //TODO
+                    isNotEmpty2: true,
+                    hasEndDate: true,
+                    isNotTime: false
+                },
+                id: id
+            },
+        }
+    );
+    doOperations.push(
+        {
+            action: "doUpdateUpdated",
+            id: id,
+            data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
+        }
+    );
+    undoOperations.push(
+
+    );
+    protyle.transaction(doOperations);
+}
+
+async function generateSiyuanID() {
+    // 生成时间戳部分
+    const now = new Date();
+    const timestamp = now.getFullYear() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0') +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0');
+
+    // 生成随机字符串部分
+    const chars = 'abcdefghijklmnopqrstuvwxyz';
+    let randomStr = '';
+    for (let i = 0; i < 7; i++) {
+        randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    // 组合ID
+    return `${timestamp}-${randomStr}`;
+}
+
+async function getDateTimestamps(dateStr: string): Promise<{ start: number, end: number }> {
+    // 创建日期对象
+    const date = new Date(dateStr);
+    
+    // 设置为当天0点
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    
+    // 设置为当天24点
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+    
+    return {
+        start: startDate.getTime(),
+        end: endDate.getTime()
+    };
+}

@@ -7,16 +7,17 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import tippy from 'tippy.js';
 // import 'tippy.js/dist/tippy.css';
+import { moduleInstances } from '@/index';
 import ICAL from 'ical.js';
 import solarLunar from 'solarlunar';
-
+import * as myF from './myF';
 
 let calendar: Calendar;
+let clicks = 0;
+let viewValue: any;
 
 
-
-
-export async function run(scheduleData, id: string, initialView = 'dayGridMonth') {
+export async function run(id: string, initialView = 'dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
         plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin],
@@ -30,13 +31,28 @@ export async function run(scheduleData, id: string, initialView = 'dayGridMonth'
         // 事件点击处理
         eventClick: function (info) {
             // ToEventNote(info);
+            console.log("事件点击", info);
+            calendar.refetchEvents();
         },
 
         // 日期点击处理
+        //// 双击触发
         dateClick: async function (info) {
-            // 这里可以添加创建新思源事件的逻辑
-            console.log('Date clicked:', info.dateStr);
+            let clickTimeout: NodeJS.Timeout;
+            clicks++;
+            if (clicks === 1) {
+                clickTimeout = setTimeout(() => {
+                clicks = 0;
+                }, 300);
+            } else if (clicks === 2) {
+                clearTimeout(clickTimeout);
+                clicks = 0;
+                console.log("创建事件", info);
+                const eventId = await myF.createEventInDatabase(info.dateStr, calendar,viewValue);
+            }
+
         },
+
 
         // 事件拖放处理
         eventDrop: async function (info) {
@@ -68,25 +84,84 @@ export async function run(scheduleData, id: string, initialView = 'dayGridMonth'
         },
 
         // 从思源数据转换事件
-        events: scheduleData.map(item => ({
-            id: item.id,
-            title: item.event,
-            start: new Date(item.startTime),
-            end: new Date(item.endTime),
-            description: item.description,
-            backgroundColor: item.status === '完成' ? '#4CAF50' : '#ff9800',
-            textColor: '#ffffff',
-            extendedProps: {
-                status: item.status,
-                blockId: item.id
+        events: async function (info, successCallback, failureCallback) {
+            try {
+                // 1. 获取引用ID
+                const av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+                if (!av_ids?.length) {
+                    console.warn('No reference IDs found');
+                    successCallback([]);
+                    return;
+                }
+        
+                // 2. 获取视图ID
+                const viewIDs = await myF.getViewId(av_ids);
+                if (!viewIDs?.length) {
+                    console.warn('No view IDs found');
+                    successCallback([]);
+                    return;
+                }
+        
+                // 3. 获取视图数据
+                viewValue = await myF.getViewValue(viewIDs);
+                console.log("View data:", viewValue);
+        
+                // 4. 转换事件数据
+                const events = await myF.convertToFullCalendarEvents(viewValue);
+                
+                // 5. 回调成功
+                successCallback(events);
+            } catch (error) {
+                console.error('Error fetching calendar events:', error);
+                failureCallback?.(error);
+                successCallback([]); // 失败时返回空数组
             }
-        })),
+        },
 
         eventDidMount: function (info) {
             // 设置样式
+            ////完成样式
             if (info.event.extendedProps.status === '完成') {
+                // 应用样式到整个事件元素
                 info.el.style.textDecoration = 'line-through';
+
+                // 找到并应用样式到标题元素
+                const titleEl = info.el.querySelector('.fc-event-title');
+                if (titleEl) {
+                    (titleEl as HTMLElement).style.textDecoration = 'line-through';
+                }
+
+                // 找到并应用样式到时间元素
+                const timeEl = info.el.querySelector('.fc-event-time');
+                if (timeEl) {
+                    (timeEl as HTMLElement).style.textDecoration = 'line-through';
+                }
+                // 添加自定义CSS类
+                info.el.classList.add('event-completed');
             }
+
+
+            //// 设置随机背景色
+            // Use event's ID or title as a unique identifier for color
+            const uniqueId = info.event.id || info.event.title;
+            // Create a hash of the uniqueId to get a number
+            const hash = Array.from(uniqueId).reduce((acc, char) => {
+                return char.charCodeAt(0) + ((acc << 5) - acc);
+            }, 0);
+
+            // Use hash as index for color and get both background and text colors
+            const [backgroundColor, textColor] = getColors(Math.abs(hash));
+            info.el.style.backgroundColor = backgroundColor;
+
+            // Also apply text color to child elements
+            const timeEl = info.el.querySelector('.fc-event-time');
+            const titleEl = info.el.querySelector('.fc-event-title');
+            if (timeEl) (timeEl as HTMLElement).style.color = textColor;
+            if (titleEl) (titleEl as HTMLElement).style.color = textColor;
+
+
+
+            // console.log(info);
 
             // 添加提示框
             tippy(info.el, {
@@ -110,10 +185,12 @@ export async function run(scheduleData, id: string, initialView = 'dayGridMonth'
                     </div>
                 `,
                 allowHTML: true,
-                placement: 'top',
+                placement: 'auto',
                 interactive: true,
+                zIndex: window.siyuan.zIndex,
+                appendTo: document.body,
                 theme: 'light',
-                delay: [200, 0]
+                delay: [300, 0]
             });
         }
     });
