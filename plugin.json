@@ -24,8 +24,8 @@
     "zh_CN": "STtools"
   },
   "description": {
-    "en_US": "personal tools",
-    "zh_CN": "个人使用的工具箱,持续更新..."
+    "en_US": "schedule management, docker sync awareness, ai sidebar",
+    "zh_CN": "日程管理, docker同步感知, ai侧边栏"
   },
   "readme": {
     "en_US": "README.md",

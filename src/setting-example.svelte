@@ -19,7 +19,7 @@
     }
 
     let groups: string[] = [
-        "日程分享",
+        "日程管理",
         "docker同步感知",
         "ai侧边栏",
         "✨开发中。。",
@@ -29,8 +29,8 @@
     let group1Items: ISettingItem[] = [
         {
             type: "checkbox",
-            title: "启用日程分享",
-            description: "启用日程分享(刷新后生效)",
+            title: "启用日程管理",
+            description: "启用日程管理(刷新后生效)",
             key: "cal-enable",
             value: settings["cal-enable"],
         },
