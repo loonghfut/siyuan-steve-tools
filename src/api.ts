@@ -773,19 +773,28 @@ async function generateSiyuanID() {
 }
 
 async function getDateTimestamps(dateStr: string): Promise<{ start: number, end: number }> {
-    // 创建日期对象
-    const date = new Date(dateStr);
-    
-    // 设置为当天0点
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
-    
-    // 设置为当天24点
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
-    
-    return {
-        start: startDate.getTime(),
-        end: endDate.getTime()
+    // 解析日期字符串
+    const parseDate = (dateStr: string): Date => {
+        if (dateStr.includes('T')) {
+            return new Date(dateStr);
+        }
+        return new Date(dateStr + 'T08:00:00+08:00');
     };
+
+    const date = parseDate(dateStr);
+    
+    if (dateStr.includes('T')) {
+        // 对于带时间的格式，end时间设为1小时后
+        return {
+            start: date.getTime(),
+            end: date.getTime() + 3600000 // 加一小时(1000 * 60 * 60)
+        };
+    } else {
+        // 对于仅日期的格式，start和end都设为当天8点
+        const fixedTime = date.getTime();
+        return {
+            start: fixedTime,
+            end: fixedTime
+        };
+    }
 }

@@ -3,7 +3,9 @@ import { ViewItem } from '@/calendar/interface';
 import * as sy from 'siyuan'
 import { settingdata } from '@/index';
 import { Calendar } from '@fullcalendar/core';
+import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
+
 
 
 // Return type using interface
@@ -25,7 +27,7 @@ export async function getViewId(va_ids: string[]): ViewData {
                 });
             });
 
-            console.log(viewIds_Data);
+            // console.log(viewIds_Data);
         } catch (error) {
             console.error(`Error processing view ${va_id}:`, error);
         }
@@ -54,6 +56,7 @@ export async function getViewValue(viewIds_Data: ViewItem[]) {
             console.error(`Error processing view ${viewId_Data.viewId}:`, error);
         }
     }
+
     console.log("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
@@ -152,14 +155,12 @@ export async function convertToFullCalendarEvents(viewData: any[]) {
 
                     const startDate = new Date(parseInt(item['开始时间'].start));
                     const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
-                    
+                    // console.log("startDate:::", startDate, "endDate:::", endDate);
                     // 判断是否为全天事件
-                    const isAllDay = endDate && 
-                        startDate.getHours() === 0 && 
-                        startDate.getMinutes() === 0 &&
-                        endDate.getHours() === 23 && 
-                        endDate.getMinutes() === 59 &&
-                        startDate.toDateString() === endDate.toDateString();
+                    const isAllDay = !endDate ||
+                        (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
+                            (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
+                        (endDate && startDate.getTime() === endDate.getTime());
 
                     events.push({
                         id: eventId,
@@ -193,6 +194,8 @@ export async function createEventInDatabase(
     calendar: Calendar,
     viewValue
 ) {
+    let isok = false;
+    console.log("viewValue:::createEventInDatabase", viewValue);
     // 1. 创建面板HTML
     //// 获取当前日期的日记块ID
     // console.log(settingdata);
@@ -201,48 +204,94 @@ export async function createEventInDatabase(
     //// 创建一个新块
     console.log("daynote_id:::", daynote_id.id);
 
-    const iddata = await api.appendBlock("markdown", "- ", daynote_id.id);
+    const iddata = await api.appendBlock("markdown", "#### ", daynote_id.id);
     const id = iddata[0].doOperations[0].id;
     // console.log("iddata:::", iddata[0].doOperations[0].id);
     console.log("dateStr:::", dateStr, "databaseId:::", settingdata["cal-db-id"]);
     const dialog = new sy.Dialog({
-        title: '添加事件',
+        title: '添加事件(按Ctrl+Enter提交)',
         content: '<div id="eventPanel"></div>',
         width: '500px',
-        destroyCallback: async (options) => {
+        height: 'auto',
+        destroyCallback: () => {
+            if (!isok) {
+                // api.deleteBlock(id);
+                sy.showMessage('已取消添加事件');
+            }
+        },
+        // hideCloseIcon: false,
+        disableClose: true,
+    })
+
+    const eventPanel = document.getElementById('eventPanel');
+    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+        blockId: id,
+        rootId: id,
+        render: {
+            breadcrumb: false,
+        },
+        // action: ["cb-get-focus"],
+
+    });
+    let ok = false;
+    window.siyuan.ws.ws.addEventListener('message', async (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.cmd === "transactions") {
+            ok = true;
+        }
+    });
+    // console.log(msg);
+    const handleKeydown = async (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && e.ctrlKey && ok) {
+            e.preventDefault();
+            await new Promise(resolve => setTimeout(resolve, 100));
+            isok = true;
+            panel.protyle.element.removeEventListener('keydown', handleKeydown);
             // 删除空白块
             //// 获取块内容
             const block = await api.getBlockByID(id);
             //// 如果块内容为空，则删除块
-            if (!block?.markdown?.trim() || block?.markdown === '- ') {
+            // console.log("block:::", block.markdown);
+            const markdownContent = block?.markdown?.trim() || '';
+            console.log("markdownContent:::", markdownContent);
+            if (!markdownContent || /^#{1,4}\s*$/.test(markdownContent)) {
                 await api.deleteBlock(id);
                 console.log('删除空白块');
+                dialog.destroy();
+                sy.showMessage('已取消添加事件');
                 return;
             }
             // 添加到日历
             //// 将块加入到数据库
             // console.log("dasdsssssssssss::::::111111", panel);
             await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"], panel);
-            console.log('添加到日历');
-
             // 添加数据库属性
             //// 添加时间和状态属性
-            console.log("viewValue:::", viewValue[0].data[0]['事件'].keyID);
-            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], viewValue[0].data[0]['开始时间'].keyID, dateStr, panel);
+            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
+            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, panel);
+            if (panel.isUploading()) {
+                const checkUploading = setInterval(() => {
+                    console.log('destroyCallbackPANEL', panel.isUploading());
+                    if (!panel.isUploading()) {
+                        clearInterval(checkUploading);
+                        setTimeout(() => calendar.refetchEvents(), 1500);
+                    }
+                }, 100);
+            } else {
+                setTimeout(() => calendar.refetchEvents(), 1500);
+            }
+            // 提示用户
+            sy.showMessage('正在添加事件', -1, "info", "1");
+            setTimeout(() => {
+                dialog.destroy();
+                sy.showMessage('已添加事件', 2000, "info", "1");
+            }, 1000);
 
-            console.log('destroyCallback', datata);
-            setTimeout(() => calendar?.refetchEvents(), 1000);//TODO优化点
-        },
-        hideCloseIcon: true,
-    })
-    const eventPanel = document.getElementById('eventPanel');
-    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
-        blockId: id,
-        render: {
-            breadcrumb: false,
-        },
+        }
+    };
+    const debouncedHandleKeydown = debounce(handleKeydown, 300);
 
-    });
+    panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     panel.focus();
 
     console.log("dasdsssssssssss::::::", panel);
@@ -250,4 +299,62 @@ export async function createEventInDatabase(
 
     // 3. 等待用户提交
 
+}
+
+
+async function getKeyIDfromViewValue(viewValue: any, key: string): Promise<string | undefined> {
+    // First try to get keyID from existing viewValue
+    const findKeyID = (data: any[]): string | undefined => {
+        for (const view of data) {
+            for (const item of view.data) {
+                if (item?.[key]?.keyID) {
+                    return item[key].keyID;
+                }
+            }
+        }
+        return undefined;
+    };
+
+    const existingKeyID = findKeyID(viewValue);
+    if (existingKeyID) {
+        return existingKeyID;
+    }
+
+    // If not found, fetch fresh data
+    try {
+        console.log('Fetching fresh view data...');
+        sy.showMessage('首次添加事件，请稍等...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const Mcalendar = moduleInstances['M_calendar'];
+        const av_ids = await Mcalendar.getAVreferenceid();
+
+        if (!av_ids?.length) {
+            console.warn('No reference IDs found');
+            return undefined;
+        }
+
+        const viewIDs = await getViewId(av_ids);
+        if (!viewIDs?.length) {
+            console.warn('No view IDs found');
+            return undefined;
+        }
+
+        const freshViewValue = await getViewValue(viewIDs);
+        return findKeyID(freshViewValue);
+    } catch (error) {
+        console.error('Error fetching key ID:', error);
+        return undefined;
+    }
+}
+
+function debounce(func: Function, wait: number) {
+    let timeout: NodeJS.Timeout;
+    return function executedFunction(...args: any[]) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }

@@ -32,7 +32,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         eventClick: function (info) {
             // ToEventNote(info);
             console.log("事件点击", info);
-            calendar.refetchEvents();
+            calendar.render();
         },
 
         // 日期点击处理
@@ -86,6 +86,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         // 从思源数据转换事件
         events: async function (info, successCallback, failureCallback) {
             try {
+                console.log('Fetching calendar events...::::::::::::::::::::::::::');
                 // 1. 获取引用ID
                 const av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
                 if (!av_ids?.length) {
@@ -175,7 +176,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                         </span>
                         <div class="event-tooltip__content">
                             <p><span class="event-tooltip__label">开始:</span> ${info.event.start?.toLocaleString()}</p>
-                            <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString()}</p>
+                            <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "全天" }</p>
                             <p><span class="event-tooltip__label">状态:</span> ${info.event.extendedProps.status}</p>
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
