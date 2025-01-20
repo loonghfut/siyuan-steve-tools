@@ -233,18 +233,25 @@ export async function createEventInDatabase(
         // action: ["cb-get-focus"],
 
     });
-    let ok = false;
-    window.siyuan.ws.ws.addEventListener('message', async (e) => {
-        const msg = JSON.parse(e.data);
-        if (msg.cmd === "transactions") {
-            ok = true;
+    let ok = false;//防崩溃
+    const messageHandler = async (e: MessageEvent) => {
+        try {
+            const msg = JSON.parse(e.data);
+            if (msg.cmd === "transactions") {
+                ok = true;
+            }
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
         }
-    });
+    };
+
+    window.siyuan.ws.ws.addEventListener('message', messageHandler);
     // console.log(msg);
     const handleKeydown = async (e: KeyboardEvent) => {
         if (e.key === 'Enter' && e.ctrlKey && ok) {
             e.preventDefault();
-            await new Promise(resolve => setTimeout(resolve, 100));
+            window.siyuan.ws.ws.removeEventListener('message', messageHandler);
+            // await new Promise(resolve => setTimeout(resolve, 100));
             isok = true;
             panel.protyle.element.removeEventListener('keydown', handleKeydown);
             // 删除空白块
@@ -268,7 +275,7 @@ export async function createEventInDatabase(
             // 添加数据库属性
             //// 添加时间和状态属性
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
-            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, panel);
+            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr);
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
                     console.log('destroyCallbackPANEL', panel.isUploading());
@@ -290,7 +297,6 @@ export async function createEventInDatabase(
         }
     };
     const debouncedHandleKeydown = debounce(handleKeydown, 300);
-
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     panel.focus();
 
@@ -300,6 +306,32 @@ export async function createEventInDatabase(
     // 3. 等待用户提交
 
 }
+
+export async function updateEventInDatabase(
+    info: any,
+    calendar: Calendar,
+    viewValue
+) {
+    // 更新思源数据库中的时间
+    console.log("事件拖放", info);
+    const blockId = info.event._def.extendedProps.blockId
+    console.log("blockId:::", blockId);
+    const newStartDate = info.event.startStr;
+    const newEndDate = info.event.endStr;
+    console.log("dateChange:::", newStartDate, newEndDate);
+    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
+    const datata = await api.updateAttrViewCell_pro(blockId, settingdata["cal-db-id"], timeKeyID,newStartDate,newEndDate);//TODOsettingdata["cal-db-id"]
+    setTimeout(() => calendar.refetchEvents(), 1000);
+    sy.showMessage('正在更新事件', -1, "info", "1");
+    setTimeout(() => {
+        sy.showMessage('已更新事件', 2000, "info", "1");
+    }, 1000);
+}
+
+//TODO删除事件
+//TODO优化代码
+//TODO生成ics文件
+
 
 
 async function getKeyIDfromViewValue(viewValue: any, key: string): Promise<string | undefined> {
@@ -358,3 +390,6 @@ function debounce(func: Function, wait: number) {
         timeout = setTimeout(later, wait);
     };
 }
+
+
+

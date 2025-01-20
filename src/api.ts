@@ -713,10 +713,16 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle: 
     protyle.transaction(doOperations, undoOperations);
 }
 
-export async function updateAttrViewCell_pro(id, avID, keyID, time, protyle: Protyle) {
+export async function updateAttrViewCell_pro(id, avID, keyID, time, endtime?) {
     let doOperations: IOperation[] = [];
     let undoOperations: IOperation[] = [];
-    const { start, end } = await getDateTimestamps(time);
+    if (endtime) {
+        console.log(endtime);
+    }
+    let { start, end } = await getDateTimestamps(time);
+    if (endtime) {
+        end = (await getDateTimestamps(endtime)).start;
+    }
     doOperations.push(
         {
             action: "updateAttrViewCell",
@@ -748,7 +754,7 @@ export async function updateAttrViewCell_pro(id, avID, keyID, time, protyle: Pro
     undoOperations.push(
 
     );
-    protyle.transaction(doOperations);
+    Protyle.prototype.transaction(doOperations, undoOperations);
 }
 
 async function generateSiyuanID() {
@@ -782,7 +788,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
     };
 
     const date = parseDate(dateStr);
-    
+
     if (dateStr.includes('T')) {
         // 对于带时间的格式，end时间设为1小时后
         return {

@@ -56,12 +56,9 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
         // 事件拖放处理
         eventDrop: async function (info) {
-            if (!confirm('确定要移动这个事件吗?')) {
-                info.revert();
-                return;
-            }
-            // 更新思源数据库中的时间
-            // TODO: 实现更新逻辑
+            console.log("事件拖动shijian",info.event.startStr,info.event.endStr); 
+            myF.updateEventInDatabase(info, calendar,viewValue);
+
         },
 
         views: {
