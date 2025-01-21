@@ -447,21 +447,21 @@ export class M_calendar {
         // 获取列ID
         const eventColumnId = this.getColumnIdByName(columns, "事件");
         const dateColumnId = this.getColumnIdByName(columns, "开始时间");
-        // const durationColumnId = this.getColumnIdByName(columns, "数字");
-        const ruleColumnId = this.getColumnIdByName(columns, "状态");
+        const durationColumnId = this.getColumnIdByName(columns, "持续时间");
+        const ruleColumnId = this.getColumnIdByName(columns, "重复规则");
         const descColumnId = this.getColumnIdByName(columns, "描述");
     
         return rows.map(row => {
             const eventValue = this.getCellValue(row.cells, eventColumnId);
             const dateValue = this.getCellValue(row.cells, dateColumnId);
-            // const durationValue = this.getCellValue(row.cells, durationColumnId);
+            const durationValue = this.getCellValue(row.cells, durationColumnId);
             const ruleValue = this.getCellValue(row.cells, ruleColumnId);
             const descValue = this.getCellValue(row.cells, descColumnId);
     
             return {
                 blockContent: eventValue?.block?.content || 'N/A',
                 dateContent: dateValue?.date?.content || 0,
-                // duration: durationValue?.number?.content || 1,
+                duration: durationValue?.number?.content || 1,
                 rule: ruleValue?.text?.content || 'N/A',
                 textContent: descValue?.text?.content || 'N/A'
             };

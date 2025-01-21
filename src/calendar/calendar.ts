@@ -8,8 +8,8 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import tippy from 'tippy.js';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
-import ICAL from 'ical.js';
-import solarLunar from 'solarlunar';
+// import ICAL from 'ical.js';
+// import solarLunar from 'solarlunar';
 import * as myF from './myF';
 
 let calendar: Calendar;
