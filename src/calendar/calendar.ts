@@ -12,6 +12,7 @@ import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
 // import solarLunar from 'solarlunar';
 import * as myF from './myF';
+import { showMessage } from 'siyuan';
 
 let calendar: Calendar;
 let clicks = 0;
@@ -59,11 +60,22 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         // 事件拖放处理
         eventDrop: async function (info) {
             console.log("事件拖动shijian", info.event.startStr, info.event.endStr);
+            if(info.event._def.extendedProps.isRecurring){
+                showMessage("重复事件不支持拖动哦");
+                //撤回拖动
+                info.revert();
+                return;
+            }
             myF.updateEventInDatabase(info, calendar, viewValue);
 
         },
         eventResize: async function (info) {
             console.log("事件调整大小", info.event.startStr, info.event.endStr);
+            if(info.event._def.extendedProps.isRecurring){
+                showMessage("重复事件不支持修改哦");
+                info.revert();
+                return;
+            }
             myF.updateEventInDatabase(info, calendar, viewValue);
         },
 
