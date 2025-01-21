@@ -233,20 +233,7 @@ export class M_calendar {
 
     }
 
-    showhelp() {
-        // new Dialog({
-        //     title: null,
-        //     content: ``,
-        //     width: '70%',
-        //     height: '80vh',
-        //     disableClose: false,
-        //     hideCloseIcon: true,
-        // });
-
-    }
-
-
-
+ 
     onunload() {
         console.log("M_calendar unloaded");
     }
@@ -265,7 +252,19 @@ export class M_calendar {
     async generateICS(events: EventAttributes[], filePath: string) {
         try {
             // 使用ics库生成ICS内容
-            const { error, value: icsContent } = createEvents(events);
+            const { error, value: calendarContent } = createEvents(events.map(event => {
+                const defaultStart: [number, number, number] = [
+                    new Date().getFullYear(),
+                    new Date().getMonth() + 1,
+                    new Date().getDate()
+                ];
+                return {
+                    ...event,
+                    // 确保必要字段存在且格式正确
+                    start: event.start || defaultStart,
+                    title: event.title || '未命名事件'
+                };
+            }));
 
             if (error) {
                 console.error('生成ICS内容时出错：', error);
@@ -273,7 +272,7 @@ export class M_calendar {
             }
 
             // 将ICS内容转换为Blob
-            const fileBlob = new Blob([icsContent], { type: 'text/calendar' });
+            const fileBlob = new Blob([calendarContent], { type: 'text/calendar' });
 
             // 使用api.putFile上传文件
             const response = await api.putFile(filePath, false, fileBlob);
@@ -296,28 +295,64 @@ export class M_calendar {
     }
 
     // 从JSON文件生成ICS文件
+    // 新增转换函数
+    private convertArrayTimeToDate(timeArray: number[]): [number, number, number, number, number] {
+        return [timeArray[0], timeArray[1], timeArray[2], timeArray[3] || 0, timeArray[4] || 0];
+    }
+    
+    private convertEventFormat(eventData: any): EventAttributes[] {
+        const events: EventAttributes[] = [];
+        
+        // 处理常规事件数组
+        if (Array.isArray(eventData[0])) {
+            eventData[0].forEach((event: any) => {
+                events.push({
+                    start: this.convertArrayTimeToDate(event.start),
+                    end: this.convertArrayTimeToDate(event.end),
+                    title: event.title,
+                    description: event.description,
+                    status: event.status
+                });
+            });
+        }
+        
+        // 处理周期性事件
+        if (eventData[1]) {
+            const recurringEvent = eventData[1];
+            events.push({
+                start: this.convertArrayTimeToDate(recurringEvent.start),
+                duration: recurringEvent.duration,
+                title: recurringEvent.title,
+                description: recurringEvent.description,
+                recurrenceRule: recurringEvent.recurrenceRule
+            });
+        }
+        
+        return events;
+    }
+    
+    // 修改后的generateICSFromEventsFile函数
     async generateICSFromEventsFile(jsonFilePath: string, icsFilePath: string) {
         try {
-            // 使用api.getFileBlob读取JSON文件
             const eventsBlob = await api.getFileBlob(jsonFilePath);
             if (!eventsBlob) {
                 console.error('读取事件数据失败');
                 return;
             }
             const eventsJson = await eventsBlob.text();
-            const events: EventAttributes[] = JSON.parse(eventsJson);
-
-            // 使用ics库生成ICS内容
-            const { error, value: icsContent } = createEvents(events);
+            const rawEvents = JSON.parse(eventsJson);
+            
+            // 使用新的转换函数
+            const convertedEvents = this.convertEventFormat(rawEvents);
+            
+            // 生成ICS内容
+            const { error, value: icsContent } = createEvents(convertedEvents);
             if (error) {
                 console.error('生成ICS内容时出错：', error);
                 return;
             }
-
-            // 将ICS内容转换为Blob
+    
             const fileBlob = new Blob([icsContent], { type: 'text/calendar' });
-
-            // 使用api.putFile上传ICS文件
             await api.putFile(icsFilePath, false, fileBlob);
             steveTools.outlog('ICS文件已生成到' + icsFilePath);
         } catch (error) {
@@ -484,25 +519,33 @@ export class M_calendar {
             
             // 处理常规事件
             const avIds = await this.getAVreferenceid();
-            for (const avId of avIds) {
-                const response = await api.renderAttributeView(avId);
-                if (response?.view) {
-                    const result = this.processRegularEvents(response);
-                    await this.runAddEvent(result);
-                    steveTools.outlog(result);
-                }
-            }
+            const viewIDs = await myF.getViewId(avIds);
+            const viewValue = await myF.getViewValue(viewIDs);
+            console.log("EEEEEEEEEEEEEEEEEView data:", viewValue);
+            const result = transformEvents(viewValue);
+            await this.addEventToGlobal(result);
+
+
+           
+            // for (const avId of avIds) {
+            //     const response = await api.renderAttributeView(avId);
+            //     if (response?.view) {
+                    // const result = this.processRegularEvents(response);
+                    // await this.runAddEvent(result);
+                    // steveTools.outlog(result);
+            //     }
+            // }
     
             // 处理周期事件
-            const avIds_zq = await this.getAVreferenceid('周期');
-            for (const avId of avIds_zq) {
-                const response = await api.renderAttributeView(avId);
-                if (response?.view) {
-                    const result = this.processRecurringEvents(response);
-                    await this.runAddEvent(result, true);
-                    steveTools.outlog(result);
-                }
-            }
+            // const avIds_zq = await this.getAVreferenceid('周期');
+            // for (const avId of avIds_zq) {
+            //     const response = await api.renderAttributeView(avId);
+            //     if (response?.view) {
+            //         const result = this.processRecurringEvents(response);
+            //         await this.runAddEvent(result, true);
+            //         steveTools.outlog(result);
+            //     }
+            // }
     
             await this.uploadAllEventsToFile(eventsPath);
             await this.generateICSFromEventsFile(eventsPath, calendarpath);
@@ -593,6 +636,7 @@ export class M_calendar {
         try {
             // 将全局事件数组保存回JSON文件
             const updatedEventsJson = JSON.stringify(allEvents);
+            console.log("updatedEventsJson",allEvents);
             const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
             await api.putFile(jsonFilePath, false, fileBlob);
             steveTools.outlog('所有事件已保存到' + jsonFilePath);
@@ -688,3 +732,30 @@ function convertTimestampToArray(timestamp: number): [number, number, number, nu
 //         });
 //     }
 // }
+
+function transformEvents(inputEvents) {
+    function timestampToArray(timestamp) {
+        const date = new Date(timestamp);
+        return [
+            date.getFullYear(),
+            date.getMonth() + 1,
+            date.getDate(),
+            date.getHours(),
+            date.getMinutes()
+        ];
+    }
+
+    const transformedEvents = inputEvents[0].data.map(event => ({
+        start: timestampToArray(event.开始时间.start),
+        startInputType: "local",
+        startOutputType: "local",
+        end: timestampToArray(event.开始时间.end),
+        endInputType: "local",
+        endOutputType: "local",
+        title: event.事件.content,
+        description: event.描述.content,
+        status: event.状态.content === "完成" ? "CONFIRMED" : "TENTATIVE"
+    }));
+
+    return transformedEvents;
+}
