@@ -11,6 +11,10 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 
 具体使用方法请到插件设置页查看
 
+- [] 周期拖拽
+- [] 日志输出
+
+
 #### 更新日志
 详见代码[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main/)
 

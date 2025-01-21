@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
+import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -15,12 +16,13 @@ import * as myF from './myF';
 let calendar: Calendar;
 let clicks = 0;
 let viewValue: any;
+let viewValue_zq: any;
 
 
 export async function run(id: string, initialView = 'dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
-        plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin],
+        plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin,rrule],
         initialView: initialView,
         navLinks: true,
         dayMaxEvents: true,
@@ -90,6 +92,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 console.log('Fetching calendar events...::::::::::::::::::::::::::');
                 // 1. 获取引用ID
                 const av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+                const av_ids_zq = await moduleInstances['M_calendar'].getAVreferenceid("周期");
                 if (!av_ids?.length) {
                     console.warn('No reference IDs found');
                     successCallback([]);
@@ -97,6 +100,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 }
 
                 // 2. 获取视图ID
+                const viewIDs_zq = await myF.getViewId(av_ids_zq);
                 const viewIDs = await myF.getViewId(av_ids);
                 if (!viewIDs?.length) {
                     console.warn('No view IDs found');
@@ -105,12 +109,13 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 }
 
                 // 3. 获取视图数据
+                viewValue_zq =await myF.getViewValue(viewIDs_zq,true);
                 viewValue = await myF.getViewValue(viewIDs);
                 console.log("View data:", viewValue);
 
                 // 4. 转换事件数据
-                const events = await myF.convertToFullCalendarEvents(viewValue);
-
+                const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
+                console.log('Fetched calendar events:', events);
                 // 5. 回调成功
                 successCallback(events);
             } catch (error) {

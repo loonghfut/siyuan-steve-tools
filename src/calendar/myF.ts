@@ -5,7 +5,7 @@ import { settingdata } from '@/index';
 import { Calendar } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
-import {ISelectOption } from "@/calendar/interface";
+import { ISelectOption } from "@/calendar/interface";
 
 
 // Return type using interface
@@ -37,13 +37,13 @@ export async function getViewId(va_ids: string[]): ViewData {
 }
 
 //获取视图值
-export async function getViewValue(viewIds_Data: ViewItem[]) {
+export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
     const viewValue_Data = [];
 
     for (const viewId_Data of viewIds_Data) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
-            const data = extractDataFromTable(viewValue.view);
+            const data = extractDataFromTable(viewValue.view, isZQ);
             viewValue_Data.push({
                 from: viewId_Data,
                 data: data,
@@ -63,7 +63,7 @@ export async function getViewValue(viewIds_Data: ViewItem[]) {
 
 
 
-function extractDataFromTable(data: any) {
+function extractDataFromTable(data: any, isZQ = false) {
     // 数据有效性检查
     if (!data || !data.columns || !Array.isArray(data.columns) || !data.rows) {
         console.warn('Invalid data structure received:', data);
@@ -108,12 +108,30 @@ function extractDataFromTable(data: any) {
                 }
 
                 // 提取状态
-                if (columnMap.has('状态') && row.cells) {
-                    const statusCell = row.cells[columnMap.get('状态').index];
-                    rowData['状态'] = {
-                        content: statusCell?.value?.mSelect?.[0]?.content || '',
-                        keyID: statusCell?.value?.keyID || ''
-                    };
+                if (isZQ) {
+                    if (columnMap.has('重复规则') && row.cells) {
+                        const ruleCell = row.cells[columnMap.get('重复规则').index];
+                        rowData['重复规则'] = {
+                            content: ruleCell?.value?.text?.content || '',
+                            keyID: ruleCell?.value?.keyID || ''
+                        };
+                    }
+                    if (columnMap.has('持续时间') && row.cells) {
+                        const numCell = row.cells[columnMap.get('持续时间').index];
+                        rowData['持续时间'] = {
+                            content: numCell?.value?.number?.content || '',
+                            keyID: numCell?.value?.keyID || ''
+                        };
+                    }
+
+                } else {
+                    if (columnMap.has('状态') && row.cells) {
+                        const statusCell = row.cells[columnMap.get('状态').index];
+                        rowData['状态'] = {
+                            content: statusCell?.value?.mSelect?.[0]?.content || '',
+                            keyID: statusCell?.value?.keyID || ''
+                        };
+                    }
                 }
 
                 // 提取描述
@@ -141,11 +159,11 @@ function extractDataFromTable(data: any) {
 
 //OK解决事件重复问题
 //转换数据格式
-export async function convertToFullCalendarEvents(viewData: any[]) {
-    console.log("viewData:::啊啊啊啊啊啊啊啊啊", viewData);
+export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]) {
     const events = [];
     const addedEventIds = new Set();
-
+    console.log("viewData:::", viewData_zq);
+    // 处理普通事件
     for (const view of viewData) {
         for (const item of view.data) {
             if (item['开始时间']?.start) {
@@ -156,8 +174,7 @@ export async function convertToFullCalendarEvents(viewData: any[]) {
 
                     const startDate = new Date(parseInt(item['开始时间'].start));
                     const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
-                    // console.log("startDate:::", startDate, "endDate:::", endDate);
-                    // 判断是否为全天事件
+
                     const isAllDay = !endDate ||
                         (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
@@ -168,18 +185,60 @@ export async function convertToFullCalendarEvents(viewData: any[]) {
                         title: item['事件']?.content || '',
                         start: startDate,
                         end: endDate,
-                        allDay: isAllDay, // 添加全天事件标记
+                        allDay: isAllDay,
                         extendedProps: {
                             blockId: eventId,
                             rootid: view.from.rootid,
-                            status: item['状态'].content || '',
-                            description: item['描述'].content || '',
+                            status: item['状态']?.content || '',
+                            description: item['描述']?.content || '',
+                            isRecurring: false
                         }
                     });
                 }
             }
         }
     }
+
+    // 处理周期事件
+    if (viewData_zq) {
+        for (const view of viewData_zq) {
+            for (const item of view.data) {
+                if (item['开始时间']?.start) {
+                    const eventId = item['事件']?.id || '';
+
+                    if (eventId && !addedEventIds.has(eventId)) {
+                        addedEventIds.add(eventId);
+
+                        const startDate = new Date(parseInt(item['开始时间'].start));
+                        const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
+                        console.log("startDate:::", startDate, "endDate:::", endDate);
+                        const isAllDay = !endDate ||
+                            (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
+                                (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
+                            (endDate && startDate.getTime() === endDate.getTime());
+
+                        events.push({
+                            id: eventId,
+                            title: item['事件']?.content || '',
+                            start: startDate,
+                            end: endDate,
+                            allDay: isAllDay,
+                            rrule: item['重复规则']?.content || '',
+                            extendedProps: {
+                                blockId: eventId,
+                                rootid: view.from.rootid,
+                                // status: item['状态']?.content || '',
+                                description: item['描述']?.content || '',
+                                isRecurring: true,
+                                recurringPattern: item['重复规则']?.content || ''
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     return events;
 }
 
@@ -290,9 +349,9 @@ export async function createEventInDatabase(
             //// 添加时间和状态属性
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态');
-            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr,"date");
-            const selectdata: ISelectOption[] = [{content:"未完成"}];
-            await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID,selectdata,"select");
+            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, "date");
+            const selectdata: ISelectOption[] = [{ content: "未完成" }];
+            await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID, selectdata, "select");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
                     console.log('destroyCallbackPANEL', panel.isUploading());
@@ -339,7 +398,7 @@ export async function updateEventInDatabase(
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
     const rootid = info.event._def.extendedProps.rootid;
     console.log("rootid:::", rootid);
-    const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate,"date",newEndDate);//TODOsettingdata["cal-db-id"]
+    const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {

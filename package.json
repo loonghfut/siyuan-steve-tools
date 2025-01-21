@@ -41,6 +41,7 @@
     "@fullcalendar/interaction": "^6.1.15",
     "@fullcalendar/list": "^6.1.15",
     "@fullcalendar/multimonth": "^6.1.15",
+    "@fullcalendar/rrule": "^6.1.15",
     "@fullcalendar/timegrid": "^6.1.15",
     "@fullcalendar/vue3": "^6.1.15",
     "ical": "^0.8.0",
@@ -49,6 +50,7 @@
     "ics": "^3.8.1",
     "install": "^0.13.0",
     "npm": "^11.0.0",
+    "rrule": "^2.8.1",
     "solarlunar": "^2.0.7",
     "tippy.js": "^6.3.7",
     "vue": "3"
