@@ -23,11 +23,12 @@ export class M_calendar {
     }
     private isUpdating: boolean = false;
     public av_ids: any;
+
     async init(settingdata) {
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
-        console.log(calendarpath);
+        steveTools.outlog(calendarpath);
         this.plugin.addIcons(`
     <symbol id="iconSTcal" viewBox="0 0 500 500">
        ${ic.steveTools_cal}
@@ -39,7 +40,7 @@ export class M_calendar {
         // this.plugin.eventBus.on("loaded-protyle-static", this.avButton.bind(this));
         this.plugin.eventBus.on("switch-protyle", this.avButton.bind(this));
 
-        // console.log(this_settingdata["cal-hand-update"]);
+        // steveTools.outlog(this_settingdata["cal-hand-update"]);
         if (this_settingdata["cal-hand-update"] == true) {
             this.plugin.addTopBar({
                 icon: "iconSTcal",
@@ -60,55 +61,52 @@ export class M_calendar {
                 position: "left",
                 callback: async () => {
                     await this.openRiChengView();
-                    //测试
-                    // 获取特定的元素
-                    //测试
                 }
             });
         }
 
         if (this_settingdata["cal-auto-update"] == true) {
-            console.log("自动更新日历文件");
+            steveTools.outlog("自动更新日历文件");
             //监听
             siyuan.ws.ws.addEventListener('message', async (e) => {
                 if (!islisten) {
                     return;
                 }
-                if (1) { return; }
+                // if (1) { return; }
                 const msg = JSON.parse(e.data);
                 if (msg.cmd === "transactions") {
-                    // console.log(msg);
+                    // steveTools.outlog(msg);
                     if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃，无法稳定复现
-                        // console.log("更新了一个属性视图");
+                        // steveTools.outlog("更新了一个属性视图");
                         const avids = await this.getAVreferenceid();
                         //加上周期
                         const avids_zq = await this.getAVreferenceid('周期');
-                        console.log(avids);
+                        steveTools.outlog(avids);
                         if (avids.includes(msg.data[0].doOperations[0].avID) || avids_zq.includes(msg.data[0].doOperations[0].avID)) {
-                            console.log("更新了日程信息");
+                            steveTools.outlog("更新了日程信息");
                             //延时执行
                             this.avButton();//数据库每次更新都会重新加载页面
                             if (!this.isUpdating) {
                                 this.isUpdating = true;
                                 setTimeout(async () => {
                                     await this.getEventsFromSiYuanDatabase();
-                                    console.log("更新日历文件<2>");
+                                    steveTools.outlog("更新日历文件<2>");
                                     this.isUpdating = false;
                                 }, 3000);
                             }
                         } else {
-                            // console.log("avID 不在 avids 数组中");
+                            // steveTools.outlog("avID 不在 avids 数组中");
                         }
                     }
 
                 }
-                // console.log(msg);
+                // steveTools.outlog(msg);
             });
 
             //每15分钟调用一次await this.getEventsFromSiYuanDatabase()
             setInterval(async () => {
                 await this.getEventsFromSiYuanDatabase()
-                console.log("自动更新日历文件<1>");
+                steveTools.outlog("自动更新日历文件<1>");
             }, 600000);
         }
     }
@@ -126,14 +124,14 @@ export class M_calendar {
             if (mutation.type === 'childList') {
                 mutation.removedNodes.forEach(async (node) => {
                     if (node instanceof HTMLElement && node.matches('div[data-key="dialog-attr"].b3-dialog--open')) {
-                        // console.log('Dialog closed');
+                        // steveTools.outlog('Dialog closed');
                         await this.getEventsFromSiYuanDatabase();
                         islisten = true;
                     }
                 });
                 mutation.addedNodes.forEach(async (node) => {
                     if (node instanceof HTMLElement && node.matches('div[data-key="dialog-attr"]')) {
-                        // console.log('Dialog opened');
+                        // steveTools.outlog('Dialog opened');
                         islisten = false;
                     }
                 });
@@ -146,7 +144,7 @@ export class M_calendar {
         setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
                 .filter(span => span.closest('[name="日程"]') || span.closest('[name="周期"]'));
-            // console.log(targetSpans, "targetSpans");
+            // steveTools.outlog(targetSpans, "targetSpans");
 
             targetSpans.forEach(targetSpan => {
                 // 检查目标元素的右边是否已经存在按钮
@@ -158,7 +156,7 @@ export class M_calendar {
 
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
-                        console.log('按钮被点击了');
+                        steveTools.outlog('按钮被点击了');
                         await this.openRiChengViewDialog();
                     });
                     // 将按钮插入到目标 <span> 元素的右边
@@ -191,7 +189,7 @@ export class M_calendar {
 
     async openRiChengView() {
 
-        // console.log(viewValue);
+        // steveTools.outlog(viewValue);
         //时间戳
         const id = new Date().getTime().toString();
         let calendar: any;
@@ -208,7 +206,7 @@ export class M_calendar {
             // position: "right",
             keepCursor: false
         });
-        console.log(tab);
+        steveTools.outlog(tab);
         tab.panelElement.innerHTML = `
       <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
         calendar = await run(id);
@@ -217,10 +215,10 @@ export class M_calendar {
             const resizeObserver = new ResizeObserver(entries => {
                 for (const entry of entries) {
                     const { width, height } = entry.contentRect;
-                    // console.log('Calendar container resized:', width, height);
+                    // steveTools.outlog('Calendar container resized:', width, height);
                     if (width == 0 || height == 0) {
                         // resizeObserver.disconnect();
-                        console.log('ResizeObserver disconnected');
+                        steveTools.outlog('ResizeObserver disconnected');
                     }
                     // 如果日历组件有 resize 方法，在这里调用
                     calendar.updateSize();
@@ -235,11 +233,11 @@ export class M_calendar {
 
 
     onunload() {
-        console.log("M_calendar unloaded");
+        steveTools.outlog("M_calendar unloaded");
     }
 
     getCalUrl() {
-        // console.log(this_settingdata["cal-enable"]);
+        // steveTools.outlog(this_settingdata["cal-enable"]);
         if (this_settingdata["cal-enable"] == true) {
             const currentHost = "（思源伺服地址）";
             // linkToCalendar = currentHost + "/" + calendarpath2;
@@ -379,7 +377,7 @@ export class M_calendar {
             const updatedEventsJson = JSON.stringify(events);
             const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
             await api.putFile(jsonFilePath, false, fileBlob);
-            // console.log(await fileBlob.text());
+            // steveTools.outlog(await fileBlob.text());
             steveTools.outlog('新事件已添加并保存到' + jsonFilePath);
         } catch (error) {
             console.error('添加事件时出错：', error);
@@ -428,7 +426,7 @@ export class M_calendar {
         AND markdown LIKE '%NodeAttributeView%data-av-id%';`;
 
         const res = await api.sql(sqlStr);
-        // console.log("RES:::::::::",res);
+        // steveTools.outlog("RES:::::::::",res);
         steveTools.outlog(res);
 
         const avIds = res.map(item => ({
@@ -437,7 +435,7 @@ export class M_calendar {
         })).filter(item => item.id !== null);
 
         steveTools.outlog(avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
-        console.log("avIds", avIds);
+        steveTools.outlog("avIds", avIds);
         return avIds;
     }
     // 从思源数据库中获取日程信息
@@ -506,7 +504,7 @@ export class M_calendar {
 
     async getEventsFromSiYuanDatabase() {
         try {
-            console.log('开始生成ics文件');
+            steveTools.outlog('开始生成ics文件');
 
             // 清理旧文件
             const listfiles = await api.readDir('data/public/stevetools/');
@@ -522,7 +520,7 @@ export class M_calendar {
             const avIds = await this.getAVreferenceid();
             const viewIDs = await myF.getViewId(avIds);
             const viewValue = await myF.getViewValue(viewIDs);
-            // console.log("EEEEEEEEEEEEEEEEEView data:", viewValue);
+            // steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue);
             const result = transformEvents(viewValue);
             await this.addEventToGlobal(result);
 
@@ -530,7 +528,7 @@ export class M_calendar {
             const avids_zq = await this.getAVreferenceid("周期");
             const viewIDs_zq = await myF.getViewId(avids_zq);
             const viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
-            console.log("EEEEEEEEEEEEEEEEEView data:", viewValue_zq);
+            steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue_zq);
             const result_zq = transformEvents(viewValue_zq, true);
             await this.addEventToGlobal(result_zq);
 
@@ -550,7 +548,7 @@ export class M_calendar {
             for (const item of result) {
                 //检测item是否符合要求
                 if (!item.dateContent || !item.dateContent2 || !item.textContent || !item.blockContent) {
-                    console.log('Invalid event data:', item);
+                    steveTools.outlog('Invalid event data:', item);
                     i++;
                     showMessage('存在不符合要求的数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
                     continue;
@@ -574,14 +572,14 @@ export class M_calendar {
                     // location: 'Office'
                 }
                 await this.addEventToGlobal(newEvent);
-                // console.log(newEvent,"ttttiaos");
+                // steveTools.outlog(newEvent,"ttttiaos");
             }
         } else {//周期事件
             let i = 0;
             for (const item of result) {
                 //检测item是否符合要求
                 if (!item.dateContent || !item.textContent || !item.blockContent || !item.rule) {
-                    console.log('Invalid event data:', item);
+                    steveTools.outlog('Invalid event data:', item);
                     i++;
                     showMessage('存在不符合要求的周期数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
                     continue;
@@ -602,7 +600,7 @@ export class M_calendar {
                     recurrenceRule: recurrenceRule,
                 }
                 await this.addEventToGlobal(newEvent);
-                // console.log(newEvent,"ttttiaos");
+                // steveTools.outlog(newEvent,"ttttiaos");
             }
         }
     }
@@ -616,7 +614,7 @@ export class M_calendar {
         } catch (error) {
             console.error('添加事件到全局变量时出错：', error);
         }
-        console.log("Aevent::::::::::::::::::::", allEvents);
+        steveTools.outlog("Aevent::::::::::::::::::::", allEvents);
     }
 
     // 上传全局事件数据到JSON文件
@@ -624,7 +622,7 @@ export class M_calendar {
         try {
             // 将全局事件数组保存回JSON文件
             const updatedEventsJson = JSON.stringify(allEvents);
-            console.log("updatedEventsJson", allEvents);
+            steveTools.outlog("updatedEventsJson", allEvents);
             const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
             await api.putFile(jsonFilePath, false, fileBlob);
             steveTools.outlog('所有事件已保存到' + jsonFilePath);
@@ -635,7 +633,7 @@ export class M_calendar {
 
     async importMoBan() {
         let notebookId = getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
-        console.log("ceshi1", notebookId);
+        steveTools.outlog("ceshi1", notebookId);
         if (!notebookId) {
             showMessage("已创建名为“ST日程管理”的笔记本", 3000, "info");
             await api.createNotebook("ST日程管理");
@@ -646,7 +644,7 @@ export class M_calendar {
             const file = await api.getFileBlob("/data/plugins/siyuan-steve-tools/asset/日程.sy.zip");
             await api.importSY(notebookId, file);
         } catch (e) {
-            console.log(e);
+            steveTools.outlog(e);
         }
         showMessage("已导入日程模板", 3000, "info");
     }
@@ -692,7 +690,7 @@ function convertTimestampToArray(timestamp: number): [number, number, number, nu
 
 
 // const targetElement = document.querySelector('div[contenteditable="false"][data-av-id="20241213113357-m9b143e"][data-av-type="table"][data-node-id="20241003141312-30yk3cr"][data-type="NodeAttributeView"][class="av"][custom-sy-av-view="20241213113357-tuugpcw"][name="日程"]');
-// console.log(targetElement);
+// steveTools.outlog(targetElement);
 // if (targetElement) {
 //     // 创建新的元素
 //     const newElement = document.createElement('span');

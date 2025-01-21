@@ -7,6 +7,7 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
+import steveTools from "@/index";
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
@@ -23,7 +24,7 @@ let viewValue_zq: any;
 export async function run(id: string, initialView = 'dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
-        plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin,rrule],
+        plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin, rrule],
         initialView: initialView,
         navLinks: true,
         dayMaxEvents: true,
@@ -34,7 +35,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         // 事件点击处理
         eventClick: function (info) {
             // // ToEventNote(info);
-            // console.log("事件点击", info);
+            // steveTools.outlog("事件点击", info);
             //TODO: 事件点击处理
         },
 
@@ -50,7 +51,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             } else if (clicks === 2) {
                 clearTimeout(clickTimeout);
                 clicks = 0;
-                console.log("创建事件", info);
+                steveTools.outlog("创建事件", info);
                 const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue);
             }
 
@@ -59,8 +60,8 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
         // 事件拖放处理
         eventDrop: async function (info) {
-            console.log("事件拖动shijian", info.event.startStr, info.event.endStr);
-            if(info.event._def.extendedProps.isRecurring){
+            steveTools.outlog("事件拖动shijian", info.event.startStr, info.event.endStr);
+            if (info.event._def.extendedProps.isRecurring) {
                 showMessage("重复事件不支持拖动哦");
                 //撤回拖动
                 info.revert();
@@ -70,8 +71,8 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
         },
         eventResize: async function (info) {
-            console.log("事件调整大小", info.event.startStr, info.event.endStr);
-            if(info.event._def.extendedProps.isRecurring){
+            steveTools.outlog("事件调整大小", info.event.startStr, info.event.endStr);
+            if (info.event._def.extendedProps.isRecurring) {
                 showMessage("重复事件不支持修改哦");
                 info.revert();
                 return;
@@ -101,7 +102,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         // 从思源数据转换事件
         events: async function (info, successCallback, failureCallback) {
             try {
-                console.log('Fetching calendar events...::::::::::::::::::::::::::');
+                steveTools.outlog('Fetching calendar events...::::::::::::::::::::::::::');
                 // 1. 获取引用ID
                 const av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
                 const av_ids_zq = await moduleInstances['M_calendar'].getAVreferenceid("周期");
@@ -121,13 +122,13 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 }
 
                 // 3. 获取视图数据
-                viewValue_zq =await myF.getViewValue(viewIDs_zq,true);
+                viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
                 viewValue = await myF.getViewValue(viewIDs);
-                console.log("View data:", viewValue);
+                steveTools.outlog("View data:", viewValue);
 
                 // 4. 转换事件数据
                 const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
-                console.log('Fetched calendar events:', events);
+                steveTools.outlog('Fetched calendar events:', events);
                 // 5. 回调成功
                 successCallback(events);
             } catch (error) {
@@ -180,7 +181,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
 
 
-            // console.log(info);
+            // steveTools.outlog(info);
 
             // 添加提示框
             tippy(info.el, {
@@ -194,8 +195,8 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                         </span>
                         <div class="event-tooltip__content">
                             <p><span class="event-tooltip__label">开始:</span> ${info.event.start?.toLocaleString()}</p>
-                            <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "全天"}</p>
-                            <p><span class="event-tooltip__label">状态:</span> ${info.event.extendedProps.status}</p>
+                            <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "无"}</p>
+                            <p><span class="event-tooltip__label">状态:</span> ${info.event.extendedProps.status || "未设置"}</p>
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
                         : ''

@@ -6,7 +6,7 @@ import { Calendar } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/interface";
-
+import steveTools from "@/index";
 
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
@@ -27,7 +27,7 @@ export async function getViewId(va_ids: string[]): ViewData {
                 });
             });
 
-            // console.log(viewIds_Data);
+            // steveTools.outlog(viewIds_Data);
         } catch (error) {
             console.error(`Error processing view ${va_id}:`, error);
         }
@@ -48,8 +48,8 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
                 from: viewId_Data,
                 data: data,
             });
-            // console.log(viewValue);
-            // console.log("ceshi1", data);
+            // steveTools.outlog(viewValue);
+            // steveTools.outlog("ceshi1", data);
 
 
         } catch (error) {
@@ -57,7 +57,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
         }
     }
 
-    console.log("ceshi2222:::::::::::::2", viewValue_Data);
+    steveTools.outlog("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
 
@@ -162,7 +162,7 @@ function extractDataFromTable(data: any, isZQ = false) {
 export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]) {
     const events = [];
     const addedEventIds = new Set();
-    console.log("viewData:::", viewData_zq);
+    steveTools.outlog("viewData:::", viewData_zq);
     // 处理普通事件
     for (const view of viewData) {
         for (const item of view.data) {
@@ -211,19 +211,23 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 
                         const startDate = new Date(parseInt(item['开始时间'].start));
                         const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
-                        console.log("startDate:::", startDate, "endDate:::", endDate);
+                        steveTools.outlog("startDate:::", startDate, "endDate:::", endDate);
                         const isAllDay = !endDate ||
                             (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                                 (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
                             (endDate && startDate.getTime() === endDate.getTime());
-
+                        const rruleStr = item['重复规则']?.content
+                            ? `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${item['重复规则'].content}`
+                            : '';
                         events.push({
                             id: eventId,
                             title: item['事件']?.content || '',
                             start: startDate,
-                            end: endDate,
+                            // end: endDate,
+                            timeZone: 'local',
                             allDay: isAllDay,
-                            rrule: item['重复规则']?.content || '',
+                            rrule: rruleStr,
+                            duration: item['持续时间']?.content || '',
                             extendedProps: {
                                 blockId: eventId,
                                 rootid: view.from.rootid,
@@ -256,20 +260,20 @@ export async function createEventInDatabase(
     viewValue
 ) {
     let isok = false;
-    console.log("viewValue:::createEventInDatabase", viewValue);
+    steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
     // 1. 创建面板HTML
     //// 获取当前日期的日记块ID
-    // console.log(settingdata);
-    // console.log(window.siyuan.ws.app);
+    // steveTools.outlog(settingdata);
+    // steveTools.outlog(window.siyuan.ws.app);
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
     //// 创建一个新块
-    console.log("daynote_id:::", daynote_id.id);
+    steveTools.outlog("daynote_id:::", daynote_id.id);
     const idid = await api.generateSiyuanID();
     const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
-    // console.log("iddata:::", iddata[0].doOperations[0].id);
-    console.log("dateStr:::", dateStr, "databaseId:::", settingdata["cal-db-id"]);
+    // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
+    steveTools.outlog("dateStr:::", dateStr, "databaseId:::", settingdata["cal-db-id"]);
     const dialog = new sy.Dialog({
         title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <span>添加事件(按Ctrl+Enter提交)</span>
@@ -319,7 +323,7 @@ export async function createEventInDatabase(
     };
 
     window.siyuan.ws.ws.addEventListener('message', messageHandler);
-    // console.log(msg);
+    // steveTools.outlog(msg);
     const handleKeydown = async (e: KeyboardEvent) => {
         if (e.key === 'Enter' && e.ctrlKey && ok) {
             e.preventDefault();
@@ -331,19 +335,19 @@ export async function createEventInDatabase(
             //// 获取块内容
             const block = await api.getBlockByID(id);
             //// 如果块内容为空，则删除块
-            // console.log("block:::", block.markdown);
+            // steveTools.outlog("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
-            console.log("markdownContent:::", markdownContent);
+            steveTools.outlog("markdownContent:::", markdownContent);
             if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
                 await api.deleteBlock(id);
-                console.log('删除空白块');
+                steveTools.outlog('删除空白块');
                 dialog.destroy();
                 sy.showMessage('已取消添加事件');
                 return;
             }
             // 添加到日历
             //// 将块加入到数据库
-            // console.log("dasdsssssssssss::::::111111", panel);
+            // steveTools.outlog("dasdsssssssssss::::::111111", panel);
             await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"], panel);
             // 添加数据库属性
             //// 添加时间和状态属性
@@ -354,7 +358,7 @@ export async function createEventInDatabase(
             await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID, selectdata, "select");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
-                    console.log('destroyCallbackPANEL', panel.isUploading());
+                    steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
                     if (!panel.isUploading()) {
                         clearInterval(checkUploading);
                         setTimeout(() => calendar.refetchEvents(), 1500);
@@ -376,7 +380,7 @@ export async function createEventInDatabase(
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     panel.focus();
 
-    console.log("dasdsssssssssss::::::", panel);
+    steveTools.outlog("dasdsssssssssss::::::", panel);
     // 2. 添加到文档并显示
 
     // 3. 等待用户提交
@@ -389,15 +393,15 @@ export async function updateEventInDatabase(
     viewValue
 ) {
     // 更新思源数据库中的时间
-    console.log("事件拖放", info);
+    steveTools.outlog("事件拖放", info);
     const blockId = info.event._def.extendedProps.blockId
-    console.log("blockId:::", blockId);
+    steveTools.outlog("blockId:::", blockId);
     const newStartDate = info.event.startStr;
     const newEndDate = info.event.endStr;
-    console.log("dateChange:::", newStartDate, newEndDate);
+    steveTools.outlog("dateChange:::", newStartDate, newEndDate);
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
     const rootid = info.event._def.extendedProps.rootid;
-    console.log("rootid:::", rootid);
+    steveTools.outlog("rootid:::", rootid);
     const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
@@ -432,7 +436,7 @@ async function getKeyIDfromViewValue(viewValue: any, key: string): Promise<strin
 
     // If not found, fetch fresh data
     try {
-        console.log('Fetching fresh view data...');
+        steveTools.outlog('Fetching fresh view data...');
         sy.showMessage('首次添加事件，请稍等...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         const Mcalendar = moduleInstances['M_calendar'];
