@@ -397,7 +397,7 @@ export class M_calendar {
         
         const avIds = res.map(item => ({
             id: extractDataAvId(item.markdown),
-            name: item.content?.substring(0, 3)||'N/A'
+            name: item.content?.split(' ')[0] || 'N/A'
         })).filter(item => item.id !== null);
         
         steveTools.outlog(avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
