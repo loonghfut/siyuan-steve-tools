@@ -2,8 +2,8 @@ STEVETOOLS
 ==========
 这是一个工具集合  
 #### 目前工具
-1. 日程管理：  
-和思源深度融合的日历视图,同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历等。
+1. 日程管理2.0：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)）
+和思源深度融合的日历视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历等。
 2. docker同步感知：  
 win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 3. ai网页侧边栏：  
@@ -11,8 +11,6 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 
 具体使用方法请到插件设置页查看
 
-- [] 周期拖拽
-- [] 日志输出
 
 
 #### 更新日志
@@ -25,4 +23,4 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
-- 日历视图魔改自https://github.com/ics-tools/viewer
+- 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。

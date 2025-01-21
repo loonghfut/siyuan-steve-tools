@@ -19,7 +19,7 @@
     }
 
     let groups: string[] = [
-        "日程管理",
+        "日程管理 2.0",
         "docker同步感知",
         "ai侧边栏",
         "✨开发中。。",
@@ -135,32 +135,32 @@
                 },
             },
         },
-        {
-            type: "hint",
-            title: "使用方法",
-            description: `            
-            <div class="fn__flex b3-label">
-                <ol>
-                    <li>添加一个数据库（前三列格式如图）</li>
-                    <img
-                        src="plugins/siyuan-steve-tools/asset/1734265371736.png"
-                        alt="数据库格式示例"
-                        style="max-height: 200px;"
-                    />
-                    <li>再给此数据库添加命名属性，内容为“日程” （如图）</li>
-                    <img
-                        src="plugins/siyuan-steve-tools/asset/1734265426843.png"
-                        alt="命名属性示例"
-                        style="max-height: 200px;"
-                    />
-                    <li>最后点击右上角的日历图标</li>
-                    <li>即可生成日历文件，订阅链接在设置里获取</li>
-                    <li>打开可以订阅ics文件的日历软件（如小米日历），输入订阅链接即可（要保证手机能网络连接到思源）</li>
-                </ol>
-            </div>`,
-            key: "hint",
-            value: "error",
-        },
+        // {
+        //     type: "hint",
+        //     title: "使用方法",
+        //     description: `            
+        //     <div class="fn__flex b3-label">
+        //         <ol>
+        //             <li>添加一个数据库（前三列格式如图）</li>
+        //             <img
+        //                 src="plugins/siyuan-steve-tools/asset/1734265371736.png"
+        //                 alt="数据库格式示例"
+        //                 style="max-height: 200px;"
+        //             />
+        //             <li>再给此数据库添加命名属性，内容为“日程” （如图）</li>
+        //             <img
+        //                 src="plugins/siyuan-steve-tools/asset/1734265426843.png"
+        //                 alt="命名属性示例"
+        //                 style="max-height: 200px;"
+        //             />
+        //             <li>最后点击右上角的日历图标</li>
+        //             <li>即可生成日历文件，订阅链接在设置里获取</li>
+        //             <li>打开可以订阅ics文件的日历软件（如小米日历），输入订阅链接即可（要保证手机能网络连接到思源）</li>
+        //         </ol>
+        //     </div>`,
+        //     key: "hint",
+        //     value: "error",
+        // },
     ];
 
     let group2Items: ISettingItem[] = [
