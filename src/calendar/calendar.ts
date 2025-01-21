@@ -60,6 +60,10 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             myF.updateEventInDatabase(info, calendar,viewValue);
 
         },
+        eventResize: async function(info) {
+            console.log("事件调整大小", info.event.startStr, info.event.endStr);
+            myF.updateEventInDatabase(info, calendar, viewValue);
+        },
 
         views: {
             timeGridThreeDays: {

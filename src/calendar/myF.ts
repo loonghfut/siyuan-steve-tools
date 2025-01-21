@@ -203,27 +203,39 @@ export async function createEventInDatabase(
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
     //// 创建一个新块
     console.log("daynote_id:::", daynote_id.id);
-
-    const iddata = await api.appendBlock("markdown", "#### ", daynote_id.id);
-    const id = iddata[0].doOperations[0].id;
+    const idid = await api.generateSiyuanID();
+    const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
+    // const id = iddata[0].doOperations[0].id;
+    const id = idid;
     // console.log("iddata:::", iddata[0].doOperations[0].id);
     console.log("dateStr:::", dateStr, "databaseId:::", settingdata["cal-db-id"]);
     const dialog = new sy.Dialog({
-        title: '添加事件(按Ctrl+Enter提交)',
+        title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>添加事件(按Ctrl+Enter提交)</span>
+            <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
+           </div>`,
         content: '<div id="eventPanel"></div>',
         width: '500px',
         height: 'auto',
-        destroyCallback: () => {
+        destroyCallback: async () => {
             if (!isok) {
-                // api.deleteBlock(id);
                 sy.showMessage('已取消添加事件');
+                // await api.deleteBlock(id); //已知缺陷
+                setTimeout(async () => await api.deleteBlock(id), 1500);//防崩
             }
+            cancelBtn.removeEventListener('click', handleCancel);
         },
-        // hideCloseIcon: false,
-        disableClose: true,
+        hideCloseIcon: true,
+        // disableClose: true,
     })
 
     const eventPanel = document.getElementById('eventPanel');
+    const cancelBtn = dialog.element.querySelector('.b3-button--cancel');
+    const handleCancel = () => {
+        dialog.destroy();
+    };
+    cancelBtn.addEventListener('click', handleCancel);
+
     const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
         blockId: id,
         rootId: id,
@@ -261,7 +273,7 @@ export async function createEventInDatabase(
             // console.log("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
             console.log("markdownContent:::", markdownContent);
-            if (!markdownContent || /^#{1,4}\s*$/.test(markdownContent)) {
+            if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
                 await api.deleteBlock(id);
                 console.log('删除空白块');
                 dialog.destroy();
@@ -320,7 +332,7 @@ export async function updateEventInDatabase(
     const newEndDate = info.event.endStr;
     console.log("dateChange:::", newStartDate, newEndDate);
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
-    const datata = await api.updateAttrViewCell_pro(blockId, settingdata["cal-db-id"], timeKeyID,newStartDate,newEndDate);//TODOsettingdata["cal-db-id"]
+    const datata = await api.updateAttrViewCell_pro(blockId, settingdata["cal-db-id"], timeKeyID, newStartDate, newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {

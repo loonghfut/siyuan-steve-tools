@@ -623,7 +623,7 @@ export async function createDailyNote(app: string, notebookID: string) {
     return request(url, data);
 };
 
-
+//暂时不用
 export async function addBlockToDatabase(id: string, databaseId: string) {
     const data = {
         session: window.siyuan?.backStack[0].protyle.id,
@@ -681,6 +681,7 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
     }
 }
 
+
 export async function addBlockToDatabase_pro(id: string, avID: string, protyle: Protyle) {
     let doOperations: IOperation[] = [];
     let undoOperations: IOperation[] = [];
@@ -733,9 +734,9 @@ export async function updateAttrViewCell_pro(id, avID, keyID, time, endtime?) {
             data: {
                 type: "date",
                 date: {
-                    content: start, //TODO
+                    content: start, 
                     isNotEmpty: true,
-                    content2: end, //TODO
+                    content2: end, 
                     isNotEmpty2: true,
                     hasEndDate: true,
                     isNotTime: false
@@ -757,7 +758,7 @@ export async function updateAttrViewCell_pro(id, avID, keyID, time, endtime?) {
     Protyle.prototype.transaction(doOperations, undoOperations);
 }
 
-async function generateSiyuanID() {
+export async function generateSiyuanID() {
     // 生成时间戳部分
     const now = new Date();
     const timestamp = now.getFullYear() +
