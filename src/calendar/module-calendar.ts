@@ -254,9 +254,9 @@ export class M_calendar {
     getCalUrl() {
         // console.log(this_settingdata["cal-enable"]);
         if (this_settingdata["cal-enable"] == true) {
-            const currentHost = window.location.host;
+            const currentHost = "（思源伺服地址）";
             // linkToCalendar = currentHost + "/" + calendarpath2;
-            showMessage("日历订阅链接：" + currentHost + "/" + calendarpath2, 0, "info");
+            showMessage("日历订阅链接：" + currentHost + "/" + calendarpath2+"", 0, "info");
             return
         }
         showMessage("请先启用日历订阅模块", 6000, "info");
@@ -405,67 +405,112 @@ export class M_calendar {
         return avIds;
     }
     // 从思源数据库中获取日程信息
+    // 辅助函数
+    private getColumnIdByName(columns: any[], name: string): string {
+        const column = columns.find(col => col.name === name);
+        return column?.id || '';
+    }
+    
+    private getCellValue(cells: any[], columnId: string) {
+        const cell = cells.find(cell => cell.value.keyID === columnId);
+        return cell?.value;
+    }
+    
+    private processRegularEvents(response: any) {
+        const { columns, rows } = response.view;
+        
+        // 获取列ID
+        const eventColumnId = this.getColumnIdByName(columns, "事件");
+        const dateColumnId = this.getColumnIdByName(columns, "开始时间");
+        const descColumnId = this.getColumnIdByName(columns, "描述");
+        const statusColumnId = this.getColumnIdByName(columns, "状态");
+    
+        return rows.map(row => {
+            const eventValue = this.getCellValue(row.cells, eventColumnId);
+            const dateValue = this.getCellValue(row.cells, dateColumnId);
+            const descValue = this.getCellValue(row.cells, descColumnId);
+            const statusValue = this.getCellValue(row.cells, statusColumnId);
+    
+            return {
+                blockContent: eventValue?.block?.content || 'N/A',
+                dateContent: dateValue?.date?.content || 0,
+                dateContent2: dateValue?.date?.content2 || 0,
+                textContent: descValue?.text?.content || 'N/A',
+                status: statusValue?.mSelect?.[0]?.content || '未完成2'
+            };
+        });
+    }
+    
+    private processRecurringEvents(response: any) {
+        const { columns, rows } = response.view;
+        
+        // 获取列ID
+        const eventColumnId = this.getColumnIdByName(columns, "事件");
+        const dateColumnId = this.getColumnIdByName(columns, "开始时间");
+        // const durationColumnId = this.getColumnIdByName(columns, "数字");
+        const ruleColumnId = this.getColumnIdByName(columns, "状态");
+        const descColumnId = this.getColumnIdByName(columns, "描述");
+    
+        return rows.map(row => {
+            const eventValue = this.getCellValue(row.cells, eventColumnId);
+            const dateValue = this.getCellValue(row.cells, dateColumnId);
+            // const durationValue = this.getCellValue(row.cells, durationColumnId);
+            const ruleValue = this.getCellValue(row.cells, ruleColumnId);
+            const descValue = this.getCellValue(row.cells, descColumnId);
+    
+            return {
+                blockContent: eventValue?.block?.content || 'N/A',
+                dateContent: dateValue?.date?.content || 0,
+                // duration: durationValue?.number?.content || 1,
+                rule: ruleValue?.text?.content || 'N/A',
+                textContent: descValue?.text?.content || 'N/A'
+            };
+        });
+    }
+    
     async getEventsFromSiYuanDatabase() {
-        console.log('开始生成ics文件');
-        //删除多余的ics文件
-        const listfiles = await api.readDir('data/public/stevetools/');
-        // console.log(listfiles);
-        for (const file of Object.values(listfiles)) {
-            if (!file.isDir && file.name.endsWith('.ics')) {
-                await api.removeFile('data/public/stevetools/' + file.name);
+        try {
+            console.log('开始生成ics文件');
+            
+            // 清理旧文件
+            const listfiles = await api.readDir('data/public/stevetools/');
+            for (const file of Object.values(listfiles)) {
+                if (!file.isDir && file.name.endsWith('.ics')) {
+                    await api.removeFile('data/public/stevetools/' + file.name);
+                }
             }
-        }
-        //获取av-id
-        const avIds = await this.getAVreferenceid();
-        allEvents = [];
-        for (const avId of avIds) {
-            // const response = await api.getFile(`data/storage/av/${avId}.json`);
-            const response = await api.renderAttributeView(avId);
-            console.log(response);
-            if (response && response.view) {
-                const result = response.view.rows.map(row => {
-                    return {
-                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',//标题
-                        dateContent2: row.cells[1]?.value?.date?.content2 || 0,//结束时间
-                        dateContent: row.cells[1]?.value?.date?.content || 0,//开始时间
-                        textContent: row.cells[2]?.value?.text?.content || 'N/A', //描述
-                        status: row.cells[3]?.value?.mSelect?.[0]?.content || '未完成2' //状态
-                    };
-                });
-                await this.runAddEvent(result);
-                console.log("2222", result);
-                steveTools.outlog(result);
-            } else {
-                console.error(`Invalid response for avId ${avId}:`, response);
+    
+            allEvents = [];
+            
+            // 处理常规事件
+            const avIds = await this.getAVreferenceid();
+            for (const avId of avIds) {
+                const response = await api.renderAttributeView(avId);
+                if (response?.view) {
+                    const result = this.processRegularEvents(response);
+                    await this.runAddEvent(result);
+                    steveTools.outlog(result);
+                }
             }
-        }
-        //周期部分
-        const avIds_zq = await this.getAVreferenceid('周期');
-        for (const avId of avIds_zq) {
-            const response = await api.renderAttributeView(avId);
-            console.log(response);
-            if (response && response.view) {
-                const result = response.view.rows.map(row => {
-                    return {
-                        blockContent: row.cells[0]?.value?.block?.content || 'N/A',  //标题
-                        dateContent: row.cells[1]?.value?.date?.content || 0,           //日期
-                        textContent: row.cells[4]?.value?.text?.content || 'N/A',       //描述
-                        rule: row.cells[3]?.value?.text?.content || 'N/A',         //频率规则
-                        duration: row.cells[2]?.value?.number?.content || 1,         //持续时间  
-                    };
-                });
-                await this.runAddEvent(result, true);
-                console.log("22221111111", result);
-                steveTools.outlog(result);
-            } else {
-                console.error(`Invalid response for avId ${avId}:`, response);
+    
+            // 处理周期事件
+            const avIds_zq = await this.getAVreferenceid('周期');
+            for (const avId of avIds_zq) {
+                const response = await api.renderAttributeView(avId);
+                if (response?.view) {
+                    const result = this.processRecurringEvents(response);
+                    await this.runAddEvent(result, true);
+                    steveTools.outlog(result);
+                }
             }
+    
+            await this.uploadAllEventsToFile(eventsPath);
+            await this.generateICSFromEventsFile(eventsPath, calendarpath);
+            
+        } catch (error) {
+            console.error('生成日历文件时发生错误:', error);
+            throw error;
         }
-
-
-        await this.uploadAllEventsToFile(eventsPath);
-        await this.generateICSFromEventsFile(eventsPath, calendarpath);
-
     }
 
     async runAddEvent(result: any, isZq: boolean = false) {
@@ -540,6 +585,7 @@ export class M_calendar {
         } catch (error) {
             console.error('添加事件到全局变量时出错：', error);
         }
+        console.log("Aevent::::::::::::::::::::",allEvents);
     }
 
     // 上传全局事件数据到JSON文件

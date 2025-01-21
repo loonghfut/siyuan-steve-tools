@@ -11,3 +11,7 @@ export interface ViewValueItem {
     rootid: string;
 }
 
+export interface ISelectOption {
+    color?: string;
+    content: string;
+}

@@ -8,6 +8,7 @@
 
 import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
 import { IOperation, Protyle } from "siyuan";
+import {ISelectOption } from "@/calendar/interface";
 
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
@@ -714,47 +715,69 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle: 
     protyle.transaction(doOperations, undoOperations);
 }
 
-export async function updateAttrViewCell_pro(id, avID, keyID, time, endtime?) {
+
+
+export async function updateAttrViewCell_pro(
+    id: string, 
+    avID: string, 
+    keyID: string, 
+    value: string | Date | ISelectOption[], 
+    type: 'date' | 'select',
+    endtime?: string
+) {
     let doOperations: IOperation[] = [];
     let undoOperations: IOperation[] = [];
-    if (endtime) {
-        console.log(endtime);
-    }
-    let { start, end } = await getDateTimestamps(time);
-    if (endtime) {
-        end = (await getDateTimestamps(endtime)).start;
-    }
-    doOperations.push(
-        {
+
+    const newId = await generateSiyuanID();
+    
+    if (type === 'date') {
+        let { start, end } = await getDateTimestamps(value as string);
+        if (endtime) {
+            end = (await getDateTimestamps(endtime)).start;
+        }
+        
+        doOperations.push({
             action: "updateAttrViewCell",
-            id: await generateSiyuanID(),
+            id: newId,
             avID: avID,
             keyID: keyID,
             rowID: id,
             data: {
                 type: "date",
                 date: {
-                    content: start, 
+                    content: start,
                     isNotEmpty: true,
-                    content2: end, 
+                    content2: end,
                     isNotEmpty2: true,
                     hasEndDate: true,
                     isNotTime: false
                 },
                 id: id
-            },
-        }
-    );
-    doOperations.push(
-        {
-            action: "doUpdateUpdated",
-            id: id,
-            data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
-        }
-    );
-    undoOperations.push(
+            }
+        });
+    } else if (type === 'select') {
+        doOperations.push({
+            action: "updateAttrViewCell",
+            id: newId,
+            keyID: keyID,
+            rowID: id,
+            avID: avID,
+            data: {
+                type: "select",
+                id: newId,
+                mSelect: value as ISelectOption[]
+            }
+        });
+    }
 
-    );
+    doOperations.push({
+        action: "doUpdateUpdated",
+        id: id,
+        data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
+    });
+
+    undoOperations.push(/* 添加撤销操作 */);
+    
     Protyle.prototype.transaction(doOperations, undoOperations);
 }
 

@@ -5,7 +5,7 @@ import { settingdata } from '@/index';
 import { Calendar } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
-
+import {ISelectOption } from "@/calendar/interface";
 
 
 // Return type using interface
@@ -142,6 +142,7 @@ function extractDataFromTable(data: any) {
 //OK解决事件重复问题
 //转换数据格式
 export async function convertToFullCalendarEvents(viewData: any[]) {
+    console.log("viewData:::啊啊啊啊啊啊啊啊啊", viewData);
     const events = [];
     const addedEventIds = new Set();
 
@@ -170,6 +171,7 @@ export async function convertToFullCalendarEvents(viewData: any[]) {
                         allDay: isAllDay, // 添加全天事件标记
                         extendedProps: {
                             blockId: eventId,
+                            rootid: view.from.rootid,
                             status: item['状态'].content || '',
                             description: item['描述'].content || '',
                         }
@@ -287,7 +289,10 @@ export async function createEventInDatabase(
             // 添加数据库属性
             //// 添加时间和状态属性
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
-            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr);
+            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态');
+            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr,"date");
+            const selectdata: ISelectOption[] = [{content:"未完成"}];
+            await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID,selectdata,"select");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
                     console.log('destroyCallbackPANEL', panel.isUploading());
@@ -332,7 +337,9 @@ export async function updateEventInDatabase(
     const newEndDate = info.event.endStr;
     console.log("dateChange:::", newStartDate, newEndDate);
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
-    const datata = await api.updateAttrViewCell_pro(blockId, settingdata["cal-db-id"], timeKeyID, newStartDate, newEndDate);//TODOsettingdata["cal-db-id"]
+    const rootid = info.event._def.extendedProps.rootid;
+    console.log("rootid:::", rootid);
+    const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate,"date",newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {

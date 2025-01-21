@@ -43,8 +43,8 @@
         },
         {
             type: "button",
-            title: "获取订阅连接",
-            description: "更改日程文件名后请重新获取日程订阅连接",
+            title: "获取订阅链接",
+            description: "更改日程文件名后请重新获取日程订阅链接",
             key: "cal-get-url",
             value: settings["cal-get-url"],
             button: {

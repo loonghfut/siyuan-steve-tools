@@ -30,9 +30,9 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
         // 事件点击处理
         eventClick: function (info) {
-            // ToEventNote(info);
-            console.log("事件点击", info);
-            calendar.render();
+            // // ToEventNote(info);
+            // console.log("事件点击", info);
+            //TODO: 事件点击处理
         },
 
         // 日期点击处理
@@ -42,13 +42,13 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             clicks++;
             if (clicks === 1) {
                 clickTimeout = setTimeout(() => {
-                clicks = 0;
+                    clicks = 0;
                 }, 300);
             } else if (clicks === 2) {
                 clearTimeout(clickTimeout);
                 clicks = 0;
                 console.log("创建事件", info);
-                const eventId = await myF.createEventInDatabase(info.dateStr, calendar,viewValue);
+                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue);
             }
 
         },
@@ -56,11 +56,11 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
         // 事件拖放处理
         eventDrop: async function (info) {
-            console.log("事件拖动shijian",info.event.startStr,info.event.endStr); 
-            myF.updateEventInDatabase(info, calendar,viewValue);
+            console.log("事件拖动shijian", info.event.startStr, info.event.endStr);
+            myF.updateEventInDatabase(info, calendar, viewValue);
 
         },
-        eventResize: async function(info) {
+        eventResize: async function (info) {
             console.log("事件调整大小", info.event.startStr, info.event.endStr);
             myF.updateEventInDatabase(info, calendar, viewValue);
         },
@@ -95,7 +95,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                     successCallback([]);
                     return;
                 }
-        
+
                 // 2. 获取视图ID
                 const viewIDs = await myF.getViewId(av_ids);
                 if (!viewIDs?.length) {
@@ -103,14 +103,14 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                     successCallback([]);
                     return;
                 }
-        
+
                 // 3. 获取视图数据
                 viewValue = await myF.getViewValue(viewIDs);
                 console.log("View data:", viewValue);
-        
+
                 // 4. 转换事件数据
                 const events = await myF.convertToFullCalendarEvents(viewValue);
-                
+
                 // 5. 回调成功
                 successCallback(events);
             } catch (error) {
@@ -177,7 +177,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                         </span>
                         <div class="event-tooltip__content">
                             <p><span class="event-tooltip__label">开始:</span> ${info.event.start?.toLocaleString()}</p>
-                            <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "全天" }</p>
+                            <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "全天"}</p>
                             <p><span class="event-tooltip__label">状态:</span> ${info.event.extendedProps.status}</p>
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
