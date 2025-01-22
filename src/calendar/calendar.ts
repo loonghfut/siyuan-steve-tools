@@ -65,7 +65,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             if (clicks === 1) {
                 clickTimeout = setTimeout(() => {
                     clicks = 0;
-                }, 300);
+                }, 500);
             } else if (clicks === 2) {
                 clearTimeout(clickTimeout);
                 clicks = 0;
