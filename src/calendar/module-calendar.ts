@@ -246,7 +246,7 @@ export class M_calendar {
         }
         showMessage("请先启用日历订阅模块", 6000, "info");
     }
-  
+
     // 保存事件数据到JSON文件
     async saveEvents(events: EventAttributes[], filePath: string) {
         try {
@@ -401,11 +401,14 @@ export class M_calendar {
 
             // 处理周期事件
             const avids_zq = await this.getAVreferenceid("周期");
-            const viewIDs_zq = await myF.getViewId(avids_zq);
-            const viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
-            steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue_zq);
-            const result_zq = transformEvents(viewValue_zq, true);
-            await this.addEventToGlobal(result_zq);
+            if (avids_zq && Array.isArray(avids_zq) && avids_zq.length > 0) {
+                const viewIDs_zq = await myF.getViewId(avids_zq);
+                const viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
+                steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue_zq);
+                const result_zq = transformEvents(viewValue_zq, true);
+                await this.addEventToGlobal(result_zq);
+            }
+
 
 
             await this.uploadAllEventsToFile(eventsPath);
