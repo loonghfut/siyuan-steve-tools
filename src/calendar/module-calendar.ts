@@ -1,7 +1,7 @@
 import steveTools from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
-import { showMessage, openTab, Dialog } from "siyuan";
+import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
 import { run } from "./calendar";
@@ -15,6 +15,7 @@ let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
 let islisten = true;
+let front: "desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile";
 
 export class M_calendar {
     private plugin: steveTools;
@@ -25,6 +26,8 @@ export class M_calendar {
     public av_ids: any;
 
     async init(settingdata) {
+        front = getFrontend();
+        console.log(front);
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
@@ -60,7 +63,11 @@ export class M_calendar {
                 title: "日程视图",
                 position: "left",
                 callback: async () => {
-                    await this.openRiChengView();
+                    if (front == "browser-mobile" || front == "mobile") {
+                        await this.openRiChengViewDialog(true);
+                    } else {
+                        await this.openRiChengView();
+                    }
                 }
             });
         }
@@ -157,7 +164,11 @@ export class M_calendar {
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
                         steveTools.outlog('按钮被点击了');
-                        await this.openRiChengViewDialog();
+                        if (front == "browser-mobile" || front == "mobile") {
+                            await this.openRiChengViewDialog(true);
+                        } else {
+                            await this.openRiChengViewDialog();
+                        }
                     });
                     // 将按钮插入到目标 <span> 元素的右边
                     targetSpan.parentNode.insertBefore(button, targetSpan.nextSibling);
@@ -166,15 +177,15 @@ export class M_calendar {
         }, 500); // 延迟 500 毫秒
     }
 
-    async openRiChengViewDialog() {
+    async openRiChengViewDialog(isMobile: boolean = false) {
 
         const id = new Date().getTime().toString();
         let calendar: any;
         const dialog = new Dialog({
             title: null,
             content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
-            width: '70%',
-            height: '86.66%',
+            width: isMobile ? "100%" : '70%',
+            height: isMobile ? "90%" : '86.66%',
             disableClose: false,
             hideCloseIcon: true,
             resizeCallback: () => {

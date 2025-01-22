@@ -266,7 +266,7 @@ export async function createEventInDatabase(
     // steveTools.outlog(settingdata);
     // steveTools.outlog(window.siyuan.ws.app);
     //加一个错误判断
-    if (!settingdata["cal-create-pos"]||!settingdata["cal-db-id"]) {
+    if (!settingdata["cal-create-pos"] || !settingdata["cal-db-id"]) {
         sy.showMessage('请先设置日程创建位置和日程创建数据库');
         return;
     }
@@ -282,7 +282,10 @@ export async function createEventInDatabase(
     const dialog = new sy.Dialog({
         title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <span>添加事件(按Ctrl+Enter提交)</span>
-            <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
+            <div>
+                <button class="b3-button b3-button--text" style="padding: 4px 8px; font-size: 12px;">提交</button>
+                <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
+            </div>
            </div>`,
         content: '<div id="eventPanel"></div>',
         width: '500px',
@@ -294,43 +297,24 @@ export async function createEventInDatabase(
                 setTimeout(async () => await api.deleteBlock(id), 1500);//防崩
             }
             cancelBtn.removeEventListener('click', handleCancel);
+            okBtn.removeEventListener('click', handleKeydown);
         },
         hideCloseIcon: true,
         // disableClose: true,
     })
 
     const eventPanel = document.getElementById('eventPanel');
+    const okBtn = dialog.element.querySelector('.b3-button--text');
     const cancelBtn = dialog.element.querySelector('.b3-button--cancel');
     const handleCancel = () => {
         dialog.destroy();
     };
-    cancelBtn.addEventListener('click', handleCancel);
 
-    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
-        blockId: id,
-        rootId: id,
-        render: {
-            breadcrumb: false,
-        },
-        // action: ["cb-get-focus"],
-
-    });
-    let ok = false;//防崩溃
-    const messageHandler = async (e: MessageEvent) => {
-        try {
-            const msg = JSON.parse(e.data);
-            if (msg.cmd === "transactions") {
-                ok = true;
-            }
-        } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-        }
-    };
-
-    window.siyuan.ws.ws.addEventListener('message', messageHandler);
-    // steveTools.outlog(msg);
+    //添加事件主代码
     const handleKeydown = async (e: KeyboardEvent) => {
-        if (e.key === 'Enter' && e.ctrlKey && ok) {
+        // console.log(e);
+        if (e.type === 'click' && !ok) {sy.showMessage('请先输入内容') }
+        if ((e.key === 'Enter' && e.ctrlKey && ok) || e.type === 'click' && ok) {
             e.preventDefault();
             window.siyuan.ws.ws.removeEventListener('message', messageHandler);
             // await new Promise(resolve => setTimeout(resolve, 100));
@@ -342,6 +326,7 @@ export async function createEventInDatabase(
             //// 如果块内容为空，则删除块
             // steveTools.outlog("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
+            console.log(markdownContent);
             steveTools.outlog("markdownContent:::", markdownContent);
             if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
                 await api.deleteBlock(id);
@@ -381,6 +366,35 @@ export async function createEventInDatabase(
 
         }
     };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    okBtn.addEventListener('click', handleKeydown);
+
+    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+        blockId: id,
+        rootId: id,
+        render: {
+            breadcrumb: false,
+        },
+        
+        // action: ["cb-get-focus"],
+
+    });
+    let ok = false;//防崩溃
+    const messageHandler = async (e: MessageEvent) => {
+        try {
+            const msg = JSON.parse(e.data);
+            if (msg.cmd === "transactions") {
+                ok = true;
+            }
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+        }
+    };
+
+    window.siyuan.ws.ws.addEventListener('message', messageHandler);
+    // steveTools.outlog(msg);
+
     const debouncedHandleKeydown = debounce(handleKeydown, 300);
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     panel.focus();
