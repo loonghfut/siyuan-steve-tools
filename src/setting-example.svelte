@@ -30,7 +30,7 @@
         {
             type: "checkbox",
             title: "启用日程管理",
-            description: "启用日程管理(刷新后生效)",
+            description: "启用日程管理功能后再进行下面的设置",
             key: "cal-enable",
             value: settings["cal-enable"],
         },
@@ -213,7 +213,7 @@
         {
             type: "checkbox",
             title: "启用docker同步感知",
-            description: "启用docker同步感知(刷新后生效)",
+            description: "启用docker同步感知后再进行下面的设置",
             key: "sync-enable",
             value: settings["sync-enable"],
         },
@@ -264,7 +264,7 @@
         {
             type: "checkbox",
             title: "启用ai网页侧边栏",
-            description: "启用ai网页侧边栏",
+            description: "启用ai网页侧边栏后再进行下面的设置",
             key: "ai-enable",
             value: settings["ai-enable"],
         },
@@ -323,12 +323,22 @@
     const onChanged = ({ detail }: CustomEvent<ChangeEvent>) => {
         console.log(detail.key, detail.value);
         const setting = settings[detail.key];
+        //在启用功能时，增加自动刷新思源功能
+        isrefresh(detail.key);
+
         if (setting !== undefined) {
             settings[detail.key] = detail.value;
             saveSettings();
         }
         console.log(detail.key, detail.value);
     };
+
+    function isrefresh(setting) {
+        // console.log("isrefresh", setting);
+        if (setting === "cal-enable" || setting === "sync-enable"||setting==="ai-enable") {
+            myapi.refresh();
+        }
+    }
 
     async function saveSettings() {
         await plugin.saveData(myfile, settings);
