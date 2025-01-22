@@ -31,14 +31,17 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         locale: zhCnLocale,
         slotDuration: '01:00:00',
         editable: true,
-
+        // selectable: true,
+        // eventDurationEditable: true,
         // 事件点击处理
         eventClick: function (info) {
             // // ToEventNote(info);
             // steveTools.outlog("事件点击", info);
             //TODO: 事件点击处理
         },
-
+        select: function(info) {//TODO: 选择处理
+            // console.log('select', info);
+        },
         // 日期点击处理
         //// 双击触发
         dateClick: async function (info) {

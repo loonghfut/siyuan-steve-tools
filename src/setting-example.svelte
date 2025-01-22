@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { moduleInstances } from './index';
+    import { moduleInstances } from "./index";
     import { showMessage } from "siyuan";
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
@@ -50,7 +50,13 @@
             button: {
                 label: "获取",
                 callback: () => {
-                    moduleInstances['M_calendar'].getCalUrl();
+                    try {
+                        moduleInstances["M_calendar"].getCalUrl();
+                    } catch (error) {
+                        showMessage(
+                            `导入模板失败: ${error.message}，请先启用日程管理功能`,
+                        );
+                    }
                 },
             },
         },
@@ -83,7 +89,10 @@
             key: "cal-create-pos",
             value: settings["cal-create-pos"],
             options: Object.fromEntries(
-                window.siyuan.notebooks.map(notebook => [notebook.id, notebook.name])
+                window.siyuan.notebooks.map((notebook) => [
+                    notebook.id,
+                    notebook.name,
+                ]),
             ),
         },
         {
@@ -92,9 +101,40 @@
             description: "选择默认添加事件的数据库",
             key: "cal-db-id",
             value: settings["cal-db-id"],
-            options: moduleInstances['M_calendar'].av_ids.length > 0 ? Object.fromEntries(
-                moduleInstances['M_calendar'].av_ids.map(database => [database.id, database.name])
-            ) : {"": "无可用数据库"},
+            options: (() => {
+                try {
+                    if (
+                        !moduleInstances["M_calendar"] ||
+                        !moduleInstances["M_calendar"].av_ids
+                    ) {
+                        console.warn(
+                            "Calendar module or av_ids not initialized",
+                        );
+                        return { "": "无可用数据库" };
+                    }
+                    const ids = moduleInstances["M_calendar"].av_ids;
+                    if (!Array.isArray(ids) || ids.length === 0) {
+                        return { "": "无可用数据库" };
+                    }
+                    return Object.fromEntries(
+                        ids
+                            .map((database) => {
+                                if (!database?.id || !database?.name) {
+                                    console.warn(
+                                        "Invalid database entry:",
+                                        database,
+                                    );
+                                    return ["", "无效数据库"];
+                                }
+                                return [database.id, database.name];
+                            })
+                            .filter((entry) => entry[0] !== ""),
+                    );
+                } catch (error) {
+                    console.error("Error processing database options:", error);
+                    return { "": "加载数据库出错" };
+                }
+            })(),
         },
         {
             type: "button",
@@ -105,7 +145,13 @@
             button: {
                 label: "生成",
                 callback: () => {
-                    moduleInstances['M_calendar'].importMoBan();
+                    try {
+                        moduleInstances["M_calendar"].importMoBan();
+                    } catch (error) {
+                        showMessage(
+                            `导入模板失败: ${error.message}，请先启用日程管理功能`,
+                        );
+                    }
                 },
             },
         },
@@ -138,7 +184,7 @@
         // {
         //     type: "hint",
         //     title: "使用方法",
-        //     description: `            
+        //     description: `
         //     <div class="fn__flex b3-label">
         //         <ol>
         //             <li>添加一个数据库（前三列格式如图）</li>
@@ -195,7 +241,7 @@
             button: {
                 label: "测试",
                 callback: () => {
-                    moduleInstances['M_sync'].testSync();
+                    moduleInstances["M_sync"].testSync();
                 },
             },
         },
@@ -233,7 +279,7 @@
                 "https://kimi.moonshot.cn/": "kimi",
                 "https://metaso.cn/": "密塔",
                 "https://chat.deepseek.com/": "deepseek",
-                "https://chatgpt.com/": "chatgpt"
+                "https://chatgpt.com/": "chatgpt",
             },
         },
         {
@@ -293,7 +339,6 @@
         await runload();
         // console.log("MMMMMMMMMMMM",moduleInstances['M_calendar'].av_ids);
     });
-
 
     async function runload() {
         let data = await plugin.loadData(myfile);
