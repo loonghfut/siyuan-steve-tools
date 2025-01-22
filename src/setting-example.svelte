@@ -168,19 +168,19 @@
                 },
             },
         },
-        {
-            type: "button",
-            title: "刷新",
-            description: "若部分设置未生效请刷新思源笔记",
-            key: "reset",
-            value: "error",
-            button: {
-                label: "刷新",
-                callback: () => {
-                    myapi.refresh();
-                },
-            },
-        },
+        // {
+        //     type: "button",
+        //     title: "刷新",
+        //     description: "若部分设置未生效请刷新思源笔记",
+        //     key: "reset",
+        //     value: "error",
+        //     button: {
+        //         label: "刷新",
+        //         callback: () => {
+        //             myapi.refresh();
+        //         },
+        //     },
+        // },
         // {
         //     type: "hint",
         //     title: "使用方法",
@@ -245,19 +245,19 @@
                 },
             },
         },
-        {
-            type: "button",
-            title: "刷新",
-            description: "若部分设置未生效请刷新思源笔记",
-            key: "reset",
-            value: "error",
-            button: {
-                label: "刷新",
-                callback: () => {
-                    myapi.refresh();
-                },
-            },
-        },
+        // {
+        //     type: "button",
+        //     title: "刷新",
+        //     description: "若部分设置未生效请刷新思源笔记",
+        //     key: "reset",
+        //     value: "error",
+        //     button: {
+        //         label: "刷新",
+        //         callback: () => {
+        //             myapi.refresh();
+        //         },
+        //     },
+        // },
     ];
 
     let group3Items: ISettingItem[] = [
@@ -282,19 +282,19 @@
                 "https://chatgpt.com/": "chatgpt",
             },
         },
-        {
-            type: "button",
-            title: "刷新",
-            description: "若部分设置未生效请刷新思源笔记",
-            key: "reset",
-            value: "error",
-            button: {
-                label: "刷新",
-                callback: () => {
-                    myapi.refresh();
-                },
-            },
-        },
+        // {
+        //     type: "button",
+        //     title: "刷新",
+        //     description: "若部分设置未生效请刷新思源笔记",
+        //     key: "reset",
+        //     value: "error",
+        //     button: {
+        //         label: "刷新",
+        //         callback: () => {
+        //             myapi.refresh();
+        //         },
+        //     },
+        // },
     ];
 
     let group4Items: ISettingItem[] = [
@@ -345,6 +345,18 @@
         console.debug("Settings saved:", settings);
     }
     onMount(async () => {
+        const headerEl = document.querySelector('.b3-dialog__header');
+        if (headerEl) {
+            // 创建刷新按钮
+            const refreshBtn = document.createElement('button');
+            refreshBtn.className = 'b3-button b3-button--outline';
+            refreshBtn.style.cssText = 'float: right; margin-right: 8px;';
+            refreshBtn.textContent = '保存';
+            refreshBtn.onclick = () => myapi.refresh();
+            
+            // 添加按钮到header
+            headerEl.appendChild(refreshBtn);
+        }
         console.log("plugin-load");
         await runload();
         // console.log("MMMMMMMMMMMM",moduleInstances['M_calendar'].av_ids);
