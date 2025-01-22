@@ -302,7 +302,7 @@ export async function createEventInDatabase(
         hideCloseIcon: true,
         // disableClose: true,
     })
-
+    let ok = false;//防崩溃
     const eventPanel = document.getElementById('eventPanel');
     const okBtn = dialog.element.querySelector('.b3-button--text');
     const cancelBtn = dialog.element.querySelector('.b3-button--cancel');
@@ -376,11 +376,12 @@ export async function createEventInDatabase(
         render: {
             breadcrumb: false,
         },
-        
+        action: ["cb-get-focus"],
+        mode: "wysiwyg",
         // action: ["cb-get-focus"],
 
     });
-    let ok = false;//防崩溃
+    
     const messageHandler = async (e: MessageEvent) => {
         try {
             const msg = JSON.parse(e.data);
@@ -397,7 +398,7 @@ export async function createEventInDatabase(
 
     const debouncedHandleKeydown = debounce(handleKeydown, 300);
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
-    panel.focus();
+    // panel.focus();
 
     steveTools.outlog("dasdsssssssssss::::::", panel);
     // 2. 添加到文档并显示
