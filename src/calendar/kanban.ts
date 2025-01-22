@@ -1,18 +1,17 @@
-import { sliceEvents, createPlugin } from '@fullcalendar/core';
+import {createPlugin } from '@fullcalendar/core';
 
 const CustomViewConfig = {
     classNames: ['custom-view'],
 
     content: function (props) {
         console.log('custom view props', props);
-        let segs = sliceEvents(props, true); // allDay=true
-        let html =
-            '<div class="view-title">' +
-            props.dateProfile.currentRange.start.toUTCString() +
-            '</div>' +
-            '<div class="view-events">' +
-            segs.length + ' events' +
-            '</div>'
+        const allEvents = props.eventStore.defs;
+        console.log('custom view allEvents', allEvents);
+        // let segs = sliceEvents(props, true); // allDay=true
+        // console.log('custom view segs', segs);
+        let html =`
+
+        `
 
         return { html: html }
     },
