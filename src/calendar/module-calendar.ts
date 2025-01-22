@@ -246,40 +246,7 @@ export class M_calendar {
         }
         showMessage("请先启用日历订阅模块", 6000, "info");
     }
-    // 生成ICS文件
-    // async generateICS(events: EventAttributes[], filePath: string) {
-    //     try {
-    //         // 使用ics库生成ICS内容
-    //         const { error, value: calendarContent } = createEvents(events.map(event => {
-    //             const defaultStart: [number, number, number] = [
-    //                 new Date().getFullYear(),
-    //                 new Date().getMonth() + 1,
-    //                 new Date().getDate()
-    //             ];
-    //             return {
-    //                 ...event,
-    //                 // 确保必要字段存在且格式正确
-    //                 start: event.start || defaultStart,
-    //                 title: event.title || '未命名事件'
-    //             };
-    //         }));
-
-    //         if (error) {
-    //             console.error('生成ICS内容时出错：', error);
-    //             return;
-    //         }
-
-    //         // 将ICS内容转换为Blob
-    //         const fileBlob = new Blob([calendarContent], { type: 'text/calendar' });
-
-    //         // 使用api.putFile上传文件
-    //         const response = await api.putFile(filePath, false, fileBlob);
-    //         steveTools.outlog(response);
-    //     } catch (error) {
-    //         console.error('上传ICS文件时出错：', error);
-    //     }
-    // }
-
+  
     // 保存事件数据到JSON文件
     async saveEvents(events: EventAttributes[], filePath: string) {
         try {
@@ -292,11 +259,6 @@ export class M_calendar {
         }
     }
 
-    // 从JSON文件生成ICS文件
-    // 新增转换函数
-    // private convertArrayTimeToDate(timeArray: number[]): [number, number, number, number, number] {
-    //     return [timeArray[0], timeArray[1], timeArray[2], timeArray[3] || 0, timeArray[4] || 0];
-    // }
 
     private convertEventFormat(eventData: any[][]): EventAttributes[] {
         const events: EventAttributes[] = [];
@@ -359,30 +321,6 @@ export class M_calendar {
         }
     }
 
-    // 添加新事件到JSON文件
-    async addEvent(newEvent: EventAttributes, jsonFilePath: string) {
-        try {
-            // 读取现有的事件数据
-            const eventsBlob = await api.getFileBlob(jsonFilePath);
-            let events: EventAttributes[] = [];
-            if (eventsBlob) {
-                const eventsJson = await eventsBlob.text();
-                events = JSON.parse(eventsJson);
-            }
-
-            // 将新事件添加到事件数组
-            events.push(newEvent);
-
-            // 将更新后的事件数组保存回JSON文件
-            const updatedEventsJson = JSON.stringify(events);
-            const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
-            await api.putFile(jsonFilePath, false, fileBlob);
-            // steveTools.outlog(await fileBlob.text());
-            steveTools.outlog('新事件已添加并保存到' + jsonFilePath);
-        } catch (error) {
-            console.error('添加事件时出错：', error);
-        }
-    }
 
     // 检查并创建events.json文件
     async checkAndCreateEventsFile(filePath: string) {
@@ -437,69 +375,6 @@ export class M_calendar {
         steveTools.outlog(avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
         steveTools.outlog("avIds", avIds);
         return avIds;
-    }
-    // 从思源数据库中获取日程信息
-    // 辅助函数
-    private getColumnIdByName(columns: any[], name: string): string {
-        const column = columns.find(col => col.name === name);
-        return column?.id || '';
-    }
-
-    private getCellValue(cells: any[], columnId: string) {
-        const cell = cells.find(cell => cell.value.keyID === columnId);
-        return cell?.value;
-    }
-
-    private processRegularEvents(response: any) {
-        const { columns, rows } = response.view;
-
-        // 获取列ID
-        const eventColumnId = this.getColumnIdByName(columns, "事件");
-        const dateColumnId = this.getColumnIdByName(columns, "开始时间");
-        const descColumnId = this.getColumnIdByName(columns, "描述");
-        const statusColumnId = this.getColumnIdByName(columns, "状态");
-
-        return rows.map(row => {
-            const eventValue = this.getCellValue(row.cells, eventColumnId);
-            const dateValue = this.getCellValue(row.cells, dateColumnId);
-            const descValue = this.getCellValue(row.cells, descColumnId);
-            const statusValue = this.getCellValue(row.cells, statusColumnId);
-
-            return {
-                blockContent: eventValue?.block?.content || 'N/A',
-                dateContent: dateValue?.date?.content || 0,
-                dateContent2: dateValue?.date?.content2 || 0,
-                textContent: descValue?.text?.content || 'N/A',
-                status: statusValue?.mSelect?.[0]?.content || '未完成2'
-            };
-        });
-    }
-
-    private processRecurringEvents(response: any) {
-        const { columns, rows } = response.view;
-
-        // 获取列ID
-        const eventColumnId = this.getColumnIdByName(columns, "事件");
-        const dateColumnId = this.getColumnIdByName(columns, "开始时间");
-        const durationColumnId = this.getColumnIdByName(columns, "持续时间");
-        const ruleColumnId = this.getColumnIdByName(columns, "重复规则");
-        const descColumnId = this.getColumnIdByName(columns, "描述");
-
-        return rows.map(row => {
-            const eventValue = this.getCellValue(row.cells, eventColumnId);
-            const dateValue = this.getCellValue(row.cells, dateColumnId);
-            const durationValue = this.getCellValue(row.cells, durationColumnId);
-            const ruleValue = this.getCellValue(row.cells, ruleColumnId);
-            const descValue = this.getCellValue(row.cells, descColumnId);
-
-            return {
-                blockContent: eventValue?.block?.content || 'N/A',
-                dateContent: dateValue?.date?.content || 0,
-                duration: durationValue?.number?.content || 1,
-                rule: ruleValue?.text?.content || 'N/A',
-                textContent: descValue?.text?.content || 'N/A'
-            };
-        });
     }
 
     async getEventsFromSiYuanDatabase() {
@@ -677,47 +552,7 @@ function convertTimestampToArray(timestamp: number): [number, number, number, nu
     ];
 }
 
-// type FrequencyType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
-// const mapFrequency = (chinese: string): FrequencyType => {
-//     const frequencyMap: Record<string, FrequencyType> = {
-//         '每天': 'DAILY',
-//         '每周': 'WEEKLY',
-//         '每月': 'MONTHLY',
-//         '每年': 'YEARLY'
-//     };
-//     return frequencyMap[chinese] || 'WEEKLY';
-// };
-
-
-// const targetElement = document.querySelector('div[contenteditable="false"][data-av-id="20241213113357-m9b143e"][data-av-type="table"][data-node-id="20241003141312-30yk3cr"][data-type="NodeAttributeView"][class="av"][custom-sy-av-view="20241213113357-tuugpcw"][name="日程"]');
-// steveTools.outlog(targetElement);
-// if (targetElement) {
-//     // 创建新的元素
-//     const newElement = document.createElement('span');
-//     // newElement.setAttribute('data-type', 'av-switcher');
-//     newElement.classList.add('block__icon');
-//     newElement.setAttribute('data-position', '8bottom');
-//     newElement.setAttribute('aria-label', '日历视图');
-
-//     const svgElement = document.createElement('svg');
-//     const useElement = document.createElement('use');
-//     useElement.setAttribute('xlink:href', '#iconCalendar');
-//     svgElement.appendChild(useElement);
-
-//     newElement.appendChild(svgElement);
-
-
-
-//     // 插入新的元素到目标元素中
-//     const targetSubElement = targetElement.querySelector('.fn__flex .av__views');
-//     if (targetSubElement) {
-//         targetSubElement.appendChild(newElement);
-//         // 添加点击事件处理
-//         newElement.addEventListener('click', function () {
-
-//         });
-//     }
-// }
+// 转换思源数据库中的事件数据为 ICS 格式
 
 function transformEvents(inputEvents, isZQ: boolean = false) {
     function timestampToArray(timestamp) {
