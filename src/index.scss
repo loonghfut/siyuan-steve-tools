@@ -420,3 +420,23 @@ $background-color-today: var(--b3-list-hover);
     position: relative;
     z-index: 99999 !important;
 }
+
+
+//视图选择界面
+.view-filter-menu{
+    position: absolute;
+    z-index: 1000;
+    background-color: $background-color ;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    color: $text-color;
+    border: 1px solid $border-color;
+} 
+.view-filter-item{
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    &:hover {
+        background-color: $hover-background-color;
+    }
+}

@@ -21,6 +21,8 @@ let calendar: Calendar;
 let clicks = 0;
 let viewValue: any;
 let viewValue_zq: any;
+let filterViewId: string;
+let av_ids: string[] = [];
 
 
 
@@ -110,9 +112,63 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             }
 
         },
+        customButtons: {
+            viewFilter: {
+                text: '选择视图',
+                click: async function  () {
+                    // 获取按钮元素位置
+                    const viewIDs = await myF.getViewId(av_ids)
+                    // console.log("viewIDs", viewIDs);
+                    const button = document.querySelector('.fc-viewFilter-button');
+                    if (!button) return;
+                    // 创建下拉菜单
+                    const menu = document.createElement('div');
+                    menu.className = 'view-filter-menu ';
 
+                    // 添加视图选项
+                    const views = [
+                        { id: '', text: '全部视图' },
+                        ...viewIDs.map(v => ({
+                            id: v.viewId,
+                            text: v.name
+                        }))
+                    ];
+
+                    views.forEach(view => {
+                        const item = document.createElement('div');
+                        item.className = 'view-filter-item';
+                        item.textContent = view.text;
+
+                        item.onclick = async () => {
+                            filterViewId = view.id;
+                            // 更新日历数据
+                            calendar.refetchEvents();
+                            menu.remove();
+                            // 更新按钮文本
+                            button.textContent = view.text;
+                        };
+                        menu.appendChild(item);
+                    });
+
+                    // 定位并显示菜单
+                    const rect = button.getBoundingClientRect();
+                    menu.style.top = rect.bottom + 'px';
+                    menu.style.left = rect.left + 'px';
+                    document.body.appendChild(menu);
+
+                    // 点击外部关闭菜单
+                    document.addEventListener('click', function closeMenu(e) {
+                        const target = e.target as Node;
+                        if (!menu.contains(target) && target !== button) {
+                            menu.remove();
+                            document.removeEventListener('click', closeMenu);
+                        }
+                    });
+                },
+            },
+        },
         headerToolbar: {
-            left: 'prev,next today',
+            left: 'prev,next today viewFilter',
             center: 'title',
             right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard'
         },
@@ -122,7 +178,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             try {
                 steveTools.outlog('Fetching calendar events...::::::::::::::::::::::::::');
                 // 1. 获取引用ID
-                const av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+                av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
                 const av_ids_zq = await moduleInstances['M_calendar'].getAVreferenceid("周期");
                 if (!av_ids?.length) {
                     console.warn('No reference IDs found');
@@ -142,11 +198,14 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 // 3. 获取视图数据
                 viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
                 viewValue = await myF.getViewValue(viewIDs);
-                steveTools.outlog("View data:", viewValue);
+                console.log("View data:", viewValue, "周期", viewValue_zq);
+
+                // 3.5 增加筛选函数
+                viewValue = await myF.filterViewValue(viewValue, filterViewId);
 
                 // 4. 转换事件数据
                 const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
-                steveTools.outlog('Fetched calendar events:', events);
+                console.log('Fetched calendar events:', events);
                 // 5. 回调成功
                 successCallback(events);
             } catch (error) {

@@ -157,6 +157,29 @@ function extractDataFromTable(data: any, isZQ = false) {
     }
 }
 
+//筛选事件函数
+export async function filterViewValue(viewValue, filterKey = '') {
+    const filteredViewValue = [];
+    // 如果 filterKey 为空，返回所有数据
+    if (!filterKey) {
+        return viewValue;
+    }
+    
+    // 遍历查找匹配 viewId 的数据
+    for (const item of viewValue) {
+        if (item.from.viewId === filterKey) {
+            filteredViewValue.push(item);
+            break;
+        }
+    }
+    
+    return filteredViewValue;
+
+}
+
+
+
+
 //OK解决事件重复问题
 //转换数据格式
 export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]) {
