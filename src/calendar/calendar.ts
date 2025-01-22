@@ -8,6 +8,7 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import steveTools from "@/index";
+import kanban from './kanban';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
@@ -28,12 +29,13 @@ export async function run(id: string, initialView = 'dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
         plugins: [
-            interactionPlugin, 
-            dayGridPlugin, 
-            timeGridPlugin, 
-            listPlugin, 
-            multiMonthPlugin, 
-            rrule
+            interactionPlugin,
+            dayGridPlugin,
+            timeGridPlugin,
+            listPlugin,
+            multiMonthPlugin,
+            rrule,
+            kanban
         ],
         initialView: initialView,
         navLinks: true,
@@ -52,7 +54,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             // steveTools.outlog("事件点击", info);
             //TODO: 事件点击处理
         },
-        select: function(info) {//TODO: 选择处理
+        select: function (info) {//TODO: 选择处理
             // console.log('select', info);
         },
         // 日期点击处理
@@ -102,7 +104,11 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 duration: { days: 14 },
                 buttonText: '14日'
             },
-            
+            statusBoard: {
+                type: 'kanban',
+                buttonText: '看板'
+            }
+
         },
 
         headerToolbar: {
