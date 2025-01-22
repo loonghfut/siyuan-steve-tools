@@ -15,22 +15,35 @@ import { moduleInstances } from '@/index';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
 
+
 let calendar: Calendar;
 let clicks = 0;
 let viewValue: any;
 let viewValue_zq: any;
 
 
+
+
 export async function run(id: string, initialView = 'dayGridMonth') {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
-        plugins: [interactionPlugin, dayGridPlugin, timeGridPlugin, listPlugin, multiMonthPlugin, rrule],
+        plugins: [
+            interactionPlugin, 
+            dayGridPlugin, 
+            timeGridPlugin, 
+            listPlugin, 
+            multiMonthPlugin, 
+            rrule
+        ],
         initialView: initialView,
         navLinks: true,
         dayMaxEvents: true,
         locale: zhCnLocale,
         slotDuration: '01:00:00',
         editable: true,
+        //看板视图
+
+
         // selectable: true,
         // eventDurationEditable: true,
         // 事件点击处理
@@ -89,17 +102,13 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 duration: { days: 14 },
                 buttonText: '14日'
             },
-            timeGridFiveDays: {
-                type: 'timeGrid',
-                duration: { days: 5 },
-                buttonText: '5日'
-            }
+            
         },
 
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridFiveDays,timeGridDay'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard'
         },
 
         // 从思源数据转换事件
