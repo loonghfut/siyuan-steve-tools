@@ -265,6 +265,11 @@ export async function createEventInDatabase(
     //// 获取当前日期的日记块ID
     // steveTools.outlog(settingdata);
     // steveTools.outlog(window.siyuan.ws.app);
+    //加一个错误判断
+    if (!settingdata["cal-create-pos"]||!settingdata["cal-db-id"]) {
+        sy.showMessage('请先设置日程创建位置和日程创建数据库');
+        return;
+    }
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
     //// 创建一个新块
     steveTools.outlog("daynote_id:::", daynote_id.id);
