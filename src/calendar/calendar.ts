@@ -97,7 +97,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
 
         },
         eventResize: async function (info) {
-            steveTools.outlog("事件调整大小", info.event.startStr, info.event.endStr);
+            console.log("事件调整大小", info.event.startStr, info.event.endStr);
             if (info.event._def.extendedProps.isRecurring) {
                 showMessage("重复事件不支持修改哦");
                 info.revert();

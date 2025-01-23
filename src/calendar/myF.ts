@@ -475,8 +475,8 @@ export async function updateEventInDatabase(
     const newStartDate = info.event.startStr;
     const newEndDate = info.event.endStr;
     steveTools.outlog("dateChange:::", newStartDate, newEndDate);
-    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间',settingdata["cal-db-id"]);
     const rootid = info.event._def.extendedProps.rootid;
+    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间',rootid);
     steveTools.outlog("rootid:::", rootid);
     const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
