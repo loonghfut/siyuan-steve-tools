@@ -266,10 +266,11 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         const startDate = new Date(parseInt(item['开始时间'].start));
                         const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
                         steveTools.outlog("startDate:::", startDate, "endDate:::", endDate);
-                        const isAllDay = !endDate ||
-                            (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
-                                (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
-                            (endDate && startDate.getTime() === endDate.getTime());
+                        const isAllDay = false;
+                        // (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
+                        //     (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
+                        // (endDate && startDate.getTime() === endDate.getTime());
+
                         const rruleStr = item['重复规则']?.content
                             ? `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${item['重复规则'].content}`
                             : '';
@@ -281,7 +282,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             timeZone: 'local',
                             allDay: isAllDay,
                             rrule: rruleStr,
-                            duration: item['持续时间']?.content || '',
+                            duration: item['持续时间']?.content || 1,
                             extendedProps: {
                                 blockId: eventId,
                                 rootid: view.from.rootid,
