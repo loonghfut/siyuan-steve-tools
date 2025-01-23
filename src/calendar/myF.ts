@@ -43,7 +43,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
     for (const viewId_Data of viewIds_Data) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
-            console.log("viewValue_CHUSHI:::", viewValue);
+            // console.log("viewValue_CHUSHI:::", viewValue);
             const data = extractDataFromTable(viewValue.view, isZQ);
             viewValue_Data.push({
                 from: viewId_Data,
@@ -245,7 +245,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             description: item['描述']?.content || '',
                             isRecurring: false,
                             priority: item['优先级']?.content || '无',
-                            category: item['分类']?.content || '无'
+                            category: item['分类']?.content || '无',
+                            parent: item['父级'] || '',
                         }
                     });
                 }
@@ -288,6 +289,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                                 rootid: view.from.rootid,
                                 // status: item['状态']?.content || '',
                                 description: item['描述']?.content || '',
+                                priority: item['优先级']?.content || '无',
+                                category: item['分类']?.content || '无',
                                 isRecurring: true,
                                 recurringPattern: item['重复规则']?.content || ''
                             }
