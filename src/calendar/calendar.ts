@@ -294,7 +294,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 zIndex: window.siyuan.zIndex,
                 appendTo: document.body,
                 theme: 'light',
-                delay: [300, 0]
+                delay: [1000, 0]
             });
         }
     });
