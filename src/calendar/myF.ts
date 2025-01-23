@@ -43,6 +43,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
     for (const viewId_Data of viewIds_Data) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
+            console.log("viewValue_CHUSHI:::", viewValue);
             const data = extractDataFromTable(viewValue.view, isZQ);
             viewValue_Data.push({
                 from: viewId_Data,
@@ -57,7 +58,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
         }
     }
 
-    steveTools.outlog("ceshi2222:::::::::::::2", viewValue_Data);
+    console.log("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
 
@@ -192,7 +193,7 @@ export async function filterViewValue(viewValue, filterKey = '') {
     if (!filterKey) {
         return viewValue;
     }
-    
+
     // 遍历查找匹配 viewId 的数据
     for (const item of viewValue) {
         if (item.from.viewId === filterKey) {
@@ -200,7 +201,7 @@ export async function filterViewValue(viewValue, filterKey = '') {
             break;
         }
     }
-    
+
     return filteredViewValue;
 
 }
@@ -366,7 +367,7 @@ export async function createEventInDatabase(
     //添加事件主代码
     const handleKeydown = async (e: KeyboardEvent) => {
         // console.log(e);
-        if (e.type === 'click' && !ok) {sy.showMessage('请先输入内容') }
+        if (e.type === 'click' && !ok) { sy.showMessage('请先输入内容') }
         if ((e.key === 'Enter' && e.ctrlKey && ok) || e.type === 'click' && ok) {
             e.preventDefault();
             window.siyuan.ws.ws.removeEventListener('message', messageHandler);
@@ -394,9 +395,10 @@ export async function createEventInDatabase(
             await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"]);
             // 添加数据库属性
             //// 添加时间和状态属性
-            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
+            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间',settingdata["cal-db-id"]);
+            console.log("viewValue:::", viewValue);
             console.log("timeKeyID:::", timeKeyID);
-            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态');
+            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态',settingdata["cal-db-id"]);
             const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: "未完成" }];
             await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID, selectdata, "select");
@@ -435,7 +437,7 @@ export async function createEventInDatabase(
         // action: ["cb-get-focus"],
 
     });
-    
+
     const messageHandler = async (e: MessageEvent) => {
         try {
             const msg = JSON.parse(e.data);
@@ -473,7 +475,7 @@ export async function updateEventInDatabase(
     const newStartDate = info.event.startStr;
     const newEndDate = info.event.endStr;
     steveTools.outlog("dateChange:::", newStartDate, newEndDate);
-    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
+    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间',settingdata["cal-db-id"]);
     const rootid = info.event._def.extendedProps.rootid;
     steveTools.outlog("rootid:::", rootid);
     const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate);//TODOsettingdata["cal-db-id"]
@@ -490,12 +492,12 @@ export async function updateEventInDatabase(
 
 
 
-async function getKeyIDfromViewValue(viewValue: any, key: string): Promise<string | undefined> {
+async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string): Promise<string | undefined> {
     // First try to get keyID from existing viewValue
     const findKeyID = (data: any[]): string | undefined => {
         for (const view of data) {
             for (const item of view.data) {
-                if (item?.[key]?.keyID) {
+                if (item?.[key]?.keyID && view?.from?.rootid === rootid) {
                     return item[key].keyID;
                 }
             }
