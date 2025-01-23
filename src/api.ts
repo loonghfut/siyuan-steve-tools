@@ -8,7 +8,7 @@
 
 import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
 import { IOperation, Protyle } from "siyuan";
-import {ISelectOption } from "@/calendar/interface";
+import { ISelectOption } from "@/calendar/interface";
 
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
@@ -717,25 +717,25 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle: 
 
 
 
-export async function updateAttrViewCell_pro(
-    id: string, 
-    avID: string, 
-    keyID: string, 
-    value: string | Date | ISelectOption[], 
-    type: 'date' | 'select',
+export async function updateAttrViewCell_pro( //TODO未完善
+    id: string,
+    avID: string,
+    keyID: string,
+    value: string | Date | ISelectOption[] | [],
+    type: 'date' | 'select' | 'relation',
     endtime?: string
 ) {
     let doOperations: IOperation[] = [];
     let undoOperations: IOperation[] = [];
 
     const newId = await generateSiyuanID();
-    
+
     if (type === 'date') {
         let { start, end } = await getDateTimestamps(value as string);
         if (endtime) {
             end = (await getDateTimestamps(endtime)).start;
         }
-        
+
         doOperations.push({
             action: "updateAttrViewCell",
             id: newId,
@@ -768,6 +768,33 @@ export async function updateAttrViewCell_pro(
                 mSelect: value as ISelectOption[]
             }
         });
+    } else if (type === 'relation') {
+        doOperations.push({
+            action: "updateAttrViewCell",
+            id: newId,
+            keyID: keyID,
+            rowID: id,
+            avID: avID,
+            data: {
+                type: "relation",
+                id: newId,
+                relation: {
+                    blockIDs: [
+                        "20250122214910-mgpixck"
+                    ],
+                    contents: [
+                        {
+                            block: {
+                                content: "asdfas",
+                                id: "20250122214910-mgpixck"
+                            },
+                            isDetached: false,
+                            type: "block"
+                        }
+                    ]
+                },
+            }
+        });
     }
 
     doOperations.push({
@@ -777,7 +804,7 @@ export async function updateAttrViewCell_pro(
     });
 
     undoOperations.push(/* 添加撤销操作 */);
-    
+
     Protyle.prototype.transaction(doOperations, undoOperations);
 }
 

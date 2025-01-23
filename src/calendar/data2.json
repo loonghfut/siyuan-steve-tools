@@ -1,0 +1,70 @@
+[
+  {
+    "action": "updateAttrViewCell",
+    "data": {
+      "id": "20250123112903-fq6lk5u",
+      "relation": {
+        "blockIDs": [
+          "20250122214910-mgpixck"
+        ],
+        "contents": [
+          {
+            "block": {
+              "content": "asdfas",
+              "id": "20250122214910-mgpixck"
+            },
+            "isDetached": false,
+            "type": "block"
+          }
+        ]
+      },
+      "type": "relation"
+    },
+    "id": "20250123112903-fq6lk5u",
+    "parentID": "",
+    "previousID": "",
+    "nextID": "",
+    "retData": null,
+    "blockIDs": null,
+    "blockID": "",
+    "deckID": "",
+    "avID": "20250113213909-aohhq35",
+    "srcIDs": null,
+    "srcs": null,
+    "isDetached": false,
+    "ignoreFillFilter": false,
+    "name": "",
+    "type": "",
+    "format": "",
+    "keyID": "20250122113931-d79c445",
+    "rowID": "20250122221227-xzcekmm",
+    "isTwoWay": false,
+    "backRelationKeyID": "",
+    "removeDest": false
+  },
+  {
+    "action": "doUpdateUpdated",
+    "data": "20250123112926",
+    "id": "20250113200532-uwpenyv",
+    "parentID": "",
+    "previousID": "",
+    "nextID": "",
+    "retData": null,
+    "blockIDs": null,
+    "blockID": "",
+    "deckID": "",
+    "avID": "",
+    "srcIDs": null,
+    "srcs": null,
+    "isDetached": false,
+    "ignoreFillFilter": false,
+    "name": "",
+    "type": "",
+    "format": "",
+    "keyID": "",
+    "rowID": "",
+    "isTwoWay": false,
+    "backRelationKeyID": "",
+    "removeDest": false
+  }
+]

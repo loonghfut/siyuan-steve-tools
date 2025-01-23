@@ -1,0 +1,397 @@
+{
+    "dateProfile": {
+        "currentDate": "2025-01-22T20:57:47.083Z",
+        "validRange": {
+            "start": null,
+            "end": null
+        },
+        "currentRange": {
+            "start": "2025-01-22T00:00:00.000Z",
+            "end": "2025-01-23T00:00:00.000Z"
+        },
+        "currentRangeUnit": "day",
+        "isRangeAllDay": true,
+        "activeRange": {
+            "start": "2025-01-22T00:00:00.000Z",
+            "end": "2025-01-23T00:00:00.000Z"
+        },
+        "renderRange": {
+            "start": "2025-01-22T00:00:00.000Z",
+            "end": "2025-01-23T00:00:00.000Z"
+        },
+        "slotMinTime": {
+            "years": 0,
+            "months": 0,
+            "days": 0,
+            "milliseconds": 0
+        },
+        "slotMaxTime": {
+            "years": 0,
+            "months": 0,
+            "days": 0,
+            "milliseconds": 86400000
+        },
+        "isValid": true,
+        "dateIncrement": {
+            "years": 0,
+            "months": 0,
+            "days": 1,
+            "milliseconds": 0
+        }
+    },
+    "businessHours": {
+        "defs": {},
+        "instances": {}
+    },
+    "eventStore": {
+        "defs": {
+            "117": {
+                "title": "测试2",
+                "groupId": "",
+                "publicId": "20250122205615-pzzcvqw",
+                "url": "",
+                "recurringDef": null,
+                "defId": "117",
+                "sourceId": "14",
+                "allDay": false,
+                "hasEnd": true,
+                "ui": {
+                    "display": null,
+                    "constraints": [],
+                    "overlap": null,
+                    "allows": [],
+                    "backgroundColor": "",
+                    "borderColor": "",
+                    "textColor": "",
+                    "classNames": []
+                },
+                "extendedProps": {
+                    "blockId": "20250122205615-pzzcvqw",
+                    "rootid": "20250113213909-aohhq35",
+                    "status": "未完成",
+                    "description": "",
+                    "isRecurring": false
+                }
+            },
+            "119": {
+                "title": "c而是",
+                "groupId": "",
+                "publicId": "20250122205559-iprabrf",
+                "url": "",
+                "recurringDef": null,
+                "defId": "119",
+                "sourceId": "14",
+                "allDay": false,
+                "hasEnd": true,
+                "ui": {
+                    "display": null,
+                    "constraints": [],
+                    "overlap": null,
+                    "allows": [],
+                    "backgroundColor": "",
+                    "borderColor": "",
+                    "textColor": "",
+                    "classNames": []
+                },
+                "extendedProps": {
+                    "blockId": "20250122205559-iprabrf",
+                    "rootid": "20250113213909-aohhq35",
+                    "status": "未完成",
+                    "description": "",
+                    "isRecurring": false
+                }
+            },
+            "121": {
+                "title": "测试",
+                "groupId": "",
+                "publicId": "20250122205604-ycxcdic",
+                "url": "",
+                "recurringDef": null,
+                "defId": "121",
+                "sourceId": "14",
+                "allDay": true,
+                "hasEnd": false,
+                "ui": {
+                    "display": null,
+                    "constraints": [],
+                    "overlap": null,
+                    "allows": [],
+                    "backgroundColor": "",
+                    "borderColor": "",
+                    "textColor": "",
+                    "classNames": []
+                },
+                "extendedProps": {
+                    "blockId": "20250122205604-ycxcdic",
+                    "rootid": "20250113213909-aohhq35",
+                    "status": "未完成",
+                    "description": "",
+                    "isRecurring": false
+                }
+            },
+            "123": {
+                "title": "测试",
+                "groupId": "",
+                "publicId": "20250122205110-lwtkhhw",
+                "url": "",
+                "recurringDef": null,
+                "defId": "123",
+                "sourceId": "14",
+                "allDay": true,
+                "hasEnd": false,
+                "ui": {
+                    "display": null,
+                    "constraints": [],
+                    "overlap": null,
+                    "allows": [],
+                    "backgroundColor": "",
+                    "borderColor": "",
+                    "textColor": "",
+                    "classNames": []
+                },
+                "extendedProps": {
+                    "blockId": "20250122205110-lwtkhhw",
+                    "rootid": "20250113213909-aohhq35",
+                    "status": "未完成",
+                    "description": "",
+                    "isRecurring": false
+                }
+            },
+            "125": {
+                "title": "123",
+                "groupId": "",
+                "publicId": "20250113213926-cu5y14x",
+                "url": "",
+                "recurringDef": {
+                    "typeId": 0,
+                    "typeData": {
+                        "rruleSet": {
+                            "_cache": null,
+                            "origOptions": {},
+                            "options": {
+                                "freq": 0,
+                                "dtstart": "2025-01-22T12:57:47.000Z",
+                                "interval": 1,
+                                "wkst": 0,
+                                "count": null,
+                                "until": null,
+                                "tzid": null,
+                                "bysetpos": null,
+                                "bymonth": [
+                                    1
+                                ],
+                                "bymonthday": [
+                                    22
+                                ],
+                                "bynmonthday": [],
+                                "byyearday": null,
+                                "byweekno": null,
+                                "byweekday": null,
+                                "bynweekday": null,
+                                "byhour": [
+                                    12
+                                ],
+                                "byminute": [
+                                    57
+                                ],
+                                "bysecond": [
+                                    47
+                                ],
+                                "byeaster": null
+                            },
+                            "_rrule": [
+                                {
+                                    "_cache": null,
+                                    "origOptions": {
+                                        "freq": 2,
+                                        "interval": 2,
+                                        "dtstart": "2025-01-21T00:25:00.000Z"
+                                    },
+                                    "options": {
+                                        "freq": 2,
+                                        "dtstart": "2025-01-21T00:25:00.000Z",
+                                        "interval": 2,
+                                        "wkst": 0,
+                                        "count": null,
+                                        "until": null,
+                                        "bysetpos": null,
+                                        "bymonth": null,
+                                        "bymonthday": [],
+                                        "bynmonthday": [],
+                                        "byyearday": null,
+                                        "byweekno": null,
+                                        "byweekday": [
+                                            1
+                                        ],
+                                        "bynweekday": null,
+                                        "byhour": [
+                                            0
+                                        ],
+                                        "byminute": [
+                                            25
+                                        ],
+                                        "bysecond": [
+                                            0
+                                        ],
+                                        "byeaster": null
+                                    }
+                                }
+                            ],
+                            "_rdate": [],
+                            "_exrule": [],
+                            "_exdate": [],
+                            "_dtstart": "2025-01-21T00:25:00.000Z"
+                        },
+                        "isTimeZoneSpecified": true
+                    },
+                    "duration": {
+                        "years": 0,
+                        "months": 0,
+                        "days": 0,
+                        "milliseconds": 3
+                    }
+                },
+                "defId": "125",
+                "sourceId": "14",
+                "allDay": false,
+                "hasEnd": true,
+                "ui": {
+                    "display": null,
+                    "constraints": [],
+                    "overlap": null,
+                    "allows": [],
+                    "backgroundColor": "",
+                    "borderColor": "",
+                    "textColor": "",
+                    "classNames": []
+                },
+                "extendedProps": {
+                    "blockId": "20250113213926-cu5y14x",
+                    "rootid": "20250113213909-0btboc7",
+                    "description": "艾弗森大锅饭广东省",
+                    "isRecurring": true,
+                    "recurringPattern": "FREQ=WEEKLY;INTERVAL=2",
+                    "timeZone": "local"
+                }
+            }
+        },
+        "instances": {
+            "118": {
+                "instanceId": "118",
+                "defId": "117",
+                "range": {
+                    "start": "2025-01-23T03:00:00.000Z",
+                    "end": "2025-01-23T04:00:00.000Z"
+                },
+                "forcedStartTzo": null,
+                "forcedEndTzo": null
+            },
+            "120": {
+                "instanceId": "120",
+                "defId": "119",
+                "range": {
+                    "start": "2025-01-22T08:00:00.000Z",
+                    "end": "2025-01-22T09:00:00.000Z"
+                },
+                "forcedStartTzo": null,
+                "forcedEndTzo": null
+            },
+            "122": {
+                "instanceId": "122",
+                "defId": "121",
+                "range": {
+                    "start": "2025-01-22T00:00:00.000Z",
+                    "end": "2025-01-23T00:00:00.000Z"
+                },
+                "forcedStartTzo": null,
+                "forcedEndTzo": null
+            },
+            "124": {
+                "instanceId": "124",
+                "defId": "123",
+                "range": {
+                    "start": "2025-01-16T00:00:00.000Z",
+                    "end": "2025-01-17T00:00:00.000Z"
+                },
+                "forcedStartTzo": null,
+                "forcedEndTzo": null
+            }
+        }
+    },
+    "eventUiBases": {
+        "117": {
+            "display": null,
+            "constraints": [],
+            "overlap": null,
+            "allows": [],
+            "backgroundColor": "",
+            "borderColor": "",
+            "textColor": "",
+            "classNames": []
+        },
+        "119": {
+            "display": null,
+            "constraints": [],
+            "overlap": null,
+            "allows": [],
+            "backgroundColor": "",
+            "borderColor": "",
+            "textColor": "",
+            "classNames": []
+        },
+        "121": {
+            "display": null,
+            "constraints": [],
+            "overlap": null,
+            "allows": [],
+            "backgroundColor": "",
+            "borderColor": "",
+            "textColor": "",
+            "classNames": []
+        },
+        "123": {
+            "display": null,
+            "constraints": [],
+            "overlap": null,
+            "allows": [],
+            "backgroundColor": "",
+            "borderColor": "",
+            "textColor": "",
+            "classNames": []
+        },
+        "125": {
+            "display": null,
+            "constraints": [],
+            "overlap": null,
+            "allows": [],
+            "backgroundColor": "",
+            "borderColor": "",
+            "textColor": "",
+            "classNames": []
+        },
+        "": {
+            "display": "auto",
+            "startEditable": true,
+            "durationEditable": true,
+            "constraints": [],
+            "overlap": null,
+            "allows": [],
+            "backgroundColor": "",
+            "borderColor": "",
+            "textColor": "",
+            "classNames": []
+        }
+    },
+    "dateSelection": null,
+    "eventSelection": "",
+    "eventDrag": null,
+    "eventResize": null,
+    "isHeightAuto": false,
+    "forPrint": false,
+    "nextDayThreshold": {
+        "years": 0,
+        "months": 0,
+        "days": 0,
+        "milliseconds": 0
+    }
+}

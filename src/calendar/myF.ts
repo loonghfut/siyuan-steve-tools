@@ -106,6 +106,34 @@ function extractDataFromTable(data: any, isZQ = false) {
                         keyID: timeCell?.value?.keyID || ''
                     };
                 }
+                // 提取优先级
+                if (columnMap.has('优先级') && row.cells) {
+                    const priorityCell = row.cells[columnMap.get('优先级').index];
+                    rowData['优先级'] = {
+                        content: priorityCell?.value?.mSelect?.[0]?.content || '',
+                        keyID: priorityCell?.value?.keyID || ''
+                    };
+                }
+
+                // 提取分类
+                if (columnMap.has('分类') && row.cells) {
+                    const categoryCell = row.cells[columnMap.get('分类').index];
+                    rowData['分类'] = {
+                        content: categoryCell?.value?.mSelect?.[0]?.content || '',
+                        keyID: categoryCell?.value?.keyID || ''
+                    };
+                }
+
+                // 提取父级
+                if (columnMap.has('父级') && row.cells) {
+                    const parentCell = row.cells[columnMap.get('父级').index];
+                    rowData['父级'] = {
+                        contents: parentCell?.value?.relation?.contents || '',
+                        ids: parentCell?.value?.relation?.blockIDs || '',
+                        keyID: parentCell?.value?.keyID || '',
+                    };
+                }
+
 
                 // 提取状态
                 if (isZQ) {
@@ -214,7 +242,9 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             rootid: view.from.rootid,
                             status: item['状态']?.content || '',
                             description: item['描述']?.content || '',
-                            isRecurring: false
+                            isRecurring: false,
+                            priority: item['优先级']?.content || '无',
+                            category: item['分类']?.content || '无'
                         }
                     });
                 }

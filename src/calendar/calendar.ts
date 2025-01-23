@@ -274,6 +274,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                             <p><span class="event-tooltip__label">开始:</span> ${info.event.start?.toLocaleString()}</p>
                             <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "无"}</p>
                             <p><span class="event-tooltip__label">状态:</span> ${info.event.extendedProps.status || "未设置"}</p>
+                            <p><span class="event-tooltip__label">优先级:</span> ${info.event.extendedProps.priority || "未设置"}</p>
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
                         : ''

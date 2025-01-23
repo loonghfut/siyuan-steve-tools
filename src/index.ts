@@ -31,7 +31,7 @@ import SettingExample from "@/setting-example.svelte";
 
 
 
-let islog = false;
+let islog = true;
 const myfile = "steveTools.json";
 export let settingdata: any = {};
 let setdialog: any;
@@ -128,7 +128,7 @@ export default class steveTools extends Plugin {
     static outlog(mag: any, mag2?: any, mag3?: any, mag4?: any, mag5?: any) {
         if (islog) {
             console.log(mag, mag2, mag3, mag4, mag5);
-            // console.trace(); // 输出堆栈跟踪
+            console.trace(); // 输出堆栈跟踪
         }
     }
 }
