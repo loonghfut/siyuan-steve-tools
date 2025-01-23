@@ -2,7 +2,7 @@ STEVETOOLS
 ==========
 这是一个工具集合  
 #### 目前工具
-1. 日程管理2.0：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)）
+1. 日程管理2.0(beta)：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)）   
 和思源深度融合的日历视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历等。
 2. docker同步感知：  
 win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
