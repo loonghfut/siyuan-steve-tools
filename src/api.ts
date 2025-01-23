@@ -683,7 +683,7 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
 }
 
 
-export async function addBlockToDatabase_pro(id: string, avID: string, protyle: Protyle) {
+export async function addBlockToDatabase_pro(id: string, avID: string, protyle?: Protyle) {
     let doOperations: IOperation[] = [];
     let undoOperations: IOperation[] = [];
     doOperations.push(
@@ -695,7 +695,7 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle: 
                 id: id,
                 isDetached: false
             }],
-            blockID: avID
+            // blockID: avID //TODO:这里的blockID是数据库块的id
         },
     );
     doOperations.push(
@@ -712,7 +712,7 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle: 
             avID: avID
         }
     );
-    protyle.transaction(doOperations, undoOperations);
+    Protyle.prototype.transaction(doOperations, undoOperations);
 }
 
 

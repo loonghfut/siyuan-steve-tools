@@ -391,10 +391,11 @@ export async function createEventInDatabase(
             // 添加到日历
             //// 将块加入到数据库
             // steveTools.outlog("dasdsssssssssss::::::111111", panel);
-            await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"], panel);
+            await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"]);
             // 添加数据库属性
             //// 添加时间和状态属性
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间');
+            console.log("timeKeyID:::", timeKeyID);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态');
             const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: "未完成" }];

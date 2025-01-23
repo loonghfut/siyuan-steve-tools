@@ -583,11 +583,11 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
     const transformedEvents = inputEvents[0].data.map(event => {
         // Base event object with common properties
         const baseEvent = {
-            start: timestampToArray(event.开始时间.start),
+            start: timestampToArray(event?.开始时间?.start),
             startInputType: "local",
             startOutputType: "local",
-            title: event.事件.content,
-            description: event.描述.content
+            title: event?.事件?.content,
+            description: event?.描述?.content
         };
 
         // Add properties based on event type
