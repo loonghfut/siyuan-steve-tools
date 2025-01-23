@@ -395,10 +395,10 @@ export async function createEventInDatabase(
             await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"]);
             // 添加数据库属性
             //// 添加时间和状态属性
-            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间',settingdata["cal-db-id"]);
+            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', settingdata["cal-db-id"]);
             console.log("viewValue:::", viewValue);
             console.log("timeKeyID:::", timeKeyID);
-            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态',settingdata["cal-db-id"]);
+            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', settingdata["cal-db-id"]);
             const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: "未完成" }];
             await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID, selectdata, "select");
@@ -466,17 +466,23 @@ export async function createEventInDatabase(
 export async function updateEventInDatabase(
     info: any,
     calendar: Calendar,
-    viewValue
+    viewValue,
+    is_more_one_day: boolean = false
 ) {
     // 更新思源数据库中的时间
     steveTools.outlog("事件拖放", info);
     const blockId = info.event._def.extendedProps.blockId
     steveTools.outlog("blockId:::", blockId);
     const newStartDate = info.event.startStr;
-    const newEndDate = info.event.endStr;
+    let newEndDate = info.event.endStr;
+    if (is_more_one_day && /^\d{4}-\d{2}-\d{2}$/.test(info.event.endStr)) {
+        const endDate = new Date(info.event.endStr);
+        endDate.setDate(endDate.getDate() - 1);
+        newEndDate = endDate.toISOString();
+    }
     steveTools.outlog("dateChange:::", newStartDate, newEndDate);
     const rootid = info.event._def.extendedProps.rootid;
-    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间',rootid);
+    const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', rootid);
     steveTools.outlog("rootid:::", rootid);
     const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
