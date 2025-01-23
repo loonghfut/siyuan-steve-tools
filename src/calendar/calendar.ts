@@ -9,6 +9,7 @@ import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import steveTools from "@/index";
 import kanban from './kanban';
+import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
@@ -60,20 +61,25 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             // console.log('select', info);
         },
         // 日期点击处理
-        //// 双击触发
+        //// 双击触发(可选)
         dateClick: async function (info) {
+            if (settingdata["cal-create-way"] === "1") {
+                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue);
+                return;
+            }
             let clickTimeout: NodeJS.Timeout;
             clicks++;
             if (clicks === 1) {
                 clickTimeout = setTimeout(() => {
                     clicks = 0;
-                }, 500);
+                }, 400);
             } else if (clicks === 2) {
                 clearTimeout(clickTimeout);
                 clicks = 0;
                 steveTools.outlog("创建事件", info);
                 const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue);
             }
+
 
         },
 
@@ -115,7 +121,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         customButtons: {
             viewFilter: {
                 text: '选择视图',
-                click: async function  () {
+                click: async function () {
                     // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
                     // console.log("viewIDs", viewIDs);

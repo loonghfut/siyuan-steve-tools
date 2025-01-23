@@ -84,6 +84,17 @@
         },
         {
             type: "select",
+            title: "创建视图方式",
+            description: "在日历视图中创建视图方式",
+            key: "cal-create-way",
+            value: settings["cal-create-way"],
+            options: {
+                "0": "双击日历创建",
+                "1": "单击日历创建",
+            },
+        },
+        {
+            type: "select",
             title: "日程创建位置",
             description: "选择日记本",
             key: "cal-create-pos",
