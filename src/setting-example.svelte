@@ -62,7 +62,7 @@
         },
         {
             type: "checkbox",
-            title: "自动更新日程",
+            title: "自动更新ics文件",
             description:
                 "启用后每10分钟更新一次(需保证前端运行)，且每次编辑日程数据后自动更新(插件出问题首先关闭此选项）",
             key: "cal-auto-update",
@@ -70,8 +70,8 @@
         },
         {
             type: "checkbox",
-            title: "手动更新",
-            description: "启用后在topbar右侧会出现更新按钮",
+            title: "手动更新ics文件",
+            description: "启用后在topbar右侧会出现更新ics文件的按钮",
             key: "cal-hand-update",
             value: settings["cal-hand-update"],
         },
