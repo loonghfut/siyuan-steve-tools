@@ -38,7 +38,8 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             listPlugin,
             multiMonthPlugin,
             rrule,
-            kanban
+            kanban,
+            listPlugin
         ],
         initialView: initialView,
         navLinks: true,
@@ -176,7 +177,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         headerToolbar: {
             left: 'prev,next today viewFilter',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard,listYear'
         },
 
         // 从思源数据转换事件
