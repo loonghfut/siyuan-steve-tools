@@ -11,7 +11,7 @@ interface KBCalendarEvent {
         category: string;
         rootid: string;
         description: string;
-        parent: {
+        sub: {
             contents: Array<{
                 block: {
                     id: string;
@@ -43,9 +43,9 @@ const CustomViewConfig = {
                 <p>${event.extendedProps.description}</p>
                 <p>Category: ${event.extendedProps.category}</p>
                 <p>Priority: ${event.extendedProps.priority}</p>
-                ${event.extendedProps.parent.contents.length > 0 ? `
+                ${event.extendedProps.sub?.contents?.length > 0 ? `
                     <div class="kanban-subcards">
-                        ${event.extendedProps.parent.contents.map(subEvent => createCard({
+                        ${event.extendedProps.sub.contents.map(subEvent => createCard({
                             title: subEvent.block.content,
                             publicId: subEvent.block.id,
                             extendedProps: {
@@ -55,7 +55,7 @@ const CustomViewConfig = {
                                 category: '',
                                 rootid: '',
                                 description: subEvent.block.content,
-                                parent: { contents: [], ids: [] },
+                                sub: { contents: [], ids: [] },
                                 order: 0
                             }
                         })).join('')}
@@ -121,8 +121,8 @@ const CustomViewConfig = {
                         swapThreshold: 0.65,
                         onEnd: function (evt) {
                             const itemEl = evt.item;
-                            const parentEl = evt.to;
-                            const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+                            const subEl = evt.to;
+                            const newParentId = subEl.closest('.kanban-card')?.getAttribute('data-id') || null;
 
                             if (newParentId) {
                                 // 将事件变为子事件

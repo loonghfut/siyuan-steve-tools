@@ -26,7 +26,7 @@ export interface KBCalendarEvent {
         category: string;
         rootid: string;
         description: string;
-        parent: {
+        sub: {
             contents: Array<{
                 block: {
                     id: string;

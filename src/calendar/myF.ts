@@ -125,13 +125,13 @@ function extractDataFromTable(data: any, isZQ = false) {
                     };
                 }
 
-                // 提取父级
-                if (columnMap.has('父级') && row.cells) {
-                    const parentCell = row.cells[columnMap.get('父级').index];
-                    rowData['父级'] = {
-                        contents: parentCell?.value?.relation?.contents || '',
-                        ids: parentCell?.value?.relation?.blockIDs || '',
-                        keyID: parentCell?.value?.keyID || '',
+                // 提取子级
+                if (columnMap.has('子级') && row.cells) {
+                    const subCell = row.cells[columnMap.get('子级').index];
+                    rowData['子级'] = {
+                        contents: subCell?.value?.relation?.contents || '',
+                        ids: subCell?.value?.relation?.blockIDs || '',
+                        keyID: subCell?.value?.keyID || '',
                     };
                 }
 
@@ -252,7 +252,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             isRecurring: false,
                             priority: item['优先级']?.content || '无',
                             category: item['分类']?.content || '无',
-                            parent: item['父级'] || '',
+                            sub: item['子级'] || '',
                         }
                     });
                 }
