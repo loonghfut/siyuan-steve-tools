@@ -40,6 +40,8 @@ const CustomViewConfig = {
             <div class="kanban-card" data-id="${event.publicId}">
                 <h3>${event.title}</h3>
                 <p>${event.extendedProps.description}</p>
+                <p>Category: ${event.extendedProps.category}</p>
+                <p>Priority: ${event.extendedProps.priority}</p>
                 ${event.extendedProps.parent.contents.length > 0 ? `
                     <div class="kanban-subcards">
                         ${event.extendedProps.parent.contents.map(subEvent => createCard({
