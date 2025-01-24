@@ -144,7 +144,13 @@ function extractDataFromTable(data: any, isZQ = false) {
                             content: ruleCell?.value?.text?.content || '',
                             keyID: ruleCell?.value?.keyID || ''
                         };
+                    }else{
+                        rowData['重复规则'] = {
+                            content: '',
+                            keyID: ''
+                        };
                     }
+
                     if (columnMap.has('持续时间') && row.cells) {
                         const numCell = row.cells[columnMap.get('持续时间').index];
                         rowData['持续时间'] = {
@@ -275,6 +281,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         const rruleStr = item['重复规则']?.content
                             ? `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${item['重复规则'].content}`
                             : '';
+                        if (!rruleStr) {continue;}
                         events.push({
                             id: eventId,
                             title: item['事件']?.content || '',
