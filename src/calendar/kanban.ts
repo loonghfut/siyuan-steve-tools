@@ -17,42 +17,147 @@ const CustomViewConfig = {
         // let segs = sliceEvents(props, true); // allDay=true
         // console.log('custom view segs', segs);
         const html = `
-            <div class="kanban-container">
-                <div class="kanban-column" data-status="待办">
-                    <h3>待办</h3>
-                   <div class="kanban-list">
-                        ${columns.todo.map(event => renderEvent(event)).join('')}
-                    </div>
-                </div>
-                
-                <div class="kanban-column" data-status="进行中">
-                    <h3>进行中</h3>
-                    <div class="kanban-list">
-                        ${columns.inProgress.map(event => `
-                            <div class="kanban-item" 
-                                draggable="true"
-                                data-id="${event.id}">
-                                <div class="event-title">${event.title}</div>
-                                <div class="event-category">${event.extendedProps.category}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <div class="kanban-column" data-status="已完成">
-                    <h3>已完成</h3>
-                    <div class="kanban-list">
-                        ${columns.done.map(event => `
-                            <div class="kanban-item"
-                                draggable="true"
-                                data-id="${event.id}">
-                                <div class="event-title">${event.title}</div>
-                                <div class="event-category">${event.extendedProps.category}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
+    <div class="st-container">
+        <!-- 添加视图切换按钮 -->
+        <div class="st-view-switch">
+            <button class="st-view-switch-btn active" data-view="tab">列表视图</button>
+            <button class="st-view-switch-btn" data-view="kanban">看板视图</button>
+        </div>
+        
+        <!-- 列表视图 -->
+        <div id="tabView">
+            <div class="st-tab-container">
+            <div class="st-tab-item active" data-category="all">全部</div>
+            <div class="st-tab-item" data-category="none">未分类</div>
+            <!-- 动态添加分类标签 -->
+            <button class="st-add-category-btn">
+                <span>+</span>
+            </button>
+            <div class="st-hide-done-toggle">
+                <input type="checkbox" id="hideDoneToggleTab">
+                <label for="hideDoneToggleTab">隐藏已完成任务</label>
             </div>
+            </div>
+            <div class="st-task-input-container">
+            <input type="text" id="newTaskInput" class="st-task-input" placeholder="添加新任务...">
+            <button id="addTaskBtn" class="st-task-add-btn">添加</button>
+            </div>
+            <div class="st-sort-container">
+            <button class="st-sort-btn" data-sort="status">按状态</button>
+            <button class="st-sort-btn" data-sort="priority">按优先级</button>
+            <button class="st-sort-btn" data-sort="title">按标题</button>
+            </div>
+            <div class="st-task-tree" id="taskTree">
+            <!-- 动态添加任务列表 -->
+            </div>
+        </div>
+
+        <!-- 看板视图 -->
+        <div id="kanbanView" style="display: none;">
+            <div class="st-tab-container">
+            <div class="st-tab-item active" data-category="all">全部</div>
+            <div class="st-tab-item" data-category="none">未分类</div>
+            <!-- 动态添加分类标签 -->
+            <button class="st-add-category-btn">
+                <span>+</span>
+            </button>
+            <div class="st-hide-done-toggle">
+                <input type="checkbox" id="hideDoneToggle">
+                <label for="hideDoneToggle">隐藏已完成任务</label>
+            </div>
+            </div>
+            <div class="st-kanban-container">
+            <div class="st-kanban-view">
+                <!-- 动态添加状态列 -->
+            </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- 修改后的右键菜单 -->
+        <div id="contextMenu" class="st-context-menu">
+        <div class="st-menu-header">任务操作</div>
+        <div class="st-menu-item" data-action="addSubtask">
+            <span>添加子任务</span>
+        </div>
+        <div class="st-menu-item delete" data-action="delete">
+            <span>删除任务</span>
+        </div>
+        <div class="st-menu-separator"></div>
+        <div class="st-menu-item" data-action="setTime">
+            <span>设置时间</span>
+        </div>
+        <div class="st-menu-separator"></div>
+        <div class="st-menu-subtitle">任务状态</div>
+        <div class="st-menu-item" data-action="status" data-value="todo">
+            <span class="st-status-tag st-status-todo">待处理</span>
+        </div>
+        <div class="st-menu-item" data-action="status" data-value="doing">
+            <span class="st-status-tag st-status-doing">进行中</span>
+        </div>
+        <div class="st-menu-item" data-action="status" data-value="done">
+            <span class="st-status-tag st-status-done">已完成</span>
+        </div>
+        <div class="st-menu-separator"></div>
+        <div class="st-menu-subtitle">优先级</div>
+        <div class="st-menu-item" data-action="priority" data-value="high">
+            <span class="st-priority-tag st-priority-high">优先级：高</span>
+        </div>
+        <div class="st-menu-item" data-action="priority" data-value="medium">
+            <span class="st-priority-tag st-priority-medium">优先级：中</span>
+        </div>
+        <div class="st-menu-item" data-action="priority" data-value="low">
+            <span class="st-priority-tag st-priority-low">优先级：低</span>
+        </div>
+        <div class="st-menu-item" data-action="priority" data-value="none">
+            <span class="st-priority-tag st-priority-none">优先级：无</span>
+        </div>
+        <div class="st-menu-separator"></div>
+        <div class="st-menu-subtitle">分类</div>
+        <div class="st-menu-item" data-action="setCategory" data-value="">
+            <span>设置分类...</span>
+        </div>
+        </div>
+
+        <!-- 添加分类右键菜单 -->
+        <div id="categoryContextMenu" class="st-category-context-menu">
+        <div class="st-category-menu-item" data-action="rename">重命名分类</div>
+        <div class="st-category-menu-item delete" data-action="delete">删除分类</div>
+        </div>
+
+        <!-- 添加时间选择弹窗 -->
+        <div id="timePickerModal" class="st-time-picker-modal" style="display: none;">
+        <div class="st-time-picker-form">
+            <div>
+            <label>任务类型</label>
+            <select id="timeType">
+                <option value="deadline">截止日期</option>
+                <option value="period">时间段</option>
+            </select>
+            </div>
+            <div id="deadlineInputs">
+            <div>
+                <label>截止日期时间</label>
+                <input type="datetime-local" id="deadlineTime">
+            </div>
+            </div>
+            <div id="periodInputs" style="display: none;">
+            <div>
+                <label>开始时间</label>
+                <input type="datetime-local" id="startTime">
+            </div>
+            <div>
+                <label>结束时间</label>
+                <input type="datetime-local" id="endTime">
+            </div>
+            </div>
+            <div class="st-time-picker-actions">
+            <button class="st-cancel" onclick="closeTimePicker()">取消</button>
+            <button class="st-confirm" onclick="confirmTimePicker()">确定</button>
+            </div>
+        </div>
+        </div>
+        <div id="modalOverlay" class="st-modal-overlay" style="display: none;"></div>
         `;
 
         return { html: html }
@@ -62,8 +167,7 @@ const CustomViewConfig = {
         console.log('custom view now loaded', props);
         const container = document.querySelector('.kanban-container') as HTMLElement;
         if (container) {
-            initDragAndDrop(container);
-            initExpandCollapse(container);
+
         }
     },
 
@@ -72,122 +176,12 @@ const CustomViewConfig = {
     }
 }
 
-function initExpandCollapse(container: HTMLElement) {
-    container.addEventListener('click', (e) => {
-        const toggle = (e.target as HTMLElement).closest('.expand-toggle');
-        if (toggle) {
-            const item = toggle.closest('.kanban-item');
-            const children = item.querySelector('.event-children') as HTMLElement;
-            if (children) {
-                const isExpanded = children.style.display !== 'none';
-                children.style.display = isExpanded ? 'none' : 'block';
-                toggle.textContent = isExpanded ? '▶' : '▼';
-            }
-        }
-    });
-}
 
 
 function convertToArray(data: Record<string, any>): any[] {
     return Object.values(data);
 }
 
-function initDragAndDrop(container: HTMLElement) {
-    let draggedItem: HTMLElement | null = null;
-
-    container.addEventListener('dragstart', (e) => {
-        const item = e.target as HTMLElement;
-        if (item.classList.contains('kanban-item')) {
-            draggedItem = item;
-            item.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', item.dataset.id);
-            e.dataTransfer.effectAllowed = 'move';
-            
-            // 延迟设置透明度，提升视觉体验
-            setTimeout(() => {
-                item.style.opacity = '0.5';
-            }, 0);
-        }
-    });
-
-    container.addEventListener('dragend', (e) => {
-        if (draggedItem) {
-            draggedItem.classList.remove('dragging');
-            draggedItem.style.opacity = '1';
-            draggedItem = null;
-        }
-    });
-
-    container.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        const column = (e.target as HTMLElement).closest('.kanban-column');
-        if (column) {
-            e.dataTransfer.dropEffect = 'move';
-            // 移除所有列的hover状态
-            container.querySelectorAll('.kanban-column').forEach(col => {
-                col.classList.remove('drag-over');
-            });
-            column.classList.add('drag-over');
-        }
-    });
-
-    container.addEventListener('dragleave', (e) => {
-        const column = (e.target as HTMLElement).closest('.kanban-column');
-        if (column) {
-            column.classList.remove('drag-over');
-        }
-    });
-
-    container.addEventListener('drop', (e) => {
-        e.preventDefault();
-        const itemId = e.dataTransfer.getData('text/plain');
-        const column = (e.target as HTMLElement).closest('.kanban-column');
-        
-        if (column) {
-            column.classList.remove('drag-over');
-            const status = (column as HTMLElement).dataset.status;
-            
-            // 动画过渡到新位置
-            if (draggedItem) {
-                const list = column.querySelector('.kanban-list');
-                if (list) {
-                    list.appendChild(draggedItem);
-                    draggedItem.style.animation = 'drop-in 0.3s ease-out';
-                }
-            }
-            
-            console.log(`将事件 ${itemId} 状态更新为 ${status}`);
-        }
-    });
-}
-
-
-function renderEvent(event: any): string {
-    const hasChildren = event.children?.length > 0;
-    return `
-        <div class="kanban-item ${hasChildren ? 'parent-item' : ''}" 
-            draggable="true"
-            data-id="${event.id}">
-            <div class="event-header">
-                ${hasChildren ? '<span class="expand-toggle">▶</span>' : ''}
-                <div class="event-title">${event.title}</div>
-                ${event.category ? `<div class="event-category">${event.category}</div>` : ''}
-            </div>
-            ${hasChildren ? `
-                <div class="event-children" style="display: none;">
-                    ${event.children.map(child => `
-                        <div class="kanban-item child-item" 
-                            draggable="true"
-                            data-id="${child.id}"
-                            data-parent-id="${event.id}">
-                            <div class="event-title">${child.title}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
-        </div>
-    `;
-}
 export default createPlugin({
     name: 'custom-view',
     views: {

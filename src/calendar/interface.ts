@@ -15,3 +15,26 @@ export interface ISelectOption {
     color?: string;
     content: string;
 }
+
+export interface KBCalendarEvent {
+    title: string;
+    publicId: string;
+    extendedProps: {
+        blockId: string;
+        status: string;
+        priority: string;
+        category: string;
+        rootid: string;
+        description: string;
+        parent: {
+            contents: Array<{
+                block: {
+                    id: string;
+                    content: string;
+                }
+            }>;
+            ids: string[];
+        };
+        sort: number;
+    };
+}
