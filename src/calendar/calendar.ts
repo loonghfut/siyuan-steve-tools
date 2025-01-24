@@ -39,7 +39,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             multiMonthPlugin,
             rrule,
             kanban,
-            listPlugin
+            // listPlugin
         ],
         initialView: initialView,
         navLinks: true,
@@ -177,7 +177,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         headerToolbar: {
             left: 'prev,next today viewFilter',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard,listYear'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard'
         },
 
         // 从思源数据转换事件
