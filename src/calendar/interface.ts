@@ -35,6 +35,6 @@ export interface KBCalendarEvent {
             }>;
             ids: string[];
         };
-        sort: number;
+        order: number;
     };
 }
