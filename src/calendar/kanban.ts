@@ -35,6 +35,7 @@ const CustomViewConfig = {
             inProgress: dataArray.filter(e => e.extendedProps.status === '进行中'),
             done: dataArray.filter(e => e.extendedProps.status === '完成')
         };
+        console.log(columns);
 
         const createCard = (event: KBCalendarEvent) => `
             <div class="kanban-card" data-id="${event.publicId}">
@@ -59,7 +60,7 @@ const CustomViewConfig = {
                             }
                         })).join('')}
                     </div>
-                ` : ''}
+                ` : '<div class="kanban-subcards"></div>'}
             </div>
         `;
 

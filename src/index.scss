@@ -275,7 +275,7 @@ $background-color-today: var(--b3-list-hover);
 
 [id^="calendar-"] {
     margin: 0 auto;
-    height: calc(100vh - 130px);
+    height: calc(88vh);
     border: none;
 }
 
@@ -1020,15 +1020,23 @@ $background-color-today: var(--b3-list-hover);
 //my看板
 .kanban-board {
     display: flex;
-    gap: 20px;
-    padding: 20px;
-    background-color: #f4f4f4;
+    // gap: 20px;
+    // padding: 20px;
+    background-color: $background-color;
     flex-wrap: wrap; // 允许列在小屏幕上换行
+    overflow-x: hidden; // 防止水平溢出
+    overflow-y: auto; // 允许垂直滚动
+    //防止垂直溢出
+    max-height: calc(80vh);
+    position: relative; // 创建新的包含块
+    max-width: 100%; // 限制最大宽度
+    box-sizing: border-box; // 包含padding在内的盒模型
+
 }
 
 .kanban-column {
     flex: 1 1 300px; // 允许列根据容器大小调整宽度，最小宽度为300px
-    background-color: #fff;
+    background-color: $background-color;
     border-radius: 5px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     padding: 10px;
@@ -1043,9 +1051,16 @@ $background-color-today: var(--b3-list-hover);
 
 .kanban-cards {
     min-height: 100px;
-    padding: 10px;
+    // padding: 10px;
     background-color: #f9f9f9;
     border-radius: 5px;
+    overflow-x: hidden; // 防止水平溢出
+    overflow-y: auto; // 允许垂直滚动
+    //防止垂直溢出
+    max-height: calc(73vh);
+    position: relative; // 创建新的包含块
+    max-width: 100%; // 限制最大宽度
+    box-sizing: border-box; // 包含padding在内的盒模型
 }
 
 .kanban-card {
