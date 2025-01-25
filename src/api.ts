@@ -721,7 +721,7 @@ export async function updateAttrViewCell_pro( //TODO未完善
     id: string,
     avID: string,
     keyID: string,
-    value: string | Date | ISelectOption[] | [],
+    value: string | Date | ISelectOption[] | { blockID: string, content: string },
     type: 'date' | 'select' | 'relation',
     endtime?: string
 ) {
@@ -780,13 +780,13 @@ export async function updateAttrViewCell_pro( //TODO未完善
                 id: newId,
                 relation: {
                     blockIDs: [
-                        "20250122214910-mgpixck"
+                        (value as { blockID: string, content: string }).blockID
                     ],
                     contents: [
                         {
                             block: {
-                                content: "asdfas",
-                                id: "20250122214910-mgpixck"
+                                content: (value as { blockID: string, content: string }).content,
+                                id: (value as { blockID: string, content: string }).blockID
                             },
                             isDetached: false,
                             type: "block"
