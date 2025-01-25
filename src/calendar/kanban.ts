@@ -1,36 +1,13 @@
 import { createPlugin } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
+import { NestedKBCalendarEvent,KBCalendarEvent } from "./interface";
 
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
+let allKBEvents: NestedKBCalendarEvent[] = [];
 
 
-interface KBCalendarEvent {
-    title: string;
-    publicId: string;
-    extendedProps: {
-        blockId: string;
-        status: string;
-        statusid: string;
-        priority: string;
-        priorityid: string;
-        category: string;
-        categoryid: string;
-        rootid: string;
-        description: string;
-        descriptionid: string;
-        hasCircularRef: boolean;
-        sub?: {
-            ids: string[];
-        };
-        subid: string;
-        order: number;
-    };
-}
 
-// interface KBCalendarEvent_OK {
-
-// }
 
 
 const CustomViewConfig = {
@@ -41,6 +18,8 @@ const CustomViewConfig = {
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         console.log("处理前数据", dataArray);
         dataArray = convertEventsToNested(dataArray);
+        allKBEvents = dataArray;
+        console.log("处理后数据allKBEvents", allKBEvents);
         console.log("处理后数据", dataArray);
         const columns = {
             todo: dataArray.filter(e => e.extendedProps.status === '未完成'),
@@ -174,9 +153,7 @@ export default createPlugin({
 });
 
 
-interface NestedKBCalendarEvent extends KBCalendarEvent {
-    children?: NestedKBCalendarEvent[];
-}
+
 
 function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent[] {
     const eventMap = new Map<string, NestedKBCalendarEvent>();

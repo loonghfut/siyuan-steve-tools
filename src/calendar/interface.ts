@@ -16,25 +16,30 @@ export interface ISelectOption {
     content: string;
 }
 
+
+
+export interface NestedKBCalendarEvent extends KBCalendarEvent {
+    children?: NestedKBCalendarEvent[];
+}
 export interface KBCalendarEvent {
     title: string;
     publicId: string;
     extendedProps: {
         blockId: string;
         status: string;
+        statusid: string;
         priority: string;
+        priorityid: string;
         category: string;
+        categoryid: string;
         rootid: string;
         description: string;
+        descriptionid: string;
+        hasCircularRef: boolean;
         sub?: {
-            contents: Array<{
-                block: {
-                    id: string;
-                    content: string;
-                }
-            }>;
             ids: string[];
         };
+        subid: string;
         order: number;
     };
 }
