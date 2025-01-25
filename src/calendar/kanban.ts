@@ -72,8 +72,10 @@ const CustomViewConfig = {
         };
 
         const createColumn = (title: string, events: KBCalendarEvent[]) => `
-            <div class="kanban-column">
-                <h2>${title}</h2>
+            <div class="kanban-column-${title}">
+                <div class="kanban-column-header">
+                    <h2>${title}</h2>
+                </div>
                 <div class="kanban-cards">
                     ${events.map(createCard).join('')}
                 </div>

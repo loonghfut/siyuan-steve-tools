@@ -3,6 +3,14 @@ $text-color: var(--b3-theme-on-background);
 $hover-background-color: var(--b3-list-hover);
 $border-color: var(--b3-border-color);
 $background-color-today: var(--b3-list-hover);
+$background-color-1: var(--b3-theme-surface);
+$text-color-error: var(--b3-theme-error);
+$text-color-success: var(--b3-theme-success);
+$text-color-processing: #3573f0;
+$text-color-info: var(--b3-card-info-color);
+$background-color-success: #4b8c8a3d;
+$background-color-processing: #3478c83d;
+$background-color-info: #596c7036;
 
 [id^="calendarfu-"] {
     background-color: $background-color !important;
@@ -13,16 +21,18 @@ $background-color-today: var(--b3-list-hover);
 //时间条
 .fc-timegrid-event-harness {
     max-width: 50vh;
+
     * {
         border: none;
     }
+
     .fc-timegrid-event {
         opacity: 0.70 !important;
         // :root[data-theme-mode="dark"] {
         //     filter: brightness(30%);
         //     transition: filter 0.3s ease;
         // }
-        
+
         // :root[data-theme-mode="light"] {
         //     filter: brightness(100%);
         //     transition: filter 0.3s ease;
@@ -30,7 +40,7 @@ $background-color-today: var(--b3-list-hover);
         border-radius: 6px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
-        
+
         &:hover {
             transform: translateY(-3px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
@@ -73,25 +83,31 @@ $background-color-today: var(--b3-list-hover);
 }
 
 .fc-view-harness {
-    .fc-scrollgrid  {
+    .fc-scrollgrid {
         border-color: $border-color !important;
 
     }
 }
+
 .fc-col-header {
-    *{
+    * {
         border-color: $border-color !important;
     }
 
 }
+
 .fc-multimonth-header-table {
-    *{
+    * {
         border-color: $border-color !important;
     }
 }
-.fc-scroller,.fc-view ,.fc-list-day{
+
+.fc-scroller,
+.fc-view,
+.fc-list-day {
     border-color: $border-color !important;
 }
+
 .fc table {
     border: none;
 }
@@ -397,11 +413,11 @@ $background-color-today: var(--b3-list-hover);
     border-radius: 4px;
     transition: all 0.3s ease;
     cursor: pointer;
-    
+
     // 添加边框和背景
     border: 1px solid rgba(0, 0, 0, 0.1);
     background: rgba(255, 255, 255, 0.05);
-    
+
     // 悬浮效果
     &:hover {
         background: rgba(255, 255, 255, 0.1);
@@ -409,7 +425,7 @@ $background-color-today: var(--b3-list-hover);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         text-decoration: none;
     }
-    
+
     // 文本溢出处理
     white-space: nowrap;
     overflow: hidden;
@@ -423,7 +439,7 @@ $background-color-today: var(--b3-list-hover);
 
 
 //视图选择界面
-.view-filter-menu{
+.view-filter-menu {
     position: absolute;
     z-index: 1000;
     background-color: $background-color ;
@@ -431,11 +447,13 @@ $background-color-today: var(--b3-list-hover);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     color: $text-color;
     border: 1px solid $border-color;
-} 
-.view-filter-item{
+}
+
+.view-filter-item {
     padding: 8px 12px;
     cursor: pointer;
     transition: background-color 0.2s ease;
+
     &:hover {
         background-color: $hover-background-color;
     }
@@ -1031,28 +1049,88 @@ $background-color-today: var(--b3-list-hover);
     position: relative; // 创建新的包含块
     max-width: 100%; // 限制最大宽度
     box-sizing: border-box; // 包含padding在内的盒模型
-
+    border-radius: 15px;
 }
 
 .kanban-column {
-    flex: 1 1 300px; // 允许列根据容器大小调整宽度，最小宽度为300px
-    background-color: $background-color;
-    border-radius: 5px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 10px;
-    margin-bottom: 20px; // 在小屏幕上换行时增加间距
+    &-未完成 {
+        margin: 0px 0.5%; 
+        flex: 1 1 300px; // 允许列根据容器大小调整宽度，最小宽度为300px
+        background-color: $background-color;
+        border-radius: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        margin-bottom: 20px; // 在小屏幕上换行时增加间距
+        h2 {
+            color: $text-color-info;
+            text-align: center;
+            transform: translateY(-10px);
+        }
+
+        .kanban-card {
+            background-color: $background-color-info;
+            border-left: 2px solid $text-color-info;
+        }
+
+    }
+
+    &-进行中 {
+        margin: 0px 0.5%;  
+        flex: 1 1 300px; // 允许列根据容器大小调整宽度，最小宽度为300px
+        background-color: $background-color;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        margin-bottom: 20px; // 在小屏幕上换行时增加间距
+        border-radius: 15px;
+        h2 {
+            color: $text-color-processing;
+            text-align: center;
+            transform: translateY(-10px);
+        }
+
+        .kanban-card {
+            background-color: $background-color-processing;
+            border-left: 2px solid $text-color-processing;
+        }
+
+    }
+
+    &-完成 {
+        margin: 0px 0.5%; 
+        flex: 1 1 300px; // 允许列根据容器大小调整宽度，最小宽度为300px
+        background-color: $background-color;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        margin-bottom: 20px; // 在小屏幕上换行时增加间距
+        border-radius: 15px;
+        h2 {
+            color: $text-color-success;
+            text-align: center;
+            transform: translateY(-10px);
+        }
+
+        .kanban-cards {
+            .kanban-card {
+                background-color: $background-color-success;
+                border-left: 2px solid $text-color-success;
+            }
+            
+        }
+
+    }
 }
 
-.kanban-column h2 {
-    margin-top: 0;
-    font-size: 1.2em;
-    text-align: center;
-}
+
+// .kanban-column h2 {
+//     margin-top: 0;
+//     font-size: 1.2em;
+//     text-align: center;
+// }
 
 .kanban-cards {
     min-height: 100px;
     // padding: 10px;
-    background-color: #f9f9f9;
+    background-color: $background-color;
     border-radius: 5px;
     overflow-x: hidden; // 防止水平溢出
     overflow-y: auto; // 允许垂直滚动
@@ -1064,18 +1142,19 @@ $background-color-today: var(--b3-list-hover);
 }
 
 .kanban-card {
-    background-color: #fff;
-    border: 1px solid #ddd;
+    // background-color: $background-color-1;
+    // border: 1px solid #ddd;
     border-radius: 5px;
     padding: 10px;
     margin-bottom: 10px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px $border-color;
     // cursor: grab;
 }
 
 .kanban-card h3 {
     margin: 0 0 5px;
     font-size: 1em;
+    color: $text-color-info;
 }
 
 .kanban-card p {
@@ -1085,7 +1164,6 @@ $background-color-today: var(--b3-list-hover);
 }
 
 .kanban-subcards {
-    margin-top: 10px;
-    padding-left: 20px;
-    border-left: 2px solid #ddd;
+    //只要上方间距
+    transform: translateY(10px)
 }
