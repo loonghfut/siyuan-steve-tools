@@ -717,106 +717,124 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle?:
 
 
 
-export async function updateAttrViewCell_pro( //TODO未完善
+export async function updateAttrViewCell_pro(
     id: string,
     avID: string,
     keyID: string,
-    value: string | Date | ISelectOption[] | { blockID: string, content: string, oldrelation:{ids:[],contents:[]}},
+    value: string | Date | ISelectOption[] | {
+        blockID: string,
+        content: string,
+        oldrelation: {
+            ids: string[],
+            contents: string[]
+        },
+        action: string
+    },
     type: 'date' | 'select' | 'relation',
     endtime?: string
 ) {
-    let doOperations: IOperation[] = [];
-    let undoOperations: IOperation[] = [];
-
+    const doOperations: IOperation[] = [];
     const newId = await generateSiyuanID();
+    let cellData: any;
 
-    if (type === 'date') {
-        let { start, end } = await getDateTimestamps(value as string);
-        if (endtime) {
-            end = (await getDateTimestamps(endtime)).start;
-        }
-
-        doOperations.push({
-            action: "updateAttrViewCell",
-            id: newId,
-            avID: avID,
-            keyID: keyID,
-            rowID: id,
-            data: {
+    switch (type) {
+        case 'date':
+            const { start, end } = await getDateTimestamps(value as string);
+            cellData = {
                 type: "date",
                 date: {
                     content: start,
                     isNotEmpty: true,
-                    content2: end,
+                    content2: endtime ? (await getDateTimestamps(endtime)).start : end,
                     isNotEmpty2: true,
                     hasEndDate: true,
                     isNotTime: false
                 },
-                id: id
-            }
-        });
-    } else if (type === 'select') {
-        doOperations.push({
-            action: "updateAttrViewCell",
-            id: newId,
-            keyID: keyID,
-            rowID: id,
-            avID: avID,
-            data: {
+                id
+            };
+            break;
+
+        case 'select':
+            cellData = {
                 type: "select",
                 id: newId,
                 mSelect: value as ISelectOption[]
-            }
-        });
-    } else if (type === 'relation') {
-        const toblockid = value.blockID;
-        const oldrelation = (value as { blockID: string, content: string, oldrelation:{ids:[],contents:[]}}).oldrelation;  
-        console.log("::::::::::::::",oldrelation);
-        let blockIDs = oldrelation.ids;
-        if (!blockIDs.includes(toblockid)) {
-            blockIDs.push(toblockid);
-        } else {
-            return;
-        }
+            };
+            break;
 
-        doOperations.push({
-            action: "updateAttrViewCell",
-            id: newId,
-            keyID: keyID,
-            rowID: id,
-            avID: avID,
-            data: {
+        case 'relation':
+            const { blockID, content, oldrelation, action } = value as {
+                blockID: string,
+                content: string,
+                oldrelation: {
+                    ids: string[],
+                    contents: string[]
+                },
+                action: string
+            };
+            const readyContents = transformBlockData(oldrelation.contents);
+            if (action === 'add') {
+                if (oldrelation.ids.includes(blockID)) return;
+                oldrelation.ids.push(blockID);
+                readyContents.push({
+                    block: { content: content, id: blockID },
+                    isDetached: false,
+                    type: "block"
+                });
+            } else if (action === 'remove') {
+                const index = oldrelation.ids.indexOf(blockID);
+                if (index === -1) return;
+                oldrelation.ids.splice(index, 1);
+                readyContents.splice(index, 1);
+            } else {
+                console.error("action error");
+                return
+            }
+            cellData = {
                 type: "relation",
                 id: newId,
                 relation: {
-                    blockIDs: [
-                        (value as { blockID: string, content: string, oldrelation:{ids:[],contents:[]}}).blockID
-                    ],
-                    contents: [
-                        {
-                            block: {
-                                content: (value as { blockID: string, content: string }).content,
-                                id: (value as { blockID: string, content: string }).blockID
-                            },
-                            isDetached: false,
-                            type: "block"
-                        }
-                    ]
-                },
-            }
-        });
+                    blockIDs: oldrelation.ids,
+                    contents: readyContents
+                }
+            };
+            break;
     }
 
     doOperations.push({
-        action: "doUpdateUpdated",
-        id: id,
-        data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
+        action: "updateAttrViewCell",
+        id: newId,
+        avID,
+        keyID,
+        rowID: id,
+        data: cellData
     });
 
-    undoOperations.push(/* 添加撤销操作 */);
+    doOperations.push({
+        action: "doUpdateUpdated",
+        id,
+        data: new Date(Date.now() + 8 * 60 * 60 * 1000)
+            .toISOString()
+            .replace(/[:\-]|(\.\d{3})|T/g, "")
+            .slice(0, 14)
+    });
 
-    Protyle.prototype.transaction(doOperations, undoOperations);
+    Protyle.prototype.transaction(doOperations, []);
 }
+
+function transformBlockData(input: any[]): any[] {
+    return input.map(item => ({
+        type: "block",
+        block: {
+            id: item.block.id,
+            content: item.block.content
+        },
+        isDetached: false
+    }));
+}
+
+
+
 
 export async function generateSiyuanID() {
     // 生成时间戳部分

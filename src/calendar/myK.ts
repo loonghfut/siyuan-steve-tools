@@ -15,14 +15,30 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
             oldrelation: {
                 ids: To_event.extendedProps?.sub?.ids || [],
                 contents: To_event.extendedProps?.sub?.contents || []
-            }
+            },
+            action:"add"
         },
         "relation");
-    console.log("done-updateAttrViewCell_pro");
+    console.log("done-updateAttrViewCell_pro-add");
 
 }
 ////删除子级
 export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
+    await api.updateAttrViewCell_pro(
+        To_event.publicId,
+        To_event.extendedProps.rootid,
+        To_event.extendedProps.subid,
+        {
+            blockID: Fr_event.publicId,
+            content: Fr_event.title,
+            oldrelation: {
+                ids: To_event.extendedProps?.sub?.ids || [],
+                contents: To_event.extendedProps?.sub?.contents || []
+            },
+            action:"remove"
+        },
+        "relation");
+    console.log("done-updateAttrViewCell_pro-remove");
 
 }
 

@@ -123,8 +123,8 @@ export function initializeSortableKanban() {
                 console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
             }
 
-            // OUTcalendar.refetchEvents();
-            // setTimeout(() => { initializeSortableKanban() }, 500);//TODO需要优化
+            OUTcalendar.refetchEvents();
+            setTimeout(() => { initializeSortableKanban() }, 500);//TODO需要优化
             }
         });
         sortableInstances.push(sortable);
