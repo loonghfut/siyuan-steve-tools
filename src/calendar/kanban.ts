@@ -168,21 +168,10 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
         eventMap.set(event.extendedProps.blockId, {...event});
     });
     
-    // 记录所有子事件的blockId
-    const childrenIds = new Set<string>();
+    // 重置所有事件的循环引用标记
     events.forEach(event => {
-        // Reset the hasCircularRef property before checking
         event.extendedProps.hasCircularRef = false;
-
-        if (event.extendedProps.sub?.ids) {
-            event.extendedProps.sub.ids.forEach(id => childrenIds.add(id));
-        }
     });
-    
-    // 找出根事件
-    const rootEvents = events.filter(event => 
-        !childrenIds.has(event.extendedProps.blockId)
-    );
     
     // 递归构建嵌套结构
     function buildNested(event: NestedKBCalendarEvent, parentIds: Set<string>, depth: number): NestedKBCalendarEvent | null {
@@ -208,16 +197,15 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
         visited.delete(event.extendedProps.blockId);
         parentIds.delete(event.extendedProps.blockId);
 
-        // 标记是否存在循环引用
         if (circularRefs.has(event.extendedProps.blockId)) {
-            console.log(`Marking event`)
             event.extendedProps.hasCircularRef = true;
         }
         
         return event;
     }
     
-    return rootEvents
+    // 直接处理所有事件
+    return events
         .map(event => buildNested(event, new Set(), 0))
         .filter((e): e is NestedKBCalendarEvent => e !== null);
 }
