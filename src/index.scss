@@ -479,7 +479,7 @@ $background-color-info: #596c7036;
     // Common styles for all columns
     &-未完成, &-进行中, &-完成 {
         margin: 0px 0.5%;
-        flex: 1 1 300px;
+        flex: 1 1 200px;
         background-color: $background-color;
         border-radius: 15px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
