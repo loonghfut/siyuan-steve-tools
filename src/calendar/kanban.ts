@@ -1,5 +1,6 @@
 import { createPlugin } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
+import * as myK from './myK';
 
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 
@@ -113,6 +114,7 @@ export function initializeSortableKanban() {
 
                     if (newParentId) {
                         // 将事件变为子事件
+                        myK.getsubevents(evt);
                         console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a child of ${newParentId}`);
                     } else {
                         // 将子事件变为主事件
@@ -139,6 +141,7 @@ export function initializeSortableKanban() {
 
                         if (newParentId) {
                             // 将事件变为子事件
+                            myK.getsubevents(evt);
                             console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a child of ${newParentId}`);
                         } else {
                             // 将子事件变为主事件
