@@ -721,7 +721,7 @@ export async function updateAttrViewCell_pro( //TODO未完善
     id: string,
     avID: string,
     keyID: string,
-    value: string | Date | ISelectOption[] | { blockID: string, content: string },
+    value: string | Date | ISelectOption[] | { blockID: string, content: string, oldrelation:{ids:[],contents:[]}},
     type: 'date' | 'select' | 'relation',
     endtime?: string
 ) {
@@ -769,6 +769,16 @@ export async function updateAttrViewCell_pro( //TODO未完善
             }
         });
     } else if (type === 'relation') {
+        const toblockid = value.blockID;
+        const oldrelation = (value as { blockID: string, content: string, oldrelation:{ids:[],contents:[]}}).oldrelation;  
+        console.log("::::::::::::::",oldrelation);
+        let blockIDs = oldrelation.ids;
+        if (!blockIDs.includes(toblockid)) {
+            blockIDs.push(toblockid);
+        } else {
+            return;
+        }
+
         doOperations.push({
             action: "updateAttrViewCell",
             id: newId,
@@ -780,7 +790,7 @@ export async function updateAttrViewCell_pro( //TODO未完善
                 id: newId,
                 relation: {
                     blockIDs: [
-                        (value as { blockID: string, content: string }).blockID
+                        (value as { blockID: string, content: string, oldrelation:{ids:[],contents:[]}}).blockID
                     ],
                     contents: [
                         {

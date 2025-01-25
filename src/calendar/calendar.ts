@@ -19,7 +19,7 @@ import { showMessage } from 'siyuan';
 import { initializeSortableKanban } from './kanban';
 
 
-let calendar: Calendar;
+export let OUTcalendar: Calendar;
 let clicks = 0;
 let viewValue: any;
 let viewValue_zq: any;
@@ -301,7 +301,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             });
         }
     });
-
+    OUTcalendar = calendar;
     calendar.render();
     return calendar;
 }

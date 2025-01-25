@@ -37,7 +37,8 @@ export interface KBCalendarEvent {
         descriptionid: string;
         hasCircularRef: boolean;
         sub?: {
-            ids: string[];
+            ids: [];
+            contents: [];
         };
         subid: string;
         order: number;
