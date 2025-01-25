@@ -253,6 +253,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             priority: item['优先级']?.content || '无',
                             category: item['分类']?.content || '无',
                             sub: item['子级'] || '',
+                            hasCircularRef: false ,
                         }
                     });
                 }
@@ -299,7 +300,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                                 priority: item['优先级']?.content || '无',
                                 category: item['分类']?.content || '无',
                                 isRecurring: true,
-                                recurringPattern: item['重复规则']?.content || ''
+                                recurringPattern: item['重复规则']?.content || '',
+
                             }
                         });
                     }
@@ -502,10 +504,6 @@ export async function updateEventInDatabase(
         sy.showMessage('已更新事件', 2000, "info", "1");
     }, 1000);
 }
-
-//TODO删除事件
-//TODO优化代码
-//TODO生成ics文件
 
 
 

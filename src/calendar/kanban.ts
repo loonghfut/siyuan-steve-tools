@@ -11,6 +11,7 @@ interface KBCalendarEvent {
         category: string;
         rootid: string;
         description: string;
+        hasCircularRef: boolean;
         sub?: {
             ids: string[];
         };
@@ -28,10 +29,10 @@ const CustomViewConfig = {
 
     content: function (props) {
         const allEvents = props.eventStore.defs;
-        const dataArray = convertToArray(allEvents) as KBCalendarEvent[];
+        let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         console.log("处理前数据",dataArray);
-        const convertedEvents = convertEventsToNested(dataArray);
-        console.log("处理后数据",convertedEvents);
+        dataArray = convertEventsToNested(dataArray);
+        console.log("处理后数据",dataArray );
         const columns = {
             todo: dataArray.filter(e => e.extendedProps.status === '未完成'),
             inProgress: dataArray.filter(e => e.extendedProps.status === '进行中'),
@@ -45,7 +46,7 @@ const CustomViewConfig = {
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
-                        <h3>${event.title}</h3>
+                        <h3>${event.title} ${event.extendedProps.hasCircularRef} </h3>
                         <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                     </div>
                     <div class="kanban-card-content">
@@ -160,6 +161,7 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
     const eventMap = new Map<string, NestedKBCalendarEvent>();
     const visited = new Set<string>();
     const maxDepth = 10; // 防止过深递归
+    const circularRefs = new Set<string>(); // 记录循环引用的事件ID
     
     // 初始化事件映射
     events.forEach(event => {
@@ -169,6 +171,9 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
     // 记录所有子事件的blockId
     const childrenIds = new Set<string>();
     events.forEach(event => {
+        // Reset the hasCircularRef property before checking
+        event.extendedProps.hasCircularRef = false;
+
         if (event.extendedProps.sub?.ids) {
             event.extendedProps.sub.ids.forEach(id => childrenIds.add(id));
         }
@@ -180,25 +185,39 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
     );
     
     // 递归构建嵌套结构
-    function buildNested(event: NestedKBCalendarEvent, depth: number): NestedKBCalendarEvent | null {
+    function buildNested(event: NestedKBCalendarEvent, parentIds: Set<string>, depth: number): NestedKBCalendarEvent | null {
         if (depth > maxDepth) return null; // 深度限制
         if (visited.has(event.extendedProps.blockId)) return null; // 防止循环引用
-        
+        if (parentIds.has(event.extendedProps.blockId)) {
+            circularRefs.add(event.extendedProps.blockId); // 标记循环引用
+            console.warn(`Circular reference detected: ${[...parentIds, event.extendedProps.blockId].join(' -> ')}`);
+            return null;
+        }
+
         visited.add(event.extendedProps.blockId);
+        parentIds.add(event.extendedProps.blockId);
         
         if (event.extendedProps.sub?.ids) {
             event.children = event.extendedProps.sub.ids
                 .map(id => eventMap.get(id))
                 .filter((e): e is NestedKBCalendarEvent => e !== undefined)
-                .map(e => buildNested(e, depth + 1))
+                .map(e => buildNested(e, parentIds, depth + 1))
                 .filter((e): e is NestedKBCalendarEvent => e !== null);
         }
         
         visited.delete(event.extendedProps.blockId);
+        parentIds.delete(event.extendedProps.blockId);
+
+        // 标记是否存在循环引用
+        if (circularRefs.has(event.extendedProps.blockId)) {
+            console.log(`Marking event`)
+            event.extendedProps.hasCircularRef = true;
+        }
+        
         return event;
     }
     
     return rootEvents
-        .map(event => buildNested(event, 0))
+        .map(event => buildNested(event, new Set(), 0))
         .filter((e): e is NestedKBCalendarEvent => e !== null);
 }
