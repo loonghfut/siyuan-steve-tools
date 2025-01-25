@@ -254,6 +254,11 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             category: item['分类']?.content || '无',
                             sub: item['子级'] || '',
                             hasCircularRef: false ,
+                            statusid: item['状态']?.keyID || '',
+                            priorityid: item['优先级']?.keyID || '',
+                            categoryid: item['分类']?.keyID || '',
+                            subid: item['子级']?.keyID || '',
+                            descriptionid: item['描述']?.keyID || '',
                         }
                     });
                 }

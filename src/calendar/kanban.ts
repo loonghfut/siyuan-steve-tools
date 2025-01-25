@@ -11,14 +11,19 @@ interface KBCalendarEvent {
     extendedProps: {
         blockId: string;
         status: string;
+        statusid: string;
         priority: string;
+        priorityid: string;
         category: string;
+        categoryid: string;
         rootid: string;
         description: string;
+        descriptionid: string;
         hasCircularRef: boolean;
         sub?: {
             ids: string[];
         };
+        subid: string;
         order: number;
     };
 }
