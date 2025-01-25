@@ -1,7 +1,19 @@
 import { NestedKBCalendarEvent } from "./interface";
+import * as api from "@/api";
 
-export async function getsubevents(evt) {
-    console.log("getsubevents", evt);
+export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
+    console.log("run_getsubevents", "F:", Fr_event, "T:", To_event);
+    await api.updateAttrViewCell_pro(
+        To_event.publicId,
+        To_event.extendedProps.rootid,
+        To_event.extendedProps.subid,
+        {
+            blockID: Fr_event.publicId,
+            content: Fr_event.title
+        },
+        "relation");
+    console.log("done-updateAttrViewCell_pro");
+
 }
 
 export function findEventByPublicId(

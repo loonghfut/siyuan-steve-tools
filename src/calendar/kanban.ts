@@ -1,7 +1,7 @@
 import { createPlugin } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
-import { NestedKBCalendarEvent,KBCalendarEvent } from "./interface";
+import { NestedKBCalendarEvent, KBCalendarEvent } from "./interface";
 
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
@@ -34,7 +34,7 @@ const CustomViewConfig = {
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
-                        <h3>${event.title} ${event.extendedProps.hasCircularRef} </h3>
+                        <h3>${event.title}</h3>
                         <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                     </div>
                     <div class="kanban-card-content">
@@ -50,12 +50,12 @@ const CustomViewConfig = {
             `;
         };
 
-        const createColumn = (title: string, events: KBCalendarEvent[]) => `
+        const createColumn = (title: string, events: KBCalendarEvent[],category) => `
             <div class="kanban-column-${title}">
                 <div class="kanban-column-header">
                     <h2>${title}</h2>
                 </div>
-                <div class="kanban-cards">
+                <div class="kanban-cards" data-category="${category}">
                     ${events.map(createCard).join('')}
                 </div>
             </div>
@@ -63,9 +63,9 @@ const CustomViewConfig = {
 
         const html = `
             <div class="kanban-board">
-                ${createColumn('未完成', columns.todo)}
-                ${createColumn('进行中', columns.inProgress)}
-                ${createColumn('完成', columns.done)}
+                ${createColumn('未完成', columns.todo, 'todo')}
+                ${createColumn('进行中', columns.inProgress, 'inProgress')}
+                ${createColumn('完成', columns.done, 'done')}
             </div>
         `;
         return { html: html }
@@ -85,60 +85,50 @@ export function initializeSortableKanban() {
     destroyAllSortables();
     console.log('initializing sortable kanban');
     const container = document.querySelector('.kanban-board') as HTMLElement;
-    if (container) {
-        const columns = container.querySelectorAll('.kanban-cards');
-        columns.forEach(column => {
-            const sortable = Sortable.create(column as HTMLElement, {
-                group: 'kanban',
-                animation: 150,
-                fallbackOnBody: true,
-                swapThreshold: 0.65,
-                onEnd: function (evt) {
-                    const itemEl = evt.item;
-                    const parentEl = evt.to;
-                    const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+    if (!container) return;
 
-                    if (newParentId) {
-                        // 将事件变为子事件
-                        myK.getsubevents(evt);
-                        console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a child of ${newParentId}`);
-                    } else {
-                        // 将子事件变为主事件
-                        console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a main event`);
-                    }
-                }
-            });
-            sortableInstances.push(sortable);
-        });
+    const createSortableInstance = (element: HTMLElement) => {
+        const sortable = Sortable.create(element, {
+            group: 'kanban',
+            animation: 150,
+            fallbackOnBody: true,
+            swapThreshold: 0.65,
+            onEnd: function (evt) {
+            // If the old index and new index are the same, and from/to containers are the same, do nothing
+            if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
+                return;
+            }
 
-        const cards = container.querySelectorAll('.kanban-card');
-        cards.forEach(card => {
-            const subcards = card.querySelector('.kanban-subcards');
-            if (subcards) {
-                const sortable = Sortable.create(subcards as HTMLElement, {
-                    group: 'kanban',
-                    animation: 150,
-                    fallbackOnBody: true,
-                    swapThreshold: 0.65,
-                    onEnd: function (evt) {
-                        const itemEl = evt.item;
-                        const subEl = evt.to;
-                        const newParentId = subEl.closest('.kanban-card')?.getAttribute('data-id') || null;
-
-                        if (newParentId) {
-                            // 将事件变为子事件
-                            myK.getsubevents(evt);
-                            console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a child of ${newParentId}`);
-                        } else {
-                            // 将子事件变为主事件
-                            console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a main event`);
-                        }
-                    }
-                });
-                sortableInstances.push(sortable);
+            const itemEl = evt.item;
+            const parentEl = evt.to;
+            const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+            const itemId = itemEl.getAttribute('data-id');
+            const Fr_event = myK.findEventByPublicId(allKBEvents, itemId);
+            
+            if (newParentId) {
+                const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
+                myK.run_getsubevents(Fr_event, To_event);
+            } else {
+                const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
+                console.log(`${Fr_event.title} to ${newcategory} `);
+            }
             }
         });
-    }
+        sortableInstances.push(sortable);
+    };
+
+    // Initialize columns
+    container.querySelectorAll('.kanban-cards').forEach(column => {
+        createSortableInstance(column as HTMLElement);
+    });
+
+    // Initialize subcards
+    container.querySelectorAll('.kanban-card').forEach(card => {
+        const subcards = card.querySelector('.kanban-subcards');
+        if (subcards) {
+            createSortableInstance(subcards as HTMLElement);
+        }
+    });
 }
 
 function convertToArray(data: Record<string, any>): any[] {
