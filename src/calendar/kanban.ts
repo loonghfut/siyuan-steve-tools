@@ -78,24 +78,58 @@ const CustomViewConfig = {
                 ${createColumn('完成', columns.done)}
             </div>
         `;
-
         return { html: html }
     },
 
     didMount: function (props) {
-        const container = document.querySelector('.kanban-board') as HTMLElement;
-        if (container) {
-            const columns = container.querySelectorAll('.kanban-cards');
-            columns.forEach(column => {
-                Sortable.create(column as HTMLElement, {
+        console.log('custom view mounted', props);
+        initializeSortableKanban();
+    },
+
+    willUnmount: function (props) {
+        console.log('about to change away from custom view', props);
+    }
+}
+
+function initializeSortableKanban() {
+    const container = document.querySelector('.kanban-board') as HTMLElement;
+    if (container) {
+        const columns = container.querySelectorAll('.kanban-cards');
+        columns.forEach(column => {
+            Sortable.create(column as HTMLElement, {
+                group: 'kanban',
+                animation: 150,
+                fallbackOnBody: true,
+                swapThreshold: 0.65,
+                onEnd: function (evt) {
+                    const itemEl = evt.item;
+                    const parentEl = evt.to;
+                    const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+
+                    if (newParentId) {
+                        // 将事件变为子事件
+                        console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a child of ${newParentId}`);
+                    } else {
+                        // 将子事件变为主事件
+                        console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a main event`);
+                    }
+                }
+            });
+        });
+
+        const cards = container.querySelectorAll('.kanban-card');
+        cards.forEach(card => {
+            const subcards = card.querySelector('.kanban-subcards');
+            if (subcards) {
+                Sortable.create(subcards as HTMLElement, {
                     group: 'kanban',
                     animation: 150,
                     fallbackOnBody: true,
                     swapThreshold: 0.65,
                     onEnd: function (evt) {
                         const itemEl = evt.item;
-                        const parentEl = evt.to;
-                        const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+                        const subEl = evt.to;
+                        const newParentId = subEl.closest('.kanban-card')?.getAttribute('data-id') || null;
 
                         if (newParentId) {
                             // 将事件变为子事件
@@ -106,38 +140,8 @@ const CustomViewConfig = {
                         }
                     }
                 });
-            });
-
-            const cards = container.querySelectorAll('.kanban-card');
-            cards.forEach(card => {
-                const subcards = card.querySelector('.kanban-subcards');
-                if (subcards) {
-                    Sortable.create(subcards as HTMLElement, {
-                        group: 'kanban',
-                        animation: 150,
-                        fallbackOnBody: true,
-                        swapThreshold: 0.65,
-                        onEnd: function (evt) {
-                            const itemEl = evt.item;
-                            const subEl = evt.to;
-                            const newParentId = subEl.closest('.kanban-card')?.getAttribute('data-id') || null;
-
-                            if (newParentId) {
-                                // 将事件变为子事件
-                                console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a child of ${newParentId}`);
-                            } else {
-                                // 将子事件变为主事件
-                                console.log(`Item ${itemEl.getAttribute('data-id')} moved to be a main event`);
-                            }
-                        }
-                    });
-                }
-            });
-        }
-    },
-
-    willUnmount: function (props) {
-        console.log('about to change away from custom view', props);
+            }
+        });
     }
 }
 
