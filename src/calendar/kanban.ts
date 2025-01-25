@@ -1,6 +1,9 @@
 import { createPlugin } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 
+let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
+
+
 interface KBCalendarEvent {
     title: string;
     publicId: string;
@@ -30,9 +33,9 @@ const CustomViewConfig = {
     content: function (props) {
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
-        console.log("处理前数据",dataArray);
+        console.log("处理前数据", dataArray);
         dataArray = convertEventsToNested(dataArray);
-        console.log("处理后数据",dataArray );
+        console.log("处理后数据", dataArray);
         const columns = {
             todo: dataArray.filter(e => e.extendedProps.status === '未完成'),
             inProgress: dataArray.filter(e => e.extendedProps.status === '进行中'),
@@ -42,7 +45,7 @@ const CustomViewConfig = {
 
         const createCard = (event: NestedKBCalendarEvent) => {
             const childCards = event.children?.map(createCard).join('') || '';
-            
+
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
@@ -87,16 +90,18 @@ const CustomViewConfig = {
     },
 
     willUnmount: function (props) {
-        console.log('about to change away from custom view', props);
+        // console.log('：：：：：：：：：：about to change away from custom view', props);
     }
 }
 
-function initializeSortableKanban() {
+export function initializeSortableKanban() {
+    destroyAllSortables();
+    console.log('initializing sortable kanban');
     const container = document.querySelector('.kanban-board') as HTMLElement;
     if (container) {
         const columns = container.querySelectorAll('.kanban-cards');
         columns.forEach(column => {
-            Sortable.create(column as HTMLElement, {
+            const sortable = Sortable.create(column as HTMLElement, {
                 group: 'kanban',
                 animation: 150,
                 fallbackOnBody: true,
@@ -115,13 +120,14 @@ function initializeSortableKanban() {
                     }
                 }
             });
+            sortableInstances.push(sortable);
         });
 
         const cards = container.querySelectorAll('.kanban-card');
         cards.forEach(card => {
             const subcards = card.querySelector('.kanban-subcards');
             if (subcards) {
-                Sortable.create(subcards as HTMLElement, {
+                const sortable = Sortable.create(subcards as HTMLElement, {
                     group: 'kanban',
                     animation: 150,
                     fallbackOnBody: true,
@@ -140,6 +146,7 @@ function initializeSortableKanban() {
                         }
                     }
                 });
+                sortableInstances.push(sortable);
             }
         });
     }
@@ -166,17 +173,17 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
     const visited = new Set<string>();
     const maxDepth = 10; // 防止过深递归
     const circularRefs = new Set<string>(); // 记录循环引用的事件ID
-    
+
     // 初始化事件映射
     events.forEach(event => {
-        eventMap.set(event.extendedProps.blockId, {...event});
+        eventMap.set(event.extendedProps.blockId, { ...event });
     });
-    
+
     // 重置所有事件的循环引用标记
     events.forEach(event => {
         event.extendedProps.hasCircularRef = false;
     });
-    
+
     // 递归构建嵌套结构
     function buildNested(event: NestedKBCalendarEvent, parentIds: Set<string>, depth: number): NestedKBCalendarEvent | null {
         if (depth > maxDepth) return null; // 深度限制
@@ -189,7 +196,7 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
 
         visited.add(event.extendedProps.blockId);
         parentIds.add(event.extendedProps.blockId);
-        
+
         if (event.extendedProps.sub?.ids) {
             event.children = event.extendedProps.sub.ids
                 .map(id => eventMap.get(id))
@@ -197,19 +204,26 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
                 .map(e => buildNested(e, parentIds, depth + 1))
                 .filter((e): e is NestedKBCalendarEvent => e !== null);
         }
-        
+
         visited.delete(event.extendedProps.blockId);
         parentIds.delete(event.extendedProps.blockId);
 
         if (circularRefs.has(event.extendedProps.blockId)) {
             event.extendedProps.hasCircularRef = true;
         }
-        
+
         return event;
     }
-    
+
     // 直接处理所有事件
     return events
         .map(event => buildNested(event, new Set(), 0))
         .filter((e): e is NestedKBCalendarEvent => e !== null);
+}
+
+export function destroyAllSortables() {
+    sortableInstances.forEach(instance => {
+        instance.destroy();
+    });
+    sortableInstances = [];
 }

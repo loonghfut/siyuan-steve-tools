@@ -16,6 +16,7 @@ import { moduleInstances } from '@/index';
 // import solarLunar from 'solarlunar';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
+import { initializeSortableKanban } from './kanban';
 
 
 let calendar: Calendar;
@@ -153,6 +154,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                             menu.remove();
                             // 更新按钮文本
                             button.textContent = view.text;
+                            setTimeout(() => {initializeSortableKanban()},500);//TODO:待优化的地方
                         };
                         menu.appendChild(item);
                     });
