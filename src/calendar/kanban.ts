@@ -11,18 +11,17 @@ interface KBCalendarEvent {
         category: string;
         rootid: string;
         description: string;
-        sub: {
-            contents: Array<{
-                block: {
-                    id: string;
-                    content: string;
-                }
-            }>;
+        sub?: {
             ids: string[];
         };
         order: number;
     };
 }
+
+// interface KBCalendarEvent_OK {
+
+// }
+
 
 const CustomViewConfig = {
     classNames: ['custom-view'],
@@ -30,6 +29,9 @@ const CustomViewConfig = {
     content: function (props) {
         const allEvents = props.eventStore.defs;
         const dataArray = convertToArray(allEvents) as KBCalendarEvent[];
+        console.log("处理前数据",dataArray);
+        const convertedEvents = convertEventsToNested(dataArray);
+        console.log("处理后数据",convertedEvents);
         const columns = {
             todo: dataArray.filter(e => e.extendedProps.status === '未完成'),
             inProgress: dataArray.filter(e => e.extendedProps.status === '进行中'),
@@ -37,32 +39,27 @@ const CustomViewConfig = {
         };
         console.log(columns);
 
-        const createCard = (event: KBCalendarEvent) => `
-            <div class="kanban-card" data-id="${event.publicId}">
-                <h3>${event.title}</h3>
-                <p>${event.extendedProps.description}</p>
-                <p>Category: ${event.extendedProps.category}</p>
-                <p>Priority: ${event.extendedProps.priority}</p>
-                ${event.extendedProps.sub?.contents?.length > 0 ? `
-                    <div class="kanban-subcards">
-                        ${event.extendedProps.sub.contents.map(subEvent => createCard({
-                            title: subEvent.block.content,
-                            publicId: subEvent.block.id,
-                            extendedProps: {
-                                blockId: subEvent.block.id,
-                                status: event.extendedProps.status,
-                                priority: '',
-                                category: '',
-                                rootid: '',
-                                description: subEvent.block.content,
-                                sub: { contents: [], ids: [] },
-                                order: 0
-                            }
-                        })).join('')}
+        const createCard = (event: NestedKBCalendarEvent) => {
+            const childCards = event.children?.map(createCard).join('') || '';
+            
+            return `
+                <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
+                    <div class="kanban-card-header">
+                        <h3>${event.title}</h3>
+                        <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                     </div>
-                ` : '<div class="kanban-subcards"></div>'}
-            </div>
-        `;
+                    <div class="kanban-card-content">
+                        <p class="description">${event.extendedProps.description || ''}</p>
+                        <div class="kanban-card-meta">
+                            <span class="category">${event.extendedProps.category}</span>
+                        </div>
+                    </div>
+                    <div class="kanban-subcards">
+                        ${childCards}
+                    </div>
+                </div>
+            `;
+        };
 
         const createColumn = (title: string, events: KBCalendarEvent[]) => `
             <div class="kanban-column">
@@ -153,3 +150,55 @@ export default createPlugin({
         kanban: CustomViewConfig
     }
 });
+
+
+interface NestedKBCalendarEvent extends KBCalendarEvent {
+    children?: NestedKBCalendarEvent[];
+}
+
+function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent[] {
+    const eventMap = new Map<string, NestedKBCalendarEvent>();
+    const visited = new Set<string>();
+    const maxDepth = 10; // 防止过深递归
+    
+    // 初始化事件映射
+    events.forEach(event => {
+        eventMap.set(event.extendedProps.blockId, {...event});
+    });
+    
+    // 记录所有子事件的blockId
+    const childrenIds = new Set<string>();
+    events.forEach(event => {
+        if (event.extendedProps.sub?.ids) {
+            event.extendedProps.sub.ids.forEach(id => childrenIds.add(id));
+        }
+    });
+    
+    // 找出根事件
+    const rootEvents = events.filter(event => 
+        !childrenIds.has(event.extendedProps.blockId)
+    );
+    
+    // 递归构建嵌套结构
+    function buildNested(event: NestedKBCalendarEvent, depth: number): NestedKBCalendarEvent | null {
+        if (depth > maxDepth) return null; // 深度限制
+        if (visited.has(event.extendedProps.blockId)) return null; // 防止循环引用
+        
+        visited.add(event.extendedProps.blockId);
+        
+        if (event.extendedProps.sub?.ids) {
+            event.children = event.extendedProps.sub.ids
+                .map(id => eventMap.get(id))
+                .filter((e): e is NestedKBCalendarEvent => e !== undefined)
+                .map(e => buildNested(e, depth + 1))
+                .filter((e): e is NestedKBCalendarEvent => e !== null);
+        }
+        
+        visited.delete(event.extendedProps.blockId);
+        return event;
+    }
+    
+    return rootEvents
+        .map(event => buildNested(event, 0))
+        .filter((e): e is NestedKBCalendarEvent => e !== null);
+}
