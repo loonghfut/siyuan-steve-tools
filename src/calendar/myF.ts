@@ -259,6 +259,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             categoryid: item['分类']?.keyID || '',
                             subid: item['子级']?.keyID || '',
                             descriptionid: item['描述']?.keyID || '',
+                            Kstart: startDate,
+                            Kend: endDate,
                         }
                     });
                 }

@@ -42,5 +42,7 @@ export interface KBCalendarEvent {
         };
         subid: string;
         order: number;
+        Kend: any;
+        Kstart: any;
     };
 }
