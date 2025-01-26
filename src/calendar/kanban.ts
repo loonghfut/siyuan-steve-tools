@@ -3,6 +3,7 @@ import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
 import { OUTcalendar } from './calendar';
+import { showMessage } from 'siyuan';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
 
@@ -150,10 +151,12 @@ export function initializeSortableKanban() {
                     console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
                 }
 
-
+                showMessage('请稍等',-1,"info","kanban-update");
                 setTimeout(() => { OUTcalendar.refetchEvents() }, 500);//TODO需要优化
 
-                setTimeout(() => { initializeSortableKanban() }, 500);//TODO需要优化
+                setTimeout(() => { initializeSortableKanban()
+                    showMessage('',1,"info","kanban-update");
+                 }, 1000);//TODO需要优化
             }
         });
         sortableInstances.push(sortable);
