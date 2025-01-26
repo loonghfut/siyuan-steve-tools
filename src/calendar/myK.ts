@@ -16,7 +16,7 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
                 ids: To_event.extendedProps?.sub?.ids || [],
                 contents: To_event.extendedProps?.sub?.contents || []
             },
-            action:"add"
+            action: "add"
         },
         "relation");
     console.log("done-updateAttrViewCell_pro-add");
@@ -35,12 +35,24 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
                 ids: To_event.extendedProps?.sub?.ids || [],
                 contents: To_event.extendedProps?.sub?.contents || []
             },
-            action:"remove"
+            action: "remove"
         },
         "relation");
     console.log("done-updateAttrViewCell_pro-remove");
 
 }
+
+export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatus) {
+    await api.updateAttrViewCell_pro(
+        Fr_event.publicId,
+        Fr_event.extendedProps.rootid,
+        Fr_event.extendedProps.statusid,
+        newstatus,
+        "select");
+    console.log("done-updateAttrViewCell_pro-select");
+}
+
+
 
 export function findEventByPublicId(
     events: NestedKBCalendarEvent[],

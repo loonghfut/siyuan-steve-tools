@@ -1,7 +1,7 @@
 import { createPlugin } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
-import { NestedKBCalendarEvent, KBCalendarEvent } from "./interface";
+import { NestedKBCalendarEvent, KBCalendarEvent,ISelectOption } from "./interface";
 import { OUTcalendar } from './calendar';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
@@ -89,42 +89,65 @@ export function initializeSortableKanban() {
 
     const createSortableInstance = (element: HTMLElement) => {
         const sortable = Sortable.create(element, {
-            group: 'kanban',
+            group: {
+                name: 'kanban',
+                pull: 'clone',
+                put: true
+            },
             animation: 150,
             fallbackOnBody: true,
             swapThreshold: 0.65,
             onEnd: function (evt) {
-            // If the old index and new index are the same, and from/to containers are the same, do nothing
-            if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
-                return;
-            }
+                const itemEl = evt.item;
+                const parentEl = evt.to;
+                const itemId = itemEl.getAttribute('data-id');
+                // If the old index and new index are the same, and from/to containers are the same, do nothing
+                if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
+                    return;
+                }
+                
+                const oldParentId = evt.from.closest('.kanban-card')?.getAttribute('data-id') || null;
+                const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+                if (itemId === newParentId) {
+                    console.log('same parent, do nothing');
+                    // 特殊情况：移除克隆的元素
+                    evt.to.remove();
+                    // OUTcalendar.render();
+                    return;
+                }
 
-            const itemEl = evt.item;
-            const parentEl = evt.to;
-            const oldParentId = evt.from.closest('.kanban-card')?.getAttribute('data-id') || null;
-            const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
-            const itemId = itemEl.getAttribute('data-id');
-            const Fr_event = myK.findEventByPublicId(allKBEvents, itemId);
+                const Fr_event = myK.findEventByPublicId(allKBEvents, itemId);
 
-            if (oldParentId && !newParentId) {
-                // Moving from sub-level to top-level
-                const Old_event = myK.findEventByPublicId(allKBEvents, oldParentId);
-                myK.run_delsubevents(Fr_event, Old_event);
-                const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
-                console.log(`${Fr_event.title} moved from ${Old_event.title} to top-level ${newcategory}`);
-            } else if (newParentId) {
-                // Moving to a sub-level (either from top or another sub)
-                const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
-                myK.run_getsubevents(Fr_event, To_event);
-                console.log(`${Fr_event.title} moved to sub-level under ${newParentId}`);
-            } else {
-                // Moving between top-level columns
-                const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
-                console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
-            }
+                if (oldParentId && !newParentId) {
+                    // Moving from sub-level to top-level
+                    const Old_event = myK.findEventByPublicId(allKBEvents, oldParentId);
+                    myK.run_delsubevents(Fr_event, Old_event);
+                    const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
+                    console.log(`${Fr_event.title} moved from ${Old_event.title} to top-level ${newcategory}`);
+                } else if (newParentId) {
+                    // Moving to a sub-level (either from top or another sub)
+                    const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
+                    myK.run_getsubevents(Fr_event, To_event);
+                    console.log(`${Fr_event.title}${Fr_event.publicId} moved to sub-level under ${newParentId}`);
+                } else {
+                    // Moving between top-level columns
+                    const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
+                    const categoryMap = {
+                        'todo': '未完成',
+                        'inProgress': '进行中',
+                        'done': '完成'
+                    };
+                    const newcategory_cn = categoryMap[newcategory];
 
-            OUTcalendar.refetchEvents();
-            setTimeout(() => { initializeSortableKanban() }, 500);//TODO需要优化
+                    const selectdata: ISelectOption[] = [{ content: newcategory_cn }];
+                    console.log("selectdata", selectdata);
+                    myK.run_changestatus(Fr_event, selectdata);
+                    // myK.
+                    console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
+                }
+
+                OUTcalendar.refetchEvents();
+                setTimeout(() => { initializeSortableKanban() }, 500);//TODO需要优化
             }
         });
         sortableInstances.push(sortable);
