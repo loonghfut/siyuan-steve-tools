@@ -18,12 +18,14 @@ export async function getViewId(va_ids: string[]): ViewData {
     for (const va_id of va_ids) {
         try {
             const view = await api.renderAttributeView(va_id);
+            // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
+            const rootname = view.name ? `${view.name}-` : "";
             const rootid = view.id;
             view.views.forEach(viewItem => {
                 viewIds_Data.push({
                     rootid: rootid,
                     viewId: viewItem.id,
-                    name: viewItem.name
+                    name: rootname + viewItem.name
                 });
             });
 
@@ -144,7 +146,7 @@ function extractDataFromTable(data: any, isZQ = false) {
                             content: ruleCell?.value?.text?.content || '',
                             keyID: ruleCell?.value?.keyID || ''
                         };
-                    }else{
+                    } else {
                         rowData['重复规则'] = {
                             content: '',
                             keyID: ''
@@ -253,7 +255,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             priority: item['优先级']?.content || '无',
                             category: item['分类']?.content || '无',
                             sub: item['子级'] || '',
-                            hasCircularRef: false ,
+                            hasCircularRef: false,
                             statusid: item['状态']?.keyID || '',
                             priorityid: item['优先级']?.keyID || '',
                             categoryid: item['分类']?.keyID || '',
@@ -289,7 +291,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         const rruleStr = item['重复规则']?.content
                             ? `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${item['重复规则'].content}`
                             : '';
-                        if (!rruleStr) {continue;}
+                        if (!rruleStr) { continue; }
                         events.push({
                             id: eventId,
                             title: item['事件']?.content || '',
