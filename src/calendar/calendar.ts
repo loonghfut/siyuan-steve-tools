@@ -29,7 +29,7 @@ let av_ids: string[] = [];
 
 
 
-export async function run(id: string, initialView = 'dayGridMonth') {
+export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "") {
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
         plugins: [
@@ -183,6 +183,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         // 从思源数据转换事件
         events: async function (info, successCallback, failureCallback) {
             try {
+                filterViewId = S_viewID;
                 steveTools.outlog('Fetching calendar events...::::::::::::::::::::::::::');
                 // 1. 获取引用ID
                 av_ids = await moduleInstances['M_calendar'].getAVreferenceid();

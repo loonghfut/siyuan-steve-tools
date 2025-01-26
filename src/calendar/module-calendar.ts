@@ -121,7 +121,7 @@ export class M_calendar {
             const msg = JSON.parse(e.data);
             if (msg.cmd === "transactions") {
                 // console.log(msg);
-                if(msg.data[0].doOperations[0].action==="updateAttrs"){
+                if (msg.data[0].doOperations[0].action === "updateAttrs") {
                     console.log("updateAttrs");
                     this.avButton();
                 }
@@ -174,11 +174,33 @@ export class M_calendar {
 
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
-                        steveTools.outlog('按钮被点击了');
+                        console.log('按钮被点击了');
+                        // Find the closest element with the specified classes
+                        let dataId = '';
+                        const avBlocks = document.querySelectorAll('div.item.item--focus[data-id]');
+                        if (avBlocks.length > 0) {
+                            // Get the closest AV block relative to the button
+                            let closestBlock = avBlocks[0];
+                            let minDistance = Infinity;
+                            
+                            avBlocks.forEach(block => {
+                                const rect = block.getBoundingClientRect();
+                                const distance = Math.abs(rect.top - button.getBoundingClientRect().top);
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    closestBlock = block;
+                                }
+                            });
+
+                            dataId = closestBlock.getAttribute('data-id');
+                            console.log('data-id:', dataId);
+                            steveTools.outlog('Selected AV block ID:', dataId);
+                        }
+
                         if (front == "browser-mobile" || front == "mobile") {
-                            await this.openRiChengViewDialog(true);
+                            await this.openRiChengViewDialog(true, dataId);
                         } else {
-                            await this.openRiChengViewDialog();
+                            await this.openRiChengViewDialog(false, dataId);
                         }
                     });
                     // 将按钮插入到目标 <span> 元素的右边
@@ -188,7 +210,7 @@ export class M_calendar {
         }, 500); // 延迟 500 毫秒
     }
 
-    async openRiChengViewDialog(isMobile: boolean = false) {
+    async openRiChengViewDialog(isMobile: boolean = false, viewID="") {
 
         const id = new Date().getTime().toString();
         let calendar: any;
@@ -205,7 +227,7 @@ export class M_calendar {
         });
 
         setTimeout(async () => {
-            calendar = await run(id);
+            calendar = await run(id,'dayGridMonth',viewID);
         }, 100);
     }
 
