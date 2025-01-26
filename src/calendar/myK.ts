@@ -98,3 +98,22 @@ export function sortEvents(events: NestedKBCalendarEvent[]): NestedKBCalendarEve
         return event;
     });
 }
+
+
+export function getDaysFromNow(time: string | Date, status: string): string {
+    if (status === '完成') {
+        return '';
+    }
+    const targetDate = new Date(time);
+    const now = new Date();
+    const diffTime = targetDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays > 0) {
+        return `<span style="color: green">还有${diffDays}天</span>`;
+    } else if (diffDays < 0) {
+        return `<span style="color: red">超期${Math.abs(diffDays)}天</span>`;
+    } else {
+        return '<span style="color: orange">今天</span>';
+    }
+}

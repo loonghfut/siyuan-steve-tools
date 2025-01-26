@@ -513,10 +513,6 @@ $priority-color-high-background: var(--b3-card-error-background);
         .kanban-card {
             background-color: $background-color-info;
             border-left: 2px solid $text-color-info;
-
-            .status {
-                color: $text-color-info;
-            }
         }
     }
 
@@ -529,9 +525,6 @@ $priority-color-high-background: var(--b3-card-error-background);
             background-color: $background-color-processing;
             border-left: 2px solid $text-color-processing;
 
-            .status {
-                color: $text-color-processing;
-            }
         }
     }
 
@@ -544,9 +537,6 @@ $priority-color-high-background: var(--b3-card-error-background);
             background-color: $background-color-success;
             border-left: 2px solid $text-color-success;
 
-            .status {
-                color: $text-color-success;
-            }
         }
     }
 }
@@ -582,7 +572,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 
     // cursor: grab;
     h3 {
-        margin: 0 0 8px;
+        // margin: 0 0 8px;
         font-size: 1.1em;
         color: $text-color-info;
         font-weight: 500;
@@ -634,19 +624,35 @@ $priority-color-high-background: var(--b3-card-error-background);
         display: flex;
         gap: 8px;
         align-items: center;
-        margin: 0 0 8px;
+        // margin: 0 0 8px;
 
         .category {
             font-size: 0.85em;
             color: $text-color-info;
             opacity: 0.8;
         }
-        .status {
+        .kanban-status {
+            &-未完成 ,&-进行中,&-完成{
+                font-size: 0.85em;
+                padding: 2px 6px;
+                border-radius: 15px;
+            }
+            &-未完成 {
+                color: $text-color-info;
+                background-color: $background-color-info;
+            }
+            &-进行中 {
+                color: $text-color-processing;
+                background-color: $background-color-processing;
+            }
+            &-完成 {
+                color: #219100;
+                background-color: $background-color-success;
+            }
+        }
+        .kanban-nowToEndTime {
             font-size: 0.85em;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-weight: 500;
-        
+            opacity: 0.8;
         }
     }
 

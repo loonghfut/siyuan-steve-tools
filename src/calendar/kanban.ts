@@ -31,13 +31,21 @@ const CustomViewConfig = {
         const createCard = (event: NestedKBCalendarEvent) => {
             const childCards = event.children?.map(createCard).join('') || '';
             const starttime = new Date(event.extendedProps.Kstart).toLocaleString();
-            const endtime =(event.extendedProps.Kend? "-"+(new Date(event.extendedProps.Kend).toLocaleString()):'');
+            let endtime = '';
+            let nowToEndTime;
+            if (event.extendedProps.Kend) {
+                endtime = '-' + new Date(event.extendedProps.Kend).toLocaleString();
+                nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kend, event.extendedProps.status);
+            }else{
+                nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kstart, event.extendedProps.status);
+            }
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
                         <h3>${event.title}</h3>
                         <div class="kanban-card-meta">
-                            <span class="status">${event.extendedProps.status}</span>
+                            <span class="kanban-nowToEndTime">${nowToEndTime}</span>
+                            <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
                             <span class="category">${event.extendedProps.category}</span>
                             <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                         </div>
