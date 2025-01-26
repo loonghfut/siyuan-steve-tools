@@ -116,6 +116,17 @@ export class M_calendar {
                 steveTools.outlog("自动更新日历文件<1>");
             }, 600000);
         }
+        //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
+        window.siyuan.ws.ws.addEventListener('message', async (e) => {
+            const msg = JSON.parse(e.data);
+            if (msg.cmd === "transactions") {
+                // console.log(msg);
+                if(msg.data[0].doOperations[0].action==="updateAttrs"){
+                    console.log("updateAttrs");
+                    this.avButton();
+                }
+            }
+        });
     }
 
     async onLayoutReady() {
