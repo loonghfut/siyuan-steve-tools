@@ -117,3 +117,37 @@ export function getDaysFromNow(time: string | Date, status: string): string {
         return '<span style="color: orange">今天</span>';
     }
 }
+
+export function transformEventData_fr_filter(events: any[]): any[] {
+    return events.map(event => {
+        // 从 def 中提取所需属性
+        const {
+            title,
+            groupId,
+            publicId,
+            url,
+            recurringDef,
+            defId,
+            sourceId,
+            allDay,
+            hasEnd,
+            ui,
+            extendedProps
+        } = event.def;
+
+        // 返回新的扁平化对象
+        return {
+            title,
+            groupId,
+            publicId,
+            url,
+            recurringDef,
+            defId,
+            sourceId,
+            allDay,
+            hasEnd,
+            ui,
+            extendedProps
+        };
+    });
+}

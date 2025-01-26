@@ -687,3 +687,8 @@ $priority-color-high-background: var(--b3-card-error-background);
     //只要上方间距
     transform: translateY(10px)
 }
+
+
+.fc-kb_show_all-button-selected{
+    background-color: $background-color-success !important;
+}

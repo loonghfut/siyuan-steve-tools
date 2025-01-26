@@ -1,4 +1,4 @@
-import { createPlugin } from '@fullcalendar/core';
+import { createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
@@ -8,19 +8,29 @@ let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
 
 
-
+let isFilter = true;
 
 const CustomViewConfig = {
     classNames: ['custom-view'],
 
     content: function (props) {
+        // 带日期筛选的数据
+        // 视图全部数据
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
-        console.log("处理前数据", dataArray);
+        ///
+        if (isFilter) {
+            //带日期筛选的数据
+            const filterEvents = sliceEvents(props, false);
+            const Tevent = myK.transformEventData_fr_filter(filterEvents) as KBCalendarEvent[];
+            dataArray = Tevent;
+        }
+        ///
+        // console.log("处理前数据", dataArray);
         dataArray = convertEventsToNested(dataArray);
         allKBEvents = dataArray;
-        console.log("处理后数据allKBEvents", allKBEvents);
-        console.log("处理后数据", dataArray);
+        // console.log("处理后数据allKBEvents", allKBEvents);
+        // console.log("处理后数据", dataArray);
         const columns = {
             todo: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '未完成')),
             inProgress: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '进行中')),
@@ -36,7 +46,7 @@ const CustomViewConfig = {
             if (event.extendedProps.Kend) {
                 endtime = '-' + new Date(event.extendedProps.Kend).toLocaleString();
                 nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kend, event.extendedProps.status);
-            }else{
+            } else {
                 nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kstart, event.extendedProps.status);
             }
             return `
@@ -73,10 +83,12 @@ const CustomViewConfig = {
         `;
 
         const html = `
-            <div class="kanban-board">
-                ${createColumn('未完成', columns.todo, 'todo')}
-                ${createColumn('进行中', columns.inProgress, 'inProgress')}
-                ${createColumn('完成', columns.done, 'done')}
+            <div class="kanban-container">
+                <div class="kanban-board">
+                    ${createColumn('未完成', columns.todo, 'todo')}
+                    ${createColumn('进行中', columns.inProgress, 'inProgress')}
+                    ${createColumn('完成', columns.done, 'done')}
+                </div>
             </div>
         `;
         return { html: html }

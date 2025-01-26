@@ -18,7 +18,7 @@ import * as myF from './myF';
 import { showMessage } from 'siyuan';
 import { initializeSortableKanban } from './kanban';
 
-
+export let isFilter = true;
 export let OUTcalendar: Calendar;
 let clicks = 0;
 let viewValue: any;
@@ -116,7 +116,8 @@ export async function run(id: string, initialView = 'dayGridMonth') {
             },
             statusBoard: {
                 type: 'kanban',
-                buttonText: '看板'
+                buttonText: '看板',
+                duration: { months: 1 },
             }
 
         },
@@ -154,7 +155,7 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                             menu.remove();
                             // 更新按钮文本
                             button.textContent = view.text;
-                            setTimeout(() => {initializeSortableKanban()},500);//TODO:待优化的地方
+                            setTimeout(() => { initializeSortableKanban() }, 1000);//TODO:待优化的地方
                         };
                         menu.appendChild(item);
                     });
