@@ -66,3 +66,35 @@ export function findEventByPublicId(
     }
     return null;
 }
+
+
+const PRIORITY_MAP = {
+    '高': 3,
+    '中': 2,
+    '低': 1
+};
+
+
+
+
+export function sortEvents(events: NestedKBCalendarEvent[]): NestedKBCalendarEvent[] {
+    return events.sort((a, b) => {
+        // 先按优先级排序
+        const priorityA = PRIORITY_MAP[a.extendedProps.priority] || 0;
+        const priorityB = PRIORITY_MAP[b.extendedProps.priority] || 0;
+        
+        if (priorityA !== priorityB) {
+            return priorityB - priorityA; // 高优先级在前
+        }
+        
+        // 优先级相同则按创建时间排序
+        const timeA = new Date(a.extendedProps.Kstart).getTime();
+        const timeB = new Date(b.extendedProps.Kstart).getTime();
+        return timeA - timeB;
+    }).map(event => {
+        if (event.children && event.children.length > 0) {
+            event.children = sortEvents(event.children);
+        }
+        return event;
+    });
+}

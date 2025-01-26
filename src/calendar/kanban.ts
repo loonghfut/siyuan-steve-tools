@@ -10,7 +10,6 @@ let allKBEvents: NestedKBCalendarEvent[] = [];
 
 
 
-
 const CustomViewConfig = {
     classNames: ['custom-view'],
 
@@ -23,9 +22,9 @@ const CustomViewConfig = {
         console.log("处理后数据allKBEvents", allKBEvents);
         console.log("处理后数据", dataArray);
         const columns = {
-            todo: dataArray.filter(e => e.extendedProps.status === '未完成'),
-            inProgress: dataArray.filter(e => e.extendedProps.status === '进行中'),
-            done: dataArray.filter(e => e.extendedProps.status === '完成')
+            todo: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '未完成')),
+            inProgress: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '进行中')),
+            done: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '完成'))
         };
         console.log(columns);
 
@@ -95,6 +94,7 @@ export function initializeSortableKanban() {
                 pull: 'clone',
                 put: true
             },
+            sort: false,
             animation: 150,
             fallbackOnBody: true,
             swapThreshold: 0.65,
@@ -125,7 +125,7 @@ export function initializeSortableKanban() {
                     myK.run_delsubevents(Fr_event, Old_event);
                     const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
                     console.log(`${Fr_event.title} moved from ${Old_event.title} to top-level ${newcategory}`);
-                } 
+                }
                 //关联到子级
                 else if (newParentId) {
                     // Moving to a sub-level (either from top or another sub)
@@ -151,12 +151,13 @@ export function initializeSortableKanban() {
                     console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
                 }
 
-                showMessage('请稍等',-1,"info","kanban-update");
+                showMessage('请稍等', -1, "info", "kanban-update");
                 setTimeout(() => { OUTcalendar.refetchEvents() }, 500);//TODO需要优化
 
-                setTimeout(() => { initializeSortableKanban()
-                    showMessage('',1,"info","kanban-update");
-                 }, 1000);//TODO需要优化
+                setTimeout(() => {
+                    initializeSortableKanban()
+                    showMessage('', 1, "info", "kanban-update");
+                }, 1000);//TODO需要优化
             }
         });
         sortableInstances.push(sortable);
@@ -237,10 +238,10 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
         return event;
     }
 
-    // 直接处理所有事件
-    return events
+    const nestedEvents = events
         .map(event => buildNested(event, new Set(), 0))
         .filter((e): e is NestedKBCalendarEvent => e !== null);
+    return myK.sortEvents(nestedEvents);
 }
 
 export function destroyAllSortables() {
