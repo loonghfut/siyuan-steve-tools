@@ -8,7 +8,7 @@ let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
 
 
-let isFilter = true;
+let isFilter = false;//TODO:解决回调问题
 
 const CustomViewConfig = {
     classNames: ['custom-view'],

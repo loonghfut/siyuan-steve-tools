@@ -48,9 +48,6 @@ export async function run(id: string, initialView = 'dayGridMonth') {
         locale: zhCnLocale,
         slotDuration: '01:00:00',
         editable: true,
-        //看板视图
-
-
         // selectable: true,
         // eventDurationEditable: true,
         // 事件点击处理
@@ -300,7 +297,12 @@ export async function run(id: string, initialView = 'dayGridMonth') {
                 theme: 'light',
                 delay: [1000, 0]
             });
-        }
+        },
+        eventChange: function (changeInfo) {
+            // 事件变化时触发
+            const view = calendar.view;
+            console.log('eventChange', view);
+        },
     });
     OUTcalendar = calendar;
     calendar.render();
