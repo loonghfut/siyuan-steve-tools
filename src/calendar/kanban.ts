@@ -1,7 +1,7 @@
 import { createPlugin } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
-import { NestedKBCalendarEvent, KBCalendarEvent,ISelectOption } from "./interface";
+import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
 import { OUTcalendar } from './calendar';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
@@ -34,7 +34,7 @@ const CustomViewConfig = {
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
-                        <h3>${event.title}</h3>
+                        <h3>${event.title} ${event.extendedProps.status}</h3>
                         <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                     </div>
                     <div class="kanban-card-content">
@@ -105,7 +105,7 @@ export function initializeSortableKanban() {
                 if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
                     return;
                 }
-                
+
                 const oldParentId = evt.from.closest('.kanban-card')?.getAttribute('data-id') || null;
                 const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
                 if (itemId === newParentId) {
@@ -117,19 +117,23 @@ export function initializeSortableKanban() {
                 }
 
                 const Fr_event = myK.findEventByPublicId(allKBEvents, itemId);
-
+                //取消关联
                 if (oldParentId && !newParentId) {
                     // Moving from sub-level to top-level
                     const Old_event = myK.findEventByPublicId(allKBEvents, oldParentId);
                     myK.run_delsubevents(Fr_event, Old_event);
                     const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
                     console.log(`${Fr_event.title} moved from ${Old_event.title} to top-level ${newcategory}`);
-                } else if (newParentId) {
+                } 
+                //关联到子级
+                else if (newParentId) {
                     // Moving to a sub-level (either from top or another sub)
                     const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
                     myK.run_getsubevents(Fr_event, To_event);
                     console.log(`${Fr_event.title}${Fr_event.publicId} moved to sub-level under ${newParentId}`);
-                } else {
+                }
+                //切换状态
+                else {
                     // Moving between top-level columns
                     const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
                     const categoryMap = {
@@ -146,7 +150,9 @@ export function initializeSortableKanban() {
                     console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
                 }
 
-                OUTcalendar.refetchEvents();
+
+                setTimeout(() => { OUTcalendar.refetchEvents() }, 500);//TODO需要优化
+
                 setTimeout(() => { initializeSortableKanban() }, 500);//TODO需要优化
             }
         });
