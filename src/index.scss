@@ -12,6 +12,14 @@ $background-color-success: #4b8c8a3d;
 $background-color-processing: #3478c83d;
 $background-color-info: #596c7036;
 
+//优先级颜色
+$priority-color-low: var(--b3-card-success-color);
+$priority-color-medium: var(--b3-card-info-color);
+$priority-color-high: var(--b3-card-error-color);
+$priority-color-low-background: var(--b3-card-success-background);
+$priority-color-medium-background: var(--b3-card-info-background);
+$priority-color-high-background: var(--b3-card-error-background);
+
 [id^="calendarfu-"] {
     background-color: $background-color !important;
     padding: 10px;
@@ -458,6 +466,7 @@ $background-color-info: #596c7036;
         background-color: $hover-background-color;
     }
 }
+
 //my看板
 .kanban-board {
     display: flex;
@@ -476,8 +485,11 @@ $background-color-info: #596c7036;
 }
 
 .kanban-column {
+
     // Common styles for all columns
-    &-未完成, &-进行中, &-完成 {
+    &-未完成,
+    &-进行中,
+    &-完成 {
         margin: 0px 0.5%;
         flex: 1 1 200px;
         background-color: $background-color;
@@ -494,7 +506,10 @@ $background-color-info: #596c7036;
 
     // Specific styles for each column
     &-未完成 {
-        h2 { color: $text-color-info; }
+        h2 {
+            color: $text-color-info;
+        }
+
         .kanban-card {
             background-color: $background-color-info;
             border-left: 2px solid $text-color-info;
@@ -502,7 +517,10 @@ $background-color-info: #596c7036;
     }
 
     &-进行中 {
-        h2 { color: $text-color-processing; }
+        h2 {
+            color: $text-color-processing;
+        }
+
         .kanban-card {
             background-color: $background-color-processing;
             border-left: 2px solid $text-color-processing;
@@ -510,7 +528,10 @@ $background-color-info: #596c7036;
     }
 
     &-完成 {
-        h2 { color: $text-color-success; }
+        h2 {
+            color: $text-color-success;
+        }
+
         .kanban-cards .kanban-card {
             background-color: $background-color-success;
             border-left: 2px solid $text-color-success;
@@ -546,20 +567,92 @@ $background-color-info: #596c7036;
     padding: 10px;
     margin-bottom: 10px;
     box-shadow: 0 1px 3px $border-color;
+
     // cursor: grab;
+    h3 {
+        margin: 0 0 8px;
+        font-size: 1.1em;
+        color: $text-color-info;
+        font-weight: 500;
+    }
+
+    .badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-weight: 500;
+
+        &.priority-低 {
+            background-color: $priority-color-low-background;
+            color: $priority-color-low;
+        }
+
+        &.priority-中 {
+            background-color: $priority-color-medium-background;
+            color: $priority-color-medium;
+        }
+
+        &.priority-高 {
+            background-color: $priority-color-high-background;
+            color: $priority-color-high;
+        }
+
+        &.priority-无{
+            background-color: $background-color;
+            color: $text-color;
+        }
+
+    }
+
+    p {
+        margin: 0;
+        font-size: 0.95em;
+        color: rgba(102, 102, 102, 0.9);
+        line-height: 1.5;
+    }
+    .kanban-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        // margin-bottom: 12px;
+    }
+
+    .kanban-card-meta {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        
+        .category {
+            font-size: 0.85em;
+            color: $text-color-info;
+            opacity: 0.8;
+        }
+    }
+
+    .kanban-card-content {
+        div:first-child { // 时间显示
+            font-size: 0.9em;
+            color: $text-color-info;
+            opacity: 0.7;
+            margin-bottom: 2px;
+        }
+        
+        .description {
+            // background-color: $background-color-1;
+            color: $text-color;
+            padding-top: 4px;
+            // border-radius: 4px;
+        }
+    }
+    // 添加hover效果
+    &:hover {
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        transform: translateY(-1px);
+        transition: all 0.2s ease;
+    }
+
 }
 
-.kanban-card h3 {
-    margin: 0 0 5px;
-    font-size: 1em;
-    color: $text-color-info;
-}
-
-.kanban-card p {
-    margin: 0;
-    font-size: 0.9em;
-    color: #666;
-}
 
 .kanban-subcards {
     //只要上方间距

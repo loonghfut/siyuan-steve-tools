@@ -30,18 +30,20 @@ const CustomViewConfig = {
 
         const createCard = (event: NestedKBCalendarEvent) => {
             const childCards = event.children?.map(createCard).join('') || '';
-
+            const starttime = new Date(event.extendedProps.Kstart).toLocaleString();
+            const endtime =(event.extendedProps.Kend? "-"+(new Date(event.extendedProps.Kend).toLocaleString()):'');
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
-                        <h3>${event.title} ${event.extendedProps.status}</h3>
-                        <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
-                    </div>
-                    <div class="kanban-card-content">
-                        <p class="description">${event.extendedProps.description || ''}</p>
+                        <h3>${event.title}</h3>
                         <div class="kanban-card-meta">
                             <span class="category">${event.extendedProps.category}</span>
+                            <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                         </div>
+                    </div>
+                    <div class="kanban-card-content">
+                    <div>${starttime}${endtime}</div>
+                        <p class="description">${event.extendedProps.description || ''}</p>
                     </div>
                     <div class="kanban-subcards">
                         ${childCards}
