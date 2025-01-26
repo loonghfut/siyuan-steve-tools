@@ -37,6 +37,7 @@ const CustomViewConfig = {
                     <div class="kanban-card-header">
                         <h3>${event.title}</h3>
                         <div class="kanban-card-meta">
+                            <span class="status">${event.extendedProps.status}</span>
                             <span class="category">${event.extendedProps.category}</span>
                             <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
                         </div>
