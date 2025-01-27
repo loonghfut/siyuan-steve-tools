@@ -54,7 +54,7 @@
                         moduleInstances["M_calendar"].getCalUrl();
                     } catch (error) {
                         showMessage(
-                            `导入模板失败: ${error.message}，请先启用日程管理功能`,
+                            `获取失败: ${error.message}，请先启用日程管理功能`,
                         );
                     }
                 },

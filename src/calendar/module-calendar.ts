@@ -568,6 +568,7 @@ export class M_calendar {
             steveTools.outlog(e);
         }
         showMessage("已导入日程模板", 3000, "info");
+        api.refresh();
     }
 
 }
