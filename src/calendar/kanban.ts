@@ -159,7 +159,13 @@ export function initializeSortableKanban() {
                 else if (newParentId) {
                     // Moving to a sub-level (either from top or another sub)
                     const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
-                    myK.run_getsubevents(Fr_event, To_event);
+                    if(To_event.extendedProps.rootid === Fr_event.extendedProps.rootid){
+                        myK.run_getsubevents(Fr_event, To_event);
+                    }else{
+                        showMessage("无法跨数据库关联");
+                        evt.to.remove();
+                        return;
+                    }
                     console.log(`${Fr_event.title}${Fr_event.publicId} moved to sub-level under ${newParentId}`);
                 }
                 //切换状态
