@@ -63,8 +63,10 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
         // 日期点击处理
         //// 双击触发(可选)
         dateClick: async function (info) {
+            const viewIDs = await myF.getViewId(av_ids)
+            const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
             if (settingdata["cal-create-way"] === "1") {
-                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue);
+                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
                 return;
             }
             let clickTimeout: NodeJS.Timeout;
@@ -77,10 +79,8 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
                 clearTimeout(clickTimeout);
                 clicks = 0;
                 steveTools.outlog("创建事件", info);
-                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue);
+                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
             }
-
-
         },
 
 

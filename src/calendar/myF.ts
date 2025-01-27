@@ -333,9 +333,11 @@ export async function createEventInDatabase(
     dateStr: string,
     // databaseId?: string,
     calendar: Calendar,
-    viewValue
+    viewValue,
+    db_id?: string
 ) {
     let isok = false;
+    let to_db_id = db_id || settingdata["cal-db-id"];
     steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
     // 1. 创建面板HTML
     //// 获取当前日期的日记块ID
@@ -354,7 +356,7 @@ export async function createEventInDatabase(
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
     // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
-    steveTools.outlog("dateStr:::", dateStr, "databaseId:::", settingdata["cal-db-id"]);
+    steveTools.outlog("dateStr:::", dateStr, "databaseId:::", to_db_id);
     const dialog = new sy.Dialog({
         title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <span>添加事件(按Ctrl+Enter提交)</span>
@@ -414,16 +416,16 @@ export async function createEventInDatabase(
             // 添加到日历
             //// 将块加入到数据库
             // steveTools.outlog("dasdsssssssssss::::::111111", panel);
-            await api.addBlockToDatabase_pro(id, settingdata["cal-db-id"]);
+            await api.addBlockToDatabase_pro(id, to_db_id);
             // 添加数据库属性
             //// 添加时间和状态属性
-            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', settingdata["cal-db-id"]);
+            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
             console.log("viewValue:::", viewValue);
             console.log("timeKeyID:::", timeKeyID);
-            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', settingdata["cal-db-id"]);
-            const datata = await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], timeKeyID, dateStr, "date");
+            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
+            const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: "未完成" }];
-            await api.updateAttrViewCell_pro(id, settingdata["cal-db-id"], statusKeyID, selectdata, "select");
+            await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
                     steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
@@ -574,4 +576,6 @@ function debounce(func: Function, wait: number) {
 }
 
 
+// export async function getRootId_from_filterViewId(vi){
 
+// }
