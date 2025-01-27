@@ -36,7 +36,7 @@ const CustomViewConfig = {
             inProgress: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '进行中')),
             done: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '完成'))
         };
-        console.log(columns);
+        // console.log(columns);
 
         const createCard = (event: NestedKBCalendarEvent) => {
             const childCards = event.children?.map(createCard).join('') || '';
@@ -95,14 +95,13 @@ const CustomViewConfig = {
     },
 
     didMount: function (props) {
-        console.log('custom view mounted', props);
+        // console.log('custom view mounted', props);
         initializeSortableKanban();
     },
     datesSet: function (info) {
         // 重新加载事件数据
         // console.log('datesSet:::::::::::AAAAAAAA:::::::::::::', info);
         initializeSortableKanban();
-        // 执行其他需要的操作
     },
 
     willUnmount: function (props) {
@@ -180,7 +179,7 @@ export function initializeSortableKanban() {
                     const newcategory_cn = categoryMap[newcategory];
 
                     const selectdata: ISelectOption[] = [{ content: newcategory_cn }];
-                    console.log("selectdata", selectdata);
+                    // console.log("selectdata", selectdata);
                     myK.run_changestatus(Fr_event, selectdata);
                     // myK.
                     console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);

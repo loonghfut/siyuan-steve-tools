@@ -174,7 +174,7 @@ export class M_calendar {
 
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
-                        console.log('按钮被点击了');
+                        // console.log('按钮被点击了');
                         // Find the closest element with the specified classes
                         let dataId = '';
                         const avBlocks = document.querySelectorAll('div.item.item--focus[data-id]');
@@ -193,7 +193,7 @@ export class M_calendar {
                             });
 
                             dataId = closestBlock.getAttribute('data-id');
-                            console.log('data-id:', dataId);
+                            // console.log('data-id:', dataId);
                             steveTools.outlog('Selected AV block ID:', dataId);
                         }
 

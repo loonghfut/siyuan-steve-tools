@@ -217,7 +217,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
                 // 3. 获取视图数据
                 viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
                 viewValue = await myF.getViewValue(viewIDs);
-                console.log("View data:", viewValue, "周期", viewValue_zq);
+                // console.log("View data:", viewValue, "周期", viewValue_zq);
 
                 // 3.5 增加筛选函数
                 viewValue = await myF.filterViewValue(viewValue, filterViewId);
@@ -309,11 +309,6 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
                 theme: 'light',
                 delay: [1000, 0]
             });
-        },
-        eventChange: function (changeInfo) {
-            // 事件变化时触发
-            const view = calendar.view;
-            console.log('eventChange', view);
         },
     });
     OUTcalendar = calendar;

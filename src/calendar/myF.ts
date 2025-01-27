@@ -60,7 +60,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
         }
     }
 
-    console.log("ceshi2222:::::::::::::2", viewValue_Data);
+    // console.log("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
 
@@ -420,8 +420,8 @@ export async function createEventInDatabase(
             // 添加数据库属性
             //// 添加时间和状态属性
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
-            console.log("viewValue:::", viewValue);
-            console.log("timeKeyID:::", timeKeyID);
+            // console.log("viewValue:::", viewValue);
+            // console.log("timeKeyID:::", timeKeyID);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
             const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: "未完成" }];

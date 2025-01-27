@@ -4,7 +4,7 @@ import * as api from "@/api";
 //更新子级
 ////添加子级
 export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
-    console.log("run_getsubevents", "F:", Fr_event, "T:", To_event);
+    // console.log("run_getsubevents", "F:", Fr_event, "T:", To_event);
     await api.updateAttrViewCell_pro(
         To_event.publicId,
         To_event.extendedProps.rootid,
