@@ -178,7 +178,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
         headerToolbar: {
             left: 'prev,next today viewFilter',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,statusBoard'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay'
         },
 
         // 从思源数据转换事件
