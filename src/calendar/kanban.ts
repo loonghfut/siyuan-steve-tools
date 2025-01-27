@@ -126,7 +126,7 @@ export function initializeSortableKanban() {
             animation: 150,
             fallbackOnBody: true,
             swapThreshold: 0.65,
-            onEnd: async function (evt) {
+            onEnd: function (evt) {
                 const itemEl = evt.item;
                 const parentEl = evt.to;
                 const itemId = itemEl.getAttribute('data-id');
@@ -150,10 +150,10 @@ export function initializeSortableKanban() {
                 if (oldParentId && !newParentId) {
                     // Moving from sub-level to top-level
                     const Old_event = myK.findEventByPublicId(allKBEvents, oldParentId);
-                    const is_run_ok = await myK.run_delsubevents(Fr_event, Old_event);
+                    const is_run_ok = myK.run_delsubevents(Fr_event, Old_event);
                     if (!is_run_ok) {
-                        evt.to.remove();
-                        return;
+                        // evt.to.remove();
+                        // return;
                     }
                     const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
                     console.log(`${Fr_event.title} moved from ${Old_event.title} to top-level ${newcategory}`);
@@ -163,11 +163,11 @@ export function initializeSortableKanban() {
                     // Moving to a sub-level (either from top or another sub)
                     const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
                     if (To_event.extendedProps.rootid === Fr_event.extendedProps.rootid) {
-                        const is_run_ok = await myK.run_getsubevents(Fr_event, To_event);
+                        const is_run_ok = myK.run_getsubevents(Fr_event, To_event);
                         if (!is_run_ok) {
-                            console.log("无法关联到子级");
-                            evt.to.remove();
-                            return;
+                            // console.log("无法关联到子级");
+                            // evt.to.remove();
+                            // return;
                         }
                     } else {
                         showMessage("无法跨数据库关联");
