@@ -25,6 +25,7 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
         },
         "relation");
     console.log("done-updateAttrViewCell_pro-add");
+    return true;
 
 }
 ////删除子级
@@ -48,7 +49,7 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
         },
         "relation");
     console.log("done-updateAttrViewCell_pro-remove");
-
+    return true;
 }
 
 export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatus) {
@@ -63,6 +64,7 @@ export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatu
         newstatus,
         "select");
     console.log("done-updateAttrViewCell_pro-select");
+    return true;
 }
 
 
