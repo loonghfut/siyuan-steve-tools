@@ -112,7 +112,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
                 duration: { days: 14 },
                 buttonText: '14日'
             },
-            statusBoard: {
+            kanban: {
                 type: 'kanban',
                 buttonText: '看板',
                 duration: { months: 1 },
@@ -178,7 +178,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
         headerToolbar: {
             left: 'prev,next today viewFilter',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,kanban'
         },
 
         // 从思源数据转换事件
