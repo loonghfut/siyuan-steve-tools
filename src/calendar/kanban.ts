@@ -8,7 +8,7 @@ let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
 
 
-let isFilter = false;//TODO:解决回调问题
+let isFilter = true;//OK:解决回调问题
 
 const CustomViewConfig = {
     classNames: ['custom-view'],
@@ -97,6 +97,12 @@ const CustomViewConfig = {
     didMount: function (props) {
         console.log('custom view mounted', props);
         initializeSortableKanban();
+    },
+    datesSet: function (info) {
+        // 重新加载事件数据
+        // console.log('datesSet:::::::::::AAAAAAAA:::::::::::::', info);
+        initializeSortableKanban();
+        // 执行其他需要的操作
     },
 
     willUnmount: function (props) {

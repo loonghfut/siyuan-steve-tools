@@ -49,6 +49,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
         locale: zhCnLocale,
         slotDuration: '01:00:00',
         editable: true,
+        nowIndicator: true,
         // selectable: true,
         // eventDurationEditable: true,
         // 事件点击处理
@@ -114,9 +115,19 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
             },
             kanban: {
                 type: 'kanban',
-                buttonText: '看板',
+                buttonText: '月板',
                 duration: { months: 1 },
-            }
+            },
+            yearkanban: {
+                type: 'kanban',
+                buttonText: '年板',
+                duration: { months: 12 },
+            },
+            weekkanban: {
+                type: 'kanban',
+                buttonText: '周板',
+                duration: { days: 7 },
+            },
 
         },
         customButtons: {
@@ -178,7 +189,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
         headerToolbar: {
             left: 'prev,next today viewFilter',
             center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,kanban'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban'
         },
 
         // 从思源数据转换事件
