@@ -1,0 +1,36 @@
+{
+    "session": "ce33ac5c-9a51-463c-9113-c576e9b9b6bb",
+    "app": "466q",
+    "transactions": [
+      {
+        "doOperations": [
+          {
+            "action": "addAttrViewCol",
+            "name": "关联",
+            "avID": "20250123120913-yytnoaj",
+            "type": "relation",
+            "id": "20250127134436-ids2acy",
+            "previousID": "20250123120913-q7rkeeq"
+          },
+          {
+            "action": "doUpdateUpdated",
+            "id": "20250123120900-u61jyus",
+            "data": "20250127134436"
+          }
+        ],
+        "undoOperations": [
+          {
+            "action": "removeAttrViewCol",
+            "id": "20250127134436-ids2acy",
+            "avID": "20250123120913-yytnoaj"
+          },
+          {
+            "action": "doUpdateUpdated",
+            "id": "20250123120900-u61jyus",
+            "data": "20250126225951"
+          }
+        ]
+      }
+    ],
+    "reqId": 1737956677504
+  }

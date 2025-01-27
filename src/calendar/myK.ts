@@ -1,3 +1,4 @@
+import { showMessage } from "siyuan";
 import { NestedKBCalendarEvent } from "./interface";
 import * as api from "@/api";
 
@@ -5,6 +6,10 @@ import * as api from "@/api";
 ////添加子级
 export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
     // console.log("run_getsubevents", "F:", Fr_event, "T:", To_event);
+    if(!To_event.extendedProps.subid){
+        showMessage("目标数据库未设置关联自身的列",-1,"error");
+        return false;
+    }
     await api.updateAttrViewCell_pro(
         To_event.publicId,
         To_event.extendedProps.rootid,
@@ -24,6 +29,10 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
 }
 ////删除子级
 export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
+    if(!To_event.extendedProps.subid){
+        showMessage("目标数据库未设置关联自身的列",-1,"error");
+        return false;
+    }
     await api.updateAttrViewCell_pro(
         To_event.publicId,
         To_event.extendedProps.rootid,
@@ -43,6 +52,10 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
 }
 
 export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatus) {
+    if(!Fr_event.extendedProps.statusid){
+        showMessage("目标数据库未设置状态列",-1,"error");
+        return false;
+    }
     await api.updateAttrViewCell_pro(
         Fr_event.publicId,
         Fr_event.extendedProps.rootid,

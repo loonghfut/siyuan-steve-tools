@@ -1,0 +1,31 @@
+{
+    "session": "ce33ac5c-9a51-463c-9113-c576e9b9b6bb",
+    "app": "466q",
+    "transactions": [
+      {
+        "doOperations": [
+          {
+            "action": "updateAttrViewColRelation",
+            "avID": "20250123120913-yytnoaj",
+            "keyID": "20250127134436-ids2acy",
+            "id": "20250123120913-yytnoaj",
+            "backRelationKeyID": "20250127134505-89qd67i",
+            "isTwoWay": false,
+            "name": "",
+            "format": "关联"
+          }
+        ],
+        "undoOperations": [
+          {
+            "action": "updateAttrViewColRelation",
+            "avID": "20250123120913-yytnoaj",
+            "keyID": "20250127134436-ids2acy",
+            "id": "20250123120913-yytnoaj",
+            "name": "",
+            "format": "关联"
+          }
+        ]
+      }
+    ],
+    "reqId": 1737956706063
+  }

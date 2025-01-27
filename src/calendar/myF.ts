@@ -128,8 +128,8 @@ function extractDataFromTable(data: any, isZQ = false) {
                 }
 
                 // 提取子级
-                if (columnMap.has('子级') && row.cells) {
-                    const subCell = row.cells[columnMap.get('子级').index];
+                if (columnMap.has('关联') && row.cells) {
+                    const subCell = row.cells[columnMap.get('关联').index];
                     rowData['子级'] = {
                         contents: subCell?.value?.relation?.contents || '',
                         ids: subCell?.value?.relation?.blockIDs || '',
