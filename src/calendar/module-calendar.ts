@@ -92,7 +92,6 @@ export class M_calendar {
                         if (avids.includes(msg.data[0].doOperations[0].avID) || avids_zq.includes(msg.data[0].doOperations[0].avID)) {
                             steveTools.outlog("更新了日程信息");
                             //延时执行
-                            this.avButton();//数据库每次更新都会重新加载页面
                             if (!this.isUpdating) {
                                 this.isUpdating = true;
                                 setTimeout(async () => {
@@ -121,8 +120,8 @@ export class M_calendar {
             const msg = JSON.parse(e.data);
             if (msg.cmd === "transactions") {
                 // console.log(msg);
-                if (msg.data[0].doOperations[0].action === "updateAttrs") {
-                    console.log("updateAttrs");
+                if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
+                    // console.log("updateAttrs");
                     this.avButton();
                 }
             }
@@ -182,7 +181,7 @@ export class M_calendar {
                             // Get the closest AV block relative to the button
                             let closestBlock = avBlocks[0];
                             let minDistance = Infinity;
-                            
+
                             avBlocks.forEach(block => {
                                 const rect = block.getBoundingClientRect();
                                 const distance = Math.abs(rect.top - button.getBoundingClientRect().top);
@@ -210,7 +209,7 @@ export class M_calendar {
         }, 500); // 延迟 500 毫秒
     }
 
-    async openRiChengViewDialog(isMobile: boolean = false, viewID="") {
+    async openRiChengViewDialog(isMobile: boolean = false, viewID = "") {
 
         const id = new Date().getTime().toString();
         let calendar: any;
@@ -227,7 +226,7 @@ export class M_calendar {
         });
 
         setTimeout(async () => {
-            calendar = await run(id,'dayGridMonth',viewID);
+            calendar = await run(id, 'dayGridMonth', viewID);
         }, 100);
     }
 
