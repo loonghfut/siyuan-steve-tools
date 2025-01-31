@@ -144,7 +144,7 @@ export async function run(
                     // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
                     // console.log("viewIDs", viewIDs);
-                    const button = document.querySelector('.fc-viewFilter-button');//TODO:待优化的地方 
+                    const button = calendarEl.querySelector('.fc-viewFilter-button');//TODO:待优化的地方 
                     if (!button) return;
                     // 创建下拉菜单
                     const menu = document.createElement('div');
