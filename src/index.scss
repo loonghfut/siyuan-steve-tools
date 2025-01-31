@@ -692,3 +692,19 @@ $priority-color-high-background: var(--b3-card-error-background);
 .fc-kb_show_all-button-selected{
     background-color: $background-color-success !important;
 }
+
+
+//侧边优化
+.cal-dock-container {
+    .fc-header-toolbar{
+        padding: 0.2rem;
+        margin-bottom: 0.1rem !important;
+    }
+    .fc-toolbar-title {
+        font-size: 1em !important;  // 调整字体大小
+
+    }
+    .fc-button-group{
+        font-size: 1em !important;
+    }
+}

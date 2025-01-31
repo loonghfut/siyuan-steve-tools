@@ -32,14 +32,6 @@ export class M_ai {
             },
             data: null,
             type: "ai-dock",
-            resize() {
-                // if (this.element.clientWidth == 0) {
-                //     isclickalist = true;
-                // } else {
-                //     isclickalist = false;
-                //     this.element.style.width = "200px";
-                // }
-            },
             update() {
                 this.element.innerHTML = `
                 <div id="ai-dock" class="alist-dock-container"  >

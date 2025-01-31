@@ -29,7 +29,14 @@ let av_ids: string[] = [];
 
 
 
-export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "") {
+export async function run(
+    id: string,
+    initialView = 'dayGridMonth',
+    S_viewID = "",
+    cleft = 'prev,next today viewFilter',
+    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
+    ccenter = 'title',
+) {
     filterViewId = S_viewID;
     const calendarEl = document.getElementById(`calendar-${id}`)!;
     const calendar = new Calendar(calendarEl, {
@@ -137,7 +144,7 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
                     // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
                     // console.log("viewIDs", viewIDs);
-                    const button = document.querySelector('.fc-viewFilter-button');
+                    const button = document.querySelector('.fc-viewFilter-button');//TODO:待优化的地方 
                     if (!button) return;
                     // 创建下拉菜单
                     const menu = document.createElement('div');
@@ -187,9 +194,9 @@ export async function run(id: string, initialView = 'dayGridMonth', S_viewID = "
             },
         },
         headerToolbar: {
-            left: 'prev,next today viewFilter',
-            center: 'title',
-            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban'
+            left: cleft ,
+            center: ccenter ,
+            right: cright 
         },
 
         // 从思源数据转换事件

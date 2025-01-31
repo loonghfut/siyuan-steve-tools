@@ -85,9 +85,9 @@ const CustomViewConfig = {
         const html = `
             <div class="kanban-container">
                 <div class="kanban-board">
-                    ${createColumn('未完成', columns.todo, 'todo')}
-                    ${createColumn('进行中', columns.inProgress, 'inProgress')}
-                    ${createColumn('完成', columns.done, 'done')}
+            ${columns.todo.length ? createColumn('未完成', columns.todo, 'todo') : ''}
+            ${columns.inProgress.length ? createColumn('进行中', columns.inProgress, 'inProgress') : ''}
+            ${columns.done.length ? createColumn('完成', columns.done, 'done') : ''}
                 </div>
             </div>
         `;
@@ -150,7 +150,7 @@ export function initializeSortableKanban() {
                 if (oldParentId && !newParentId) {
                     // Moving from sub-level to top-level
                     const Old_event = myK.findEventByPublicId(allKBEvents, oldParentId);
-                    const is_run_ok =  myK.run_delsubevents(Fr_event, Old_event);
+                    const is_run_ok = myK.run_delsubevents(Fr_event, Old_event);
                     if (!is_run_ok) {
                         // evt.to.remove();
                         // return;

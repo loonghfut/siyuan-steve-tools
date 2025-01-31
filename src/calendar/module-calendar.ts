@@ -71,6 +71,29 @@ export class M_calendar {
                 }
             });
         }
+        let D_calendar: any;
+        this.plugin.addDock({
+            config: {
+                position: "RightTop",
+                size: { width: 250, height: 0 },
+                icon: "iconSTcal",
+                title: "侧边视图",
+            },
+            data: null,
+            type: "cal-dock",
+            resize: async () => {
+                D_calendar.updateSize();
+            },
+            init: async (dock) => {
+                const id = new Date().getTime().toString();
+                dock.element.innerHTML = `
+                <div id="calendar-${id}" class="cal-dock-container" ></div>
+                `;
+                setTimeout(async () => {
+                    D_calendar = await run(id, 'kanban', '','title','viewFilter,prev,next','');
+                }, 100);
+            },
+        });
 
         if (this_settingdata["cal-auto-update"] == true) {
             steveTools.outlog("自动更新日历文件");
