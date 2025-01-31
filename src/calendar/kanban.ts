@@ -1,4 +1,4 @@
-import { createPlugin, sliceEvents } from '@fullcalendar/core';
+import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
@@ -7,7 +7,7 @@ import { showMessage } from 'siyuan';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 let allKBEvents: NestedKBCalendarEvent[] = [];
 
-
+let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
 
 const CustomViewConfig = {
@@ -15,12 +15,17 @@ const CustomViewConfig = {
 
     content: function (props) {
         // 带日期筛选的数据
+        if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
+        thisCalendars.push(OUTcalendar);
+        }
+        console.log("OUTcalendar::::::::", thisCalendars);
         // 视图全部数据
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         ///
         if (isFilter) {
             //带日期筛选的数据
+            console.log("OUTcalendar::::::::",);
             const filterEvents = sliceEvents(props, false);
             const Tevent = myK.transformEventData_fr_filter(filterEvents) as KBCalendarEvent[];
             dataArray = Tevent;
@@ -112,8 +117,8 @@ const CustomViewConfig = {
 export function initializeSortableKanban() {
     destroyAllSortables();
     console.log('initializing sortable kanban');
-    const container = document.querySelector('.kanban-board') as HTMLElement;
-    if (!container) return;
+    const containers = document.querySelectorAll('.kanban-board');
+    if (!containers.length) return;
 
     const createSortableInstance = (element: HTMLElement) => {
         const sortable = Sortable.create(element, {
@@ -196,7 +201,11 @@ export function initializeSortableKanban() {
                 }
 
                 showMessage('请稍等', -1, "info", "kanban-update");
-                setTimeout(() => { OUTcalendar.refetchEvents() }, 500);//TODO需要优化
+                setTimeout(() => {
+                    thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el))
+                    thisCalendars.forEach(calendar => calendar.refetchEvents()); // 刷新所有calendar实例
+                ;
+                }, 500);//TODO需要优化
 
                 setTimeout(() => {
                     initializeSortableKanban()
@@ -208,16 +217,18 @@ export function initializeSortableKanban() {
     };
 
     // Initialize columns
-    container.querySelectorAll('.kanban-cards').forEach(column => {
-        createSortableInstance(column as HTMLElement);
-    });
+    containers.forEach(container => {
+        container.querySelectorAll('.kanban-cards').forEach(column => {
+            createSortableInstance(column as HTMLElement);
+        });
 
-    // Initialize subcards
-    container.querySelectorAll('.kanban-card').forEach(card => {
-        const subcards = card.querySelector('.kanban-subcards');
-        if (subcards) {
-            createSortableInstance(subcards as HTMLElement);
-        }
+        // Initialize subcards
+        container.querySelectorAll('.kanban-card').forEach(card => {
+            const subcards = card.querySelector('.kanban-subcards');
+            if (subcards) {
+                createSortableInstance(subcards as HTMLElement);
+            }
+        });
     });
 }
 
@@ -231,9 +242,6 @@ export default createPlugin({
         kanban: CustomViewConfig
     }
 });
-
-
-
 
 function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent[] {
     const eventMap = new Map<string, NestedKBCalendarEvent>();
