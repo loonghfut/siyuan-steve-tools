@@ -13,6 +13,7 @@ export const defaultSettings = {
     "cal-create-pos": null,
     "cal-db-id": null,
     "cal-create-way": "0",
+    "cal-seemore":false,
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

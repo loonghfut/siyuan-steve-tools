@@ -125,7 +125,7 @@
                     }
                     const ids = moduleInstances["M_calendar"].av_ids;
                     if (!Array.isArray(ids) || ids.length === 0) {
-                        return { "": "无可用数据库" };
+                        return { "": "无可用数据库请先导入日程周期模板" };
                     }
                     return Object.fromEntries(
                         ids
@@ -146,6 +146,13 @@
                     return { "": "加载数据库出错" };
                 }
             })(),
+        },
+        {
+            type: "checkbox",
+            title: "事件交互方式",
+            description: "启用后双击事件会自动跳转到块属性页面",
+            key: "cal-seemore",
+            value: settings["cal-seemore"],
         },
         {
             type: "button",

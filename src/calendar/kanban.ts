@@ -152,8 +152,8 @@ export function initializeSortableKanban() {
             onUnchoose: async function (evt) {
                 let clickTimeout: NodeJS.Timeout;
                 clicks++;
-                if (clicks === 1) {
-                    clickTimeout = setTimeout(() => {
+                if (!isDragging && clicks === 1) {
+                    clickTimeout = setTimeout(async () => {
                         clicks = 0;
                     }, 400);
                 } else if (!isDragging && clicks === 2) {
@@ -162,6 +162,7 @@ export function initializeSortableKanban() {
                     // console.log('onunChoose', evt);
                     await myK.runclick(evt);
                 }
+                
 
             },
             // onChoose: function (evt) {
@@ -170,6 +171,7 @@ export function initializeSortableKanban() {
             onEnd: async function (evt) {
                 try {
                     isDragging = false;
+                    clicks = 0;
                     const itemEl = evt.item;
                     const parentEl = evt.to;
                     const itemId = itemEl.getAttribute('data-id');
@@ -311,9 +313,9 @@ export const refreshKanban = async () => {
     showMessage('[ST]请稍等', -1, "info", "kanban-update");
     await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
 
-    
+
     thisCalendars.forEach(calendar => calendar.refetchEvents());
-    
+
     // 重新初始化拖拽
     await new Promise(resolve => setTimeout(resolve, INIT_DELAY - REFRESH_DELAY));
     initializeSortableKanban();

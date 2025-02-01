@@ -323,8 +323,9 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
     return events;
 }
 //查看事件
-export async function showEvent(blockID, rootId) {
+export async function showEvent(blockID, rootId, isSeeMore = false) {
     //// 判断是否存在此块
+    const seemore =settingdata["cal-seemore"]  || isSeeMore;
     const block = await api.getBlockByID(blockID);
     if (!block) {
         sy.showMessage('未找到此块');
@@ -358,15 +359,17 @@ export async function showEvent(blockID, rootId) {
         mode: "wysiwyg",
         // action: ["cb-get-focus"],
         after: () => {
-            // console.log(panel.protyle);
-            const parentElement = document.getElementById('eventPanel-show');
-            // console.log("parentElement", parentElement);
-            if (parentElement) {
-                const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                // console.log("找到目标元素:", targetElement);
-                if (targetElement) {
-                    (targetElement as HTMLElement).click();
+            if (seemore) {
+                // console.log(panel.protyle);
+                const parentElement = document.getElementById('eventPanel-show');
+                // console.log("parentElement", parentElement);
+                if (parentElement) {
+                    const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
+                    // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
+                    // console.log("找到目标元素:", targetElement);
+                    if (targetElement) {
+                        (targetElement as HTMLElement).click();
+                    }
                 }
             }
         }
