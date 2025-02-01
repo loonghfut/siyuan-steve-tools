@@ -31,7 +31,7 @@ const CustomViewConfig = {
         // 视图全部数据
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
-        allKBEvents = dataArray;
+        allKBEvents = dataArray;//重要
         ///
         if (isFilter) {
             //带日期筛选的数据
@@ -112,11 +112,12 @@ const CustomViewConfig = {
 
     didMount: function (props) {
         // console.log('custom view mounted', props);
-        initializeSortableKanban();
+        // initializeSortableKanban();
+        // console.log('custom view mounted  didMount didMount didMount didMount');
     },
     datesSet: function (info) {
         // 重新加载事件数据
-        // console.log('datesSet:::::::::::AAAAAAAA:::::::::::::', info);
+        console.log('datesSet:::::::::::AAAAAAAA:::::::::::::');
         initializeSortableKanban();
     },
 
