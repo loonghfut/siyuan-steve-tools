@@ -711,9 +711,8 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .kanban-column-empty {
     // 尺寸约束
-    width: 90%;
+    width: 100%;
     min-height: 100px;
-    max-width: 800px;
     margin: 0 auto; // 添加这行实现水平居中
     
     // Flex布局保持
