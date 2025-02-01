@@ -22,8 +22,8 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 [id^="calendarfu-"] {
     background-color: $background-color !important;
-    padding: 10px;
-
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 //时间条
@@ -717,6 +717,12 @@ $priority-color-high-background: var(--b3-card-error-background);
     .fc-button-group {
         font-size: 1em !important;
     }
+    .kanban-board {
+        max-height: 88.7vh;
+    }
+    // [id^=calendar-] {
+    //     height: 93vh;
+    // }
 }
 
 .kanban-column-empty {

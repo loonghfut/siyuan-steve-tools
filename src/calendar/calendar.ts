@@ -16,7 +16,6 @@ import { moduleInstances } from '@/index';
 import solarLunar from 'solarlunar';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
-import { initializeSortableKanban } from './kanban';
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
