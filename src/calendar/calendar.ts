@@ -13,7 +13,7 @@ import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
-// import solarLunar from 'solarlunar';
+import solarLunar from 'solarlunar';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
 import { initializeSortableKanban } from './kanban';
@@ -104,7 +104,56 @@ export async function run(
                 const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
             }
         },
-
+        // 农历显示
+        dayCellDidMount: function(arg) {
+            try {
+                // 获取日期
+                const date = arg.date;
+                const year = date.getFullYear();
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
+                
+                // 调试输出
+                // console.log('Solar date:', year, month, day);
+                
+                // 转换为农历
+                const lunar = solarLunar.solar2lunar(year, month, day);
+                // console.log('Lunar result:', lunar);
+                
+                // 添加空值检查
+                if (!lunar) {
+                    console.error('农历转换失败');
+                    return;
+                }
+                
+                // 创建农历显示元素
+                const lunarEl = document.createElement('a');
+                lunarEl.className = 'fc-daygrid-day-lunar fc-daygrid-day-number';
+                lunarEl.style.fontSize = '1em';
+                lunarEl.style.color = '#666';
+                // lunarEl.setAttribute('data-navlink', '');
+                lunarEl.tabIndex = 0;
+                
+                // 设置农历文本和标题
+                let lunarText = '';
+                if (!lunar.dayCn) {
+                    lunarText = '数据异常';
+                } else {
+                    lunarText = lunar.dayCn ;
+                    lunarEl.title = `${lunar.yearCn}${lunar.monthCn}${lunar.dayCn}`;
+                }
+                
+                lunarEl.innerHTML = lunarText;
+                
+                // 将农历元素添加到日期单元格中
+                const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
+                if (numberEl) {
+                    numberEl.after(lunarEl);
+                }
+            } catch (error) {
+                console.error('农历显示错误:', error);
+            }
+        },
 
         // 事件拖放处理
         eventDrop: async function (info) {
