@@ -92,7 +92,7 @@ const CustomViewConfig = {
         const createColumn = (title: string, events: KBCalendarEvent[], category) => `
             <div class="kanban-column-${title}">
                 <div class="kanban-column-header">
-                    <h2>${title}</h2>
+                    <h2>${title}</h2><button class="kanban-add-button">+</button>
                 </div>
                 <div class="kanban-cards" data-category="${category}">
                     ${events.map(createCard).join('')}
@@ -108,8 +108,9 @@ const CustomViewConfig = {
             ${columns.done.length ? createColumn('完成', columns.done, 'done') : ''}
             ${!columns.todo.length && !columns.inProgress.length && !columns.done.length ?
                 `
-                <div class="kanban-column-empty">无事件</div>
+                <div class="kanban-column-empty">无事件
                 <button class="kanban-add-button">添加事件</button>
+                </div>
                 `
                 : ''}
             </div>

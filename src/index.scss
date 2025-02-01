@@ -631,25 +631,33 @@ $priority-color-high-background: var(--b3-card-error-background);
             color: $text-color-info;
             opacity: 0.8;
         }
+
         .kanban-status {
-            &-未完成 ,&-进行中,&-完成{
+
+            &-未完成,
+            &-进行中,
+            &-完成 {
                 font-size: 0.85em;
                 padding: 2px 6px;
                 border-radius: 15px;
             }
+
             &-未完成 {
                 color: $text-color-info;
                 background-color: $background-color-info;
             }
+
             &-进行中 {
                 color: $text-color-processing;
                 background-color: $background-color-processing;
             }
+
             &-完成 {
                 color: #219100;
                 background-color: $background-color-success;
             }
         }
+
         .kanban-nowToEndTime {
             font-size: 0.85em;
             opacity: 0.8;
@@ -689,22 +697,24 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 
-.fc-kb_show_all-button-selected{
+.fc-kb_show_all-button-selected {
     background-color: $background-color-success !important;
 }
 
 
 //侧边优化
 .cal-dock-container {
-    .fc-header-toolbar{
+    .fc-header-toolbar {
         padding: 0.2rem;
         margin-bottom: 0.1rem !important;
     }
+
     .fc-toolbar-title {
-        font-size: 1em !important;  // 调整字体大小
+        font-size: 1em !important; // 调整字体大小
 
     }
-    .fc-button-group{
+
+    .fc-button-group {
         font-size: 1em !important;
     }
 }
@@ -714,12 +724,12 @@ $priority-color-high-background: var(--b3-card-error-background);
     width: 100%;
     min-height: 100px;
     margin: 0 auto; // 添加这行实现水平居中
-    
+
     // Flex布局保持
     display: flex;
     justify-content: center;
     align-items: center;
-    
+
     // 原有样式保持
     font-size: 1.5em;
     text-align: center;
@@ -727,10 +737,10 @@ $priority-color-high-background: var(--b3-card-error-background);
     background-color: var(--kanban-empty-bg, $background-color);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     margin: 20px;
-    
+
     // 交互效果
     transition: all 0.3s ease;
-    
+
     @media (max-width: 768px) {
         width: 95%;
         font-size: 1.2em;
@@ -739,21 +749,58 @@ $priority-color-high-background: var(--b3-card-error-background);
     }
 }
 
-.kanban-add-button{
-    background-color: $background-color;
-    color: $text-color;
-    border: 1px solid $border-color;
-    border-radius: 4px;
-    padding: 8px 16px;
-    font-size: 0.9em;
-    transition: all 0.2s ease;
-    margin: 0 auto;
-    display: block;
-    text-align: center;
-    margin-top: 20px;
-    margin-bottom: 20px;
+.kanban-column-header {
+    display: flex;
+    align-items: center;
+    position: relative;
 
-    &:hover {
-        background-color: $hover-background-color;
+    // 当存在标题时的样式
+    &:has(h2) {
+        h2 {
+            flex: 1;
+            text-align: center;
+            margin: 0;
+        }
+
+        .kanban-add-button {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translate(-100%, -80%);
+        }
+    }
+
+    .kanban-add-button {
+        background-color: var(--b3-theme-background);
+        color: var(--b3-theme-on-background);
+        border: 1px solid var(--b3-border-color);
+        border-radius: 4px;
+        font-size: 1em;
+        transition: all .2s ease;
+
+        &:hover {
+            background-color: $hover-background-color;
+        }
+    }
+}
+
+.kanban-column-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .kanban-add-button {
+        background-color: var(--b3-theme-background);
+        color: var(--b3-theme-on-background);
+        border: 1px solid var(--b3-border-color);
+        padding: 8px 16px;
+        font-size: 0.9em;
+        transition: all 0.2s ease;
+        margin: 20px 0;
+        text-align: center;
+
+        &:hover {
+            background-color: $hover-background-color;
+        }
     }
 }
