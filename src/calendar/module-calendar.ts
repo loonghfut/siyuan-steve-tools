@@ -37,6 +37,9 @@ export class M_calendar {
     <symbol id="iconSTcal" viewBox="0 0 500 500">
        ${ic.steveTools_cal}
     </symbol>  
+    <symbol id="iconSTcalKanban" viewBox="0 0 802 802">
+        ${ic.steveTools_cal_kanban}
+    </symbol>
         `);
         this.checkAndCreateEventsFile(eventsPath);
         linkToCalendar = calendarpath2;
@@ -77,8 +80,8 @@ export class M_calendar {
             config: {
                 position: "RightTop",
                 size: { width: 250, height: 0 },
-                icon: "iconSTcal",
-                title: "侧边视图",
+                icon: "iconSTcalKanban",
+                title: "侧边看板",
             },
             data: null,
             type: "cal-dock",
