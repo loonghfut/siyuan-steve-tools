@@ -92,6 +92,7 @@ export class M_calendar {
                 `;
                 setTimeout(async () => {
                     D_calendar = await run(id, 'kanban', '','title','viewFilter,prev,next','');
+                    refreshKanban();
                 }, 100);
             },
         });
