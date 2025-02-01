@@ -124,9 +124,9 @@ export async function run(
                 type: 'kanban',
                 buttonText: '月板',
                 duration: { months: 1 },
-                customParams: {
-                    calendarEl: calendarEl,
-                },
+                // customParams: {
+                //     calendarEl: calendarEl,
+                // },
             },
             yearkanban: {
                 type: 'kanban',

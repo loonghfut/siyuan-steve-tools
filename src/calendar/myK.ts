@@ -166,3 +166,8 @@ export function transformEventData_fr_filter(events: any[]): any[] {
         };
     });
 }
+
+export function runclick(){
+    console.log("click");
+    showMessage("click");
+}

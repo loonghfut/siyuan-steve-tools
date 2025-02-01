@@ -16,7 +16,7 @@ const CustomViewConfig = {
     content: function (props) {
         // 带日期筛选的数据
         if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
-        thisCalendars.push(OUTcalendar);
+            thisCalendars.push(OUTcalendar);
         }
         console.log("OUTcalendar::::::::", thisCalendars);
         // 视图全部数据
@@ -121,6 +121,8 @@ export function initializeSortableKanban() {
     if (!containers.length) return;
 
     const createSortableInstance = (element: HTMLElement) => {
+        let clicks = 0;
+        let isDragging = false; // 新增拖拽标志
         const sortable = Sortable.create(element, {
             group: {
                 name: 'kanban',
@@ -131,7 +133,30 @@ export function initializeSortableKanban() {
             animation: 150,
             fallbackOnBody: true,
             swapThreshold: 0.65,
+            onStart: function(evt) {
+                isDragging = true; // 开始拖拽时设置标志
+                console.log('onStart', evt);
+            },
+            onUnchoose: function (evt) {
+                let clickTimeout: NodeJS.Timeout;
+                clicks++;
+                if (clicks === 1) {
+                    clickTimeout = setTimeout(() => {
+                        clicks = 0;
+                    }, 400);
+                } else if (!isDragging && clicks === 2) {
+                    clearTimeout(clickTimeout);
+                    clicks = 0;
+                    console.log('onunChoose', evt);
+                    myK.runclick();
+                }
+
+            },
+            // onChoose: function (evt) {
+            //     console.log('onchoose', evt);
+            // },
             onEnd: async function (evt) {
+                isDragging = false;
                 const itemEl = evt.item;
                 const parentEl = evt.to;
                 const itemId = itemEl.getAttribute('data-id');
@@ -204,7 +229,7 @@ export function initializeSortableKanban() {
                 setTimeout(() => {
                     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el))
                     thisCalendars.forEach(calendar => calendar.refetchEvents()); // 刷新所有calendar实例
-                ;
+                    ;
                 }, 500);//TODO需要优化
 
                 setTimeout(() => {
