@@ -8,7 +8,7 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import steveTools from "@/index";
-import kanban from './kanban';
+import kanban, { refreshKanban } from './kanban';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -24,8 +24,8 @@ let clicks1 = 0;
 let clicks2 = 0;
 export let viewValue: any;
 let viewValue_zq: any;
-let filterViewId: string;
-let av_ids: string[] = [];
+export let filterViewId: string;
+export let av_ids: string[] = [];
 
 
 
@@ -233,11 +233,11 @@ export async function run(
                         item.onclick = async () => {
                             filterViewId = view.id;
                             // 更新日历数据
-                            calendar.refetchEvents();
                             menu.remove();
                             // 更新按钮文本
                             button.textContent = view.text;
-                            setTimeout(() => { initializeSortableKanban() }, 1000);//TODO:待优化的地方
+                            refreshKanban();
+
                         };
                         menu.appendChild(item);
                     });

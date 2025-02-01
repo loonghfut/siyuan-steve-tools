@@ -2,10 +2,10 @@ import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
-import { OUTcalendar,viewValue } from './calendar';
+import { av_ids, filterViewId, OUTcalendar } from './calendar';
 import { showMessage, Protyle } from 'siyuan';
 import { settingdata } from '..';
-import { createEventInDatabase } from './myF';
+import { createEventInDatabase, getViewId, getViewValue } from './myF';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
@@ -149,22 +149,26 @@ export function initializeSortableKanban() {
         addButton.forEach(button => {
             const status = button.getAttribute('status'); // 获取status属性值
             // console.log('Button status:', status);
-            
+
             const newButton = button.cloneNode(true);
-            
+
             button.parentNode.replaceChild(newButton, button);
             newButton.addEventListener('click', () => handleAddButtonClick(status));
         });
     }
 
 
-    function handleAddButtonClick(status: string) {
+    async function handleAddButtonClick(status: string) {
         console.log('添加事件按钮被点击');
         const now = new Date()
         // console.log('当前时间:', now);
         const fnow = myK.formatDateTime(now);
         // console.log('格式化时间:', fnow);
-        createEventInDatabase(fnow,OUTcalendar,viewValue,'',status);
+        
+        const viewIDs = await getViewId(av_ids)
+        const viewValue = await getViewValue(viewIDs);
+        const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
+        await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status);
     }
 
 
@@ -218,8 +222,14 @@ export function initializeSortableKanban() {
                     const itemId = itemEl.getAttribute('data-id');
 
                     // 检查是否需要处理
-                    if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
-                        logDebug('相同位置，无需处理');
+                    console.log('onEnd', evt);
+                    if (evt.to.attributes[1].nodeValue === evt.from.attributes[1].nodeValue) {
+                        if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
+                            logDebug('相同位置，无需处理');
+                            return;
+                        }
+                        logDebug('不同位置，相同列');
+                        evt.item.remove();
                         return;
                     }
 
