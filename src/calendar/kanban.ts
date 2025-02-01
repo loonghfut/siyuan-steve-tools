@@ -3,13 +3,14 @@ import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
 import { OUTcalendar } from './calendar';
-import { showMessage } from 'siyuan';
+import { showMessage, Protyle } from 'siyuan';
 import { settingdata } from '..';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
 let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
+let id = '';//渲染protyle用
 
 const REFRESH_DELAY = 500;
 const INIT_DELAY = 1000;
@@ -97,14 +98,19 @@ const CustomViewConfig = {
                 </div>
             </div>
         `;
-
+        id = new Date().getTime().toString();
         const html = `
             <div class="kanban-container">
             <div class="kanban-board">
             ${columns.todo.length ? createColumn('未完成', columns.todo, 'todo') : ''}
             ${columns.inProgress.length ? createColumn('进行中', columns.inProgress, 'inProgress') : ''}
             ${columns.done.length ? createColumn('完成', columns.done, 'done') : ''}
-            ${!columns.todo.length && !columns.inProgress.length && !columns.done.length ? '<div class="kanban-column-empty">无事件</div>' : ''}
+            ${!columns.todo.length && !columns.inProgress.length && !columns.done.length ?
+                `
+                <div class="kanban-column-empty">无事件</div>
+                <button class="kanban-add-button">添加事件</button>
+                `
+                : ''}
             </div>
             </div>
         `;
@@ -132,6 +138,25 @@ export function initializeSortableKanban() {
     console.log('initializing sortable kanban');
     const containers = document.querySelectorAll('.kanban-board');
     if (!containers.length) return;
+
+    // 添加按钮点击监听
+
+    const addButton = document.querySelectorAll('.kanban-add-button');
+    if (addButton) {
+        console.log(addButton);
+        addButton.forEach(button => {
+            const newButton = button.cloneNode(true);
+            button.parentNode.replaceChild(newButton, button);
+            newButton.addEventListener('click', handleAddButtonClick);
+        });
+    }
+
+
+    function handleAddButtonClick() {
+        console.log('添加事件按钮被点击');
+    }
+
+
 
     const createSortableInstance = (element: HTMLElement) => {
         let clicks = 0;
@@ -311,6 +336,7 @@ export function destroyAllSortables() {
 
 export const refreshKanban = async () => {
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
+    // console.log('刷新日历', thisCalendars);
     if (!thisCalendars.length) {
         return;
     }
@@ -351,7 +377,7 @@ async function handleMoveToSubLevel(Fr_event, newParentId, evt) {
     const To_event = await myK.findEventByPublicId(allKBEvents, newParentId);
 
     if (To_event.extendedProps.rootid !== Fr_event.extendedProps.rootid) {
-        showMessage("无法跨数据库关联", 3000, "error");
+        // showMessage("无法跨数据库关联", 3000, "error");
         evt.to.remove();
         return false;
     }

@@ -332,13 +332,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
         return;
     }
     const dialog = new sy.Dialog({
-        title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <span>修改事件</span>
-            <div>
-                <button class="b3-button b3-button--text" style="padding: 4px 8px; font-size: 12px;">提交</button>
-                <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
-            </div>
-           </div>`,
+        title: null,
         content: '<div id="eventPanel-show"></div>',
         width: '500px',
         height: 'auto',
