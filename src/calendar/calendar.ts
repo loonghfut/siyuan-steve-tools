@@ -234,7 +234,7 @@ export async function run(
 
                 // 4. 转换事件数据
                 const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
-                console.log('Fetched calendar events:', events);
+                // console.log('Fetched calendar events:', events);
                 // 5. 回调成功
                 successCallback(events);
             } catch (error) {

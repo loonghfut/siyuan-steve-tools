@@ -27,14 +27,15 @@ const CustomViewConfig = {
         if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
             thisCalendars.push(OUTcalendar);
         }
-        console.log("OUTcalendar::::::::", thisCalendars);
+        // console.log("OUTcalendar::::::::", thisCalendars);
         // 视图全部数据
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
+        allKBEvents = dataArray;
         ///
         if (isFilter) {
             //带日期筛选的数据
-            console.log("OUTcalendar::::::::",);
+            // console.log("OUTcalendar::::::::",);
             const filterEvents = sliceEvents(props, false);
             const Tevent = myK.transformEventData_fr_filter(filterEvents) as KBCalendarEvent[];
             dataArray = Tevent;
@@ -42,7 +43,7 @@ const CustomViewConfig = {
         ///
         // console.log("处理前数据", dataArray);
         dataArray = convertEventsToNested(dataArray);
-        allKBEvents = dataArray;
+        
         // console.log("处理后数据allKBEvents", allKBEvents);
         // console.log("处理后数据", dataArray);
         const columns = {
@@ -145,7 +146,7 @@ export function initializeSortableKanban() {
             swapThreshold: 0.65,
             onStart: function (evt) {
                 isDragging = true; // 开始拖拽时设置标志
-                console.log('onStart', evt);
+                // console.log('onStart', evt);
             },
             onUnchoose: function (evt) {
                 let clickTimeout: NodeJS.Timeout;
@@ -157,7 +158,7 @@ export function initializeSortableKanban() {
                 } else if (!isDragging && clicks === 2) {
                     clearTimeout(clickTimeout);
                     clicks = 0;
-                    console.log('onunChoose', evt);
+                    // console.log('onunChoose', evt);
                     myK.runclick();
                 }
 
