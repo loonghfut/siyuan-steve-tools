@@ -10,6 +10,15 @@ let allKBEvents: NestedKBCalendarEvent[] = [];
 let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
 
+const REFRESH_DELAY = 500;
+const INIT_DELAY = 1000;
+const CATEGORY_MAP = {
+    'todo': '未完成',
+    'inProgress': '进行中', 
+    'done': '完成'
+} as const;
+
+
 const CustomViewConfig = {
     classNames: ['custom-view'],
 
@@ -134,7 +143,7 @@ export function initializeSortableKanban() {
             animation: 150,
             fallbackOnBody: true,
             swapThreshold: 0.65,
-            onStart: function(evt) {
+            onStart: function (evt) {
                 isDragging = true; // 开始拖拽时设置标志
                 console.log('onStart', evt);
             },
@@ -157,87 +166,49 @@ export function initializeSortableKanban() {
             //     console.log('onchoose', evt);
             // },
             onEnd: async function (evt) {
-                isDragging = false;
-                const itemEl = evt.item;
-                const parentEl = evt.to;
-                const itemId = itemEl.getAttribute('data-id');
-                // If the old index and new index are the same, and from/to containers are the same, do nothing
-                if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
-                    return;
-                }
-
-                const oldParentId = evt.from.closest('.kanban-card')?.getAttribute('data-id') || null;
-                const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
-                if (itemId === newParentId) {
-                    console.log('same parent, do nothing');
-                    // 特殊情况：移除克隆的元素
-                    evt.to.remove();
-                    // OUTcalendar.render();
-                    return;
-                }
-
-                const Fr_event = myK.findEventByPublicId(allKBEvents, itemId);
-                //取消关联
-                if (oldParentId && !newParentId) {
-                    // Moving from sub-level to top-level
-                    const Old_event = myK.findEventByPublicId(allKBEvents, oldParentId);
-                    const is_run_ok = myK.run_delsubevents(Fr_event, Old_event);
-                    if (!is_run_ok) {
-                        // evt.to.remove();
-                        // return;
+                try {
+                    isDragging = false;
+                    const itemEl = evt.item;
+                    const parentEl = evt.to;
+                    const itemId = itemEl.getAttribute('data-id');
+            
+                    // 检查是否需要处理
+                    if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
+                        logDebug('相同位置，无需处理');
+                        return;
                     }
-                    const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
-                    console.log(`${Fr_event.title} moved from ${Old_event.title} to top-level ${newcategory}`);
-                }
-                //关联到子级
-                else if (newParentId) {
-                    // Moving to a sub-level (either from top or another sub)
-                    const To_event = myK.findEventByPublicId(allKBEvents, newParentId);
-                    if (To_event.extendedProps.rootid === Fr_event.extendedProps.rootid) {
-                        const is_run_ok = await myK.run_getsubevents(Fr_event, To_event);
-                        if (!is_run_ok) {
-                            console.log("无法关联到子级");
-                            // evt.item.remove();
-                            evt.to.remove();
-                            // return;
-                        }
+            
+                    const oldParentId = evt.from.closest('.kanban-card')?.getAttribute('data-id') || null;
+                    const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
+            
+                    // 处理自身拖拽到自身的情况
+                    if (itemId === newParentId) {
+                        logDebug('拖拽到自身，移除克隆元素');
+                        evt.item.remove();
+                        return;
+                    }
+            
+                    const Fr_event = await myK.findEventByPublicId(allKBEvents, itemId);
+                    if (!Fr_event) {
+                        throw new Error(`未找到事件: ${itemId}`);
+                    }
+            
+                    // 处理不同拖拽场景
+                    if (oldParentId && !newParentId) {
+                        await handleMoveToTopLevel(Fr_event, oldParentId, parentEl);
+                    } else if (newParentId) {
+                        await handleMoveToSubLevel(Fr_event, newParentId, evt);
                     } else {
-                        showMessage("无法跨数据库关联");
-                        evt.to.remove();
-                        // return;
+                        await handleStatusChange(Fr_event, parentEl);
                     }
-                    console.log(`${Fr_event.title}${Fr_event.publicId} moved to sub-level under ${newParentId}`);
+            
+                    await refreshKanban();
+            
+                } catch (error) {
+                    console.error('[Kanban Error]', error);
+                    showMessage(`操作失败: ${error.message}`, 3000, "error");
                 }
-                //切换状态
-                else {
-                    // Moving between top-level columns
-                    const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
-                    const categoryMap = {
-                        'todo': '未完成',
-                        'inProgress': '进行中',
-                        'done': '完成'
-                    };
-                    const newcategory_cn = categoryMap[newcategory];
-
-                    const selectdata: ISelectOption[] = [{ content: newcategory_cn }];
-                    // console.log("selectdata", selectdata);
-                    myK.run_changestatus(Fr_event, selectdata);
-                    // myK.
-                    console.log(`${Fr_event.title} moved between top-level columns to ${newcategory}`);
-                }
-
-                showMessage('请稍等', -1, "info", "kanban-update");
-                setTimeout(() => {
-                    thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el))
-                    thisCalendars.forEach(calendar => calendar.refetchEvents()); // 刷新所有calendar实例
-                    ;
-                }, 500);//TODO需要优化
-
-                setTimeout(() => {
-                    initializeSortableKanban()
-                    showMessage('', 1, "info", "kanban-update");
-                }, 1000);//TODO需要优化
-            }
+            },
         });
         sortableInstances.push(sortable);
     };
@@ -327,4 +298,72 @@ export function destroyAllSortables() {
         instance.destroy();
     });
     sortableInstances = [];
+}
+
+const refreshKanban = async () => {
+    showMessage('请稍等', -1, "info", "kanban-update");
+    
+    // 刷新日历
+    await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
+    thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
+    thisCalendars.forEach(calendar => calendar.refetchEvents());
+    
+    // 重新初始化拖拽
+    await new Promise(resolve => setTimeout(resolve, INIT_DELAY - REFRESH_DELAY));
+    initializeSortableKanban();
+    showMessage('', 1, "info", "kanban-update");
+};
+
+const logDebug = (message: string, ...args: any[]) => {
+    console.log(`[Kanban] ${message}`, ...args);
+};
+
+
+
+// 处理移动到顶层
+async function handleMoveToTopLevel(Fr_event, oldParentId, parentEl) {
+    const Old_event = await myK.findEventByPublicId(allKBEvents, oldParentId);
+    const is_run_ok = await myK.run_delsubevents(Fr_event, Old_event);
+    
+    if (!is_run_ok) {
+        logDebug('取消关联失败');
+    }
+    
+    const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
+    logDebug(`${Fr_event.title} 从 ${Old_event.title} 移动到顶层 ${newcategory}`);
+}
+
+// 处理移动到子层级
+async function handleMoveToSubLevel(Fr_event, newParentId, evt) {
+    const To_event = await myK.findEventByPublicId(allKBEvents, newParentId);
+    
+    if (To_event.extendedProps.rootid !== Fr_event.extendedProps.rootid) {
+        showMessage("无法跨数据库关联", 3000, "error");
+        evt.to.remove();
+        return false;
+    }
+
+    const is_run_ok = await myK.run_getsubevents(Fr_event, To_event);
+    if (!is_run_ok) {
+        logDebug("关联子级失败");
+        evt.to.remove();
+        return false;
+    }
+
+    logDebug(`${Fr_event.title}(${Fr_event.publicId}) 移动到 ${newParentId} 下级`);
+    return true;
+}
+
+// 处理状态变更
+async function handleStatusChange(Fr_event, parentEl) {
+    const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
+    const newcategory_cn = CATEGORY_MAP[newcategory];
+    
+    if (!newcategory_cn) {
+        throw new Error(`未知状态: ${newcategory}`);
+    }
+
+    const selectdata: ISelectOption[] = [{ content: newcategory_cn }];
+    await myK.run_changestatus(Fr_event, selectdata);
+    logDebug(`${Fr_event.title} 状态更改为 ${newcategory}`);
 }

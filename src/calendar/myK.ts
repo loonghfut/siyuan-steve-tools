@@ -69,10 +69,10 @@ export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatu
 
 
 
-export function findEventByPublicId(
+export async function findEventByPublicId(
     events: NestedKBCalendarEvent[],
     targetId: string
-): NestedKBCalendarEvent | null {
+): Promise<NestedKBCalendarEvent | null> {
     for (const event of events) {
         // 检查当前事件
         if (event.publicId === targetId) {
