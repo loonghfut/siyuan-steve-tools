@@ -186,5 +186,6 @@ export async function runclick(evt) {
 }
 
 export function formatDateTime(date: Date) {
-    return date.toISOString().slice(0, 16); // 格式化为 YYYY-MM-DDTHH:mm
+    const adjustedDate = new Date(date.getTime() + 8 * 60 * 60 * 1000); // 加8个小时
+    return adjustedDate.toISOString().slice(0, 16); // 格式化为 YYYY-MM-DDTHH:mm
 }

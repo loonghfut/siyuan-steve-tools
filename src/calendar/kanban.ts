@@ -145,10 +145,10 @@ export function initializeSortableKanban() {
 
     const addButton = document.querySelectorAll('.kanban-add-button');
     if (addButton) {
-        console.log(addButton);
+        // console.log(addButton);
         addButton.forEach(button => {
             const status = button.getAttribute('status'); // 获取status属性值
-            console.log('Button status:', status);
+            // console.log('Button status:', status);
             
             const newButton = button.cloneNode(true);
             
@@ -160,8 +160,10 @@ export function initializeSortableKanban() {
 
     function handleAddButtonClick(status: string) {
         console.log('添加事件按钮被点击');
-        const now = new Date();
-        const fnow =myK.formatDateTime(now);
+        const now = new Date()
+        // console.log('当前时间:', now);
+        const fnow = myK.formatDateTime(now);
+        // console.log('格式化时间:', fnow);
         createEventInDatabase(fnow,OUTcalendar,viewValue,'',status);
     }
 
