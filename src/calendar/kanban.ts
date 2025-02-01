@@ -89,11 +89,12 @@ const CustomViewConfig = {
 
         const html = `
             <div class="kanban-container">
-                <div class="kanban-board">
+            <div class="kanban-board">
             ${columns.todo.length ? createColumn('未完成', columns.todo, 'todo') : ''}
             ${columns.inProgress.length ? createColumn('进行中', columns.inProgress, 'inProgress') : ''}
             ${columns.done.length ? createColumn('完成', columns.done, 'done') : ''}
-                </div>
+            ${!columns.todo.length && !columns.inProgress.length && !columns.done.length ? '<div class="kanban-column-empty">无事件</div>' : ''}
+            </div>
             </div>
         `;
         return { html: html }
