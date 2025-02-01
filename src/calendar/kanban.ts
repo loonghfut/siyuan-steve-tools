@@ -4,6 +4,7 @@ import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
 import { OUTcalendar } from './calendar';
 import { showMessage } from 'siyuan';
+import { settingdata } from '..';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
@@ -117,7 +118,7 @@ const CustomViewConfig = {
     },
     datesSet: function (info) {
         // 重新加载事件数据
-        console.log('datesSet:::::::::::AAAAAAAA:::::::::::::');
+        // console.log('datesSet:::::::::::AAAAAAAA:::::::::::::');
         initializeSortableKanban();
     },
 
@@ -153,6 +154,10 @@ export function initializeSortableKanban() {
                 let clickTimeout: NodeJS.Timeout;
                 clicks++;
                 if (!isDragging && clicks === 1) {
+                    if (settingdata["cal-create-way"] === "1") {
+                        await myK.runclick(evt);
+                        return;
+                    }
                     clickTimeout = setTimeout(async () => {
                         clicks = 0;
                     }, 400);
@@ -162,7 +167,7 @@ export function initializeSortableKanban() {
                     // console.log('onunChoose', evt);
                     await myK.runclick(evt);
                 }
-                
+
 
             },
             // onChoose: function (evt) {

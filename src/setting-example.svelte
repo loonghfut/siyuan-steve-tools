@@ -84,13 +84,13 @@
         },
         {
             type: "select",
-            title: "创建视图方式",
-            description: "在日历视图中创建视图方式",
+            title: "基本交互方式",
+            description: "在日历视图中的基本交互方式",
             key: "cal-create-way",
             value: settings["cal-create-way"],
             options: {
-                "0": "双击日历创建",
-                "1": "单击日历创建",
+                "0": "双击交互",
+                "1": "单击交互",
             },
         },
         {
@@ -150,7 +150,7 @@
         {
             type: "checkbox",
             title: "事件交互方式",
-            description: "启用后双击事件会自动跳转到块属性页面",
+            description: "启用后和事件交互会自动跳转到块属性页面",
             key: "cal-seemore",
             value: settings["cal-seemore"],
         },

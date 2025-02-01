@@ -20,7 +20,8 @@ import { initializeSortableKanban } from './kanban';
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
-let clicks = 0;
+let clicks1 = 0;
+let clicks2 = 0;
 let viewValue: any;
 let viewValue_zq: any;
 let filterViewId: string;
@@ -60,10 +61,23 @@ export async function run(
         // selectable: true,
         // eventDurationEditable: true,
         // 事件点击处理
-        eventClick: function (info) {
-            // // ToEventNote(info);
-            // steveTools.outlog("事件点击", info);
-            //TODO: 事件点击处理
+        eventClick: async function (info) {
+            // console.log('eventClick', info);
+            if (settingdata["cal-create-way"] === "1") {
+                await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
+                return;
+            }
+            let clickTimeout: NodeJS.Timeout;
+            clicks2++;
+            if (clicks2 === 1) {
+                clickTimeout = setTimeout(() => {
+                    clicks2 = 0;
+                }, 400);
+            } else if (clicks2 === 2) {
+                clearTimeout(clickTimeout);
+                clicks2 = 0;
+               await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
+            }
         },
         select: function (info) {//TODO: 选择处理
             // console.log('select', info);
@@ -78,14 +92,14 @@ export async function run(
                 return;
             }
             let clickTimeout: NodeJS.Timeout;
-            clicks++;
-            if (clicks === 1) {
+            clicks1++;
+            if (clicks1 === 1) {
                 clickTimeout = setTimeout(() => {
-                    clicks = 0;
+                    clicks1 = 0;
                 }, 400);
-            } else if (clicks === 2) {
+            } else if (clicks1 === 2) {
                 clearTimeout(clickTimeout);
-                clicks = 0;
+                clicks1 = 0;
                 steveTools.outlog("创建事件", info);
                 const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
             }

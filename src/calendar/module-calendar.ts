@@ -145,7 +145,7 @@ export class M_calendar {
         window.siyuan.ws.ws.addEventListener('message', async (e) => {
             const msg = JSON.parse(e.data);
             if (msg.cmd === "transactions") {
-                console.log(msg);
+                // console.log(msg);
                 if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
                     // console.log("updateAttrs");
                     this.avButton();

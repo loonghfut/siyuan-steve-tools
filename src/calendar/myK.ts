@@ -173,7 +173,7 @@ export async function runclick(evt) {
     try {
         const eventId = evt.item.dataset.id;
         const eventData = await findEventByPublicId(allKBEvents, eventId);
-        showEvent(eventData.extendedProps.blockId, eventData.extendedProps.rootid);
+        await showEvent(eventData.extendedProps.blockId, eventData.extendedProps.rootid);
         if (!eventData) {
             throw new Error("Event not found");
         }
