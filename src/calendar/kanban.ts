@@ -308,7 +308,7 @@ export const refreshKanban = async () => {
         return;
     }
     // 刷新日历
-    showMessage('请稍等', -1, "info", "kanban-update");
+    showMessage('[ST]请稍等', -1, "info", "kanban-update");
     await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
 
     

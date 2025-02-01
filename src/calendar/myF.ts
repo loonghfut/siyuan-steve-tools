@@ -7,6 +7,7 @@ import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
+import { refreshKanban } from './kanban';
 
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
@@ -341,7 +342,7 @@ export async function showEvent(blockID, rootId) {
         width: '500px',
         height: 'auto',
         destroyCallback: async () => {
-
+            await refreshKanban();
         },
         hideCloseIcon: true,
         // disableClose: true,
@@ -357,13 +358,13 @@ export async function showEvent(blockID, rootId) {
         mode: "wysiwyg",
         // action: ["cb-get-focus"],
         after: () => {
-            console.log(panel.protyle);
+            // console.log(panel.protyle);
             const parentElement = document.getElementById('eventPanel-show');
             // console.log("parentElement", parentElement);
             if (parentElement) {
                 const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
                 // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                console.log("找到目标元素:", targetElement);
+                // console.log("找到目标元素:", targetElement);
                 if (targetElement) {
                     (targetElement as HTMLElement).click();
                 }
