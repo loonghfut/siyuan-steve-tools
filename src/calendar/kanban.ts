@@ -92,7 +92,7 @@ const CustomViewConfig = {
         const createColumn = (title: string, events: KBCalendarEvent[], category) => `
             <div class="kanban-column-${title}">
                 <div class="kanban-column-header">
-                    <h2>${title}</h2><button class="kanban-add-button">+</button>
+                    <h2>${title}</h2><button class="kanban-add-button" status="${title}" >+</button>
                 </div>
                 <div class="kanban-cards" data-category="${category}">
                     ${events.map(createCard).join('')}
@@ -147,18 +147,22 @@ export function initializeSortableKanban() {
     if (addButton) {
         console.log(addButton);
         addButton.forEach(button => {
+            const status = button.getAttribute('status'); // 获取status属性值
+            console.log('Button status:', status);
+            
             const newButton = button.cloneNode(true);
+            
             button.parentNode.replaceChild(newButton, button);
-            newButton.addEventListener('click', handleAddButtonClick);
+            newButton.addEventListener('click', () => handleAddButtonClick(status));
         });
     }
 
 
-    function handleAddButtonClick() {
+    function handleAddButtonClick(status: string) {
         console.log('添加事件按钮被点击');
         const now = new Date();
         const fnow =myK.formatDateTime(now);
-        createEventInDatabase(fnow,OUTcalendar,viewValue);
+        createEventInDatabase(fnow,OUTcalendar,viewValue,'',status);
     }
 
 

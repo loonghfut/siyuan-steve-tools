@@ -332,7 +332,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
         return;
     }
     const dialog = new sy.Dialog({
-        title: null,
+        title: "事件详情",
         content: '<div id="eventPanel-show"></div>',
         width: '500px',
         height: 'auto',
@@ -381,9 +381,11 @@ export async function createEventInDatabase(
     // databaseId?: string,
     calendar: Calendar,
     viewValue,
-    db_id?: string
+    db_id?: string,
+    status="",
 ) {
     let isok = false;
+    status = status || "未完成";
     let to_db_id = db_id || settingdata["cal-db-id"];
     steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
     function formatDateWithTime(dateStr: string, hour: number = 8): string {
@@ -493,7 +495,8 @@ export async function createEventInDatabase(
                 dateStr=newdateStr;
             }
             const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
-            const selectdata: ISelectOption[] = [{ content: "未完成" }];
+            const selectdata: ISelectOption[] = [{ content: status }];
+            console.log("selectdata",selectdata);
             await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
