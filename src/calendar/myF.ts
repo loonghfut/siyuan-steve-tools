@@ -325,7 +325,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 //查看事件
 export async function showEvent(blockID, rootId, isSeeMore = false) {
     //// 判断是否存在此块
-    const seemore =settingdata["cal-seemore"]  || isSeeMore;
+    const seemore = settingdata["cal-seemore"] || isSeeMore;
     const block = await api.getBlockByID(blockID);
     if (!block) {
         sy.showMessage('未找到此块');
@@ -386,6 +386,16 @@ export async function createEventInDatabase(
     let isok = false;
     let to_db_id = db_id || settingdata["cal-db-id"];
     steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
+    function formatDateWithTime(dateStr: string, hour: number = 8): string {
+        // 如果日期字符串已经包含时间部分，直接返回原值
+        if (dateStr.includes('T')) {
+            return dateStr;
+        }
+        // 确保日期格式为 YYYY-MM-DD
+        const date = dateStr.split('T')[0];
+        // 添加8点
+        return `${date}T${hour.toString().padStart(2, '0')}:00`;
+    }
     // 1. 创建面板HTML
     //// 获取当前日期的日记块ID
     // steveTools.outlog(settingdata);
@@ -403,15 +413,22 @@ export async function createEventInDatabase(
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
     // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
-    steveTools.outlog("dateStr:::", dateStr, "databaseId:::", to_db_id);
+    // console.log("dateStr:::", dateStr, "databaseId:::", to_db_id);
     const dialog = new sy.Dialog({
-        title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <span>添加事件(按Ctrl+Enter提交)</span>
-            <div>
-                <button class="b3-button b3-button--text" style="padding: 4px 8px; font-size: 12px;">提交</button>
-                <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
-            </div>
-           </div>`,
+        title: `   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span>添加事件</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <div style="display: flex; align-items: center;">
+                                    <input type="datetime-local" 
+                                    id="st-start-time"
+                                    class="b3-text-field" 
+                                    style="padding: 4px; font-size: 12px; width: 130px;"
+                                    value="${formatDateWithTime(dateStr)}"/>
+                                </div>
+                                <button class="b3-button b3-button--text" style="padding: 4px 8px; font-size: 12px;">提交</button>
+                                <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
+                            </div>
+                           </div>`,
         content: '<div id="eventPanel"></div>',
         width: '500px',
         height: 'auto',
@@ -470,6 +487,11 @@ export async function createEventInDatabase(
             // console.log("viewValue:::", viewValue);
             // console.log("timeKeyID:::", timeKeyID);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
+            //// 新：用户自定义改动开始时间
+            const newdateStr=(document.getElementById('st-start-time') as HTMLInputElement).value
+            if(newdateStr){
+                dateStr=newdateStr;
+            }
             const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: "未完成" }];
             await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");

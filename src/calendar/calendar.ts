@@ -22,7 +22,7 @@ export let isFilter = true;
 export let OUTcalendar: Calendar;
 let clicks1 = 0;
 let clicks2 = 0;
-let viewValue: any;
+export let viewValue: any;
 let viewValue_zq: any;
 let filterViewId: string;
 let av_ids: string[] = [];

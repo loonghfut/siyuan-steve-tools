@@ -184,3 +184,7 @@ export async function runclick(evt) {
     }
 
 }
+
+export function formatDateTime(date: Date) {
+    return date.toISOString().slice(0, 16); // 格式化为 YYYY-MM-DDTHH:mm
+}

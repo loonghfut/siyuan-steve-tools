@@ -2,15 +2,16 @@ import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
-import { OUTcalendar } from './calendar';
+import { OUTcalendar,viewValue } from './calendar';
 import { showMessage, Protyle } from 'siyuan';
 import { settingdata } from '..';
+import { createEventInDatabase } from './myF';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
 let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
-let id = '';//渲染protyle用
+// let id = '';//渲染protyle用
 
 const REFRESH_DELAY = 500;
 const INIT_DELAY = 1000;
@@ -98,7 +99,7 @@ const CustomViewConfig = {
                 </div>
             </div>
         `;
-        id = new Date().getTime().toString();
+
         const html = `
             <div class="kanban-container">
             <div class="kanban-board">
@@ -154,6 +155,9 @@ export function initializeSortableKanban() {
 
     function handleAddButtonClick() {
         console.log('添加事件按钮被点击');
+        const now = new Date();
+        const fnow =myK.formatDateTime(now);
+        createEventInDatabase(fnow,OUTcalendar,viewValue);
     }
 
 
@@ -406,3 +410,5 @@ async function handleStatusChange(Fr_event, parentEl) {
     await myK.run_changestatus(Fr_event, selectdata);
     logDebug(`${Fr_event.title} 状态更改为 ${newcategory}`);
 }
+
+
