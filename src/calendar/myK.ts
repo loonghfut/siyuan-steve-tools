@@ -1,13 +1,14 @@
 import { showMessage } from "siyuan";
 import { NestedKBCalendarEvent } from "./interface";
 import * as api from "@/api";
-
+import { allKBEvents } from "./kanban";
+import { showEvent } from "./myF";
 //更新子级
 ////添加子级
 export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
     // console.log("run_getsubevents", "F:", Fr_event, "T:", To_event);
-    if(!To_event.extendedProps.subid){
-        showMessage("目标数据库未设置关联自身的列",-1,"error");
+    if (!To_event.extendedProps.subid) {
+        showMessage("目标数据库未设置关联自身的列", -1, "error");
         return false;
     }
     await api.updateAttrViewCell_pro(
@@ -30,8 +31,8 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
 }
 ////删除子级
 export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
-    if(!To_event.extendedProps.subid){
-        showMessage("目标数据库未设置关联自身的列",-1,"error");
+    if (!To_event.extendedProps.subid) {
+        showMessage("目标数据库未设置关联自身的列", -1, "error");
         return false;
     }
     await api.updateAttrViewCell_pro(
@@ -53,8 +54,8 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
 }
 
 export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatus) {
-    if(!Fr_event.extendedProps.statusid){
-        showMessage("目标数据库未设置状态列",-1,"error");
+    if (!Fr_event.extendedProps.statusid) {
+        showMessage("目标数据库未设置状态列", -1, "error");
         return false;
     }
     await api.updateAttrViewCell_pro(
@@ -97,11 +98,11 @@ export function sortEvents(events: NestedKBCalendarEvent[]): NestedKBCalendarEve
         // 先按优先级排序
         const priorityA = PRIORITY_MAP[a.extendedProps.priority] || 0;
         const priorityB = PRIORITY_MAP[b.extendedProps.priority] || 0;
-        
+
         if (priorityA !== priorityB) {
             return priorityB - priorityA; // 高优先级在前
         }
-        
+
         // 优先级相同则按创建时间排序
         const timeA = new Date(a.extendedProps.Kstart).getTime();
         const timeB = new Date(b.extendedProps.Kstart).getTime();
@@ -123,7 +124,7 @@ export function getDaysFromNow(time: string | Date, status: string): string {
     const now = new Date();
     const diffTime = targetDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays > 0) {
         return `<span style="color: green">还有${diffDays}天</span>`;
     } else if (diffDays < 0) {
@@ -167,7 +168,19 @@ export function transformEventData_fr_filter(events: any[]): any[] {
     });
 }
 
-export function runclick(){
-    console.log("click");
-    showMessage("click");
+export async function runclick(evt) {
+    // console.log("click", evt);
+    try {
+        const eventId = evt.item.dataset.id;
+        const eventData = await findEventByPublicId(allKBEvents, eventId);
+        showEvent(eventData.extendedProps.blockId, eventData.extendedProps.rootid);
+        if (!eventData) {
+            throw new Error("Event not found");
+        }
+        console.log('data', eventData);
+    } catch (error) {
+        console.error("Error processing event click:", error);
+        showMessage("处理事件点击时出错: " + error.message, -1, "error");
+    }
+
 }

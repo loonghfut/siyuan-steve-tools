@@ -11,6 +11,7 @@ export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 export let linkToCalendar = '';
 import * as myF from "./myF";
+import { refreshKanban } from "./kanban";
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
@@ -139,6 +140,7 @@ export class M_calendar {
             }, 600000);
         }
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
+        //实现看板实时更新
         window.siyuan.ws.ws.addEventListener('message', async (e) => {
             const msg = JSON.parse(e.data);
             if (msg.cmd === "transactions") {
@@ -146,6 +148,9 @@ export class M_calendar {
                 if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
                     // console.log("updateAttrs");
                     this.avButton();
+                    if(msg.data[0].doOperations[0].action === "updateAttrViewCell"){
+                        await refreshKanban();
+                    }
                 }
             }
         });

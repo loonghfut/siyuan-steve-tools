@@ -321,8 +321,57 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 
     return events;
 }
+//查看事件
+export async function showEvent(blockID, rootId) {
+    //// 判断是否存在此块
+    const block = await api.getBlockByID(blockID);
+    if (!block) {
+        sy.showMessage('未找到此块');
+        return;
+    }
+    const dialog = new sy.Dialog({
+        title: `<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span>修改事件</span>
+            <div>
+                <button class="b3-button b3-button--text" style="padding: 4px 8px; font-size: 12px;">提交</button>
+                <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
+            </div>
+           </div>`,
+        content: '<div id="eventPanel-show"></div>',
+        width: '500px',
+        height: 'auto',
+        destroyCallback: async () => {
 
+        },
+        hideCloseIcon: true,
+        // disableClose: true,
+    });
+    const eventPanel = document.getElementById('eventPanel-show');
+    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+        blockId: blockID,
+        rootId: blockID,
+        render: {
+            breadcrumb: false,
+        },
+        action: ["cb-get-focus"],
+        mode: "wysiwyg",
+        // action: ["cb-get-focus"],
+        after: () => {
+            console.log(panel.protyle);
+            const parentElement = document.getElementById('eventPanel-show');
+            // console.log("parentElement", parentElement);
+            if (parentElement) {
+                const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
+                // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
+                console.log("找到目标元素:", targetElement);
+                if (targetElement) {
+                    (targetElement as HTMLElement).click();
+                }
+            }
+        }
 
+    });
+}
 
 // 添加数据到思源数据库
 //// 调用思源API创建块，块的内容为用户添加事件的面板

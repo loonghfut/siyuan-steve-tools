@@ -5,7 +5,7 @@ import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interfa
 import { OUTcalendar } from './calendar';
 import { showMessage } from 'siyuan';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
-let allKBEvents: NestedKBCalendarEvent[] = [];
+export let allKBEvents: NestedKBCalendarEvent[] = [];
 
 let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
@@ -14,7 +14,7 @@ const REFRESH_DELAY = 500;
 const INIT_DELAY = 1000;
 const CATEGORY_MAP = {
     'todo': '未完成',
-    'inProgress': '进行中', 
+    'inProgress': '进行中',
     'done': '完成'
 } as const;
 
@@ -43,7 +43,7 @@ const CustomViewConfig = {
         ///
         // console.log("处理前数据", dataArray);
         dataArray = convertEventsToNested(dataArray);
-        
+
         // console.log("处理后数据allKBEvents", allKBEvents);
         // console.log("处理后数据", dataArray);
         const columns = {
@@ -149,7 +149,7 @@ export function initializeSortableKanban() {
                 isDragging = true; // 开始拖拽时设置标志
                 // console.log('onStart', evt);
             },
-            onUnchoose: function (evt) {
+            onUnchoose: async function (evt) {
                 let clickTimeout: NodeJS.Timeout;
                 clicks++;
                 if (clicks === 1) {
@@ -160,7 +160,7 @@ export function initializeSortableKanban() {
                     clearTimeout(clickTimeout);
                     clicks = 0;
                     // console.log('onunChoose', evt);
-                    myK.runclick();
+                    await myK.runclick(evt);
                 }
 
             },
@@ -173,28 +173,28 @@ export function initializeSortableKanban() {
                     const itemEl = evt.item;
                     const parentEl = evt.to;
                     const itemId = itemEl.getAttribute('data-id');
-            
+
                     // 检查是否需要处理
                     if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
                         logDebug('相同位置，无需处理');
                         return;
                     }
-            
+
                     const oldParentId = evt.from.closest('.kanban-card')?.getAttribute('data-id') || null;
                     const newParentId = parentEl.closest('.kanban-card')?.getAttribute('data-id') || null;
-            
+
                     // 处理自身拖拽到自身的情况
                     if (itemId === newParentId) {
                         logDebug('拖拽到自身，移除克隆元素');
                         evt.item.remove();
                         return;
                     }
-            
+
                     const Fr_event = await myK.findEventByPublicId(allKBEvents, itemId);
                     if (!Fr_event) {
                         throw new Error(`未找到事件: ${itemId}`);
                     }
-            
+
                     // 处理不同拖拽场景
                     if (oldParentId && !newParentId) {
                         await handleMoveToTopLevel(Fr_event, oldParentId, parentEl);
@@ -203,9 +203,9 @@ export function initializeSortableKanban() {
                     } else {
                         await handleStatusChange(Fr_event, parentEl);
                     }
-            
+
                     await refreshKanban();
-            
+
                 } catch (error) {
                     console.error('[Kanban Error]', error);
                     showMessage(`操作失败: ${error.message}`, 3000, "error");
@@ -302,12 +302,16 @@ export function destroyAllSortables() {
     sortableInstances = [];
 }
 
-const refreshKanban = async () => {
-    showMessage('请稍等', -1, "info", "kanban-update");
-    
-    // 刷新日历
-    await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
+export const refreshKanban = async () => {
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
+    if (!thisCalendars.length) {
+        return;
+    }
+    // 刷新日历
+    showMessage('请稍等', -1, "info", "kanban-update");
+    await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
+
+    
     thisCalendars.forEach(calendar => calendar.refetchEvents());
     
     // 重新初始化拖拽
@@ -326,11 +330,11 @@ const logDebug = (message: string, ...args: any[]) => {
 async function handleMoveToTopLevel(Fr_event, oldParentId, parentEl) {
     const Old_event = await myK.findEventByPublicId(allKBEvents, oldParentId);
     const is_run_ok = await myK.run_delsubevents(Fr_event, Old_event);
-    
+
     if (!is_run_ok) {
         logDebug('取消关联失败');
     }
-    
+
     const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
     logDebug(`${Fr_event.title} 从 ${Old_event.title} 移动到顶层 ${newcategory}`);
 }
@@ -338,7 +342,7 @@ async function handleMoveToTopLevel(Fr_event, oldParentId, parentEl) {
 // 处理移动到子层级
 async function handleMoveToSubLevel(Fr_event, newParentId, evt) {
     const To_event = await myK.findEventByPublicId(allKBEvents, newParentId);
-    
+
     if (To_event.extendedProps.rootid !== Fr_event.extendedProps.rootid) {
         showMessage("无法跨数据库关联", 3000, "error");
         evt.to.remove();
@@ -360,7 +364,7 @@ async function handleMoveToSubLevel(Fr_event, newParentId, evt) {
 async function handleStatusChange(Fr_event, parentEl) {
     const newcategory = parentEl.closest('.kanban-cards')?.getAttribute('data-category') || null;
     const newcategory_cn = CATEGORY_MAP[newcategory];
-    
+
     if (!newcategory_cn) {
         throw new Error(`未知状态: ${newcategory}`);
     }
