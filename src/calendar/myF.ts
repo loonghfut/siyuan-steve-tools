@@ -331,50 +331,62 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
         sy.showMessage('未找到此块');
         return;
     }
-    const dialog = new sy.Dialog({
-        title: `事件详情`,
-        content: '<div id="eventPanel-show"></div>',
-        width: '500px',
-        height: 'auto',
-        destroyCallback: async (option) => {
-            // console.log("ishandle",option?.ishandle)
-            if(option?.ishandle){
-            }else{
-               await refreshKanban(); 
-            }
-            
-        },
-        hideCloseIcon: true,
-        // disableClose: true,
-    });
-    const eventPanel = document.getElementById('eventPanel-show');
-    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
-        blockId: blockID,
-        rootId: blockID,
-        render: {
-            breadcrumb: false,
-        },
-        action: ["cb-get-focus"],
-        mode: "wysiwyg",
-        // action: ["cb-get-focus"],
-        after: () => {
-            if (seemore) {
-                // console.log(panel.protyle);
-                const parentElement = document.getElementById('eventPanel-show');
-                // console.log("parentElement", parentElement);
-                if (parentElement) {
-                    const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                    // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                    // console.log("找到目标元素:", targetElement);
-                    if (targetElement) {
-                        (targetElement as HTMLElement).click();
-                        dialog.destroy({ishandle:"1"});
+    if (!seemore) {
+        const tab = await sy.openTab({
+            app: window.siyuan.ws.app,
+            doc: {
+                id: blockID,
+                action: ["cb-get-hl"],
+            },
+            // position: "right",
+            keepCursor: false
+        });
+
+    } else {
+        const dialog = new sy.Dialog({
+            title: `事件详情`,
+            content: '<div id="eventPanel-show"></div>',
+            width: '500px',
+            height: 'auto',
+            destroyCallback: async (option) => {
+                // console.log("ishandle",option?.ishandle)
+                if (option?.ishandle) {
+                } else {
+                    await refreshKanban();
+                }
+            },
+            hideCloseIcon: true,
+            // disableClose: true,
+        });
+        const eventPanel = document.getElementById('eventPanel-show');
+        const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+            blockId: blockID,
+            rootId: blockID,
+            render: {
+                breadcrumb: false,
+            },
+            action: ["cb-get-focus",],
+            mode: "wysiwyg",
+            // action: ["cb-get-focus"],
+            after: () => {
+                if (seemore) {
+                    // console.log(panel.protyle);
+                    const parentElement = document.getElementById('eventPanel-show');
+                    // console.log("parentElement", parentElement);
+                    if (parentElement) {
+                        const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
+                        // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
+                        // console.log("找到目标元素:", targetElement);
+                        if (targetElement) {
+                            (targetElement as HTMLElement).click();
+                            dialog.destroy({ ishandle: "1" });
+                        }
                     }
                 }
             }
-        }
 
-    });
+        });
+    }
 }
 
 // 添加数据到思源数据库
@@ -388,7 +400,7 @@ export async function createEventInDatabase(
     calendar: Calendar,
     viewValue,
     db_id?: string,
-    status="",
+    status = "",
 ) {
     let isok = false;
     status = status || "未完成";
@@ -496,13 +508,13 @@ export async function createEventInDatabase(
             // console.log("timeKeyID:::", timeKeyID);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
             //// 新：用户自定义改动开始时间
-            const newdateStr=(document.getElementById('st-start-time') as HTMLInputElement).value
-            if(newdateStr){
-                dateStr=newdateStr;
+            const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
+            if (newdateStr) {
+                dateStr = newdateStr;
             }
             const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: status }];
-            console.log("selectdata",selectdata);
+            console.log("selectdata", selectdata);
             await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {

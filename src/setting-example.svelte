@@ -150,7 +150,7 @@
         {
             type: "checkbox",
             title: "事件交互方式",
-            description: "启用后和事件交互会自动跳转到块属性页面",
+            description: "启用后和事件交互会自动跳转到块属性页面，启用前则跳转到目标块",
             key: "cal-seemore",
             value: settings["cal-seemore"],
         },
