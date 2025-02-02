@@ -336,8 +336,13 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
         content: '<div id="eventPanel-show"></div>',
         width: '500px',
         height: 'auto',
-        destroyCallback: async () => {
-            await refreshKanban();
+        destroyCallback: async (option) => {
+            // console.log("ishandle",option?.ishandle)
+            if(option?.ishandle){
+            }else{
+               await refreshKanban(); 
+            }
+            
         },
         hideCloseIcon: true,
         // disableClose: true,
@@ -363,6 +368,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
                     // console.log("找到目标元素:", targetElement);
                     if (targetElement) {
                         (targetElement as HTMLElement).click();
+                        dialog.destroy({ishandle:"1"});
                     }
                 }
             }

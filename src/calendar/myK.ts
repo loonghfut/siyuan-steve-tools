@@ -177,7 +177,7 @@ export async function runclick(evt) {
         if (!eventData) {
             throw new Error("Event not found");
         }
-        console.log('data', eventData);
+        // console.log('data', eventData);
     } catch (error) {
         console.error("Error processing event click:", error);
         showMessage("处理事件点击时出错: " + error.message, -1, "error");

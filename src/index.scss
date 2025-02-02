@@ -813,4 +813,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .st-ref{
     cursor: pointer;
+    &:hover {
+        text-decoration: underline ;
+    }
 }

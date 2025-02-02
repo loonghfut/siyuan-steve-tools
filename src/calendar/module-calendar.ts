@@ -32,7 +32,6 @@ export class M_calendar {
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
-        steveTools.outlog(calendarpath);
         this.plugin.addIcons(`
     <symbol id="iconSTcal" viewBox="0 0 500 500">
        ${ic.steveTools_cal}
