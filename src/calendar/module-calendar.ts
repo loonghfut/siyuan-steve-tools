@@ -83,7 +83,7 @@ export class M_calendar {
                 title: "侧边看板",
             },
             data: null,
-            type: "cal-dock",
+            type: "cal-dock-kanban",
             resize: async () => {
                 D_calendar.updateSize();
             },
@@ -98,6 +98,31 @@ export class M_calendar {
                 }, 100);
             },
         });
+
+        let D_calendar_day: any;
+        this.plugin.addDock({
+            config: {
+                position: "RightTop",
+                size: { width: 250, height: 0 },
+                icon: "iconSTcalKanban",
+                title: "今日事件",
+            },
+            data: null,
+            type: "cal-dock-day",
+            resize: async () => {
+                D_calendar_day.updateSize();
+            },
+            init: async (dock) => {
+                const id = new Date().getTime().toString();
+                dock.element.innerHTML = `
+                <div id="calendar-${id}" class="cal-dock-container" ></div>
+                `;
+                setTimeout(async () => {
+                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'viewFilter,prev,next', '');
+                }, 100);
+            },
+        });
+
 
         if (this_settingdata["cal-auto-update"] == true) {
             steveTools.outlog("自动更新日历文件");

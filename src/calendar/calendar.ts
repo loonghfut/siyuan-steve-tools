@@ -236,6 +236,7 @@ export async function run(
                             // 更新按钮文本
                             button.textContent = view.text;
                             refreshKanban();
+                            calendar.refetchEvents();
 
                         };
                         menu.appendChild(item);

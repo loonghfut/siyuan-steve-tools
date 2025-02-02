@@ -355,7 +355,7 @@ export function destroyAllSortables() {
     sortableInstances = [];
 }
 
-export const refreshKanban = async () => {
+export const refreshKanban = async () => {//TODO兼容原刷新
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
     // console.log('刷新日历', thisCalendars);
     if (!thisCalendars.length) {

@@ -55,13 +55,14 @@ $priority-color-high-background: var(--b3-card-error-background);
         }
 
         .fc-event-main {
-            padding: 4px 6px;
+            // padding: 4px 6px;
 
             .fc-event-main-frame {
                 .fc-event-time {
-                    font-weight: 500;
-                    font-size: 0.9em;
-                    margin-bottom: 4px;
+                    display: none;
+                    // font-weight: 500;
+                    // font-size: 0.9em;
+                    // margin-bottom: 4px;
                 }
 
                 .fc-event-title-container {
@@ -717,9 +718,11 @@ $priority-color-high-background: var(--b3-card-error-background);
     .fc-button-group {
         font-size: 1em !important;
     }
+
     .kanban-board {
         max-height: 88.7vh;
     }
+
     // [id^=calendar-] {
     //     height: 93vh;
     // }
@@ -811,9 +814,29 @@ $priority-color-high-background: var(--b3-card-error-background);
     }
 }
 
-.st-ref{
+.st-ref {
     cursor: pointer;
+
     &:hover {
-        text-decoration: underline ;
+        text-decoration: underline;
+    }
+}
+
+.sy__siyuan-steve-toolscal-dock-day {
+    .fc-timeGridDay-view {
+        height: 86.6vh;
+    }
+
+    .fc .fc-timegrid-slot {
+        border-bottom: 0px;
+        height: calc((79vh) / 24);
+    }
+
+    .fc .fc-view-harness {
+        height: 100%;
+    }
+
+    [id^=calendar-] {
+        height: 93vh;
     }
 }
