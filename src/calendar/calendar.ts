@@ -179,8 +179,8 @@ export async function run(
         views: {
             timeGridThreeDays: {
                 type: 'timeGrid',
-                duration: { days: 14 },
-                buttonText: '14日'
+                duration: { weeks: 2 },
+                buttonText: '两周'
             },
             kanban: {
                 type: 'kanban',
@@ -193,12 +193,12 @@ export async function run(
             yearkanban: {
                 type: 'kanban',
                 buttonText: '年板',
-                duration: { months: 12 },
+                duration: { years: 1 },
             },
             weekkanban: {
                 type: 'kanban',
                 buttonText: '周板',
-                duration: { days: 7 },
+                duration: { weeks: 1 },
             },
 
         },
