@@ -104,8 +104,8 @@ export class M_calendar {
             config: {
                 position: "RightTop",
                 size: { width: 250, height: 0 },
-                icon: "iconSTcalKanban",
-                title: "今日事件",
+                icon: "iconCalendar",
+                title: "今日日程",
             },
             data: null,
             type: "cal-dock-day",
