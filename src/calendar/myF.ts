@@ -332,7 +332,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
         return;
     }
     const dialog = new sy.Dialog({
-        title: "事件详情",
+        title: `事件详情`,
         content: '<div id="eventPanel-show"></div>',
         width: '500px',
         height: 'auto',

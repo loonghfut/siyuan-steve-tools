@@ -70,7 +70,7 @@ const CustomViewConfig = {
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
-                        <h3>${event.title}</h3>
+                        <h3><span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span></h3>
                         <div class="kanban-card-meta">
                             <span class="kanban-nowToEndTime">${nowToEndTime}</span>
                             <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
