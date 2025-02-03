@@ -1,7 +1,7 @@
 STEVETOOLS
 ==========
 This is a collection of personal tools. While I use it myself, I hope to share it and help others with relevant needs. 
-(Note: Because it is a self-use tool plug-in, there may be some imperfections and even data loss!! (Because you use the API related to Siyuan Data Operation), please test it yourself and use it if there is no problem. At the same time, this plug-in is completely open source)   
+(Note: Because it is a self-use tool plug-in, there may be some imperfections and even data loss!! (Because it use the API related to Siyuan Data Operation), please test it yourself and use it if there is no problem. At the same time, this plug-in is completely open source)   
  Do not use if you mind.
 ### If you find a BUG or have good suggestions, you are welcome to mention issue or pr.
 #### Current tools
@@ -12,7 +12,7 @@ After the win side s3 is synchronized, the docker side senses the s3 synchroniza
 3. ai webpage sidebar:  
 Some ai web pages are embedded for easy use.
 #### Update Log
-See the code [Submission Record](https://github.com/loonghfut/siyuan-steve-tools/commits/main/)
+See the code [Submission Record](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
 #### Thanks:
 - [wilsons](https://ld246.com/member/wilsons): Guidelines for developing the `ics function of generating calendar files`
 - [Frostime](https://ld246.com/member/Frostime): Provides plug-in development templates
