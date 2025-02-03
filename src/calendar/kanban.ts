@@ -362,7 +362,8 @@ export const refreshKanban = async () => {//TODO兼容原刷新
         return;
     }
     // 刷新日历
-    showMessage('[ST]请稍等', -1, "info", "kanban-update");
+    // showMessage('[ST]请稍等', -1, "info", "kanban-update");
+    console.log('ST刷新日历');
     await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
 
 
@@ -371,7 +372,7 @@ export const refreshKanban = async () => {//TODO兼容原刷新
     // 重新初始化拖拽
     await new Promise(resolve => setTimeout(resolve, INIT_DELAY - REFRESH_DELAY));
     initializeSortableKanban();
-    showMessage('', 1, "info", "kanban-update");
+    // showMessage('', 1, "info", "kanban-update");
 };
 
 const logDebug = (message: string, ...args: any[]) => {
