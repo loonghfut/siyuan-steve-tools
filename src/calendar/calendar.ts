@@ -25,7 +25,7 @@ export let viewValue: any;
 let viewValue_zq: any;
 export let filterViewId: string;
 export let av_ids: string[] = [];
-let viewName = "全部视图";
+export let viewName = "全部视图";
 
 
 
@@ -76,7 +76,7 @@ export async function run(
             } else if (clicks2 === 2) {
                 clearTimeout(clickTimeout);
                 clicks2 = 0;
-               await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
+                await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
             }
         },
         select: function (info) {//TODO: 选择处理
@@ -105,27 +105,27 @@ export async function run(
             }
         },
         // 农历显示
-        dayCellDidMount: function(arg) {
+        dayCellDidMount: function (arg) {
             try {
                 // 获取日期
                 const date = arg.date;
                 const year = date.getFullYear();
                 const month = date.getMonth() + 1;
                 const day = date.getDate();
-                
+
                 // 调试输出
                 // console.log('Solar date:', year, month, day);
-                
+
                 // 转换为农历
                 const lunar = solarLunar.solar2lunar(year, month, day);
                 // console.log('Lunar result:', lunar);
-                
+
                 // 添加空值检查
                 if (!lunar) {
                     console.error('农历转换失败');
                     return;
                 }
-                
+
                 // 创建农历显示元素
                 const lunarEl = document.createElement('a');
                 lunarEl.className = 'fc-daygrid-day-lunar fc-daygrid-day-number';
@@ -133,18 +133,18 @@ export async function run(
                 lunarEl.style.color = '#666';
                 // lunarEl.setAttribute('data-navlink', '');
                 lunarEl.tabIndex = 0;
-                
+
                 // 设置农历文本和标题
                 let lunarText = '';
                 if (!lunar.dayCn) {
                     lunarText = '数据异常';
                 } else {
-                    lunarText = lunar.dayCn ;
+                    lunarText = lunar.dayCn;
                     lunarEl.title = `${lunar.yearCn}${lunar.monthCn}${lunar.dayCn}`;
                 }
-                
+
                 lunarEl.innerHTML = lunarText;
-                
+
                 // 将农历元素添加到日期单元格中
                 const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
                 if (numberEl) {
@@ -205,7 +205,7 @@ export async function run(
         },
         customButtons: {
             viewFilter: {
-                text: viewName,
+                text: '',
                 click: async function () {
                     // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
@@ -235,11 +235,11 @@ export async function run(
                             // 更新日历数据
                             menu.remove();
                             // 更新所有按钮文本
-                            const buttons = document.querySelectorAll('.fc-viewFilter-button');
-                            buttons.forEach(btn => btn.textContent = view.text);
+                            // const buttons = document.querySelectorAll('.fc-viewFilter-button');
+                            // buttons.forEach(btn => btn.textContent = view.text);
                             viewName = view.text;
+                            // 刷新日历
                             refreshKanban();
-                            // calendar.refetchEvents();
 
                         };
                         menu.appendChild(item);
@@ -263,13 +263,16 @@ export async function run(
             },
         },
         headerToolbar: {
-            left: cleft ,
-            center: ccenter ,
-            right: cright 
+            left: cleft,
+            center: ccenter,
+            right: cright
         },
 
         // 从思源数据转换事件
         events: async function (info, successCallback, failureCallback) {
+            //刷新视图按钮
+            // const buttons = document.querySelectorAll('.fc-viewFilter-button');
+            // buttons.forEach(btn => btn.textContent = viewName);
             try {
                 steveTools.outlog('Fetching calendar events...::::::::::::::::::::::::::');
                 // 1. 获取引用ID
@@ -311,8 +314,12 @@ export async function run(
         },
 
         eventDidMount: function (info) {
+            //修改按钮文本
+            const buttons = document.querySelectorAll('.fc-viewFilter-button');
+            buttons.forEach(btn => btn.textContent = viewName);
             // 设置样式
             ////完成样式
+
             if (info.event.extendedProps.status === '完成') {
                 // 应用样式到整个事件元素
                 info.el.style.textDecoration = 'line-through';

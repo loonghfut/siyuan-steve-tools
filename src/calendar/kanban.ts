@@ -2,7 +2,7 @@ import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
-import { av_ids, filterViewId, OUTcalendar } from './calendar';
+import { av_ids, filterViewId, OUTcalendar, viewName } from './calendar';
 import { showMessage, Protyle } from 'siyuan';
 import { settingdata } from '..';
 import { createEventInDatabase, getViewId, getViewValue } from './myF';
@@ -358,6 +358,10 @@ export function destroyAllSortables() {
 export const refreshKanban = async () => {//OK兼容原刷新
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
     // console.log('刷新日历', thisCalendars);
+    //视图按钮刷新
+    const buttons = document.querySelectorAll('.fc-viewFilter-button');
+    buttons.forEach(btn => btn.textContent = viewName);
+
     if (!thisCalendars.length) {
         return;
     }
