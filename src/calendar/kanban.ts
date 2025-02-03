@@ -3,7 +3,7 @@ import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
 import { av_ids, filterViewId, OUTcalendar, viewName } from './calendar';
-import { showMessage, Protyle } from 'siyuan';
+import { showMessage } from 'siyuan';
 import { settingdata } from '..';
 import { createEventInDatabase, getViewId, getViewValue } from './myF';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
@@ -13,8 +13,6 @@ export let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
 // let id = '';//渲染protyle用
 
-const REFRESH_DELAY = 500;
-const INIT_DELAY = 1000;
 const CATEGORY_MAP = {
     'todo': '未完成',
     'inProgress': '进行中',
@@ -221,7 +219,7 @@ export function initializeSortableKanban() {
                     const itemId = itemEl.getAttribute('data-id');
 
                     // 检查是否需要处理
-                    console.log('onEnd', evt);
+                    // console.log('onEnd', evt);
                     if (evt.to?.attributes[1]?.nodeValue === evt.from?.attributes[1]?.nodeValue) {
                         if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
                             logDebug('相同位置，无需处理');
@@ -300,15 +298,13 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
     const maxDepth = 10; // 防止过深递归
     const circularRefs = new Set<string>(); // 记录循环引用的事件ID
 
-    // 初始化事件映射
-    events.forEach(event => {
-        eventMap.set(event.extendedProps.blockId, { ...event });
+    // 初始化事件映射，同时包含 allKBEvents 中的事件
+    const allEvents = [...events, ...allKBEvents];
+    allEvents.forEach(event => {
+        if (!eventMap.has(event.extendedProps.blockId)) {
+            eventMap.set(event.extendedProps.blockId, { ...event });
+        }
     });
-
-    // 重置所有事件的循环引用标记
-    // events.forEach(event => {
-    //     event.extendedProps.hasCircularRef = false;
-    // });
 
     // 递归构建嵌套结构
     function buildNested(event: NestedKBCalendarEvent, parentIds: Set<string>, depth: number): NestedKBCalendarEvent | null {
@@ -325,7 +321,12 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
 
         if (event.extendedProps.sub?.ids) {
             event.children = event.extendedProps.sub.ids
-                .map(id => eventMap.get(id))
+                .map(id => {
+                    // 先在 eventMap 中查找，如果找不到则在 allKBEvents 中查找
+                    const nestedEvent = eventMap.get(id) || 
+                        allKBEvents.find(e => e.extendedProps.blockId === id);
+                    return nestedEvent ? { ...nestedEvent } : undefined;
+                })
                 .filter((e): e is NestedKBCalendarEvent => e !== undefined)
                 .map(e => buildNested(e, parentIds, depth + 1))
                 .filter((e): e is NestedKBCalendarEvent => e !== null);
@@ -333,10 +334,6 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
 
         visited.delete(event.extendedProps.blockId);
         parentIds.delete(event.extendedProps.blockId);
-
-        // if (circularRefs.has(event.extendedProps.blockId)) {
-        //     event.extendedProps.hasCircularRef = true;
-        // }
 
         return event;
     }
@@ -379,24 +376,32 @@ export const refreshKanban = async () => {//OK兼容原刷新
         (card as HTMLElement).style.cursor = 'wait'; // 更改鼠标样式表示加载中
     });
 
-    //防止元素未刷新的清况
+    //错误操作提示
     setTimeout(() => {
-        kanbanCards.forEach(card => { 
-            (card as HTMLElement).style.cursor = ''; // 恢复鼠标样式
-        });
+            const cards = document.querySelectorAll('.kanban-card');
+            let hasWaitCursor = false;
+            cards.forEach(card => {
+                if ((card as HTMLElement).style.cursor === 'wait') {
+                    hasWaitCursor = true;
+                }
+            });
+            if (hasWaitCursor) {
+                showMessage('进行了非常规操作，请手动刷新一下视图', -1, "info", "kanban-update");
+            }
     }, 3000);
 
     console.log('ST刷新日历');
-    // 等待刷新
-
-    await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
 
 
-    thisCalendars.forEach(calendar => calendar.refetchEvents());
+    // 重新获取事件
+    await Promise.all(thisCalendars.map(calendar => new Promise(resolve => {
+        calendar.refetchEvents();
+        calendar.on('eventsSet', resolve); // 等待事件加载完成
+    })));
 
     // 重新初始化拖拽
-    await new Promise(resolve => setTimeout(resolve, INIT_DELAY - REFRESH_DELAY));
     initializeSortableKanban();
+
 
     // showMessage('', 1, "info", "kanban-update");
     // 恢复滚动位置
