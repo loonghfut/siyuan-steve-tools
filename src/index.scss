@@ -135,7 +135,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     background-color: $background-color !important;
     border-color: $border-color !important;
     color: $text-color !important;
-    padding: 0.5rem 1rem;
+    padding: 0.1em 0.1em !important; 
     font-size: 0.9rem;
     transition: all 0.2s ease;
 
