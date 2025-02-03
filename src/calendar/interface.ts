@@ -46,3 +46,8 @@ export interface KBCalendarEvent {
         Kstart: any;
     };
 }
+
+export interface ScrollState {
+    top: number;
+    left: number;
+}

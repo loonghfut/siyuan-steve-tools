@@ -1,7 +1,7 @@
 import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
-import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption } from "./interface";
+import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption, ScrollState } from "./interface";
 import { av_ids, filterViewId, OUTcalendar, viewName } from './calendar';
 import { showMessage } from 'siyuan';
 import { settingdata } from '..';
@@ -323,7 +323,7 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
             event.children = event.extendedProps.sub.ids
                 .map(id => {
                     // 先在 eventMap 中查找，如果找不到则在 allKBEvents 中查找
-                    const nestedEvent = eventMap.get(id) || 
+                    const nestedEvent = eventMap.get(id) ||
                         allKBEvents.find(e => e.extendedProps.blockId === id);
                     return nestedEvent ? { ...nestedEvent } : undefined;
                 })
@@ -353,14 +353,27 @@ export function destroyAllSortables() {
 
 export const refreshKanban = async () => {//OK兼容原刷新
 
-    // 记录当前滚动位置
-    // const scrollContainer = OUTcalendar.el.querySelector('.kanban-board');
-    // const scrollTop = scrollContainer?.scrollTop || 0;
-    // const scrollLeft = scrollContainer?.scrollLeft || 0;
-    // console.log('刷新日历', scrollContainer, "sTOP:", scrollTop, "sLEFT:", scrollLeft);
 
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
     // console.log('刷新日历', thisCalendars);
+    // 记录当前滚动位置
+    thisCalendars.forEach(calendar => {
+        try {
+            const scrollContainer = calendar.el.querySelector<HTMLElement>('.kanban-board');
+            if (!scrollContainer) return;
+            
+            const scrollState: ScrollState = {
+                top: scrollContainer.scrollTop,
+                left: scrollContainer.scrollLeft
+            };
+            
+            // 在日历实例上保存滚动状态
+            calendar['_scrollState'] = scrollState;
+        } catch (err) {
+            console.error('保存滚动位置失败:', err);
+        }
+    });
+
     //视图按钮刷新
     const buttons = document.querySelectorAll('.fc-viewFilter-button');
     buttons.forEach(btn => btn.textContent = viewName);
@@ -378,16 +391,16 @@ export const refreshKanban = async () => {//OK兼容原刷新
 
     //错误操作提示
     setTimeout(() => {
-            const cards = document.querySelectorAll('.kanban-card');
-            let hasWaitCursor = false;
-            cards.forEach(card => {
-                if ((card as HTMLElement).style.cursor === 'wait') {
-                    hasWaitCursor = true;
-                }
-            });
-            if (hasWaitCursor) {
-                showMessage('进行了非常规操作，请手动刷新一下视图', -1, "info", "kanban-update");
+        const cards = document.querySelectorAll('.kanban-card');
+        let hasWaitCursor = false;
+        cards.forEach(card => {
+            if ((card as HTMLElement).style.cursor === 'wait') {
+                hasWaitCursor = true;
             }
+        });
+        if (hasWaitCursor) {
+            showMessage('进行了非常规操作，请手动刷新一下一直加载的视图', -1, "info", "kanban-update");
+        }
     }, 3000);
 
     console.log('ST刷新日历');
@@ -405,14 +418,21 @@ export const refreshKanban = async () => {//OK兼容原刷新
 
     // showMessage('', 1, "info", "kanban-update");
     // 恢复滚动位置
-    // const scrollContainer1 = OUTcalendar.el.querySelector('.kanban-board');
-    // if (scrollContainer1) {
-    //     scrollContainer1.scrollTo({
-    //         top: scrollTop,
-    //         left: scrollLeft,
-    //         behavior: 'smooth'  // 添加平滑滚动
-    //     });
-    // }
+    thisCalendars.forEach(calendar => {
+        try {
+            const scrollState = calendar['_scrollState'] as ScrollState;
+            const scrollContainer = calendar.el.querySelector<HTMLElement>('.kanban-board');
+            
+            if (scrollContainer && scrollState) {
+                scrollContainer.scrollTo({
+                    top: scrollState.top,
+                    left: scrollState.left,
+                });
+            }
+        } catch (err) {
+            console.error('恢复滚动位置失败:', err);
+        }
+    });
 
 
 };
