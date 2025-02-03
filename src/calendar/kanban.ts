@@ -375,9 +375,17 @@ export const refreshKanban = async () => {//OK兼容原刷新
     // showMessage('[ST]请稍等', -1, "info", "kanban-update");
     const kanbanCards = document.querySelectorAll('.kanban-card');
     kanbanCards.forEach(card => {
-        card.setAttribute('draggable', 'false');
+        destroyAllSortables();
         (card as HTMLElement).style.cursor = 'wait'; // 更改鼠标样式表示加载中
     });
+
+    //防止元素未刷新的清况
+    setTimeout(() => {
+        kanbanCards.forEach(card => { 
+            (card as HTMLElement).style.cursor = ''; // 恢复鼠标样式
+        });
+    }, 3000);
+
     console.log('ST刷新日历');
     // 等待刷新
 
@@ -389,6 +397,7 @@ export const refreshKanban = async () => {//OK兼容原刷新
     // 重新初始化拖拽
     await new Promise(resolve => setTimeout(resolve, INIT_DELAY - REFRESH_DELAY));
     initializeSortableKanban();
+
     // showMessage('', 1, "info", "kanban-update");
     // 恢复滚动位置
     // const scrollContainer1 = OUTcalendar.el.querySelector('.kanban-board');
