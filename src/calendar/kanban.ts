@@ -223,7 +223,7 @@ export function initializeSortableKanban() {
 
                     // 检查是否需要处理
                     console.log('onEnd', evt);
-                    if (evt.to.attributes[1].nodeValue === evt.from.attributes[1].nodeValue) {
+                    if (evt.to?.attributes[1]?.nodeValue === evt.from?.attributes[1]?.nodeValue) {
                         if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
                             logDebug('相同位置，无需处理');
                             return;
