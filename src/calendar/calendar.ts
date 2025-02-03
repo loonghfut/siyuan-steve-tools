@@ -26,7 +26,7 @@ let viewValue_zq: any;
 export let filterViewId: string;
 export let av_ids: string[] = [];
 export let viewName = "全部视图";
-
+// export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
 
 
 
@@ -396,6 +396,7 @@ export async function run(
     });
     thisCalendars.push(calendar);
     console.log("thisCalendars", thisCalendars);
+    // Calendars_pro.push({Calendar:calendar,id:id});
     OUTcalendar = calendar;
     calendar.render();
     return calendar;

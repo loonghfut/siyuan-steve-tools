@@ -24,7 +24,6 @@ const CATEGORY_MAP = {
 
 const CustomViewConfig = {
     classNames: ['custom-view'],
-
     content: function (props) {
         // 带日期筛选的数据
         // if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
@@ -257,7 +256,7 @@ export function initializeSortableKanban() {
                         await handleStatusChange(Fr_event, parentEl);
                     }
 
-                    await refreshKanban();
+                    // await refreshKanban();//TODO:观察：是否需要刷新
 
                 } catch (error) {
                     console.error('[Kanban Error]', error);
@@ -356,6 +355,13 @@ export function destroyAllSortables() {
 }
 
 export const refreshKanban = async () => {//OK兼容原刷新
+
+    // 记录当前滚动位置
+    // const scrollContainer = OUTcalendar.el.querySelector('.kanban-board');
+    // const scrollTop = scrollContainer?.scrollTop || 0;
+    // const scrollLeft = scrollContainer?.scrollLeft || 0;
+    // console.log('刷新日历', scrollContainer, "sTOP:", scrollTop, "sLEFT:", scrollLeft);
+
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
     // console.log('刷新日历', thisCalendars);
     //视图按钮刷新
@@ -384,6 +390,17 @@ export const refreshKanban = async () => {//OK兼容原刷新
     await new Promise(resolve => setTimeout(resolve, INIT_DELAY - REFRESH_DELAY));
     initializeSortableKanban();
     // showMessage('', 1, "info", "kanban-update");
+    // 恢复滚动位置
+    // const scrollContainer1 = OUTcalendar.el.querySelector('.kanban-board');
+    // if (scrollContainer1) {
+    //     scrollContainer1.scrollTo({
+    //         top: scrollTop,
+    //         left: scrollLeft,
+    //         behavior: 'smooth'  // 添加平滑滚动
+    //     });
+    // }
+
+
 };
 
 const logDebug = (message: string, ...args: any[]) => {
