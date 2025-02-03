@@ -363,7 +363,14 @@ export const refreshKanban = async () => {//TODO兼容原刷新
     }
     // 刷新日历
     // showMessage('[ST]请稍等', -1, "info", "kanban-update");
+    const kanbanCards = document.querySelectorAll('.kanban-card');
+    kanbanCards.forEach(card => {
+        card.setAttribute('draggable', 'false');
+        (card as HTMLElement).style.cursor = 'wait'; // 更改鼠标样式表示加载中
+    });
     console.log('ST刷新日历');
+    // 等待刷新
+
     await new Promise(resolve => setTimeout(resolve, REFRESH_DELAY));
 
 
