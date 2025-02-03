@@ -8,7 +8,7 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import steveTools from "@/index";
-import kanban, { refreshKanban } from './kanban';
+import kanban, { refreshKanban, thisCalendars } from './kanban';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -25,6 +25,7 @@ export let viewValue: any;
 let viewValue_zq: any;
 export let filterViewId: string;
 export let av_ids: string[] = [];
+let viewName = "全部视图";
 
 
 
@@ -204,7 +205,7 @@ export async function run(
         },
         customButtons: {
             viewFilter: {
-                text: '选择视图',
+                text: viewName,
                 click: async function () {
                     // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
@@ -233,10 +234,12 @@ export async function run(
                             filterViewId = view.id;
                             // 更新日历数据
                             menu.remove();
-                            // 更新按钮文本
-                            button.textContent = view.text;
+                            // 更新所有按钮文本
+                            const buttons = document.querySelectorAll('.fc-viewFilter-button');
+                            buttons.forEach(btn => btn.textContent = view.text);
+                            viewName = view.text;
                             refreshKanban();
-                            calendar.refetchEvents();
+                            // calendar.refetchEvents();
 
                         };
                         menu.appendChild(item);
@@ -384,6 +387,8 @@ export async function run(
             });
         },
     });
+    thisCalendars.push(calendar);
+    console.log("thisCalendars", thisCalendars);
     OUTcalendar = calendar;
     calendar.render();
     return calendar;

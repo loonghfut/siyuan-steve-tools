@@ -435,10 +435,10 @@ $priority-color-high-background: var(--b3-card-error-background);
         text-decoration: none;
     }
 
-    // 文本溢出处理
-    white-space: nowrap;
+    // 文本换行处理
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
+    word-wrap: break-word;
 }
 
 .tippy-box {

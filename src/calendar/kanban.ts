@@ -9,7 +9,7 @@ import { createEventInDatabase, getViewId, getViewValue } from './myF';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
-let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
+export let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
 // let id = '';//渲染protyle用
 
@@ -27,9 +27,9 @@ const CustomViewConfig = {
 
     content: function (props) {
         // 带日期筛选的数据
-        if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
-            thisCalendars.push(OUTcalendar);
-        }
+        // if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
+        //     thisCalendars.push(OUTcalendar);
+        // }
         // console.log("OUTcalendar::::::::", thisCalendars);
         // 视图全部数据
         const allEvents = props.eventStore.defs;
@@ -355,7 +355,7 @@ export function destroyAllSortables() {
     sortableInstances = [];
 }
 
-export const refreshKanban = async () => {//TODO兼容原刷新
+export const refreshKanban = async () => {//OK兼容原刷新
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
     // console.log('刷新日历', thisCalendars);
     if (!thisCalendars.length) {
