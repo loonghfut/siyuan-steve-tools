@@ -164,7 +164,7 @@ export function initializeSortableKanban() {
         // console.log('当前时间:', now);
         const fnow = myK.formatDateTime(now);
         // console.log('格式化时间:', fnow);
-        
+
         const viewIDs = await getViewId(av_ids)
         const viewValue = await getViewValue(viewIDs);
         const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
@@ -399,8 +399,11 @@ async function handleMoveToSubLevel(Fr_event, newParentId, evt) {
     const To_event = await myK.findEventByPublicId(allKBEvents, newParentId);
 
     if (To_event.extendedProps.rootid !== Fr_event.extendedProps.rootid) {
-        // showMessage("无法跨数据库关联", 3000, "error");
-        evt.to.remove();
+        showMessage("无法跨数据库关联", 3000, "error");
+        const targetElement = evt.to.querySelector(`.kanban-card[data-id="${Fr_event.extendedProps.blockId}"]`); // 获取要移除的元素
+        if (targetElement) {
+            evt.to.removeChild(targetElement);
+        }
         return false;
     }
 
