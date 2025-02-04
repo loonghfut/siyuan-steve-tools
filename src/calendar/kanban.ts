@@ -132,6 +132,20 @@ const CustomViewConfig = {
     }
 }
 
+export async function handleAddButtonClick(status = "") {
+    console.log('添加事件按钮被点击');
+    const now = new Date()
+    // console.log('当前时间:', now);
+    const fnow = myK.formatDateTime(now);
+    // console.log('格式化时间:', fnow);
+
+    const viewIDs = await getViewId(av_ids)
+    const viewValue = await getViewValue(viewIDs);
+    const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
+    await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status);
+}
+
+
 export function initializeSortableKanban() {
     destroyAllSortables();
     console.log('initializing sortable kanban');
@@ -153,21 +167,6 @@ export function initializeSortableKanban() {
             newButton.addEventListener('click', () => handleAddButtonClick(status));
         });
     }
-
-
-    async function handleAddButtonClick(status: string) {
-        console.log('添加事件按钮被点击');
-        const now = new Date()
-        // console.log('当前时间:', now);
-        const fnow = myK.formatDateTime(now);
-        // console.log('格式化时间:', fnow);
-
-        const viewIDs = await getViewId(av_ids)
-        const viewValue = await getViewValue(viewIDs);
-        const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
-        await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status);
-    }
-
 
 
     const createSortableInstance = (element: HTMLElement) => {
@@ -372,7 +371,7 @@ export const refreshKanban = async () => {
     const buttons = document.querySelectorAll('.fc-viewFilter-button');
     buttons.forEach(btn => btn.textContent = viewName);
 
-    
+
 
     // 设置加载状态
     const kanbanCards = document.querySelectorAll('.kanban-card');

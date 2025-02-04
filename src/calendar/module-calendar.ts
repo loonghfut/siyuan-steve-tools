@@ -11,7 +11,9 @@ export const eventsPath = 'data/public/stevetools/events.json';
 export const cal_id = '';
 export let linkToCalendar = '';
 import * as myF from "./myF";
-import { refreshKanban } from "./kanban";
+import { handleAddButtonClick, refreshKanban } from "./kanban";
+// import { openNewWindowById } from "./myK";
+
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
@@ -190,6 +192,15 @@ export class M_calendar {
         const config = { childList: true, subtree: true };
         const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
         observer.observe(targetNode, config);
+
+        this.plugin.addCommand({
+            langKey: "ST_calendar",
+            langText: "添加日程",
+            hotkey: "⇧⌘Q",
+            globalCallback: async () => {
+                console.log("添加日程waiwai");
+            },
+        })
     }
 
     async callback(mutationsList: MutationRecord[]) {
