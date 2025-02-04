@@ -97,7 +97,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar = await run(id, 'kanban', '', 'title', 'viewFilter,prev,next', '');
+                    D_calendar = await run(id, 'kanban', '', 'title', 'today,viewFilter,prev,next', '');
                     refreshKanban();
                 }, 100);
             },
@@ -122,7 +122,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'viewFilter,prev,next', '');
+                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'today,viewFilter,prev,next', '');
                 }, 100);
             },
         });
