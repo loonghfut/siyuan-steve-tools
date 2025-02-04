@@ -318,28 +318,6 @@ export async function run(
             const buttons = document.querySelectorAll('.fc-viewFilter-button');
             buttons.forEach(btn => btn.textContent = viewName);
             // 设置样式
-            ////完成样式
-
-            if (info.event.extendedProps.status === '完成') {
-                // 应用样式到整个事件元素
-                info.el.style.textDecoration = 'line-through';
-
-                // 找到并应用样式到标题元素
-                const titleEl = info.el.querySelector('.fc-event-title');
-                if (titleEl) {
-                    (titleEl as HTMLElement).style.textDecoration = 'line-through';
-                }
-
-                // 找到并应用样式到时间元素
-                const timeEl = info.el.querySelector('.fc-event-time');
-                if (timeEl) {
-                    (timeEl as HTMLElement).style.textDecoration = 'line-through';
-                }
-                // 添加自定义CSS类
-                info.el.classList.add('event-completed');
-            }
-
-
             //// 设置随机背景色
             // Use event's ID or title as a unique identifier for color
             const uniqueId = info.event.id || info.event.title;
@@ -357,6 +335,39 @@ export async function run(
             const titleEl = info.el.querySelector('.fc-event-title');
             if (timeEl) (timeEl as HTMLElement).style.color = textColor;
             if (titleEl) (titleEl as HTMLElement).style.color = textColor;
+
+
+
+            ////完成样式
+            if (info.event.extendedProps.status === '完成') {
+                // 应用完成状态的样式
+                info.el.style.textDecoration = 'line-through';
+                
+                // 调暗背景色
+                const uniqueId = info.event.id || info.event.title;
+                const hash = Array.from(uniqueId).reduce((acc, char) => {
+                    return char.charCodeAt(0) + ((acc << 5) - acc);
+                }, 0);
+                const [backgroundColor] = getColors(Math.abs(hash));
+                
+                // 将背景色转换为 RGBA 格式并降低不透明度
+                info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
+                
+                // 应用其他样式
+                const titleEl = info.el.querySelector('.fc-event-title');
+                if (titleEl) {
+                    (titleEl as HTMLElement).style.textDecoration = 'line-through';
+                }
+                
+                const timeEl = info.el.querySelector('.fc-event-time');
+                if (timeEl) {
+                    (timeEl as HTMLElement).style.textDecoration = 'line-through';
+                }
+                
+                info.el.classList.add('event-completed');
+            }
+
+
 
 
 
