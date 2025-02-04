@@ -12,6 +12,8 @@ export const cal_id = '';
 export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
+import { globalOpen, globalOpen2 } from "./myK";
+
 // import { openNewWindowById } from "./myK";
 
 let allEvents: EventAttributes[] = [];
@@ -193,12 +195,46 @@ export class M_calendar {
         const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
         observer.observe(targetNode, config);
 
+        let isCommandExecuting = false;
         this.plugin.addCommand({
-            langKey: "ST_calendar",
-            langText: "添加日程",
-            hotkey: "⇧⌘Q",
+            langKey: "ST_calendar_day",
+            langText: "打开日记",
+            hotkey: "",
             globalCallback: async () => {
+                if (isCommandExecuting) {
+                    return;
+                }
+                isCommandExecuting = true;
                 console.log("添加日程waiwai");
+                try {
+                    // await globalOpen();//失败
+                    globalOpen2();
+                } finally {
+                    setTimeout(() => {
+                        isCommandExecuting = false;
+                    }, 3000);
+                }
+            },
+        })
+        this.plugin.addCommand({
+            langKey: "ST_calendar_quick",
+            langText: "创建日程（应用内弹窗）",
+            hotkey: "",
+            callback: async () => {
+                handleAddButtonClick();
+            },
+        })
+        this.plugin.addCommand({
+            langKey: "ST_calendar_quick_pro",
+            langText: "创建日程（光标所在块）",
+            hotkey: "",
+            editorCallback: async (pro) => {
+                if (!pro?.breadcrumb?.id) {
+                    showMessage("请在块内使用", 3000, "info");
+                    return;
+                }
+                console.log("创建日程（光标所在块）", pro.breadcrumb.id);
+                handleAddButtonClick('', { isdirect: true, directid: pro.breadcrumb.id });
             },
         })
     }

@@ -132,7 +132,7 @@ const CustomViewConfig = {
     }
 }
 
-export async function handleAddButtonClick(status = "") {
+export async function handleAddButtonClick(status = "",direct={isdirect:false,directid:""}) {
     console.log('添加事件按钮被点击');
     const now = new Date()
     // console.log('当前时间:', now);
@@ -142,7 +142,7 @@ export async function handleAddButtonClick(status = "") {
     const viewIDs = await getViewId(av_ids)
     const viewValue = await getViewValue(viewIDs);
     const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
-    await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status);
+    await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status,direct);
 }
 
 

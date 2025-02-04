@@ -401,6 +401,7 @@ export async function createEventInDatabase(
     viewValue,
     db_id?: string,
     status = "",
+    direct={isdirect:false,directid:""},
 ) {
     let isok = false;
     status = status || "未完成";
@@ -425,6 +426,18 @@ export async function createEventInDatabase(
         sy.showMessage('请先设置日程创建位置和日程创建数据库');
         return;
     }
+    if(direct.isdirect){
+        await api.addBlockToDatabase_pro(direct.directid, to_db_id);
+        const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
+        const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
+        const datata = await api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date");
+        const selectdata: ISelectOption[] = [{ content: status }];
+        // console.log("selectdata", selectdata);
+        await api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select");
+        sy.showMessage('已添加事件', 2000, "info", "1");
+        return;
+    }
+
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
     //// 创建一个新块
     steveTools.outlog("daynote_id:::", daynote_id.id);
@@ -525,7 +538,7 @@ export async function createEventInDatabase(
                     }
                 }, 100);
             } else {
-                setTimeout(() => calendar.refetchEvents(), 1500);
+                setTimeout(() => calendar.refetchEvents(), 1500);//TODO:优化速度
             }
             // 提示用户
             sy.showMessage('正在添加事件', -1, "info", "1");
@@ -629,7 +642,7 @@ async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string
     // If not found, fetch fresh data
     try {
         steveTools.outlog('Fetching fresh view data...');
-        sy.showMessage('首次添加事件，请稍等...');
+        sy.showMessage('添加事件中，请稍等...', -1, "info", "1");
         await new Promise(resolve => setTimeout(resolve, 1000));
         const Mcalendar = moduleInstances['M_calendar'];
         const av_ids = await Mcalendar.getAVreferenceid();
@@ -646,6 +659,7 @@ async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string
         }
 
         const freshViewValue = await getViewValue(viewIDs);
+        sy.showMessage('添加事件中，请稍等...', 1, "info", "1");
         return findKeyID(freshViewValue);
     } catch (error) {
         console.error('Error fetching key ID:', error);

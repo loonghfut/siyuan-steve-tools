@@ -1,8 +1,9 @@
-import { showMessage } from "siyuan";
+import { showMessage, openWindow, Protyle } from "siyuan";
 import { NestedKBCalendarEvent } from "./interface";
 import * as api from "@/api";
 import { allKBEvents } from "./kanban";
 import { showEvent } from "./myF";
+import { settingdata } from '@/index';
 //更新子级
 ////添加子级
 export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
@@ -188,4 +189,68 @@ export async function runclick(evt) {
 export function formatDateTime(date: Date) {
     const adjustedDate = new Date(date.getTime() + 8 * 60 * 60 * 1000); // 加8个小时
     return adjustedDate.toISOString().slice(0, 16); // 格式化为 YYYY-MM-DDTHH:mm
+}
+
+
+let win: any = null;//TODO后面有时间再用此方式
+export async function globalOpen() {
+    if (win && !win.isDestroyed()) {
+        win.show();
+        win.focus();
+        return;
+    }
+    const { BrowserWindow } = require('@electron/remote');
+    win = new BrowserWindow({
+        width: 800,
+        height: 600,
+        frame: false,
+        // titleBarStyle: 'default',
+        alwaysOnTop: false, // Changed to true to enable window always on top
+        skipTaskbar: false,
+        // backgroundColor: '#000000',
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+            enableRemoteModule: true,
+            webSecurity: false,
+        },
+        autoHideMenuBar: true,
+        fullscreenable: true,
+        maximizable: true,
+        show: true
+    });
+    // Load the URL and pass required parameters
+    win.loadURL(`${window.location.protocol}//${window.location.host}/stage/build/app/window.html`);
+
+    // Inject main window's context
+    win.webContents.executeJavaScript(`
+        setTimeout(() => {
+            window.siyuan = window.opener.siyuan;
+            console.log("window.siyuan", window.siyuan);
+        }, 1000);
+    `);
+
+    // 窗口关闭时清理引用
+    win.on('closed', () => {
+        win = null;
+    });
+}
+
+export async function globalOpen2() {
+    if (!settingdata["cal-create-pos"] || !settingdata["cal-db-id"]) {
+        showMessage('请先设置日程创建位置和日程创建数据库');
+        return;
+    }
+    const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
+    const idid = await api.generateSiyuanID();
+    const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
+    const id = idid;
+    openWindow({
+        height: 500,
+        width: 400,
+        doc: {
+            id: id
+        }
+    });
+
 }
