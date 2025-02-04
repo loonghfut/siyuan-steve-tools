@@ -351,24 +351,18 @@ export function destroyAllSortables() {
     sortableInstances = [];
 }
 
-export const refreshKanban = async () => {//OK兼容原刷新
-
-
+export const refreshKanban = async () => {
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
-    // console.log('刷新日历', thisCalendars);
-    // 记录当前滚动位置
+    if (!thisCalendars.length) return;
+    // 记录所有日历的滚动位置
     thisCalendars.forEach(calendar => {
         try {
             const scrollContainer = calendar.el.querySelector<HTMLElement>('.kanban-board');
             if (!scrollContainer) return;
-            
-            const scrollState: ScrollState = {
+            calendar['_scrollState'] = {
                 top: scrollContainer.scrollTop,
                 left: scrollContainer.scrollLeft
             };
-            
-            // 在日历实例上保存滚动状态
-            calendar['_scrollState'] = scrollState;
         } catch (err) {
             console.error('保存滚动位置失败:', err);
         }
@@ -378,63 +372,51 @@ export const refreshKanban = async () => {//OK兼容原刷新
     const buttons = document.querySelectorAll('.fc-viewFilter-button');
     buttons.forEach(btn => btn.textContent = viewName);
 
-    if (!thisCalendars.length) {
-        return;
-    }
-    // 刷新日历
-    // showMessage('[ST]请稍等', -1, "info", "kanban-update");
+    
+
+    // 设置加载状态
     const kanbanCards = document.querySelectorAll('.kanban-card');
     kanbanCards.forEach(card => {
         destroyAllSortables();
-        (card as HTMLElement).style.cursor = 'wait'; // 更改鼠标样式表示加载中
+        (card as HTMLElement).style.cursor = 'wait';
     });
 
-    //错误操作提示
+    // 错误操作检查
     setTimeout(() => {
         const cards = document.querySelectorAll('.kanban-card');
-        let hasWaitCursor = false;
-        cards.forEach(card => {
-            if ((card as HTMLElement).style.cursor === 'wait') {
-                hasWaitCursor = true;
-            }
-        });
-        if (hasWaitCursor) {
+        if ([...cards].some(card => (card as HTMLElement).style.cursor === 'wait')) {
             showMessage('进行了非常规操作，请手动刷新一下一直加载的视图', -1, "info", "kanban-update");
         }
     }, 3000);
 
-    console.log('ST刷新日历');
+    console.log('ST开始依次刷新日历');
 
-
-    // 重新获取事件
-    await Promise.all(thisCalendars.map(calendar => new Promise(resolve => {
-        calendar.refetchEvents();
-        calendar.on('eventsSet', resolve); // 等待事件加载完成
-    })));
+    // 依次刷新每个日历
+    for (const calendar of thisCalendars) {
+        await new Promise<void>(resolve => {
+            calendar.refetchEvents();
+            calendar.on('eventsSet', () => {
+                // 恢复当前日历的滚动位置
+                try {
+                    const scrollState = calendar['_scrollState'] as ScrollState;
+                    const scrollContainer = calendar.el.querySelector<HTMLElement>('.kanban-board');
+                    if (scrollContainer && scrollState) {
+                        scrollContainer.scrollTo({
+                            top: scrollState.top,
+                            left: scrollState.left,
+                        });
+                    }
+                } catch (err) {
+                    console.error('恢复滚动位置失败:', err);
+                }
+                resolve();
+            });
+        });
+        console.log(`日历 ${calendar.el.id} 刷新完成`);
+    }
 
     // 重新初始化拖拽
     initializeSortableKanban();
-
-
-    // showMessage('', 1, "info", "kanban-update");
-    // 恢复滚动位置
-    thisCalendars.forEach(calendar => {
-        try {
-            const scrollState = calendar['_scrollState'] as ScrollState;
-            const scrollContainer = calendar.el.querySelector<HTMLElement>('.kanban-board');
-            
-            if (scrollContainer && scrollState) {
-                scrollContainer.scrollTo({
-                    top: scrollState.top,
-                    left: scrollState.left,
-                });
-            }
-        } catch (err) {
-            console.error('恢复滚动位置失败:', err);
-        }
-    });
-
-
 };
 
 const logDebug = (message: string, ...args: any[]) => {
