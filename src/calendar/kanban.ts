@@ -381,12 +381,12 @@ export const refreshKanban = async () => {
     });
 
     // 错误操作检查
-    setTimeout(() => {
-        const cards = document.querySelectorAll('.kanban-card');
-        if ([...cards].some(card => (card as HTMLElement).style.cursor === 'wait')) {
-            showMessage('进行了非常规操作，请手动刷新一下一直加载的视图', -1, "info", "kanban-update");
-        }
-    }, 3000);
+    // setTimeout(() => {
+    //     const cards = document.querySelectorAll('.kanban-card');
+    //     if ([...cards].some(card => (card as HTMLElement).style.cursor === 'wait')) {
+    //         showMessage('进行了非常规操作，请手动刷新一下一直加载的视图', -1, "info", "kanban-update");
+    //     }
+    // }, 3000);
 
     console.log('ST开始依次刷新日历');
 
