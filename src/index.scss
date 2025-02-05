@@ -550,7 +550,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 // }
 
 .kanban-cards {
-    // min-height: 100%;
+    min-height: 100%;
     // padding: 10px;
     background-color: $background-color;
     border-radius: 5px;
@@ -777,7 +777,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     position: sticky; // 改为 sticky 定位
     top: 10px; // 设置顶部边距为 0
     background: inherit; // 继承父元素背景色
-    z-index: 20; // 确保显示在其他内容之上
+    z-index: 1; // 确保显示在其他内容之上
 
     // 当存在标题时的样式
     &:has(h2) {

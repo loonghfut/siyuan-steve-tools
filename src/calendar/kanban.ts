@@ -213,6 +213,9 @@ export function initializeSortableKanban() {
             animation: 150,
             fallbackOnBody: true,
             swapThreshold: 0.65,
+            scroll: true, // 启用滚动
+            scrollSensitivity: 10, // 滚动敏感度
+            scrollSpeed: 10, // 滚动速度
             onStart: function (evt) {
                 isDragging = true; // 开始拖拽时设置标志
                 // console.log('onStart', evt);
