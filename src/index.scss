@@ -677,7 +677,8 @@ $priority-color-high-background: var(--b3-card-error-background);
         .description {
             // background-color: $background-color-1;
             color: $text-color;
-            padding-top: 4px;
+            // padding-top: 4px;
+            transform: translateY(5px);
             // border-radius: 4px;
         }
     }
@@ -694,7 +695,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .kanban-subcards {
     //只要上方间距
-    transform: translateY(5px);
+    // transform: translateY(5px);
 
     .kanban-card-content {
         display: none;
@@ -702,6 +703,10 @@ $priority-color-high-background: var(--b3-card-error-background);
 
     //字体调小
     font-size: 0.8em;
+    .kanban-card{
+        margin-bottom: 1px;
+    }
+    
 }
 
 
@@ -852,4 +857,46 @@ $priority-color-high-background: var(--b3-card-error-background);
 //日历事件边框
 .fc-h-event {
     border: none;
+}
+
+
+.time-progress-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-ring {
+    transform: rotate(-90deg);
+}
+
+.progress-ring-bg {
+    fill: none;
+    stroke: #e6e6e6;
+    stroke-width: 2;
+}
+
+.progress-ring-circle {
+    fill: none;
+    stroke: #4CAF50;
+    stroke-width: 2;
+    transition: stroke-dashoffset 0.35s;
+    transform-origin: center;
+}
+
+.progress-text {
+    transform: rotate(90deg);
+    font-size: 6px;
+    fill: $text-color;
+    font-family: Arial, sans-serif;
+}
+
+.progress-percentage {
+    font-size: 12px;
+    color: $text-color;
+}
+.progress-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }

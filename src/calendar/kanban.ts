@@ -53,6 +53,7 @@ const CustomViewConfig = {
         };
         // console.log(columns);
 
+        // 在createCard函数中添加环形进度统计
         const createCard = (event: NestedKBCalendarEvent) => {
             const childCards = event.children?.map(createCard).join('') || '';
             const starttime = new Date(event.extendedProps.Kstart).toLocaleString();
@@ -64,6 +65,31 @@ const CustomViewConfig = {
             } else {
                 nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kstart, event.extendedProps.status);
             }
+
+            // 计算子任务完成进度
+            const totalSubtasks = event.children?.length || 0;
+            const completedSubtasks = event.children?.filter(child =>
+                child.extendedProps.status === '完成'
+            ).length || 0;
+            const progressPercent = totalSubtasks ? (completedSubtasks / totalSubtasks) * 100 : 0;
+
+            // 生成SVG环形进度图
+            const progressCircle = totalSubtasks ? `
+    <div class="progress-container">
+        <svg class="progress-ring" width="20" height="20" viewBox="0 0 20 20">
+            <circle class="progress-ring-bg" r="8" cx="10" cy="10" />
+            <circle class="progress-ring-circle" 
+                r="8" 
+                cx="10" 
+                cy="10"
+                style="stroke-dasharray: ${2 * Math.PI * 8};
+                       stroke-dashoffset: ${2 * Math.PI * 8 * (1 - progressPercent / 100)}"
+            />
+        </svg>
+        <span class="progress-percentage">${Math.round(progressPercent)}%</span>
+    </div>
+            ` : '';
+
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
                     <div class="kanban-card-header">
@@ -75,12 +101,17 @@ const CustomViewConfig = {
                             ${event.extendedProps.priority !== "无" ? `<span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>` : ''}
                         </div>
                     </div>
-                <div class="kanban-card-content">
-                    <div>${endtime}</div>
-                         ${event.extendedProps.description ? `<p class="description">${event.extendedProps.description}</p>` : ''}
-                </div>
+                    <div class="kanban-card-content">
+                        <div class="time-progress-container">
+                            ${endtime}
+                            ${progressCircle}
+                        </div>
+                    </div>
                     <div class="kanban-subcards">
                         ${childCards}
+                    </div>
+                    <div class="kanban-card-content">
+                        ${event.extendedProps.description ? `<p class="description">${event.extendedProps.description}</p>` : ''}
                     </div>
                 </div>
             `;
