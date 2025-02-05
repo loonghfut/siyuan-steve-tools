@@ -124,7 +124,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .fc-header-toolbar {
     padding: 1rem;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.1rem !important;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -550,16 +550,16 @@ $priority-color-high-background: var(--b3-card-error-background);
 // }
 
 .kanban-cards {
-    min-height: 70vh;
+    // min-height: 100%;
     // padding: 10px;
     background-color: $background-color;
     border-radius: 5px;
     overflow-x: hidden; // 防止水平溢出
     overflow-y: auto; // 允许垂直滚动
     //防止垂直溢出
-    max-height: calc(73vh);
+    // max-height: calc(73vh);
     position: relative; // 创建新的包含块
-    max-width: 100%; // 限制最大宽度
+    width: 100%; 
     box-sizing: border-box; // 包含padding在内的盒模型
 }
 
@@ -705,6 +705,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     font-size: 0.8em;
     .kanban-card{
         margin-bottom: 1px;
+        transform: translateX(-1px);
     }
     
 }
@@ -773,7 +774,10 @@ $priority-color-high-background: var(--b3-card-error-background);
 .kanban-column-header {
     display: flex;
     align-items: center;
-    position: relative;
+    position: sticky; // 改为 sticky 定位
+    top: 10px; // 设置顶部边距为 0
+    background: inherit; // 继承父元素背景色
+    z-index: 20; // 确保显示在其他内容之上
 
     // 当存在标题时的样式
     &:has(h2) {
@@ -781,6 +785,7 @@ $priority-color-high-background: var(--b3-card-error-background);
             flex: 1;
             text-align: center;
             margin: 0;
+            background-color: $background-color;
         }
 
         .kanban-add-button {
