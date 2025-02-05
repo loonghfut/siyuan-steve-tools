@@ -884,12 +884,6 @@ $priority-color-high-background: var(--b3-card-error-background);
     transform-origin: center;
 }
 
-.progress-text {
-    transform: rotate(90deg);
-    font-size: 6px;
-    fill: $text-color;
-    font-family: Arial, sans-serif;
-}
 
 .progress-percentage {
     font-size: 12px;
@@ -899,4 +893,5 @@ $priority-color-high-background: var(--b3-card-error-background);
     display: flex;
     align-items: center;
     gap: 4px;
+    margin-left: auto; // 添加这行使其靠右对齐
 }
