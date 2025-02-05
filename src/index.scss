@@ -567,8 +567,8 @@ $priority-color-high-background: var(--b3-card-error-background);
     // background-color: $background-color-1;
     // border: 1px solid #ddd;
     border-radius: 5px;
-    padding: 10px;
-    margin-bottom: 10px;
+    padding: 6px;
+    margin-bottom: 7px;
     box-shadow: 0 1px 3px $border-color;
 
     // cursor: grab;
@@ -694,7 +694,14 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .kanban-subcards {
     //只要上方间距
-    transform: translateY(10px)
+    transform: translateY(5px);
+
+    .kanban-card-content {
+        display: none;
+    }
+
+    //字体调小
+    font-size: 0.8em;
 }
 
 

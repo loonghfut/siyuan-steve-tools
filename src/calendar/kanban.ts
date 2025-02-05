@@ -59,7 +59,7 @@ const CustomViewConfig = {
             let endtime = '';
             let nowToEndTime;
             if (event.extendedProps.Kend) {
-                endtime = '-' + new Date(event.extendedProps.Kend).toLocaleString();
+                endtime = '' + new Date(event.extendedProps.Kend).toLocaleString();
                 nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kend, event.extendedProps.status);
             } else {
                 nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kstart, event.extendedProps.status);
@@ -71,14 +71,14 @@ const CustomViewConfig = {
                         <div class="kanban-card-meta">
                             <span class="kanban-nowToEndTime">${nowToEndTime}</span>
                             <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
-                            <span class="category">${event.extendedProps.category}</span>
-                            <span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>
+                            ${event.extendedProps.category !== "无" ? `<span class="category">${event.extendedProps.category}</span>` : ''}
+                            ${event.extendedProps.priority !== "无" ? `<span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>` : ''}
                         </div>
                     </div>
-                    <div class="kanban-card-content">
-                    <div>${starttime}${endtime}</div>
-                        <p class="description">${event.extendedProps.description || ''}</p>
-                    </div>
+                <div class="kanban-card-content">
+                    <div>${endtime}</div>
+                         ${event.extendedProps.description ? `<p class="description">${event.extendedProps.description}</p>` : ''}
+                </div>
                     <div class="kanban-subcards">
                         ${childCards}
                     </div>
@@ -132,7 +132,7 @@ const CustomViewConfig = {
     }
 }
 
-export async function handleAddButtonClick(status = "",direct={isdirect:false,directid:""}) {
+export async function handleAddButtonClick(status = "", direct = { isdirect: false, directid: "" }) {
     console.log('添加事件按钮被点击');
     const now = new Date()
     // console.log('当前时间:', now);
@@ -142,7 +142,7 @@ export async function handleAddButtonClick(status = "",direct={isdirect:false,di
     const viewIDs = await getViewId(av_ids)
     const viewValue = await getViewValue(viewIDs);
     const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
-    await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status,direct);
+    await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct);
 }
 
 
