@@ -20,7 +20,14 @@ $priority-color-low-background: var(--b3-card-success-background);
 $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
 
+div.fc-view-harness.fc-view-harness-active > div > table > thead > tr > th{
+    border: none !important;
+}
+
 [id^="calendarfu-"] {
+    td {
+        border-color:$border-color !important; 
+    }
     background-color: $background-color !important;
     padding-left: 10px;
     padding-right: 10px;
@@ -199,7 +206,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .fc-theme-standard td,
 .fc-theme-standard {
-    border: 1px solid $border-color;
+    border: 1px solid $border-color !important;
 }
 
 .fc-toolbar {
@@ -268,7 +275,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .fc .fc-list-event:hover td {
-    background-color: $hover-background-color;
+    background-color: $hover-background-color !important;
 }
 
 /* 适配深色模式的 .popover 样式 */
@@ -299,6 +306,9 @@ $priority-color-high-background: var(--b3-card-error-background);
 /* 隐藏滚动条 */
 
 [id^="calendar-"] {
+    td{
+        border-color:$border-color !important; 
+    }
     margin: 0 auto;
     height: calc(88vh);
     border: none;
