@@ -8,6 +8,7 @@ import { moduleInstances } from '@/index';
 import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
+import { runblockdata_for_time } from './quickadd';
 
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
@@ -401,7 +402,7 @@ export async function createEventInDatabase(
     viewValue,
     db_id?: string,
     status = "",
-    direct={isdirect:false,directid:""},
+    direct = { isdirect: false, directid: "" },
 ) {
     let isok = false;
     status = status || "未完成";
@@ -426,7 +427,18 @@ export async function createEventInDatabase(
         sy.showMessage('请先设置日程创建位置和日程创建数据库');
         return;
     }
-    if(direct.isdirect){
+    if (direct.isdirect) {
+
+        //块时间处理
+        const blockdata = await api.getBlockByID(direct.directid);
+        console.log("blockdata:::", blockdata.content);
+        const ce = runblockdata_for_time(blockdata.content);
+        console.log("ce:::", ce);
+        if (ce) {
+            dateStr = ce;
+        }
+        //块时间处理
+
         await api.addBlockToDatabase_pro(direct.directid, to_db_id);
         const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
         const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);

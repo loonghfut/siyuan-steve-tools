@@ -13,6 +13,7 @@ export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen, globalOpen2 } from "./myK";
+import { getCursorElement } from "./quickadd";
 
 // import { openNewWindowById } from "./myK";
 
@@ -229,12 +230,12 @@ export class M_calendar {
             langText: "创建日程（光标所在块）",
             hotkey: "",
             editorCallback: async (pro) => {
-                if (!pro?.breadcrumb?.id) {
-                    showMessage("请在块内使用", 3000, "info");
-                    return;
-                }
-                console.log("创建日程（光标所在块）", pro.breadcrumb.id);
-                handleAddButtonClick('', { isdirect: true, directid: pro.breadcrumb.id });
+                const cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
+                console.log("cursorElement", cursorElementId);
+                const blockId = cursorElementId || pro?.breadcrumb?.id;
+                console.log("pro", blockId);
+                console.log("创建日程（光标所在块）", blockId);
+                handleAddButtonClick('', { isdirect: true, directid: blockId });
             },
         })
     }
