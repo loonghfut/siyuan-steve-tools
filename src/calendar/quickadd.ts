@@ -22,6 +22,9 @@ function getCursorElementRecursive(node) {
 
 export function runblockdata_for_time(content: string): string | null {
     // 日期匹配模式
+    if (content === '') {
+        return null;
+    }
     const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)/;
     // 时间匹配模式
     const timePattern = /(\d{1,2})点(?:(\d{1,2})分)?|(\d{1,2})[:|：](\d{1,2})/;

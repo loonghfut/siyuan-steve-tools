@@ -432,7 +432,7 @@ export async function createEventInDatabase(
         //块时间处理
         const blockdata = await api.getBlockByID(direct.directid);
         // console.log("blockdata:::", blockdata.content);
-        const ce = runblockdata_for_time(blockdata.content);
+        const ce = runblockdata_for_time(blockdata?.content);
         // console.log("ce:::", ce);
         if (ce) {
             dateStr = ce;
@@ -539,7 +539,7 @@ export async function createEventInDatabase(
             }
             ////块时间处理
             const blockdata = await api.getBlockByID(id);
-            const ce = runblockdata_for_time(blockdata.content);
+            const ce = runblockdata_for_time(blockdata?.content);
             if (ce) {
                 dateStr = ce;
             }
