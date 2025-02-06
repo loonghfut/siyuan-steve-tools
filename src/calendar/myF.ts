@@ -395,7 +395,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
 //// 将新创建的块添加到数据库中
 //// 并设置此块的数据库属性，属性的值来源于用户添加事件的面板
 //// 尽量使用思源的api实现
-export async function createEventInDatabase(
+export async function createEventInDatabase(//TODO:加一个是否刷新日历的参数
     dateStr: string,
     // databaseId?: string,
     calendar: Calendar,

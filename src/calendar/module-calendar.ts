@@ -13,7 +13,7 @@ export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen, globalOpen2 } from "./myK";
-import { getCursorElement } from "./quickadd";
+import { getCursorElement, quickadd_event_more } from "./quickadd";
 
 // import { openNewWindowById } from "./myK";
 
@@ -190,6 +190,7 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
+        this.plugin.eventBus.on("click-blockicon", quickadd_event_more);
         this.av_ids = await this.getAVreferenceid_pro();
         const targetNode = document.body;
         const config = { childList: true, subtree: true };
