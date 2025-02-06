@@ -20,14 +20,15 @@ $priority-color-low-background: var(--b3-card-success-background);
 $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
 
-div.fc-view-harness.fc-view-harness-active > div > table > thead > tr > th{
+div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     border: none !important;
 }
 
 [id^="calendarfu-"] {
     td {
-        border-color:$border-color !important; 
+        border-color: $border-color !important;
     }
+
     background-color: $background-color !important;
     padding-left: 10px;
     padding-right: 10px;
@@ -306,9 +307,10 @@ div.fc-view-harness.fc-view-harness-active > div > table > thead > tr > th{
 /* 隐藏滚动条 */
 
 [id^="calendar-"] {
-    td{
-        border-color:$border-color !important; 
+    td {
+        border-color: $border-color !important;
     }
+
     margin: 0 auto;
     height: calc(88vh);
     border: none;
@@ -569,7 +571,7 @@ div.fc-view-harness.fc-view-harness-active > div > table > thead > tr > th{
     //防止垂直溢出
     // max-height: calc(73vh);
     position: relative; // 创建新的包含块
-    width: 100%; 
+    width: 100%;
     box-sizing: border-box; // 包含padding在内的盒模型
 }
 
@@ -713,11 +715,12 @@ div.fc-view-harness.fc-view-harness-active > div > table > thead > tr > th{
 
     //字体调小
     font-size: 0.8em;
-    .kanban-card{
+
+    .kanban-card {
         margin-bottom: 1px;
         transform: translateX(-1px);
     }
-    
+
 }
 
 
@@ -904,9 +907,11 @@ div.fc-view-harness.fc-view-harness-active > div > table > thead > tr > th{
     font-size: 12px;
     color: $text-color;
 }
+
 .progress-container {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-left: auto; // 添加这行使其靠右对齐
 }
+
