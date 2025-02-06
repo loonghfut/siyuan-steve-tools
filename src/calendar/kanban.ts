@@ -422,7 +422,7 @@ export const refreshKanban = async () => {
     //     }
     // }, 3000);
 
-    console.log('ST开始依次刷新日历');
+    // console.log('ST开始依次刷新日历');
 
     // 依次刷新每个日历
     for (const calendar of thisCalendars) {
@@ -445,7 +445,7 @@ export const refreshKanban = async () => {
                 resolve();
             });
         });
-        console.log(`日历 ${calendar.el.id} 刷新完成`);
+        // console.log(`日历 ${calendar.el.id} 刷新完成`);
     }
 
     // 重新初始化拖拽

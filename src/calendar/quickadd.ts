@@ -24,7 +24,7 @@ export function runblockdata_for_time(content: string): string | null {
     // 日期匹配模式
     const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)/;
     // 时间匹配模式
-    const timePattern = /(\d{1,2})点|(\d{1,2})[:|：](\d{1,2})/;
+    const timePattern = /(\d{1,2})点(?:(\d{1,2})分)?|(\d{1,2})[:|：](\d{1,2})/;
 
     const dateMatch = content.match(datePattern);
     const timeMatch = content.match(timePattern);
@@ -65,15 +65,19 @@ export function runblockdata_for_time(content: string): string | null {
     // 处理时间部分
     if (timeMatch) {
         if (timeMatch[1]) {
-            // 处理 "X点" 格式
-            targetDate = targetDate.hour(parseInt(timeMatch[1])).minute(0);
-        } else if (timeMatch[2] && timeMatch[3]) {
+            // 处理 "X点X分" 格式
+            const hours = parseInt(timeMatch[1]);
+            const minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0; // 如果有分钟则解析，否则默认0
+            targetDate = targetDate.hour(hours).minute(minutes);
+        } else {
             // 处理 "XX:XX" 格式
-            targetDate = targetDate.hour(parseInt(timeMatch[2])).minute(parseInt(timeMatch[3]));
+            const hours = parseInt(timeMatch[3]);
+            const minutes = parseInt(timeMatch[4]);
+            targetDate = targetDate.hour(hours).minute(minutes);
         }
     } else {
-        // 如果没有指定时间，默认设置为当天 00:00
-        targetDate = targetDate.hour(0).minute(0);
+        // 如果没有指定时间，默认设置为当天 08:00
+        targetDate = targetDate.hour(8).minute(0);
     }
 
     return targetDate.format('YYYY-MM-DDTHH:mm');

@@ -4,7 +4,7 @@ import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
-import { run } from "./calendar";
+import { av_ids, run, update_av_ids } from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -153,7 +153,7 @@ export class M_calendar {
                                 this.isUpdating = true;
                                 setTimeout(async () => {
                                     await this.getEventsFromSiYuanDatabase();
-                                    steveTools.outlog("更新日历文件<2>");
+                                    console.log("更新日历文件<2>");
                                     this.isUpdating = false;
                                 }, 3000);
                             }
@@ -195,7 +195,7 @@ export class M_calendar {
         const config = { childList: true, subtree: true };
         const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
         observer.observe(targetNode, config);
-
+        await update_av_ids();
         let isCommandExecuting = false;
         this.plugin.addCommand({
             langKey: "ST_calendar_day",

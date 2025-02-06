@@ -431,9 +431,9 @@ export async function createEventInDatabase(
 
         //块时间处理
         const blockdata = await api.getBlockByID(direct.directid);
-        console.log("blockdata:::", blockdata.content);
+        // console.log("blockdata:::", blockdata.content);
         const ce = runblockdata_for_time(blockdata.content);
-        console.log("ce:::", ce);
+        // console.log("ce:::", ce);
         if (ce) {
             dateStr = ce;
         }
@@ -537,6 +537,13 @@ export async function createEventInDatabase(
             if (newdateStr) {
                 dateStr = newdateStr;
             }
+            ////块时间处理
+            const blockdata = await api.getBlockByID(id);
+            const ce = runblockdata_for_time(blockdata.content);
+            if (ce) {
+                dateStr = ce;
+            }
+            ////块时间处理
             const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: status }];
             console.log("selectdata", selectdata);
@@ -546,18 +553,18 @@ export async function createEventInDatabase(
                     steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
                     if (!panel.isUploading()) {
                         clearInterval(checkUploading);
-                        setTimeout(() => calendar.refetchEvents(), 1500);
+                        setTimeout(() => calendar?.refetchEvents(), 1000);
                     }
                 }, 100);
             } else {
-                setTimeout(() => calendar.refetchEvents(), 1500);//TODO:优化速度
+                setTimeout(() => calendar?.refetchEvents(), 1000);//TODO:优化速度
             }
             // 提示用户
             sy.showMessage('正在添加事件', -1, "info", "1");
             setTimeout(() => {
                 dialog.destroy();
                 sy.showMessage('已添加事件', 2000, "info", "1");
-            }, 1000);
+            }, 500);
 
         }
     };

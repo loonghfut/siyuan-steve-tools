@@ -28,6 +28,9 @@ export let av_ids: string[] = [];
 export let viewName = "全部视图";
 // export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
 
+export async function update_av_ids() {
+    av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+}
 
 
 export async function run(
@@ -342,28 +345,28 @@ export async function run(
             if (info.event.extendedProps.status === '完成') {
                 // 应用完成状态的样式
                 info.el.style.textDecoration = 'line-through';
-                
+
                 // 调暗背景色
                 const uniqueId = info.event.id || info.event.title;
                 const hash = Array.from(uniqueId).reduce((acc, char) => {
                     return char.charCodeAt(0) + ((acc << 5) - acc);
                 }, 0);
                 const [backgroundColor] = getColors(Math.abs(hash));
-                
+
                 // 将背景色转换为 RGBA 格式并降低不透明度
                 info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
-                
+
                 // 应用其他样式
                 const titleEl = info.el.querySelector('.fc-event-title');
                 if (titleEl) {
                     (titleEl as HTMLElement).style.textDecoration = 'line-through';
                 }
-                
+
                 const timeEl = info.el.querySelector('.fc-event-time');
                 if (timeEl) {
                     (timeEl as HTMLElement).style.textDecoration = 'line-through';
                 }
-                
+
                 info.el.classList.add('event-completed');
             }
 
