@@ -13,7 +13,7 @@ export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen, globalOpen2 } from "./myK";
-import { getCursorElement, quickadd_event_more } from "./quickadd";
+import { getCursorElement } from "./quickadd";
 
 // import { openNewWindowById } from "./myK";
 
@@ -170,7 +170,7 @@ export class M_calendar {
             setInterval(async () => {
                 await this.getEventsFromSiYuanDatabase()
                 steveTools.outlog("自动更新日历文件<1>");
-            }, 600000);
+            }, 900000);
         }
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
         //实现看板实时更新
@@ -190,7 +190,7 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
-        this.plugin.eventBus.on("click-blockicon", quickadd_event_more);
+        // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
         const targetNode = document.body;
         const config = { childList: true, subtree: true };

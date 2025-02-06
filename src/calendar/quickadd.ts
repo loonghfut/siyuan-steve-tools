@@ -1,6 +1,8 @@
 import dayjs from 'dayjs';
 import { IProtyle, showMessage, subMenu } from 'siyuan';
-import { handleAddButtonClick } from './kanban';
+import { allKBEvents, handleAddButtonClick } from './kanban';
+import { updateAttrViewCell_pro } from '@/api';
+import { findEventByPublicId, run_getsubevents } from './myK';
 
 interface BlockNode {
     id: string;
@@ -165,7 +167,7 @@ export function runblockdata_for_time(content: string): string | null {
 }
 
 
-export function quickadd_event_more(event: CustomEvent<{
+export function quickadd_event_more(event: CustomEvent<{//无法实现（短时间内多次添加事件，会导致事件数据丢失）
     menu: subMenu;
     protyle: IProtyle;
     blockElements: HTMLElement[];
@@ -184,7 +186,7 @@ export function quickadd_event_more(event: CustomEvent<{
             console.log('列表项列表:', result.listItems);
             const listItemsdata = result.listItems;
             await quickadd_event_more_main(listItemsdata);
-
+            // await quickadd_event_more_sub(listItemsdata);
         },
     })
 }
@@ -195,16 +197,73 @@ async function quickadd_event_more_main(listItemsdata: BlockTreeResult['listItem
         showMessage("此功能只支持列表类块")
         return;
     }
-
+    let isok = false;
     // 遍历所有列表项
     for (const item of listItemsdata) {
         if (item.id) {
-            // 对每个项目调用 handleAddButtonClick
-            // 传入空字符串作为第一个参数，并设置 directid 和 isdirect
-            await handleAddButtonClick("", {
-                directid: item.id,
-                isdirect: true
-            });
+            try {
+                 isok = await handleAddButtonClick("", {
+                    directid: item.id,
+                    isdirect: true
+                });
+                if(isok){
+                    isok=false;
+                    showMessage(`成功处理列表项 ${item.id}`);
+                    continue;
+                }
+                if (!isok) {
+                    console.warn(`Failed to process item ${item.id}`);
+                    continue;
+                }
+            } catch (error) {
+                console.error(`Error processing item ${item.id}:`, error);
+                continue;
+            }
         }
     }
 }
+
+export async function quickadd_event_more_sub(listItemsdata: BlockTreeResult['listItems']) {
+    // 检查输入是否有效
+    if (!listItemsdata || listItemsdata.length === 0) {
+        showMessage("没有找到列表项");
+        return;
+    }
+
+    // 遍历列表项，处理每个项的子项关联
+    for (const item of listItemsdata) {
+        // 获取当前项的子项 IDs
+        const childIds = item.BlockNodeChildren || [];
+
+        if (childIds.length > 0) {
+            // 查找父事件
+            const parentEvent = await findEventByPublicId(allKBEvents, item.id);
+            if (!parentEvent) {
+                console.warn(`未找到父事件: ${item.id}`);
+                continue;
+            }
+
+            // 对每个子项进行处理
+            for (const childId of childIds) {
+                // 查找子事件
+                const childEvent = await findEventByPublicId(allKBEvents, childId);
+                if (!childEvent) {
+                    console.warn(`未找到子事件: ${childId}`);
+                    continue;
+                }
+
+                // 建立关联关系
+                try {
+                    const result = await run_getsubevents(childEvent, parentEvent);
+                    if (!result) {
+                        console.warn(`关联失败: ${childId} -> ${item.id}`);
+                    }
+                } catch (error) {
+                    console.error(`建立关联时出错: ${error}`);
+                }
+            }
+        }
+    }
+}
+
+

@@ -447,7 +447,7 @@ export async function createEventInDatabase(//TODO:加一个是否刷新日历�
         // console.log("selectdata", selectdata);
         await api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select");
         sy.showMessage('已添加事件', 2000, "info", "1");
-        return;
+        return true ;
     }
 
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);

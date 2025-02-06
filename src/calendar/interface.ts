@@ -23,7 +23,7 @@ export interface NestedKBCalendarEvent extends KBCalendarEvent {
 }
 export interface KBCalendarEvent {
     title: string;
-    publicId: string;
+    publicId?: string;
     extendedProps: {
         blockId: string;
         status: string;

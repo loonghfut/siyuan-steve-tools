@@ -20,18 +20,20 @@ const CATEGORY_MAP = {
 } as const;
 
 
+export function update_allKBEvents(){
+    
+}
+
+
+
 const CustomViewConfig = {
     classNames: ['custom-view'],
     content: function (props) {
-        // 带日期筛选的数据
-        // if (!thisCalendars.some(calendar => calendar.el === OUTcalendar.el)) {
-        //     thisCalendars.push(OUTcalendar);
-        // }
-        // console.log("OUTcalendar::::::::", thisCalendars);
-        // 视图全部数据
+
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         allKBEvents = dataArray;//重要
+        // console.log("allKBEvents::::::::", allKBEvents);
         ///
         if (isFilter) {
             //带日期筛选的数据
@@ -173,7 +175,7 @@ export async function handleAddButtonClick(status = "", direct = { isdirect: fal
     const viewIDs = await getViewId(av_ids)
     const viewValue = await getViewValue(viewIDs);
     const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
-    await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct);
+    return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct);
 }
 
 
