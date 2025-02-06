@@ -232,10 +232,10 @@ export class M_calendar {
             hotkey: "",
             editorCallback: async (pro) => {
                 const cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
-                console.log("cursorElement", cursorElementId);
+                // console.log("cursorElement", cursorElementId);
                 const blockId = cursorElementId || pro?.breadcrumb?.id;
-                console.log("pro", blockId);
-                console.log("创建日程（光标所在块）", blockId);
+                // console.log("pro", blockId);
+                // console.log("创建日程（光标所在块）", blockId);
                 handleAddButtonClick('', { isdirect: true, directid: blockId });
             },
         })

@@ -166,7 +166,7 @@ const CustomViewConfig = {
 }
 
 export async function handleAddButtonClick(status = "", direct = { isdirect: false, directid: "" }) {
-    console.log('添加事件按钮被点击');
+    // console.log('添加事件按钮被点击');
     const now = new Date()
     // console.log('当前时间:', now);
     const fnow = myK.formatDateTime(now);
