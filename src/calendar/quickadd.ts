@@ -182,6 +182,18 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
     return results;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////目前无法实现（短时间内多次添加事件，会导致事件数据丢失）////////////////////////////////////////
 export function quickadd_event_more(event: CustomEvent<{//无法实现（短时间内多次添加事件，会导致事件数据丢失）
     menu: subMenu;
     protyle: IProtyle;

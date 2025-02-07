@@ -440,8 +440,6 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     }
     // 1. 创建面板HTML
     //// 获取当前日期的日记块ID
-    // steveTools.outlog(settingdata);
-    // steveTools.outlog(window.siyuan.ws.app);
     //加一个错误判断
     if (!settingdata["cal-create-pos"] || !settingdata["cal-db-id"]) {
         sy.showMessage('请先设置日程创建位置和日程创建数据库');
@@ -451,8 +449,13 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
         //块时间处理
         const blockdata = await api.getBlockKramdown(direct.directid);
-        console.log("blockdata:::", blockdata.kramdown);
+        // console.log("blockdata:::", blockdata.kramdown);
         const ce = runblockdata_for_time(blockdata?.kramdown);
+        const minsub =runblockdata_for_sub(blockdata?.kramdown);
+        let ismain=false;
+        if(minsub.length>0){
+            ismain=true;
+        }
         if (ce) {
             dateStr = ce;
         }
@@ -461,10 +464,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         await api.addBlockToDatabase_pro(direct.directid, to_db_id);
         const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
         const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
+        const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
         const datata = await api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date");
         const selectdata: ISelectOption[] = [{ content: status }];
         // console.log("selectdata", selectdata);
         await api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select");
+        await api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, ismain, "checkbox");
         sy.showMessage('已添加事件', 2000, "info", "1");
         return true;
     }

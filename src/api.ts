@@ -721,7 +721,7 @@ export async function updateAttrViewCell_pro(
     id: string,
     avID: string,
     keyID: string,
-    value: string | Date | ISelectOption[] | {
+    value: string | Date | ISelectOption[] | boolean | {
         blockID: string,
         content: string,
         oldrelation: {
@@ -730,7 +730,7 @@ export async function updateAttrViewCell_pro(
         },
         action: string
     },
-    type: 'date' | 'select' | 'relation',
+    type: 'date' | 'select' | 'relation' | 'checkbox',
     endtime?: string
 ) {
     const doOperations: IOperation[] = [];
@@ -760,6 +760,16 @@ export async function updateAttrViewCell_pro(
                 id: newId,
                 mSelect: value as ISelectOption[]
             };
+            break;
+
+        case 'checkbox':
+            cellData = {
+                type: "checkbox",
+                id: newId,
+                checkbox: {
+                    checked: value as boolean
+                },
+            }
             break;
 
         case 'relation':
