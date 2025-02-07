@@ -325,9 +325,15 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
     return events;
 }
 //查看事件
-export async function showEvent(blockID, rootId, isSeeMore = false) {
+//@param forceSeeMore 是否强制使isSeeMore生效
+export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMore = false) {
     //// 判断是否存在此块
-    const seemore = settingdata["cal-seemore"] || isSeeMore;
+    let seemore = false;
+    if (!forceSeeMore) {
+        seemore = settingdata["cal-seemore"] || isSeeMore;
+    }else{
+        seemore = isSeeMore;
+    }
     const block = await api.getBlockByID(blockID);
     if (!block) {
         sy.showMessage('未找到此块');
@@ -338,7 +344,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
             app: window.siyuan.ws.app,
             doc: {
                 id: blockID,
-                action: ["cb-get-hl"],
+                action: ["cb-get-hl","cb-get-all"],
             },
             // position: "right",
             keepCursor: false

@@ -5,7 +5,7 @@ import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption, ScrollState } fr
 import { av_ids, filterViewId, OUTcalendar, viewName } from './calendar';
 import { showMessage } from 'siyuan';
 import { settingdata } from '..';
-import { createEventInDatabase, getViewId, getViewValue } from './myF';
+import { createEventInDatabase, getViewId, getViewValue, showEvent } from './myF';
 import { runblockdata_for_sub } from './quickadd';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
@@ -224,8 +224,23 @@ export function initializeSortableKanban() {
     const containers = document.querySelectorAll('.kanban-board');
     if (!containers.length) return;
 
-    // 添加按钮点击监听
+    // 添加事件点击监听
+    const stRefs = document.querySelectorAll('.st-ref');
+    stRefs.forEach(ref => {
+        const newRef = ref.cloneNode(true);
+        ref.parentNode.replaceChild(newRef, ref);
+        newRef.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const blockId = (e.currentTarget as HTMLElement).getAttribute('data-id');
+            if (blockId) {
+                showEvent(blockId,"",false,true);
+            }
+        });
+    });
 
+
+    // 添加按钮点击监听
     const addButton = document.querySelectorAll('.kanban-add-button');
     if (addButton) {
         // console.log(addButton);
