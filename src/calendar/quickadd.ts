@@ -166,6 +166,21 @@ export function runblockdata_for_time(content: string): string | null {
     return targetDate.format('YYYY-MM-DDTHH:mm');
 }
 
+export function runblockdata_for_sub(content: string): { subevent: string, completed: boolean }[] {
+    // 使用正则表达式全局匹配所有 [X] 或 [ ] 及后面的事件内容，考虑markdown列表格式
+    const taskRegex = /^\s*\*\s*\{:[^}]*\}\s*\[(X| )\]\s*(.+?)(?=\s*\{:|$)/gm;
+    const results: { subevent: string, completed: boolean }[] = [];
+    
+    let match;
+    while ((match = taskRegex.exec(content)) !== null) {
+        results.push({
+            subevent: match[2].trim(),
+            completed: match[1] === 'X'
+        });
+    }
+    
+    return results;
+}
 
 export function quickadd_event_more(event: CustomEvent<{//无法实现（短时间内多次添加事件，会导致事件数据丢失）
     menu: subMenu;
@@ -186,7 +201,7 @@ export function quickadd_event_more(event: CustomEvent<{//无法实现（短时�
             console.log('列表项列表:', result.listItems);
             const listItemsdata = result.listItems;
             await quickadd_event_more_main(listItemsdata);
-            // await quickadd_event_more_sub(listItemsdata);
+            await quickadd_event_more_sub(listItemsdata);
         },
     })
 }
@@ -205,6 +220,12 @@ async function quickadd_event_more_main(listItemsdata: BlockTreeResult['listItem
                  isok = await handleAddButtonClick("", {
                     directid: item.id,
                     isdirect: true
+                });
+                //延时处理
+                await new Promise<void>((resolve) => {
+                    setTimeout(() => {
+                        resolve(void 0);
+                    }, 1000);
                 });
                 if(isok){
                     isok=false;
@@ -255,6 +276,12 @@ export async function quickadd_event_more_sub(listItemsdata: BlockTreeResult['li
                 // 建立关联关系
                 try {
                     const result = await run_getsubevents(childEvent, parentEvent);
+                    //延时处理
+                    await new Promise<void>((resolve) => {
+                        setTimeout(() => {
+                            resolve(void 0);
+                        }, 1000);
+                    });
                     if (!result) {
                         console.warn(`关联失败: ${childId} -> ${item.id}`);
                     }

@@ -26,6 +26,7 @@ export interface KBCalendarEvent {
     publicId?: string;
     extendedProps: {
         blockId: string;
+        kramdown: string;
         status: string;
         statusid: string;
         priority: string;

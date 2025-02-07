@@ -13,7 +13,7 @@ export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen, globalOpen2 } from "./myK";
-import { getCursorElement } from "./quickadd";
+import { getCursorElement, quickadd_event_more } from "./quickadd";
 
 // import { openNewWindowById } from "./myK";
 
@@ -231,8 +231,13 @@ export class M_calendar {
             langText: "创建日程（光标所在块）",
             hotkey: "",
             editorCallback: async (pro) => {
-                const cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
-                // console.log("cursorElement", cursorElementId);
+                let cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
+                let cursorElement = getCursorElement();
+                if (cursorElement?.closest('.li')) {
+                    cursorElementId = cursorElement.closest('.li').getAttribute('data-node-id');
+                    console.log("c", cursorElementId);
+                }
+                console.log("cursorElement", cursorElementId);
                 const blockId = cursorElementId || pro?.breadcrumb?.id;
                 // console.log("pro", blockId);
                 // console.log("创建日程（光标所在块）", blockId);

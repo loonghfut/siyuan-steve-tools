@@ -8,7 +8,7 @@ import { moduleInstances } from '@/index';
 import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
-import { runblockdata_for_time } from './quickadd';
+import { runblockdata_for_sub, runblockdata_for_time } from './quickadd';
 
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
@@ -241,7 +241,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
                         (endDate && startDate.getTime() === endDate.getTime());
-
+                    const kramdown = (await api.getBlockKramdown(eventId)).kramdown;
                     events.push({
                         id: eventId,
                         title: item['事件']?.content || '',
@@ -250,6 +250,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         allDay: isAllDay,
                         extendedProps: {
                             blockId: eventId,
+                            kramdown:kramdown,
                             rootid: view.from.rootid,
                             status: item['状态']?.content || '',
                             description: item['描述']?.content || '',
@@ -430,10 +431,9 @@ export async function createEventInDatabase(//TODO:加一个是否刷新日历�
     if (direct.isdirect) {
 
         //块时间处理
-        const blockdata = await api.getBlockByID(direct.directid);
-        // console.log("blockdata:::", blockdata.content);
-        const ce = runblockdata_for_time(blockdata?.content);
-        // console.log("ce:::", ce);
+        const blockdata = await api.getBlockKramdown(direct.directid);
+        console.log("blockdata:::", blockdata.kramdown);
+        const ce = runblockdata_for_time(blockdata?.kramdown);
         if (ce) {
             dateStr = ce;
         }
@@ -538,8 +538,8 @@ export async function createEventInDatabase(//TODO:加一个是否刷新日历�
                 dateStr = newdateStr;
             }
             ////块时间处理
-            const blockdata = await api.getBlockByID(id);
-            const ce = runblockdata_for_time(blockdata?.content);
+            const blockdata = await api.getBlockKramdown(id);
+            const ce = runblockdata_for_time(blockdata?.kramdown);
             if (ce) {
                 dateStr = ce;
             }

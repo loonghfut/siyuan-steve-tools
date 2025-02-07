@@ -6,6 +6,7 @@ import { av_ids, filterViewId, OUTcalendar, viewName } from './calendar';
 import { showMessage } from 'siyuan';
 import { settingdata } from '..';
 import { createEventInDatabase, getViewId, getViewValue } from './myF';
+import { runblockdata_for_sub } from './quickadd';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
@@ -20,8 +21,8 @@ const CATEGORY_MAP = {
 } as const;
 
 
-export function update_allKBEvents(){
-    
+export function update_allKBEvents() {
+
 }
 
 
@@ -75,6 +76,13 @@ const CustomViewConfig = {
             ).length || 0;
             const progressPercent = totalSubtasks ? (completedSubtasks / totalSubtasks) * 100 : 0;
 
+            // 添加新的子事件完成进度计算
+            const blockSubEvents = runblockdata_for_sub(event.extendedProps.kramdown || '');
+            const totalBlockSubs = blockSubEvents.length;
+            const completedBlockSubs = blockSubEvents.filter(sub => sub.completed).length;
+            const blockProgressPercent = totalBlockSubs ? (completedBlockSubs / totalBlockSubs) * 100 : 0;
+
+
             // 生成SVG环形进度图
             const progressCircle = totalSubtasks ? `
     <div class="progress-container">
@@ -88,9 +96,26 @@ const CustomViewConfig = {
                        stroke-dashoffset: ${2 * Math.PI * 8 * (1 - progressPercent / 100)}"
             />
         </svg>
-        <span class="progress-percentage">${Math.round(progressPercent)}%</span>
+        <span class="progress-percentage">${completedSubtasks}/${totalSubtasks}</span>
     </div>
             ` : '';
+
+            // 生成新的块内子事件进度环形图
+            const blockProgressCircle = totalBlockSubs ? `
+    <div class="progress-container block-progress" title="块内子事件完成进度">
+        <svg class="progress-ring" width="20" height="20" viewBox="0 0 20 20">
+            <circle class="progress-ring-bg" r="8" cx="10" cy="10" />
+            <circle class="progress-ring-circle block-progress-circle" 
+                r="8" 
+                cx="10" 
+                cy="10"
+                style="stroke-dasharray: ${2 * Math.PI * 8};
+                       stroke-dashoffset: ${2 * Math.PI * 8 * (1 - blockProgressPercent / 100)}"
+            />
+        </svg>
+        <span class="progress-percentage">${completedBlockSubs}/${totalBlockSubs}</span>
+    </div>
+` : '';
 
             return `
                 <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
@@ -106,6 +131,7 @@ const CustomViewConfig = {
                     <div class="kanban-card-content">
                         <div class="time-progress-container">
                             ${endtime}
+                            ${blockProgressCircle}
                             ${progressCircle}
                         </div>
                     </div>
