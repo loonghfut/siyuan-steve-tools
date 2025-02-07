@@ -224,7 +224,7 @@ export function initializeSortableKanban() {
     const containers = document.querySelectorAll('.kanban-board');
     if (!containers.length) return;
 
-    // 添加事件点击监听
+    // 跳转事件点击监听
     const stRefs = document.querySelectorAll('.st-ref');
     stRefs.forEach(ref => {
         const newRef = ref.cloneNode(true);
