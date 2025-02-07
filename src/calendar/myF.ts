@@ -139,6 +139,14 @@ function extractDataFromTable(data: any, isZQ = false) {
                     };
                 }
 
+                //提取是否主事件
+                if (columnMap.has('主事件') && row.cells) {
+                    const mainCell= row.cells[columnMap.get('主事件').index];
+                    rowData['主事件'] = {
+                        content: mainCell?.value?.checkbox?.checked || false,
+                        keyID: mainCell?.value?.keyID || ''
+                    }; 
+                }
 
                 // 提取状态
                 if (isZQ) {
@@ -241,7 +249,10 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
                         (endDate && startDate.getTime() === endDate.getTime());
-                    const kramdown = (await api.getBlockKramdown(eventId)).kramdown;
+                    let kramdown = "";
+                    if (item['主事件']?.content || false) {
+                        kramdown = (await api.getBlockKramdown(eventId)).kramdown;
+                    }
                     events.push({
                         id: eventId,
                         title: item['事件']?.content || '',
@@ -251,6 +262,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         extendedProps: {
                             blockId: eventId,
                             kramdown: kramdown,
+                            iskramdown: item['主事件']?.content || false,
                             rootid: view.from.rootid,
                             status: item['状态']?.content || '',
                             description: item['描述']?.content || '',
@@ -331,7 +343,7 @@ export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMor
     let seemore = false;
     if (!forceSeeMore) {
         seemore = settingdata["cal-seemore"] || isSeeMore;
-    }else{
+    } else {
         seemore = isSeeMore;
     }
     const block = await api.getBlockByID(blockID);
@@ -344,7 +356,7 @@ export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMor
             app: window.siyuan.ws.app,
             doc: {
                 id: blockID,
-                action: ["cb-get-hl","cb-get-all"],
+                action: ["cb-get-hl", "cb-get-all"],
             },
             // position: "right",
             keepCursor: false
