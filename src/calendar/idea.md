@@ -23,7 +23,8 @@
 17. 快速添加日程优化 no
     借鉴制闪卡的规则，实现快速标记事件和关联事件 no （短时间内多次添加事件，会导致事件丢失）
 18. 添加过程中，识别添加块中是否有时间，若有则按照块中的时间设置日程 ok
-19. export async function createEventInDatabase//TODO:加一个是否刷新日历的参数
+19. export async function createEventInDatabase//TODO:加一个是否刷新日历的参数 ok
 20. 生成日历ics文件的错误处理，常常无法读取到目录（应该是电脑休眠后，思源内核会停止工作）
 21. 换了一种方式实现子任务快速添加 ok
+
 22. 优先级高的事件，生成ics文件时带闹钟提醒
