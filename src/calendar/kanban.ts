@@ -199,7 +199,6 @@ const CustomViewConfig = {
         // console.log('datesSet:::::::::::AAAAAAAA:::::::::::::');
         initializeSortableKanban();
     },
-
     willUnmount: function (props) {
         // console.log('：：：：：：：：：：about to change away from custom view', props);
     }

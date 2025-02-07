@@ -182,8 +182,15 @@ export class M_calendar {
                     // console.log("updateAttrs");
                     this.avButton();
                     // if(msg.data[0].doOperations[0].action === "updateAttrViewCell"){
-                    await refreshKanban();
+                    refreshKanban();
                     // }
+                }
+                //【】同步更新看板
+                if (msg.data[0].doOperations[0].action === "update") {
+                    const data = msg.data[0].doOperations[0].data;
+                    if (data.startsWith('<div data-marker')) {
+                        refreshKanban();
+                    }
                 }
             }
         });
