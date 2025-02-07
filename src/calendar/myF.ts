@@ -250,7 +250,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         allDay: isAllDay,
                         extendedProps: {
                             blockId: eventId,
-                            kramdown:kramdown,
+                            kramdown: kramdown,
                             rootid: view.from.rootid,
                             status: item['状态']?.content || '',
                             description: item['描述']?.content || '',
@@ -396,7 +396,7 @@ export async function showEvent(blockID, rootId, isSeeMore = false) {
 //// 将新创建的块添加到数据库中
 //// 并设置此块的数据库属性，属性的值来源于用户添加事件的面板
 //// 尽量使用思源的api实现
-export async function createEventInDatabase(//TODO:加一个是否刷新日历的参数
+export async function createEventInDatabase(//OK:加一个是否刷新日历的参数
     dateStr: string,
     // databaseId?: string,
     calendar: Calendar,
@@ -404,6 +404,7 @@ export async function createEventInDatabase(//TODO:加一个是否刷新日历�
     db_id?: string,
     status = "",
     direct = { isdirect: false, directid: "" },
+    isrefresh = true
 ) {
     let isok = false;
     status = status || "未完成";
@@ -447,7 +448,7 @@ export async function createEventInDatabase(//TODO:加一个是否刷新日历�
         // console.log("selectdata", selectdata);
         await api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select");
         sy.showMessage('已添加事件', 2000, "info", "1");
-        return true ;
+        return true;
     }
 
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
@@ -553,11 +554,15 @@ export async function createEventInDatabase(//TODO:加一个是否刷新日历�
                     steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
                     if (!panel.isUploading()) {
                         clearInterval(checkUploading);
-                        setTimeout(() => calendar?.refetchEvents(), 1000);
+                        if (isrefresh) {
+                            setTimeout(() => calendar?.refetchEvents(), 1000);
+                        }
                     }
                 }, 100);
             } else {
-                setTimeout(() => calendar?.refetchEvents(), 1000);//TODO:优化速度
+                if (isrefresh) {
+                    setTimeout(() => calendar?.refetchEvents(), 1000);//TODO:优化速度
+                }
             }
             // 提示用户
             sy.showMessage('正在添加事件', -1, "info", "1");
