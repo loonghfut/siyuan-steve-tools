@@ -27,7 +27,7 @@ export let filterViewId: string;
 export let av_ids: string[] = [];
 export let viewName = "全部视图";
 // export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
-
+// let ishandrefetchEvents = true;
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
 }
@@ -413,6 +413,18 @@ export async function run(
     // Calendars_pro.push({Calendar:calendar,id:id});
     OUTcalendar = calendar;
     calendar.render();
+    // // 手动重新获取视图数据 - 只添加一次事件监听器
+    // const titleClickHandler = (e: MouseEvent) => {
+    //     const target = e.target as HTMLElement;
+    //     if (target.classList.contains('fc-toolbar-title')) {
+    //         refreshKanban();
+    //         console.log('refetchEvents：：AAA');
+    //     }
+    // };
+    // if (ishandrefetchEvents) {
+    //     document.addEventListener('click', titleClickHandler);
+    //     ishandrefetchEvents = false;
+    // }
     return calendar;
 }
 

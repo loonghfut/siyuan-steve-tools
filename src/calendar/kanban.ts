@@ -21,8 +21,22 @@ const CATEGORY_MAP = {
 } as const;
 
 
-export function update_allKBEvents() {
-
+function debounce<T extends (...args: any[]) => any>(
+    func: T,
+    wait: number
+): (...args: Parameters<T>) => void {
+    let timeout: NodeJS.Timeout | null = null;
+    
+    return function (...args: Parameters<T>) {
+        if (timeout) {
+            clearTimeout(timeout);
+        }
+        
+        timeout = setTimeout(() => {
+            func.apply(this, args);
+            timeout = null;
+        }, wait);
+    };
 }
 
 
@@ -412,7 +426,8 @@ export function destroyAllSortables() {
     sortableInstances = [];
 }
 
-export const refreshKanban = async () => {
+// 创建防抖后的 refreshKanban
+const _refreshKanban = async () => {
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
     if (!thisCalendars.length) return;
     // 记录所有日历的滚动位置
@@ -433,25 +448,13 @@ export const refreshKanban = async () => {
     const buttons = document.querySelectorAll('.fc-viewFilter-button');
     buttons.forEach(btn => btn.textContent = viewName);
 
-
-
     // 设置加载状态
     const kanbanCards = document.querySelectorAll('.kanban-card');
     kanbanCards.forEach(card => {
         destroyAllSortables();
         (card as HTMLElement).style.cursor = 'wait';
     });
-
-    // 错误操作检查
-    // setTimeout(() => {
-    //     const cards = document.querySelectorAll('.kanban-card');
-    //     if ([...cards].some(card => (card as HTMLElement).style.cursor === 'wait')) {
-    //         showMessage('进行了非常规操作，请手动刷新一下一直加载的视图', -1, "info", "kanban-update");
-    //     }
-    // }, 3000);
-
     // console.log('ST开始依次刷新日历');
-
     // 依次刷新每个日历
     for (const calendar of thisCalendars) {
         await new Promise<void>(resolve => {
@@ -475,10 +478,13 @@ export const refreshKanban = async () => {
         });
         // console.log(`日历 ${calendar.el.id} 刷新完成`);
     }
-
+    kanbanCards.forEach(card => {
+        (card as HTMLElement).style.cursor = '';
+    });
     // 重新初始化拖拽
     initializeSortableKanban();
 };
+export const refreshKanban = debounce(_refreshKanban, 300); 
 
 const logDebug = (message: string, ...args: any[]) => {
     console.log(`[Kanban] ${message}`, ...args);
