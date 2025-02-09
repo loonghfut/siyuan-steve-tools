@@ -272,6 +272,10 @@ export function initializeSortableKanban() {
             scroll: true, // 启用滚动
             scrollSensitivity: 10, // 滚动敏感度
             scrollSpeed: 10, // 滚动速度
+            //移动端适配
+            delayOnTouchOnly: true, // 仅在触摸设备上启用延迟
+            delay: 750, // 设置长按延迟时间为750毫秒
+            touchStartThreshold: 15, // 触摸移动阈值，防止轻微移动触发拖拽
             onStart: function (evt) {
                 isDragging = true; // 开始拖拽时设置标志
                 // console.log('onStart', evt);
