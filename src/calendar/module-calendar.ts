@@ -583,68 +583,6 @@ export class M_calendar {
         }
     }
 
-    async runAddEvent(result: any, isZq: boolean = false) {
-        if (isZq == false) {
-            let i = 0;
-            for (const item of result) {
-                //检测item是否符合要求
-                if (!item.dateContent || !item.dateContent2 || !item.textContent || !item.blockContent) {
-                    steveTools.outlog('Invalid event data:', item);
-                    i++;
-                    showMessage('存在不符合要求的数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
-                    continue;
-                }
-                const endtime = convertTimestampToArray(item.dateContent2);
-                const starttime = convertTimestampToArray(item.dateContent);
-                const description = item.textContent;
-                const title = item.blockContent;
-                const status = item.status === "完成" ? "CONFIRMED" : "TENTATIVE";
-
-                const newEvent: EventAttributes = {
-                    start: starttime,
-                    startInputType: 'local',
-                    startOutputType: 'local',
-                    end: endtime, // 指定结束时间
-                    endInputType: 'local',
-                    endOutputType: 'local',
-                    title: title,
-                    description: description,
-                    status: status,
-                    // location: 'Office'
-                }
-                await this.addEventToGlobal(newEvent);
-                // steveTools.outlog(newEvent,"ttttiaos");
-            }
-        } else {//周期事件
-            let i = 0;
-            for (const item of result) {
-                //检测item是否符合要求
-                if (!item.dateContent || !item.textContent || !item.blockContent || !item.rule) {
-                    steveTools.outlog('Invalid event data:', item);
-                    i++;
-                    showMessage('存在不符合要求的周期数据（请检查数据库格式），已跳过' + i + '条数据', 6000, "info", "tiao");
-                    continue;
-                }
-                const duration = { hours: item.duration };
-                const starttime = convertTimestampToArray(item.dateContent);
-                const description = item.textContent;
-                const title = item.blockContent;
-                // const frequency = mapFrequency(item.frequency);//TODO
-                const recurrenceRule = item.rule
-                const newEvent: EventAttributes = {
-                    start: starttime,
-                    startInputType: 'local',
-                    startOutputType: 'local',
-                    duration: duration, // 指定持续时间
-                    title: title,
-                    description: description,
-                    recurrenceRule: recurrenceRule,
-                }
-                await this.addEventToGlobal(newEvent);
-                // steveTools.outlog(newEvent,"ttttiaos");
-            }
-        }
-    }
 
     // 添加新事件到全局变量
     async addEventToGlobal(newEvent: EventAttributes) {
