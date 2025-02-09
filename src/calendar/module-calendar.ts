@@ -155,7 +155,7 @@ export class M_calendar {
                                     await this.getEventsFromSiYuanDatabase();
                                     console.log("更新日历文件<2>");
                                     this.isUpdating = false;
-                                }, 3000);
+                                }, 10000);
                             }
                         } else {
                             // steveTools.outlog("avID 不在 avids 数组中");
