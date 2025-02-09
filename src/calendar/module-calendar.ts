@@ -423,7 +423,7 @@ export class M_calendar {
     }
 
 
-    private convertEventFormat(eventData: any[][]): EventAttributes[] {
+    private convertEventFormat(eventData: any[][]): EventAttributes[] {//TODO这里才是重点！！待优化(加接口)
         const events: EventAttributes[] = [];
 
         // 处理常规事件数组
@@ -434,7 +434,19 @@ export class M_calendar {
                     end: event.end,
                     title: event.title,
                     description: event.description,
-                    status: event.status
+                    status: event.status,
+                    // 添加提醒配置
+                    alarms: [
+                        {
+                            action: 'display',
+                            summary:`${event.title}`,
+                            description: `${event.description}`,
+                            trigger: {
+                                before: true,
+                                minutes: 15,
+                            }
+                        }
+                    ],
                 });
             });
         }
@@ -447,7 +459,19 @@ export class M_calendar {
                     title: recurringEvent.title,
                     description: recurringEvent.description,
                     recurrenceRule: recurringEvent.recurrenceRule,
-                    duration: recurringEvent.duration // Add default duration of 1 hour for recurring events
+                    duration: recurringEvent.duration, // Add default duration of 1 hour for recurring events
+                    // 添加提醒配置
+                    alarms: [
+                        {
+                            action: 'display',
+                            summary:`${recurringEvent.title}`,
+                            description: `${recurringEvent.description}`,
+                            trigger: {
+                                before: true,
+                                minutes: 15,
+                            }
+                        }
+                    ],
                 });
             });
         }
@@ -470,7 +494,10 @@ export class M_calendar {
             const convertedEvents = this.convertEventFormat(rawEvents);
 
             // 生成ICS内容
-            const { error, value: icsContent } = createEvents(convertedEvents);
+            const { error, value: icsContent } = createEvents(convertedEvents, {
+                method: 'PUBLISH',
+                calName: 'ST思源日程',
+            });
             if (error) {
                 console.error('生成ICS内容时出错：', error);
                 return;
@@ -678,7 +705,18 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
             startInputType: "local",
             startOutputType: "local",
             title: event?.事件?.content,
-            description: event?.描述?.content
+            description: event?.描述?.content,
+            // 添加默认提醒
+            alarms: [
+                {
+                    action: 'DISPLAY',  // 注意大写
+                    description: `提醒: ${event?.事件?.content}`,
+                    trigger: {
+                        before: true,
+                        minutes: 10,
+                        repeat: 1    // 添加重复次数
+                    }
+                }],
         };
 
         // Add properties based on event type
