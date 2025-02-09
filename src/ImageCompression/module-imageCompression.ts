@@ -4,7 +4,7 @@ import { showMessage } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
 
-export class imageCompression {
+export class M_imageCompression {
     private plugin: steveTools;
     constructor(plugin: steveTools) {
         this.plugin = plugin;

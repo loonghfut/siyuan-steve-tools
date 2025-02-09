@@ -19,9 +19,11 @@
     }
 
     let groups: string[] = [
-        "📅日程管理 2.1",
+        "日程管理 2.1",
         "docker同步感知",
         "ai侧边栏",
+        "🛠️图片压缩（未完成）",
+        "🛠️画板（未完成）",
         "✨开发中。。",
     ];
     let focusGroup = groups[0];
@@ -150,7 +152,8 @@
         {
             type: "checkbox",
             title: "事件交互方式",
-            description: "启用后和事件交互会自动跳转到块属性页面，启用前则跳转到目标块",
+            description:
+                "启用后和事件交互会自动跳转到块属性页面，启用前则跳转到目标块",
             key: "cal-seemore",
             value: settings["cal-seemore"],
         },
@@ -331,6 +334,45 @@
         },
     ];
 
+    let group5Items: ISettingItem[] = [
+        {
+            type: "checkbox",
+            title: "启用手写功能",
+            description: "启用后可以在编辑器中使用手写功能",
+            key: "handwriting-enable",
+            value: settings["handwriting-enable"],
+        },
+        {
+            type: "button",
+            title: "button",
+            description: "This is a button",
+            key: "e",
+            value: "Click Button",
+            button: {
+                label: "Click Me",
+                callback: () => {
+                    showMessage("Hello, world!");
+                },
+            },
+        },
+    ];
+
+    let group6Items: ISettingItem[] = [
+        {
+            type: "button",
+            title: "button",
+            description: "This is a button",
+            key: "e",
+            value: "Click Button",
+            button: {
+                label: "Click Me",
+                callback: () => {
+                    showMessage("Hello, world!");
+                },
+            },
+        },
+    ];
+
     /********** Events **********/
     interface ChangeEvent {
         group: string;
@@ -353,7 +395,11 @@
 
     function isrefresh(setting) {
         // console.log("isrefresh", setting);
-        if (setting === "cal-enable" || setting === "sync-enable"||setting==="ai-enable") {
+        if (
+            setting === "cal-enable" ||
+            setting === "sync-enable" ||
+            setting === "ai-enable"
+        ) {
             myapi.refresh();
         }
     }
@@ -363,15 +409,15 @@
         console.debug("Settings saved:", settings);
     }
     onMount(async () => {
-        const headerEl = document.querySelector('.b3-dialog__header');
+        const headerEl = document.querySelector(".b3-dialog__header");
         if (headerEl) {
             // 创建刷新按钮
-            const refreshBtn = document.createElement('button');
-            refreshBtn.className = 'b3-button b3-button--outline';
-            refreshBtn.style.cssText = 'float: right; margin-right: 8px;';
-            refreshBtn.textContent = '保存';
+            const refreshBtn = document.createElement("button");
+            refreshBtn.className = "b3-button b3-button--outline";
+            refreshBtn.style.cssText = "float: right; margin-right: 8px;";
+            refreshBtn.textContent = "保存";
             refreshBtn.onclick = () => myapi.refresh();
-            
+
             // 添加按钮到header
             headerEl.appendChild(refreshBtn);
         }
@@ -404,6 +450,18 @@
             value: settings[item.key] ?? item.value,
         }));
         group3Items = group3Items.map((item) => ({
+            ...item,
+            value: settings[item.key] ?? item.value,
+        }));
+        group4Items = group4Items.map((item) => ({
+            ...item,
+            value: settings[item.key] ?? item.value,
+        }));
+        group5Items = group5Items.map((item) => ({
+            ...item,
+            value: settings[item.key] ?? item.value,
+        }));
+        group6Items = group6Items.map((item) => ({
             ...item,
             value: settings[item.key] ?? item.value,
         }));
@@ -463,6 +521,24 @@
             group={groups[3]}
             settingItems={group4Items}
             display={focusGroup === groups[3]}
+            on:changed={onChanged}
+            on:click={({ detail }) => {
+                console.debug("Click:", detail.key);
+            }}
+        ></SettingPanel>
+        <SettingPanel
+            group={groups[4]}
+            settingItems={group5Items}
+            display={focusGroup === groups[4]}
+            on:changed={onChanged}
+            on:click={({ detail }) => {
+                console.debug("Click:", detail.key);
+            }}
+        ></SettingPanel>
+        <SettingPanel
+            group={groups[5]}
+            settingItems={group6Items}
+            display={focusGroup === groups[5]}
             on:changed={onChanged}
             on:click={({ detail }) => {
                 console.debug("Click:", detail.key);

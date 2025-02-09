@@ -915,3 +915,30 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     margin-left: auto; // 添加这行使其靠右对齐
 }
 
+
+//画板模块
+// .handwriting-canvas {
+//     touch-action: none; // 防止触摸设备上的默认行为
+//     cursor: crosshair;
+//     background: rgba(255, 255, 255, 0.9);
+// }
+
+// .toolbar-item[aria-label="手写"] {
+//     opacity: 0.7;
+//     &:hover {
+//         opacity: 1;
+//     }
+// }
+// .handwriting-canvas {
+//     touch-action: none;
+//     cursor: crosshair;
+//     pointer-events: auto !important;
+// }
+
+// .protyle-toolbar__item[aria-label="手写"] {
+//     opacity: 0.7;
+    
+//     &:hover {
+//         opacity: 1;
+//     }
+// }

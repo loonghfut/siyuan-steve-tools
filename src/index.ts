@@ -26,6 +26,9 @@ import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";
 import { M_sync } from "./sync/module-sync";
 import { M_ai  } from "./ai/ai";
+import { M_handwriting } from "./handwriting/module-handwriting";
+import { M_imageCompression } from "./ImageCompression/module-imageCompression";
+
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";
 
@@ -57,6 +60,14 @@ export default class steveTools extends Plugin {
             console.log("ai模块加载");
         //    initdock();
         }
+        if (data["img-compress-enable"] == true) {
+            this.loadModule(M_imageCompression, 'M_imageCompression');
+            console.log("图片压缩模块加载");
+        }
+        if (data["handwriting-enable"] == true) {
+            this.loadModule(M_handwriting, 'M_handwriting'); 
+            console.log("画板模块加载");
+        }
 
     }
 
@@ -81,7 +92,7 @@ export default class steveTools extends Plugin {
         this.runloadModule(settingdata);
         for (const moduleName in moduleInstances) {
             steveTools.outlog("init--"+moduleName);
-            await moduleInstances[moduleName].init(settingdata);
+            await moduleInstances[moduleName]?.init?.(settingdata);
         }
 
     }

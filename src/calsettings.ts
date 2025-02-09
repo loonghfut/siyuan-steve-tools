@@ -21,6 +21,10 @@ export const defaultSettings = {
     // ai模块
     "ai-enable": false,
     "ai-url": "https://www.doubao.com/chat/",
+    // 图片压缩模块
+    "img-compress-enable": false,
+    // 画板模块
+    "handwriting-enable": false,
 };
 
 export function getSettings() {
