@@ -174,15 +174,17 @@ export class M_calendar {
         }
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
         //实现看板实时更新
-        window.siyuan.ws.ws.addEventListener('message', async (e) => {
-            const msg = JSON.parse(e.data);
+        //2025-2-9更新为插件api方式监听
+        this.plugin.eventBus.on("ws-main", async (e) => {
+            const msg = e.detail;
             if (msg.cmd === "transactions") {
-                // console.log(msg);
+                // console.log("newway",msg);
                 if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
                     // console.log("updateAttrs");
                     this.avButton();
                     // if(msg.data[0].doOperations[0].action === "updateAttrViewCell"){
                     refreshKanban();
+                    console.log('trans')
                     // }
                 }
                 //【】同步更新看板 //TODO优化请求频率
