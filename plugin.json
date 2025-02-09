@@ -25,7 +25,7 @@
   },
   "description": {
     "en_US": "schedule management, docker sync awareness, ai sidebar",
-    "zh_CN": "日程管理, docker同步感知, ai侧边栏"
+    "zh_CN": "日程管理（基于数据库的看板视图和日历视图）, docker同步感知, ai侧边栏"
   },
   "readme": {
     "en_US": "README.md",
