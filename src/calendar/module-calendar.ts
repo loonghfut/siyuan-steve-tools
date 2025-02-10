@@ -14,6 +14,7 @@ import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen, globalOpen2 } from "./myK";
 import { getCursorElement, quickadd_event_more } from "./quickadd";
+import { insertHtml } from "./insertHtml";
 
 // import { openNewWindowById } from "./myK";
 
@@ -255,23 +256,26 @@ export class M_calendar {
             },
         })
         //注册斜杠
-        this.plugin.protyleSlash = [{
-            filter: ["kb", "看板"],
-            html: "插入看板",
-            id: "ST_calendar_slash_kanban",
-            callback: async (protyle) => {
-                console.log("添加日程", protyle);
-                // protyle.insert()
-            }
-        },{
-            filter: ["rl", "日历"],
-            html: "插入日历",
-            id: "ST_calendar_slash_calendar",
-            callback: async (protyle) => {
-                console.log("添加日程", protyle);
-                // protyle.insert()
-            }
-        }]
+        // this.plugin.protyleSlash = [{
+        //     filter: ["kb", "看板"],
+        //     html: "插入看板",
+        //     id: "ST_calendar_slash_kanban",
+        //     callback: async (protyle) => {
+        //         console.log("添加日程", protyle);
+        //         const Hdata=await insertHtml();
+        //         const ca = await run("", 'dayGridMonth')
+        //         protyle.insert(`${ca.el.outerHTML}`,true,true);
+
+        //     }
+        // },{
+        //     filter: ["rl", "日历"],
+        //     html: "插入日历",
+        //     id: "ST_calendar_slash_calendar",
+        //     callback: async (protyle) => {
+        //         console.log("添加日程", protyle);
+        //         // protyle.insert()
+        //     }
+        // }]
     }
 
     async callback(mutationsList: MutationRecord[]) {

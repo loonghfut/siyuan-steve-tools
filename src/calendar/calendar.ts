@@ -42,7 +42,12 @@ export async function run(
     ccenter = 'title',
 ) {
     filterViewId = S_viewID;
-    const calendarEl = document.getElementById(`calendar-${id}`)!;
+    let calendarEl: HTMLElement;
+    if (id === "") {
+        calendarEl = document.createElement('div');
+    } else {
+        calendarEl = document.getElementById(`calendar-${id}`)!;
+    }
     const calendar = new Calendar(calendarEl, {
         plugins: [
             interactionPlugin,

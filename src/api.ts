@@ -734,7 +734,7 @@ export async function updateAttrViewCell_pro(
     endtime?: string
 ) {
     const doOperations: IOperation[] = [];
-    const newId = await generateSiyuanID();
+    const newId = await generateSiyuanID() as string;
     let cellData: any;
 
     switch (type) {
@@ -846,7 +846,7 @@ function transformBlockData(input: any[]): any[] {
 
 
 
-export async function generateSiyuanID() {
+export async function generateSiyuanID(more = false) {
     // 生成时间戳部分
     const now = new Date();
     const timestamp = now.getFullYear() +
@@ -864,7 +864,15 @@ export async function generateSiyuanID() {
     }
 
     // 组合ID
-    return `${timestamp}-${randomStr}`;
+    if (more) {
+        return {
+            id: `${timestamp}-${randomStr}`,
+            timestamp,
+            randomStr
+        };
+    } else {
+        return `${timestamp}-${randomStr}`;
+    }
 }
 
 async function getDateTimestamps(dateStr: string): Promise<{ start: number, end: number }> {
