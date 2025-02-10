@@ -435,11 +435,11 @@ export class M_calendar {
                     title: event.title,
                     description: event.description,
                     status: event.status,
-                    // 添加提醒配置
-                    alarms: [
+                    // 根据状态决定是否添加提醒配置
+                    alarms: event.status === 'CONFIRMED' ? [] : [
                         {
                             action: 'display',
-                            summary:`${event.title}`,
+                            summary: `${event.title}`,
                             description: `${event.description}`,
                             trigger: {
                                 before: true,
@@ -464,7 +464,7 @@ export class M_calendar {
                     alarms: [
                         {
                             action: 'display',
-                            summary:`${recurringEvent.title}`,
+                            summary: `${recurringEvent.title}`,
                             description: `${recurringEvent.description}`,
                             trigger: {
                                 before: true,
@@ -702,21 +702,8 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
         // Base event object with common properties
         const baseEvent = {
             start: timestampToArray(event?.开始时间?.start),
-            startInputType: "local",
-            startOutputType: "local",
             title: event?.事件?.content,
             description: event?.描述?.content,
-            // 添加默认提醒
-            alarms: [
-                {
-                    action: 'DISPLAY',  // 注意大写
-                    description: `提醒: ${event?.事件?.content}`,
-                    trigger: {
-                        before: true,
-                        minutes: 10,
-                        repeat: 1    // 添加重复次数
-                    }
-                }],
         };
 
         // Add properties based on event type
@@ -730,8 +717,6 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
             return {
                 ...baseEvent,
                 end: timestampToArray(event.开始时间.end),
-                endInputType: "local",
-                endOutputType: "local",
                 status: event.状态.content === "完成" ? "CONFIRMED" : "TENTATIVE"
             };
         }
