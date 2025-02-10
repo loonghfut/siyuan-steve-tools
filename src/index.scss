@@ -334,7 +334,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 .fc .fc-timegrid-slot {
     border-bottom: 0px;
-    height: calc((100vh - 300px) / 24); // 减去顶部工具栏、标题等空间，平均分配给24个时间槽
+    height: calc((100vh - 255px) / 24); // 减去顶部工具栏、标题等空间，平均分配给24个时间槽
 }
 
 .fc-multimonth-singlecol .fc-day {
@@ -746,7 +746,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     }
 
     .kanban-board {
-        max-height: 88.7vh;
+        max-height: 100%;
     }
 
     // [id^=calendar-] {
@@ -854,12 +854,16 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 .sy__siyuan-steve-toolscal-dock-day {
     .fc-timeGridDay-view {
-        height: 86.6vh;
+        height: 100%;
     }
 
     .fc .fc-timegrid-slot {
         border-bottom: 0px;
-        height: calc((79vh) / 24);
+        height: calc((100vh - 132px) / 24);
+    }
+    .fc-daygrid-day-events{
+        min-height: 0em !important;
+        margin-bottom: 0em !important;
     }
 
     .fc .fc-view-harness {
@@ -867,7 +871,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     }
 
     [id^=calendar-] {
-        height: 93vh;
+        height: 100% !important;
     }
 }
 
