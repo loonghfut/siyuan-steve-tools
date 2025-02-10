@@ -217,7 +217,7 @@ export class M_calendar {
                     return;
                 }
                 isCommandExecuting = true;
-                console.log("添加日程waiwai");
+                // console.log("添加日程waiwai");
                 try {
                     // await globalOpen();//失败
                     globalOpen2();
