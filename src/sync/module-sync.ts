@@ -32,12 +32,27 @@ export class M_sync {
                         console.log("取消感知");
                     } else {
                         setTimeout(async () => {
-                            const state = await api.URLsync(url, token);
-                            // console.log("state: ", state);
-                            if (state) {
-                                console.log("docker感知成功");//TODO：后面改为图标交互
-                            } else {
-                                showMessage("docker同步感知失败");
+                            try {
+                                let originalIcon = "";
+                                const iconElement = document.querySelector('#plugin_siyuan-steve-tools_0 svg use');
+                                if (iconElement) {
+                                    // 临时改变图标
+                                    originalIcon = iconElement.getAttribute('xlink:href');
+                                    iconElement.setAttribute('xlink:href', '#iconHistory');
+                                }
+                                const state = await api.URLsync(url, token);
+                                // console.log("state: ", state);
+                                if (state) {
+                                    console.log("docker感知成功");//OK：后面改为图标交互
+                                    if (originalIcon) { // 确保 originalIcon 不为空
+                                        iconElement.setAttribute('xlink:href', originalIcon);
+                                    }
+                                } else {
+                                    showMessage("docker同步感知失败");
+                                }
+                            }
+                            catch (e) {
+                                showMessage("同步失败: " + e, -1, "error");
                             }
                         }, 1000);
                     }
