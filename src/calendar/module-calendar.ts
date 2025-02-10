@@ -254,6 +254,24 @@ export class M_calendar {
                 handleAddButtonClick('', { isdirect: true, directid: blockId });
             },
         })
+        //注册斜杠
+        this.plugin.protyleSlash = [{
+            filter: ["kb", "看板"],
+            html: "插入看板",
+            id: "ST_calendar_slash_kanban",
+            callback: async (protyle) => {
+                console.log("添加日程", protyle);
+                // protyle.insert()
+            }
+        },{
+            filter: ["rl", "日历"],
+            html: "插入日历",
+            id: "ST_calendar_slash_calendar",
+            callback: async (protyle) => {
+                console.log("添加日程", protyle);
+                // protyle.insert()
+            }
+        }]
     }
 
     async callback(mutationsList: MutationRecord[]) {
