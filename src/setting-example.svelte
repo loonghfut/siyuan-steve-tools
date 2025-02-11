@@ -391,14 +391,13 @@
     const onChanged = ({ detail }: CustomEvent<ChangeEvent>) => {
         console.log(detail.key, detail.value);
         const setting = settings[detail.key];
-        //在启用功能时，增加自动刷新思源功能
-        isrefresh(detail.key);
-
         if (setting !== undefined) {
             settings[detail.key] = detail.value;
             saveSettings();
         }
-        console.log(detail.key, detail.value);
+        // console.log(detail.key, detail.value);
+        //在启用功能时，增加自动刷新思源功能
+        isrefresh(detail.key);
     };
 
     function isrefresh(setting) {
@@ -406,7 +405,9 @@
         if (
             setting === "cal-enable" ||
             setting === "sync-enable" ||
-            setting === "ai-enable"
+            setting === "ai-enable" ||
+            setting === "handwriting-enable" ||
+            setting === "img-compress-enable"
         ) {
             myapi.refresh();
         }

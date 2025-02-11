@@ -4,7 +4,7 @@ import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
-import { av_ids, run, update_av_ids } from "./calendar";
+import { run, update_av_ids } from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
@@ -12,9 +12,9 @@ export const cal_id = '';
 export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
-import { globalOpen, globalOpen2 } from "./myK";
-import { getCursorElement, quickadd_event_more } from "./quickadd";
-import { insertHtml } from "./insertHtml";
+import { globalOpen2 } from "./myK";
+import { getCursorElement } from "./quickadd";
+// import { insertHtml } from "./insertHtml";
 
 
 
@@ -357,7 +357,7 @@ export class M_calendar {
 
         const id = new Date().getTime().toString();
         let calendar: any;
-        const dialog = new Dialog({
+        new Dialog({
             title: null,
             content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
             width: isMobile ? "100%" : '70%',
@@ -695,18 +695,18 @@ function extractDataAvId(markdown: string): string | null {
 }
 
 
-function convertTimestampToArray(timestamp: number): [number, number, number, number, number] {
-    const date = new Date(timestamp);
-    const offset = 8 * 60; // 东八区的偏移量，单位为分钟
-    const localDate = new Date(date.getTime() + offset * 60 * 1000);
-    return [
-        localDate.getUTCFullYear(),
-        localDate.getUTCMonth() + 1, // 月份从0开始，所以需要加1
-        localDate.getUTCDate(),
-        localDate.getUTCHours(),
-        localDate.getUTCMinutes()
-    ];
-}
+// function convertTimestampToArray(timestamp: number): [number, number, number, number, number] {
+//     const date = new Date(timestamp);
+//     const offset = 8 * 60; // 东八区的偏移量，单位为分钟
+//     const localDate = new Date(date.getTime() + offset * 60 * 1000);
+//     return [
+//         localDate.getUTCFullYear(),
+//         localDate.getUTCMonth() + 1, // 月份从0开始，所以需要加1
+//         localDate.getUTCDate(),
+//         localDate.getUTCHours(),
+//         localDate.getUTCMinutes()
+//     ];
+// }
 
 // 转换思源数据库中的事件数据为 ICS 格式
 
