@@ -44,20 +44,6 @@
             value: settings["cal-url"],
         },
         {
-            type: "textinput",
-            title: "QQ邮箱地址",
-            description: "",
-            key: "cal-qq-email",
-            value: settings["cal-qq-email"],
-        },
-        {
-            type: "textinput",
-            title: "QQ邮箱授权码",
-            description: "",
-            key: "cal-qq-code",
-            value: settings["cal-qq-code"],
-        },
-        {
             type: "button",
             title: "获取订阅链接",
             description: "更改日程文件名后请重新获取日程订阅链接",
