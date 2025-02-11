@@ -15,6 +15,8 @@ import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen, globalOpen2 } from "./myK";
 import { getCursorElement, quickadd_event_more } from "./quickadd";
 import { insertHtml } from "./insertHtml";
+import { CalDAVClient } from "./qqcaldav";
+
 
 // import { openNewWindowById } from "./myK";
 
@@ -31,6 +33,7 @@ export class M_calendar {
     }
     private isUpdating: boolean = false;
     public av_ids: any;
+    private QQCalDAVClient: CalDAVClient;
 
     async init(settingdata) {
         front = getFrontend();
@@ -202,6 +205,11 @@ export class M_calendar {
 
     async onLayoutReady() {
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
+        if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"]) {
+            this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
+            const client =await this.QQCalDAVClient.getCalendars();
+            console.log(client);
+        }
         this.av_ids = await this.getAVreferenceid_pro();
         const targetNode = document.body;
         const config = { childList: true, subtree: true };

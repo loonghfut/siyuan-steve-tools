@@ -52,6 +52,7 @@
     "rrule": "^2.8.1",
     "solarlunar": "^2.0.7",
     "sortablejs": "^1.15.6",
-    "tippy.js": "^6.3.7"
+    "tippy.js": "^6.3.7",
+    "webdav": "^5.7.1"
   }
 }
