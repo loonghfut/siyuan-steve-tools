@@ -158,6 +158,14 @@
             value: settings["cal-seemore"],
         },
         {
+            type: "checkbox",
+            title: "是否展示被关联子的事件",
+            description:
+                "启用后看板会展示被关联子的事件（建议开启）（若关闭，请不要手动操作关联列）",
+            key: "cal-show-ref-event",
+            value: settings["cal-show-ref-event"],
+        },
+        {
             type: "button",
             title: "日程周期模板",
             description: "生成日程周期模板（注意：会创建一个笔记本）",

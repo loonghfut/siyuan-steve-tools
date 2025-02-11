@@ -14,6 +14,7 @@ export const defaultSettings = {
     "cal-db-id": null,
     "cal-create-way": "0",
     "cal-seemore":false,
+    "cal-show-ref-event":true,//是否展示被引用的事件
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

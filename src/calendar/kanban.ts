@@ -26,12 +26,12 @@ function debounce<T extends (...args: any[]) => any>(
     wait: number
 ): (...args: Parameters<T>) => void {
     let timeout: NodeJS.Timeout | null = null;
-    
+
     return function (...args: Parameters<T>) {
         if (timeout) {
             clearTimeout(timeout);
         }
-        
+
         timeout = setTimeout(() => {
             func.apply(this, args);
             timeout = null;
@@ -59,7 +59,7 @@ const CustomViewConfig = {
         }
         ///
         // console.log("处理前数据", dataArray);
-        dataArray = convertEventsToNested(dataArray);
+        dataArray = convertEventsToNested(dataArray, settingdata["cal-show-ref-event"]);
 
         // console.log("处理后数据allKBEvents", allKBEvents);
         // console.log("处理后数据", dataArray);
@@ -234,7 +234,7 @@ export function initializeSortableKanban() {
             e.stopPropagation();
             const blockId = (e.currentTarget as HTMLElement).getAttribute('data-id');
             if (blockId) {
-                showEvent(blockId,"",false,true);
+                showEvent(blockId, "", false, true);
             }
         });
     });
@@ -385,13 +385,15 @@ export default createPlugin({
     }
 });
 
-function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent[] {
+function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvents: boolean = true): NestedKBCalendarEvent[] {
     const eventMap = new Map<string, NestedKBCalendarEvent>();
     const visited = new Set<string>();
     const maxDepth = 10; // 防止过深递归
     const circularRefs = new Set<string>(); // 记录循环引用的事件ID
+    const referencedEvents = new Set<string>(); // 记录被引用的事件ID
 
     // 初始化事件映射，同时包含 allKBEvents 中的事件
+
     const allEvents = [...events, ...allKBEvents];
     allEvents.forEach(event => {
         if (!eventMap.has(event.extendedProps.blockId)) {
@@ -430,10 +432,29 @@ function convertEventsToNested(events: KBCalendarEvent[]): NestedKBCalendarEvent
 
         return event;
     }
+    // 先构建所有事件的引用关系
+    allEvents.forEach(event => {
+        if (event.extendedProps.sub?.ids) {
+            event.extendedProps.sub.ids.forEach(id => {
+                referencedEvents.add(id);
+            });
+        }
+    });
 
-    const nestedEvents = events
+    // 获取所有顶层事件（未被引用的事件）
+    const topLevelEvents = events.filter(event => {
+        const isReferenced = referencedEvents.has(event.extendedProps.blockId);
+        return includeReferencedEvents || !isReferenced;
+    });
+
+    const nestedEvents = topLevelEvents
         .map(event => buildNested(event, new Set(), 0))
         .filter((e): e is NestedKBCalendarEvent => e !== null);
+
+    // console.log('被引用的事件:', Array.from(referencedEvents));
+    // console.log('过滤前事件数:', events.length);
+    // console.log('顶层事件数:', topLevelEvents.length);
+    // console.log('过滤后事件数:', nestedEvents.length);
     return myK.sortEvents(nestedEvents);
 }
 
@@ -502,7 +523,7 @@ const _refreshKanban = async () => {
     // 重新初始化拖拽
     initializeSortableKanban();
 };
-export const refreshKanban = debounce(_refreshKanban, 300); 
+export const refreshKanban = debounce(_refreshKanban, 300);
 
 const logDebug = (message: string, ...args: any[]) => {
     console.log(`[Kanban] ${message}`, ...args);
