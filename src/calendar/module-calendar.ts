@@ -222,10 +222,6 @@ export class M_calendar {
         init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
-        const targetNode = document.body;
-        const config = { childList: true, subtree: true };
-        const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
-        observer.observe(targetNode, config);
         await update_av_ids();//更新日历文件中的av_ids
         let isCommandExecuting = false;
         this.plugin.addCommand({
@@ -297,25 +293,6 @@ export class M_calendar {
         // }]
     }
 
-    async callback(mutationsList: MutationRecord[]) {
-        for (const mutation of mutationsList) {
-            if (mutation.type === 'childList') {
-                mutation.removedNodes.forEach(async (node) => {
-                    if (node instanceof HTMLElement && node.matches('div[data-key="dialog-attr"].b3-dialog--open')) {
-                        // steveTools.outlog('Dialog closed');
-                        await this.getEventsFromSiYuanDatabase();
-                        islisten = true;
-                    }
-                });
-                mutation.addedNodes.forEach(async (node) => {
-                    if (node instanceof HTMLElement && node.matches('div[data-key="dialog-attr"]')) {
-                        // steveTools.outlog('Dialog opened');
-                        islisten = false;
-                    }
-                });
-            }
-        }
-    };
 
 
     private avButton() {
