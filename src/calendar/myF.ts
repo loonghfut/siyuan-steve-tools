@@ -208,7 +208,7 @@ function extractDataFromTable(data: any, isZQ = false) {
 export async function filterViewValue(viewValue, filterKey = '') {
     const filteredViewValue = [];
     // 如果 filterKey 为空，返回所有数据
-    if (!filterKey) {
+    if (!filterKey || filterKey === 'all') {
         return viewValue;
     }
 
@@ -477,7 +477,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
     //// 创建一个新块
     steveTools.outlog("daynote_id:::", daynote_id.id);
-    const idid = await api.generateSiyuanID();
+    const idid = await api.generateSiyuanID() as string;
     const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
     // const id = iddata[0].doOperations[0].id;
     const id = idid;

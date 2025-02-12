@@ -26,6 +26,7 @@ let viewValue_zq: any;
 export let filterViewId: string;
 export let av_ids: string[] = [];
 export let viewName = "全部视图";
+export let viewId = "";
 // export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
 // let ishandrefetchEvents = true;
 export async function update_av_ids() {
@@ -41,7 +42,7 @@ export async function run(
     cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
     ccenter = 'title',
 ) {
-    filterViewId = S_viewID;
+    filterViewId = S_viewID || viewId;
     let calendarEl: HTMLElement;
     if (id === "") {
         calendarEl = document.createElement('div');
@@ -246,6 +247,7 @@ export async function run(
                             // const buttons = document.querySelectorAll('.fc-viewFilter-button');
                             // buttons.forEach(btn => btn.textContent = view.text);
                             viewName = view.text;
+                            viewId = view.id;
                             // 刷新日历
                             refreshKanban();
 
