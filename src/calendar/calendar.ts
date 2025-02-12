@@ -33,7 +33,7 @@ export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
 }
 
-export async function init_viewValue(data:{viewId:string,viewName:string}) {
+export async function init_viewValue(data: { viewId: string, viewName: string }) {
     viewId = data.viewId;
     viewName = data.viewName;
 }
@@ -219,7 +219,7 @@ export async function run(
         },
         customButtons: {
             viewFilter: {
-                text: '',
+                text: '#',
                 click: async function () {
                     // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
@@ -331,10 +331,7 @@ export async function run(
             }
         },
 
-        eventDidMount: function (info) {
-            //修改按钮文本
-            const buttons = document.querySelectorAll('.fc-viewFilter-button');
-            buttons.forEach(btn => btn.textContent = viewName);
+        eventDidMount: async function (info) {
             // 设置样式
             //// 设置随机背景色
             // Use event's ID or title as a unique identifier for color
@@ -384,11 +381,6 @@ export async function run(
 
                 info.el.classList.add('event-completed');
             }
-
-
-
-
-
             // steveTools.outlog(info);
 
             // 添加提示框
@@ -410,10 +402,10 @@ export async function run(
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
                         : ''
                     }
+                            </div>
                         </div>
-                    </div>
-                `,
-                allowHTML: true,
+                    `,
+                    allowHTML: true,
                 placement: 'auto',
                 interactive: true,
                 zIndex: window.siyuan.zIndex,
@@ -421,6 +413,9 @@ export async function run(
                 theme: 'light',
                 delay: [1000, 0]
             });
+            //修改按钮文本
+            const buttons = document.querySelectorAll('.fc-viewFilter-button');
+            buttons.forEach(btn => btn.textContent = viewName);
         },
     });
     thisCalendars.push(calendar);

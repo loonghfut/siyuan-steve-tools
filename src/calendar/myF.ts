@@ -141,11 +141,11 @@ function extractDataFromTable(data: any, isZQ = false) {
 
                 //提取是否主事件
                 if (columnMap.has('主事件') && row.cells) {
-                    const mainCell= row.cells[columnMap.get('主事件').index];
+                    const mainCell = row.cells[columnMap.get('主事件').index];
                     rowData['主事件'] = {
                         content: mainCell?.value?.checkbox?.checked || false,
                         keyID: mainCell?.value?.keyID || ''
-                    }; 
+                    };
                 }
 
                 // 提取状态
@@ -219,8 +219,8 @@ export async function filterViewValue(viewValue, filterKey = '') {
             break;
         }
     }
-    if(filteredViewValue.length===0){
-        sy.showMessage('未找到此视图,请重新选择视图');
+    if (filteredViewValue.length === 0) {
+        sy.showMessage('未找到此视图,请重新选择视图', -1, "error");
     }
     return filteredViewValue;
 
@@ -453,10 +453,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const blockdata = await api.getBlockKramdown(direct.directid);
         // console.log("blockdata:::", blockdata.kramdown);
         const ce = runblockdata_for_time(blockdata?.kramdown);
-        const minsub =runblockdata_for_sub(blockdata?.kramdown);
-        let ismain=false;
-        if(minsub.length>0){
-            ismain=true;
+        const minsub = runblockdata_for_sub(blockdata?.kramdown);
+        let ismain = false;
+        if (minsub.length > 0) {
+            ismain = true;
         }
         if (ce) {
             dateStr = ce;
