@@ -206,7 +206,7 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
-        init_viewValue({viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName")});
+        init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
         const targetNode = document.body;
@@ -374,7 +374,11 @@ export class M_calendar {
         });
 
         setTimeout(async () => {
-            calendar = await run(id, 'dayGridMonth', viewID);
+            if (viewID) {
+                calendar = await run(id, 'dayGridMonth', viewID,'prev,next today');
+            } else {
+                calendar = await run(id, 'dayGridMonth');
+            }
         }, 100);
     }
 
