@@ -4,22 +4,22 @@ import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
 declare const siyuan: any;
-import { run, update_av_ids } from "./calendar";
+import { init_viewValue, run, update_av_ids } from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
 let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
-export const cal_id = '';
 export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen2 } from "./myK";
 import { getCursorElement } from "./quickadd";
+import { M_caldata } from "./M_caldata";
+
 // import { insertHtml } from "./insertHtml";
 
 
 
 // import { openNewWindowById } from "./myK";
-
 let allEvents: EventAttributes[] = [];
 
 let this_settingdata: any = {};
@@ -33,10 +33,13 @@ export class M_calendar {
     }
     private isUpdating: boolean = false;
     public av_ids: any;
+    public calConfig: M_caldata;
 
     async init(settingdata) {
         front = getFrontend();
-        console.log(front);
+        this.calConfig = new M_caldata(this.plugin.name);
+        await this.calConfig.load();
+        console.log(this.calConfig.getAll());
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
@@ -203,6 +206,7 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
+        init_viewValue({viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName")});
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
         const targetNode = document.body;

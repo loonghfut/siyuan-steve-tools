@@ -219,7 +219,9 @@ export async function filterViewValue(viewValue, filterKey = '') {
             break;
         }
     }
-
+    if(filteredViewValue.length===0){
+        sy.showMessage('未找到此视图,请重新选择视图');
+    }
     return filteredViewValue;
 
 }

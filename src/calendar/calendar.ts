@@ -25,12 +25,17 @@ export let viewValue: any;
 let viewValue_zq: any;
 export let filterViewId: string;
 export let av_ids: string[] = [];
-export let viewName = "全部视图";
+export let viewName = "";
 export let viewId = "";
 // export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
 // let ishandrefetchEvents = true;
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+}
+
+export async function init_viewValue(data:{viewId:string,viewName:string}) {
+    viewId = data.viewId;
+    viewName = data.viewName;
 }
 
 
@@ -248,6 +253,9 @@ export async function run(
                             // buttons.forEach(btn => btn.textContent = view.text);
                             viewName = view.text;
                             viewId = view.id;
+                            moduleInstances['M_calendar'].calConfig.set("viewId", viewId);
+                            moduleInstances['M_calendar'].calConfig.set("viewName", viewName);
+                            moduleInstances['M_calendar'].calConfig.save();
                             // 刷新日历
                             refreshKanban();
 

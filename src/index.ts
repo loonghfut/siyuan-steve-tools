@@ -25,7 +25,7 @@ import * as api from "@/api";
 import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";
 import { M_sync } from "./sync/module-sync";
-import { M_ai  } from "./ai/ai";
+import { M_ai } from "./ai/ai";
 import { M_handwriting } from "./handwriting/module-handwriting";
 import { M_imageCompression } from "./ImageCompression/module-imageCompression";
 
@@ -38,7 +38,13 @@ let islog = false;
 const myfile = "steveTools.json";
 export let settingdata: any = {};
 let setdialog: any;
-export let moduleInstances: { [key: string]: any } = {};
+export let moduleInstances: {
+    M_calendar?: M_calendar;
+    M_sync?: M_sync;
+    M_ai?: M_ai;
+    M_handwriting?: M_handwriting;
+    M_imageCompression?: M_imageCompression;
+} = {};
 
 export default class steveTools extends Plugin {
     // private modules: any[];
@@ -58,14 +64,14 @@ export default class steveTools extends Plugin {
         if (data["ai-enable"] == true) {
             this.loadModule(M_ai, 'M_ai');
             console.log("ai模块加载");
-        //    initdock();
+            //    initdock();
         }
         if (data["img-compress-enable"] == true) {
             this.loadModule(M_imageCompression, 'M_imageCompression');
             console.log("图片压缩模块加载");
         }
         if (data["handwriting-enable"] == true) {
-            this.loadModule(M_handwriting, 'M_handwriting'); 
+            this.loadModule(M_handwriting, 'M_handwriting');
             console.log("画板模块加载");
         }
 
@@ -79,7 +85,7 @@ export default class steveTools extends Plugin {
        ${ic.steveTools_icon}
     </symbol>  
         `);
-        
+
         this.addTopBar({
             icon: "iconST",
             title: "SteveTools",
@@ -91,7 +97,7 @@ export default class steveTools extends Plugin {
         settingdata = await this.loadData(myfile);
         this.runloadModule(settingdata);
         for (const moduleName in moduleInstances) {
-            steveTools.outlog("init--"+moduleName);
+            steveTools.outlog("init--" + moduleName);
             await moduleInstances[moduleName]?.init?.(settingdata);
         }
 
@@ -99,7 +105,7 @@ export default class steveTools extends Plugin {
 
     async onLayoutReady() {
         for (const moduleName in moduleInstances) {
-            steveTools.outlog("onLayoutReady--"+moduleName);
+            steveTools.outlog("onLayoutReady--" + moduleName);
             await moduleInstances[moduleName]?.onLayoutReady?.();
         }
     }
