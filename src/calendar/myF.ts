@@ -9,7 +9,12 @@ import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
 import { runblockdata_for_sub, runblockdata_for_time } from './quickadd';
-
+export const statusMap = {
+    "未完成": "todo",
+    "完成": "done",
+    "进行中": "inprogress",
+    "归档": "archive",
+};
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
 
@@ -480,7 +485,14 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     //// 创建一个新块
     steveTools.outlog("daynote_id:::", daynote_id.id);
     const idid = await api.generateSiyuanID() as string;
-    const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
+    // const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
+    await api.appendBlock("markdown", `{{{row
+
+{: id="${await api.generateSiyuanID() as string}"}
+
+{: id="${await api.generateSiyuanID() as string}"}
+}}}
+{: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id.id)
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
     // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
@@ -549,8 +561,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 return;
             }
             // 添加到日历
+            //2025-02-12 修改：添加到数据库通过{: custom-avs="数据库ID"}属性实现
+            //放弃：不稳定
             //// 将块加入到数据库
-            // steveTools.outlog("dasdsssssssssss::::::111111", panel);
             await api.addBlockToDatabase_pro(id, to_db_id);
             // 添加数据库属性
             //// 添加时间和状态属性

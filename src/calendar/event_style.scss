@@ -1,0 +1,18 @@
+$background-color-success: #4b8c8a3d;
+$background-color-processing: #3478c83d;
+$background-color-info: #596c7036;
+//超级快背景
+.sb {
+    &[custom-st-event="todo"] {
+        background-color: $background-color-info;
+    }
+    &[custom-st-event="inprogress"] {
+        background-color: $background-color-processing;
+    }
+    &[custom-st-event="done"] {
+        background-color: $background-color-success;
+    }
+    &[custom-st-event="archive"] {
+        background-color: $background-color-success;
+    }
+}

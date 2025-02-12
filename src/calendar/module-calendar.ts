@@ -3,6 +3,7 @@ import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
+import "./event_style.scss";
 declare const siyuan: any;
 import { init_viewValue, run, update_av_ids } from "./calendar";
 export let calendarpath = 'data/public/stevetools/calendar.ics';
@@ -184,13 +185,25 @@ export class M_calendar {
         this.plugin.eventBus.on("ws-main", async (e) => {
             const msg = e.detail;
             if (msg.cmd === "transactions") {
-                // console.log("newway",msg);
+                console.log("newway", msg);
                 if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
                     // console.log("updateAttrs");
                     this.avButton();
                     // if(msg.data[0].doOperations[0].action === "updateAttrViewCell"){
                     refreshKanban();
                     console.log('trans')
+                    //更新背景色
+                    if (msg?.data?.[0]?.doOperations?.[0]?.avID &&
+                        msg?.data?.[0]?.doOperations?.[0]?.data?.mSelect?.[0]?.content &&
+                        msg?.data?.[0]?.doOperations?.[0]?.rowID) {
+                        //判断是否为事件（判断是否是日程数据库的事件）
+                        if (this.av_ids.map(item => item.id).includes(msg.data[0].doOperations[0].avID)) {
+                            const status = msg.data[0]?.doOperations[0]?.data?.mSelect[0]?.content;
+                            const blockID = msg.data[0]?.doOperations[0]?.rowID;
+                            console.log("status", status, blockID);
+                            await api.setBlockAttrs(blockID, { "custom-st-event": myF.statusMap[status] });//TODO优化，防止二次触发
+                        }
+                    }
                     // }
                 }
                 //【】同步更新看板 //TODO优化请求频率
@@ -213,7 +226,7 @@ export class M_calendar {
         const config = { childList: true, subtree: true };
         const observer = new MutationObserver(this.callback.bind(this)); // 监听点击数据库按键的弹窗变化
         observer.observe(targetNode, config);
-        await update_av_ids();
+        await update_av_ids();//更新日历文件中的av_ids
         let isCommandExecuting = false;
         this.plugin.addCommand({
             langKey: "ST_calendar_day",
@@ -375,7 +388,7 @@ export class M_calendar {
 
         setTimeout(async () => {
             if (viewID) {
-                calendar = await run(id, 'dayGridMonth', viewID,'prev,next today');
+                calendar = await run(id, 'dayGridMonth', viewID, 'prev,next today');
             } else {
                 calendar = await run(id, 'dayGridMonth');
             }
