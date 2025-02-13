@@ -2,7 +2,7 @@
   "name": "siyuan-steve-tools",
   "author": "steve",
   "url": "https://github.com/loonghfut/siyuan-steve-tools",
-  "version": "0.5.7", 
+  "version": "0.6.0", 
   "minAppVersion": "3.0.13",
   "backends": [
     "all"
@@ -16,7 +16,7 @@
   },
   "description": {
     "en_US": "schedule management, docker sync awareness, ai sidebar",
-    "zh_CN": "日程管理（基于数据库的看板视图和日历视图）, docker同步感知, ai侧边栏"
+    "zh_CN": "日程管理（基于数据库的看板视图和日历视图）, docker同步感知, ai侧边栏, 图片压缩"
   },
   "readme": {
     "en_US": "README.md",
