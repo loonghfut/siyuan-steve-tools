@@ -334,6 +334,19 @@
             key: "img-compress-enable",
             value: settings["img-compress-enable"],
         },
+        {
+            type: "button",
+            title: "button",
+            description: "This is a button",
+            key: "e",
+            value: "Click Button",
+            button: {
+                label: "Click Me",
+                callback: () => {
+                    showMessage("Hello, world!");
+                },
+            },
+        },
     ];
 
     let group5Items: ISettingItem[] = [
