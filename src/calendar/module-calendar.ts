@@ -185,7 +185,7 @@ export class M_calendar {
         this.plugin.eventBus.on("ws-main", async (e) => {
             const msg = e.detail;
             if (msg.cmd === "transactions") {
-                console.log("newway", msg);
+                // console.log("newway", msg);
                 if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
                     // console.log("updateAttrs");
                     this.avButton();
