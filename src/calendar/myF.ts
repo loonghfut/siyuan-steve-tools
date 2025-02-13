@@ -535,8 +535,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         dialog.destroy();
     };
 
-    //添加事件主代码
-    const handleKeydown = async (e: KeyboardEvent) => {
+    
+    const handleKeydown = async (e: KeyboardEvent) => {//添加事件主代码
         // console.log(e);
         if (e.type === 'click' && !ok) { sy.showMessage('请先输入内容') }
         if ((e.key === 'Enter' && e.ctrlKey && ok) || e.type === 'click' && ok) {
@@ -570,6 +570,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
             // console.log("viewValue:::", viewValue);
             // console.log("timeKeyID:::", timeKeyID);
+            const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
             //// 新：用户自定义改动开始时间
             const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
@@ -579,6 +580,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             ////块时间处理
             const blockdata = await api.getBlockKramdown(id);
             const ce = runblockdata_for_time(blockdata?.kramdown);
+            const minsub = runblockdata_for_sub(blockdata?.kramdown);
+            let ismain = false;
+            // console.log("minsub", minsub);
+            if (minsub.length > 0) {
+                ismain = true;
+            }
             if (ce) {
                 dateStr = ce;
             }
@@ -587,6 +594,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const selectdata: ISelectOption[] = [{ content: status }];
             console.log("selectdata", selectdata);
             await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
+            await api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox");
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
                     steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
