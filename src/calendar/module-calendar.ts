@@ -307,7 +307,7 @@ export class M_calendar {
                     // 创建一个新的按钮元素
                     const button = document.createElement('button');
                     button.innerText = '日程视图';
-                    button.className = 'block__icon ariaLabel my-plugin-button'; // 确保样式统一，并添加一个标识类
+                    button.className = 'block__icon ariaLabel st-plugin-button'; // 确保样式统一，并添加一个标识类
 
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
