@@ -58,10 +58,16 @@ export class M_imageCompression {
                     totalSize += file.size;
                     totalCompressedSize += compressedFile.size;
                     
+                    // Create a new File with "st_" prefix
+                    const renamedFile = new File([compressedFile], `st_${file.name}`, {
+                        type: compressedFile.type
+                    });
+                    
                     try {
-                        const response = await api.upload("assets/st_image", [compressedFile]);
+                        const response = await api.upload("assets/st_image", [renamedFile]);
                         if (response.succMap) {
-                            let imageId = response.succMap["blob"].replace("data/","");
+                            // console.log('上传成功:', response.succMap);
+                            let imageId = response.succMap[renamedFile.name].replace("data/","");
                             await this.insertImage(imageId);
                         } else {
                             showMessage(`第 ${i + 1} 张图片上传失败`,-1,"error");
@@ -90,11 +96,6 @@ export class M_imageCompression {
     }
 
     init(){
-        // this.plugin.addIcons(`
-        // <symbol id="iconImage" viewBox="0 0 512 512">
-            
-        // </symbol>
-        // `);
         this.plugin.addTopBar({
             icon: "iconImgDown",
             title: "图片压缩",
@@ -107,11 +108,34 @@ export class M_imageCompression {
     }
 
     // 插入图片到编辑器
-    private async insertImage(imageId: string) {
-        if (this.M_image_protyle) {
-            const imgMd = `![](${imageId})`;
-            this.M_image_protyle.getInstance().insert(imgMd, true, true);
+    private requestQueue: { imageId: string, resolve: () => void }[] = [];
+    private isProcessing = false;
+    private readonly DELAY_TIME = 1000; // 500ms delay between each request
+
+    private async processQueue() {
+        if (this.isProcessing || this.requestQueue.length === 0) return;
+
+        this.isProcessing = true;
+        while (this.requestQueue.length > 0) {
+            const item = this.requestQueue.shift();
+            if (!item) continue;
+
+            if (this.M_image_protyle) {
+                const imgMd = `![](${item.imageId})`;
+                this.M_image_protyle.getInstance().insert(imgMd, true, true);
+                console.log("插入图片", item.imageId);
+                item.resolve();
+                await new Promise(resolve => setTimeout(resolve, this.DELAY_TIME));
+            }
         }
+        this.isProcessing = false;
+    }
+
+    private async insertImage(imageId: string) {
+        return new Promise<void>((resolve) => {
+            this.requestQueue.push({ imageId, resolve });
+            this.processQueue();
+        });
     }
 
 
