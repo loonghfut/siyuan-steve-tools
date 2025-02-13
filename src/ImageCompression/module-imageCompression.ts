@@ -10,6 +10,7 @@ export class M_imageCompression {
         this.plugin = plugin;
     }
     public cursorID: string;
+    public cursorID_b: string;
     public M_image_protyle: IProtyle;
 
     // 压缩单个图片
@@ -159,6 +160,8 @@ export class M_imageCompression {
         this.plugin.eventBus.on("click-editorcontent", this.handleSelectionChange.bind(this));
         this.plugin.eventBus.on("switch-protyle", async (event) => {
             this.M_image_protyle = event.detail.protyle;
+            this.cursorID_b = event.detail.protyle.block.id;
+            this.cursorID = null;
             console.log("switch-image-protyle");
         });
     }
