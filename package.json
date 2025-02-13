@@ -45,6 +45,7 @@
     "@fullcalendar/rrule": "^6.1.15",
     "@fullcalendar/timegrid": "^6.1.15",
     "@types/sortablejs": "^1.15.8",
+    "browser-image-compression": "^2.0.2",
     "dayjs": "^1.11.13",
     "ical": "^0.8.0",
     "ical.js": "^2.1.0",

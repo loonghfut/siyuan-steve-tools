@@ -328,17 +328,11 @@
 
     let group4Items: ISettingItem[] = [
         {
-            type: "button",
-            title: "button",
-            description: "This is a button",
-            key: "e",
-            value: "Click Button",
-            button: {
-                label: "Click Me",
-                callback: () => {
-                    showMessage("Hello, world!");
-                },
-            },
+            type: "checkbox",
+            title: "启用图片压缩功能",
+            description: "启用图片压缩功能后再进行下面的设置",
+            key: "img-compress-enable",
+            value: settings["img-compress-enable"],
         },
     ];
 
