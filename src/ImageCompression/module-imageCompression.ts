@@ -37,7 +37,7 @@ export class M_imageCompression {
         if (blockId) {
             // showMessage(`光标所在的块ID: ${blockId}`);
             this.cursorID = blockId;
-            console.log("光标所在的块ID", this.cursorID);
+            // console.log("光标所在的块ID", this.cursorID);
         }
     }
 
@@ -73,6 +73,7 @@ export class M_imageCompression {
                     });
 
                     try {
+                        if(!this.cursorID) return showMessage("请将光标放在需要插入图片的位置", -1, "error");
                         const response = await api.upload("assets/st_image", [renamedFile]);
                         if (response.succMap) {
                             // console.log('上传成功:', response.succMap);
@@ -119,7 +120,7 @@ export class M_imageCompression {
     // 插入图片到编辑器
     private requestQueue: { imageId: string, resolve: () => void }[] = [];
     private isProcessing = false;
-    private readonly DELAY_TIME = 1000; // 500ms delay between each request
+    private readonly DELAY_TIME = 500; // 500ms delay between each request
 
     private async processQueue() {
         if (this.isProcessing || this.requestQueue.length === 0) return;
@@ -135,7 +136,7 @@ export class M_imageCompression {
                 // this.M_image_protyle.getInstance().insert(imgMd, true, true);
                 console.log("插入图片", this.cursorID);
                 if (this.cursorID) {
-                    api.appendBlock("markdown", imgMd, this.cursorID);
+                   await api.appendBlock("markdown", imgMd, this.cursorID);
                 } else {
                     showMessage("请将光标放在需要插入图片的位置", -1, "error");
                 }
@@ -161,7 +162,7 @@ export class M_imageCompression {
         this.plugin.eventBus.on("switch-protyle", async (event) => {
             this.M_image_protyle = event.detail.protyle;
             this.cursorID_b = event.detail.protyle.block.id;
-            this.cursorID = null;
+            this.cursorID = this.cursorID_b;
             console.log("switch-image-protyle");
         });
     }
@@ -218,7 +219,7 @@ export function getCursorBlockId() {
     const blockElement = container.closest('.protyle-wysiwyg [data-node-id]');
 
     if (blockElement) {
-        console.log(blockElement.getAttribute('data-node-id'));
+        // console.log(blockElement.getAttribute('data-node-id'));
         return blockElement.getAttribute('data-node-id');
     } else {
         return null;
