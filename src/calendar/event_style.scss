@@ -1,6 +1,7 @@
 $background-color-success: #4b8c8a3d;
 $background-color-processing: #3478c83d;
 $background-color-info: #596c7036;
+$background-color-archive: #747d403d;
 
 //事件块背景
 .sb,
@@ -19,6 +20,6 @@ $background-color-info: #596c7036;
     }
 
     &[custom-st-event="archive"] {
-        background-color: $background-color-success;
+        background-color: $background-color-archive;
     }
 }
