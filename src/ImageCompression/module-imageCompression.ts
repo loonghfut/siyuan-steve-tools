@@ -1,6 +1,6 @@
 import steveTools from "@/index";
 import * as api from "@/api"
-import { IProtyle, Protyle, showMessage } from "siyuan";
+import { IProtyle, showMessage } from "siyuan";
 import imageCompression from 'browser-image-compression';
 declare const siyuan: any;
 
@@ -42,29 +42,49 @@ export class M_imageCompression {
         input.onchange = async (e) => {
             const files = (e.target as HTMLInputElement).files;
             if (!files) return;
-
-            for (const file of Array.from(files)) {
+    
+            const fileArray = Array.from(files);
+            let totalSize = 0;
+            let totalCompressedSize = 0;
+            
+            showMessage(`开始处理 ${fileArray.length} 张图片...`,-1,"info","image_upload");
+    
+            for (let i = 0; i < fileArray.length; i++) {
+                const file = fileArray[i];
+                showMessage(`正在处理第 ${i + 1}/${fileArray.length} 张图片...`,-1,"info","image_upload");
+                
                 const compressedFile = await this.compressImage(file);
                 if (compressedFile) {
+                    totalSize += file.size;
+                    totalCompressedSize += compressedFile.size;
+                    
                     try {
                         const response = await api.upload("assets/st_image", [compressedFile]);
                         if (response.succMap) {
-                           console.log(response);
-                            let imageId = response.succMap["blob"];
-                            //去掉imageId的data/前缀
-                            imageId = imageId.replace("data/","")
-                            console.log(imageId);
-                            this.insertImage(imageId);
-                            showMessage("图片上传成功");
+                            let imageId = response.succMap["blob"].replace("data/","");
+                            await this.insertImage(imageId);
                         } else {
-                            showMessage("图片上传失败");
+                            showMessage(`第 ${i + 1} 张图片上传失败`,-1,"error");
                         }
                     } catch (error) {
                         console.error('上传失败:', error);
-                        showMessage('图片上传失败');
+                        showMessage(`第 ${i + 1} 张图片上传失败`,-1,"error");
                     }
                 }
             }
+    
+            // 计算并显示压缩效果总结
+            const originalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
+            const compressedSizeMB = (totalCompressedSize / 1024 / 1024).toFixed(2);
+            const compressionRatio = ((1 - totalCompressedSize / totalSize) * 100).toFixed(1);
+            
+            showMessage(`
+                压缩完成！
+                处理图片：${fileArray.length} 张
+                原始大小：${originalSizeMB} MB
+                压缩后：${compressedSizeMB} MB
+                压缩率：${compressionRatio}%
+            `.replace(/\s+/g, ' '),-1,"info","image_upload");
         };
         input.click();
     }
@@ -87,10 +107,10 @@ export class M_imageCompression {
     }
 
     // 插入图片到编辑器
-    private insertImage(imageId: string) {
+    private async insertImage(imageId: string) {
         if (this.M_image_protyle) {
             const imgMd = `![](${imageId})`;
-            this.M_image_protyle.getInstance().insert(imgMd);
+            this.M_image_protyle.getInstance().insert(imgMd, true, true);
         }
     }
 
