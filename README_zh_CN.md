@@ -27,14 +27,15 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 #### 下面表格列出了一些我用不上但是可能对你有用的功能和教程（还未开发和制作，达到条件后开始制作）（若你用不上，忽略即可）
 | 功能/教程 | 条件 | 状态 |
 |-----------|------|------|
-| 日程管理详细教程2.0 | 打赏 ≥ 10元 | 🚧 待完成 |
+| 日程管理详细教程2.0 | 打赏 ≥ 10元 | 🛠️ 进行中 |
 | Docker同步感知功能展示 | ⭐ Star ≥ 10 | 🚧 待完成 |
 | 多平台日程同步支持<br>(alist/s3存储ics) | 打赏 ≥ 15元 | 🚧 待完成 |
 | AI侧边栏自定义网址 | ⭐ Star ≥ 15 | 🚧 待完成 |
 
-注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准。    
-**当前状态**
-- 💰 打赏：0元
+注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准。   
+
+**当前状态** （建议打赏时留下您的邮箱）  
+- 💰 打赏：10元（每次更新插件时更新） [详细(32小时内更新进度)](./sponsor.md)
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
@@ -45,7 +46,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板
 - [seanduo](https://github.com/seanduo)：PR
 - [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
-
+- [空幽]()：打赏支持 `the first one`
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
