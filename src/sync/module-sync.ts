@@ -52,7 +52,7 @@ export class M_sync {
                                 }
                             }
                             catch (e) {
-                                showMessage("同步失败: " + e, -1, "error");
+                                showMessage("docker感知同步失败: " + e, -1, "error");
                             }
                         }, 1000);
                     }
