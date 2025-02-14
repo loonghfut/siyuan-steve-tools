@@ -20,7 +20,7 @@ STEVETOOLS
 win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 3. ai网页侧边栏：  
 嵌入了一些ai的网页，方便使用。
-4. 图片压缩：
+4. 图片压缩：  
 压缩图片大小，减少图片占用空间。
 
 #### 目前主要是我自己使用，实在没精力和动力去制作详细教程（简单的使用方式会在滴链发）。要是您希望我能制作教程，不妨通过[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)或者给项目点个 [star](https://github.com/loonghfut/siyuan-steve-tools) 来鼓励鼓励，这对我来说会是很大的动力，若长期没有打赏和star，后续的功能交互提示可能会很潦草，还请见谅。
