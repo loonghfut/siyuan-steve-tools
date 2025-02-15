@@ -303,7 +303,7 @@ export class M_calendar {
 
             targetSpans.forEach(targetSpan => {
                 // 检查目标元素的右边是否已经存在按钮
-                if (!targetSpan.nextSibling || !(targetSpan.nextSibling instanceof HTMLElement) || !targetSpan.nextSibling.classList.contains('my-plugin-button')) {
+                if (!targetSpan.nextSibling || !(targetSpan.nextSibling instanceof HTMLElement) || !targetSpan.nextSibling.classList.contains('st-plugin-button')) {
                     // 创建一个新的按钮元素
                     const button = document.createElement('button');
                     button.innerText = '日程视图';
