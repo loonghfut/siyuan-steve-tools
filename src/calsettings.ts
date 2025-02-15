@@ -17,6 +17,7 @@ export const defaultSettings = {
     "cal-show-ref-event":true,//是否展示被引用的事件
     "cal-qq-code": "",
     "cal-qq-email": "",
+    "cal-share": "",
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

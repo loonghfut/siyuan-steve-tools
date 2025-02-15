@@ -4,19 +4,19 @@
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
     import * as myapi from "@/api";
-    import { getSettings, resetSettings } from "./calsettings";
+    import { getSettings } from "./calsettings";
 
     export let plugin;
     export let myfile;
     export let setdialog;
 
     let settings = getSettings();
-    function resetToDefault() {
-        settings = resetSettings();
-        console.log("resetToDefault", settings);
-        saveSettings();
-        setdialog.destroy();
-    }
+    // function resetToDefault() {
+    //     settings = resetSettings();
+    //     console.log("resetToDefault", settings);
+    //     saveSettings();
+    //     setdialog.destroy();
+    // }
 
     let groups: string[] = [
         "日程管理 2.1",
@@ -185,57 +185,17 @@
             },
         },
         {
-            type: "button",
-            title: "恢复默认配置",
-            description: "遇到问题先恢复默认配置",
-            key: "cal-reset",
-            value: settings["cal-reset"],
-            button: {
-                label: "恢复",
-                callback: () => {
-                    resetToDefault();
-                },
+            type: "select",
+            title: "ics分享平台",
+            description: "选择ics文件分享平台",
+            key: "cal-share",
+            value: settings["ai-url-type"],
+            options: {
+                "": "无",
+                "alist": "alist(需安装alist附件管理插件)",
+                "s3": "s3(开发中)",
             },
         },
-        // {
-        //     type: "button",
-        //     title: "刷新",
-        //     description: "若部分设置未生效请刷新思源笔记",
-        //     key: "reset",
-        //     value: "error",
-        //     button: {
-        //         label: "刷新",
-        //         callback: () => {
-        //             myapi.refresh();
-        //         },
-        //     },
-        // },
-        // {
-        //     type: "hint",
-        //     title: "使用方法",
-        //     description: `
-        //     <div class="fn__flex b3-label">
-        //         <ol>
-        //             <li>添加一个数据库（前三列格式如图）</li>
-        //             <img
-        //                 src="plugins/siyuan-steve-tools/asset/1734265371736.png"
-        //                 alt="数据库格式示例"
-        //                 style="max-height: 200px;"
-        //             />
-        //             <li>再给此数据库添加命名属性，内容为“日程” （如图）</li>
-        //             <img
-        //                 src="plugins/siyuan-steve-tools/asset/1734265426843.png"
-        //                 alt="命名属性示例"
-        //                 style="max-height: 200px;"
-        //             />
-        //             <li>最后点击右上角的日历图标</li>
-        //             <li>即可生成日历文件，订阅链接在设置里获取</li>
-        //             <li>打开可以订阅ics文件的日历软件（如小米日历），输入订阅链接即可（要保证手机能网络连接到思源）</li>
-        //         </ol>
-        //     </div>`,
-        //     key: "hint",
-        //     value: "error",
-        // },
     ];
 
     let group2Items: ISettingItem[] = [

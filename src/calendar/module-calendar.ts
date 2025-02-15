@@ -1,4 +1,4 @@
-import steveTools from "@/index";
+import steveTools, { settingdata } from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
@@ -15,6 +15,7 @@ import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen2 } from "./myK";
 import { getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
+import { ics_alist } from "./share/alist";
 
 // import { insertHtml } from "./insertHtml";
 
@@ -35,6 +36,7 @@ export class M_calendar {
     private isUpdating: boolean = false;
     public av_ids: any;
     public calConfig: M_caldata;
+    public alistPlugin: ics_alist;
 
     async init(settingdata) {
         front = getFrontend();
@@ -219,6 +221,10 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
+        if (settingdata["cal-share"] === "alist") {
+            this.alistPlugin = new ics_alist();
+            this.alistPlugin.init();
+        }
         init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
@@ -625,7 +631,10 @@ export class M_calendar {
 
             await this.uploadAllEventsToFile(eventsPath);
             await this.generateICSFromEventsFile(eventsPath, calendarpath);
-
+            if (settingdata["cal-share"] === "alist") {
+                await this.alistPlugin.upload_ics();
+                console.log("alist_ics");
+            }
         } catch (error) {
             console.error('生成日历文件时发生错误:', error);
             throw error;
