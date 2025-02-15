@@ -4,7 +4,7 @@ export class PluginConfig {
     private configPath: string;
     private config: { [key: string]: any };
 
-    constructor(pluginName: string,M_name:string) {
+    constructor(pluginName: string, M_name: string) {
         this.configPath = `/data/storage/petal/${pluginName}/${M_name}/config.json`;
         this.config = {};
     }
@@ -15,17 +15,17 @@ export class PluginConfig {
     async load(): Promise<void> {
         try {
             const configData = await getFile(this.configPath);
-            // console.log("::::",configData);
-            if (configData) {
+            // console.log("::::", configData);
+            if (configData && configData?.viewName) {
                 this.config = configData;
             } else {
                 // 如果配置文件不存在，保存默认配置
-                console.warn("配置文件不存在，将创建并保存默认配置");
-                await this.save();
+                console.warn("配置文件不存在");
+                this.config = {};
             }
         } catch (error) {
-            console.warn("配置文件加载失败，将创建并保存默认配置", error);
-            await this.save();
+            console.warn("配置文件加载失败", error);
+            this.config = {};
         }
     }
 
