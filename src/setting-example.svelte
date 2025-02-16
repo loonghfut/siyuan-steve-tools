@@ -193,8 +193,30 @@
             options: {
                 "": "无",
                 "alist": "alist(需安装alist附件管理插件)",
-                "s3": "s3(开发中)",
+                "s3": "s3(同步桶)",
+                "s3-diy": "s3-diy(自定义桶)",
             },
+        },
+        {
+            type: "textinput",
+            title: "S3_Bucket",
+            description: "选择s3-diy(自定义桶)时填写",
+            key: "cal-s3-bucket",
+            value: settings["cal-s3-bucket"],
+        },
+        {
+            type: "textinput",
+            title: "S3_AccessKeyId",
+            description: "选择s3-diy(自定义桶)时填写",
+            key: "cal-s3-accessKeyId",
+            value: settings["cal-s3-accessKeyId"],
+        },
+        {
+            type: "textinput",
+            title: "S3_SecretAccessKey",
+            description: "选择s3-diy(自定义桶)时填写",
+            key: "cal-s3-secretAccessKey",
+            value: settings["cal-s3-secretAccessKey"],
         },
     ];
 

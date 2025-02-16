@@ -26,6 +26,14 @@ export class ics_s3 {
         this.bucket = bucket || "";
         this.endpoint = "";
     }
+    load_little_date_from_siyuan() {
+        this.region = window.siyuan.config.sync.s3?.region;
+        // this.accessKeyId = window.siyuan.config.sync.s3?.accessKey;
+        // this.secretAccessKey = window.siyuan.config.sync.s3?.secretKey;
+        // this.bucket = window.siyuan.config.sync.s3?.bucket;
+        this.endpoint = window.siyuan.config.sync.s3?.endpoint;
+        // console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
+    }
 
     load_date_from_siyuan() {
         this.region = window.siyuan.config.sync.s3?.region;
@@ -33,7 +41,7 @@ export class ics_s3 {
         this.secretAccessKey = window.siyuan.config.sync.s3?.secretKey;
         this.bucket = window.siyuan.config.sync.s3?.bucket;
         this.endpoint = window.siyuan.config.sync.s3?.endpoint;
-        console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
+        // console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
     }
 
     async init(): Promise<void> {
@@ -70,7 +78,7 @@ export class ics_s3 {
                 MaxKeys: 1
             });
             await this.s3Client.send(command);
-            showMessage("S3 连接测试成功", -1, "info");
+            // showMessage("S3 连接测试成功", -1, "info");
             return true;
         } catch (error) {
             console.error("S3 连接测试失败:", error);
@@ -81,7 +89,7 @@ export class ics_s3 {
 
     async uploadFile(key: string, content: string | Blob): Promise<void> {
         if (!this.s3Client) {
-            throw new Error('S3 客户端未初始化');
+            throw new Error('ST_S3 客户端未初始化');
         }
 
         let body: Buffer | string | Blob;
@@ -107,10 +115,11 @@ export class ics_s3 {
             });
 
             await this.s3Client.send(command);
-            console.log(`上传文件成功: ${key}`);
+            console.log(`ST_s3上传文件成功: ${key}`);
         } catch (error) {
-            console.error('上传错误详情:', error);
-            throw new Error(`上传文件失败: ${error.message}`);
+            console.error('ST_s3上传错误详情:', error);
+            showMessage(`ST_s3上传文件失败: ${error.message}`, -1, 'error');
+            throw new Error(`ST_s3上传文件失败: ${error.message}`);
         }
     }
 

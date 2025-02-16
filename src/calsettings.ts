@@ -15,9 +15,14 @@ export const defaultSettings = {
     "cal-create-way": "0",
     "cal-seemore":false,
     "cal-show-ref-event":true,//是否展示被引用的事件
+    //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",
     "cal-share": "",
+    //// s3子模块
+    "cal-s3-bucket": "",
+    "cal-s3-accessKeyId":"",
+    "cal-s3-secretAccessKey":"",
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

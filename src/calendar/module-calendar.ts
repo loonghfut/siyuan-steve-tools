@@ -223,18 +223,7 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
-        if (settingdata["cal-share"] === "alist") {
-            this.alistPlugin = new ics_alist();
-            this.alistPlugin.init();
-        }
-        if (this_settingdata["cal-share"] === "s3") {
-            this.s3Client = new ics_s3({});
-            this.s3Client.load_date_from_siyuan();
-            this.s3Client.init();
-            console.log("s3_ics_init");
-            console.log( "AAAAAAAAAAASSSSSSSSS####",await this.s3Client.testConnection());
-            console.log("s3_ics_test");
-        }
+        await this.shareicsinit();
         init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
@@ -310,6 +299,28 @@ export class M_calendar {
     }
 
 
+
+    private async shareicsinit() {
+        if (settingdata["cal-share"] === "alist") {
+            this.alistPlugin = new ics_alist();
+            this.alistPlugin.init();
+        }
+        if (this_settingdata["cal-share"] === "s3") {
+            this.s3Client = new ics_s3({});
+            this.s3Client.load_date_from_siyuan();
+            this.s3Client.init();
+            console.log("ST_s3状态:", await this.s3Client.testConnection());
+        }
+        if(this_settingdata["cal-share"] === "s3-diy"){
+            const bucket = this_settingdata["cal-s3-bucket"];
+            const accessKeyId = this_settingdata["cal-s3-accessKeyId"];
+            const secretAccessKey = this_settingdata["cal-s3-secretAccessKey"];
+            this.s3Client = new ics_s3({bucket:bucket,accessKeyId:accessKeyId,secretAccessKey:secretAccessKey});
+            this.s3Client.load_little_date_from_siyuan();
+            this.s3Client.init();
+            console.log("ST_s3状态:", await this.s3Client.testConnection());
+        }
+    }
 
     private avButton() {
         setTimeout(async () => {
@@ -646,6 +657,11 @@ export class M_calendar {
                 console.log("alist_ics");
             }
             if (settingdata["cal-share"] === "s3") {
+                const ics = await api.getFileBlob(calendarpath)
+                const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                await this.s3Client.uploadFile(calendarpath2, file);
+            }
+            if(settingdata["cal-share"] === "s3-diy"){
                 const ics = await api.getFileBlob(calendarpath)
                 const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                 await this.s3Client.uploadFile(calendarpath2, file);
