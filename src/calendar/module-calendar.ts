@@ -16,6 +16,7 @@ import { globalOpen2 } from "./myK";
 import { getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
 import { ics_alist } from "./share/alist";
+import { ics_s3 } from "./share/s3";
 
 // import { insertHtml } from "./insertHtml";
 
@@ -37,6 +38,7 @@ export class M_calendar {
     public av_ids: any;
     public calConfig: M_caldata;
     public alistPlugin: ics_alist;
+    public s3Client: ics_s3;
 
     async init(settingdata) {
         front = getFrontend();
@@ -224,6 +226,14 @@ export class M_calendar {
         if (settingdata["cal-share"] === "alist") {
             this.alistPlugin = new ics_alist();
             this.alistPlugin.init();
+        }
+        if (this_settingdata["cal-share"] === "s3") {
+            this.s3Client = new ics_s3({});
+            this.s3Client.load_date_from_siyuan();
+            this.s3Client.init();
+            console.log("s3_ics_init");
+            console.log( "AAAAAAAAAAASSSSSSSSS####",await this.s3Client.testConnection());
+            console.log("s3_ics_test");
         }
         init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
@@ -634,6 +644,11 @@ export class M_calendar {
             if (settingdata["cal-share"] === "alist") {
                 await this.alistPlugin.upload_ics();
                 console.log("alist_ics");
+            }
+            if (settingdata["cal-share"] === "s3") {
+                const ics = await api.getFileBlob(calendarpath)
+                const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                await this.s3Client.uploadFile(calendarpath2, file);
             }
         } catch (error) {
             console.error('生成日历文件时发生错误:', error);
