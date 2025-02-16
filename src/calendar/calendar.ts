@@ -287,12 +287,23 @@ export async function run(
         },
 
         // 从思源数据转换事件
-        events: async function (info, successCallback, failureCallback) {
+        events: async function (info, successCallback, failureCallback) {//TODO:性能优化
             //刷新视图按钮
             // const buttons = document.querySelectorAll('.fc-viewFilter-button');
             // buttons.forEach(btn => btn.textContent = viewName);
             try {
-                steveTools.outlog('Fetching calendar events...::::::::::::::::::::::::::');
+                let allEvents = [];
+                /////////////////////QQ日历////////////////////////
+                if (moduleInstances['M_calendar'].QQCalDAVClient) {
+                    try {
+                        console.log('QQ calendar events:', moduleInstances["M_calendar"].qqFullCalendarEvents);
+                        allEvents = allEvents.concat(moduleInstances["M_calendar"].qqFullCalendarEvents);
+                    } catch (error) {
+                        console.error('Error fetching QQ calendar events:', error);
+                    }
+                }
+
+                /////////////////////思源////////////////////////
                 // 1. 获取引用ID
                 av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
                 const av_ids_zq = await moduleInstances['M_calendar'].getAVreferenceid("周期");
@@ -322,8 +333,9 @@ export async function run(
                 // 4. 转换事件数据
                 const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
                 // console.log('Fetched calendar events:', events);
+                allEvents = allEvents.concat(events);
                 // 5. 回调成功
-                successCallback(events);
+                successCallback(allEvents);
             } catch (error) {
                 console.error('Error fetching calendar events:', error);
                 failureCallback?.(error);
@@ -382,7 +394,14 @@ export async function run(
                 info.el.classList.add('event-completed');
             }
             // steveTools.outlog(info);
-
+            if (info.event.extendedProps.source === 'qqcalendar') {
+                info.el.classList.add('qq-calendar-event');
+                // 添加QQ日历图标
+                const titleEl = info.el.querySelector('.fc-event-title');
+                if (titleEl) {
+                    titleEl.insertAdjacentHTML('afterbegin', '<i class="qq-calendar-icon">📅</i> ');
+                }
+            }
             // 添加提示框
             tippy(info.el, {
                 content: `

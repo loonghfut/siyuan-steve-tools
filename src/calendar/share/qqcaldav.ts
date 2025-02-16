@@ -1,55 +1,85 @@
-import { createClient } from 'webdav';
+import { DAVClient, DAVCalendar, DAVCalendarObject } from 'tsdav';
+
+interface CalendarEvent {
+    id: string;
+    title: string;
+    start: Date | null;
+    end: Date | null;
+    extendedProps: {
+        source: string;
+        description: string;
+        status: string;
+    };
+}
 
 export class CalDAVClient {
-    private client;
-    private baseUrl: string;
-    private credentials: {
-        username: string;
-        password: string;
-    };
-
+    private client: DAVClient;
+    
     constructor(username: string, password: string) {
-        this.baseUrl = 'https://wx.mail.qq.com/caldav/';
-        this.credentials = {
-            username, // QQ邮箱完整地址
-            password  // 邮箱授权码，不是QQ密码
-        };
-
-        this.client = createClient(this.baseUrl, {
-            username: this.credentials.username,
-            password: this.credentials.password
+        console.log(username, password);
+        this.client = new DAVClient({
+            serverUrl: 'https://dav.qq.com/.well-known/caldav',
+            credentials: {
+                username, // QQ邮箱完整地址
+                password  // 授权码
+            },
+            defaultAccountType: 'caldav',
+            authMethod: 'Basic'
         });
     }
 
-    async getCalendars() {
+    async init() {
+        await this.client.login();
+    }
+
+    async getCalendars(): Promise<DAVCalendar[]> {
         try {
-            // 使用 PROPFIND 请求获取日历列表
-            const response = await fetch(this.baseUrl, {
-                method: 'PROPFIND',
-                headers: {
-                    'Content-Type': 'application/xml; charset=utf-8',
-                    'Depth': '1',
-                    'Authorization': 'Basic ' + btoa(this.credentials.username + ':' + this.credentials.password)
-                },
-                body: `<?xml version="1.0" encoding="utf-8" ?>
-                       <D:propfind xmlns:D="DAV:">
-                           <D:prop>
-                               <D:resourcetype/>
-                               <D:displayname/>
-                           </D:prop>
-                       </D:propfind>`
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.text();
-            console.log('CalDAV Response:', data);
-            return data;
+            const calendars = await this.client.fetchCalendars();
+            return calendars;
         } catch (error) {
             console.error('获取日历列表失败:', error);
             throw error;
         }
     }
+
+    async getEvents(calendarId: string): Promise<CalendarEvent[]> {
+        try {
+            const events = await this.client.fetchCalendarObjects({
+                calendar: { url: calendarId },
+            });
+
+            return events
+                .map(event => {
+                    const icsData = event.data;
+                    const veventMatch = icsData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/);
+                    
+                    if (veventMatch) {
+                        const veventData = veventMatch[1];
+                        const summary = veventData.match(/SUMMARY:(.+)/)?.[1] || '';
+                        const start = veventData.match(/DTSTART(?:;[^:]*)?:(.+)/)?.[1];
+                        const end = veventData.match(/DTEND(?:;[^:]*)?:(.+)/)?.[1];
+                        const description = veventData.match(/DESCRIPTION:(.+)/)?.[1] || '';
+                        const uid = veventData.match(/UID:(.+)/)?.[1];
+
+                        return {
+                            id: uid,
+                            title: summary,
+                            start: start ? new Date(start.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')) : null,
+                            end: end ? new Date(end.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')) : null,
+                            extendedProps: {
+                                source: 'qqcalendar',
+                                description: description,
+                                status: summary.includes('已完成') ? '完成' : '未完成'
+                            }
+                        };
+                    }
+                    return null;
+                })
+                .filter((event): event is CalendarEvent => event !== null);
+        } catch (error) {
+            console.error('获取日历事件失败:', error);
+            throw error;
+        }
+    }
+
 }

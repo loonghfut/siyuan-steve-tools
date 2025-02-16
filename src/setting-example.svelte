@@ -218,6 +218,20 @@
             key: "cal-s3-secretAccessKey",
             value: settings["cal-s3-secretAccessKey"],
         },
+        {
+            type: "textinput",
+            title: "QQ邮箱地址",
+            description: "",
+            key: "cal-qq-email",
+            value: settings["cal-qq-email"],
+        },
+        {
+            type: "textinput",
+            title: "QQ邮箱授权码",
+            description: "",
+            key: "cal-qq-code",
+            value: settings["cal-qq-code"],
+        },
     ];
 
     let group2Items: ISettingItem[] = [
@@ -316,19 +330,19 @@
             key: "img-compress-enable",
             value: settings["img-compress-enable"],
         },
-        {
-            type: "button",
-            title: "button",
-            description: "This is a button",
-            key: "e",
-            value: "Click Button",
-            button: {
-                label: "Click Me",
-                callback: () => {
-                    showMessage("Hello, world!");
-                },
-            },
-        },
+        // {
+        //     type: "button",
+        //     title: "button",
+        //     description: "This is a button",
+        //     key: "e",
+        //     value: "Click Button",
+        //     button: {
+        //         label: "Click Me",
+        //         callback: () => {
+        //             showMessage("Hello, world!");
+        //         },
+        //     },
+        // },
     ];
 
     let group5Items: ISettingItem[] = [

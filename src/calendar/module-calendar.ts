@@ -17,6 +17,7 @@ import { getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
 import { ics_alist } from "./share/alist";
 import { ics_s3 } from "./share/s3";
+import { CalDAVClient } from "./share/qqcaldav";
 
 // import { insertHtml } from "./insertHtml";
 
@@ -39,7 +40,8 @@ export class M_calendar {
     public calConfig: M_caldata;
     public alistPlugin: ics_alist;
     public s3Client: ics_s3;
-
+    public QQCalDAVClient: CalDAVClient;
+    public qqFullCalendarEvents;
     async init(settingdata) {
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
@@ -224,7 +226,14 @@ export class M_calendar {
 
     async onLayoutReady() {
         await this.shareicsinit();
-        init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
+        if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"]) {
+            this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
+            await this.QQCalDAVClient.init();
+            const client = await this.QQCalDAVClient.getCalendars();
+            console.log("QQ", client);
+            this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(client[0].url)
+        }
+        await init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();
         await update_av_ids();//更新日历文件中的av_ids
@@ -311,11 +320,11 @@ export class M_calendar {
             this.s3Client.init();
             console.log("ST_s3状态:", await this.s3Client.testConnection());
         }
-        if(this_settingdata["cal-share"] === "s3-diy"){
+        if (this_settingdata["cal-share"] === "s3-diy") {
             const bucket = this_settingdata["cal-s3-bucket"];
             const accessKeyId = this_settingdata["cal-s3-accessKeyId"];
             const secretAccessKey = this_settingdata["cal-s3-secretAccessKey"];
-            this.s3Client = new ics_s3({bucket:bucket,accessKeyId:accessKeyId,secretAccessKey:secretAccessKey});
+            this.s3Client = new ics_s3({ bucket: bucket, accessKeyId: accessKeyId, secretAccessKey: secretAccessKey });
             this.s3Client.load_little_date_from_siyuan();
             this.s3Client.init();
             console.log("ST_s3状态:", await this.s3Client.testConnection());
@@ -661,7 +670,7 @@ export class M_calendar {
                 const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                 await this.s3Client.uploadFile(calendarpath2, file);
             }
-            if(settingdata["cal-share"] === "s3-diy"){
+            if (settingdata["cal-share"] === "s3-diy") {
                 const ics = await api.getFileBlob(calendarpath)
                 const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                 await this.s3Client.uploadFile(calendarpath2, file);
