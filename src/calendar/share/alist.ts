@@ -13,10 +13,9 @@ export class ics_alist {
     }
 
     init() {
-        console.log("alist lode");
         const plugin = this.findAlistPlugin();
         if (plugin) {
-            console.log("找到Alist插件实例:", plugin);
+            console.log("找到Alist插件实例");
             this.alist = plugin;
         } else {
             console.warn("未找到Alist插件实例");

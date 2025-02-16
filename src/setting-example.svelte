@@ -186,7 +186,7 @@
         },
         {
             type: "select",
-            title: "ics分享平台 -beta",
+            title: "ics分享平台 -beta(请悉知再使用)",
             description: "选择ics文件分享平台(重要！ics文件会被分享到其他平台上，可能会有隐私泄漏的风险，建议将S3的桶名称和ics文件名称复杂化，防止被他人猜到）",
             key: "cal-share",
             value: settings["ai-url-type"],
