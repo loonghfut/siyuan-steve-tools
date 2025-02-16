@@ -186,15 +186,15 @@
         },
         {
             type: "select",
-            title: "ics分享平台",
-            description: "选择ics文件分享平台",
+            title: "ics分享平台 -beta",
+            description: "选择ics文件分享平台(重要！ics文件会被分享到其他平台上，可能会有隐私泄漏的风险，建议将S3的桶名称和ics文件名称复杂化，防止被他人猜到）",
             key: "cal-share",
             value: settings["ai-url-type"],
             options: {
                 "": "无",
                 "alist": "alist(需安装alist附件管理插件)",
-                "s3": "s3(同步桶)",
-                "s3-diy": "s3-diy(自定义桶)",
+                "s3": "s3(和思源s3同步用同一个桶,使用前请自行测试会不会影响到思源的s3同步)",
+                "s3-diy": "s3-diy(自定义桶)(推荐)",
             },
         },
         {
