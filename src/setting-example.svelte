@@ -454,25 +454,28 @@
         if (data) {
             settings = { ...settings, ...data };
 
-                    // 获取QQ日历列表
-        try {
-            if (moduleInstances["M_calendar"]?.QQCalDAVClient) {
-                const calendars = await moduleInstances["M_calendar"].QQCalDAVClient.getCalendars();
-                if (Array.isArray(calendars) && calendars.length > 0) {
-                    // 更新日历选项
-                    const calendarItem = group1Items.find(item => item.key === 'cal-qq-calendar-url');
-                    if (calendarItem) {
-                        let calendarOptions = { "": "无" };
-                        calendars.forEach(cal => {
-                            calendarOptions[cal.url] = `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`;
-                        });
-                        calendarItem.options = calendarOptions;
+            // Load QQ calendars asynchronously
+            Promise.resolve().then(async () => {
+                try {
+                    if (moduleInstances["M_calendar"]?.QQCalDAVClient) {
+                        const calendars = await moduleInstances["M_calendar"].QQCalDAVClient.getCalendars();
+                        if (Array.isArray(calendars) && calendars.length > 0) {
+                            // 更新日历选项
+                            const calendarItem = group1Items.find(item => item.key === 'cal-qq-calendar-url');
+                            if (calendarItem) {
+                                let calendarOptions = { "": "无" };
+                                calendars.forEach(cal => {
+                                    calendarOptions[cal.url] = `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`;
+                                });
+                                calendarItem.options = calendarOptions;
+                                updateGroupItems();
+                            }
+                        }
                     }
+                } catch (error) {
+                    console.error("Error loading QQ calendars:", error);
                 }
-            }
-        } catch (error) {
-            console.error("Error loading QQ calendars:", error);
-        }
+            });
             updateGroupItems();
             await saveSettings();
         } else {
