@@ -337,6 +337,7 @@ export async function run(
                 // 5. 回调成功
                 successCallback(allEvents);
             } catch (error) {
+                showMessage('请重新打开日历视图', -1, 'error');
                 console.error('Error fetching calendar events:', error);
                 failureCallback?.(error);
                 successCallback([]); // 失败时返回空数组

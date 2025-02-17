@@ -428,7 +428,7 @@
 
     async function saveSettings() {
         await plugin.saveData(myfile, settings);
-        console.debug("Settings saved:", settings);
+        // console.debug("Settings saved:", settings);
     }
     onMount(async () => {
         const headerEl = document.querySelector(".b3-dialog__header");
@@ -450,7 +450,7 @@
 
     async function runload() {
         let data = await plugin.loadData(myfile);
-        console.debug("Load config:", data);
+        // console.debug("Load config:", data);
         if (data) {
             settings = { ...settings, ...data };
 

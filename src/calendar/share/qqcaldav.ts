@@ -23,7 +23,7 @@ export class CalDAVClient {
     private client: DAVClient;
     
     constructor(username: string, password: string) {
-        console.log(username, password);
+        // console.log(username, password);
         this.client = new DAVClient({
             serverUrl: 'https://dav.qq.com/.well-known/caldav',
             credentials: {
