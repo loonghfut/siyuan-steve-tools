@@ -116,10 +116,10 @@ export class CalDAVClient {
                             extendedProps: {
                                 source: 'qqcalendar',
                                 description: description,
-                                status: summary.includes('已完成') ? '完成' : '未完成',
-                                isRecurring: !!rruleMatch,
+                                // status: summary.includes('已完成') ? '完成' : '未完成',
+                                isRecurring: true,
                                 rrule: rruleMatch || '',
-                                allDay: isAllDay
+                                allDay: isAllDay,
                             }
                         };
                     });

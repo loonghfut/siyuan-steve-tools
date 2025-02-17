@@ -248,7 +248,7 @@ export async function globalOpen2() {
         height: 500,
         width: 400,
         doc: {
-            id: id
+            id: id as string,
         }
     });
 
