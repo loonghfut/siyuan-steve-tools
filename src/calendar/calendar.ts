@@ -172,8 +172,8 @@ export async function run(
         // 事件拖放处理
         eventDrop: async function (info) {
             steveTools.outlog("事件拖动shijian", info.event.startStr, info.event.endStr);
-            if (info.event._def.extendedProps.isRecurring) {
-                showMessage("重复事件不支持拖动哦");
+            if (info.event._def.extendedProps.isRecurring || info.event.extendedProps.source === 'qqcalendar') {
+                showMessage("不支持拖动哦");
                 //撤回拖动
                 info.revert();
                 return;
@@ -424,7 +424,7 @@ export async function run(
                             </div>
                         </div>
                     `,
-                    allowHTML: true,
+                allowHTML: true,
                 placement: 'auto',
                 interactive: true,
                 zIndex: window.siyuan.zIndex,
