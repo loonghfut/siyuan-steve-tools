@@ -187,7 +187,8 @@
         {
             type: "select",
             title: "ics分享平台 -beta(请悉知再使用)",
-            description: "选择ics文件分享平台(重要！ics文件会被分享到其他平台上，可能会有隐私泄漏的风险，建议将S3的桶名称和ics文件名称复杂化，防止被他人猜到）",
+            description:
+                "选择ics文件分享平台(重要！ics文件会被分享到其他平台上，可能会有隐私泄漏的风险，建议将S3的桶名称和ics文件名称复杂化，防止被他人猜到）",
             key: "cal-share",
             value: settings["ai-url-type"],
             options: {
@@ -221,16 +222,25 @@
         {
             type: "textinput",
             title: "QQ邮箱地址",
-            description: "",
+            description: "对接QQ邮箱时填写",
             key: "cal-qq-email",
             value: settings["cal-qq-email"],
         },
         {
             type: "textinput",
             title: "QQ邮箱授权码",
-            description: "",
+            description: "对接QQ邮箱时填写",
             key: "cal-qq-code",
             value: settings["cal-qq-code"],
+        },
+        //选择QQ邮箱的日历id
+        {
+            type: "select",
+            title: "QQ日历选择",
+            description: "选择要同步的QQ日历",
+            key: "cal-qq-calendar-url",
+            value: settings["cal-qq-calendar-url"],
+            options: { "": "请先配置QQ邮箱信息" }  // 设置初始静态值
         },
     ];
 
@@ -443,6 +453,26 @@
         console.debug("Load config:", data);
         if (data) {
             settings = { ...settings, ...data };
+
+                    // 获取QQ日历列表
+        try {
+            if (moduleInstances["M_calendar"]?.QQCalDAVClient) {
+                const calendars = await moduleInstances["M_calendar"].QQCalDAVClient.getCalendars();
+                if (Array.isArray(calendars) && calendars.length > 0) {
+                    // 更新日历选项
+                    const calendarItem = group1Items.find(item => item.key === 'cal-qq-calendar-url');
+                    if (calendarItem) {
+                        let calendarOptions = { "": "无" };
+                        calendars.forEach(cal => {
+                            calendarOptions[cal.url] = `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`;
+                        });
+                        calendarItem.options = calendarOptions;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error loading QQ calendars:", error);
+        }
             updateGroupItems();
             await saveSettings();
         } else {

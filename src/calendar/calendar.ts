@@ -183,8 +183,8 @@ export async function run(
         },
         eventResize: async function (info) {
             // console.log("事件调整大小", info.event.startStr, info.event.endStr);
-            if (info.event._def.extendedProps.isRecurring) {
-                showMessage("重复事件不支持修改哦");
+            if (info.event._def.extendedProps.isRecurring || info.event.extendedProps.source === 'qqcalendar') {
+                showMessage("不支持修改哦");
                 info.revert();
                 return;
             }
@@ -294,9 +294,9 @@ export async function run(
             try {
                 let allEvents = [];
                 /////////////////////QQ日历////////////////////////
-                if (moduleInstances['M_calendar'].QQCalDAVClient) {
+                if (moduleInstances['M_calendar']?.QQCalDAVClient) {
                     try {
-                        console.log('QQ calendar events:', moduleInstances["M_calendar"].qqFullCalendarEvents);
+                        // console.log('QQ calendar events:', moduleInstances["M_calendar"].qqFullCalendarEvents);
                         allEvents = allEvents.concat(moduleInstances["M_calendar"].qqFullCalendarEvents);
                     } catch (error) {
                         console.error('Error fetching QQ calendar events:', error);

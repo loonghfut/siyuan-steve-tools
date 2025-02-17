@@ -48,7 +48,7 @@ const CustomViewConfig = {
         const allEvents = props.eventStore.defs;
         let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         allKBEvents = dataArray;//重要
-        // console.log("allKBEvents::::::::", allKBEvents);
+        console.log("allKBEvents::::::::", allKBEvents);
         ///
         if (isFilter) {
             //带日期筛选的数据

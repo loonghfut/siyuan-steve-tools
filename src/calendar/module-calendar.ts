@@ -229,9 +229,10 @@ export class M_calendar {
         if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"]) {
             this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
             await this.QQCalDAVClient.init();
-            const client = await this.QQCalDAVClient.getCalendars();
-            console.log("QQ", client);
-            this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(client[0].url)
+            const qqCalendars_url=this_settingdata["cal-qq-calendar-url"];
+            this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(qqCalendars_url);
+            refreshKanban();
+            console.log("QQevent", this.qqFullCalendarEvents);
         }
         await init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
