@@ -81,8 +81,8 @@ export class ics_s3 {
             // showMessage("S3 连接测试成功", -1, "info");
             return true;
         } catch (error) {
-            console.error("S3 连接测试失败:", error);
-            showMessage(`S3 连接测试失败: ${error.message}`, -1, "error");
+            console.error("ST_S3 连接测试失败:", error);
+            showMessage(`ST_S3 连接测试失败: ${error.message}`, -1, "error");
             return false;
         }
     }
