@@ -8,7 +8,8 @@ export class ics_s3 {
     private accessKeyId: string;
     private secretAccessKey: string;
     private endpoint: string;
-
+    private pathStyle: boolean;
+    private tls: boolean;
     constructor({
         region,
         accessKeyId,
@@ -41,6 +42,8 @@ export class ics_s3 {
         this.secretAccessKey = window.siyuan.config.sync.s3?.secretKey;
         this.bucket = window.siyuan.config.sync.s3?.bucket;
         this.endpoint = window.siyuan.config.sync.s3?.endpoint;
+        this.pathStyle = window.siyuan.config.sync.s3?.pathStyle;
+        this.tls = !window.siyuan.config.sync.s3?.skipTlsVerify;
         // console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
     }
 
@@ -57,7 +60,23 @@ export class ics_s3 {
                     secretAccessKey: this.secretAccessKey
                 },
                 endpoint: this.endpoint,
-                forcePathStyle: true // 添加这个配置以支持自定义 endpoint
+                forcePathStyle: this.pathStyle, // 使用路径样式访问
+                tls: this.tls, // 启用 TLS
+                // 添加以下配置来处理自签名证书
+                requestHandler: {
+                    // @ts-ignore
+                    async request(httpParams) {
+                        const { protocol, hostname, port, method, headers, body } = httpParams;
+                        const requestOptions = {
+                            method,
+                            headers,
+                            body,
+                            // 忽略SSL证书验证
+                            rejectUnauthorized: false
+                        };
+                        return fetch(`${protocol}//${hostname}${port ? `:${port}` : ''}${httpParams.path}`, requestOptions);
+                    }
+                }
             });
         } catch (error) {
             showMessage(`ST_s3初始化失败: ${error.message}`, -1, "error");
