@@ -33,6 +33,8 @@ export class ics_s3 {
         // this.secretAccessKey = window.siyuan.config.sync.s3?.secretKey;
         // this.bucket = window.siyuan.config.sync.s3?.bucket;
         this.endpoint = window.siyuan.config.sync.s3?.endpoint;
+        this.pathStyle = window.siyuan.config.sync.s3?.pathStyle;
+        this.tls = !window.siyuan.config.sync.s3?.skipTlsVerify;
         // console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
     }
 
