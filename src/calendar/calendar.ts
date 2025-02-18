@@ -76,10 +76,20 @@ export async function run(
         // eventDurationEditable: true,
         // 事件点击处理
         eventClick: async function (info) {
-            // console.log('eventClick', info);
+
             if (settingdata["cal-create-way"] === "1") {
-                await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
-                return;
+                if (info.event._def.extendedProps.isRecurring) {
+                    if (info.event._def.extendedProps.source === 'qqcalendar') {
+                        showMessage("不支持修改哦");
+                        return;
+                    }
+                    // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                    myF.changestatus_for_zq(info.event.extendedProps,info.event.start.toISOString().split('T')[0]);
+                    return;
+                }else{
+                    await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
+                    return;
+                }
             }
             let clickTimeout: NodeJS.Timeout;
             clicks2++;
@@ -90,7 +100,18 @@ export async function run(
             } else if (clicks2 === 2) {
                 clearTimeout(clickTimeout);
                 clicks2 = 0;
-                await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
+                if (info.event._def.extendedProps.isRecurring) {
+                    if (info.event._def.extendedProps.source === 'qqcalendar') {
+                        showMessage("不支持修改哦");
+                        return;
+                    }
+                    // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                    myF.changestatus_for_zq(info.event.extendedProps,info.event.start.toISOString().split('T')[0]);
+                    return;
+                }else{
+                    await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
+                    return;
+                }
             }
         },
         select: function (info) {//TODO: 选择处理
@@ -99,6 +120,7 @@ export async function run(
         // 日期点击处理
         //// 双击触发(可选)
         dateClick: async function (info) {
+            // console.log('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
             const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
             if (settingdata["cal-create-way"] === "1") {
@@ -365,9 +387,10 @@ export async function run(
             if (titleEl) (titleEl as HTMLElement).style.color = textColor;
 
 
-
+            // console.log("info.event.extendedProps", info.event.extendedProps);
             ////完成样式
-            if (info.event.extendedProps.status === '完成') {
+            if (info.event.extendedProps.status === '完成' ||
+                (info.event.extendedProps.isRecurring && isEventCompleted(info.event))) {
                 // 应用完成状态的样式
                 info.el.style.textDecoration = 'line-through';
 
@@ -404,6 +427,7 @@ export async function run(
                 }
             }
             // 添加提示框
+            const isCompleted = info.el.classList.contains('event-completed');
             tippy(info.el, {
                 content: `
                     <div class="event-tooltip">
@@ -416,7 +440,7 @@ export async function run(
                         <div class="event-tooltip__content">
                             <p><span class="event-tooltip__label">开始:</span> ${info.event.start?.toLocaleString()}</p>
                             <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "无"}</p>
-                            <p><span class="event-tooltip__label">状态:</span> ${info.event.extendedProps.status || "未设置"}</p>
+                            <p><span class="event-tooltip__label">状态:</span> ${isCompleted ? "完成" : (info.event.extendedProps.status || "未设置")}</p>
                             <p><span class="event-tooltip__label">优先级:</span> ${info.event.extendedProps.priority || "未设置"}</p>
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
@@ -487,3 +511,15 @@ var colourIsLight = function (r: number, g: number, b: number) { // Copied from 
     return (a < 0.5);
 }
 
+// 添加一个独立的辅助函数来检查事件完成状态
+function isEventCompleted(event: any): boolean {
+    const okday = event.extendedProps.okday;
+    // console.log("okday",okday);
+    if (!okday) return false;
+
+    const completedDates = okday.split(',').map(d => d.trim());
+    const currentDateStr = event.start.toISOString().split('T')[0];
+    // console.log("completedDates",completedDates);
+    // console.log("currentDateStr",currentDateStr);
+    return completedDates.includes(currentDateStr);
+}

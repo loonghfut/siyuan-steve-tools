@@ -175,6 +175,14 @@ function extractDataFromTable(data: any, isZQ = false) {
                             keyID: numCell?.value?.keyID || ''
                         };
                     }
+                    if (columnMap.has('完成日期') && row.cells) {
+                        const endCell = row.cells[columnMap.get('完成日期').index];
+                        // console.log("endCell", endCell);
+                        rowData['完成日期'] = {
+                            content: endCell?.value?.text?.content || '',
+                            keyID: endCell?.value?.keyID || ''
+                        };
+                    }
 
                 } else {
                     if (columnMap.has('状态') && row.cells) {
@@ -332,7 +340,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                                 category: item['分类']?.content || '无',
                                 isRecurring: true,
                                 recurringPattern: item['重复规则']?.content || '',
-
+                                okday: item['完成日期']?.content || '',
+                                okdayid: item['完成日期']?.keyID || '',
                             }
                         });
                     }
@@ -535,7 +544,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         dialog.destroy();
     };
 
-    
+
     const handleKeydown = async (e: KeyboardEvent) => {//添加事件主代码
         // console.log(e);
         if (e.type === 'click' && !ok) { sy.showMessage('请先输入内容') }
@@ -750,6 +759,27 @@ function debounce(func: Function, wait: number) {
 }
 
 
-// export async function getRootId_from_filterViewId(vi){
+export function changestatus_for_zq(event, date) {
+    if (!event.okdayid) {
+        sy.showMessage('未找到完成日期列', -1, "error");
+        return;
+    }
 
-// }
+    let okdays = event.okday ? event.okday.split(',').map(d => d.trim()) : [];
+    let newOkday = '';
+
+    if (okdays.includes(date)) {
+        // 如果日期存在，则删除
+        okdays = okdays.filter(d => d !== date);
+        sy.showMessage('已取消完成此事件', 3000, "info");
+    } else {
+        // 如果日期不存在，则添加
+        okdays.push(date);
+        sy.showMessage('已完成此事件', 3000, "info");
+    }
+
+    // 将数组转换回字符串
+    newOkday = okdays.filter(Boolean).join(','); // filter(Boolean)用于移除空值
+
+    api.updateAttrViewCell_pro(event.blockId, event.rootid, event.okdayid, newOkday, "text");
+}

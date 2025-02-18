@@ -730,7 +730,7 @@ export async function updateAttrViewCell_pro(
         },
         action: string
     },
-    type: 'date' | 'select' | 'relation' | 'checkbox',
+    type: 'date' | 'select' | 'relation' | 'checkbox'| 'text',
     endtime?: string
 ) {
     const doOperations: IOperation[] = [];
@@ -808,6 +808,16 @@ export async function updateAttrViewCell_pro(
                     contents: readyContents
                 }
             };
+            break;
+
+        case 'text':
+            cellData = {
+                type: "text",
+                id: newId,
+                text: {
+                    content: value as string
+                }
+            }
             break;
     }
 
