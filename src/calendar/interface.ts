@@ -47,6 +47,9 @@ export interface KBCalendarEvent {
         Kstart: any;
         recurringPattern: any;
         isRecurring: boolean;
+        source: string;
+        okday: string;
+        okdayid: string;
     };
     range: {
         start: Date;

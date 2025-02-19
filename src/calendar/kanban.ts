@@ -2,10 +2,10 @@ import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption, ScrollState } from "./interface";
-import { av_ids, filterViewId, OUTcalendar, viewName } from './calendar';
+import { av_ids, filterViewId, isEventCompleted, OUTcalendar, viewName } from './calendar';
 import { showMessage } from 'siyuan';
 import { settingdata } from '..';
-import { createEventInDatabase, getViewId, getViewValue, showEvent } from './myF';
+import { changestatus_for_zq, createEventInDatabase, getViewId, getViewValue, showEvent } from './myF';
 import { runblockdata_for_sub } from './quickadd';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
@@ -40,13 +40,13 @@ function debounce<T extends (...args: any[]) => any>(
 }
 
 
-
+let dataArray: NestedKBCalendarEvent[] = [];
 const CustomViewConfig = {
     classNames: ['custom-view'],
     content: function (props) {
 
         const allEvents = props.eventStore.defs;
-        let dataArray = convertToArray(allEvents) as KBCalendarEvent[];
+        dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         allKBEvents = dataArray;//重要
         // console.log("allKBEvents::::::::", allKBEvents);
         ///
@@ -63,6 +63,7 @@ const CustomViewConfig = {
 
         // console.log("处理后数据allKBEvents", allKBEvents);
         // console.log("处理后数据", dataArray);
+
         const columns = {
             todo: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '未完成')),
             inProgress: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '进行中')),
@@ -76,7 +77,7 @@ const CustomViewConfig = {
             const starttime = new Date(event.extendedProps.Kstart).toLocaleString();
             let endtime = '';
             let nowToEndTime;
-            console.log('event.extendedProps.priority:', event);
+            // console.log('event.extendedProps.priority:', event);
             //周期事件处理
             const isRecurring = event.extendedProps?.isRecurring;
             // const recurringPattern = event.extendedProps?.recurringPattern;
@@ -138,7 +139,11 @@ const CustomViewConfig = {
 ` : '';
 
             return `
-                <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}"${isRecurring ? 'data-recurring="true"' : ''}>
+                <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" 
+                data-id="${event.publicId}" 
+                data-block-id="${event.extendedProps.blockId}"
+                data-start-date="${event.range.start.toISOString().split('T')[0]}"
+                ${isRecurring ? 'data-recurring="true"' : ''}>
                     <div class="kanban-card-header">
                         <h3><span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}
                          ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
@@ -147,9 +152,9 @@ const CustomViewConfig = {
                             <span class="kanban-nowToEndTime">${nowToEndTime}</span>
                             <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
                             ${event.extendedProps.category !== "无" ? `<span class="category">${event.extendedProps.category}</span>` : ''}
-                            ${event.extendedProps.priority && event.extendedProps.priority !== "无" ? 
-                                `<span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>` 
-                                : ''}
+                            ${event.extendedProps.priority && event.extendedProps.priority !== "无" ?
+                    `<span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>`
+                    : ''}
                         </div>
                     </div>
                     <div class="kanban-card-content">
@@ -249,6 +254,31 @@ export function initializeSortableKanban() {
         });
     });
 
+    // 添加周期事件图标点击监听
+    const recurringIcons = document.querySelectorAll('.recurring-icon');
+    recurringIcons.forEach(icon => {
+        const newIcon = icon.cloneNode(true);
+        icon.parentNode.replaceChild(newIcon, icon);
+        newIcon.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 获取事件信息
+            const card = (e.currentTarget as HTMLElement).closest('.kanban-card');
+            const blockId = card?.getAttribute('data-block-id');
+            const startDate = card?.getAttribute('data-start-date');
+            const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
+            
+            // showMessage(`周期事件规则: ${pattern}`, 5000, 'info');
+            // console.log('Recurring icon clicked:', blockId, startDate);
+            if (eventData) {
+                changestatus_for_zq(eventData.extendedProps, startDate);
+            }
+            // 显示周期规则信息
+            // showMessage(`周期规则: ${pattern || '无规则'}`, 5000, 'info');
+        });
+    });
+
 
     // 添加按钮点击监听
     const addButton = document.querySelectorAll('.kanban-add-button');
@@ -291,17 +321,17 @@ export function initializeSortableKanban() {
                 // 检查是否为周期事件
                 const draggedItem = evt.dragged;
                 if (draggedItem.classList.contains('recurring-event')) {
-                    showMessage('周期事件不可拖动', 3000, );
+                    showMessage('周期事件不可拖动', 3000,);
                     return false;
                 }
-                
+
                 // 检查目标是否为周期事件的子级容器
                 const targetParent = evt.to.closest('.kanban-card');
                 if (targetParent?.getAttribute('data-recurring') === 'true') {
                     showMessage('周期事件不能包含子事件', 3000,);
                     return false;
                 }
-                
+
                 return true;
             },
             onStart: function (evt) {
@@ -439,26 +469,51 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
             return null;
         }
 
-        visited.add(event.extendedProps.blockId);
-        parentIds.add(event.extendedProps.blockId);
+        // 创建深拷贝
+        const clonedEvent = {
+            ...event,
+            extendedProps: { ...event.extendedProps },
+            range: { ...event.range },
+        };
 
-        if (event.extendedProps.sub?.ids) {
-            event.children = event.extendedProps.sub.ids
+        visited.add(clonedEvent.extendedProps.blockId);
+        parentIds.add(clonedEvent.extendedProps.blockId);
+
+        // 处理周期事件状态
+        if (clonedEvent.extendedProps?.isRecurring && clonedEvent.extendedProps.source !== 'qqcalendar') {
+            const okday = clonedEvent.extendedProps.okday;
+            if (okday) {
+                const completedDates = okday.split(',').map(d => d.trim());
+                const currentDateStr = clonedEvent.range.start.toISOString().split('T')[0];
+                const newStatus = completedDates.includes(currentDateStr) ? '完成' : '未完成';
+                clonedEvent.extendedProps.status = newStatus;
+                // console.log('Status updated:', {
+                //     id: clonedEvent.extendedProps.blockId,
+                //     date: currentDateStr,
+                //     okday: okday,
+                //     newStatus: newStatus
+                // });
+            } else {
+                clonedEvent.extendedProps.status = '未完成';
+            }
+        }
+
+        if (clonedEvent.extendedProps.sub?.ids) {
+            clonedEvent.children = clonedEvent.extendedProps.sub.ids
                 .map(id => {
-                    // 先在 eventMap 中查找，如果找不到则在 allKBEvents 中查找
                     const nestedEvent = eventMap.get(id) ||
                         allKBEvents.find(e => e.extendedProps.blockId === id);
                     return nestedEvent ? { ...nestedEvent } : undefined;
                 })
                 .filter((e): e is NestedKBCalendarEvent => e !== undefined)
-                .map(e => buildNested(e, parentIds, depth + 1))
+                .map(e => buildNested(e, new Set(parentIds), depth + 1))
                 .filter((e): e is NestedKBCalendarEvent => e !== null);
         }
 
-        visited.delete(event.extendedProps.blockId);
-        parentIds.delete(event.extendedProps.blockId);
+        visited.delete(clonedEvent.extendedProps.blockId);
+        parentIds.delete(clonedEvent.extendedProps.blockId);
 
-        return event;
+        return clonedEvent;
     }
     // 先构建所有事件的引用关系
     allEvents.forEach(event => {

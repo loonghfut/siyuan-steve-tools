@@ -523,7 +523,11 @@ export function isEventCompleted(event: any): boolean {
     if (!okday) return false;
 
     const completedDates = okday.split(',').map(d => d.trim());
-    const currentDateStr = event.start.toISOString().split('T')[0];
+    let currentDateStr = event?.start?.toISOString?.()?.split('T')?.[0];
+    if (!currentDateStr && event?.range?.start) {
+        currentDateStr = event.range.start.toISOString?.()?.split('T')?.[0] || '';
+    }
+    if (!currentDateStr) return false;
     // console.log("completedDates",completedDates);
     // console.log("currentDateStr",currentDateStr);
     return completedDates.includes(currentDateStr);

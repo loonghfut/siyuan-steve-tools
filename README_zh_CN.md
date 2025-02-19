@@ -28,7 +28,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 | 功能/教程 | 条件 | 状态 |主观难度|
 |-----------|------|------|:-------:|
 | [日程管理详细教程2.0](https://ld246.com/article/1739584703693) | 打赏 ≥ 10元 | 👌已完成 | 低|
-| Docker同步感知功能展示 | ⭐ Star ≥ 10 |  🛠️进行中 | 低|
+| Docker同步感知功能展示 | ⭐ Star ≥ 10 |  👌已完成 | 低|
 | 多平台日程同步支持<br>([alist](https://ld246.com/article/1739629792990)/[s3](https://ld246.com/article/1739691995360)存储ics) | 打赏 ≥ 15元 | 😊基本完成 |中|
 | AI侧边栏自定义网址 | ⭐ Star ≥ 15 | 🚧 待完成 |低|
 | 接入QQ邮箱日历 | 打赏 ≥ 35元 | 🛠️进行中 |高|
@@ -36,8 +36,8 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 
 注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准，个人能力有限，主观难度较高的可能无法实现或实现效果较差，若介意请不要为此而打赏。   
 
-**当前状态** （建议打赏时留下您的邮箱或链滴名称）  
-- 💰 打赏：35元（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
+**当前状态** （建议打赏时留下您的邮箱或链滴名称）打赏者的需求我会优先考虑      
+- 💰 打赏：74元（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
@@ -48,8 +48,9 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板
 - [seanduo](https://github.com/seanduo)：PR
 - [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
-- [空幽]()：打赏支持 `the first one`
-- [挥墨留香](): 打赏支持 `the second one`
+- [空幽]()：打赏支持 `the first `
+- [挥墨留香](): 打赏支持 `the second `
+- [博]()：打赏支持 `the most `
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
