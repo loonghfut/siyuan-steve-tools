@@ -9,6 +9,7 @@ import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
 import { runblockdata_for_sub, runblockdata_for_time } from './quickadd';
+import { isEventCompleted } from './calendar';
 export const statusMap = {
     "未完成": "todo",
     "完成": "done",
@@ -342,7 +343,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                                 blockId: eventId,
                                 rootid: view.from.rootid,
                                 kramdown: kramdown,
-                                // status: item['状态']?.content || '未完成',
+                                status: '未完成',
                                 description: item['描述']?.content || '',
                                 priority: item['优先级']?.content || '无',
                                 category: item['分类']?.content || '无',

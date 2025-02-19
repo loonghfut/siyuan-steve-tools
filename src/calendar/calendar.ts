@@ -84,9 +84,9 @@ export async function run(
                         return;
                     }
                     // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
-                    myF.changestatus_for_zq(info.event.extendedProps,info.event.start.toISOString().split('T')[0]);
+                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                     return;
-                }else{
+                } else {
                     await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
                     return;
                 }
@@ -106,9 +106,9 @@ export async function run(
                         return;
                     }
                     // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
-                    myF.changestatus_for_zq(info.event.extendedProps,info.event.start.toISOString().split('T')[0]);
+                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                     return;
-                }else{
+                } else {
                     await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
                     return;
                 }
@@ -386,11 +386,16 @@ export async function run(
             if (timeEl) (timeEl as HTMLElement).style.color = textColor;
             if (titleEl) (titleEl as HTMLElement).style.color = textColor;
 
-
+            if (info.event.extendedProps.isRecurring&&info.event.extendedProps.source !== 'qqcalendar') {
+                const isCompleted = isEventCompleted(info.event);
+                // 动态更新 status 属性
+                // console.log('Before update:', {...info.event.extendedProps}); // 记录更新前的属性
+                info.event.setExtendedProp('status', isCompleted ? '完成' : '未完成');
+                // console.log('After update:', {...info.event.extendedProps}); // 记录更新后的属性
+            }
             // console.log("info.event.extendedProps", info.event.extendedProps);
             ////完成样式
-            if (info.event.extendedProps.status === '完成' ||
-                (info.event.extendedProps.isRecurring && isEventCompleted(info.event))) {
+            if (info.event.extendedProps.status === '完成') {
                 // 应用完成状态的样式
                 info.el.style.textDecoration = 'line-through';
 
@@ -512,7 +517,7 @@ var colourIsLight = function (r: number, g: number, b: number) { // Copied from 
 }
 
 // 添加一个独立的辅助函数来检查事件完成状态
-function isEventCompleted(event: any): boolean {
+export function isEventCompleted(event: any): boolean {
     const okday = event.extendedProps.okday;
     // console.log("okday",okday);
     if (!okday) return false;

@@ -76,9 +76,15 @@ const CustomViewConfig = {
             const starttime = new Date(event.extendedProps.Kstart).toLocaleString();
             let endtime = '';
             let nowToEndTime;
-            if (event.extendedProps.Kend) {
-                endtime = '' + new Date(event.extendedProps.Kend).toLocaleString();
-                nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kend, event.extendedProps.status);
+            console.log('event.extendedProps.priority:', event);
+            //周期事件处理
+            const isRecurring = event.extendedProps?.isRecurring;
+            // const recurringPattern = event.extendedProps?.recurringPattern;
+
+
+            if (event.range.end) {
+                endtime = '' + new Date(event.range.end).toLocaleString();
+                nowToEndTime = myK.getDaysFromNow(event.range.end, event.extendedProps.status);
             } else {
                 nowToEndTime = myK.getDaysFromNow(event.extendedProps.Kstart, event.extendedProps.status);
             }
@@ -132,14 +138,18 @@ const CustomViewConfig = {
 ` : '';
 
             return `
-                <div class="kanban-card" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}">
+                <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" data-id="${event.publicId}" data-block-id="${event.extendedProps.blockId}"${isRecurring ? 'data-recurring="true"' : ''}>
                     <div class="kanban-card-header">
-                        <h3><span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span></h3>
+                        <h3><span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}
+                         ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
+                         </span></h3>
                         <div class="kanban-card-meta">
                             <span class="kanban-nowToEndTime">${nowToEndTime}</span>
                             <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
                             ${event.extendedProps.category !== "无" ? `<span class="category">${event.extendedProps.category}</span>` : ''}
-                            ${event.extendedProps.priority !== "无" ? `<span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>` : ''}
+                            ${event.extendedProps.priority && event.extendedProps.priority !== "无" ? 
+                                `<span class="badge priority-${event.extendedProps.priority.toLowerCase()}">${event.extendedProps.priority}</span>` 
+                                : ''}
                         </div>
                     </div>
                     <div class="kanban-card-content">
@@ -276,6 +286,24 @@ export function initializeSortableKanban() {
             delayOnTouchOnly: true, // 仅在触摸设备上启用延迟
             delay: 750, // 设置长按延迟时间为750毫秒
             touchStartThreshold: 15, // 触摸移动阈值，防止轻微移动触发拖拽
+            filter: '.no-drag', // 添加过滤器，禁止拖动带有 no-drag 类的元素
+            onMove: function (evt) {
+                // 检查是否为周期事件
+                const draggedItem = evt.dragged;
+                if (draggedItem.classList.contains('recurring-event')) {
+                    showMessage('周期事件不可拖动', 3000, );
+                    return false;
+                }
+                
+                // 检查目标是否为周期事件的子级容器
+                const targetParent = evt.to.closest('.kanban-card');
+                if (targetParent?.getAttribute('data-recurring') === 'true') {
+                    showMessage('周期事件不能包含子事件', 3000,);
+                    return false;
+                }
+                
+                return true;
+            },
             onStart: function (evt) {
                 isDragging = true; // 开始拖拽时设置标志
                 // console.log('onStart', evt);

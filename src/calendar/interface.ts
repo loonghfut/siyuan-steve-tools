@@ -45,6 +45,12 @@ export interface KBCalendarEvent {
         order: number;
         Kend: any;
         Kstart: any;
+        recurringPattern: any;
+        isRecurring: boolean;
+    };
+    range: {
+        start: Date;
+        end: Date;
     };
 }
 

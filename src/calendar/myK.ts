@@ -135,6 +135,7 @@ export function getDaysFromNow(time: string | Date, status: string): string {
 }
 
 export function transformEventData_fr_filter(events: any[]): any[] {
+    console.log("transformEventData_fr_filter", events);
     return events.map(event => {
         // 从 def 中提取所需属性
         const {
@@ -151,6 +152,13 @@ export function transformEventData_fr_filter(events: any[]): any[] {
             extendedProps
         } = event.def;
 
+
+        // Adjust range times by subtracting 8 hours
+        const range = {
+            start: new Date(event.range.start.getTime() - 8 * 60 * 60 * 1000),
+            end: new Date(event.range.end.getTime() - 8 * 60 * 60 * 1000)
+        };
+
         // 返回新的扁平化对象
         return {
             title,
@@ -163,7 +171,8 @@ export function transformEventData_fr_filter(events: any[]): any[] {
             allDay,
             hasEnd,
             ui,
-            extendedProps
+            extendedProps,
+            range
         };
     });
 }
