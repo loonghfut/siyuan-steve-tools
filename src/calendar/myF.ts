@@ -322,6 +322,13 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             ? `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${item['重复规则'].content}`
                             : '';
                         if (!rruleStr) { continue; }
+
+                        // 获取 kramdown 内容
+                        let kramdown = "";
+                        if (item['主事件']?.content || false) {
+                            kramdown = (await api.getBlockKramdown(eventId)).kramdown;
+                        }
+
                         events.push({
                             id: eventId,
                             title: item['事件']?.content || '',
@@ -334,7 +341,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             extendedProps: {
                                 blockId: eventId,
                                 rootid: view.from.rootid,
-                                // status: item['状态']?.content || '',
+                                kramdown: kramdown,
+                                // status: item['状态']?.content || '未完成',
                                 description: item['描述']?.content || '',
                                 priority: item['优先级']?.content || '无',
                                 category: item['分类']?.content || '无',
@@ -342,6 +350,16 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                                 recurringPattern: item['重复规则']?.content || '',
                                 okday: item['完成日期']?.content || '',
                                 okdayid: item['完成日期']?.keyID || '',
+                                ////////////////////////////////////////
+                                // statusid: item['状态']?.keyID || '',
+                                priorityid: item['优先级']?.keyID || '',
+                                categoryid: item['分类']?.keyID || '',
+                                subid: item['子级']?.keyID || '',
+                                descriptionid: item['描述']?.keyID || '',
+                                Kstart: startDate,
+                                Kend: endDate,
+                                sub: item['子级'] || '',
+                                // hasCircularRef: false
                             }
                         });
                     }
