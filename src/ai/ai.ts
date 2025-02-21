@@ -7,13 +7,14 @@ let resizeObserver: ResizeObserver | null = null;
 let resizeTimeout: number = 0;
 let settingdata
 let M_plugin
+
 export class M_ai {
     private plugin: steveTools;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
         M_plugin = plugin;
     }
-
+    public url = "";
     async init(settingdata) {
         this.plugin.addIcons(`
             <symbol id="iconSTai" viewBox="0 0 900 900">
@@ -23,6 +24,11 @@ export class M_ai {
         settingdata = settingdata;
         console.log("ai模块初始化");
         // console.log(this.plugin);
+        const slef = this;
+        this.url = settingdata["ai-url"];
+        if (this.url === "custom") {
+            this.url = settingdata["ai-url-custom"];
+        }
         this.plugin.addDock({
             config: {
                 position: "RightTop",
@@ -38,7 +44,7 @@ export class M_ai {
                 <iframe 
                 allow="clipboard-read; clipboard-write"
                 sandbox="allow-forms allow-presentation allow-same-origin allow-scripts allow-modals allow-popups" 
-                src="${settingdata["ai-url"]}" 
+                src="${slef.url}" 
                 data-src="" 
                 border="1" 
                 frameborder="no" 
@@ -69,7 +75,7 @@ export class M_ai {
             init: (dock) => {
                 // this.aidock = dock;//将dock赋值给全局变量，以便在其它地方进行后续操作
 
-                if (settingdata["ai-url"] == "") {
+                if (slef.url == "") {
                     showMessage("请先配置ai网址...", -1, "error");
                 }
                 dock.element.innerHTML = `
@@ -77,7 +83,7 @@ export class M_ai {
                 <iframe 
                 allow="clipboard-read; clipboard-write"
                 sandbox="allow-forms allow-presentation allow-same-origin allow-scripts allow-modals allow-popups" 
-                src="${settingdata["ai-url"]}" 
+                src="${slef.url}" 
                 data-src="" 
                 border="1" 
                 frameborder="no" 

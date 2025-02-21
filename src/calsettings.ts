@@ -31,6 +31,7 @@ export const defaultSettings = {
     // ai模块
     "ai-enable": false,
     "ai-url": "https://www.doubao.com/chat/",
+    "ai-url-custom":'',
     // 图片压缩模块
     "img-compress-enable": false,
     // 画板模块

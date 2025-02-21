@@ -193,8 +193,8 @@
             value: settings["ai-url-type"],
             options: {
                 "": "无",
-                "alist": "alist(需安装alist附件管理插件)",
-                "s3": "s3(和思源s3同步用同一个桶,使用前请自行测试会不会影响到思源的s3同步)",
+                alist: "alist(需安装alist附件管理插件)",
+                s3: "s3(和思源s3同步用同一个桶,使用前请自行测试会不会影响到思源的s3同步)",
                 "s3-diy": "s3-diy(自定义桶)(推荐)",
             },
         },
@@ -240,7 +240,7 @@
             description: "选择要同步的QQ日历",
             key: "cal-qq-calendar-url",
             value: settings["cal-qq-calendar-url"],
-            options: { "": "请先配置QQ邮箱信息" }  // 设置初始静态值
+            options: { "": "请先配置QQ邮箱信息" }, // 设置初始静态值
         },
     ];
 
@@ -315,7 +315,16 @@
                 "https://metaso.cn/": "密塔",
                 "https://chat.deepseek.com/": "deepseek",
                 "https://chatgpt.com/": "chatgpt",
+                "custom": "自定义地址",
             },
+        },
+        {
+            type: "textinput",
+            title: "自定义AI网页地址",
+            description: `当选择"自定义地址"时生效，请输入完整URL（以http(s)://开头）`,
+            key: "ai-url-custom",
+            value: settings["ai-url-custom"],
+            placeholder: "http(s)://",
         },
         // {
         //     type: "button",
@@ -458,14 +467,20 @@
             Promise.resolve().then(async () => {
                 try {
                     if (moduleInstances["M_calendar"]?.QQCalDAVClient) {
-                        const calendars = await moduleInstances["M_calendar"].QQCalDAVClient.getCalendars();
+                        const calendars =
+                            await moduleInstances[
+                                "M_calendar"
+                            ].QQCalDAVClient.getCalendars();
                         if (Array.isArray(calendars) && calendars.length > 0) {
                             // 更新日历选项
-                            const calendarItem = group1Items.find(item => item.key === 'cal-qq-calendar-url');
+                            const calendarItem = group1Items.find(
+                                (item) => item.key === "cal-qq-calendar-url",
+                            );
                             if (calendarItem) {
                                 let calendarOptions = { "": "无" };
-                                calendars.forEach(cal => {
-                                    calendarOptions[cal.url] = `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`;
+                                calendars.forEach((cal) => {
+                                    calendarOptions[cal.url] =
+                                        `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`;
                                 });
                                 calendarItem.options = calendarOptions;
                                 updateGroupItems();
