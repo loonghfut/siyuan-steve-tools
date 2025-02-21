@@ -186,7 +186,7 @@
         },
         {
             type: "select",
-            title: "ics分享平台 -beta(请悉知再使用)",
+            title: "ics分享平台(docker端无需使用)(请悉知再使用)(beta)",
             description:
                 "选择ics文件分享平台(重要！ics文件会被分享到其他平台上，可能会有隐私泄漏的风险，建议将S3的桶名称和ics文件名称复杂化，防止被他人猜到）",
             key: "cal-share",
@@ -221,14 +221,14 @@
         },
         {
             type: "textinput",
-            title: "QQ邮箱地址",
+            title: "QQ邮箱地址-beta",
             description: "对接QQ邮箱时填写",
             key: "cal-qq-email",
             value: settings["cal-qq-email"],
         },
         {
             type: "textinput",
-            title: "QQ邮箱授权码",
+            title: "QQ邮箱授权码-beta",
             description: "对接QQ邮箱时填写",
             key: "cal-qq-code",
             value: settings["cal-qq-code"],
@@ -236,7 +236,7 @@
         //选择QQ邮箱的日历id
         {
             type: "select",
-            title: "QQ日历选择",
+            title: "QQ日历选择-beta",
             description: "选择要同步的QQ日历",
             key: "cal-qq-calendar-url",
             value: settings["cal-qq-calendar-url"],
