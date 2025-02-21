@@ -55,11 +55,19 @@ const CustomViewConfig = {
             // console.log("OUTcalendar::::::::",);
             const filterEvents = sliceEvents(props, false);
             const Tevent = myK.transformEventData_fr_filter(filterEvents) as KBCalendarEvent[];
-            dataArray = Tevent;
+            // 先处理事件的嵌套结构
+            dataArray = convertEventsToNested(Tevent, settingdata["cal-show-ref-event"]);
+
+            // 然后再过滤周期事件
+            dataArray = myK.filterRecurringEvents(dataArray, {
+                futureOccurrences: 1,
+                pastOccurrences: 1,
+                excludeStatuses: ['完成']
+            });
         }
         ///
         // console.log("处理前数据", dataArray);
-        dataArray = convertEventsToNested(dataArray, settingdata["cal-show-ref-event"]);
+
 
         // console.log("处理后数据allKBEvents", allKBEvents);
         // console.log("处理后数据", dataArray);
@@ -237,47 +245,38 @@ export function initializeSortableKanban() {
     destroyAllSortables();
     console.log('initializing sortable kanban');
     const containers = document.querySelectorAll('.kanban-board');
+    console.log('containers:', containers);
     if (!containers.length) return;
 
     // 跳转事件点击监听
-    const stRefs = document.querySelectorAll('.st-ref');
-    stRefs.forEach(ref => {
-        const newRef = ref.cloneNode(true);
-        ref.parentNode.replaceChild(newRef, ref);
-        newRef.addEventListener('click', async (e) => {
+    document.querySelector('.kanban-board')?.addEventListener('click', async (e) => {
+        const target = e.target as HTMLElement;
+        // 检查点击的是否是 st-ref 元素
+        if (target.matches('.st-ref')) {
             e.preventDefault();
             e.stopPropagation();
-            const blockId = (e.currentTarget as HTMLElement).getAttribute('data-id');
+            const blockId = target.getAttribute('data-id');
             if (blockId) {
                 showEvent(blockId, "", false, true);
             }
-        });
-    });
-
-    // 添加周期事件图标点击监听
-    const recurringIcons = document.querySelectorAll('.recurring-icon');
-    recurringIcons.forEach(icon => {
-        const newIcon = icon.cloneNode(true);
-        icon.parentNode.replaceChild(newIcon, icon);
-        newIcon.addEventListener('click', (e) => {
+        }
+        // 委托处理周期事件图标点击 
+        if (target.matches('.recurring-icon')) {
             e.preventDefault();
             e.stopPropagation();
-
-            // 获取事件信息
-            const card = (e.currentTarget as HTMLElement).closest('.kanban-card');
-            const blockId = card?.getAttribute('data-block-id');
-            const startDate = card?.getAttribute('data-start-date');
-            const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
-            
-            // showMessage(`周期事件规则: ${pattern}`, 5000, 'info');
-            // console.log('Recurring icon clicked:', blockId, startDate);
-            if (eventData) {
-                changestatus_for_zq(eventData.extendedProps, startDate);
+            const card = target.closest('.kanban-card');
+            if (card) {
+                const blockId = card.getAttribute('data-block-id');
+                const startDate = card.getAttribute('data-start-date');
+                const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
+                if (eventData) {
+                    changestatus_for_zq(eventData.extendedProps, startDate);
+                }
             }
-            // 显示周期规则信息
-            // showMessage(`周期规则: ${pattern || '无规则'}`, 5000, 'info');
-        });
+        }
     });
+
+
 
 
     // 添加按钮点击监听
@@ -543,6 +542,11 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
 
 export function destroyAllSortables() {
     sortableInstances.forEach(instance => {
+        // Remove all event listeners and destroy sortable instance
+        if (instance.el) {
+            const clonedEl = instance.el.cloneNode(true);
+            instance.el.parentNode?.replaceChild(clonedEl, instance.el);
+        }
         instance.destroy();
     });
     sortableInstances = [];

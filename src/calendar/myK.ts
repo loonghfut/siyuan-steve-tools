@@ -1,5 +1,5 @@
 import { showMessage, openWindow, Protyle } from "siyuan";
-import { NestedKBCalendarEvent } from "./interface";
+import { KBCalendarEvent, NestedKBCalendarEvent } from "./interface";
 import * as api from "@/api";
 import { allKBEvents } from "./kanban";
 import { showEvent } from "./myF";
@@ -261,4 +261,62 @@ export async function globalOpen2() {
         }
     });
 
+}
+
+
+// 新增过滤周期事件的函数
+export function filterRecurringEvents(events: KBCalendarEvent[], 
+    options = { 
+        futureOccurrences: 3,  // Show 3 future occurrences by default
+        pastOccurrences: 1,    // Show 1 past occurrence by default
+        excludeStatuses: []     // 需要过滤掉的状态数组，例如 ['完成']
+    }): KBCalendarEvent[] {
+    const now = new Date();
+    const processedEvents = new Set<string>();
+    const filteredEvents: KBCalendarEvent[] = [];
+    const recurringEventMap = new Map<string, KBCalendarEvent[]>();
+
+    // First, collect non-recurring events and group recurring events
+    events.forEach(event => {
+        // 检查事件状态是否在排除列表中
+        if (options.excludeStatuses?.includes(event.extendedProps?.status)) {
+            return; // 跳过被排除的状态
+        }
+
+        if (!event.extendedProps?.isRecurring) {
+            if (!processedEvents.has(event.publicId)) {
+                filteredEvents.push(event);
+                processedEvents.add(event.publicId);
+            }
+        } else {
+            const blockId = event.extendedProps.blockId;
+            if (!recurringEventMap.has(blockId)) {
+                recurringEventMap.set(blockId, []);
+            }
+            recurringEventMap.get(blockId)!.push(event);
+        }
+    });
+
+    // Process recurring events
+    recurringEventMap.forEach((events, blockId) => {
+        const sortedEvents = events
+            .sort((a, b) => a.range.start.getTime() - b.range.start.getTime());
+        
+        // Find current position
+        const currentIndex = sortedEvents.findIndex(e => e.range.start > now);
+        const validCurrentIndex = currentIndex === -1 ? sortedEvents.length : currentIndex;
+        
+        // Select events within the specified range
+        const startIndex = Math.max(validCurrentIndex - options.pastOccurrences, 0);
+        const endIndex = Math.min(validCurrentIndex + options.futureOccurrences, sortedEvents.length);
+        
+        sortedEvents.slice(startIndex, endIndex).forEach(e => {
+            if (!processedEvents.has(e.publicId)) {
+                filteredEvents.push(e);
+                processedEvents.add(e.publicId);
+            }
+        });
+    });
+
+    return filteredEvents;
 }
