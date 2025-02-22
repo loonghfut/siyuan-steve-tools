@@ -48,9 +48,10 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板
 - [seanduo](https://github.com/seanduo)：PR
 - [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
-- [空幽]()：打赏支持 `the first `
+- [空幽]()：打赏支持 `the first ` `the most`
 - [挥墨留香](): 打赏支持 `the second `
-- [博]()：打赏支持 `the most `
+- [博]()：打赏支持 `the third `
+- [林（新塘版）]()：打赏支持 `the fourth `
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。

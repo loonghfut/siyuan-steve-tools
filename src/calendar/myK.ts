@@ -276,19 +276,13 @@ export function filterRecurringEvents(events: KBCalendarEvent[],
     const filteredEvents: KBCalendarEvent[] = [];
     const recurringEventMap = new Map<string, KBCalendarEvent[]>();
 
-    // First, collect non-recurring events and group recurring events
+    // 首先处理非周期事件 - 直接添加到结果中
     events.forEach(event => {
-        // 检查事件状态是否在排除列表中
-        if (options.excludeStatuses?.includes(event.extendedProps?.status)) {
-            return; // 跳过被排除的状态
-        }
-
         if (!event.extendedProps?.isRecurring) {
-            if (!processedEvents.has(event.publicId)) {
-                filteredEvents.push(event);
-                processedEvents.add(event.publicId);
-            }
+            // 非周期事件直接添加，不做任何处理
+            filteredEvents.push(event);
         } else {
+            // 周期事件进行分类处理
             const blockId = event.extendedProps.blockId;
             if (!recurringEventMap.has(blockId)) {
                 recurringEventMap.set(blockId, []);
@@ -297,19 +291,21 @@ export function filterRecurringEvents(events: KBCalendarEvent[],
         }
     });
 
-    // Process recurring events
+    // 处理周期事件
     recurringEventMap.forEach((events, blockId) => {
         const sortedEvents = events
+            .filter(event => !options.excludeStatuses?.includes(event.extendedProps?.status))
             .sort((a, b) => a.range.start.getTime() - b.range.start.getTime());
         
-        // Find current position
+        // 找到当前位置
         const currentIndex = sortedEvents.findIndex(e => e.range.start > now);
         const validCurrentIndex = currentIndex === -1 ? sortedEvents.length : currentIndex;
         
-        // Select events within the specified range
+        // 在指定范围内选择事件
         const startIndex = Math.max(validCurrentIndex - options.pastOccurrences, 0);
         const endIndex = Math.min(validCurrentIndex + options.futureOccurrences, sortedEvents.length);
         
+        // 添加筛选后的周期事件
         sortedEvents.slice(startIndex, endIndex).forEach(e => {
             if (!processedEvents.has(e.publicId)) {
                 filteredEvents.push(e);
