@@ -153,9 +153,12 @@ const CustomViewConfig = {
                 data-start-date="${event.range.start.toISOString().split('T')[0]}"
                 ${isRecurring ? 'data-recurring="true"' : ''}>
                     <div class="kanban-card-header">
-                        <h3><span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}
+                        <h3>${isRecurring ? 
+                            `<span>${event.title}</span>` :
+                            `<span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
+                        }
                          ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
-                         </span></h3>
+                         </h3>
                         <div class="kanban-card-meta">
                             <span class="kanban-nowToEndTime">${nowToEndTime}</span>
                             <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
