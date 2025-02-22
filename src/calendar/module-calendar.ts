@@ -335,7 +335,7 @@ export class M_calendar {
     private avButton() {
         setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
-                .filter(span => span.closest('[name="日程"]') || span.closest('[name="周期"]'));
+                .filter(span => span.closest('[name="日程"]'));
             // steveTools.outlog(targetSpans, "targetSpans");
 
             targetSpans.forEach(targetSpan => {
