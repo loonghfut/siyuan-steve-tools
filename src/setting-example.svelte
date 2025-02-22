@@ -10,9 +10,8 @@
     export let myfile;
     export let setdialog;
 
-
-// Add subGroups and activeSubGroup properties to the module's entry in the groups array.
-// Add an entry to the subGroupItemCounts object for the module, specifying the item counts for each of its sub-groups. 
+    // Add subGroups and activeSubGroup properties to the module's entry in the groups array.
+    // Add an entry to the subGroupItemCounts object for the module, specifying the item counts for each of its sub-groups.
 
     let settings = getSettings();
 
@@ -27,11 +26,12 @@
     let groups: ISettingGroup[] = [
         {
             name: "日程管理 2.1",
-            subGroups: ["基础设置", "同步设置", "高级设置"],
+            subGroups: ["基础设置", "高级设置", "同步设置"],
             activeSubGroup: "基础设置",
             items: [
                 // 基础设置
                 {
+                    //1
                     type: "checkbox",
                     title: "启用日程管理",
                     description: "启用日程管理功能后再进行下面的设置",
@@ -39,48 +39,7 @@
                     value: settings["cal-enable"],
                 },
                 {
-                    type: "textinput",
-                    title: "日程文件名",
-                    description: "建议越复杂越好，记得加上.ics后缀",
-                    key: "cal-url",
-                    value: settings["cal-url"],
-                },
-                {
-                    type: "button",
-                    title: "获取订阅链接",
-                    description: "更改日程文件名后请重新获取日程订阅链接",
-                    key: "cal-get-url",
-                    value: settings["cal-get-url"],
-                    button: {
-                        label: "获取",
-                        callback: () => {
-                            try {
-                                moduleInstances["M_calendar"].getCalUrl();
-                            } catch (error) {
-                                showMessage(
-                                    `获取失败: ${error.message}，请先启用日程管理功能`,
-                                );
-                            }
-                        },
-                    },
-                },
-                // 同步设置
-                {
-                    type: "checkbox",
-                    title: "自动更新ics文件",
-                    description:
-                        "启用后每10分钟更新一次(需保证前端运行)，且每次编辑日程数据后自动更新(插件出问题首先关闭此选项）",
-                    key: "cal-auto-update",
-                    value: settings["cal-auto-update"],
-                },
-                {
-                    type: "checkbox",
-                    title: "手动更新ics文件",
-                    description: "启用后在topbar右侧会出现更新ics文件的按钮",
-                    key: "cal-hand-update",
-                    value: settings["cal-hand-update"],
-                },
-                {
+                    //2
                     type: "checkbox",
                     title: "全局日程视图",
                     description: "启用后再左上角加一个日历视图的入口",
@@ -88,18 +47,7 @@
                     value: settings["cal-show-view"],
                 },
                 {
-                    type: "select",
-                    title: "基本交互方式",
-                    description: "在日历视图中的基本交互方式",
-                    key: "cal-create-way",
-                    value: settings["cal-create-way"],
-                    options: {
-                        "0": "双击交互",
-                        "1": "单击交互",
-                    },
-                },
-                // 高级设置
-                {
+                    //3
                     type: "select",
                     title: "日程创建位置",
                     description: "选择日记本",
@@ -113,6 +61,7 @@
                     ),
                 },
                 {
+                    //4
                     type: "select",
                     title: "日程数据库选择",
                     description: "选择默认添加事件的数据库",
@@ -131,7 +80,9 @@
                             }
                             const ids = moduleInstances["M_calendar"].av_ids;
                             if (!Array.isArray(ids) || ids.length === 0) {
-                                return { "": "无可用数据库请先导入日程周期模板" };
+                                return {
+                                    "": "无可用数据库请先导入日程周期模板",
+                                };
                             }
                             return Object.fromEntries(
                                 ids
@@ -157,22 +108,7 @@
                     })(),
                 },
                 {
-                    type: "checkbox",
-                    title: "事件交互方式",
-                    description:
-                        "启用后和事件交互会自动跳转到块属性页面，启用前则跳转到目标块",
-                    key: "cal-seemore",
-                    value: settings["cal-seemore"],
-                },
-                {
-                    type: "checkbox",
-                    title: "是否展示被关联子的事件",
-                    description:
-                        "启用后看板会展示被关联子的事件（建议开启）（若关闭，请不要手动操作关联列）",
-                    key: "cal-show-ref-event",
-                    value: settings["cal-show-ref-event"],
-                },
-                {
+                    //12
                     type: "button",
                     title: "日程周期模板",
                     description: "生成日程周期模板（注意：会创建一个笔记本）",
@@ -191,7 +127,86 @@
                         },
                     },
                 },
+                //高级设置
                 {
+                    //9
+                    type: "select",
+                    title: "基本交互方式",
+                    description: "在日历视图中的基本交互方式",
+                    key: "cal-create-way",
+                    value: settings["cal-create-way"],
+                    options: {
+                        "0": "双击交互",
+                        "1": "单击交互",
+                    },
+                },
+                {
+                    //10
+                    type: "checkbox",
+                    title: "事件交互方式",
+                    description:
+                        "启用后和事件交互会自动跳转到块属性页面，启用前则跳转到目标块",
+                    key: "cal-seemore",
+                    value: settings["cal-seemore"],
+                },
+                {
+                    //11
+                    type: "checkbox",
+                    title: "是否展示被关联子的事件",
+                    description:
+                        "启用后看板会展示被关联子的事件（建议开启）（若关闭，请不要手动操作关联列）",
+                    key: "cal-show-ref-event",
+                    value: settings["cal-show-ref-event"],
+                },
+                //同步设置
+                {
+                    //5
+                    type: "textinput",
+                    title: "日程文件名",
+                    description: "建议越复杂越好，记得加上.ics后缀",
+                    key: "cal-url",
+                    value: settings["cal-url"],
+                },
+                {
+                    //6
+                    type: "button",
+                    title: "获取订阅链接",
+                    description: "更改日程文件名后请重新获取日程订阅链接",
+                    key: "cal-get-url",
+                    value: settings["cal-get-url"],
+                    button: {
+                        label: "获取",
+                        callback: () => {
+                            try {
+                                moduleInstances["M_calendar"].getCalUrl();
+                            } catch (error) {
+                                showMessage(
+                                    `获取失败: ${error.message}，请先启用日程管理功能`,
+                                );
+                            }
+                        },
+                    },
+                },
+                {
+                    //7
+                    type: "checkbox",
+                    title: "自动更新ics文件",
+                    description:
+                        "启用后每10分钟更新一次(需保证前端运行)，且每次编辑日程数据后自动更新(插件出问题首先关闭此选项）",
+                    key: "cal-auto-update",
+                    value: settings["cal-auto-update"],
+                },
+                {
+                    //8
+                    type: "checkbox",
+                    title: "手动更新ics文件",
+                    description: "启用后在topbar右侧会出现更新ics文件的按钮",
+                    key: "cal-hand-update",
+                    value: settings["cal-hand-update"],
+                },
+
+                {
+                    //13
                     type: "select",
                     title: "ics分享平台(docker端无需使用)(请悉知再使用)(beta)",
                     description:
@@ -206,6 +221,7 @@
                     },
                 },
                 {
+                    //14
                     type: "textinput",
                     title: "S3_Bucket",
                     description: "选择s3-diy(自定义桶)时填写",
@@ -213,6 +229,7 @@
                     value: settings["cal-s3-bucket"],
                 },
                 {
+                    //15
                     type: "textinput",
                     title: "S3_AccessKeyId",
                     description: "选择s3-diy(自定义桶)时填写",
@@ -220,6 +237,7 @@
                     value: settings["cal-s3-accessKeyId"],
                 },
                 {
+                    //16
                     type: "textinput",
                     title: "S3_SecretAccessKey",
                     description: "选择s3-diy(自定义桶)时填写",
@@ -227,6 +245,7 @@
                     value: settings["cal-s3-secretAccessKey"],
                 },
                 {
+                    //17
                     type: "textinput",
                     title: "QQ邮箱地址-beta",
                     description: "对接QQ邮箱时填写",
@@ -234,6 +253,7 @@
                     value: settings["cal-qq-email"],
                 },
                 {
+                    //18
                     type: "textinput",
                     title: "QQ邮箱授权码-beta",
                     description: "对接QQ邮箱时填写",
@@ -242,6 +262,7 @@
                 },
                 //选择QQ邮箱的日历id
                 {
+                    //19
                     type: "select",
                     title: "QQ日历选择-beta",
                     description: "选择要同步的QQ日历",
@@ -487,33 +508,35 @@
     $: currentGroup = groups.find((group) => group.name === focusGroup);
 
     $: activeSubGroupItems = currentGroup?.items.filter((_, index) => {
-            if (!currentGroup?.subGroups) return true; // 如果没有子分组，显示所有项目
-    
-            // 定义每个子分组显示的item数量
-            const subGroupItemCounts = {
-                "基础设置": 7,
-                "同步设置": 6,
-                "高级设置": undefined, // 不限制
-            };
-    
-            const subGroupIndex = currentGroup.subGroups.indexOf(
-                currentGroup.activeSubGroup,
-            );
-            const itemCount = subGroupItemCounts[currentGroup.activeSubGroup];
-    
-            if (itemCount === undefined) {
-                return true; // 不限制数量
-            }
-    
-            let startIndex = 0;
-            for (let i = 0; i < subGroupIndex; i++) {
-                const subGroupName = currentGroup.subGroups[i];
-                startIndex += subGroupItemCounts[subGroupName] || 0; // 累加之前的数量，未定义则为0
-            }
-    
-            const endIndex = startIndex + itemCount;
-            return index >= startIndex && index < endIndex;
-        });
+        if (!currentGroup?.subGroups) return true; // 如果没有子分组，显示所有项目
+
+        // 定义每个子分组显示的item数量
+        const subGroupItemCounts = {
+            //19
+            基础设置: 5,
+            高级设置: 3,
+            同步设置: 11,
+             // 不限制
+        };
+
+        const subGroupIndex = currentGroup.subGroups.indexOf(
+            currentGroup.activeSubGroup,
+        );
+        const itemCount = subGroupItemCounts[currentGroup.activeSubGroup];
+
+        if (itemCount === undefined) {
+            return true; // 不限制数量
+        }
+
+        let startIndex = 0;
+        for (let i = 0; i < subGroupIndex; i++) {
+            const subGroupName = currentGroup.subGroups[i];
+            startIndex += subGroupItemCounts[subGroupName] || 0; // 累加之前的数量，未定义则为0
+        }
+
+        const endIndex = startIndex + itemCount;
+        return index >= startIndex && index < endIndex;
+    });
 </script>
 
 <div class="fn__flex-1 fn__flex config__panel">
