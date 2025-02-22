@@ -10,6 +10,10 @@
     export let myfile;
     export let setdialog;
 
+
+// Add subGroups and activeSubGroup properties to the module's entry in the groups array.
+// Add an entry to the subGroupItemCounts object for the module, specifying the item counts for each of its sub-groups. 
+
     let settings = getSettings();
 
     interface ISettingGroup {
@@ -19,12 +23,14 @@
         activeSubGroup?: string;
     }
 
+    // Define setting groups with their items
     let groups: ISettingGroup[] = [
         {
             name: "日程管理 2.1",
             subGroups: ["基础设置", "同步设置", "高级设置"],
             activeSubGroup: "基础设置",
             items: [
+                // 基础设置
                 {
                     type: "checkbox",
                     title: "启用日程管理",
@@ -58,6 +64,7 @@
                         },
                     },
                 },
+                // 同步设置
                 {
                     type: "checkbox",
                     title: "自动更新ics文件",
@@ -91,6 +98,7 @@
                         "1": "单击交互",
                     },
                 },
+                // 高级设置
                 {
                     type: "select",
                     title: "日程创建位置",
@@ -471,15 +479,41 @@
             items: group.items.map((item) => ({
                 ...item,
                 value: settings[item.key] ?? item.value,
+                options: item.options, // 确保 options 也被更新
             })),
         }));
     }
 
     $: currentGroup = groups.find((group) => group.name === focusGroup);
 
-    $: calendarBaseItems = groups[0].items.slice(0, 7);
-    $: calendarSyncItems = groups[0].items.slice(7, 13);
-    $: calendarAdvancedItems = groups[0].items.slice(13);
+    $: activeSubGroupItems = currentGroup?.items.filter((_, index) => {
+            if (!currentGroup?.subGroups) return true; // 如果没有子分组，显示所有项目
+    
+            // 定义每个子分组显示的item数量
+            const subGroupItemCounts = {
+                "基础设置": 7,
+                "同步设置": 6,
+                "高级设置": undefined, // 不限制
+            };
+    
+            const subGroupIndex = currentGroup.subGroups.indexOf(
+                currentGroup.activeSubGroup,
+            );
+            const itemCount = subGroupItemCounts[currentGroup.activeSubGroup];
+    
+            if (itemCount === undefined) {
+                return true; // 不限制数量
+            }
+    
+            let startIndex = 0;
+            for (let i = 0; i < subGroupIndex; i++) {
+                const subGroupName = currentGroup.subGroups[i];
+                startIndex += subGroupItemCounts[subGroupName] || 0; // 累加之前的数量，未定义则为0
+            }
+    
+            const endIndex = startIndex + itemCount;
+            return index >= startIndex && index < endIndex;
+        });
 </script>
 
 <div class="fn__flex-1 fn__flex config__panel">
@@ -518,37 +552,15 @@
                     {/each}
                 </div>
 
-                {#if currentGroup.activeSubGroup === "基础设置"}
-                    <SettingPanel
-                        group={currentGroup.name}
-                        settingItems={calendarBaseItems}
-                        display={true}
-                        on:changed={onChanged}
-                        on:click={({ detail }) => {
-                            console.debug("Click:", detail.key);
-                        }}
-                    />
-                {:else if currentGroup.activeSubGroup === "同步设置"}
-                    <SettingPanel
-                        group={currentGroup.name}
-                        settingItems={calendarSyncItems}
-                        display={true}
-                        on:changed={onChanged}
-                        on:click={({ detail }) => {
-                            console.debug("Click:", detail.key);
-                        }}
-                    />
-                {:else}
-                    <SettingPanel
-                        group={currentGroup.name}
-                        settingItems={calendarAdvancedItems}
-                        display={true}
-                        on:changed={onChanged}
-                        on:click={({ detail }) => {
-                            console.debug("Click:", detail.key);
-                        }}
-                    />
-                {/if}
+                <SettingPanel
+                    group={currentGroup.name}
+                    settingItems={activeSubGroupItems}
+                    display={true}
+                    on:changed={onChanged}
+                    on:click={({ detail }) => {
+                        console.debug("Click:", detail.key);
+                    }}
+                />
             </div>
         {:else}
             <SettingPanel
@@ -575,27 +587,5 @@
     .config__panel {
         height: 70vh;
         overflow: auto;
-    }
-    .calendar-settings {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .calendar-subtabs {
-        display: flex;
-        gap: 0.5rem;
-        padding: 8px 16px;
-        border-bottom: 1px solid var(--b3-border-color);
-
-        button {
-            padding: 4px 12px;
-            border-radius: 4px;
-
-            &:not(.b3-button--text) {
-                background-color: var(--b3-theme-primary);
-                color: white;
-            }
-        }
     }
 </style>
