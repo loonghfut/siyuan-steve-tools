@@ -44,7 +44,7 @@ let dataArray: NestedKBCalendarEvent[] = [];
 const CustomViewConfig = {
     classNames: ['custom-view'],
     content: function (props) {
-
+        console.log('custom view content！！！！！！！！！！！！1');
         const allEvents = props.eventStore.defs;
         dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         allKBEvents = dataArray;//重要
@@ -153,10 +153,10 @@ const CustomViewConfig = {
                 data-start-date="${event.range.start.toISOString().split('T')[0]}"
                 ${isRecurring ? 'data-recurring="true"' : ''}>
                     <div class="kanban-card-header">
-                        <h3>${isRecurring ? 
-                            `<span>${event.title}</span>` :
-                            `<span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
-                        }
+                        <h3>${isRecurring ?
+                    `<span>${event.title}</span>` :
+                    `<span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
+                }
                          ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
                          </h3>
                         <div class="kanban-card-meta">
@@ -212,22 +212,24 @@ const CustomViewConfig = {
             </div>
             </div>
         `;
+
+        Promise.resolve().then(() => {
+            requestAnimationFrame(async () => {
+                await initializeSortableKanban();
+                // console.log('初始化完成');
+            });
+        });
+
         return { html: html }
     },
 
-    didMount: function (props) {
-        // console.log('custom view mounted', props);
-        // initializeSortableKanban();
-        // console.log('custom view mounted  didMount didMount didMount didMount');
-    },
-    datesSet: function (info) {
-        // 重新加载事件数据
-        // console.log('datesSet:::::::::::AAAAAAAA:::::::::::::');
-        initializeSortableKanban();
-    },
-    willUnmount: function (props) {
-        // console.log('：：：：：：：：：：about to change away from custom view', props);
-    }
+    // didMount: function (props) {
+    // },
+    // datesSet: function (info) {
+    // },
+    // willUnmount: function (props) {
+    //     console.log('：：：：：：：：：：about to change away from custom view', props);
+    // },
 }
 
 export async function handleAddButtonClick(status = "", direct = { isdirect: false, directid: "" }, isrefresh = true) {
@@ -243,60 +245,57 @@ export async function handleAddButtonClick(status = "", direct = { isdirect: fal
     return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct, isrefresh);
 }
 
+async function handleKanbanClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    console.log('点击事件:1');
+    // 处理 st-ref 点击
+    if (target.matches('.st-ref')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const blockId = target.getAttribute('data-id');
+        if (blockId) {
+            showEvent(blockId, "", false, true);
+        }
+    }
 
-export function initializeSortableKanban() {
-    destroyAllSortables();
+    // 处理周期事件图标点击
+    if (target.matches('.recurring-icon')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = target.closest('.kanban-card');
+        if (card) {
+            const blockId = card.getAttribute('data-block-id');
+            const startDate = card.getAttribute('data-start-date');
+            const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
+            if (eventData) {
+                changestatus_for_zq(eventData.extendedProps, startDate);
+            }
+        }
+    }
+    // 处理添加按钮点击
+    if (target.matches('.kanban-add-button')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const status = target.getAttribute('status') || "";
+        await handleAddButtonClick(status);
+    }
+}
+
+
+export async function initializeSortableKanban() {
+    await destroyAllSortables();
+    // setTimeout(() => {
     console.log('initializing sortable kanban');
     const containers = document.querySelectorAll('.kanban-board');
     console.log('containers:', containers);
     if (!containers.length) return;
 
-    // 跳转事件点击监听
-    document.querySelector('.kanban-board')?.addEventListener('click', async (e) => {
-        const target = e.target as HTMLElement;
-        // 检查点击的是否是 st-ref 元素
-        if (target.matches('.st-ref')) {
-            e.preventDefault();
-            e.stopPropagation();
-            const blockId = target.getAttribute('data-id');
-            if (blockId) {
-                showEvent(blockId, "", false, true);
-            }
-        }
-        // 委托处理周期事件图标点击 
-        if (target.matches('.recurring-icon')) {
-            e.preventDefault();
-            e.stopPropagation();
-            const card = target.closest('.kanban-card');
-            if (card) {
-                const blockId = card.getAttribute('data-block-id');
-                const startDate = card.getAttribute('data-start-date');
-                const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
-                if (eventData) {
-                    changestatus_for_zq(eventData.extendedProps, startDate);
-                }
-            }
-        }
+    // Remove click handlers from all containers
+    containers.forEach(container => {
+        container.removeEventListener('click', handleKanbanClick);
+        container.addEventListener('click', handleKanbanClick);
     });
-
-
-
-
-    // 添加按钮点击监听
-    const addButton = document.querySelectorAll('.kanban-add-button');
-    if (addButton) {
-        // console.log(addButton);
-        addButton.forEach(button => {
-            const status = button.getAttribute('status'); // 获取status属性值
-            // console.log('Button status:', status);
-
-            const newButton = button.cloneNode(true);
-
-            button.parentNode.replaceChild(newButton, button);
-            newButton.addEventListener('click', () => handleAddButtonClick(status));
-        });
-    }
-
+    //打印containers的监听数量
 
     const createSortableInstance = (element: HTMLElement) => {
         let clicks = 0;
@@ -432,6 +431,7 @@ export function initializeSortableKanban() {
             }
         });
     });
+    // }, 1000); // 添加100ms延迟
 }
 
 function convertToArray(data: Record<string, any>): any[] {
@@ -543,13 +543,13 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
     return myK.sortEvents(nestedEvents);
 }
 
-export function destroyAllSortables() {
+export async function destroyAllSortables() {
     sortableInstances.forEach(instance => {
         // Remove all event listeners and destroy sortable instance
-        if (instance.el) {
-            const clonedEl = instance.el.cloneNode(true);
-            instance.el.parentNode?.replaceChild(clonedEl, instance.el);
-        }
+        // if (instance.el) {
+        //     const clonedEl = instance.el.cloneNode(true);
+        //     instance.el.parentNode?.replaceChild(clonedEl, instance.el);
+        // }
         instance.destroy();
     });
     sortableInstances = [];
@@ -611,7 +611,7 @@ const _refreshKanban = async () => {
         (card as HTMLElement).style.cursor = '';
     });
     // 重新初始化拖拽
-    initializeSortableKanban();
+    await initializeSortableKanban();
 };
 export const refreshKanban = debounce(_refreshKanban, 300);
 
