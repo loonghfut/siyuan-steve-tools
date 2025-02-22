@@ -507,22 +507,30 @@
 
     $: currentGroup = groups.find((group) => group.name === focusGroup);
 
-    $: activeSubGroupItems = currentGroup?.items.filter((_, index) => {
-        if (!currentGroup?.subGroups) return true; // 如果没有子分组，显示所有项目
-
-        // 定义每个子分组显示的item数量
-        const subGroupItemCounts = {
-            //19
-            基础设置: 5,
-            高级设置: 3,
-            同步设置: 11,
+    const subGroupItemCounts = {
+        "日程管理 2.1": {
+            "基础设置": 5,
+            "高级设置": 3,
+            "同步设置": 11,
              // 不限制
-        };
+        },
+        // "docker同步感知": {
+        //     "连接设置": 4,
+        //     "高级设置": undefined,
+        // },
+        // Add other modules here as needed
+    };
+    $: activeSubGroupItems = currentGroup?.items.filter((_, index) => {
+        if (!currentGroup?.subGroups) return true;
 
+        const moduleName = currentGroup.name;
+        const subGroupName = currentGroup.activeSubGroup;
         const subGroupIndex = currentGroup.subGroups.indexOf(
             currentGroup.activeSubGroup,
         );
-        const itemCount = subGroupItemCounts[currentGroup.activeSubGroup];
+
+        const itemCount =
+            subGroupItemCounts[moduleName]?.[subGroupName];
 
         if (itemCount === undefined) {
             return true; // 不限制数量
@@ -530,8 +538,9 @@
 
         let startIndex = 0;
         for (let i = 0; i < subGroupIndex; i++) {
-            const subGroupName = currentGroup.subGroups[i];
-            startIndex += subGroupItemCounts[subGroupName] || 0; // 累加之前的数量，未定义则为0
+            const prevSubGroupName = currentGroup.subGroups[i];
+            startIndex +=
+                subGroupItemCounts[moduleName]?.[prevSubGroupName] || 0;
         }
 
         const endIndex = startIndex + itemCount;
