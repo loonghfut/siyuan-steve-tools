@@ -8,7 +8,7 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import steveTools from "@/index";
-import kanban, { refreshKanban, thisCalendars } from './kanban';
+import kanban, { refreshKanban, thisCalendars, update_thisCalendars } from './kanban';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -467,6 +467,7 @@ export async function run(
             buttons.forEach(btn => btn.textContent = viewName);
         },
     });
+    update_thisCalendars();
     thisCalendars.push(calendar);
     console.log("thisCalendars", thisCalendars);
     // Calendars_pro.push({Calendar:calendar,id:id});

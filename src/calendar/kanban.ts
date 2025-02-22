@@ -14,6 +14,11 @@ export let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
 // let id = '';//渲染protyle用
 
+export function update_thisCalendars() {
+    thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
+}
+
+
 const CATEGORY_MAP = {
     'todo': '未完成',
     'inProgress': '进行中',
@@ -247,7 +252,7 @@ export async function handleAddButtonClick(status = "", direct = { isdirect: fal
 
 async function handleKanbanClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    console.log('点击事件:1');
+    // console.log('点击事件:1');
     // 处理 st-ref 点击
     if (target.matches('.st-ref')) {
         e.preventDefault();
@@ -287,7 +292,7 @@ export async function initializeSortableKanban() {
     // setTimeout(() => {
     console.log('initializing sortable kanban');
     const containers = document.querySelectorAll('.kanban-board');
-    console.log('containers:', containers);
+    // console.log('containers:', containers);
     if (!containers.length) return;
 
     // Remove click handlers from all containers
@@ -546,10 +551,10 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
 export async function destroyAllSortables() {
     sortableInstances.forEach(instance => {
         // Remove all event listeners and destroy sortable instance
-        // if (instance.el) {
-        //     const clonedEl = instance.el.cloneNode(true);
-        //     instance.el.parentNode?.replaceChild(clonedEl, instance.el);
-        // }
+        if (instance.el) {
+            const clonedEl = instance.el.cloneNode(true);
+            instance.el.parentNode?.replaceChild(clonedEl, instance.el);
+        }
         instance.destroy();
     });
     sortableInstances = [];
@@ -558,6 +563,7 @@ export async function destroyAllSortables() {
 // 创建防抖后的 refreshKanban
 const _refreshKanban = async () => {
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
+    // console.log("++++",thisCalendars);
     if (!thisCalendars.length) return;
     // 记录所有日历的滚动位置
     thisCalendars.forEach(calendar => {
