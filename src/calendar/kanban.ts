@@ -49,7 +49,7 @@ let dataArray: NestedKBCalendarEvent[] = [];
 const CustomViewConfig = {
     classNames: ['custom-view'],
     content: function (props) {
-        console.log('custom view content！！！！！！！！！！！！1');
+        // console.log('custom view content！！！！！！！！！！！！1');
         const allEvents = props.eventStore.defs;
         dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         allKBEvents = dataArray;//重要
@@ -64,11 +64,19 @@ const CustomViewConfig = {
             dataArray = convertEventsToNested(Tevent, settingdata["cal-show-ref-event"]);
 
             // 然后再过滤周期事件
-            dataArray = myK.filterRecurringEvents(dataArray, {
-                futureOccurrences: 1,
-                pastOccurrences: 1,
-                excludeStatuses: ['完成']
-            });
+            if (!settingdata["cal-show-zq-done"]) {
+                dataArray = myK.filterRecurringEvents(dataArray, {
+                    futureOccurrences: 1,
+                    pastOccurrences: 1,
+                    excludeStatuses: ['完成'],
+                });
+            } else {
+                dataArray = myK.filterRecurringEvents(dataArray, {
+                    futureOccurrences: 1,
+                    pastOccurrences: 1,
+                    excludeStatuses: [],
+                });
+            }
         }
         ///
         // console.log("处理前数据", dataArray);

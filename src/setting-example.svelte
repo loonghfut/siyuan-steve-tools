@@ -26,7 +26,7 @@
     let groups: ISettingGroup[] = [
         {
             name: "日程管理 2.1",
-            subGroups: ["基础设置", "高级设置", "同步设置"],
+            subGroups: ["基础设置", "高级设置", "同步设置","邮箱日历"],
             activeSubGroup: "基础设置",
             items: [
                 // 基础设置
@@ -150,13 +150,20 @@
                     value: settings["cal-seemore"],
                 },
                 {
-                    //11
                     type: "checkbox",
                     title: "是否展示被关联子的事件",
                     description:
                         "启用后看板会展示被关联子的事件（建议开启）（若关闭，请不要手动操作关联列）",
                     key: "cal-show-ref-event",
                     value: settings["cal-show-ref-event"],
+                },
+                {
+                    type: "checkbox",
+                    title: "完成项是否显示周期事件",
+                    description:
+                        "启用后看板完成项会展示周期事件",
+                    key: "cal-show-zq-done",
+                    value: settings["cal-show-zq-done"],
                 },
                 //同步设置
                 {
@@ -509,10 +516,11 @@
 
     const subGroupItemCounts = {
         "日程管理 2.1": {
-            "基础设置": 5,
-            "高级设置": 3,
-            "同步设置": 11,
-             // 不限制
+            基础设置: 5,
+            高级设置: 4,
+            同步设置: 8,
+            邮箱日历: 3,
+            // 不限制
         },
         // "docker同步感知": {
         //     "连接设置": 4,
@@ -529,8 +537,7 @@
             currentGroup.activeSubGroup,
         );
 
-        const itemCount =
-            subGroupItemCounts[moduleName]?.[subGroupName];
+        const itemCount = subGroupItemCounts[moduleName]?.[subGroupName];
 
         if (itemCount === undefined) {
             return true; // 不限制数量
@@ -567,8 +574,8 @@
     </ul>
     <div class="config__tab-wrap">
         {#if currentGroup?.subGroups}
-            <div class="calendar-settings">
-                <div class="calendar-subtabs">
+            <div class="config__tab-wrap">
+                <div class="subgroup-buttons">
                     {#each currentGroup.subGroups as subGroup}
                         <button
                             class="b3-button"
@@ -583,16 +590,18 @@
                         </button>
                     {/each}
                 </div>
-
-                <SettingPanel
-                    group={currentGroup.name}
-                    settingItems={activeSubGroupItems}
-                    display={true}
-                    on:changed={onChanged}
-                    on:click={({ detail }) => {
-                        console.debug("Click:", detail.key);
-                    }}
-                />
+                <div class="config__tab-container">
+                    <!-- 添加这个容器 -->
+                    <SettingPanel
+                        group={currentGroup.name}
+                        settingItems={activeSubGroupItems}
+                        display={true}
+                        on:changed={onChanged}
+                        on:click={({ detail }) => {
+                            console.debug("Click:", detail.key);
+                        }}
+                    />
+                </div>
             </div>
         {:else}
             <SettingPanel
@@ -610,14 +619,32 @@
 
 <style lang="scss">
     .config__panel {
-        height: 100%;
+        height: 70vh;
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
     }
-    .config__panel > ul > li {
-        padding-left: 1rem;
+    .config__panel > .b3-tab-bar {
+        width: 170px;
     }
 
-    .config__panel {
-        height: 70vh;
-        overflow: auto;
+    .config__tab-wrap {
+        flex: 1;
+        height: 100%;
+        overflow: auto; // 添加滚动条
+        padding: 2px; // 添加一些内边距
+    }
+
+    .config__tab-container {
+        flex: 1;
+        height: calc(100% - 48px); // 减去子分组按钮的高度
+        overflow-y: auto;
+    }
+
+    // 为子分组按钮容器添加样式
+    .subgroup-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 </style>

@@ -24,6 +24,9 @@ export const defaultSettings = {
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId":"",
     "cal-s3-secretAccessKey":"",
+    //// 周期显示设置
+    "cal-show-zq-done": false,
+    // "cal-show-zq-todo": '',
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",
