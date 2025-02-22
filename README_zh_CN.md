@@ -10,7 +10,7 @@ STEVETOOLS
 #### 带beta的功能请谨慎使用，未经过严格测试，可能会有一些问题。
 （注：由于是自用工具插件，可能会有一些不完善的地方，甚至出现数据遗失！！（因为使用了思源数据操作相关的api），请自行测试无问题的情况下再使用，同时本插件完全开源）   
  若介意请勿使用。
-#### ！！寒假即将结束，后面新功能的开发会放缓，大三学业繁忙，后面的空闲时间大概率只会修复bug，除非你带着打赏催更（包括alist附件管理，数据库属性显示插件）！！
+#### ！！寒假已结束，后面新功能的开发会放缓，大三学业繁忙，后面的空闲时间大概率只会修复bug，除非你带着打赏催更（包括alist附件管理，数据库属性显示插件）！！
 ### 若发现BUG或者有好的建议，欢迎提issue或者pr。
 
 #### 目前工具
@@ -37,7 +37,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准，个人能力有限，主观难度较高的可能无法实现或实现效果较差，若介意请不要为此而打赏。   
 
 **当前状态** （建议打赏时留下您的邮箱或链滴名称）打赏者的需求我会优先考虑      
-- 💰 打赏：149元（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
+- 💰 打赏：159元（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
@@ -52,6 +52,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [挥墨留香](): 打赏支持 `the second `
 - [博]()：打赏支持 `the third `
 - [林（新塘版）]()：打赏支持 `the fourth `
+- [VeryZHH]()：打赏支持 `the fifth `
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
