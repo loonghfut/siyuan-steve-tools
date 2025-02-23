@@ -482,12 +482,32 @@ export class M_calendar {
     }
 
 
-    private convertEventFormat(eventData: any[][]): EventAttributes[] {//TODO这里才是重点！！待优化(加接口)
+    private convertEventFormat(eventData: any[]): EventAttributes[] {
         const events: EventAttributes[] = [];
-
-        // 处理常规事件数组
-        if (Array.isArray(eventData[0])) {
-            eventData[0].forEach((event: any) => {
+    
+        eventData.forEach((event: any) => {
+            // 检查事件是否为周期性事件
+            if (event.recurrenceRule) {
+                // 处理周期性事件
+                events.push({
+                    start: event.start,
+                    title: event.title,
+                    description: event.description,
+                    recurrenceRule: event.recurrenceRule,
+                    duration: event.duration,
+                    // 添加提醒配置
+                    alarms: [{
+                        action: 'display',
+                        summary: event.title,
+                        description: event.description,
+                        trigger: {
+                            before: true,
+                            minutes: 15,
+                        }
+                    }],
+                });
+            } else {
+                // 处理常规事件
                 events.push({
                     start: event.start,
                     end: event.end,
@@ -495,46 +515,20 @@ export class M_calendar {
                     description: event.description,
                     status: event.status,
                     // 根据状态决定是否添加提醒配置
-                    alarms: event.status === 'CONFIRMED' ? [] : [
-                        {
-                            action: 'display',
-                            summary: `${event.title}`,
-                            description: `${event.description}`,
-                            trigger: {
-                                before: true,
-                                minutes: 15,
-                            }
+                    alarms: event.status === 'CONFIRMED' ? [] : [{
+                        action: 'display',
+                        summary: event.title,
+                        description: event.description,
+                        trigger: {
+                            before: true,
+                            minutes: 15,
                         }
-                    ],
+                    }],
                 });
-            });
-        }
-
-        // 处理周期性事件
-        if (Array.isArray(eventData[1])) {
-            eventData[1].forEach((recurringEvent: any) => {
-                events.push({
-                    start: recurringEvent.start,
-                    title: recurringEvent.title,
-                    description: recurringEvent.description,
-                    recurrenceRule: recurringEvent.recurrenceRule,
-                    duration: recurringEvent.duration, // Add default duration of 1 hour for recurring events
-                    // 添加提醒配置
-                    alarms: [
-                        {
-                            action: 'display',
-                            summary: `${recurringEvent.title}`,
-                            description: `${recurringEvent.description}`,
-                            trigger: {
-                                before: true,
-                                minutes: 15,
-                            }
-                        }
-                    ],
-                });
-            });
-        }
-
+            }
+        });
+    
+        // console.log("events", events);
         return events;
     }
 
@@ -644,7 +638,7 @@ export class M_calendar {
             const avIds = await this.getAVreferenceid();
             const viewIDs = await myF.getViewId(avIds);
             const viewValue = await myF.getViewValue(viewIDs);
-            // steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue);
+            // console.log("EEEEEEEEEEEEEEEEEView data:", viewValue);
             const result = transformEvents(viewValue);
             await this.addEventToGlobal(result);
 
@@ -684,11 +678,15 @@ export class M_calendar {
 
 
     // 添加新事件到全局变量
-    async addEventToGlobal(newEvent: EventAttributes) {
+    async addEventToGlobal(newEvents: EventAttributes | EventAttributes[]) {
         try {
-            // 将新事件添加到全局事件数组
-            allEvents.push(newEvent);
+            if (Array.isArray(newEvents)) {
+                allEvents.push(...newEvents);
+            } else {
+                allEvents.push(newEvents);
+            }
             steveTools.outlog('新事件已添加到全局变量');
+            // console.log("allEvents", allEvents);
         } catch (error) {
             console.error('添加事件到全局变量时出错：', error);
         }
@@ -770,28 +768,48 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
         ];
     }
 
-    const transformedEvents = inputEvents[0].data.map(event => {
-        // Base event object with common properties
-        const baseEvent = {
-            start: timestampToArray(event?.开始时间?.start),
-            title: event?.事件?.content,
-            description: event?.描述?.content,
-        };
+    // 用于存储已处理过的事件的唯一标识
+    const processedEvents = new Set();
+    const transformedEvents = [];
 
-        // Add properties based on event type
-        if (isZQ) {
-            return {
-                ...baseEvent,
-                recurrenceRule: event.重复规则.content,
-                duration: { hours: event.持续时间.content }
+    // 遍历所有输入的事件数组
+    inputEvents.forEach(eventGroup => {
+        if (!eventGroup.data) return;
+
+        eventGroup.data.forEach(event => {
+            // 创建事件的唯一标识
+            const eventKey = `${event?.事件?.id}`;
+            
+            // 检查事件是否已经处理过
+            if (processedEvents.has(eventKey)) {
+                return; // 跳过重复的事件
+            }
+
+            // 记录已处理的事件
+            processedEvents.add(eventKey);
+
+            // Base event object with common properties
+            const baseEvent = {
+                start: timestampToArray(event?.开始时间?.start),
+                title: event?.事件?.content,
+                description: event?.描述?.content,
             };
-        } else {
-            return {
-                ...baseEvent,
-                end: timestampToArray(event.开始时间.end),
-                status: event.状态.content === "完成" ? "CONFIRMED" : "TENTATIVE"
-            };
-        }
+
+            // Add properties based on event type
+            if (isZQ) {
+                transformedEvents.push({
+                    ...baseEvent,
+                    recurrenceRule: event.重复规则.content,
+                    duration: { hours: event.持续时间.content }
+                });
+            } else {
+                transformedEvents.push({
+                    ...baseEvent,
+                    end: timestampToArray(event.开始时间.end),
+                    status: event.状态.content === "完成" ? "CONFIRMED" : "TENTATIVE"
+                });
+            }
+        });
     });
 
     return transformedEvents;
