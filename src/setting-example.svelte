@@ -26,7 +26,7 @@
     let groups: ISettingGroup[] = [
         {
             name: "日程管理 2.1",
-            subGroups: ["基础设置", "高级设置", "同步设置","邮箱日历"],
+            subGroups: ["基础设置", "高级设置", "ics设置","ics分享","邮箱日历"],
             activeSubGroup: "基础设置",
             items: [
                 // 基础设置
@@ -173,6 +173,22 @@
                     description: "建议越复杂越好，记得加上.ics后缀",
                     key: "cal-url",
                     value: settings["cal-url"],
+                },
+                {
+                    //5
+                    type: "number",
+                    title: "(ics)事件范围前(单位：月)",
+                    description: "以当前时间为基准，向前多少个月的事件",
+                    key: "cal-ics-filter-old",
+                    value: settings["cal-ics-filter-old"],
+                },
+                {
+                    //5
+                    type: "number",
+                    title: "(ics)事件范围后(单位：月)",
+                    description: "以当前时间为基准，向后多少个月的事件",
+                    key: "cal-ics-filter-new",
+                    value: settings["cal-ics-filter-new"],
                 },
                 {
                     //6
@@ -518,7 +534,8 @@
         "日程管理 2.1": {
             基础设置: 5,
             高级设置: 4,
-            同步设置: 8,
+            ics设置: 6,
+            ics分享: 4,
             邮箱日历: 3,
             // 不限制
         },

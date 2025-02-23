@@ -229,7 +229,7 @@ export class M_calendar {
         if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"]) {
             this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
             await this.QQCalDAVClient.init();
-            const qqCalendars_url=this_settingdata["cal-qq-calendar-url"];
+            const qqCalendars_url = this_settingdata["cal-qq-calendar-url"];
             this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(qqCalendars_url);
             refreshKanban();
             console.log("QQevent", this.qqFullCalendarEvents);
@@ -484,7 +484,7 @@ export class M_calendar {
 
     private convertEventFormat(eventData: any[]): EventAttributes[] {
         const events: EventAttributes[] = [];
-    
+
         eventData.forEach((event: any) => {
             // 检查事件是否为周期性事件
             if (event.recurrenceRule) {
@@ -527,7 +527,7 @@ export class M_calendar {
                 });
             }
         });
-    
+
         // console.log("events", events);
         return events;
     }
@@ -768,8 +768,8 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
         ];
     }
 
-    const oldM = 6;
-    const newM = 2;
+    const oldM = settingdata["cal-ics-filter-old"] || 1;
+    const newM = settingdata["cal-ics-filter-new"] || 1;
     // 获取当前时间前后6个月的时间范围
     const now = new Date();
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - oldM, now.getDate());
@@ -792,7 +792,7 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
         eventGroup.data.forEach(event => {
             // 创建事件的唯一标识
             const eventKey = `${event?.事件?.id}`;
-            
+
             // 检查事件是否已经处理过
             if (processedEvents.has(eventKey)) {
                 return; // 跳过重复的事件

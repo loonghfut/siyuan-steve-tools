@@ -26,6 +26,9 @@ export const defaultSettings = {
     "cal-s3-secretAccessKey":"",
     //// 周期显示设置
     "cal-show-zq-done": false,
+    //// ics文件事件筛选
+    "cal-ics-filter-old": 1,
+    "cal-ics-filter-new": 1,
     // "cal-show-zq-todo": '',
     // 同步模块
     "sync-enable": false,
