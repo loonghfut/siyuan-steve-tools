@@ -768,6 +768,19 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
         ];
     }
 
+    const oldM = 6;
+    const newM = 2;
+    // 获取当前时间前后6个月的时间范围
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - oldM, now.getDate());
+    const sixMonthsLater = new Date(now.getFullYear(), now.getMonth() + newM, now.getDate());
+
+    // 用于检查事件是否在时间范围内
+    function isEventInTimeRange(eventTime) {
+        const eventDate = new Date(eventTime);
+        return eventDate >= sixMonthsAgo && eventDate <= sixMonthsLater;
+    }
+
     // 用于存储已处理过的事件的唯一标识
     const processedEvents = new Set();
     const transformedEvents = [];
@@ -783,6 +796,11 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
             // 检查事件是否已经处理过
             if (processedEvents.has(eventKey)) {
                 return; // 跳过重复的事件
+            }
+
+            // 对于非周期性事件，检查时间范围
+            if (!isZQ && !isEventInTimeRange(event?.开始时间?.start)) {
+                return; // 跳过不在时间范围内的事件
             }
 
             // 记录已处理的事件
