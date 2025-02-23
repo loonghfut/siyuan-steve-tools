@@ -316,13 +316,16 @@ export async function run(
             try {
                 let allEvents = [];
                 /////////////////////QQ日历////////////////////////
-                if (moduleInstances['M_calendar']?.QQCalDAVClient) {
-                    try {
-                        // console.log('QQ calendar events:', moduleInstances["M_calendar"].qqFullCalendarEvents);
-                        allEvents = allEvents.concat(moduleInstances["M_calendar"].qqFullCalendarEvents);
-                    } catch (error) {
-                        console.error('Error fetching QQ calendar events:', error);
+                try {
+                    if (moduleInstances['M_calendar']?.QQCalDAVClient) {
+                        const qqEvents = moduleInstances["M_calendar"].getEventsFromQQCalDAV();
+                        if (qqEvents && Array.isArray(qqEvents)) {
+                            allEvents = allEvents.concat(qqEvents);
+                        }
                     }
+                } catch (error) {
+                    console.error('Error fetching QQ calendar events:', error);
+                    // Continue execution without QQ calendar events
                 }
 
                 /////////////////////思源////////////////////////

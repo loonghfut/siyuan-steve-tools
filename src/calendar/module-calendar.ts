@@ -226,7 +226,7 @@ export class M_calendar {
 
     async onLayoutReady() {
         await this.shareicsinit();
-        if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"]) {
+        if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"] && this_settingdata["cal-qq-enable"]) {
             this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
             await this.QQCalDAVClient.init();
             const qqCalendars_url = this_settingdata["cal-qq-calendar-url"];
@@ -724,6 +724,10 @@ export class M_calendar {
         }
         showMessage("已导入日程模板", 3000, "info");
         api.refresh();
+    }
+
+    public  getEventsFromQQCalDAV() {
+        return this.qqFullCalendarEvents;
     }
 
 }

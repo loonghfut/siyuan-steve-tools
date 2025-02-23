@@ -268,6 +268,14 @@
                     value: settings["cal-s3-secretAccessKey"],
                 },
                 {
+                    //8
+                    type: "checkbox",
+                    title: "启用QQ邮箱日历(beta)",
+                    description: "启用后在日历中会出现QQ邮箱日历事件",
+                    key: "cal-qq-enable",
+                    value: settings["cal-qq-enable"],
+                },
+                {
                     //17
                     type: "textinput",
                     title: "QQ邮箱地址-beta",
@@ -536,7 +544,7 @@
             高级设置: 4,
             ics设置: 6,
             ics分享: 4,
-            邮箱日历: 3,
+            邮箱日历: 4,
             // 不限制
         },
         // "docker同步感知": {

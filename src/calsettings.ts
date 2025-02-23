@@ -20,6 +20,7 @@ export const defaultSettings = {
     "cal-qq-email": "",
     "cal-share": "",
     "cal-qq-calendar-url": "",
+    "cal-qq-enable": false,
     //// s3子模块
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId":"",
