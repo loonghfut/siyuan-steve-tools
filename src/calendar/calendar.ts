@@ -51,12 +51,13 @@ export async function run(
     let calendarEl: HTMLElement;
     if (id === "") {
         // 查找包含calendar的protyle-html元素
-        const protyleHtml = document.querySelector('protyle-html[data-content*="calendar"]');
+        const protyleHtml = document.querySelector('iframe[src="calendar"]');
+        console.log("protyleHtml", protyleHtml);
         if (!protyleHtml) return;
 
         // 获取protyle-html元素的位置和尺寸
         const htmlRect = protyleHtml.getBoundingClientRect();
-        
+
         // 查找最近的.protyle-content父元素
         const protyleContent = document.querySelector('.protyle-content');
         if (!protyleContent) return;
@@ -466,7 +467,7 @@ export async function run(
             if (timeEl) (timeEl as HTMLElement).style.color = textColor;
             if (titleEl) (titleEl as HTMLElement).style.color = textColor;
 
-            if (info.event.extendedProps.isRecurring&&info.event.extendedProps.source !== 'qqcalendar') {
+            if (info.event.extendedProps.isRecurring && info.event.extendedProps.source !== 'qqcalendar') {
                 const isCompleted = isEventCompleted(info.event);
                 // 动态更新 status 属性
                 // console.log('Before update:', {...info.event.extendedProps}); // 记录更新前的属性
