@@ -165,6 +165,14 @@
                     key: "cal-show-zq-done",
                     value: settings["cal-show-zq-done"],
                 },
+                {
+                    type: "checkbox",
+                    title: "是否悬浮显示视图",
+                    description:
+                        "启用后会在页面上方显示悬浮视图",
+                    key: "cal-show-float-view",
+                    value: settings["cal-show-float-view"],
+                },
                 //同步设置
                 {
                     //5
@@ -541,7 +549,7 @@
     const subGroupItemCounts = {
         "日程管理 2.1": {
             基础设置: 5,
-            高级设置: 4,
+            高级设置: 5,
             ics设置: 6,
             ics分享: 4,
             邮箱日历: 4,

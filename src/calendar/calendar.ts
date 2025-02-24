@@ -49,18 +49,24 @@ export async function run(
 ) {
     filterViewId = S_viewID || viewId;
     let calendarEl: HTMLElement;
-    if (id === "") {
+    if (id === "1") {
         // 创建悬浮容器
+        let existingContainer = document.getElementById('float-calendar-container');
+        if (existingContainer) {
+            document.body.removeChild(existingContainer);
+        }
+
         const floatContainer = document.createElement('div');
         floatContainer.id = 'float-calendar-container';
         floatContainer.style.cssText = `
             position: fixed;
             top: 0;
             left: 50%;
-            transform: translateX(-50%) translateY(-99%);
-            width: 80%;
+            transform: translateX(-80%) translateY(-69vh);
+            width: auto;
             max-width: 1200px;
-            height: auto;
+            height: 70vh;
+            overflow: auto;
             transition: transform 0.3s ease;
             background: var(--b3-theme-background);
             z-index: ${window.siyuan.zIndex};
@@ -81,26 +87,14 @@ export async function run(
         floatContainer.addEventListener('mouseenter', () => {
             clearTimeout(leaveTimeout);
             enterTimeout = setTimeout(() => {
-                floatContainer.style.transform = 'translateX(-50%) translateY(10%)';
+            floatContainer.style.transform = 'translateX(-50%) translateY(10px)';
             }, 200);
         });
         
-        floatContainer.addEventListener('mouseleave', (e) => {
-            // 检查鼠标是否移动到了比当前容器层级更高的元素
-            const toElement = e.relatedTarget as HTMLElement;
-            if (toElement) {
-                const containerZIndex = parseInt(window.getComputedStyle(floatContainer).zIndex) || 0;
-                const targetZIndex = parseInt(window.getComputedStyle(toElement).zIndex) || 0;
-                
-                if (targetZIndex > containerZIndex) {
-                    // 如果移动到更高层级的元素,不触发隐藏
-                    return;
-                }
-            }
-            
+        floatContainer.addEventListener('mouseleave', () => {
             clearTimeout(enterTimeout);
             leaveTimeout = setTimeout(() => {
-                floatContainer.style.transform = 'translateX(-50%) translateY(-99%)';
+            floatContainer.style.transform = 'translateX(-80%) translateY(-69vh)';
             }, 500);
         });
     } else {

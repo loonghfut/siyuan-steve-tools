@@ -15,6 +15,7 @@ export const defaultSettings = {
     "cal-create-way": "0",
     "cal-seemore":false,
     "cal-show-ref-event":true,//是否展示被引用的事件
+    "cal-show-float-view" : false,//是否展示悬浮窗
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

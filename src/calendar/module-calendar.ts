@@ -84,12 +84,11 @@ export class M_calendar {
                 title: "日程视图",
                 position: "left",
                 callback: async () => {
-                    run("");
-                    // if (front == "browser-mobile" || front == "mobile") {
-                    //     await this.openRiChengViewDialog(true);
-                    // } else {
-                    //     await this.openRiChengView();
-                    // }
+                    if (front == "browser-mobile" || front == "mobile") {
+                        await this.openRiChengViewDialog(true);
+                    } else {
+                        await this.openRiChengView();
+                    }
                 }
             });
         }
@@ -226,6 +225,11 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
+        //悬浮显示
+        if(this_settingdata["cal-show-float-view"]){
+            run("1");
+        }
+        //
         await this.shareicsinit();
         if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"] && this_settingdata["cal-qq-enable"]) {
             this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
