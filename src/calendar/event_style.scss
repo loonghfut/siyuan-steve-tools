@@ -25,13 +25,9 @@ $background-color-archive: #747d403d;
 }
 
 
-.calendar-wrapper {
-    background: var(--b3-theme-background);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+#float-calendar-container {
+    border-bottom: 2px solid var(--b3-theme-primary);
 }
-
-.calendar-wrapper .fc {
-    height: 100%;
+#fcalendar-float > div.fc-view-harness.fc-view-harness-active > div > div > div{
+    max-height: 70vh;
 }
-
-

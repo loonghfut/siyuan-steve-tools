@@ -50,85 +50,59 @@ export async function run(
     filterViewId = S_viewID || viewId;
     let calendarEl: HTMLElement;
     if (id === "") {
-        // 查找包含calendar的protyle-html元素
-        const protyleHtml = document.querySelector('iframe[src="calendar"]');
-        console.log("protyleHtml", protyleHtml);
-        if (!protyleHtml) return;
-
-        // 获取protyle-html元素的位置和尺寸
-        const htmlRect = protyleHtml.getBoundingClientRect();
-
-        // 查找最近的.protyle-content父元素
-        const protyleContent = document.querySelector('.protyle-content');
-        if (!protyleContent) return;
-
-        // 清除之前可能存在的日历元素
-        const existingCalendar = protyleContent.querySelector('.calendar-wrapper');
-        if (existingCalendar) {
-            existingCalendar.remove();
-        }
-
-        // 创建日历容器
-        interface ExtendedHTMLDivElement extends HTMLDivElement {
-            cleanup?: () => void;
-        }
-        const wrapper = document.createElement('div') as ExtendedHTMLDivElement;
-        wrapper.className = 'calendar-wrapper';
-        wrapper.style.cssText = `
-            width: ${htmlRect.width}px;
-            height: 600px;
+        // 创建悬浮容器
+        const floatContainer = document.createElement('div');
+        floatContainer.id = 'float-calendar-container';
+        floatContainer.style.cssText = `
             position: fixed;
-            top: ${htmlRect.top}px;
-            left: ${htmlRect.left}px;
-            z-index: 0; 
-            border: 1px solid var(--b3-border-color);
-            border-radius: 4px;
-            overflow: hidden;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(-99%);
+            width: 80%;
+            max-width: 1200px;
+            height: auto;
+            transition: transform 0.3s ease;
             background: var(--b3-theme-background);
+            z-index: ${window.siyuan.zIndex};
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         `;
-
-        // 创建观察器，监听protyle-html元素位置变化
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                const rect = entry.boundingClientRect;
-                wrapper.style.top = `${rect.top}px`;
-                wrapper.style.left = `${rect.left}px`;
-                wrapper.style.width = `${rect.width}px`;
-            });
-        }, {
-            threshold: 1.0
+        
+        calendarEl = document.createElement('div');
+        calendarEl.id = 'fcalendar-float';
+        calendarEl.style.height = '100%';
+        floatContainer.appendChild(calendarEl);
+        
+        document.body.appendChild(floatContainer);
+        
+        let enterTimeout: NodeJS.Timeout;
+        let leaveTimeout: NodeJS.Timeout;
+        
+        floatContainer.addEventListener('mouseenter', () => {
+            clearTimeout(leaveTimeout);
+            enterTimeout = setTimeout(() => {
+                floatContainer.style.transform = 'translateX(-50%) translateY(10%)';
+            }, 200);
         });
-
-        observer.observe(protyleHtml);
-
-        // 监听滚动事件
-        const handleScroll = () => {
-            const rect = protyleHtml.getBoundingClientRect();
-            wrapper.style.top = `${rect.top}px`;
-            wrapper.style.left = `${rect.left}px`;
-        };
-        window.addEventListener('scroll', handleScroll, true);
-
-        const div = document.createElement('div');
-        div.style.cssText = `
-            width: 100%;
-            height: 100%;
-        `;
-        div.id = 'calendar_in-';
-
-        wrapper.appendChild(div);
-        protyleContent.appendChild(wrapper);
-        calendarEl = div;
-
-        // 清理函数
-        const cleanup = () => {
-            observer.disconnect();
-            window.removeEventListener('scroll', handleScroll, true);
-        };
-
-        // 添加清理逻辑
-        wrapper.cleanup = cleanup;
-
+        
+        floatContainer.addEventListener('mouseleave', (e) => {
+            // 检查鼠标是否移动到了比当前容器层级更高的元素
+            const toElement = e.relatedTarget as HTMLElement;
+            if (toElement) {
+                const containerZIndex = parseInt(window.getComputedStyle(floatContainer).zIndex) || 0;
+                const targetZIndex = parseInt(window.getComputedStyle(toElement).zIndex) || 0;
+                
+                if (targetZIndex > containerZIndex) {
+                    // 如果移动到更高层级的元素,不触发隐藏
+                    return;
+                }
+            }
+            
+            clearTimeout(enterTimeout);
+            leaveTimeout = setTimeout(() => {
+                floatContainer.style.transform = 'translateX(-50%) translateY(-99%)';
+            }, 500);
+        });
     } else {
         calendarEl = document.getElementById(`calendar-${id}`)!;
     }
