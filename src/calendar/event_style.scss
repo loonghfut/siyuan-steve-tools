@@ -25,6 +25,13 @@ $background-color-archive: #747d403d;
 }
 
 
+.calendar-wrapper {
+    background: var(--b3-theme-background);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
 
+.calendar-wrapper .fc {
+    height: 100%;
+}
 
 

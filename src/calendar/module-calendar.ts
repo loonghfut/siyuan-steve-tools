@@ -84,11 +84,12 @@ export class M_calendar {
                 title: "日程视图",
                 position: "left",
                 callback: async () => {
-                    if (front == "browser-mobile" || front == "mobile") {
-                        await this.openRiChengViewDialog(true);
-                    } else {
-                        await this.openRiChengView();
-                    }
+                    run("");
+                    // if (front == "browser-mobile" || front == "mobile") {
+                    //     await this.openRiChengViewDialog(true);
+                    // } else {
+                    //     await this.openRiChengView();
+                    // }
                 }
             });
         }

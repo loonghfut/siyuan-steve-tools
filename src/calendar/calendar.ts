@@ -50,7 +50,84 @@ export async function run(
     filterViewId = S_viewID || viewId;
     let calendarEl: HTMLElement;
     if (id === "") {
-        calendarEl = document.createElement('div');
+        // 查找包含calendar的protyle-html元素
+        const protyleHtml = document.querySelector('protyle-html[data-content*="calendar"]');
+        if (!protyleHtml) return;
+
+        // 获取protyle-html元素的位置和尺寸
+        const htmlRect = protyleHtml.getBoundingClientRect();
+        
+        // 查找最近的.protyle-content父元素
+        const protyleContent = document.querySelector('.protyle-content');
+        if (!protyleContent) return;
+
+        // 清除之前可能存在的日历元素
+        const existingCalendar = protyleContent.querySelector('.calendar-wrapper');
+        if (existingCalendar) {
+            existingCalendar.remove();
+        }
+
+        // 创建日历容器
+        interface ExtendedHTMLDivElement extends HTMLDivElement {
+            cleanup?: () => void;
+        }
+        const wrapper = document.createElement('div') as ExtendedHTMLDivElement;
+        wrapper.className = 'calendar-wrapper';
+        wrapper.style.cssText = `
+            width: ${htmlRect.width}px;
+            height: 600px;
+            position: fixed;
+            top: ${htmlRect.top}px;
+            left: ${htmlRect.left}px;
+            z-index: 0; 
+            border: 1px solid var(--b3-border-color);
+            border-radius: 4px;
+            overflow: hidden;
+            background: var(--b3-theme-background);
+        `;
+
+        // 创建观察器，监听protyle-html元素位置变化
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const rect = entry.boundingClientRect;
+                wrapper.style.top = `${rect.top}px`;
+                wrapper.style.left = `${rect.left}px`;
+                wrapper.style.width = `${rect.width}px`;
+            });
+        }, {
+            threshold: 1.0
+        });
+
+        observer.observe(protyleHtml);
+
+        // 监听滚动事件
+        const handleScroll = () => {
+            const rect = protyleHtml.getBoundingClientRect();
+            wrapper.style.top = `${rect.top}px`;
+            wrapper.style.left = `${rect.left}px`;
+        };
+        window.addEventListener('scroll', handleScroll, true);
+
+        const div = document.createElement('div');
+        div.style.cssText = `
+            width: 100%;
+            height: 100%;
+        `;
+        div.id = 'calendar_in-';
+
+        wrapper.appendChild(div);
+        protyleContent.appendChild(wrapper);
+        calendarEl = div;
+
+        // 清理函数
+        const cleanup = () => {
+            observer.disconnect();
+            window.removeEventListener('scroll', handleScroll, true);
+        };
+
+        // 添加清理逻辑
+        wrapper.cleanup = cleanup;
+
     } else {
         calendarEl = document.getElementById(`calendar-${id}`)!;
     }
