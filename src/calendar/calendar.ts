@@ -55,23 +55,23 @@ export async function run(
         if (existingContainer) {
             document.body.removeChild(existingContainer);
         }
-
+        
         const floatContainer = document.createElement('div');
         floatContainer.id = 'float-calendar-container';
         floatContainer.style.cssText = `
             position: fixed;
             top: 0;
-            left: 50%;
-            transform: translateX(-80%) translateY(-69vh);
-            width: auto;
-            max-width: 1200px;
-            height: 70vh;
+            left: 0;
+            transform: translateX(-70%) translateY(-78vh); /* 初始位置在左上角外侧 */
+            width: 58%;
+            max-width: 1400px;
+            height: 78vh;
             overflow: auto;
-            transition: transform 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* 使用更平滑的动画曲线 */
             background: var(--b3-theme-background);
             z-index: ${window.siyuan.zIndex};
-            border-radius: 0 0 8px 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
         `;
         
         calendarEl = document.createElement('div');
@@ -84,21 +84,60 @@ export async function run(
         let enterTimeout: NodeJS.Timeout;
         let leaveTimeout: NodeJS.Timeout;
         
+        // 鼠标进入时移动到页面中央
         floatContainer.addEventListener('mouseenter', () => {
             clearTimeout(leaveTimeout);
             enterTimeout = setTimeout(() => {
-            floatContainer.style.transform = 'translateX(-50%) translateY(10px)';
-            }, 200);
+                floatContainer.style.transform = `
+                    translate(calc(50vw - 50%), calc(50vh - 50%))
+                `; // 居中显示
+                floatContainer.style.opacity = '1';
+            }, 100);
         });
         
-        floatContainer.addEventListener('mouseleave', () => {
+        // 鼠标离开时移回左上角
+        floatContainer.addEventListener('mouseleave', (e) => {
             clearTimeout(enterTimeout);
+            
+            // 检查鼠标是否移动到了其他相关元素上
+            const checkForElements = (x: number, y: number) => {
+                // 获取鼠标当前位置的元素
+                const elementAtPoint = document.elementFromPoint(x, y);
+                
+                // 检查该元素是否是日历相关的元素
+                if (!elementAtPoint) return false;
+                
+                // 检查是否是日历相关元素或其子元素
+                const isCalendarElement = elementAtPoint.closest('.fc') || 
+                                        elementAtPoint.closest('.tippy-box') ||
+                                        elementAtPoint.closest('.view-filter-menu');
+                                        
+                return isCalendarElement !== null;
+            };
+        
+            // 获取鼠标离开事件的坐标
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+        
+            // 如果鼠标移动到了日历相关元素上，则不收回
+            if (checkForElements(mouseX, mouseY)) {
+                return;
+            }
+        
+            // 设置延迟收回
             leaveTimeout = setTimeout(() => {
-            floatContainer.style.transform = 'translateX(-80%) translateY(-69vh)';
+                // 再次检查鼠标位置，确保不会误收回
+                if (!checkForElements(mouseX, mouseY)) {
+                    floatContainer.style.transform = 'translateX(-70%) translateY(-78vh)';
+                }
             }, 500);
         });
     } else {
         calendarEl = document.getElementById(`calendar-${id}`)!;
+    }
+    if (!calendarEl) {
+        console.error('Calendar container not found');
+        return;
     }
     const calendar = new Calendar(calendarEl, {
         plugins: [
