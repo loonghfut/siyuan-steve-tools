@@ -513,7 +513,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     //// 创建一个新块
     steveTools.outlog("daynote_id:::", daynote_id.id);
     const idid = await api.generateSiyuanID() as string;
-    // const iddata = await api.appendBlock("dom", `<div data-node-id="${idid}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094434"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p" updated="20250121094435"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`, daynote_id.id);
+   
     await api.appendBlock("markdown", `{{{row
 
 {: id="${await api.generateSiyuanID() as string}"}
@@ -534,6 +534,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                                         <option value="中">中</option>
                                         <option value="低">低</option>
                                         <option value="" selected>无</option>
+                                </select>
+                                <select id="st-category" class="b3-text-field" style="padding: 4px; font-size: 12px; width: auto; text-align: center;">
+                                    <option value="" selected>加载中...</option>
                                 </select>
                                 <div style="display: flex; align-items: center;">
                                     <input type="datetime-local" 
@@ -561,6 +564,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         hideCloseIcon: true,
         // disableClose: true,
     })
+    // 加载分类选项
+    const categorySelect = dialog.element.querySelector('#st-category') as HTMLSelectElement;
+    await loadCategoryOptions(to_db_id, categorySelect);
+    ///////
     let ok = false;//防崩溃
     const eventPanel = document.getElementById('eventPanel');
     const okBtn = dialog.element.querySelector('.b3-button--text');
@@ -603,10 +610,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
             // console.log("viewValue:::", viewValue);
             // console.log("timeKeyID:::", timeKeyID);
+            const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
             const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
             const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
-            //// 新：用户自定义改动开始时间
+            //// 新：用户自定义改动开始时间,优先级,分类
+            const category = (document.getElementById('st-category') as HTMLSelectElement).value;
             const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
             const priority = (document.getElementById('st-priority') as HTMLSelectElement).value;
             if (newdateStr) {
@@ -625,11 +634,15 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 dateStr = ce;
             }
             ////块时间处理
-            const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
+            await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: status }];
             const priorityData: ISelectOption[] = [{ content: priority }];
+            const categoryData: ISelectOption[] = [{ content: category }];
             console.log("selectdata", selectdata);
             ///////////更新属性////////////////////
+            if (category && categoryKeyID && categoryData && category!=="加载中..."&& category!=="无") {
+                await api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, categoryData, "select");
+            }
             if (priority && priorityKeyID && priorityData) {
                 await api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, priorityData, "select");
             }
@@ -704,6 +717,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     // 3. 等待用户提交
 
 }
+
+
 
 export async function updateEventInDatabase(
     info: any,
@@ -818,4 +833,48 @@ export function changestatus_for_zq(event, date) {
     newOkday = okdays.filter(Boolean).join(','); // filter(Boolean)用于移除空值
 
     api.updateAttrViewCell_pro(event.blockId, event.rootid, event.okdayid, newOkday, "text");
+}
+
+
+// 获取数据库中已有的分类列表
+async function getCategories(dbId: string): Promise<string[]> {
+    try {
+        const view = await api.renderAttributeView(dbId);
+        
+        // 查找分类列
+        const categoryColumn = view.view?.columns?.find(col => col.name === '分类');
+        if (!categoryColumn) return ['无'];
+        
+        // 直接从选项中获取分类名称
+        const categories = categoryColumn.options?.map(option => option.name) || [];
+        
+        // 如果没有预设选项，返回默认值
+        if (!categories.length) {
+            return ['无'];
+        }
+        
+        // 返回排序后的分类列表（不包含"无"）
+        return categories.sort();
+    } catch (error) {
+        console.error('获取分类列表失败:', error);
+        return ['无'];
+    }
+}
+
+async function loadCategoryOptions(to_db_id: any, categorySelect: HTMLSelectElement) {
+    try {
+        const categories = await getCategories(to_db_id);
+        categorySelect.innerHTML = '';
+        // 只在这里添加"无"选项
+        categorySelect.appendChild(new Option('无', '无', true));
+        // 添加其他分类
+        categories.forEach(category => {
+            if (category !== '无') { // 避免重复添加"无"选项
+                categorySelect.appendChild(new Option(category, category));
+            }
+        });
+    } catch (error) {
+        console.error('加载分类失败:', error);
+        sy.showMessage('加载分类失败', -1, "error");
+    }
 }
