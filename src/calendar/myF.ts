@@ -529,6 +529,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         title: `   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <span>添加事件</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
+                                <select id="st-priority" class="b3-text-field" style="padding: 4px; font-size: 12px; width: 20px;">
+                                        <option value="高">高</option>
+                                        <option value="中">中</option>
+                                        <option value="低">低</option>
+                                        <option value="" selected>无</option>
+                                </select>
                                 <div style="display: flex; align-items: center;">
                                     <input type="datetime-local" 
                                     id="st-start-time"
@@ -579,8 +585,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             //// 如果块内容为空，则删除块
             // steveTools.outlog("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
-            console.log(markdownContent);
-            steveTools.outlog("markdownContent:::", markdownContent);
+            // console.log(markdownContent);
             if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
                 await api.deleteBlock(id);
                 steveTools.outlog('删除空白块');
@@ -598,10 +603,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
             // console.log("viewValue:::", viewValue);
             // console.log("timeKeyID:::", timeKeyID);
+            const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
             const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
             //// 新：用户自定义改动开始时间
             const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
+            const priority = (document.getElementById('st-priority') as HTMLSelectElement).value;
             if (newdateStr) {
                 dateStr = newdateStr;
             }
@@ -620,7 +627,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             ////块时间处理
             const datata = await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
             const selectdata: ISelectOption[] = [{ content: status }];
+            const priorityData: ISelectOption[] = [{ content: priority }];
             console.log("selectdata", selectdata);
+            await api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, priorityData, "select");
             await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
             await api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox");
             if (panel.isUploading()) {
