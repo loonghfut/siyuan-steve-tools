@@ -16,6 +16,7 @@ import { moduleInstances } from '@/index';
 import solarLunar from 'solarlunar';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
+import { createFloatingCalendar } from './createFloatingCalendar';
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
@@ -51,87 +52,8 @@ export async function run(
     let calendarEl: HTMLElement;
     if (id === "1") {
         // 创建悬浮容器
-        let existingContainer = document.getElementById('float-calendar-container');
-        if (existingContainer) {
-            document.body.removeChild(existingContainer);
-        }
-        
-        const floatContainer = document.createElement('div');
-        floatContainer.id = 'float-calendar-container';
-        floatContainer.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            transform: translateX(-70%) translateY(-78vh); /* 初始位置在左上角外侧 */
-            width: 58%;
-            max-width: 1400px;
-            height: 78vh;
-            overflow: auto;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* 使用更平滑的动画曲线 */
-            background: var(--b3-theme-background);
-            z-index: ${window.siyuan.zIndex};
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        `;
-        
-        calendarEl = document.createElement('div');
-        calendarEl.id = 'fcalendar-float';
-        calendarEl.style.height = '100%';
-        floatContainer.appendChild(calendarEl);
-        
-        document.body.appendChild(floatContainer);
-        
-        let enterTimeout: NodeJS.Timeout;
-        let leaveTimeout: NodeJS.Timeout;
-        
-        // 鼠标进入时移动到页面中央
-        floatContainer.addEventListener('mouseenter', () => {
-            clearTimeout(leaveTimeout);
-            enterTimeout = setTimeout(() => {
-                floatContainer.style.transform = `
-                    translate(calc(50vw - 50%), calc(50vh - 50%))
-                `; // 居中显示
-                floatContainer.style.opacity = '1';
-            }, 100);
-        });
-        
-        // 鼠标离开时移回左上角
-        floatContainer.addEventListener('mouseleave', (e) => {
-            clearTimeout(enterTimeout);
-            
-            // 检查鼠标是否移动到了其他相关元素上
-            const checkForElements = (x: number, y: number) => {
-                // 获取鼠标当前位置的元素
-                const elementAtPoint = document.elementFromPoint(x, y);
-                
-                // 检查该元素是否是日历相关的元素
-                if (!elementAtPoint) return false;
-                
-                // 检查是否是日历相关元素或其子元素
-                const isCalendarElement = elementAtPoint.closest('.fc') || 
-                                        elementAtPoint.closest('.tippy-box') ||
-                                        elementAtPoint.closest('.view-filter-menu');
-                                        
-                return isCalendarElement !== null;
-            };
-        
-            // 获取鼠标离开事件的坐标
-            const mouseX = e.clientX;
-            const mouseY = e.clientY;
-        
-            // 如果鼠标移动到了日历相关元素上，则不收回
-            if (checkForElements(mouseX, mouseY)) {
-                return;
-            }
-        
-            // 设置延迟收回
-            leaveTimeout = setTimeout(() => {
-                // 再次检查鼠标位置，确保不会误收回
-                if (!checkForElements(mouseX, mouseY)) {
-                    floatContainer.style.transform = 'translateX(-70%) translateY(-78vh)';
-                }
-            }, 500);
-        });
+        const Fcalendar = createFloatingCalendar(calendarEl);
+        calendarEl = Fcalendar.element;
     } else {
         calendarEl = document.getElementById(`calendar-${id}`)!;
     }
