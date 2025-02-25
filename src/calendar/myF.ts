@@ -629,11 +629,17 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const selectdata: ISelectOption[] = [{ content: status }];
             const priorityData: ISelectOption[] = [{ content: priority }];
             console.log("selectdata", selectdata);
+            ///////////更新属性////////////////////
             if (priority && priorityKeyID && priorityData) {
                 await api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, priorityData, "select");
             }
-            await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
-            await api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox");
+            if (status && statusKeyID && selectdata) {
+                await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
+            }
+            if (checkboxKeyID) {
+                await api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox");
+            }
+            //////////////////
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
                     steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
