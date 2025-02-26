@@ -25,7 +25,7 @@
     // Define setting groups with their items
     let groups: ISettingGroup[] = [
         {
-            name: "日程管理 2.1",
+            name: "🗓️日程管理",
             subGroups: ["基础设置", "高级设置", "ics设置","ics分享","邮箱日历"],
             activeSubGroup: "基础设置",
             items: [
