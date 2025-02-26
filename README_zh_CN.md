@@ -14,7 +14,7 @@ STEVETOOLS
 ### 若发现BUG或者有好的建议，欢迎提issue或者pr。
 
 #### 目前工具
-1. 日程管理 2.1：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
+1. 日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
 和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历等。
 2. docker同步感知：  
 win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
@@ -30,14 +30,14 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 | [日程管理详细教程2.0](https://ld246.com/article/1739584703693) | 打赏 ≥ 10元 | 👌已完成 | 低|
 | Docker同步感知功能展示 | ⭐ Star ≥ 10 |  👌已完成 | 低|
 | 多平台日程同步支持<br>([alist](https://ld246.com/article/1739629792990)/[s3](https://ld246.com/article/1739691995360)存储ics) | 打赏 ≥ 15元 | 👌已完成 |中|
-| AI侧边栏自定义网址 | ⭐ Star ≥ 15 | 基本完成 |低|
+| AI侧边栏自定义网址 | ⭐ Star ≥ 15 | 👌已完成 |低|
 | 接入QQ邮箱日历 | 打赏 ≥ 35元 | 🛠️进行中 |高|
 | 优化性能 | 打赏人数 ≥ 20 | 🚧 待完成 |高|
 
 注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准，个人能力有限，主观难度较高的可能无法实现或实现效果较差，若介意请不要为此而打赏。   
 
 **当前状态** （建议打赏时留下您的邮箱或链滴名称）打赏者的需求我会优先考虑      
-- 💰 [打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)：191元（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
+- 💰 [打赏人数](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)：8（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
