@@ -78,9 +78,19 @@ export async function run(
         navLinks: true,
         dayMaxEvents: true,
         locale: zhCnLocale,
-        slotDuration: '01:00:00',
         editable: true,
         nowIndicator: true,
+        slotDuration: validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00'),
+        slotMinTime: validateTimeFormat(settingdata["cal-slot-min-time"], '00:00:00'),
+        slotMaxTime: validateTimeFormat(settingdata["cal-slot-max-time"], '24:00:00'),
+        snapDuration: validateTimeFormat(settingdata["cal-snap-duration"], '00:15:00'),
+        eventResizableFromStart: true, // 允许从事件开始处调整大小
+        slotLabelInterval: '00:05:00', // 时间标签
+        slotLabelFormat: {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        },
         // selectable: true,
         // eventDurationEditable: true,
         // 事件点击处理
@@ -260,66 +270,66 @@ export async function run(
                     // 修改创建菜单的代码
                     const menu = document.createElement('div');
                     menu.className = 'view-filter-menu';
-                    
+
                     // 创建菜单头部（包含"全部视图"选项）
                     const menuHeader = document.createElement('div');
                     menuHeader.className = 'view-filter-header';
-                    
+
                     // 添加全选/全不选选项
                     menu.appendChild(menuHeader);
-                    
+
                     // 创建可滚动的视图列表容器
                     const menuContent = document.createElement('div');
                     menuContent.className = 'view-filter-content';
-                    
+
                     // 添加视图选项
                     viewIDs.forEach(view => {
                         const item = document.createElement('div');
                         item.className = 'view-filter-item';
-                    
+
                         // 创建复选框
                         const checkbox = document.createElement('input');
                         checkbox.type = 'checkbox';
                         checkbox.checked = filterViewId.includes(view.viewId);
                         checkbox.className = 'view-filter-checkbox';
-                    
+
                         // 创建标签
                         const label = document.createElement('span');
                         label.textContent = view.name;
                         label.className = 'view-filter-label';
-                    
+
                         item.appendChild(checkbox);
                         item.appendChild(label);
-                    
+
                         item.onclick = (e) => {
                             // 防止冒泡到菜单外
                             e.stopPropagation();
-                    
+
                             // 切换当前视图的选中状态
                             if (filterViewId.includes(view.viewId)) {
                                 filterViewId = filterViewId.filter(id => id !== view.viewId);
                             } else {
                                 filterViewId.push(view.viewId);
                             }
-                    
+
                             // 更新复选框状态
                             checkbox.checked = filterViewId.includes(view.viewId);
-                    
+
                             // 保存配置并刷新
                             moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
                             moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
                             moduleInstances['M_calendar'].calConfig.save();
-                    
+
                             // 不关闭菜单，允许多选
                         };
                         menuContent.appendChild(item);
                     });
                     menu.appendChild(menuContent);
-                    
+
                     // 创建固定在底部的按钮容器
                     const menuFooter = document.createElement('div');
                     menuFooter.className = 'view-filter-footer';
-                    
+
                     // 添加确定按钮
                     const confirmBtn = document.createElement('button');
                     confirmBtn.className = 'b3-button';
@@ -594,4 +604,27 @@ export function isEventCompleted(event: any): boolean {
     // console.log("completedDates",completedDates);
     // console.log("currentDateStr",currentDateStr);
     return completedDates.includes(currentDateStr);
+}
+
+function validateTimeFormat(timeStr: string, defaultValue: string): string {
+    // 正则表达式匹配严格的时间格式: HH:MM:SS (00:00:00 to 24:00:00)
+    const timeFormatRegex = /^([01][0-9]|2[0-4]):([0-5][0-9]):([0-5][0-9])$/;
+
+    if (!timeStr || typeof timeStr !== 'string') {
+        console.warn(`无效的时间格式: "${timeStr}", 使用默认值: "${defaultValue}"`);
+        return defaultValue;
+    }
+
+    // 验证时间格式
+    if (!timeFormatRegex.test(timeStr)) {
+        console.warn(`时间格式不符合要求 (必须为 HH:MM:SS 且小时在00-24之间): "${timeStr}", 使用默认值: "${defaultValue}"`);
+        return defaultValue;
+    }
+
+    // 处理特殊情况 24:00:00
+    if (timeStr === '24:00:00') {
+        return timeStr;
+    }
+
+    return timeStr;
 }

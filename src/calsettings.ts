@@ -31,7 +31,11 @@ export const defaultSettings = {
     //// ics文件事件筛选
     "cal-ics-filter-old": 1,
     "cal-ics-filter-new": 1,
-    // "cal-show-zq-todo": '',
+    //// 视图设置
+    "cal-slot-duration": "01:00:00",
+    "cal-slot-min-time": "00:00:00",
+    "cal-slot-max-time": "24:00:00",
+    "cal-snap-duration": "00:30:00",
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

@@ -25,8 +25,15 @@
     // Define setting groups with their items
     let groups: ISettingGroup[] = [
         {
-            name: "🗓️日程管理",
-            subGroups: ["基础设置", "高级设置", "ics设置","ics分享","邮箱日历"],
+            name: "日程管理",
+            subGroups: [
+                "基础设置",
+                "高级设置",
+                "ics设置",
+                "ics分享",
+                "邮箱日历",
+                "视图设置",
+            ],
             activeSubGroup: "基础设置",
             items: [
                 // 基础设置
@@ -160,16 +167,14 @@
                 {
                     type: "checkbox",
                     title: "完成项是否显示周期事件",
-                    description:
-                        "启用后看板完成项会展示周期事件",
+                    description: "启用后看板完成项会展示周期事件",
                     key: "cal-show-zq-done",
                     value: settings["cal-show-zq-done"],
                 },
                 {
                     type: "checkbox",
                     title: "是否悬浮显示视图",
-                    description:
-                        "启用后会在页面上方显示悬浮视图",
+                    description: "启用后会在页面上方显示悬浮视图",
                     key: "cal-show-float-view",
                     value: settings["cal-show-float-view"],
                 },
@@ -308,6 +313,38 @@
                     key: "cal-qq-calendar-url",
                     value: settings["cal-qq-calendar-url"],
                     options: { "": "请先配置QQ邮箱信息" }, // 设置初始静态值
+                },
+                {
+                    type: "textinput",
+                    title: "时间槽间隔",
+                    description:
+                        "时间网格视图中每个槽的持续时间，格式如: 00:30:00（30分钟）, 01:00:00（1小时）",
+                    key: "cal-slot-duration",
+                    value: settings["cal-slot-duration"],
+                },
+                {
+                    type: "textinput",
+                    title: "最早显示时间",
+                    description:
+                        "时间网格视图的开始时间，格式如: 06:00:00（早上6点）, 07:00:00（早上7点）",
+                    key: "cal-slot-min-time",
+                    value: settings["cal-slot-min-time"],
+                },
+                {
+                    type: "textinput",
+                    title: "最晚显示时间",
+                    description:
+                        "时间网格视图的结束时间，格式如: 21:00:00（晚上9点）, 22:00:00（晚上10点）",
+                    key: "cal-slot-max-time",
+                    value: settings["cal-slot-max-time"],
+                },
+                {
+                    type: "textinput",
+                    title: "拖拽时间间隔",
+                    description:
+                        "控制拖拽事件时的最小时间单位，较小的值可实现更精确的调整，格式如: 00:15:00（15分钟）, 00:30:00（30分钟）",
+                    key: "cal-snap-duration",
+                    value: settings["cal-snap-duration"],
                 },
             ],
         },
@@ -547,12 +584,13 @@
     $: currentGroup = groups.find((group) => group.name === focusGroup);
 
     const subGroupItemCounts = {
-        "日程管理 2.1": {
+        日程管理: {
             基础设置: 5,
             高级设置: 5,
             ics设置: 6,
             ics分享: 4,
             邮箱日历: 4,
+            视图设置: 4,
             // 不限制
         },
         // "docker同步感知": {
