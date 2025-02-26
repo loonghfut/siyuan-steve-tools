@@ -54,7 +54,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 // 视图选择菜单
 .view-filter-menu {
     position: absolute;
-    z-index: 1;
+    // z-index: 1;
     background-color: $background-color;
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -88,7 +88,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     background-color: $background-color;
     position: sticky;
     bottom: 0;
-    z-index: 1;
+    // z-index: 1;
 }
 
 // 各部分的样式
