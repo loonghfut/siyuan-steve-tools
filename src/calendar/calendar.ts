@@ -24,7 +24,7 @@ let clicks1 = 0;
 let clicks2 = 0;
 export let viewValue: any;
 let viewValue_zq: any;
-export let filterViewId: string;
+export let filterViewId: string[] = [];
 export let av_ids: string[] = [];
 export let viewName = "";
 export let viewId = "";
@@ -37,6 +37,8 @@ export async function update_av_ids() {
 export async function init_viewValue(data: { viewId: string, viewName: string }) {
     viewId = data.viewId;
     viewName = data.viewName;
+    // 将逗号分隔的视图ID解析为数组
+    filterViewId = data.viewId ? data.viewId.split(',') : [];
 }
 
 
@@ -48,7 +50,7 @@ export async function run(
     cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
     ccenter = 'title',
 ) {
-    filterViewId = S_viewID || viewId;
+    filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
     let calendarEl: HTMLElement;
     if (id === "1") {
         // 创建悬浮容器
@@ -129,7 +131,7 @@ export async function run(
         dateClick: async function (info) {
             // console.log('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
-            const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
+            const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
             if (settingdata["cal-create-way"] === "1") {
                 const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
                 return;
@@ -248,49 +250,88 @@ export async function run(
         },
         customButtons: {
             viewFilter: {
-                text: '#',
+                text: '视图选择',
                 click: async function () {
-                    // 获取按钮元素位置
                     const viewIDs = await myF.getViewId(av_ids)
-                    // console.log("viewIDs", viewIDs);
-                    const button = calendarEl.querySelector('.fc-viewFilter-button');//TODO:待优化的地方 
+                    const button = calendarEl.querySelector('.fc-viewFilter-button');
                     if (!button) return;
+
                     // 创建下拉菜单
                     const menu = document.createElement('div');
-                    menu.className = 'view-filter-menu ';
+                    menu.className = 'view-filter-menu';
+
+                    // 添加全选/全不选选项
+                    const allItem = document.createElement('div');
+                    allItem.className = 'view-filter-item view-filter-all';
+                    allItem.textContent = '全部视图';
+                    allItem.onclick = () => {
+                        // 切换选择状态
+                        const isAllSelected = filterViewId.length === 0;
+                        if (isAllSelected) {
+                            // 如果当前是全部选择，则选择所有视图
+                            filterViewId = viewIDs.map(v => v.viewId);
+                        } else {
+                            // 否则清空选择，表示全部视图
+                            filterViewId = [];
+                        }
+                        refreshFiltersDisplay();
+                        refreshKanban();
+                        menu.remove();
+                    };
+                    menu.appendChild(allItem);
 
                     // 添加视图选项
-                    const views = [
-                        { id: '', text: '全部视图' },
-                        ...viewIDs.map(v => ({
-                            id: v.viewId,
-                            text: v.name
-                        }))
-                    ];
-
-                    views.forEach(view => {
+                    viewIDs.forEach(view => {
                         const item = document.createElement('div');
                         item.className = 'view-filter-item';
-                        item.textContent = view.text;
 
-                        item.onclick = async () => {
-                            filterViewId = view.id;
-                            // 更新日历数据
-                            menu.remove();
-                            // 更新所有按钮文本
-                            // const buttons = document.querySelectorAll('.fc-viewFilter-button');
-                            // buttons.forEach(btn => btn.textContent = view.text);
-                            viewName = view.text;
-                            viewId = view.id;
-                            moduleInstances['M_calendar'].calConfig.set("viewId", viewId);
-                            moduleInstances['M_calendar'].calConfig.set("viewName", viewName);
+                        // 创建复选框
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = filterViewId.includes(view.viewId);
+                        checkbox.className = 'view-filter-checkbox';
+
+                        // 创建标签
+                        const label = document.createElement('span');
+                        label.textContent = view.name;
+                        label.className = 'view-filter-label';
+
+                        item.appendChild(checkbox);
+                        item.appendChild(label);
+
+                        item.onclick = (e) => {
+                            // 防止冒泡到菜单外
+                            e.stopPropagation();
+
+                            // 切换当前视图的选中状态
+                            if (filterViewId.includes(view.viewId)) {
+                                filterViewId = filterViewId.filter(id => id !== view.viewId);
+                            } else {
+                                filterViewId.push(view.viewId);
+                            }
+
+                            // 更新复选框状态
+                            checkbox.checked = filterViewId.includes(view.viewId);
+
+                            // 保存配置并刷新
+                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
+                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
                             moduleInstances['M_calendar'].calConfig.save();
-                            // 刷新日历
-                            refreshKanban();
 
+                            // 不关闭菜单，允许多选
                         };
                         menu.appendChild(item);
                     });
+
+                    // 添加确定按钮
+                    const confirmBtn = document.createElement('button');
+                    confirmBtn.className = 'b3-button';
+                    confirmBtn.textContent = '确定';
+                    confirmBtn.onclick = () => {
+                        refreshKanban();
+                        menu.remove();
+                    };
+                    menu.appendChild(confirmBtn);
 
                     // 定位并显示菜单
                     const rect = button.getBoundingClientRect();
@@ -306,6 +347,22 @@ export async function run(
                             document.removeEventListener('click', closeMenu);
                         }
                     });
+
+                    // 辅助函数：更新筛选显示
+                    function refreshFiltersDisplay() {
+                        if (filterViewId.length === 0) {
+                            viewName = '全部视图';
+                        } else if (filterViewId.length === 1) {
+                            const selectedView = viewIDs.find(v => v.viewId === filterViewId[0]);
+                            if (selectedView) {
+                                viewName = selectedView.name;
+                            }
+                        } else {
+                            viewName = `已选择 ${filterViewId.length} 个视图`;
+                        }
+
+                        viewId = filterViewId.join(',');
+                    }
                 },
             },
         },
@@ -472,9 +529,6 @@ export async function run(
                 theme: 'light',
                 delay: [1000, 0]
             });
-            //修改按钮文本
-            const buttons = document.querySelectorAll('.fc-viewFilter-button');
-            buttons.forEach(btn => btn.textContent = viewName);
         },
     });
     update_thisCalendars();

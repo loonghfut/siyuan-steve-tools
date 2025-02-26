@@ -254,7 +254,7 @@ export async function handleAddButtonClick(status = "", direct = { isdirect: fal
 
     const viewIDs = await getViewId(av_ids)
     const viewValue = await getViewValue(viewIDs);
-    const rootid = viewIDs.find(v => v.viewId === filterViewId)?.rootid;
+    const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
     return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct, isrefresh);
 }
 
@@ -587,9 +587,6 @@ const _refreshKanban = async () => {
         }
     });
 
-    //视图按钮刷新
-    const buttons = document.querySelectorAll('.fc-viewFilter-button');
-    buttons.forEach(btn => btn.textContent = viewName);
 
     // 设置加载状态
     const kanbanCards = document.querySelectorAll('.kanban-card');

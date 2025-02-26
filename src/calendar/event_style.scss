@@ -2,7 +2,25 @@ $background-color-success: #4b8c8a3d;
 $background-color-processing: #3478c83d;
 $background-color-info: #596c7036;
 $background-color-archive: #747d403d;
+$background-color: var(--b3-theme-background);
+$text-color: var(--b3-theme-on-background);
+$hover-background-color: var(--b3-list-hover);
+$border-color: var(--b3-border-color);
+$background-color-today: var(--b3-list-hover);
+$background-color-1: var(--b3-theme-surface);
+$text-color-error: var(--b3-theme-error);
+$text-color-success: var(--b3-theme-success);
+$text-color-processing: #3573f0;
+$text-color-info: var(--b3-card-info-color);
 
+
+//优先级颜色
+$priority-color-low: var(--b3-card-success-color);
+$priority-color-medium: var(--b3-card-info-color);
+$priority-color-high: var(--b3-card-error-color);
+$priority-color-low-background: var(--b3-card-success-background);
+$priority-color-medium-background: var(--b3-card-info-background);
+$priority-color-high-background: var(--b3-card-error-background);
 //事件块背景
 .sb,
 .li,
@@ -30,4 +48,50 @@ $background-color-archive: #747d403d;
 }
 #fcalendar-float > div.fc-view-harness.fc-view-harness-active > div > div > div{
     max-height: 70vh;
+}
+
+
+.view-filter-menu {
+    position: absolute;
+    background-color: $background-color;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    // z-index: 999; 
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    width: 200px;
+}
+
+.view-filter-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.view-filter-item:hover {
+    background-color: $hover-background-color;
+}
+
+.view-filter-all {
+    font-weight: bold;
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+}
+
+.view-filter-checkbox {
+    margin: 0;
+}
+
+.view-filter-label {
+    flex: 1;
+}
+
+.view-filter-menu button {
+    margin: 8px;
+    padding: 4px 12px;
 }

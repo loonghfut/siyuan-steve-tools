@@ -219,27 +219,23 @@ function extractDataFromTable(data: any, isZQ = false) {
 }
 
 //筛选事件函数
-export async function filterViewValue(viewValue, filterKey = '') {
-    const filteredViewValue = [];
-    // 如果 filterKey 为空，返回所有数据
-    if (!filterKey || filterKey === 'all') {
+export async function filterViewValue(viewValue, filterKeys: string[] = []) {
+    // 如果 filterKeys 为空数组，返回所有数据
+    if (!filterKeys || filterKeys.length === 0) {
         return viewValue;
     }
 
-    // 遍历查找匹配 viewId 的数据
-    for (const item of viewValue) {
-        if (item.from.viewId === filterKey) {
-            filteredViewValue.push(item);
-            break;
-        }
-    }
+    // 筛选出匹配任一 ID 的视图
+    const filteredViewValue = viewValue.filter(item => 
+        filterKeys.includes(item.from.viewId)
+    );
+
     if (filteredViewValue.length === 0) {
-        sy.showMessage('未找到此视图,请重新选择视图', -1, "error");
+        sy.showMessage('未找到匹配的视图，请重新选择', -1, "error");
     }
+    
     return filteredViewValue;
-
 }
-
 
 
 
