@@ -72,7 +72,6 @@ export async function run(
             multiMonthPlugin,
             rrule,
             kanban,
-            // listPlugin
         ],
         initialView: initialView,
         navLinks: true,
