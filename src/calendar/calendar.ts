@@ -257,72 +257,69 @@ export async function run(
                     if (!button) return;
 
                     // 创建下拉菜单
+                    // 修改创建菜单的代码
                     const menu = document.createElement('div');
                     menu.className = 'view-filter-menu';
-
+                    
+                    // 创建菜单头部（包含"全部视图"选项）
+                    const menuHeader = document.createElement('div');
+                    menuHeader.className = 'view-filter-header';
+                    
                     // 添加全选/全不选选项
-                    const allItem = document.createElement('div');
-                    allItem.className = 'view-filter-item view-filter-all';
-                    allItem.textContent = '全部视图';
-                    allItem.onclick = () => {
-                        // 切换选择状态
-                        const isAllSelected = filterViewId.length === 0;
-                        if (isAllSelected) {
-                            // 如果当前是全部选择，则选择所有视图
-                            filterViewId = viewIDs.map(v => v.viewId);
-                        } else {
-                            // 否则清空选择，表示全部视图
-                            filterViewId = [];
-                        }
-                        refreshFiltersDisplay();
-                        refreshKanban();
-                        menu.remove();
-                    };
-                    menu.appendChild(allItem);
-
+                    menu.appendChild(menuHeader);
+                    
+                    // 创建可滚动的视图列表容器
+                    const menuContent = document.createElement('div');
+                    menuContent.className = 'view-filter-content';
+                    
                     // 添加视图选项
                     viewIDs.forEach(view => {
                         const item = document.createElement('div');
                         item.className = 'view-filter-item';
-
+                    
                         // 创建复选框
                         const checkbox = document.createElement('input');
                         checkbox.type = 'checkbox';
                         checkbox.checked = filterViewId.includes(view.viewId);
                         checkbox.className = 'view-filter-checkbox';
-
+                    
                         // 创建标签
                         const label = document.createElement('span');
                         label.textContent = view.name;
                         label.className = 'view-filter-label';
-
+                    
                         item.appendChild(checkbox);
                         item.appendChild(label);
-
+                    
                         item.onclick = (e) => {
                             // 防止冒泡到菜单外
                             e.stopPropagation();
-
+                    
                             // 切换当前视图的选中状态
                             if (filterViewId.includes(view.viewId)) {
                                 filterViewId = filterViewId.filter(id => id !== view.viewId);
                             } else {
                                 filterViewId.push(view.viewId);
                             }
-
+                    
                             // 更新复选框状态
                             checkbox.checked = filterViewId.includes(view.viewId);
-
+                    
                             // 保存配置并刷新
                             moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
                             moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
                             moduleInstances['M_calendar'].calConfig.save();
-
+                    
                             // 不关闭菜单，允许多选
                         };
-                        menu.appendChild(item);
+                        menuContent.appendChild(item);
                     });
-
+                    menu.appendChild(menuContent);
+                    
+                    // 创建固定在底部的按钮容器
+                    const menuFooter = document.createElement('div');
+                    menuFooter.className = 'view-filter-footer';
+                    
                     // 添加确定按钮
                     const confirmBtn = document.createElement('button');
                     confirmBtn.className = 'b3-button';
@@ -331,7 +328,8 @@ export async function run(
                         refreshKanban();
                         menu.remove();
                     };
-                    menu.appendChild(confirmBtn);
+                    menuFooter.appendChild(confirmBtn);
+                    menu.appendChild(menuFooter);
 
                     // 定位并显示菜单
                     const rect = button.getBoundingClientRect();
