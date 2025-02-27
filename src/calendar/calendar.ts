@@ -218,9 +218,40 @@ export async function run(
                 info.revert();
                 return;
             }
+            showDropTimeIndicator(info);
             myF.updateEventInDatabase(info, calendar, viewValue);
 
         },
+
+        eventResizeStart: function (info) {
+            // 创建半透明的时间指示器跟随鼠标
+            const timeGhost = document.createElement('div');
+            timeGhost.id = 'fc-time-ghost';
+            timeGhost.style.cssText = `
+                position: fixed;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 10001;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            `;
+            document.body.appendChild(timeGhost);
+            // 监听鼠标移动
+            document.addEventListener('mousemove', updateTimeGhost);
+        },
+
+        eventResizeStop: function () {
+            // 移除时间指示器和事件监听器
+            const timeGhost = document.getElementById('fc-time-ghost');
+            if (timeGhost) {
+                timeGhost.remove();
+            }
+            document.removeEventListener('mousemove', updateTimeGhost);
+        },
+
         eventResize: async function (info) {
             // console.log("事件调整大小", info.event.startStr, info.event.endStr);
             if (info.event._def.extendedProps.isRecurring || info.event.extendedProps.source === 'qqcalendar') {
@@ -228,6 +259,8 @@ export async function run(
                 info.revert();
                 return;
             }
+            // 显示时间刻度线
+            showResizeTimeIndicator(info);
             myF.updateEventInDatabase(info, calendar, viewValue, true);
         },
 
@@ -626,4 +659,139 @@ function validateTimeFormat(timeStr: string, defaultValue: string): string {
     }
 
     return timeStr;
+}
+
+
+/**
+ * 更新跟随鼠标的时间指示器
+ * @param e 鼠标事件
+ */
+function updateTimeGhost(e: MouseEvent) {
+    const timeGhost = document.getElementById('fc-time-ghost');
+    if (!timeGhost) return;
+
+    // 获取当前鼠标位置对应的时间格子
+    const fcGrid = document.querySelector('.fc-timegrid-body');
+    if (fcGrid) {
+        const rect = fcGrid.getBoundingClientRect();
+        const withinGrid =
+            e.clientX >= rect.left &&
+            e.clientX <= rect.right &&
+            e.clientY >= rect.top &&
+            e.clientY <= rect.bottom;
+
+        if (withinGrid) {
+            // 计算鼠标悬停位置对应的时间
+            const slots = document.querySelectorAll('.fc-timegrid-slot-label');
+            let hoveredTime = '未知时间';
+
+            // 寻找最接近的时间刻度
+            let closestSlot = null;
+            let minDistance = Infinity;
+
+            slots.forEach(slot => {
+                const slotRect = slot.getBoundingClientRect();
+                const distance = Math.abs(e.clientY - (slotRect.top + slotRect.height / 2));
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestSlot = slot;
+                }
+            });
+
+            if (closestSlot) {
+                hoveredTime = closestSlot.textContent?.trim() || '未知时间';
+            }
+
+            timeGhost.textContent = hoveredTime;
+            timeGhost.style.display = 'block';
+        } else {
+            timeGhost.style.display = 'none';
+        }
+    }
+
+    // 跟随鼠标位置
+    timeGhost.style.left = (e.clientX + 10) + 'px';
+    timeGhost.style.top = (e.clientY + 10) + 'px';
+}
+/**
+ * 在事件调整大小时显示时间刻度线
+ * @param info 事件调整信息
+ */
+function showResizeTimeIndicator(info: any) {
+    const startTime = info.event.start ? formatTime(info.event.start) : '';
+    const endTime = info.event.end ? formatTime(info.event.end) : '';
+
+    // 创建或获取时间指示器元素
+    let timeIndicator = document.getElementById('fc-time-indicator');
+    if (!timeIndicator) {
+        timeIndicator = document.createElement('div');
+        timeIndicator.id = 'fc-time-indicator';
+        timeIndicator.className = 'fc-time-indicator';
+        document.body.appendChild(timeIndicator);
+
+        // 添加样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .fc-time-indicator {
+                position: fixed;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                pointer-events: none;
+                z-index: 10000;
+                transition: opacity 0.2s;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            .fc-time-indicator::after {
+                content: '';
+                position: absolute;
+                top: 100%;
+                left: 50%;
+                margin-left: -5px;
+                border-width: 5px;
+                border-style: solid;
+                border-color: rgba(0, 0, 0, 0.8) transparent transparent transparent;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // 显示时间指示器
+    timeIndicator.textContent = `${startTime} → ${endTime}`;
+
+    // 放置在事件元素的上方
+    const rect = info.el.getBoundingClientRect();
+    timeIndicator.style.top = (rect.top - 30) + 'px';
+    timeIndicator.style.left = (rect.left + rect.width / 2 - timeIndicator.offsetWidth / 2) + 'px';
+    timeIndicator.style.opacity = '1';
+
+    // 3秒后隐藏
+    setTimeout(() => {
+        timeIndicator.style.opacity = '0';
+    }, 3000);
+}
+
+/**
+ * 在事件拖动时显示时间刻度线
+ * @param info 事件拖动信息
+ */
+function showDropTimeIndicator(info: any) {
+    // 重用调整大小时的指示器函数
+    showResizeTimeIndicator(info);
+}
+// 在 import 语句后添加
+
+/**
+ * 格式化时间为24小时制显示
+ * @param date Date对象
+ * @returns 格式化后的时间字符串 (HH:MM)
+ */
+function formatTime(date: Date): string {
+    return date.toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
 }
