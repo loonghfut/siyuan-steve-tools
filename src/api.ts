@@ -750,7 +750,7 @@ export async function updateAttrViewCell_pro(
                     hasEndDate: true,
                     isNotTime: false
                 },
-                id
+                id:newId
             };
             break;
 
@@ -832,7 +832,7 @@ export async function updateAttrViewCell_pro(
 
     doOperations.push({
         action: "doUpdateUpdated",
-        id,
+        id: newId,
         data: new Date(Date.now() + 8 * 60 * 60 * 1000)
             .toISOString()
             .replace(/[:\-]|(\.\d{3})|T/g, "")
