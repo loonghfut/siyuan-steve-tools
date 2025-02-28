@@ -92,6 +92,17 @@ export class M_calendar {
                 }
             });
         }
+        // 在适当的位置添加，比如在其他按钮设置之后
+        if (this_settingdata["cal-qq-enable"]) {
+            this.plugin.addTopBar({
+                icon: "iconCalendar", // 可以使用适当的图标
+                title: "导出到QQ日历",
+                position: "right",
+                callback: async () => {
+                    await this.exportToQQCalendar();
+                }
+            });
+        }
         let D_calendar: any;
         this.plugin.addDock({
             config: {
@@ -226,7 +237,7 @@ export class M_calendar {
 
     async onLayoutReady() {
         //悬浮显示
-        if(this_settingdata["cal-show-float-view"]){
+        if (this_settingdata["cal-show-float-view"]) {
             run("1");
         }
         //
@@ -731,9 +742,98 @@ export class M_calendar {
         api.refresh();
     }
 
-    public  getEventsFromQQCalDAV() {
+    public getEventsFromQQCalDAV() {
         return this.qqFullCalendarEvents;
     }
+
+    /**
+     * 将思源日程导出到QQ日历
+     */
+    async exportToQQCalendar() {
+        try {
+            // 检查是否配置了QQ日历
+            if (!this.QQCalDAVClient || !this_settingdata["cal-qq-calendar-url"]) {
+                showMessage('请先在设置中配置QQ日历', -1, 'error');
+                return;
+            }
+
+            showMessage('开始同步到QQ日历...', 3000, 'info');
+
+            // 获取QQ日历中的现有事件
+            let existingEvents = [];
+            try {
+                existingEvents = await this.QQCalDAVClient.getEvents(this_settingdata["cal-qq-calendar-url"]);
+                console.log("QQ日历现有事件数:", existingEvents.length);
+            } catch (error) {
+                console.error('获取QQ日历现有事件失败:', error);
+                showMessage('获取QQ日历现有事件失败，将尝试直接添加', 3000);
+            }
+
+            // 创建现有事件的标识映射，用于去重
+            const existingEventMap = new Map();
+            existingEvents.forEach(event => {
+                // 使用标题+开始时间作为事件的唯一标识
+                const eventKey = `${event.title}-${event.start?.toISOString() || ''}`;
+                existingEventMap.set(eventKey, event);
+            });
+
+            // 获取思源的日程事件数据
+            const avIds = await this.getAVreferenceid();
+            const viewIDs = await myF.getViewId(avIds);
+            const viewValue = await myF.getViewValue(viewIDs);
+
+            // 转换为QQ日历可接受的格式，同时过滤掉已存在的事件
+            const events = viewValue.flatMap(eventGroup => {
+                if (!eventGroup.data) return [];
+
+                return eventGroup.data.map(event => {
+                    // 跳过已完成的事件
+                    if (event?.状态?.content === "完成") return null;
+
+                    const startTime = new Date(event?.开始时间?.start);
+                    const endTime = new Date(event?.开始时间?.end);
+
+                    // 检查日期是否有效
+                    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                        return null;
+                    }
+
+                    // 创建事件唯一标识
+                    const eventKey = `${event?.事件?.content || '未命名事件'}-${startTime.toISOString()}`;
+
+                    // 检查事件是否已存在于QQ日历中
+                    if (existingEventMap.has(eventKey)) {
+                        console.log(`跳过已存在的事件: ${eventKey}`);
+                        return null;
+                    }
+
+                    return {
+                        title: event?.事件?.content || '未命名事件',
+                        description: event?.描述?.content || '',
+                        start: startTime,
+                        end: endTime,
+                        isAllDay: false // 根据实际情况设置
+                    };
+                }).filter(Boolean); // 过滤掉无效事件
+            });
+
+
+            // 同步到QQ日历
+            if (events.length > 0) {
+                await this.QQCalDAVClient.syncEvents(
+                    this_settingdata["cal-qq-calendar-url"],
+                    events
+                );
+                showMessage(`成功将${events.length}个事件同步到QQ日历`, 3000, "info");
+            } else {
+                showMessage('没有需要同步的新事件', 3000, 'info');
+            }
+        } catch (error) {
+            console.error('导出到QQ日历失败:', error);
+            showMessage('导出到QQ日历失败，请查看控制台错误', -1, 'error');
+        }
+    }
+
 
 }
 

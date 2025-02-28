@@ -21,7 +21,7 @@ interface CalendarEvent {
 
 export class CalDAVClient {
     private client: DAVClient;
-    
+
     constructor(username: string, password: string) {
         // console.log(username, password);
         this.client = new DAVClient({
@@ -50,7 +50,7 @@ export class CalDAVClient {
     }
 
     async getEvents(calendarId: string): Promise<CalendarEvent[]> {
-        if(!calendarId) {
+        if (!calendarId) {
             showMessage('请设置QQ日历', -1, 'error');
             return [];
         }
@@ -58,27 +58,27 @@ export class CalDAVClient {
             const events = await this.client.fetchCalendarObjects({
                 calendar: { url: calendarId },
             });
-            
+
             const processedEvents = events
                 .map(event => {
                     const icsData = event.data;
                     // 匹配事件数据块，包括VEVENT之间的所有内容
                     const veventMatches = icsData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/g);
-                    
+
                     if (!veventMatches) return null;
-                    
+
                     // 处理每个VEVENT块
                     const eventData = veventMatches.map(veventBlock => {
                         const veventData = veventBlock.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/)[1];
-                        
+
                         // 提取基本信息
                         const summary = veventData.match(/SUMMARY:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
                         const uid = veventData.match(/UID:(.+?)(?:\r\n|\n|$)/)?.[1];
                         const description = veventData.match(/DESCRIPTION:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
-                        
+
                         // 解析重复规则
                         const rruleMatch = veventData.match(/RRULE:(.+?)(?:\r\n|\n|$)/)?.[1];
-                        
+
                         // 解析开始时间
                         let start: Date | null = null;
                         const dtstart = veventData.match(/DTSTART(?:;[^:]*)?:([^\r\n]+)/)?.[1];
@@ -89,7 +89,7 @@ export class CalDAVClient {
                                 start = new Date(dtstart.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
                             }
                         }
-                        
+
                         // 解析结束时间
                         let end: Date | null = null;
                         const dtend = veventData.match(/DTEND(?:;[^:]*)?:([^\r\n]+)/)?.[1];
@@ -100,10 +100,10 @@ export class CalDAVClient {
                                 end = new Date(dtend.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
                             }
                         }
-    
+
                         // 判断是否为全天事件
                         const isAllDay = !!dtstart && !dtstart.includes('T');
-                        
+
                         // 构建标准日历事件对象
                         return {
                             id: uid || '',
@@ -123,17 +123,351 @@ export class CalDAVClient {
                             }
                         };
                     });
-    
+
                     return eventData;
                 })
                 .filter((event): event is CalendarEvent[] => event !== null)
                 .flat();
-    
+
             return processedEvents;
-            
+
         } catch (error) {
             console.error('获取日历事件失败:', error);
             throw error;
         }
     }
+
+
+    /**
+     * 创建新事件
+     * @param calendarId 日历ID
+     * @param event 事件数据
+     */
+    async createEvent(calendarId: string, event: {
+        title: string;
+        description?: string;
+        start: Date;
+        end: Date;
+        isAllDay?: boolean;
+        recurrenceRule?: string;
+    }): Promise<string> {
+        if (!calendarId) {
+            showMessage('请设置QQ日历', -1, 'error');
+            throw new Error('未设置QQ日历');
+        }
+
+        try {
+            // 生成唯一的UID
+            const uid = `siyuan-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+            // 构建iCalendar格式的事件
+            let icsData = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//SiYuan//Steve-Tools Calendar//CN',
+                'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH',
+                'BEGIN:VEVENT'
+            ];
+
+            // 添加UID
+            icsData.push(`UID:${uid}`);
+
+            // 格式化日期时间
+            const formatDate = (date: Date, isAllDay = false) => {
+                if (isAllDay) {
+                    return date.toISOString().replace(/[-:]/g, '').substring(0, 8);
+                }
+                return date.toISOString().replace(/[-:]/g, '').substring(0, 15) + 'Z';
+            };
+
+            // 添加开始和结束时间
+            if (event.isAllDay) {
+                icsData.push(`DTSTART;VALUE=DATE:${formatDate(event.start, true)}`);
+                icsData.push(`DTEND;VALUE=DATE:${formatDate(event.end, true)}`);
+            } else {
+                icsData.push(`DTSTART:${formatDate(event.start)}`);
+                icsData.push(`DTEND:${formatDate(event.end)}`);
+            }
+
+            // 添加标题和描述
+            icsData.push(`SUMMARY:${event.title}`);
+            if (event.description) {
+                icsData.push(`DESCRIPTION:${event.description}`);
+            }
+
+            // 添加重复规则
+            if (event.recurrenceRule) {
+                icsData.push(`RRULE:${event.recurrenceRule}`);
+            }
+
+            // 添加创建时间
+            icsData.push(`DTSTAMP:${formatDate(new Date())}`);
+
+            // 结束事件
+            icsData.push('END:VEVENT');
+            icsData.push('END:VCALENDAR');
+
+            // 上传事件到服务器
+            const result = await this.client.createCalendarObject({
+                calendar: { url: calendarId },
+                filename: `${uid}.ics`,
+                iCalString: icsData.join('\r\n')
+            });
+
+            showMessage('事件已成功添加到QQ日历', 3000, 'info');
+            return uid;
+        } catch (error) {
+            console.error('创建QQ日历事件失败:', error);
+            showMessage('创建QQ日历事件失败', -1, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * 更新已有事件
+     * @param calendarId 日历ID
+     * @param uid 事件UID
+     * @param event 更新的事件数据
+     */
+    async updateEvent(calendarId: string, uid: string, event: {
+        title?: string;
+        description?: string;
+        start?: Date;
+        end?: Date;
+        isAllDay?: boolean;
+        recurrenceRule?: string;
+    }): Promise<void> {
+        if (!calendarId || !uid) {
+            showMessage('参数不完整', -1, 'error');
+            throw new Error('参数不完整');
+        }
+
+        try {
+            // 先获取当前事件
+            const events = await this.client.fetchCalendarObjects({
+                calendar: { url: calendarId },
+                filters: [{
+                    'comp-filter': {
+                        _attributes: {
+                            name: 'VCALENDAR'
+                        },
+                        'comp-filter': {
+                            _attributes: {
+                                name: 'VEVENT'
+                            },
+                            'prop-filter': {
+                                _attributes: {
+                                    name: 'UID'
+                                },
+                                'text-match': {
+                                    _attributes: {
+                                        'collation': 'i;octet',
+                                        'negate-condition': 'no',
+                                        'match-type': 'equals'
+                                    },
+                                    _text: uid
+                                }
+                            }
+                        }
+                    }
+                }]
+            });
+
+            if (events.length === 0) {
+                showMessage('未找到要更新的事件', -1, 'error');
+                throw new Error('未找到要更新的事件');
+            }
+
+            const existingEvent = events[0];
+            const icsData = existingEvent.data;
+
+            // 解析现有事件数据
+            const veventMatch = icsData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/);
+            if (!veventMatch) {
+                throw new Error('无效的事件数据');
+            }
+
+            const veventData = veventMatch[1];
+            const summary = event.title || veventData.match(/SUMMARY:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
+            const description = event.description || veventData.match(/DESCRIPTION:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
+            const rrule = event.recurrenceRule || veventData.match(/RRULE:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
+
+            // 构建更新后的事件数据
+            let updatedIcsData = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//SiYuan//Steve-Tools Calendar//CN',
+                'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH',
+                'BEGIN:VEVENT'
+            ];
+
+            // 添加UID
+            updatedIcsData.push(`UID:${uid}`);
+
+            // 格式化日期时间
+            const formatDate = (date: Date, isAllDay = false) => {
+                if (isAllDay) {
+                    return date.toISOString().replace(/[-:]/g, '').substring(0, 8);
+                }
+                return date.toISOString().replace(/[-:]/g, '').substring(0, 15) + 'Z';
+            };
+
+            // 添加开始和结束时间
+            const isAllDay = event.isAllDay ?? (!veventData.match(/DTSTART:/));
+            const start = event.start || new Date(veventData.match(/DTSTART(?:;[^:]*)?:([^\r\n]+)/)?.[1]?.replace(/(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?(\d{2})?Z?/, '$1-$2-$3T$4:$5:$6Z') || '');
+            const end = event.end || new Date(veventData.match(/DTEND(?:;[^:]*)?:([^\r\n]+)/)?.[1]?.replace(/(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?(\d{2})?Z?/, '$1-$2-$3T$4:$5:$6Z') || '');
+
+            if (isAllDay) {
+                updatedIcsData.push(`DTSTART;VALUE=DATE:${formatDate(start, true)}`);
+                updatedIcsData.push(`DTEND;VALUE=DATE:${formatDate(end, true)}`);
+            } else {
+                updatedIcsData.push(`DTSTART:${formatDate(start)}`);
+                updatedIcsData.push(`DTEND:${formatDate(end)}`);
+            }
+
+            // 添加标题和描述
+            updatedIcsData.push(`SUMMARY:${summary}`);
+            if (description) {
+                updatedIcsData.push(`DESCRIPTION:${description}`);
+            }
+
+            // 添加重复规则
+            if (rrule) {
+                updatedIcsData.push(`RRULE:${rrule}`);
+            }
+
+            // 添加修改时间
+            updatedIcsData.push(`DTSTAMP:${formatDate(new Date())}`);
+
+            // 结束事件
+            updatedIcsData.push('END:VEVENT');
+            updatedIcsData.push('END:VCALENDAR');
+
+            // 更新服务器上的事件
+            await this.client.updateCalendarObject({
+                calendarObject: {
+                    url: existingEvent.url,
+                    data: updatedIcsData.join('\r\n')
+                }
+            });
+
+            showMessage('事件已成功更新', 3000, 'info');
+        } catch (error) {
+            console.error('更新QQ日历事件失败:', error);
+            showMessage('更新QQ日历事件失败', -1, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * 删除事件
+     * @param calendarId 日历ID
+     * @param uid 事件UID
+     */
+    async deleteEvent(calendarId: string, uid: string): Promise<void> {
+        if (!calendarId || !uid) {
+            showMessage('参数不完整', -1, 'error');
+            throw new Error('参数不完整');
+        }
+
+        try {
+            // 获取要删除的事件
+            const events = await this.client.fetchCalendarObjects({
+                calendar: { url: calendarId },
+                filters: [{
+                    'comp-filter': {
+                        _attributes: {
+                            name: 'VCALENDAR'
+                        },
+                        'comp-filter': {
+                            _attributes: {
+                                name: 'VEVENT'
+                            },
+                            'prop-filter': {
+                                _attributes: {
+                                    name: 'UID'
+                                },
+                                'text-match': {
+                                    _attributes: {
+                                        'collation': 'i;octet',
+                                        'negate-condition': 'no',
+                                        'match-type': 'equals'
+                                    },
+                                    _text: uid
+                                }
+                            }
+                        }
+                    }
+                }]
+            });
+
+            if (events.length === 0) {
+                showMessage('未找到要删除的事件', -1, 'error');
+                throw new Error('未找到要删除的事件');
+            }
+
+            // 删除事件
+            await this.client.deleteCalendarObject({
+                calendarObject: events[0]
+            });
+
+            showMessage('事件已成功删除', 3000, 'info');
+        } catch (error) {
+            console.error('删除QQ日历事件失败:', error);
+            showMessage('删除QQ日历事件失败', -1, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * 同步多个事件到QQ日历
+     * @param calendarId 日历ID
+     * @param events 要同步的事件数组
+     */
+    async syncEvents(calendarId: string, events: Array<{
+        id?: string;
+        title: string;
+        description?: string;
+        start: Date;
+        end: Date;
+        isAllDay?: boolean;
+        recurrenceRule?: string;
+    }>): Promise<void> {
+        if (!calendarId) {
+            showMessage('请设置QQ日历', -1, 'error');
+            throw new Error('未设置QQ日历');
+        }
+
+        try {
+            // 记录成功和失败的数量
+            let successCount = 0;
+            let failCount = 0;
+
+            // 依次处理每个事件
+            for (const event of events) {
+                try {
+                    if (event.id) {
+                        // 更新已有事件
+                        await this.updateEvent(calendarId, event.id, event);
+                    } else {
+                        // 创建新事件
+                        await this.createEvent(calendarId, event);
+                    }
+                    successCount++;
+                } catch (error) {
+                    console.error(`同步事件 "${event.title}" 失败:`, error);
+                    failCount++;
+                }
+            }
+
+            showMessage(`同步完成: ${successCount}个成功, ${failCount}个失败`, 3000, 'info');
+        } catch (error) {
+            console.error('批量同步事件失败:', error);
+            showMessage('批量同步事件失败', -1, 'error');
+            throw error;
+        }
+    }
+
 }
