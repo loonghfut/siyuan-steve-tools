@@ -470,11 +470,11 @@ export class CalDAVClient {
         }
     }
 
-        /**
-     * 清空日历中的所有事件
-     * @param calendarId 日历ID
-     * @param options 选项，如选择特定源的事件删除
-     */
+    /**
+ * 清空日历中的所有事件
+ * @param calendarId 日历ID
+ * @param options 选项，如选择特定源的事件删除
+ */
     async clearCalendar(calendarId: string, options: {
         onlyFromSource?: string; // 如果指定，只删除来自特定来源的事件
         excludeIds?: string[]; // 排除特定ID的事件
@@ -483,37 +483,37 @@ export class CalDAVClient {
             showMessage('请设置QQ日历', -1, 'error');
             throw new Error('未设置QQ日历');
         }
-    
+
         try {
             // 获取所有事件
             const events = await this.getEvents(calendarId);
             console.log(`找到${events.length}个事件`);
-            
+
             // 根据选项过滤要删除的事件
             const eventsToDelete = events.filter(event => {
                 // 如果指定了来源，只删除匹配来源的事件
                 if (options.onlyFromSource && event.extendedProps?.source !== options.onlyFromSource) {
                     return false;
                 }
-                
+
                 // 如果指定了排除ID，排除这些事件
                 if (options.excludeIds && options.excludeIds.includes(event.id)) {
                     return false;
                 }
-                
+
                 return true;
             });
-            
+
             if (eventsToDelete.length === 0) {
                 showMessage('没有找到需要删除的事件', 3000, 'info');
                 return;
             }
-            
+
             // 显示确认对话框
             if (confirm(`确定要删除${eventsToDelete.length}个事件吗？此操作不可恢复！`)) {
                 let successCount = 0;
                 let failCount = 0;
-                
+
                 // 批量删除事件
                 for (const event of eventsToDelete) {
                     try {
@@ -546,7 +546,7 @@ export class CalDAVClient {
                                 }
                             }]
                         });
-                        
+
                         if (eventObjects.length > 0) {
                             await this.client.deleteCalendarObject({
                                 calendarObject: eventObjects[0]
@@ -562,7 +562,7 @@ export class CalDAVClient {
                         failCount++;
                     }
                 }
-                
+
                 showMessage(`清空完成: 成功删除${successCount}个事件，失败${failCount}个`, 3000, "info");
             }
         } catch (error) {
@@ -570,5 +570,79 @@ export class CalDAVClient {
             showMessage('清空日历失败，请查看控制台错误', -1, 'error');
             throw error;
         }
+    }
+
+    // 在 CalDAVClient 类中添加创建事件的方法
+    async createEvent_new(calendarId: string, event: {
+        summary: string;
+        start: Date;
+        end: Date;
+        description?: string;
+        allDay?: boolean;
+    }): Promise<string> {
+        if (!calendarId) {
+            showMessage('请设置QQ日历', -1, 'error');
+            return '';
+        }
+
+        try {
+            // 生成唯一ID
+            const uid = this.generateUID();
+
+            // 格式化时间
+            const dtstart = this.formatDate(event.start, event.allDay);
+            const dtend = this.formatDate(event.end, event.allDay);
+
+            // 创建事件内容
+            const icsContent = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//SiYuan//Calendar//CN',
+                'BEGIN:VEVENT',
+                `UID:${uid}`,
+                `SUMMARY:${event.summary}`,
+                `DTSTAMP:${this.formatDate(new Date())}`,
+                `DTSTART${event.allDay ? ';VALUE=DATE' : ''}:${dtstart}`,
+                `DTEND${event.allDay ? ';VALUE=DATE' : ''}:${dtend}`,
+                event.description ? `DESCRIPTION:${event.description}` : '',
+                'STATUS:CONFIRMED',
+                'BEGIN:VALARM',
+                'ACTION:DISPLAY',
+                'TRIGGER:-PT15M',
+                `SUMMARY:${event.summary}`,
+                'END:VALARM',
+                'END:VEVENT',
+                'END:VCALENDAR'
+            ].filter(Boolean).join('\r\n');
+
+            // 创建事件对象
+            await this.client.createCalendarObject({
+                calendar: { url: calendarId },
+                filename: `${uid}.ics`,
+                iCalString: icsContent
+            });
+
+            return uid;
+        } catch (error) {
+            console.error('创建日历事件失败:', error);
+            showMessage('创建日历事件失败', -1, 'error');
+            throw error;
+        }
+    }
+
+    // 生成唯一ID
+    private generateUID(): string {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    // 格式化日期为iCalendar格式
+    private formatDate(date: Date, allDay: boolean = false): string {
+        if (allDay) {
+            return date.toISOString().replace(/[-:]/g, '').split('T')[0];
+        }
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     }
 }

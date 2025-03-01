@@ -140,7 +140,12 @@ export async function run(
         dateClick: async function (info) {
             // console.log('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
-            const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
+            let rootid;
+            if (filterViewId.includes('qqcalendar') && (!filterViewId.some(id => id !== 'qqcalendar'))) {
+                rootid = 'qqcalendar'; // 特殊标识，用于在createEventInDatabase中区分
+            } else {
+                rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
+            }
             if (settingdata["cal-create-way"] === "1") {
                 const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
                 return;

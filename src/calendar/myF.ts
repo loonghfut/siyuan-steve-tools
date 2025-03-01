@@ -224,16 +224,16 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
     if (!filterKeys || filterKeys.length === 0) {
         return viewValue;
     }
-
+    // console.log("filterKeys:::", filterKeys);
     // 筛选出匹配任一 ID 的视图
-    const filteredViewValue = viewValue.filter(item => 
+    const filteredViewValue = viewValue.filter(item =>
         filterKeys.includes(item.from.viewId)
     );
 
-    if (filteredViewValue.length === 0) {
+    if (filteredViewValue.length === 0 && !filterKeys.includes('qqcalendar')) {
         sy.showMessage('未找到匹配的视图，请重新选择', -1, "error");
     }
-    
+
     return filteredViewValue;
 }
 
@@ -458,6 +458,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     let isok = false;
     status = status || "未完成";
     let to_db_id = db_id || settingdata["cal-db-id"];
+    ///////////QQ日历//////////////
+    createEventInDatabase_QQ(to_db_id, dateStr);
+    if (to_db_id === 'qqcalendar') return;
+
     steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
     function formatDateWithTime(dateStr: string, hour: number = 8): string {
         // 如果日期字符串已经包含时间部分，直接返回原值
@@ -509,7 +513,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     //// 创建一个新块
     steveTools.outlog("daynote_id:::", daynote_id.id);
     const idid = await api.generateSiyuanID() as string;
-   
+
     await api.appendBlock("markdown", `{{{row
 
 {: id="${await api.generateSiyuanID() as string}"}
@@ -636,7 +640,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const categoryData: ISelectOption[] = [{ content: category }];
             console.log("selectdata", selectdata);
             ///////////更新属性////////////////////
-            if (category && categoryKeyID && categoryData && category!=="加载中..."&& category!=="无") {
+            if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
                 await api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, categoryData, "select");
             }
             if (priority && priorityKeyID && priorityData) {
@@ -836,19 +840,19 @@ export function changestatus_for_zq(event, date) {
 async function getCategories(dbId: string): Promise<string[]> {
     try {
         const view = await api.renderAttributeView(dbId);
-        
+
         // 查找分类列
         const categoryColumn = view.view?.columns?.find(col => col.name === '分类');
         if (!categoryColumn) return ['无'];
-        
+
         // 直接从选项中获取分类名称
         const categories = categoryColumn.options?.map(option => option.name) || [];
-        
+
         // 如果没有预设选项，返回默认值
         if (!categories.length) {
             return ['无'];
         }
-        
+
         // 返回排序后的分类列表（不包含"无"）
         return categories.sort();
     } catch (error) {
@@ -872,5 +876,134 @@ async function loadCategoryOptions(to_db_id: any, categorySelect: HTMLSelectElem
     } catch (error) {
         console.error('加载分类失败:', error);
         sy.showMessage('加载分类失败', -1, "error");
+    }
+}
+
+
+
+
+function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
+    // 在 createEventInDatabase 函数中添加处理QQ日历的部分
+    if (to_db_id === 'qqcalendar') {
+        // 用户选择了QQ日历作为目标
+        const calendar = moduleInstances['M_calendar']?.QQCalDAVClient;
+        if (!calendar) {
+            sy.showMessage('QQ日历客户端未初始化', -1, 'error');
+            return;
+        }
+
+        try {
+            // 获取QQ日历ID
+            const calendarId = settingdata['cal-qq-calendar-url'];
+            if (!calendarId) {
+                sy.showMessage('未设置QQ日历ID', -1, 'error');
+                return;
+            }
+
+            // 解析开始时间和结束时间
+            const startTime = new Date(dateStr);
+            let endTime = new Date(startTime);
+            endTime.setHours(startTime.getHours() + 1); // 默认1小时
+
+            // 创建事件并获取面板输入内容
+            const dialog = new sy.Dialog({
+                title: '添加到QQ日历',
+                content: `
+                    <div style="padding: 16px;">
+                        <div class="form-item">
+                            <label>标题</label>
+                            <input type="text" id="qq-event-title" class="b3-text-field" placeholder="请输入事件标题">
+                        </div>
+                        <div class="form-item">
+                            <label>开始时间</label>
+                            <input type="datetime-local" id="qq-event-start" class="b3-text-field" value="${formatDateForInput(startTime)}">
+                        </div>
+                        <div class="form-item">
+                            <label>结束时间</label>
+                            <input type="datetime-local" id="qq-event-end" class="b3-text-field" value="${formatDateForInput(endTime)}">
+                        </div>
+                        <div class="form-item">
+                            <label>描述</label>
+                            <textarea id="qq-event-desc" class="b3-text-field" rows="3" placeholder="事件描述(可选)"></textarea>
+                        </div>
+                        <div class="b3-dialog__action">
+                            <button class="b3-button b3-button--cancel">取消</button>
+                            <button class="b3-button b3-button--text" id="qq-confirm-btn">确认</button>
+                        </div>
+                    </div>
+                `,
+                width: '400px',
+                height: 'auto',
+            });
+            // 在dialog创建时添加样式
+            const style = document.createElement('style');
+            style.textContent = `
+                .form-item {
+                    margin-bottom: 12px;
+                }
+                .form-item label {
+                    display: block;
+                    margin-bottom: 4px;
+                    font-weight: 500;
+                }
+                .form-item input, .form-item textarea {
+                    width: 100%;
+                    padding: 6px 8px;
+                }
+            `;
+            document.head.appendChild(style);
+
+            // 添加确认按钮的事件监听器
+            const confirmBtn = dialog.element.querySelector('#qq-confirm-btn');
+            const cancelBtn = dialog.element.querySelector('.b3-button--cancel');
+
+            cancelBtn.addEventListener('click', () => {
+                dialog.destroy();
+            });
+
+            confirmBtn.addEventListener('click', async () => {
+                // 获取表单值
+                const title = (document.getElementById('qq-event-title') as HTMLInputElement).value;
+                const start = new Date((document.getElementById('qq-event-start') as HTMLInputElement).value);
+                const end = new Date((document.getElementById('qq-event-end') as HTMLInputElement).value);
+                const description = (document.getElementById('qq-event-desc') as HTMLTextAreaElement).value;
+                // const allDay = (document.getElementById('qq-event-allday') as HTMLInputElement).checked;
+
+                if (!title) {
+                    sy.showMessage('请输入事件标题', -1, 'error');
+                    return; // 阻止继续执行
+                }
+
+                // 创建事件
+                try {
+                    sy.showMessage('正在添加事件到QQ日历...', -1, 'info','addcal');
+                    await calendar.createEvent_new(calendarId, {
+                        summary: title,
+                        start: start,
+                        end: end,
+                        description: description,
+                    });
+                    await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
+                    refreshKanban();
+                    // setTimeout(() => refreshKanban(), 1000);
+                    sy.showMessage('已添加事件到QQ日历', 3000, 'info','addcal');
+                    dialog.destroy();
+                } catch (error) {
+                    console.error('添加QQ日历事件失败:', error);
+                    sy.showMessage('添加事件失败', -1, 'error');
+                }
+            });
+
+            return;
+        } catch (error) {
+            console.error('添加QQ日历事件失败:', error);
+            sy.showMessage('添加事件失败', -1, 'error');
+            return;
+        }
+    }
+
+    // 格式化日期为datetime-local输入框格式
+    function formatDateForInput(date: Date): string {
+        return date.toISOString().slice(0, 16); // 格式 YYYY-MM-DDTHH:MM
     }
 }

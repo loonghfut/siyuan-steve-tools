@@ -735,6 +735,11 @@ export class M_calendar {
         return this.qqFullCalendarEvents;
     }
 
+    public async updateEventsFromQQCalDAV() {
+        this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(this_settingdata["cal-qq-calendar-url"]);
+        console.log("QQevent", this.qqFullCalendarEvents);
+        return this.qqFullCalendarEvents;
+    }
     /**
      * 将思源日程导出到QQ日历
      */
