@@ -901,6 +901,7 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
             }
 
             // 解析开始时间和结束时间
+            console.log('dateStr:', dateStr);
             const startTime = new Date(dateStr);
             let endTime = new Date(startTime);
             endTime.setHours(startTime.getHours() + 1); // 默认1小时
@@ -1004,6 +1005,12 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
 
     // 格式化日期为datetime-local输入框格式
     function formatDateForInput(date: Date): string {
-        return date.toISOString().slice(0, 16); // 格式 YYYY-MM-DDTHH:MM
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
 }
