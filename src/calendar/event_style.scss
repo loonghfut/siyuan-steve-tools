@@ -125,3 +125,15 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 
 
+.form-item {
+    margin-bottom: 12px;
+}
+.form-item label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+.form-item input, .form-item textarea {
+    width: 100%;
+    padding: 6px 8px;
+}

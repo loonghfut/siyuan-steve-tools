@@ -936,23 +936,6 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
                 width: '400px',
                 height: 'auto',
             });
-            // 在dialog创建时添加样式
-            const style = document.createElement('style');
-            style.textContent = `
-                .form-item {
-                    margin-bottom: 12px;
-                }
-                .form-item label {
-                    display: block;
-                    margin-bottom: 4px;
-                    font-weight: 500;
-                }
-                .form-item input, .form-item textarea {
-                    width: 100%;
-                    padding: 6px 8px;
-                }
-            `;
-            document.head.appendChild(style);
 
             // 添加确认按钮的事件监听器
             const confirmBtn = dialog.element.querySelector('#qq-confirm-btn');
@@ -977,7 +960,7 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
 
                 // 创建事件
                 try {
-                    sy.showMessage('正在添加事件到QQ日历...', -1, 'info','addcal');
+                    sy.showMessage('正在添加事件到QQ日历...', -1, 'info', 'addcal');
                     await calendar.createEvent_new(calendarId, {
                         summary: title,
                         start: start,
@@ -987,7 +970,7 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
                     await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
                     refreshKanban();
                     // setTimeout(() => refreshKanban(), 1000);
-                    sy.showMessage('已添加事件到QQ日历', 3000, 'info','addcal');
+                    sy.showMessage('已添加事件到QQ日历', 3000, 'info', 'addcal');
                     dialog.destroy();
                 } catch (error) {
                     console.error('添加QQ日历事件失败:', error);
@@ -1004,13 +987,112 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
     }
 
     // 格式化日期为datetime-local输入框格式
-    function formatDateForInput(date: Date): string {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
+
+}
+function formatDateForInput(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+export function updataqqcalendar(info) {
+    const dialog = new sy.Dialog({
+        title: '编辑QQ日历事件',
+        content: `
+            <div style="padding: 16px;">
+                <div class="form-item">
+                    <label>标题</label>
+                    <input type="text" id="qq-edit-title" class="b3-text-field" value="${info.event.title}">
+                </div>
+                <div class="form-item">
+                    <label>开始时间</label>
+                    <input type="datetime-local" id="qq-edit-start" class="b3-text-field" value="${formatDateForInput(info.event.start)}">
+                </div>
+                <div class="form-item">
+                    <label>结束时间</label>
+                    <input type="datetime-local" id="qq-edit-end" class="b3-text-field" value="${formatDateForInput(info.event.end || new Date(info.event.start.getTime() + 60 * 60 * 1000))}">
+                </div>
+                <div class="form-item">
+                    <label>描述</label>
+                    <textarea id="qq-edit-desc" class="b3-text-field" rows="3">${info.event.extendedProps.description || ''}</textarea>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel" id="qq-edit-cancel">取消</button>
+                    <button class="b3-button b3-button--text" id="qq-edit-confirm">确认</button>
+                </div>
+            </div>
+        `,
+        width: '400px',
+    });
+
+    // 添加确认按钮事件
+    const confirmBtn = dialog.element.querySelector('#qq-edit-confirm');
+    confirmBtn.addEventListener('click', async () => {
+        const title = (document.getElementById('qq-edit-title') as HTMLInputElement).value;
+        const start = new Date((document.getElementById('qq-edit-start') as HTMLInputElement).value);
+        const end = new Date((document.getElementById('qq-edit-end') as HTMLInputElement).value);
+        const description = (document.getElementById('qq-edit-desc') as HTMLTextAreaElement).value;
+        // const allDay = (document.getElementById('qq-edit-allday') as HTMLInputElement).checked;
+
+        if (!title) {
+            sy.showMessage('请输入事件标题', -1, 'error');
+            return;
+        }
+
+        try {
+            sy.showMessage('正在更新QQ日历事件...', 3000);
+            const calendarId = settingdata['cal-qq-calendar-url'];
+            const success = await moduleInstances['M_calendar'].QQCalDAVClient.updateEvent(
+                calendarId,
+                info.event.id,
+                {
+                    title: title,
+                    start: start,
+                    end: end,
+                    description: description,
+                }
+            );
+
+            if (success) {
+                dialog.destroy();
+                await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
+                refreshKanban();
+            }
+        } catch (error) {
+            console.error('更新QQ日历事件失败:', error);
+            sy.showMessage('更新事件失败', -1, 'error');
+        }
+    });
+    // 添加删除按钮
+    const footer = dialog.element.querySelector('.b3-dialog__action');
+    if (footer) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'b3-button b3-button--cancel';
+        deleteBtn.textContent = '删除';
+        deleteBtn.style.backgroundColor = '#e53935';
+        deleteBtn.style.color = 'white';
+        deleteBtn.onclick = async () => {
+            if (confirm('确定要删除这个事件吗？此操作不可撤销。')) {
+                const calendarId = settingdata['cal-qq-calendar-url'];
+                const success = await moduleInstances['M_calendar'].QQCalDAVClient.deleteEvent(
+                    calendarId,
+                    info.event.id
+                );
+
+                if (success) {
+                    dialog.destroy();
+                    await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
+                    refreshKanban();
+                    sy.showMessage('QQ日历事件已删除', 3000);
+                }
+            }
+        };
+        footer.insertBefore(deleteBtn, footer.firstChild);
     }
 }
+
+

@@ -237,12 +237,12 @@ export class CalDAVClient {
         end?: Date;
         isAllDay?: boolean;
         recurrenceRule?: string;
-    }): Promise<void> {
+    }): Promise<boolean> {
         if (!calendarId || !uid) {
             showMessage('参数不完整', -1, 'error');
             throw new Error('参数不完整');
         }
-
+        console.log('updateEvent', uid);
         try {
             // 先获取当前事件
             const events = await this.client.fetchCalendarObjects({
@@ -354,6 +354,7 @@ export class CalDAVClient {
             });
 
             showMessage('事件已成功更新', 3000, 'info');
+            return true;
         } catch (error) {
             console.error('更新QQ日历事件失败:', error);
             showMessage('更新QQ日历事件失败', -1, 'error');
@@ -366,7 +367,7 @@ export class CalDAVClient {
      * @param calendarId 日历ID
      * @param uid 事件UID
      */
-    async deleteEvent(calendarId: string, uid: string): Promise<void> {
+    async deleteEvent(calendarId: string, uid: string): Promise<boolean> {
         if (!calendarId || !uid) {
             showMessage('参数不完整', -1, 'error');
             throw new Error('参数不完整');
@@ -414,6 +415,7 @@ export class CalDAVClient {
             });
 
             showMessage('事件已成功删除', 3000, 'info');
+            return true;
         } catch (error) {
             console.error('删除QQ日历事件失败:', error);
             showMessage('删除QQ日历事件失败', -1, 'error');
@@ -645,4 +647,14 @@ export class CalDAVClient {
         }
         return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
     }
+
+
+
+
+
+
+
+
+
+
 }

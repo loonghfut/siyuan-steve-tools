@@ -98,7 +98,7 @@ export async function run(
             if (settingdata["cal-create-way"] === "1") {
                 if (info.event._def.extendedProps.isRecurring) {
                     if (info.event._def.extendedProps.source === 'qqcalendar') {
-                        showMessage("不支持修改哦");
+                        myF.updataqqcalendar(info);
                         return;
                     }
                     // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
@@ -120,7 +120,8 @@ export async function run(
                 clicks2 = 0;
                 if (info.event._def.extendedProps.isRecurring) {
                     if (info.event._def.extendedProps.source === 'qqcalendar') {
-                        showMessage("不支持修改哦");
+                        console.log("qqcalendar",info.event.id);
+                        myF.updataqqcalendar(info);
                         return;
                     }
                     // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
