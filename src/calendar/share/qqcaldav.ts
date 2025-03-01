@@ -470,4 +470,105 @@ export class CalDAVClient {
         }
     }
 
+        /**
+     * 清空日历中的所有事件
+     * @param calendarId 日历ID
+     * @param options 选项，如选择特定源的事件删除
+     */
+    async clearCalendar(calendarId: string, options: {
+        onlyFromSource?: string; // 如果指定，只删除来自特定来源的事件
+        excludeIds?: string[]; // 排除特定ID的事件
+    } = {}): Promise<void> {
+        if (!calendarId) {
+            showMessage('请设置QQ日历', -1, 'error');
+            throw new Error('未设置QQ日历');
+        }
+    
+        try {
+            // 获取所有事件
+            const events = await this.getEvents(calendarId);
+            console.log(`找到${events.length}个事件`);
+            
+            // 根据选项过滤要删除的事件
+            const eventsToDelete = events.filter(event => {
+                // 如果指定了来源，只删除匹配来源的事件
+                if (options.onlyFromSource && event.extendedProps?.source !== options.onlyFromSource) {
+                    return false;
+                }
+                
+                // 如果指定了排除ID，排除这些事件
+                if (options.excludeIds && options.excludeIds.includes(event.id)) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            if (eventsToDelete.length === 0) {
+                showMessage('没有找到需要删除的事件', 3000, 'info');
+                return;
+            }
+            
+            // 显示确认对话框
+            if (confirm(`确定要删除${eventsToDelete.length}个事件吗？此操作不可恢复！`)) {
+                let successCount = 0;
+                let failCount = 0;
+                
+                // 批量删除事件
+                for (const event of eventsToDelete) {
+                    try {
+                        // 获取要删除的事件对象
+                        const eventObjects = await this.client.fetchCalendarObjects({
+                            calendar: { url: calendarId },
+                            filters: [{
+                                'comp-filter': {
+                                    _attributes: {
+                                        name: 'VCALENDAR'
+                                    },
+                                    'comp-filter': {
+                                        _attributes: {
+                                            name: 'VEVENT'
+                                        },
+                                        'prop-filter': {
+                                            _attributes: {
+                                                name: 'UID'
+                                            },
+                                            'text-match': {
+                                                _attributes: {
+                                                    'collation': 'i;octet',
+                                                    'negate-condition': 'no',
+                                                    'match-type': 'equals'
+                                                },
+                                                _text: event.id
+                                            }
+                                        }
+                                    }
+                                }
+                            }]
+                        });
+                        
+                        if (eventObjects.length > 0) {
+                            await this.client.deleteCalendarObject({
+                                calendarObject: eventObjects[0]
+                            });
+                            successCount++;
+                            console.log(`成功删除事件: ${event.title}`);
+                        } else {
+                            console.warn(`未找到事件: ${event.title} (ID: ${event.id})`);
+                            failCount++;
+                        }
+                    } catch (error) {
+                        console.error(`删除事件失败: ${event.title}`, error);
+                        failCount++;
+                    }
+                }
+                
+                showMessage(`清空完成: 成功删除${successCount}个事件，失败${failCount}个`, 3000, "info");
+            }
+        } catch (error) {
+            console.error('清空日历失败:', error);
+            showMessage('清空日历失败，请查看控制台错误', -1, 'error');
+            throw error;
+        }
+    }
 }

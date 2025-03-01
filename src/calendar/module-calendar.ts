@@ -92,17 +92,6 @@ export class M_calendar {
                 }
             });
         }
-        // 在适当的位置添加，比如在其他按钮设置之后
-        if (this_settingdata["cal-qq-enable"]) {
-            this.plugin.addTopBar({
-                icon: "iconCalendar", // 可以使用适当的图标
-                title: "导出到QQ日历",
-                position: "right",
-                callback: async () => {
-                    await this.exportToQQCalendar();
-                }
-            });
-        }
         let D_calendar: any;
         this.plugin.addDock({
             config: {
@@ -775,6 +764,11 @@ export class M_calendar {
                 // 使用标题+开始时间作为事件的唯一标识
                 const eventKey = `${event.title}-${event.start?.toISOString() || ''}`;
                 existingEventMap.set(eventKey, event);
+
+                // 记录事件来源为QQ日历
+                if (event.extendedProps?.source === 'qqcalendar') {
+                    event.extendedProps.fromQQ = true;
+                }
             });
 
             // 获取思源的日程事件数据
@@ -790,6 +784,12 @@ export class M_calendar {
                     // 跳过已完成的事件
                     if (event?.状态?.content === "完成") return null;
 
+                    // 跳过重复规则不为空的周期事件
+                    if (event?.重复规则?.content) {
+                        console.log(`跳过周期事件: ${event?.事件?.content || '未命名事件'}`);
+                        return null;
+                    }
+
                     const startTime = new Date(event?.开始时间?.start);
                     const endTime = new Date(event?.开始时间?.end);
 
@@ -803,6 +803,14 @@ export class M_calendar {
 
                     // 检查事件是否已存在于QQ日历中
                     if (existingEventMap.has(eventKey)) {
+                        const existingEvent = existingEventMap.get(eventKey);
+
+                        // 如果是来自QQ日历的事件，跳过
+                        if (existingEvent.extendedProps?.fromQQ) {
+                            console.log(`跳过QQ日历原有事件: ${eventKey}`);
+                            return null;
+                        }
+
                         console.log(`跳过已存在的事件: ${eventKey}`);
                         return null;
                     }
@@ -812,11 +820,13 @@ export class M_calendar {
                         description: event?.描述?.content || '',
                         start: startTime,
                         end: endTime,
-                        isAllDay: false // 根据实际情况设置
+                        isAllDay: event?.全天事件?.content === "是", // 根据属性判断是否为全天事件
+                        extendedProps: {
+                            source: 'siyuan', // 标记来源为思源
+                        }
                     };
                 }).filter(Boolean); // 过滤掉无效事件
             });
-
 
             // 同步到QQ日历
             if (events.length > 0) {
@@ -834,7 +844,34 @@ export class M_calendar {
         }
     }
 
+    /**
+     * 清空QQ日历中的事件
+     * @param onlySiyuanEvents 是否只删除来自思源的事件
+     */
+    async clearQQCalendar(onlySiyuanEvents: boolean = true) {
+        try {
+            // 检查是否配置了QQ日历
+            if (!this.QQCalDAVClient || !this_settingdata["cal-qq-calendar-url"]) {
+                showMessage('请先在设置中配置QQ日历', -1, 'error');
+                return;
+            }
 
+            // 调用CalDAVClient的清空方法
+            await this.QQCalDAVClient.clearCalendar(
+                this_settingdata["cal-qq-calendar-url"],
+                {
+                    onlyFromSource: onlySiyuanEvents ? 'siyuan' : undefined
+                }
+            );
+
+            // 刷新日历显示
+            refreshKanban();
+
+        } catch (error) {
+            console.error('清空QQ日历失败:', error);
+            showMessage('清空QQ日历失败，请查看控制台错误', -1, 'error');
+        }
+    }
 }
 
 

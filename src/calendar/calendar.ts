@@ -314,6 +314,42 @@ export async function run(
                     const menuContent = document.createElement('div');
                     menuContent.className = 'view-filter-content';
 
+                    // 添加QQ日历选项
+                    if (moduleInstances['M_calendar']?.QQCalDAVClient) {
+                        const qqItem = document.createElement('div');
+                        qqItem.className = 'view-filter-item';
+
+                        // 创建复选框
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = filterViewId.includes('qqcalendar');
+                        checkbox.className = 'view-filter-checkbox';
+
+                        // 创建标签
+                        const label = document.createElement('span');
+                        label.textContent = 'QQ邮箱日历';
+                        label.className = 'view-filter-label';
+
+                        qqItem.appendChild(checkbox);
+                        qqItem.appendChild(label);
+
+                        qqItem.onclick = (e) => {
+                            e.stopPropagation();
+                            if (filterViewId.includes('qqcalendar')) {
+                                filterViewId = filterViewId.filter(id => id !== 'qqcalendar');
+                            } else {
+                                filterViewId.push('qqcalendar');
+                            }
+                            checkbox.checked = filterViewId.includes('qqcalendar');
+
+                            // 保存配置
+                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
+                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+                            moduleInstances['M_calendar'].calConfig.save();
+                        };
+
+                        menuContent.appendChild(qqItem);
+                    }
                     // 添加视图选项
                     viewIDs.forEach(view => {
                         const item = document.createElement('div');
@@ -424,7 +460,13 @@ export async function run(
                     if (moduleInstances['M_calendar']?.QQCalDAVClient) {
                         const qqEvents = moduleInstances["M_calendar"].getEventsFromQQCalDAV();
                         if (qqEvents && Array.isArray(qqEvents)) {
-                            allEvents = allEvents.concat(qqEvents);
+                            // 如果有筛选视图且不是要显示所有视图，检查是否应该显示QQ日历事件
+                            const showQQEvents = filterViewId.length === 0 ||
+                                filterViewId.includes('qqcalendar'); // 假设'qqcalendar'是QQ日历视图的ID
+
+                            if (showQQEvents) {
+                                allEvents = allEvents.concat(qqEvents);
+                            }
                         }
                     }
                 } catch (error) {
