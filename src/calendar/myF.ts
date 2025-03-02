@@ -1076,7 +1076,7 @@ export function updataqqcalendar(info) {
         deleteBtn.style.backgroundColor = '#e53935';
         deleteBtn.style.color = 'white';
         deleteBtn.onclick = async () => {
-            if (confirm('确定要删除这个事件吗？此操作不可撤销。')) {
+            sy.confirm('删除事件', '确定要删除这个事件吗？此操作不可撤销。', async () => {
                 const calendarId = settingdata['cal-qq-calendar-url'];
                 const success = await moduleInstances['M_calendar'].QQCalDAVClient.deleteEvent(
                     calendarId,
@@ -1089,7 +1089,7 @@ export function updataqqcalendar(info) {
                     refreshKanban();
                     sy.showMessage('QQ日历事件已删除', 3000);
                 }
-            }
+            });
         };
         footer.insertBefore(deleteBtn, footer.firstChild);
     }
