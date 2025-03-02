@@ -242,44 +242,26 @@ export class CalDAVClient {
             showMessage('参数不完整', -1, 'error');
             throw new Error('参数不完整');
         }
-        console.log('updateEvent', uid);
+        // console.log('updateEvent', uid);
         try {
             // 先获取当前事件
             const events = await this.client.fetchCalendarObjects({
                 calendar: { url: calendarId },
-                filters: [{
-                    'comp-filter': {
-                        _attributes: {
-                            name: 'VCALENDAR'
-                        },
-                        'comp-filter': {
-                            _attributes: {
-                                name: 'VEVENT'
-                            },
-                            'prop-filter': {
-                                _attributes: {
-                                    name: 'UID'
-                                },
-                                'text-match': {
-                                    _attributes: {
-                                        'collation': 'i;octet',
-                                        'negate-condition': 'no',
-                                        'match-type': 'equals'
-                                    },
-                                    _text: uid
-                                }
-                            }
-                        }
-                    }
-                }]
             });
 
-            if (events.length === 0) {
-                showMessage('未找到要更新的事件', -1, 'error');
-                throw new Error('未找到要更新的事件');
+            // 查找匹配UID的事件
+            const targetEvent = events.find(event => {
+                const uidMatch = event.data.match(/UID:(.+?)(?:\r\n|\n|$)/);
+                return uidMatch && uidMatch[1] === uid;
+            });
+
+            if (!targetEvent) {
+                console.error('未找到要修改的事件:', uid);
+                showMessage('未找到要修改的事件', -1, 'error');
+                return false;
             }
 
-            const existingEvent = events[0];
+            const existingEvent = targetEvent;
             const icsData = existingEvent.data;
 
             // 解析现有事件数据
@@ -377,41 +359,24 @@ export class CalDAVClient {
             // 获取要删除的事件
             const events = await this.client.fetchCalendarObjects({
                 calendar: { url: calendarId },
-                filters: [{
-                    'comp-filter': {
-                        _attributes: {
-                            name: 'VCALENDAR'
-                        },
-                        'comp-filter': {
-                            _attributes: {
-                                name: 'VEVENT'
-                            },
-                            'prop-filter': {
-                                _attributes: {
-                                    name: 'UID'
-                                },
-                                'text-match': {
-                                    _attributes: {
-                                        'collation': 'i;octet',
-                                        'negate-condition': 'no',
-                                        'match-type': 'equals'
-                                    },
-                                    _text: uid
-                                }
-                            }
-                        }
-                    }
-                }]
+            });
+            // 查找匹配UID的事件
+            const targetEvent = events.find(event => {
+                const uidMatch = event.data.match(/UID:(.+?)(?:\r\n|\n|$)/);
+                return uidMatch && uidMatch[1] === uid;
             });
 
-            if (events.length === 0) {
+            if (!targetEvent) {
+                console.error('未找到要删除的事件:', uid);
                 showMessage('未找到要删除的事件', -1, 'error');
-                throw new Error('未找到要删除的事件');
+                return false;
             }
 
+
+            // console.log('deleteEvent', uid, events);
             // 删除事件
             await this.client.deleteCalendarObject({
-                calendarObject: events[0]
+                calendarObject: targetEvent
             });
 
             showMessage('事件已成功删除', 3000, 'info');
