@@ -120,7 +120,7 @@ export async function run(
                 clicks2 = 0;
                 if (info.event._def.extendedProps.isRecurring) {
                     if (info.event._def.extendedProps.source === 'qqcalendar') {
-                        console.log("qqcalendar",info.event.id);
+                        console.log("qqcalendar", info.event.id);
                         myF.updataqqcalendar(info);
                         return;
                     }
@@ -218,7 +218,43 @@ export async function run(
         // 事件拖放处理
         eventDrop: async function (info) {
             steveTools.outlog("事件拖动shijian", info.event.startStr, info.event.endStr);
-            if (info.event._def.extendedProps.isRecurring || info.event.extendedProps.source === 'qqcalendar') {
+            // 检查是否是QQ日历事件
+            if (info.event.extendedProps.source === 'qqcalendar') {
+                showDropTimeIndicator(info);
+
+                try {
+                    const calendarId = settingdata['cal-qq-calendar-url'];
+                    const success = await moduleInstances['M_calendar'].QQCalDAVClient.updateEvent(
+                        calendarId,
+                        info.event.id,
+                        {
+                            title: info.event.title,
+                            start: info.event.start,
+                            end: info.event.end || new Date(info.event.start.getTime() + 60 * 60 * 1000),
+                            description: info.event.extendedProps.description || '',
+                        }
+                    );
+
+                    if (success) {
+                        setTimeout(() => {
+                            moduleInstances['M_calendar'].updateEventsFromQQCalDAV().then(() => {
+                                calendar.refetchEvents();
+                                showMessage('QQ日历事件已更新', 3000);
+                            });
+                        }, 1000);
+                    } else {
+                        info.revert();
+                    }
+                } catch (error) {
+                    console.error('更新QQ日历事件失败:', error);
+                    showMessage('更新事件失败', -1, 'error');
+                    info.revert();
+                }
+
+                return;
+            }
+
+            if (info.event._def.extendedProps.isRecurring) {
                 showMessage("不支持拖动哦");
                 //撤回拖动
                 info.revert();
@@ -259,8 +295,43 @@ export async function run(
         },
 
         eventResize: async function (info) {
-            // console.log("事件调整大小", info.event.startStr, info.event.endStr);
-            if (info.event._def.extendedProps.isRecurring || info.event.extendedProps.source === 'qqcalendar') {
+            // 检查是否是QQ日历事件
+            if (info.event.extendedProps.source === 'qqcalendar') {
+                showResizeTimeIndicator(info);
+
+                try {
+                    const calendarId = settingdata['cal-qq-calendar-url'];
+                    const success = await moduleInstances['M_calendar'].QQCalDAVClient.updateEvent(
+                        calendarId,
+                        info.event.id,
+                        {
+                            title: info.event.title,
+                            start: info.event.start,
+                            end: info.event.end,
+                            description: info.event.extendedProps.description || '',
+                        }
+                    );
+
+                    if (success) {
+                        setTimeout(() => {
+                            moduleInstances['M_calendar'].updateEventsFromQQCalDAV().then(() => {
+                                calendar.refetchEvents();
+                                showMessage('QQ日历事件已更新', 3000);
+                            });
+                        }, 1000);
+                    } else {
+                        info.revert();
+                    }
+                } catch (error) {
+                    console.error('更新QQ日历事件失败:', error);
+                    showMessage('更新事件失败', -1, 'error');
+                    info.revert();
+                }
+
+                return;
+            }
+
+            if (info.event._def.extendedProps.isRecurring) {
                 showMessage("不支持修改哦");
                 info.revert();
                 return;
