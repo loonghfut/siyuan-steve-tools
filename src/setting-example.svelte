@@ -424,12 +424,12 @@
             ],
         },
         {
-            name: "图片压缩 beta",
+            name: "资源压缩 beta",
             items: [
                 {
                     type: "checkbox",
-                    title: "启用图片压缩功能",
-                    description: "启用图片压缩功能后再进行下面的设置",
+                    title: "启用资源压缩功能",
+                    description: "启用资源压缩功能后再进行下面的设置",
                     key: "img-compress-enable",
                     value: settings["img-compress-enable"],
                 },

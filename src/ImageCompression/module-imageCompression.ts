@@ -108,7 +108,7 @@ export class M_imageCompression {
     init() {
         this.plugin.addTopBar({
             icon: "iconImgDown",
-            title: "图片压缩",
+            title: "压缩资源",
             position: "right",
             callback: () => {
                 this.openFileDialog();
@@ -167,37 +167,6 @@ export class M_imageCompression {
         });
     }
 }
-
-// export function getCursorElement() {
-//     const selection = window.getSelection();
-//     if (selection.rangeCount > 0) {
-//         const range = selection.getRangeAt(0);
-//         // 获取光标所在的元素
-//         const cursorElement = getCursorElementRecursive(range.startContainer);
-//         return cursorElement;
-//     }
-//     return null;
-// }
-// function getCursorElementRecursive(node) {
-//     if (node.nodeType === Node.TEXT_NODE) {
-//         // 如果是文本节点，返回其父元素节点
-//         return node.parentElement;
-//     } else {
-//         // 如果是元素节点，直接返回
-//         return node;
-//     }
-// }
-
-// //获取光标位置id
-// let cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
-// let cursorElement = getCursorElement();
-// if (cursorElement?.closest('.li')) {
-//     cursorElementId = cursorElement.closest('.li').getAttribute('data-node-id');
-//     console.log("c", cursorElementId);
-// }
-// console.log("cursorElement", cursorElementId);
-// const cursorID = cursorElementId;
-// //获取光标位置id
 
 export function getCursorBlockId() {
     const selection = window.getSelection();
