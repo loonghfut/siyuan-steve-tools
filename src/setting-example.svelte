@@ -433,6 +433,14 @@
                     key: "img-compress-enable",
                     value: settings["img-compress-enable"],
                 },
+                {
+                    type: "hint",
+                    title: "提示",
+                    description:
+                        "图片压缩效果还行，视频压缩效果较差（浏览器环境限制较大，经常压缩视频建议用专业软件）",
+                    key: "img-compress-hint",
+                    value: "",
+                }
             ],
         },
         {
