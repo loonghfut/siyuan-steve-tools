@@ -529,11 +529,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         title: `   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <span>添加事件</span>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <select id="st-priority" class="b3-text-field" style="padding: 4px; font-size: 12px; width: 20px;">
-                                        <option value="高">高</option>
-                                        <option value="中">中</option>
-                                        <option value="低">低</option>
-                                        <option value="" selected>无</option>
+                                <select id="st-priority" class="b3-text-field" style="padding: 4px; font-size: 12px; width: auto; text-align: center;">
+                                    <option value="" selected>加载中...</option>
                                 </select>
                                 <select id="st-category" class="b3-text-field" style="padding: 4px; font-size: 12px; width: auto; text-align: center;">
                                     <option value="" selected>加载中...</option>
@@ -567,6 +564,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     // 加载分类选项
     const categorySelect = dialog.element.querySelector('#st-category') as HTMLSelectElement;
     await loadCategoryOptions(to_db_id, categorySelect);
+    // 加载优先级选项
+    const prioritySelect = dialog.element.querySelector('#st-priority') as HTMLSelectElement;
+    await loadPriorityOptions(to_db_id, prioritySelect);
     ///////
     let ok = false;//防崩溃
     const eventPanel = document.getElementById('eventPanel');
@@ -1096,3 +1096,46 @@ export function updataqqcalendar(info) {
 }
 
 
+// 获取数据库中已有的优先级列表
+async function getPriorities(dbId: string): Promise<string[]> {
+    try {
+        const view = await api.renderAttributeView(dbId);
+
+        // 查找优先级列
+        const priorityColumn = view.view?.columns?.find(col => col.name === '优先级');
+        if (!priorityColumn) return ['无'];
+
+        // 直接从选项中获取优先级名称
+        const priorities = priorityColumn.options?.map(option => option.name) || [];
+
+        // 如果没有预设选项，返回默认值
+        if (!priorities.length) {
+            return ['高', '中', '低', '无'];
+        }
+
+        // 返回排序后的优先级列表
+        return priorities.sort();
+    } catch (error) {
+        console.error('获取优先级列表失败:', error);
+        return ['高', '中', '低', '无'];
+    }
+}
+
+// 加载优先级选项
+async function loadPriorityOptions(to_db_id: any, prioritySelect: HTMLSelectElement) {
+    try {
+        const priorities = await getPriorities(to_db_id);
+        prioritySelect.innerHTML = '';
+        // 添加"无"选项
+        prioritySelect.appendChild(new Option('无', '无', true));
+        // 添加其他优先级
+        priorities.forEach(priority => {
+            if (priority !== '无') { // 避免重复添加"无"选项
+                prioritySelect.appendChild(new Option(priority, priority));
+            }
+        });
+    } catch (error) {
+        console.error('加载优先级失败:', error);
+        sy.showMessage('加载优先级失败', -1, "error");
+    }
+}
