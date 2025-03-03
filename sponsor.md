@@ -16,3 +16,4 @@
 | 2025-2-25 | Komorebi | ¥10 |7
 | 2025-2-26 | reputations | ¥5 |8
 | 2025-3-2  | Sonsy soul | ¥5 |9
+| 2025-3-3  | Komorebi | ¥10 |7
