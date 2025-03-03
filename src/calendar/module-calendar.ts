@@ -216,6 +216,7 @@ export class M_calendar {
                 if (msg.data[0].doOperations[0].action === "update") {
                     const data = msg.data[0].doOperations[0].data;
                     if (data.startsWith('<div data-marker')) {
+                        // console.log('asd', data);
                         refreshKanban();
                         console.log("update");
                     }

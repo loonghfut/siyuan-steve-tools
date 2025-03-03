@@ -123,8 +123,32 @@ const CustomViewConfig = {
             const totalBlockSubs = blockSubEvents.length;
             const completedBlockSubs = blockSubEvents.filter(sub => sub.completed).length;
             const blockProgressPercent = totalBlockSubs ? (completedBlockSubs / totalBlockSubs) * 100 : 0;
+            // 根据块内子事件完成情况自动更新事件状态（用户需求）///////////
+            if (settingdata["cal-auto-update-status"]) {
+                if (totalBlockSubs > 0) {
+                    let newStatus = '';
+                    if (completedBlockSubs === totalBlockSubs) {
+                        newStatus = '完成';
+                    } else if (completedBlockSubs > 0) {
+                        newStatus = '进行中';
+                    } else {
+                        newStatus = '未完成';
+                    }
 
-
+                    // 只有当状态不同时才更新
+                    if (event.extendedProps.status !== newStatus) {
+                        // 使用已有的状态更改函数，传入新状态
+                        const selectdata: ISelectOption[] = [{ content: newStatus }];
+                        // 异步更新状态，不阻塞渲染
+                        setTimeout(() => {
+                            myK.run_changestatus(event, selectdata)
+                                .then(() => console.log(`自动更新事件状态: ${event.title} -> ${newStatus}`))
+                                .catch(err => console.error('自动更新状态失败:', err));
+                        }, 100);
+                    }
+                }
+            }
+            //////////////////////////////////////
             // 生成SVG环形进度图
             const progressCircle = totalSubtasks ? `
     <div class="progress-container">

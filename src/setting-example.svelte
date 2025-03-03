@@ -178,6 +178,13 @@
                     key: "cal-show-float-view",
                     value: settings["cal-show-float-view"],
                 },
+                {
+                    type: "checkbox",
+                    title: "是否自动更新状态(打开视图时生效）",
+                    description: "启用后会根据块内子事件完成情况自动更新事件状态",
+                    key: "cal-auto-update-status",
+                    value: settings["cal-auto-update-status"],
+                },
                 //同步设置
                 {
                     //5
@@ -594,7 +601,7 @@
     const subGroupItemCounts = {
         日程管理: {
             基础设置: 5,
-            高级设置: 5,
+            高级设置: 6,
             ics设置: 6,
             ics分享: 4,
             邮箱日历: 4,
