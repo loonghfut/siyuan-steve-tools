@@ -593,6 +593,7 @@ export async function run(
         },
 
         eventDidMount: async function (info) {
+            if (!info || !info.event) return;
             // 设置样式
             //// 设置随机背景色
             // Use event's ID or title as a unique identifier for color
@@ -621,32 +622,53 @@ export async function run(
             }
             // console.log("info.event.extendedProps", info.event.extendedProps);
             ////完成样式
-            if (info.event.extendedProps.status === '完成') {
-                // 应用完成状态的样式
-                info.el.style.textDecoration = 'line-through';
-
-                // 调暗背景色
-                const uniqueId = info.event.id || info.event.title;
-                const hash = Array.from(uniqueId).reduce((acc, char) => {
-                    return char.charCodeAt(0) + ((acc << 5) - acc);
-                }, 0);
-                const [backgroundColor] = getColors(Math.abs(hash));
-
-                // 将背景色转换为 RGBA 格式并降低不透明度
-                info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
-
-                // 应用其他样式
-                const titleEl = info.el.querySelector('.fc-event-title');
-                if (titleEl) {
-                    (titleEl as HTMLElement).style.textDecoration = 'line-through';
+            
+            try {
+                if(info.event._def===undefined) return;
+                if (info && info.event && info.event.extendedProps && info.event.extendedProps.status === '完成') {
+                    // 应用完成状态的样式
+                    info.el.style.textDecoration = 'line-through';
+                    
+                    try {
+                        // 调暗背景色
+                        const uniqueId = info.event.id || info.event.title;
+                        const hash = Array.from(uniqueId).reduce((acc, char) => {
+                            return char.charCodeAt(0) + ((acc << 5) - acc);
+                        }, 0);
+                        const [backgroundColor] = getColors(Math.abs(hash));
+                        
+                        // 将背景色转换为 RGBA 格式并降低不透明度
+                        info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
+                    } catch (colorError) {
+                        console.error('背景色处理错误:', colorError);
+                        console.log('事件数据:', info.event);
+                    }
+                    
+                    try {
+                        // 应用其他样式
+                        const titleEl = info.el.querySelector('.fc-event-title');
+                        if (titleEl) {
+                            (titleEl as HTMLElement).style.textDecoration = 'line-through';
+                        }
+                        
+                        const timeEl = info.el.querySelector('.fc-event-time');
+                        if (timeEl) {
+                            (timeEl as HTMLElement).style.textDecoration = 'line-through';
+                        }
+                        
+                        info.el.classList.add('event-completed');
+                    } catch (styleError) {
+                        console.error('样式应用错误:', styleError);
+                        console.log('DOM元素:', info.el);
+                    }
                 }
-
-                const timeEl = info.el.querySelector('.fc-event-time');
-                if (timeEl) {
-                    (timeEl as HTMLElement).style.textDecoration = 'line-through';
+            } catch (mainError) {
+                console.error('完成状态处理主要错误:', mainError);
+                console.log('完整 info 对象:', info);
+                console.log('info.event:', info?.event._def);
+                if (info?.event) {
+                    console.log('info.event.extendedProps:', info.event.extendedProps);
                 }
-
-                info.el.classList.add('event-completed');
             }
             // steveTools.outlog(info);
             if (info.event.extendedProps.source === 'qqcalendar') {
@@ -742,6 +764,8 @@ var colourIsLight = function (r: number, g: number, b: number) { // Copied from 
 
 // 添加一个独立的辅助函数来检查事件完成状态
 export function isEventCompleted(event: any): boolean {
+    if (!event || !event.extendedProps) return false;
+    
     const okday = event.extendedProps.okday;
     // console.log("okday",okday);
     if (!okday) return false;
