@@ -1,5 +1,6 @@
 import steveTools, { settingdata } from "@/index";
 import { createEvents, EventAttributes } from 'ics';
+import { RRule } from 'rrule'; 
 import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
@@ -655,6 +656,7 @@ export class M_calendar {
                 const viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
                 steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue_zq);
                 const result_zq = transformEvents(viewValue_zq, true);
+                //TODO:周期事件的周期处理改为数据库单选
                 await this.addEventToGlobal(result_zq);
             }
 
@@ -909,6 +911,7 @@ function extractDataAvId(markdown: string): string | null {
 // 转换思源数据库中的事件数据为 ICS 格式
 
 function transformEvents(inputEvents, isZQ: boolean = false) {
+    // console.log("inputEvents", inputEvents);
     function timestampToArray(timestamp) {
         const date = new Date(timestamp);
         return [
@@ -967,11 +970,27 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
 
             // Add properties based on event type
             if (isZQ) {
-                transformedEvents.push({
-                    ...baseEvent,
-                    recurrenceRule: event.重复规则.content,
-                    duration: { hours: event.持续时间.content }
-                });
+                try {
+                    // 尝试解析重复规则
+                    const rruleString = event.重复规则.content;
+                    
+                    // 如果不是以"RRULE:"开头，添加前缀
+                    const formattedRrule = rruleString.startsWith("RRULE:") ? 
+                        rruleString : `RRULE:${rruleString}`;
+                        
+                    // 尝试用 rrule.js 解析，验证格式是否正确
+                    const rule = RRule.fromString(formattedRrule);
+                    
+                    // 如果解析成功，将正确格式的规则添加到事件中
+                    transformedEvents.push({
+                        ...baseEvent,
+                        recurrenceRule: formattedRrule.replace("RRULE:", ""), // 去掉前缀
+                        duration: { hours: event.持续时间.content || 1 }
+                    });
+                } catch (error) {
+                    console.error('解析重复规则出错:', event.重复规则.content, error);
+                    showMessage('周期事件-解析重复规则出错,请重试'+event.重复规则.content, -1, 'error');
+                }
             } else {
                 transformedEvents.push({
                     ...baseEvent,
