@@ -36,7 +36,12 @@ export class CalDAVClient {
     }
 
     async init() {
+        try{
         await this.client.login();
+        }catch(e){
+            console.error('QQ日历登录失败:', e);
+            showMessage('QQ日历登录失败，请检查网络，QQ邮箱配置', -1, 'error');
+        }
     }
 
     async getCalendars(): Promise<DAVCalendar[]> {
@@ -45,7 +50,8 @@ export class CalDAVClient {
             return calendars;
         } catch (error) {
             console.error('获取日历列表失败:', error);
-            throw error;
+            showMessage('获取日历事件失败，请检查网络，QQ邮箱配置', -1, 'error');
+            return [];
         }
     }
 
@@ -133,6 +139,7 @@ export class CalDAVClient {
 
         } catch (error) {
             console.error('获取日历事件失败:', error);
+            showMessage('获取日历事件失败，请检查网络，QQ邮箱配置', -1, 'error');
             throw error;
         }
     }
