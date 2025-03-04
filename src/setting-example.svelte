@@ -181,7 +181,8 @@
                 {
                     type: "checkbox",
                     title: "是否自动更新状态(打开视图时生效）",
-                    description: "启用后会根据块内子事件完成情况自动更新事件状态",
+                    description:
+                        "启用后会根据块内子事件完成情况自动更新事件状态",
                     key: "cal-auto-update-status",
                     value: settings["cal-auto-update-status"],
                 },
@@ -353,6 +354,17 @@
                     key: "cal-snap-duration",
                     value: settings["cal-snap-duration"],
                 },
+                {
+                    title: "日历周起始日",
+                    description: "选择日历显示时以周几作为一周的第一天",
+                    type: "select",
+                    key: "cal-week-start",
+                    value: settings["cal-week-start"],
+                    options: {
+                        monday: "周一",
+                        sunday: "周日",
+                    },
+                },
             ],
         },
         {
@@ -447,7 +459,7 @@
                         "图片压缩效果还行，视频压缩效果较差（浏览器环境限制较大，经常压缩视频建议用专业软件）",
                     key: "img-compress-hint",
                     value: "",
-                }
+                },
             ],
         },
         {
@@ -605,7 +617,7 @@
             ics设置: 6,
             ics分享: 4,
             邮箱日历: 4,
-            视图设置: 4,
+            视图设置: 5,
             // 不限制
         },
         // "docker同步感知": {

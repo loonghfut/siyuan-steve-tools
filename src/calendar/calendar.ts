@@ -79,6 +79,7 @@ export async function run(
         locale: zhCnLocale,
         editable: true,
         nowIndicator: true,
+        firstDay: settingdata["cal-week-start"] === "sunday" ? 0 : 1,
         slotDuration: validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00'),
         slotMinTime: validateTimeFormat(settingdata["cal-slot-min-time"], '00:00:00'),
         slotMaxTime: validateTimeFormat(settingdata["cal-slot-max-time"], '24:00:00'),

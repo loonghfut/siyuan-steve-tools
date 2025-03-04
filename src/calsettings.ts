@@ -17,6 +17,7 @@ export const defaultSettings = {
     "cal-show-ref-event":true,//是否展示被引用的事件
     "cal-show-float-view" : false,//是否展示悬浮窗
     "cal-auto-update-status": false,//根据块内子事件完成情况自动更新事件状态
+    "cal-week-start": "monday",
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",
