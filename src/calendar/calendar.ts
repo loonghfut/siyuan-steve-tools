@@ -595,6 +595,49 @@ export async function run(
 
         eventDidMount: async function (info) {
             if (!info || !info.event) return;
+            // 添加右键菜单事件监听
+            if (settingdata["cal-show-right-click"]) {
+                info.el.addEventListener('contextmenu', async (e: MouseEvent) => {
+                    e.preventDefault();
+                    if (settingdata["cal-create-way"] === "1") {
+                        if (info.event._def.extendedProps.isRecurring) {
+                            if (info.event._def.extendedProps.source === 'qqcalendar') {
+                                myF.updataqqcalendar(info);
+                                return;
+                            }
+                            // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                            return;
+                        } else {
+                            await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid, null, null, true);
+                            return;
+                        }
+                    }
+                    let clickTimeout: NodeJS.Timeout;
+                    clicks2++;
+                    if (clicks2 === 1) {
+                        clickTimeout = setTimeout(() => {
+                            clicks2 = 0;
+                        }, 400);
+                    } else if (clicks2 === 2) {
+                        clearTimeout(clickTimeout);
+                        clicks2 = 0;
+                        if (info.event._def.extendedProps.isRecurring) {
+                            if (info.event._def.extendedProps.source === 'qqcalendar') {
+                                console.log("qqcalendar", info.event.id);
+                                myF.updataqqcalendar(info);
+                                return;
+                            }
+                            // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                            return;
+                        } else {
+                            await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid, null, null, true);
+                            return;
+                        }
+                    }
+                });
+            }
             // 设置样式
             //// 设置随机背景色
             // Use event's ID or title as a unique identifier for color
@@ -623,13 +666,13 @@ export async function run(
             }
             // console.log("info.event.extendedProps", info.event.extendedProps);
             ////完成样式
-            
+
             try {
-                if(info.event._def===undefined) return;
+                if (info.event._def === undefined) return;
                 if (info && info.event && info.event.extendedProps && info.event.extendedProps.status === '完成') {
                     // 应用完成状态的样式
                     info.el.style.textDecoration = 'line-through';
-                    
+
                     try {
                         // 调暗背景色
                         const uniqueId = info.event.id || info.event.title;
@@ -637,26 +680,26 @@ export async function run(
                             return char.charCodeAt(0) + ((acc << 5) - acc);
                         }, 0);
                         const [backgroundColor] = getColors(Math.abs(hash));
-                        
+
                         // 将背景色转换为 RGBA 格式并降低不透明度
                         info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
                     } catch (colorError) {
                         console.error('背景色处理错误:', colorError);
                         console.log('事件数据:', info.event);
                     }
-                    
+
                     try {
                         // 应用其他样式
                         const titleEl = info.el.querySelector('.fc-event-title');
                         if (titleEl) {
                             (titleEl as HTMLElement).style.textDecoration = 'line-through';
                         }
-                        
+
                         const timeEl = info.el.querySelector('.fc-event-time');
                         if (timeEl) {
                             (timeEl as HTMLElement).style.textDecoration = 'line-through';
                         }
-                        
+
                         info.el.classList.add('event-completed');
                     } catch (styleError) {
                         console.error('样式应用错误:', styleError);
@@ -766,7 +809,7 @@ var colourIsLight = function (r: number, g: number, b: number) { // Copied from 
 // 添加一个独立的辅助函数来检查事件完成状态
 export function isEventCompleted(event: any): boolean {
     if (!event || !event.extendedProps) return false;
-    
+
     const okday = event.extendedProps.okday;
     // console.log("okday",okday);
     if (!okday) return false;

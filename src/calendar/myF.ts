@@ -369,13 +369,16 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 }
 //查看事件
 //@param forceSeeMore 是否强制使isSeeMore生效
-export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMore = false) {
+export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMore = false, qu_fan = false) {
     //// 判断是否存在此块
     let seemore = false;
     if (!forceSeeMore) {
         seemore = settingdata["cal-seemore"] || isSeeMore;
     } else {
         seemore = isSeeMore;
+    }
+    if (qu_fan) {
+        seemore = !seemore;
     }
     const block = await api.getBlockByID(blockID);
     if (!block) {

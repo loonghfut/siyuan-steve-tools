@@ -157,6 +157,15 @@
                     value: settings["cal-seemore"],
                 },
                 {
+                    //10
+                    type: "checkbox",
+                    title: "启用右键事件交互方式",
+                    description:
+                        "启用后会互补左键交互方式",
+                    key: "cal-show-right-click",
+                    value: settings["cal-show-right-click"],
+                },
+                {
                     type: "checkbox",
                     title: "是否展示被关联子的事件",
                     description:
@@ -613,7 +622,7 @@
     const subGroupItemCounts = {
         日程管理: {
             基础设置: 5,
-            高级设置: 6,
+            高级设置: 7,
             ics设置: 6,
             ics分享: 4,
             邮箱日历: 4,
