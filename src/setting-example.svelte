@@ -452,7 +452,7 @@
             ],
         },
         {
-            name: "资源压缩 beta",
+            name: "资源压缩",
             items: [
                 {
                     type: "checkbox",
@@ -472,12 +472,12 @@
             ],
         },
         {
-            name: "🛠️画板（未完成）",
+            name: "🛠️画板(开发中。。)",
             items: [
                 {
                     type: "checkbox",
-                    title: "启用手写功能",
-                    description: "启用后可以在编辑器中使用手写功能",
+                    title: "启用画板功能（开发中，请勿使用！！）",
+                    description: "启用后可以在编辑器中使用画板功能",
                     key: "handwriting-enable",
                     value: settings["handwriting-enable"],
                 },
@@ -497,7 +497,7 @@
             ],
         },
         {
-            name: "✨开发中。。",
+            name: "✨敬请期待。。",
             items: [
                 {
                     type: "button",
