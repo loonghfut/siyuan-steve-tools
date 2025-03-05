@@ -1,5 +1,5 @@
 // src/handwriting/module-handwriting.ts
-
+import * as ic from "@/icon"
 import { Plugin } from "siyuan";
 import * as fabric from 'fabric';
 import './handwriting.css';
@@ -18,8 +18,15 @@ export class M_handwriting {
     constructor(plugin: Plugin) {
         this.plugin = plugin;
     }
+    async init(settingdata) {
+        this.plugin.addIcons(`
+            <symbol id="iconSTWhiteboard" viewBox="0 0 500 500">
+               ${ic.steveTools_whiteboard}
+            </symbol>  
+                `);
+    }
 
-    async onLayoutReady(settingdata: any) {
+    async onLayoutReady() {
         console.log("init handwriting module");
         await this.initDependencies();
         this.initWhiteboard();
@@ -35,7 +42,9 @@ export class M_handwriting {
 
     private async initDependencies() {
         // 检查是否已加载fabric.js，如果没有则动态加载
+        console.log('initDependencies');
         if (typeof fabric === 'undefined') {
+            console.log('fabric.js not found, loading from CDN');
             return new Promise<void>((resolve) => {
                 const script = document.createElement('script');
                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js';
@@ -213,43 +222,7 @@ export class M_handwriting {
     }
 
     private async insertSiyuanBlock() {
-        // 获取用户选择的块ID
-        // const blockId = await this.plugin.showMessage('请输入需要插入的块ID', 'input');
-        // if (!blockId || !this.canvas) return;
 
-        // try {
-        //     // 获取块内容
-        //     const response = await this.plugin.fetchSyncPost('/api/block/getBlockInfo', {
-        //         id: blockId
-        //     });
-
-        //     if (response.code === 0 && response.data) {
-        //         const blockData = response.data;
-
-        //         // 创建一个fabric对象来表示思源块
-        //         const blockElement = new fabric.Textbox(blockData.content, {
-        //             width: 300,
-        //             left: 100,
-        //             top: 100,
-        //             fontSize: 16,
-        //             fill: '#000000',
-        //             backgroundColor: '#f8f9fa',
-        //             padding: 10,
-        //             data: { 
-        //                 type: 'siyuan-block',
-        //                 blockId: blockId 
-        //             }
-        //         });
-
-        //         this.canvas.add(blockElement);
-        //         this.canvas.setActiveObject(blockElement);
-        //     } else {
-        //         this.plugin.showMessage('无法获取块信息，请检查块ID是否正确');
-        //     }
-        // } catch (error) {
-        //     console.error('获取块内容失败:', error);
-        //     this.plugin.showMessage('获取块内容失败');
-        // }
     }
 
     private clearCanvas() {
@@ -296,7 +269,7 @@ export class M_handwriting {
                 // 如果容器不在当前的编辑区域内，则重新挂载
                 protyleContent.appendChild(this.container);
             }
-            
+
             this.container.style.display = 'flex';
             this.resizeCanvas();
         } else {
@@ -305,7 +278,7 @@ export class M_handwriting {
                 this.container.style.display = 'flex';
             }
         }
-        
+
         this.isWhiteboardVisible = true;
         this.updateButtonState();
     }
@@ -315,7 +288,7 @@ export class M_handwriting {
         if (this.container) {
             this.container.style.display = 'none';
         }
-        
+
         this.isWhiteboardVisible = false;
         this.updateButtonState();
     }
@@ -331,13 +304,13 @@ export class M_handwriting {
         this.whiteboardButtonElement = document.createElement('button');
         this.whiteboardButtonElement.className = 'toolbar__item b3-tooltips b3-tooltips__w';
         this.whiteboardButtonElement.setAttribute('aria-label', '白板');
-        this.whiteboardButtonElement.innerHTML = '<svg class="toolbar__icon" style="width: 14px; height: 14px;"><use xlink:href="#iconWhiteboard"></use></svg>';
+        this.whiteboardButtonElement.innerHTML = '<svg class="toolbar__icon" style="width: 14px; height: 14px;"><use xlink:href="#iconSTWhiteboard"></use></svg>';
         console.log(this.whiteboardButtonElement);
         // 添加点击事件
         this.whiteboardButtonElement.addEventListener('click', () => {
             this.toggleWhiteboard();
         });
-        
+
         // 观察DOM变化，确保面包屑导航栏出现时添加按钮
         this.observeBreadcrumb();
     }
@@ -351,7 +324,7 @@ export class M_handwriting {
     // 尝试添加按钮到面包屑导航
     private tryAddButtonToBreadcrumb() {
         if (!this.whiteboardButtonElement) return;
-        
+
         // 查找所有面包屑导航栏
         const breadcrumbs = document.querySelectorAll('.protyle-breadcrumb');
         console.log(breadcrumbs);
@@ -363,11 +336,11 @@ export class M_handwriting {
                 const buttonClone = this.whiteboardButtonElement.cloneNode(true) as HTMLElement;
                 buttonClone.classList.add('whiteboard-toggle-btn'); // 添加标识类
                 buttonClone.addEventListener('click', () => this.toggleWhiteboard());
-                
+
                 // 将按钮添加到面包屑末尾
 
                 breadcrumb.appendChild(buttonClone);
-     
+
             }
         });
     }
@@ -380,7 +353,7 @@ export class M_handwriting {
             this.showWhiteboard();
         }
         this.isWhiteboardVisible = !this.isWhiteboardVisible;
-        
+
         // 更新所有按钮的状态
         this.updateButtonState();
     }
