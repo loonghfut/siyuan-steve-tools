@@ -187,7 +187,7 @@ const CustomViewConfig = {
                 <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" 
                 data-id="${event.publicId}" 
                 data-block-id="${event.extendedProps.blockId}"
-                data-start-date="${event.range.start.toISOString().split('T')[0]}"
+                data-start-date="${event.range.start instanceof Date ? event.range.start.toISOString().split('T')[0] : ''}"
                 ${isRecurring ? 'data-recurring="true"' : ''}>
                     <div class="kanban-card-header">
                         <h3>${isRecurring ?
