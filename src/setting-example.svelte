@@ -160,8 +160,7 @@
                     //10
                     type: "checkbox",
                     title: "启用右键事件交互方式",
-                    description:
-                        "启用后会互补左键交互方式",
+                    description: "启用后会互补左键交互方式",
                     key: "cal-show-right-click",
                     value: settings["cal-show-right-click"],
                 },
@@ -271,6 +270,7 @@
                         alist: "alist(需安装alist附件管理插件)",
                         s3: "s3(和思源s3同步用同一个桶,使用前请自行测试会不会影响到思源的s3同步)",
                         "s3-diy": "s3-diy(自定义桶)(推荐)",
+                        webdav: "WebDAV(通用协议)",
                     },
                 },
                 {
@@ -296,6 +296,36 @@
                     description: "选择s3-diy(自定义桶)时填写",
                     key: "cal-s3-secretAccessKey",
                     value: settings["cal-s3-secretAccessKey"],
+                },
+                {
+                    type: "textinput",
+                    title: "WebDAV服务器地址",
+                    description:
+                        "选择WebDAV时填写，如 https://example.com/dav/",
+                    key: "cal-webdav-url",
+                    value: settings["cal-webdav-url"],
+                },
+                {
+                    type: "textinput",
+                    title: "WebDAV用户名",
+                    description: "WebDAV服务的用户名",
+                    key: "cal-webdav-username",
+                    value: settings["cal-webdav-username"],
+                },
+                {
+                    type: "textinput",
+                    title: "WebDAV密码",
+                    description: "WebDAV服务的密码",
+                    key: "cal-webdav-password",
+                    value: settings["cal-webdav-password"],
+                },
+                {
+                    type: "textinput",
+                    title: "WebDAV远程路径",
+                    description:
+                        "ICS文件在WebDAV服务器上的保存路径，如 /calendars/",
+                    key: "cal-webdav-path",
+                    value: settings["cal-webdav-path"],
                 },
                 {
                     //8
@@ -624,7 +654,7 @@
             基础设置: 5,
             高级设置: 7,
             ics设置: 6,
-            ics分享: 4,
+            ics分享: 8,
             邮箱日历: 4,
             视图设置: 5,
             // 不限制

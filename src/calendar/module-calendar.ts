@@ -1,6 +1,6 @@
 import steveTools, { settingdata } from "@/index";
 import { createEvents, EventAttributes } from 'ics';
-import { RRule } from 'rrule'; 
+import { RRule } from 'rrule';
 import * as api from "@/api"
 import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
 import * as ic from "@/icon"
@@ -19,6 +19,7 @@ import { M_caldata } from "./M_caldata";
 import { ics_alist } from "./share/alist";
 import { ics_s3 } from "./share/s3";
 import { CalDAVClient } from "./share/qqcaldav";
+import { WebDAVSync } from "./share/webdav";
 
 // import { insertHtml } from "./insertHtml";
 
@@ -42,6 +43,7 @@ export class M_calendar {
     public alistPlugin: ics_alist;
     public s3Client: ics_s3;
     public QQCalDAVClient: CalDAVClient;
+    public webdavClient: WebDAVSync;
     public qqFullCalendarEvents;
     async init(settingdata) {
         front = getFrontend();
@@ -336,6 +338,21 @@ export class M_calendar {
             this.s3Client.load_little_date_from_siyuan();
             this.s3Client.init();
             console.log("ST_s3状态:", await this.s3Client.testConnection());
+        }
+        if (this_settingdata["cal-share"] === "webdav") {
+            const serverUrl = this_settingdata["cal-webdav-url"];
+            const username = this_settingdata["cal-webdav-username"];
+            const password = this_settingdata["cal-webdav-password"];
+            const remotePath = this_settingdata["cal-webdav-path"];
+
+            this.webdavClient = new WebDAVSync({
+                serverUrl,
+                username,
+                password,
+                remotePath
+            });
+            await this.webdavClient.init();
+            console.log("WebDAV状态:", await this.webdavClient.testConnection());
         }
     }
 
@@ -678,6 +695,11 @@ export class M_calendar {
                 const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                 await this.s3Client.uploadFile(calendarpath2, file);
             }
+            if (settingdata["cal-share"] === "webdav") {
+                const ics = await api.getFileBlob(calendarpath)
+                const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                await this.webdavClient.uploadFile(calendarpath2, file);
+            }
         } catch (error) {
             console.error('生成日历文件时发生错误:', error);
             throw error;
@@ -973,14 +995,14 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
                 try {
                     // 尝试解析重复规则
                     const rruleString = event.重复规则.content;
-                    
+
                     // 如果不是以"RRULE:"开头，添加前缀
-                    const formattedRrule = rruleString.startsWith("RRULE:") ? 
+                    const formattedRrule = rruleString.startsWith("RRULE:") ?
                         rruleString : `RRULE:${rruleString}`;
-                        
+
                     // 尝试用 rrule.js 解析，验证格式是否正确
                     const rule = RRule.fromString(formattedRrule);
-                    
+
                     // 如果解析成功，将正确格式的规则添加到事件中
                     transformedEvents.push({
                         ...baseEvent,
@@ -989,7 +1011,7 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
                     });
                 } catch (error) {
                     console.error('解析重复规则出错:', event.重复规则.content, error);
-                    showMessage('周期事件-解析重复规则出错,请重试'+event.重复规则.content, -1, 'error');
+                    showMessage('周期事件-解析重复规则出错,请重试' + event.重复规则.content, -1, 'error');
                 }
             } else {
                 transformedEvents.push({

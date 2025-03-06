@@ -29,6 +29,11 @@ export const defaultSettings = {
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId":"",
     "cal-s3-secretAccessKey":"",
+    //// webdav子模块
+    "cal-webdav-url": "",
+    "cal-webdav-username": "",
+    "cal-webdav-password": "",
+    "cal-webdav-path": "",
     //// 周期显示设置
     "cal-show-zq-done": false,
     //// ics文件事件筛选
