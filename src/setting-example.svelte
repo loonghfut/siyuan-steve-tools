@@ -194,6 +194,13 @@
                     key: "cal-auto-update-status",
                     value: settings["cal-auto-update-status"],
                 },
+                {
+                    type: "checkbox",
+                    title: "日历视图拖拽归档",
+                    description: "启用后在日历视图中拖拽事件到视图上方即可归档",
+                    key: "cal-drag-change",
+                    value: settings["cal-drag-change"],
+                },
                 //同步设置
                 {
                     //5
@@ -652,7 +659,7 @@
     const subGroupItemCounts = {
         日程管理: {
             基础设置: 5,
-            高级设置: 7,
+            高级设置: 8,
             ics设置: 6,
             ics分享: 8,
             邮箱日历: 4,

@@ -19,6 +19,7 @@ export const defaultSettings = {
     "cal-auto-update-status": false,//根据块内子事件完成情况自动更新事件状态
     "cal-week-start": "monday",
     "cal-show-right-click": false,
+    "cal-drag-change": false,//是否允许拖拽改变事件时间
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

@@ -96,52 +96,16 @@ export async function run(
         // eventDurationEditable: true,
         eventDragStart: function (info) {
             // 创建或获取用于改变状态的拖放区域指示器
-            let statusDropZone = document.getElementById('status-drop-zone');
-            if (!statusDropZone) {
-                statusDropZone = document.createElement('div');
-                statusDropZone.id = 'status-drop-zone';
-                statusDropZone.innerHTML = '<div>拖放到此处将切换事件状态</div>';
-
-                // 添加样式
-                statusDropZone.style.position = 'absolute';
-                statusDropZone.style.top = '0';
-                statusDropZone.style.left = '0';
-                statusDropZone.style.right = '0';
-                statusDropZone.style.height = '40px';
-                statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
-                statusDropZone.style.color = 'var(--b3-theme-on-background)';
-                statusDropZone.style.display = 'flex';
-                statusDropZone.style.alignItems = 'center';
-                statusDropZone.style.justifyContent = 'center';
-                statusDropZone.style.fontSize = '14px';
-                statusDropZone.style.fontWeight = 'bold';
-                statusDropZone.style.zIndex = '9';
-                statusDropZone.style.pointerEvents = 'none'; // 允许事件穿透
-                statusDropZone.style.opacity = '0';
-                statusDropZone.style.transition = 'opacity 0.3s, background-color 0.3s';
-
-                // 插入到日历的头部
-                const header = calendarEl.querySelector('.fc-header-toolbar');
-                if (header && header.parentElement) {
-                    header.parentElement.insertBefore(statusDropZone, header);
-                }
+            if (settingdata["cal-drag-change"]) {
+                displayStatusDropZone(calendarEl, info);
             }
-            // 根据事件类型设置提示文本
-            if (info.event.extendedProps.isRecurring) {
-                if (info.event.extendedProps.source === 'qqcalendar') {
-                    statusDropZone.innerHTML = '<div>QQ日历事件不支持修改状态</div>';
-                    statusDropZone.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
-                }
-            } else {
-                statusDropZone.innerHTML = '<div>拖放到此处将事件标记为"归档"</div>';
-                statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
-            }   
-
-            // 显示拖放区域
-            statusDropZone.style.opacity = '1';
         },
-
-
+        // 事件拖动结束时处理状态更改
+        eventDragStop: function (info) {
+            if (settingdata["cal-drag-change"]) {
+                displayStatusDropZone_done(calendarEl, info);
+            }
+        },
         // 事件点击处理
         eventClick: async function (info) {
 
@@ -268,83 +232,7 @@ export async function run(
 
         // 事件拖放处理
 
-        // 事件拖动结束时处理状态更改
-        eventDragStop: function (info) {
-            // 获取拖放区域和标题区域
-            const statusDropZone = document.getElementById('status-drop-zone');
-            const headerToolbar = calendarEl.querySelector('.fc-header-toolbar');
 
-            if (statusDropZone) {
-                statusDropZone.style.opacity = '0';
-
-                // 3秒后移除元素
-                setTimeout(() => {
-                    if (statusDropZone && statusDropZone.parentElement) {
-                        statusDropZone.parentElement.removeChild(statusDropZone);
-                    }
-                }, 3000);
-            }
-
-            if (headerToolbar) {
-                const headerRect = headerToolbar.getBoundingClientRect();
-                const mouseY = info.jsEvent.clientY;
-
-                // 如果鼠标在标题区域内，执行状态更改
-                if (mouseY <= headerRect.bottom && mouseY >= headerRect.top) {
-                    // 取消默认的拖动行为
-                    // info.revert = true;
-
-                    // 根据事件类型执行不同的操作
-                    if (info.event.extendedProps.isRecurring) {
-                        if (info.event.extendedProps.source === 'qqcalendar') {
-                            showMessage('QQ日历事件不支持状态修改', 3000, 'error');
-                            return;
-                        } else {
-                            // 周期性事件处理
-                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
-                            showMessage('已将当前日期标记为完成', 3000);
-                        }
-                    } else {
-                        // 普通事件处理
-                        try {
-                            const blockId = info.event.extendedProps.blockId;
-                            const rootid = info.event.extendedProps.rootid;
-                            const statusKeyID = info.event.extendedProps.statusid;
-
-                            if (blockId && rootid && statusKeyID) {
-                                // const api = window.siyuan?.ws?.api;
-                                // if (!api) {
-                                //     showMessage('无法访问思源API', 3000, 'error');
-                                //     return;
-                                // }
-
-                                // 更新事件状态为"完成"
-                                const selectdata = [{ content: "归档" }];
-                                updateAttrViewCell_pro(
-                                    blockId,
-                                    rootid,
-                                    statusKeyID,
-                                    selectdata,
-                                    "select"
-                                ).then(() => {
-                                    showMessage('已将事件标记为归档', 3000);
-                                    // 刷新日历以显示更新后的状态
-                                    setTimeout(() => calendar.refetchEvents(), 500);
-                                }).catch(error => {
-                                    console.error('更新事件状态失败:', error);
-                                    showMessage('更新事件状态失败', 3000, 'error');
-                                });
-                            } else {
-                                showMessage('无法更新此事件，缺少必要属性', 3000, 'error');
-                            }
-                        } catch (error) {
-                            console.error('处理状态更改时出错:', error);
-                            showMessage('更新事件状态失败', 3000, 'error');
-                        }
-                    }
-                }
-            }
-        },
 
 
         eventDrop: async function (info) {
@@ -905,6 +793,129 @@ export async function run(
     // }
     return calendar;
 }
+
+function displayStatusDropZone(calendarEl: HTMLElement, info) {
+    let statusDropZone = document.getElementById('status-drop-zone');
+    if (!statusDropZone) {
+        statusDropZone = document.createElement('div');
+        statusDropZone.id = 'status-drop-zone';
+        statusDropZone.innerHTML = '<div>拖放到此处将切换事件状态</div>';
+
+        // 添加样式
+        statusDropZone.style.position = 'absolute';
+        statusDropZone.style.top = '0';
+        statusDropZone.style.left = '0';
+        statusDropZone.style.right = '0';
+        statusDropZone.style.height = '40px';
+        statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
+        statusDropZone.style.color = 'var(--b3-theme-on-background)';
+        statusDropZone.style.display = 'flex';
+        statusDropZone.style.alignItems = 'center';
+        statusDropZone.style.justifyContent = 'center';
+        statusDropZone.style.fontSize = '14px';
+        statusDropZone.style.fontWeight = 'bold';
+        statusDropZone.style.zIndex = '9';
+        statusDropZone.style.pointerEvents = 'none'; // 允许事件穿透
+        statusDropZone.style.opacity = '0';
+        statusDropZone.style.transition = 'opacity 0.3s, background-color 0.3s';
+
+        // 插入到日历的头部
+        const header = calendarEl.querySelector('.fc-header-toolbar');
+        if (header && header.parentElement) {
+            header.parentElement.insertBefore(statusDropZone, header);
+        }
+    }
+    // 根据事件类型设置提示文本
+    if (info.event.extendedProps.isRecurring) {
+        if (info.event.extendedProps.source === 'qqcalendar') {
+            statusDropZone.innerHTML = '<div>QQ日历事件不支持修改状态</div>';
+            statusDropZone.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
+        }
+    } else {
+        statusDropZone.innerHTML = '<div>拖放到此处将事件标记为"归档"</div>';
+        statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
+    }
+
+    // 显示拖放区域
+    statusDropZone.style.opacity = '1';
+}
+
+function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
+    // 获取拖放区域和标题区域
+    const statusDropZone = document.getElementById('status-drop-zone');
+    const headerToolbar = calendarEl.querySelector('.fc-header-toolbar');
+    if (statusDropZone) {
+        statusDropZone.style.opacity = '0';
+
+        // 3秒后移除元素
+        setTimeout(() => {
+            if (statusDropZone && statusDropZone.parentElement) {
+                statusDropZone.parentElement.removeChild(statusDropZone);
+            }
+        }, 3000);
+    }
+    if (headerToolbar) {
+        const headerRect = headerToolbar.getBoundingClientRect();
+        const mouseY = info.jsEvent.clientY;
+
+        // 如果鼠标在标题区域内，执行状态更改
+        if (mouseY <= headerRect.bottom && mouseY >= headerRect.top) {
+            // 取消默认的拖动行为
+            // info.revert = true;
+
+            // 根据事件类型执行不同的操作
+            if (info.event.extendedProps.isRecurring) {
+                if (info.event.extendedProps.source === 'qqcalendar') {
+                    showMessage('QQ日历事件不支持状态修改', 3000, 'error');
+                    return;
+                } else {
+                    // 周期性事件处理
+                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                    showMessage('已将当前日期标记为完成', 3000);
+                }
+            } else {
+                // 普通事件处理
+                try {
+                    const blockId = info.event.extendedProps.blockId;
+                    const rootid = info.event.extendedProps.rootid;
+                    const statusKeyID = info.event.extendedProps.statusid;
+
+                    if (blockId && rootid && statusKeyID) {
+                        // const api = window.siyuan?.ws?.api;
+                        // if (!api) {
+                        //     showMessage('无法访问思源API', 3000, 'error');
+                        //     return;
+                        // }
+
+                        // 更新事件状态为"完成"
+                        const selectdata = [{ content: "归档" }];
+                        updateAttrViewCell_pro(
+                            blockId,
+                            rootid,
+                            statusKeyID,
+                            selectdata,
+                            "select"
+                        ).then(() => {
+                            showMessage('已将事件标记为归档', 3000);
+                            // 刷新日历以显示更新后的状态
+                            refreshKanban();
+                        }).catch(error => {
+                            console.error('更新事件状态失败:', error);
+                            showMessage('更新事件状态失败', 3000, 'error');
+                        });
+                    } else {
+                        showMessage('无法更新此事件，缺少必要属性', 3000, 'error');
+                    }
+                } catch (error) {
+                    console.error('处理状态更改时出错:', error);
+                    showMessage('更新事件状态失败', 3000, 'error');
+                }
+            }
+        }
+    }
+}
+
+
 
 function getColors(index: number): string[] {
     const hue = index * 137.508; // use golden angle approximation // Copied from https://stackoverflow.com/a/20129594/13231742
