@@ -698,7 +698,7 @@ export class M_calendar {
             if (settingdata["cal-share"] === "webdav") {
                 const ics = await api.getFileBlob(calendarpath)
                 const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                await this.webdavClient.uploadFile(calendarpath2, file);
+                await this.webdavClient.uploadFile(settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
             }
         } catch (error) {
             console.error('生成日历文件时发生错误:', error);
