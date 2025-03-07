@@ -134,6 +134,14 @@
                         },
                     },
                 },
+                {
+                    //5
+                    type: "number",
+                    title: "默认持续时间(单位：小时)",
+                    description: "默认事件持续时间",
+                    key: "cal-time",
+                    value: settings["cal-time"],
+                },
                 //高级设置
                 {
                     //9
@@ -658,7 +666,7 @@
 
     const subGroupItemCounts = {
         日程管理: {
-            基础设置: 5,
+            基础设置: 6,
             高级设置: 8,
             ics设置: 6,
             ics分享: 8,

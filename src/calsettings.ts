@@ -13,13 +13,14 @@ export const defaultSettings = {
     "cal-create-pos": null,
     "cal-db-id": null,
     "cal-create-way": "0",
-    "cal-seemore":false,
-    "cal-show-ref-event":true,//是否展示被引用的事件
-    "cal-show-float-view" : false,//是否展示悬浮窗
+    "cal-seemore": false,
+    "cal-show-ref-event": true,//是否展示被引用的事件
+    "cal-show-float-view": false,//是否展示悬浮窗
     "cal-auto-update-status": false,//根据块内子事件完成情况自动更新事件状态
     "cal-week-start": "monday",
     "cal-show-right-click": false,
     "cal-drag-change": false,//是否允许拖拽改变事件时间
+    "cal-time": 1,
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",
@@ -28,8 +29,8 @@ export const defaultSettings = {
     "cal-qq-enable": false,
     //// s3子模块
     "cal-s3-bucket": "",
-    "cal-s3-accessKeyId":"",
-    "cal-s3-secretAccessKey":"",
+    "cal-s3-accessKeyId": "",
+    "cal-s3-secretAccessKey": "",
     //// webdav子模块
     "cal-webdav-url": "",
     "cal-webdav-username": "",
@@ -52,7 +53,7 @@ export const defaultSettings = {
     // ai模块
     "ai-enable": false,
     "ai-url": "https://www.doubao.com/chat/",
-    "ai-url-custom":'',
+    "ai-url-custom": '',
     // 图片压缩模块
     "img-compress-enable": false,
     // 画板模块

@@ -9,6 +9,7 @@
 import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
 import { IOperation, Protyle } from "siyuan";
 import { ISelectOption } from "@/calendar/interface";
+import { settingdata } from ".";
 
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
@@ -730,7 +731,7 @@ export async function updateAttrViewCell_pro(
         },
         action: string
     },
-    type: 'date' | 'select' | 'relation' | 'checkbox'| 'text',
+    type: 'date' | 'select' | 'relation' | 'checkbox' | 'text',
     endtime?: string
 ) {
     const doOperations: IOperation[] = [];
@@ -750,7 +751,7 @@ export async function updateAttrViewCell_pro(
                     hasEndDate: true,
                     isNotTime: false
                 },
-                id:newId
+                id: newId
             };
             break;
 
@@ -898,9 +899,11 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
 
     if (dateStr.includes('T')) {
         // 对于带时间的格式，end时间设为1小时后
+        const n = settingdata['cal-time'] ? settingdata['cal-time'] : 1;
+        const ONE_HOUR_MS = n * 60 * 60 * 1000; // 1小时的毫秒数
         return {
             start: date.getTime(),
-            end: date.getTime() + 3600000 // 加一小时(1000 * 60 * 60)
+            end: date.getTime() + ONE_HOUR_MS
         };
     } else {
         // 对于仅日期的格式，start和end都设为当天8点
