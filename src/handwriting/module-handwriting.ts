@@ -8,9 +8,9 @@ import '@tldraw/tldraw/tldraw.css';
 
 export class M_handwriting {
     private plugin: Plugin;
-    private whiteBoardDialog: Dialog;
+    private whiteBoardDialog;
     private root: ReactDOM.Root | null = null;
-
+    private tldrawApp: any;
     constructor(plugin: Plugin) {
         this.plugin = plugin;
     }
@@ -38,31 +38,42 @@ export class M_handwriting {
         // 布局准备完成后的初始化
     }
 
-    private openWhiteboard() {
+    private async openWhiteboard() {
         // 创建对话框
-        this.whiteBoardDialog = new Dialog({
-            title: "手写画板",
-            content: `<div id="tldraw-container" style="height: 80vh;"></div>`,
-            width: "90%",
-            height: "90%",
-            destroyCallback: () => {
-                // 销毁React组件
-                this.root?.unmount();
-                this.root = null;
-            }
+        const id = new Date().getTime().toString();
+        this.whiteBoardDialog = await openTab({
+            app: window.siyuan.ws.app,
+            custom: {
+                icon: "iconSTWhiteboard",
+                title: `画板`,
+                id: this.plugin.name + 'whiteboard-' + id, // 使用时间戳确保唯一性
+            },
+            // position: "right",
+            keepCursor: false
         });
-
+        this.whiteBoardDialog.panelElement.innerHTML = `
+            <div id="tldraw-container-${id}" style="width: 100%; height: 100%;"></div>
+        `;
         // 获取容器元素
-        const container = this.whiteBoardDialog.element.querySelector('#tldraw-container');
+        const container = document.querySelector('#tldraw-container-' + id);
         if (container) {
             // 使用React创建Tldraw组件
             this.root = ReactDOM.createRoot(container);
-            this.root.render(
+                       this.root.render(
                 React.createElement(
                     React.StrictMode, 
                     null, 
                     React.createElement(Tldraw, {
-                        // 可以添加Tldraw的配置选项
+                        // 添加TLDraw配置选项
+                        darkMode: document.querySelector('html').getAttribute('data-theme') === 'dark',
+                        showMenu: true,
+                        showTools: true,
+                        showUI: true,
+                        autofocus: true,
+                        onMount: (app) => {
+                            // 保存应用实例以便后续操作
+                            this.tldrawApp = app;
+                        }
                     })
                 )
             );
@@ -76,4 +87,9 @@ export class M_handwriting {
         }
         this.root?.unmount();
     }
+
+    
+
+
+
 }
