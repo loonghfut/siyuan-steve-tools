@@ -28,16 +28,19 @@ export class Whiteboard {
 
         // 初始化画布
         const canvasEl = document.getElementById(`drawing-canvas-${this.id}`) as HTMLCanvasElement;
-        const containerRect = this.containerEl.getBoundingClientRect();
+        const containerRect = this.containerEl.getBoundingClientRect();//解释：获取元素的大小及其相对于视口的位置
         canvasEl.width = containerRect.width;
-        canvasEl.height = containerRect.height - 50; // 减去工具栏高度
+        canvasEl.height = containerRect.height - 45; // 减去工具栏高度
 
         // 初始化Fabric.js画布
         this.canvas = new fabric.Canvas(`drawing-canvas-${this.id}`, {
             isDrawingMode: true,
-            backgroundColor: this.isDarkMode ? '#2d2d2d' : 'white'
+            backgroundColor: this.isDarkMode ? '#2d2d2d' : 'white' // 添加背景色
         });
 
+        // 设置画笔类型为铅笔
+        this.canvas.freeDrawingBrush = new fabric.PencilBrush(this.canvas);
+        
         // 确保画布初始化完成后再设置画笔属性
         this.setupBrush();
 
@@ -52,7 +55,7 @@ export class Whiteboard {
         // 确保画笔对象已创建
         if (this.canvas.freeDrawingBrush) {
             this.canvas.freeDrawingBrush.width = 2;
-            this.canvas.freeDrawingBrush.color = this.isDarkMode ? '#ffffff' : '#000000';
+            this.canvas.freeDrawingBrush.color = this.isDarkMode ? '#ffffff' : '#000000'; // 根据深色模式调整画笔颜色
         } else {
             // 如果画笔对象未创建，则延迟设置
             setTimeout(() => {
@@ -94,7 +97,7 @@ export class Whiteboard {
         // 取消所有工具的选中状态
         const tools = this.containerEl.querySelectorAll('.siyuan-whiteboard-tool');
         tools.forEach(tool => tool.classList.remove('active'));
-        
+
         // 设置当前工具的选中状态
         const currentTool = this.containerEl.querySelector(`[data-tool="${toolType}"]`);
         if (currentTool) {
@@ -115,7 +118,7 @@ export class Whiteboard {
             quality: 1.0,
             multiplier: 1.0
         });
-        
+
         // 下载图片
         const link = document.createElement('a');
         link.download = 'whiteboard.png';
@@ -125,23 +128,13 @@ export class Whiteboard {
 
     private resizeCanvas = () => {
         if (!this.canvas || !this.containerEl) return;
-        
+
         const containerRect = this.containerEl.getBoundingClientRect();
-        this.canvas.setWidth(containerRect.width);
-        this.canvas.setHeight(containerRect.height - 50);
+        this.canvas.setDimensions({ width: containerRect.width });
+        this.canvas.setDimensions({ height: containerRect.height - 45 });
         this.canvas.renderAll();
     }
 
-    public setDarkMode(isDark: boolean) {
-        this.isDarkMode = isDark;
-        this.canvas.backgroundColor = isDark ? '#2d2d2d' : 'white';
-        
-        if (this.canvas.freeDrawingBrush) {
-            this.canvas.freeDrawingBrush.color = isDark ? '#ffffff' : '#000000';
-        }
-        
-        this.canvas.renderAll();
-    }
 
     public dispose() {
         window.removeEventListener('resize', this.resizeCanvas);

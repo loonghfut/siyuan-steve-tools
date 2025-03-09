@@ -36,17 +36,7 @@ export class M_handwriting {
     async onLayoutReady(settingdata) {
         this.isdark = isDarkMode();
         console.log('layout ready', this.isdark);
-        
-        // 监听主题变化
-        window.addEventListener('themechange', () => {
-            const newIsDark = isDarkMode();
-            if (this.isdark !== newIsDark) {
-                this.isdark = newIsDark;
-                if (this.whiteboard) {
-                    this.whiteboard.setDarkMode(this.isdark);
-                }
-            }
-        });
+
     }
 
     private async openWhiteboard() {
