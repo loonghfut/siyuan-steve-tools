@@ -64,8 +64,6 @@ export class M_handwriting {
 
     async onunload() {
         // 清理白板实例
-        if (this.whiteboard) {
-            this.whiteboard.dispose();
-        }
+
     }
 }

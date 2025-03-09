@@ -6,12 +6,14 @@ export class Whiteboard {
     private id: string;
     private isDarkMode: boolean;
     private isPanning: boolean = false;
+    private isMiddleButtonDown: boolean = false; // 添加中键按下状态
     private lastPosX: number = 0;
     private lastPosY: number = 0;
     private currentScale: number = 1; // 当前缩放级别
     private readonly maxZoom: number = 5; // 最大缩放级别
     private readonly minZoom: number = 0.1; // 最小缩放级别
     private hasSelection: boolean = false; // 添加新属性跟踪选择状态
+    private currentMode: string = 'select'; // 当前模式，默认为选择模式
 
     constructor(containerId: string, isDark: boolean) {
         this.id = containerId;
@@ -25,7 +27,8 @@ export class Whiteboard {
         this.containerEl.className = 'siyuan-whiteboard-container';
         this.containerEl.innerHTML = `
             <div class="siyuan-whiteboard-toolbox">
-                <div class="siyuan-whiteboard-tool active" data-tool="pencil">铅笔</div>
+                <div class="siyuan-whiteboard-tool" data-tool="select">选择</div>
+                <div class="siyuan-whiteboard-tool" data-tool="pencil">铅笔</div>
                 <div class="siyuan-whiteboard-tool" data-tool="pan">移动</div>
                 <div class="siyuan-whiteboard-tool" data-tool="clear">清空</div>
                 <div class="siyuan-whiteboard-tool" data-tool="zoom-in">放大</div>
@@ -47,10 +50,9 @@ export class Whiteboard {
 
         // 初始化Fabric.js画布
         this.canvas = new fabric.Canvas(`drawing-canvas-${this.id}`, {
-            isDrawingMode: true,
+            isDrawingMode: false, // 默认不是绘图模式
             backgroundColor: this.isDarkMode ? '#2d2d2d' : 'white',
-            // 添加无限画布所需的配置
-            selection: false, // 禁用默认的选择框
+            selection: true, // 启用选择功能
             renderOnAddRemove: true
         });
 
@@ -71,6 +73,9 @@ export class Whiteboard {
 
         // 监听窗口大小变化
         window.addEventListener('resize', this.resizeCanvas);
+        
+        // 设置默认工具为选择
+        this.setActiveTool('select');
     }
 
     private setupBrush() {
@@ -89,11 +94,20 @@ export class Whiteboard {
         }
     }
 
-
     private setupCanvasEvents() {
-        // 监听鼠标事件，实现平移功能
+        // 监听鼠标事件
         this.canvas.on('mouse:down', (opt) => {
-            if (this.isPanning && !this.hasSelection) {
+            // 检查是否是中键
+            if (opt.e instanceof MouseEvent && opt.e.button === 1) {
+                this.isMiddleButtonDown = true;
+                this.canvas.selection = false; // 暂时禁用选择功能
+                const clientPoint = this.getClientPoint(opt.e);
+                this.lastPosX = clientPoint.x;
+                this.lastPosY = clientPoint.y;
+                this.canvas.setCursor('grabbing');
+                opt.e.preventDefault();
+            } else if (this.isPanning && !this.hasSelection) {
+                // 原有的平移逻辑
                 this.canvas.selection = false;
                 const clientPoint = this.getClientPoint(opt.e);
                 this.lastPosX = clientPoint.x;
@@ -113,33 +127,69 @@ export class Whiteboard {
         });
 
         this.canvas.on('mouse:move', (opt) => {
-            if (this.isPanning && !this.hasSelection && this.isMouseButtonDown(opt.e)) {
+            if (this.isMiddleButtonDown) {
+                // 中键平移逻辑
                 const vpt = this.canvas.viewportTransform;
                 if (!vpt) return;
 
-                // 获取当前客户端坐标
                 const clientPoint = this.getClientPoint(opt.e);
-
-                // 计算平移差值
                 const deltaX = clientPoint.x - this.lastPosX;
                 const deltaY = clientPoint.y - this.lastPosY;
 
-                // 更新视口变换
                 vpt[4] += deltaX;
                 vpt[5] += deltaY;
 
                 this.canvas.requestRenderAll();
 
-                // 更新上次位置
+                this.lastPosX = clientPoint.x;
+                this.lastPosY = clientPoint.y;
+                opt.e.preventDefault();
+            } else if (this.isPanning && !this.hasSelection && this.isMouseButtonDown(opt.e)) {
+                // 原有的平移逻辑
+                const vpt = this.canvas.viewportTransform;
+                if (!vpt) return;
+
+                const clientPoint = this.getClientPoint(opt.e);
+                const deltaX = clientPoint.x - this.lastPosX;
+                const deltaY = clientPoint.y - this.lastPosY;
+
+                vpt[4] += deltaX;
+                vpt[5] += deltaY;
+
+                this.canvas.requestRenderAll();
+
                 this.lastPosX = clientPoint.x;
                 this.lastPosY = clientPoint.y;
             }
         });
 
-        this.canvas.on('mouse:up', () => {
-            if (this.isPanning) {
+        this.canvas.on('mouse:up', (opt) => {
+            // 检查是否释放中键
+            if (opt.e instanceof MouseEvent && opt.e.button === 1) {
+                this.isMiddleButtonDown = false;
+                // 恢复到之前的模式
+                if (this.currentMode === 'select') {
+                    this.canvas.selection = true;
+                    this.canvas.setCursor('default');
+                } else if (this.isPanning) {
+                    this.canvas.setCursor('grab');
+                }
+                opt.e.preventDefault();
+            } else if (this.isPanning) {
                 this.canvas.setCursor('grab');
             }
+        });
+
+        // 防止中键点击默认行为（通常是自动滚动）
+        this.canvas.wrapperEl.addEventListener('mousedown', (e) => {
+            if (e.button === 1) {
+                e.preventDefault();
+            }
+        });
+        
+        // 防止右键菜单
+        this.canvas.wrapperEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
         });
 
         // 监听鼠标滚轮事件，实现缩放功能
@@ -163,10 +213,7 @@ export class Whiteboard {
 
             this.zoomTo(zoom, point);
         });
-
-
     }
-
 
     // 添加辅助方法用于获取客户端坐标点，处理不同事件类型
     private getClientPoint(e: Event): { x: number, y: number } {
@@ -223,17 +270,29 @@ export class Whiteboard {
     private handleToolClick(toolType: string) {
         // 处理工具点击事件
         switch (toolType) {
+            case 'select':
+                this.setActiveTool(toolType);
+                this.canvas.isDrawingMode = false;
+                this.isPanning = false;
+                this.canvas.selection = true; // 启用选择功能
+                this.canvas.setCursor('default');
+                this.currentMode = 'select';
+                break;
             case 'pencil':
                 this.setActiveTool(toolType);
                 this.canvas.isDrawingMode = true;
                 this.isPanning = false;
+                this.canvas.selection = false; // 禁用选择功能
                 this.canvas.setCursor('default');
+                this.currentMode = 'pencil';
                 break;
             case 'pan':
                 this.setActiveTool(toolType);
                 this.canvas.isDrawingMode = false;
                 this.isPanning = true;
+                this.canvas.selection = false; // 禁用选择功能
                 this.canvas.setCursor('grab');
+                this.currentMode = 'pan';
                 break;
             case 'clear':
                 this.clearCanvas();
