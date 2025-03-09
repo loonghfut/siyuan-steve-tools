@@ -1,17 +1,14 @@
 import * as ic from "@/icon"
 import { openTab, Plugin } from "siyuan";
 import './handwriting.css';
-import * as React from 'react';
-import * as ReactDOM from 'react-dom/client';
-import { TldrawBoard } from './components/TldrawBoard';
 import { isDarkMode } from './utils/theme-utils';
+import { Whiteboard } from './components/whiteboard';
 
 export class M_handwriting {
     private plugin: Plugin;
     private whiteBoardTab;
-    private root: ReactDOM.Root | null = null;
-    private tldrawApp: any;
     private isdark: boolean = false;
+    private whiteboard: Whiteboard;
     
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -39,6 +36,17 @@ export class M_handwriting {
     async onLayoutReady(settingdata) {
         this.isdark = isDarkMode();
         console.log('layout ready', this.isdark);
+        
+        // 监听主题变化
+        window.addEventListener('themechange', () => {
+            const newIsDark = isDarkMode();
+            if (this.isdark !== newIsDark) {
+                this.isdark = newIsDark;
+                if (this.whiteboard) {
+                    this.whiteboard.setDarkMode(this.isdark);
+                }
+            }
+        });
     }
 
     private async openWhiteboard() {
@@ -54,28 +62,20 @@ export class M_handwriting {
         });
         
         this.whiteBoardTab.panelElement.innerHTML = `
-            <div id="tldraw-container-${id}" style="width: 100%; height: 100%;"></div>
+            <div id="draw-container-${id}" style="width: 100%; height: 100%;"></div>
         `;
         
-        const container = document.querySelector('#tldraw-container-' + id);
+        const container = document.getElementById('draw-container-' + id);
         if (container) {
-            this.root = ReactDOM.createRoot(container);
-            this.root.render(
-                React.createElement(
-                    TldrawBoard, {
-                    darkMode: this.isdark,
-                    onMount: (app) => {
-                        this.tldrawApp = app;
-                    }
-                })
-            );
+            // 初始化白板
+            this.whiteboard = new Whiteboard('draw-container-' + id, this.isdark);
         }
     }
 
     async onunload() {
-        // 清理资源
-        if (this.root) {
-            this.root.unmount();
+        // 清理白板实例
+        if (this.whiteboard) {
+            this.whiteboard.dispose();
         }
     }
 }
