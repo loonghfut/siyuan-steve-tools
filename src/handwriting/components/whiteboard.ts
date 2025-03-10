@@ -1,19 +1,27 @@
-import * as fabric from 'fabric';
+import Konva from 'konva';
 
 export class Whiteboard {
-    private canvas: fabric.Canvas;
+    private stage: Konva.Stage;
+    private layer: Konva.Layer;
     private containerEl: HTMLElement;
     private id: string;
     private isDarkMode: boolean;
     private isPanning: boolean = false;
-    private isMiddleButtonDown: boolean = false; // 添加中键按下状态
-    private lastPosX: number = 0;
-    private lastPosY: number = 0;
-    private currentScale: number = 1; // 当前缩放级别
-    private readonly maxZoom: number = 5; // 最大缩放级别
-    private readonly minZoom: number = 0.1; // 最小缩放级别
-    private hasSelection: boolean = false; // 添加新属性跟踪选择状态
-    private currentMode: string = 'select'; // 当前模式，默认为选择模式
+    private isDrawing: boolean = false;
+    private currentLine: Konva.Line | null = null;
+    private currentPoints: number[] = [];
+    private currentTool: string = 'select';
+
+    // 用于平移和缩放的变量
+    private lastPointerPosition: { x: number, y: number } | null = null;
+    private stageScale: number = 1;
+    private readonly maxScale: number = 5;
+    private readonly minScale: number = 0.1;
+
+    // 网格相关
+    private gridGroup: Konva.Group | null = null;
+    private background: Konva.Rect | null = null;
+    private gridSize: number = 50;
 
     constructor(containerId: string, isDark: boolean) {
         this.id = containerId;
@@ -23,7 +31,7 @@ export class Whiteboard {
     }
 
     private initialize() {
-        // 创建简化的白板容器结构
+        // 创建白板容器结构
         this.containerEl.className = 'siyuan-whiteboard-container';
         this.containerEl.innerHTML = `
             <div class="siyuan-whiteboard-toolbox">
@@ -37,320 +45,450 @@ export class Whiteboard {
                 <div style="flex-grow: 1;"></div>
                 <div class="siyuan-whiteboard-tool" data-tool="save">保存</div>
             </div>
-            <div class="siyuan-whiteboard-canvas-container">
-                <canvas id="drawing-canvas-${this.id}"></canvas>
-            </div>
+            <div class="siyuan-whiteboard-canvas-container" id="konva-container-${this.id}"></div>
         `;
 
-        // 初始化画布
-        const canvasEl = document.getElementById(`drawing-canvas-${this.id}`) as HTMLCanvasElement;
+        // 获取容器尺寸
         const containerRect = this.containerEl.getBoundingClientRect();
-        canvasEl.width = containerRect.width;
-        canvasEl.height = containerRect.height - 45; // 减去工具栏高度
+        const canvasWidth = containerRect.width;
+        const canvasHeight = containerRect.height - 45; // 减去工具栏高度
 
-        // 初始化Fabric.js画布
-        this.canvas = new fabric.Canvas(`drawing-canvas-${this.id}`, {
-            isDrawingMode: false, // 默认不是绘图模式
-            backgroundColor: this.isDarkMode ? '#2d2d2d' : 'white',
-            selection: true, // 启用选择功能
-            renderOnAddRemove: true
+        // 创建Konva舞台和图层
+        this.stage = new Konva.Stage({
+            container: `konva-container-${this.id}`,
+            width: canvasWidth,
+            height: canvasHeight,
         });
 
-        // 设置画布的视口变换矩阵
-        this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+        // 创建背景图层和内容图层
+        const backgroundLayer = new Konva.Layer();
+        this.layer = new Konva.Layer();
+        this.stage.add(backgroundLayer);
+        this.stage.add(this.layer);
 
-        // 设置画笔类型为铅笔
-        this.canvas.freeDrawingBrush = new fabric.PencilBrush(this.canvas);
-
-        // 确保画布初始化完成后再设置画笔属性
-        this.setupBrush();
+        // 绘制无限网格背景
+        this.drawGrid(backgroundLayer, canvasWidth, canvasHeight);
 
         // 绑定工具栏事件
         this.bindEvents();
 
-        // 绑定画布事件用于平移和缩放
-        this.setupCanvasEvents();
-
         // 监听窗口大小变化
-        window.addEventListener('resize', this.resizeCanvas);
-        
+        window.addEventListener('resize', this.resizeStage);
+
         // 设置默认工具为选择
         this.setActiveTool('select');
     }
 
-    private setupBrush() {
-        // 确保画笔对象已创建
-        if (this.canvas.freeDrawingBrush) {
-            this.canvas.freeDrawingBrush.width = 2;
-            this.canvas.freeDrawingBrush.color = this.isDarkMode ? '#ffffff' : '#000000'; // 根据深色模式调整画笔颜色
-        } else {
-            // 如果画笔对象未创建，则延迟设置
-            setTimeout(() => {
-                if (this.canvas && this.canvas.freeDrawingBrush) {
-                    this.canvas.freeDrawingBrush.width = 2;
-                    this.canvas.freeDrawingBrush.color = this.isDarkMode ? '#ffffff' : '#000000';
-                }
-            }, 100);
-        }
+    private drawGrid(layer: Konva.Layer, width: number, height: number) {
+        const gridSize = 50; // 网格大小
+        const gridColor = this.isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+
+        // 创建背景矩形
+        const background = new Konva.Rect({
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
+            fill: this.isDarkMode ? '#2d2d2d' : 'white',
+            name: 'background'
+        });
+        layer.add(background);
+
+        // 创建网格组
+        const gridGroup = new Konva.Group({
+            name: 'grid'
+        });
+
+        // 创建垂直线
+        const verticalLines = new Konva.Line({
+            points: [],
+            stroke: gridColor,
+            strokeWidth: 1,
+        });
+
+        // 创建水平线
+        const horizontalLines = new Konva.Line({
+            points: [],
+            stroke: gridColor,
+            strokeWidth: 1,
+        });
+
+        // 更新网格线的点
+        this.updateGridLines(verticalLines, horizontalLines, width, height, gridSize);
+
+        gridGroup.add(verticalLines);
+        gridGroup.add(horizontalLines);
+        layer.add(gridGroup);
+
+        // 存储参考，以便在缩放和平移时更新
+        this.gridGroup = gridGroup;
+        this.background = background;
+        this.gridSize = gridSize;
+
+        layer.batchDraw();
     }
 
-    private setupCanvasEvents() {
-        // 监听鼠标事件
-        this.canvas.on('mouse:down', (opt) => {
-            // 检查是否是中键
-            if (opt.e instanceof MouseEvent && opt.e.button === 1) {
-                this.isMiddleButtonDown = true;
-                this.canvas.selection = false; // 暂时禁用选择功能
-                const clientPoint = this.getClientPoint(opt.e);
-                this.lastPosX = clientPoint.x;
-                this.lastPosY = clientPoint.y;
-                this.canvas.setCursor('grabbing');
-                opt.e.preventDefault();
-            } else if (this.isPanning && !this.hasSelection) {
-                // 原有的平移逻辑
-                this.canvas.selection = false;
-                const clientPoint = this.getClientPoint(opt.e);
-                this.lastPosX = clientPoint.x;
-                this.lastPosY = clientPoint.y;
-                this.canvas.setCursor('grabbing');
-            }
-        });
+    private updateGridLines(vLines: Konva.Line, hLines: Konva.Line, width: number, height: number, gridSize: number) {
+        const vPoints: number[] = [];
+        const hPoints: number[] = [];
 
-        this.canvas.on('selection:created', () => {
-            this.hasSelection = true;
-            this.isPanning = false;
-            this.canvas.setCursor('default');
-        });
+        // 计算当前视口的左上角和右下角在世界坐标系中的位置
+        const scale = this.stage.scaleX();
+        const position = this.stage.position();
 
-        this.canvas.on('selection:cleared', () => {
-            this.hasSelection = false;
-        });
+        const topLeftX = -position.x / scale;
+        const topLeftY = -position.y / scale;
+        const bottomRightX = (width - position.x) / scale;
+        const bottomRightY = (height - position.y) / scale;
 
-        this.canvas.on('mouse:move', (opt) => {
-            if (this.isMiddleButtonDown) {
-                // 中键平移逻辑
-                const vpt = this.canvas.viewportTransform;
-                if (!vpt) return;
+        // 计算网格起始点（保证网格线对齐）
+        const startX = Math.floor(topLeftX / gridSize) * gridSize;
+        const startY = Math.floor(topLeftY / gridSize) * gridSize;
+        const endX = Math.ceil(bottomRightX / gridSize) * gridSize;
+        const endY = Math.ceil(bottomRightY / gridSize) * gridSize;
 
-                const clientPoint = this.getClientPoint(opt.e);
-                const deltaX = clientPoint.x - this.lastPosX;
-                const deltaY = clientPoint.y - this.lastPosY;
-
-                vpt[4] += deltaX;
-                vpt[5] += deltaY;
-
-                this.canvas.requestRenderAll();
-
-                this.lastPosX = clientPoint.x;
-                this.lastPosY = clientPoint.y;
-                opt.e.preventDefault();
-            } else if (this.isPanning && !this.hasSelection && this.isMouseButtonDown(opt.e)) {
-                // 原有的平移逻辑
-                const vpt = this.canvas.viewportTransform;
-                if (!vpt) return;
-
-                const clientPoint = this.getClientPoint(opt.e);
-                const deltaX = clientPoint.x - this.lastPosX;
-                const deltaY = clientPoint.y - this.lastPosY;
-
-                vpt[4] += deltaX;
-                vpt[5] += deltaY;
-
-                this.canvas.requestRenderAll();
-
-                this.lastPosX = clientPoint.x;
-                this.lastPosY = clientPoint.y;
-            }
-        });
-
-        this.canvas.on('mouse:up', (opt) => {
-            // 检查是否释放中键
-            if (opt.e instanceof MouseEvent && opt.e.button === 1) {
-                this.isMiddleButtonDown = false;
-                // 恢复到之前的模式
-                if (this.currentMode === 'select') {
-                    this.canvas.selection = true;
-                    this.canvas.setCursor('default');
-                } else if (this.isPanning) {
-                    this.canvas.setCursor('grab');
-                }
-                opt.e.preventDefault();
-            } else if (this.isPanning) {
-                this.canvas.setCursor('grab');
-            }
-        });
-
-        // 防止中键点击默认行为（通常是自动滚动）
-        this.canvas.wrapperEl.addEventListener('mousedown', (e) => {
-            if (e.button === 1) {
-                e.preventDefault();
-            }
-        });
-        
-        // 防止右键菜单
-        this.canvas.wrapperEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-
-        // 监听鼠标滚轮事件，实现缩放功能
-        this.canvas.on('mouse:wheel', (opt) => {
-            opt.e.preventDefault();
-            opt.e.stopPropagation();
-
-            // 获取滚轮方向和缩放因子
-            const delta = opt.e.deltaY;
-            let zoom = this.canvas.getZoom();
-            zoom = delta > 0 ? zoom * 0.9 : zoom * 1.1;
-
-            // 限制缩放范围
-            zoom = Math.min(Math.max(this.minZoom, zoom), this.maxZoom);
-
-            // 相对于鼠标位置缩放
-            const point = {
-                x: opt.e.offsetX,
-                y: opt.e.offsetY
-            };
-
-            this.zoomTo(zoom, point);
-        });
-    }
-
-    // 添加辅助方法用于获取客户端坐标点，处理不同事件类型
-    private getClientPoint(e: Event): { x: number, y: number } {
-        // 处理鼠标事件
-        if ('clientX' in e && 'clientY' in e) {
-            return {
-                x: (e as MouseEvent).clientX,
-                y: (e as MouseEvent).clientY
-            };
+        // 生成垂直线
+        for (let x = startX; x <= endX; x += gridSize) {
+            vPoints.push(x, startY);
+            vPoints.push(x, endY);
+            vPoints.push(x, startY); // 添加一个移动点，分隔不同的线段
         }
 
-        // 处理触摸事件
-        if ('touches' in e && (e as TouchEvent).touches.length > 0) {
-            return {
-                x: (e as TouchEvent).touches[0].clientX,
-                y: (e as TouchEvent).touches[0].clientY
-            };
+        // 生成水平线
+        for (let y = startY; y <= endY; y += gridSize) {
+            hPoints.push(startX, y);
+            hPoints.push(endX, y);
+            hPoints.push(startX, y); // 添加一个移动点，分隔不同的线段
         }
 
-        // 默认返回中心点坐标（这种情况不应该发生，但提供一个默认值）
-        return {
-            x: this.canvas.width! / 2,
-            y: this.canvas.height! / 2
-        };
-    }
-
-
-    // 添加辅助方法检查鼠标按钮是否按下
-    private isMouseButtonDown(e: Event): boolean {
-        // 处理鼠标事件
-        if ('buttons' in e) {
-            return e.buttons === 1;
-        }
-
-        // 处理触摸事件
-        if ('touches' in e) {
-            return (e as TouchEvent).touches.length > 0;
-        }
-
-        return false;
+        vLines.points(vPoints);
+        hLines.points(hPoints);
     }
 
 
     private bindEvents() {
+        // 绑定工具按钮事件
         const tools = this.containerEl.querySelectorAll('.siyuan-whiteboard-tool');
         tools.forEach(tool => {
             tool.addEventListener('click', (e) => {
                 const toolType = (e.currentTarget as HTMLElement).dataset.tool;
-                this.handleToolClick(toolType);
+                if (toolType) {
+                    this.handleToolClick(toolType);
+                }
             });
+        });
+
+        // 绑定舞台事件
+        const container = this.stage.container();
+
+        // 鼠标按下事件
+        this.stage.on('mousedown touchstart', (e) => {
+            // 阻止默认行为
+            if (e.evt.button === 1 || e.evt.button === 2) {
+                e.evt.preventDefault();
+                return;
+            }
+
+            if (this.currentTool === 'pencil') {
+                this.isDrawing = true;
+                this.currentPoints = [];
+                const pos = this.stage.getPointerPosition();
+                if (pos) {
+                    // 将鼠标位置转换为考虑缩放和平移后的坐标
+                    const stagePos = this.getRelativePointerPosition();
+                    if (stagePos) {
+                        this.currentPoints = [stagePos.x, stagePos.y];
+                        this.currentLine = new Konva.Line({
+                            points: this.currentPoints,
+                            stroke: this.isDarkMode ? 'white' : 'black',
+                            strokeWidth: 2 / this.stageScale, // 根据缩放调整线宽
+                            lineCap: 'round',
+                            lineJoin: 'round',
+                            tension: 0.5,
+                            draggable: false,
+                        });
+                        this.layer.add(this.currentLine);
+                    }
+                }
+            } else if (this.currentTool === 'pan') {
+                container.style.cursor = 'grabbing';
+                this.lastPointerPosition = this.stage.getPointerPosition();
+            }
+        });
+
+        // 鼠标移动事件
+        this.stage.on('mousemove touchmove', (e) => {
+            if (this.isDrawing && this.currentLine) {
+                const stagePos = this.getRelativePointerPosition();
+                if (stagePos) {
+                    this.currentPoints.push(stagePos.x);
+                    this.currentPoints.push(stagePos.y);
+                    this.currentLine.points(this.currentPoints);
+                    this.layer.batchDraw();
+                }
+            } else if (this.currentTool === 'pan' && this.lastPointerPosition) {
+                const pos = this.stage.getPointerPosition();
+                if (!pos) return;
+
+                const dx = pos.x - this.lastPointerPosition.x;
+                const dy = pos.y - this.lastPointerPosition.y;
+
+                const newPos = {
+                    x: this.stage.x() + dx,
+                    y: this.stage.y() + dy
+                };
+
+                this.stage.position(newPos);
+
+                // 更新网格
+                this.updateGrid();
+
+                this.stage.batchDraw();
+                this.lastPointerPosition = pos;
+            }
+        });
+
+
+
+
+        // 鼠标抬起事件
+        this.stage.on('mouseup touchend', () => {
+            if (this.isDrawing) {
+                this.isDrawing = false;
+                this.currentLine = null;
+            } else if (this.currentTool === 'pan') {
+                container.style.cursor = 'grab';
+                this.lastPointerPosition = null;
+            }
+        });
+
+        // 鼠标滚轮事件
+        this.stage.on('wheel', (e) => {
+            e.evt.preventDefault();
+
+            const oldScale = this.stageScale;
+            const pointer = this.stage.getPointerPosition();
+
+            if (!pointer) return;
+
+            const mousePointTo = {
+                x: (pointer.x - this.stage.x()) / oldScale,
+                y: (pointer.y - this.stage.y()) / oldScale,
+            };
+
+            // 根据滚轮方向确定是放大还是缩小
+            const direction = e.evt.deltaY > 0 ? -1 : 1;
+            const scaleBy = 1.1;
+            const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+            // 限制缩放范围
+            this.stageScale = Math.max(this.minScale, Math.min(this.maxScale, newScale));
+
+            // 计算新位置
+            const newPos = {
+                x: pointer.x - mousePointTo.x * this.stageScale,
+                y: pointer.y - mousePointTo.y * this.stageScale,
+            };
+
+            // 应用新的缩放和位置
+            this.stage.scale({ x: this.stageScale, y: this.stageScale });
+            this.stage.position(newPos);
+
+            // 更新网格
+            this.updateGrid();
+
+            this.stage.batchDraw();
+        });
+
+        // 阻止右键菜单
+        container.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+        // 中键平移
+        container.addEventListener('mousedown', (e) => {
+            if (e.button === 1) { // 中键
+                e.preventDefault();
+                container.style.cursor = 'grabbing';
+                this.lastPointerPosition = this.stage.getPointerPosition();
+                
+                // 添加鼠标移动监听器
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                    const pos = this.stage.getPointerPosition();
+                    if (pos && this.lastPointerPosition) {
+                        const dx = pos.x - this.lastPointerPosition.x;
+                        const dy = pos.y - this.lastPointerPosition.y;
+                        
+                        this.stage.position({
+                            x: this.stage.x() + dx,
+                            y: this.stage.y() + dy
+                        });
+                        
+                        this.updateGrid();
+                        this.stage.batchDraw();
+                        this.lastPointerPosition = pos;
+                    }
+                };
+                
+                // 添加鼠标抬起监听器
+                const handleMouseUp = (upEvent: MouseEvent) => {
+                    if (upEvent.button === 1) {
+                        container.style.cursor = this.currentTool === 'pan' ? 'grab' : 'default';
+                        this.lastPointerPosition = null;
+                        window.removeEventListener('mousemove', handleMouseMove);
+                        window.removeEventListener('mouseup', handleMouseUp);
+                    }
+                };
+                
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 1) {
+                container.style.cursor = this.currentTool === 'pan' ? 'grab' : 'default';
+            }
         });
     }
 
+    // 在类的成员方法中添加
+    private getRelativePointerPosition() {
+        const pos = this.stage.getPointerPosition();
+        if (pos) {
+            // 将鼠标坐标转换为相对于舞台的坐标，考虑缩放和平移
+            return {
+                x: (pos.x - this.stage.x()) / this.stageScale,
+                y: (pos.y - this.stage.y()) / this.stageScale
+            };
+        }
+        return null;
+    }
+
+
+
+    private updateGrid() {
+        if (!this.gridGroup || !this.background) return;
+    
+        const width = this.stage.width();
+        const height = this.stage.height();
+        const scale = this.stageScale;
+        const position = this.stage.position();
+    
+        // 计算背景矩形需要的尺寸和位置，以确保覆盖整个视口
+        const bgX = -position.x / scale;
+        const bgY = -position.y / scale;
+        const bgWidth = width / scale;
+        const bgHeight = height / scale;
+    
+        // 更新背景大小和位置
+        this.background.position({
+            x: bgX,
+            y: bgY
+        });
+        this.background.size({
+            width: bgWidth,
+            height: bgHeight
+        });
+    
+        // 更新网格线
+        const verticalLines = this.gridGroup.findOne('Line') as Konva.Line;
+        const horizontalLines = this.gridGroup.getChildren(node => node !== verticalLines)[0] as Konva.Line;
+    
+        if (verticalLines && horizontalLines) {
+            this.updateGridLines(verticalLines, horizontalLines, width, height, this.gridSize);
+        }
+    }
+
+
     private handleToolClick(toolType: string) {
-        // 处理工具点击事件
         switch (toolType) {
             case 'select':
                 this.setActiveTool(toolType);
-                this.canvas.isDrawingMode = false;
-                this.isPanning = false;
-                this.canvas.selection = true; // 启用选择功能
-                this.canvas.setCursor('default');
-                this.currentMode = 'select';
+                this.currentTool = 'select';
+                this.stage.container().style.cursor = 'default';
                 break;
+
             case 'pencil':
                 this.setActiveTool(toolType);
-                this.canvas.isDrawingMode = true;
-                this.isPanning = false;
-                this.canvas.selection = false; // 禁用选择功能
-                this.canvas.setCursor('default');
-                this.currentMode = 'pencil';
+                this.currentTool = 'pencil';
+                this.stage.container().style.cursor = 'crosshair';
                 break;
+
             case 'pan':
                 this.setActiveTool(toolType);
-                this.canvas.isDrawingMode = false;
-                this.isPanning = true;
-                this.canvas.selection = false; // 禁用选择功能
-                this.canvas.setCursor('grab');
-                this.currentMode = 'pan';
+                this.currentTool = 'pan';
+                this.stage.container().style.cursor = 'grab';
                 break;
+
             case 'clear':
                 this.clearCanvas();
                 break;
-            case 'save':
-                this.saveCanvas();
-                break;
+
             case 'zoom-in':
                 this.zoom(1.1);
                 break;
+
             case 'zoom-out':
                 this.zoom(0.9);
                 break;
+
             case 'zoom-reset':
                 this.resetZoom();
+                break;
+
+            case 'save':
+                this.saveCanvas();
                 break;
         }
     }
 
     private zoom(factor: number) {
-        let zoom = this.canvas.getZoom() * factor;
-        zoom = Math.min(Math.max(this.minZoom, zoom), this.maxZoom);
-
-        // 获取画布的中心点作为缩放中心
+        const oldScale = this.stageScale;
         const center = {
-            x: this.canvas.width! / 2,
-            y: this.canvas.height! / 2
+            x: this.stage.width() / 2,
+            y: this.stage.height() / 2,
         };
-
-        this.zoomTo(zoom, center);
+    
+        const mousePointTo = {
+            x: (center.x - this.stage.x()) / oldScale,
+            y: (center.y - this.stage.y()) / oldScale,
+        };
+    
+        const newScale = oldScale * factor;
+        this.stageScale = Math.max(this.minScale, Math.min(this.maxScale, newScale));
+    
+        const newPos = {
+            x: center.x - mousePointTo.x * this.stageScale,
+            y: center.y - mousePointTo.y * this.stageScale,
+        };
+    
+        this.stage.scale({ x: this.stageScale, y: this.stageScale });
+        this.stage.position(newPos);
+        
+        // 更新网格和背景
+        this.updateGrid();
+        
+        this.stage.batchDraw();
     }
-
-    private zoomTo(zoom: number, point: { x: number, y: number }) {
-        const vpt = this.canvas.viewportTransform;
-        if (!vpt) return;
-
-        // 保存当前缩放级别
-        this.currentScale = zoom;
-
-        // 设置缩放级别和位置
-        this.canvas.zoomToPoint(point as fabric.Point, zoom);
-    }
-
+    
     private resetZoom() {
-        const vpt = this.canvas.viewportTransform;
-        if (!vpt) return;
-
-        // 重置缩放和平移
-        this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-        this.currentScale = 1;
+        this.stageScale = 1;
+        this.stage.scale({ x: 1, y: 1 });
+        this.stage.position({ x: 0, y: 0 });
+        
+        // 更新网格和背景
+        this.updateGrid();
+        
+        this.stage.batchDraw();
     }
 
     private setActiveTool(toolType: string) {
-        // 取消所有工具的选中状态
+        // 移除所有工具的激活状态
         const tools = this.containerEl.querySelectorAll('.siyuan-whiteboard-tool');
         tools.forEach(tool => tool.classList.remove('active'));
 
-        // 设置当前工具的选中状态
+        // 设置当前工具的激活状态
         const currentTool = this.containerEl.querySelector(`[data-tool="${toolType}"]`);
         if (currentTool) {
             currentTool.classList.add('active');
@@ -358,18 +496,18 @@ export class Whiteboard {
     }
 
     private clearCanvas() {
-        this.canvas.clear();
-        this.canvas.backgroundColor = this.isDarkMode ? '#2d2d2d' : 'white';
-        this.canvas.renderAll();
+        // 清空所有图形，保留网格背景
+        const children = this.layer.getChildren();
+        for (const child of children) {
+            child.destroy();
+        }
+
+        this.layer.batchDraw();
     }
 
     private saveCanvas() {
         // 保存为图片
-        const dataURL = this.canvas.toDataURL({
-            format: 'png',
-            quality: 1.0,
-            multiplier: 1.0
-        });
+        const dataURL = this.stage.toDataURL({ pixelRatio: 2 });
 
         // 下载图片
         const link = document.createElement('a');
@@ -378,19 +516,26 @@ export class Whiteboard {
         link.click();
     }
 
-    private resizeCanvas = () => {
-        if (!this.canvas || !this.containerEl) return;
-
+    private resizeStage = () => {
+        if (!this.stage || !this.containerEl) return;
+        
         const containerRect = this.containerEl.getBoundingClientRect();
-        this.canvas.setDimensions({ width: containerRect.width });
-        this.canvas.setDimensions({ height: containerRect.height - 45 });
-        this.canvas.renderAll();
+        const width = containerRect.width;
+        const height = containerRect.height - 45; // 减去工具栏高度
+        
+        this.stage.width(width);
+        this.stage.height(height);
+        
+        // 更新网格
+        this.updateGrid();
+        
+        this.stage.batchDraw();
     }
 
     public dispose() {
-        window.removeEventListener('resize', this.resizeCanvas);
-        if (this.canvas) {
-            this.canvas.dispose();
+        window.removeEventListener('resize', this.resizeStage);
+        if (this.stage) {
+            this.stage.destroy();
         }
     }
 }
