@@ -5,13 +5,7 @@ export interface Point {
     y: number;
 }
 
-export interface WhiteboardOptions {
-    id: string;
-    isDarkMode: boolean;
-    gridSize?: number;
-    maxScale?: number;
-    minScale?: number;
-}
+
 
 export interface Tool {
     name: string;
@@ -21,4 +15,14 @@ export interface Tool {
     handleMouseUp?: (e: Konva.KonvaEventObject<MouseEvent>) => void;
 }
 
-export type ToolType = 'select' | 'pencil' | 'pan' | 'clear' | 'zoom-in' | 'zoom-out' | 'zoom-reset' | 'save';
+export interface WhiteboardOptions {
+    id: string;
+    isDarkMode: boolean;
+    gridSize: number;
+    maxScale: number;
+    minScale: number;
+    selectionEnabled?: boolean; // 是否启用选择功能
+}
+
+
+export type ToolType = 'select' | 'pencil' | 'pan' | 'eraser';

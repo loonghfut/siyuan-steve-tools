@@ -31,7 +31,7 @@ export class DrawingManager {
             lineCap: 'round',
             lineJoin: 'round',
             tension: 0.5,
-            draggable: false,
+            draggable: true, // 使线条可拖动
         });
         
         this.layer.add(this.currentLine);
