@@ -40,7 +40,7 @@ export class Whiteboard {
         // 获取容器尺寸
         const containerRect = this.containerEl.getBoundingClientRect();
         const canvasWidth = containerRect.width;
-        const canvasHeight = containerRect.height - 45; // 减去工具栏高度
+        const canvasHeight = containerRect.height - 50; // 减去工具栏高度
 
         // 创建Konva舞台和图层
         this.stage = new Konva.Stage({
@@ -56,11 +56,11 @@ export class Whiteboard {
         this.stage.add(this.layer);
 
         // 创建各个管理器
-        this.toolManager = new ToolManager(this.containerEl);
-        this.viewManager = new ViewManager(this.stage, options.minScale, options.maxScale);
-        this.drawingManager = new DrawingManager(this.stage, this.layer, options.isDarkMode);
-        this.gridManager = new GridManager(this.stage, backgroundLayer, options);
-        this.selectionManager = new SelectionManager(this.stage, this.layer, options.isDarkMode);
+        this.toolManager = new ToolManager(this.containerEl);                                       //工具管理器     
+        this.viewManager = new ViewManager(this.stage, options.minScale, options.maxScale);         //视图管理器
+        this.drawingManager = new DrawingManager(this.stage, this.layer, options.isDarkMode);       //绘图管理器
+        this.gridManager = new GridManager(this.stage, backgroundLayer, options);                   //网格管理器
+        this.selectionManager = new SelectionManager(this.stage, this.layer, options.isDarkMode);   //选择管理器
 
         // 创建事件管理器并绑定事件
         this.eventManager = new EventManager(
@@ -72,16 +72,12 @@ export class Whiteboard {
             this.gridManager,
             this.selectionManager
         );
-
         // 绘制网格背景
         this.gridManager.createGrid(canvasWidth, canvasHeight);
-
         // 绑定事件
         this.eventManager.bindEvents();
-
         // 注册工具
         this.registerTools();
-
         // 设置默认工具为选择
         this.toolManager.setActiveTool('select');
     }
@@ -123,11 +119,6 @@ export class Whiteboard {
             name: 'pan',
             cursor: 'grab'
         });
-
-        // this.toolManager.registerTool('text', {
-        //     name: 'text',
-        //     cursor: 'text'
-        // });
 
         // 注册橡皮工具
         this.toolManager.registerTool('eraser', {

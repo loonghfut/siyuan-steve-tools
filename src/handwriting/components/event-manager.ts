@@ -104,20 +104,22 @@ export class EventManager {
         } else if (currentTool === 'pan') {
             document.body.style.cursor = 'grabbing';
             this.viewManager.startPan(pos);
-        // } else if (currentTool === 'text') {
-        //     this.createTextElement(pos);
         } else if (currentTool === 'eraser') {
             this.startErasing(pos);
         }
     }
 
+    // 在handleMouseMove方法中添加框选更新的处理
     private handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>): void => {
         const currentTool = this.toolManager.getCurrentTool();
         const pos = this.stage.getPointerPosition();
 
         if (!pos) return;
 
-        if (currentTool === 'pencil' && this.drawingManager.isCurrentlyDrawing()) {
+        if (currentTool === 'select' && this.selectionManager.isSelecting()) {
+            // 如果在选择模式下进行框选
+            this.selectionManager.updateBoxSelection(pos);
+        } else if (currentTool === 'pencil' && this.drawingManager.isCurrentlyDrawing()) {
             const relPos = this.viewManager.getRelativePointerPosition(pos);
             this.drawingManager.continueDrawing(relPos);
         } else if (currentTool === 'pan') {
@@ -125,21 +127,20 @@ export class EventManager {
             this.gridManager.updateGrid(this.viewManager.getScale());
             this.stage.batchDraw();
         }
-
-        // 其他工具的处理逻辑...
     }
 
     private handleMouseUp = (): void => {
         const currentTool = this.toolManager.getCurrentTool();
 
-        if (currentTool === 'pencil') {
+        if (currentTool === 'select' && this.selectionManager.isSelecting()) {
+            // 如果在选择模式下完成框选
+            this.selectionManager.endBoxSelection();
+        } else if (currentTool === 'pencil') {
             this.drawingManager.endDrawing();
         } else if (currentTool === 'pan') {
             document.body.style.cursor = 'grab';
             this.viewManager.endPan();
         }
-
-        // 其他工具的处理逻辑...
     }
 
     private handleWheel = (e: Konva.KonvaEventObject<WheelEvent>): void => {
@@ -273,7 +274,7 @@ export class EventManager {
     private createTextElement(pos: Point): void {
         // 创建文本节点
         const relPos = this.viewManager.getRelativePointerPosition(pos);
-        
+
         const textNode = new Konva.Text({
             x: relPos.x,
             y: relPos.y,
@@ -284,14 +285,14 @@ export class EventManager {
             padding: 5,
             draggable: true,
         });
-        
+
         this.stage.getLayers()[1].add(textNode);
-        
+
         // 添加双击事件
         textNode.on('dblclick', () => {
             this.editText(textNode);
         });
-        
+
         // 选中新创建的文本
         this.selectionManager.selectShape(textNode);
     }
@@ -331,7 +332,7 @@ export class EventManager {
 
         // 隐藏文本节点
         textNode.hide();
-        
+
         // 更新图层
         this.stage.getLayers()[1].batchDraw();
 
@@ -358,7 +359,7 @@ export class EventManager {
                 textNode.text(textarea.value);
                 removeTextarea();
             }
-            
+
             if (e.key === 'Escape') {
                 removeTextarea();
             }
@@ -378,7 +379,7 @@ export class EventManager {
 
     private startErasing(pos: Point): void {
         const shape = this.stage.getIntersection(pos) as Konva.Shape;
-        
+
         if (shape && !shape.hasName('background') && !shape.hasName('grid')) {
             shape.destroy();
             this.selectionManager.clearSelection();
