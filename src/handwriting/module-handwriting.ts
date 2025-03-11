@@ -1,8 +1,8 @@
 import * as ic from "@/icon"
 import { openTab, Plugin } from "siyuan";
 import './handwriting.css';
-import { App, Leafer, Box, Line,Debug } from 'leafer-ui'
-
+import { App, Leafer, Box, Line, Frame, ZoomEvent, Rect,DragEvent, Pen } from 'leafer-ui'
+import '@leafer-in/viewport'
 
 
 export class M_handwriting {
@@ -59,12 +59,47 @@ export class M_handwriting {
         <div id='steveTool-whiteboard-${id}' style="width: 100%; height: 100%;"></div>`;
         this.app = new App({
             view: document.getElementById(`steveTool-whiteboard-${id}`),
+            wheel: {
+                zoomMode: true,
+            },
         });
-        this.background = this.app.addLeafer({ hittable: false, usePartRender: false }) // 背景层，用于绘制网格等
+        this.background = this.app.addLeafer({
+            // hittable: false,
+            // usePartRender: false
+            wheel: {
+                zoomMode: true,
+            },
+        }) // 背景层，用于绘制网格等
         this.leafer = this.app.addLeafer() // 内容层
-        this.stroke = this.app.addLeafer({ hittable: false }) // 描边层，用于绘制经常变化的hover、select描边效果
-
+        this.stroke = this.app.addLeafer({
+            // hittable: false           
+            wheel: {
+                zoomMode: true,
+            },
+        }) // 描边层，用于绘制经常变化的hover、select描边效果
+        const frame = new Frame({
+            fill: '#F6F6F6',
+        })
         this.drawGrid();
+        this.leafer.add(frame);
+        this.background.on(ZoomEvent.ZOOM, function (e: ZoomEvent) {
+            this.background.scale *= e.scale
+        })
+        this.leafer.add(Rect.one({ fill: '#32cd79', draggable: true }, 100, 100))
+
+        const pen = new Pen()
+        this.leafer.add(pen)
+        this.leafer.on(DragEvent.START, (e: DragEvent) => {
+            const point = e.getPagePoint() // 转换事件为 page 坐标 = pen.getPagePoint(e)  
+            pen.setStyle({ stroke: '#32cd79', strokeWidth: 10, strokeCap: 'round', strokeJoin: 'round' })
+            pen.moveTo(point.x, point.y)
+        })
+        
+        this.leafer.on(DragEvent.DRAG, (e: DragEvent) => {
+            const point = e.getPagePoint() // 转换事件为 page 坐标 = pen.getPagePoint(e)  
+            pen.lineTo(point.x, point.y)
+        })
+
 
     }
 
@@ -73,7 +108,7 @@ export class M_handwriting {
         const gridSize = 20;
         const gridColor = '#e0e0e0';
         this.gridContainer = new Box();
-        
+
         // 获取当前视图边界
         const viewBox = (this.app.view as HTMLElement).getBoundingClientRect();
         console.log(viewBox);
@@ -81,7 +116,7 @@ export class M_handwriting {
         const top = Math.floor(viewBox.top / gridSize) * gridSize;
         const right = Math.ceil((viewBox.left + viewBox.width) / gridSize) * gridSize;
         const bottom = Math.ceil((viewBox.top + viewBox.height) / gridSize) * gridSize;
-        
+
         // 绘制水平线
         for (let y = top; y <= bottom; y += gridSize) {
             const line = new Line({
@@ -91,7 +126,7 @@ export class M_handwriting {
             });
             this.gridContainer.add(line);
         }
-        
+
         // 绘制垂直线
         for (let x = left; x <= right; x += gridSize) {
             const line = new Line({
@@ -101,7 +136,7 @@ export class M_handwriting {
             });
             this.gridContainer.add(line);
         }
-        
+
         // 添加到背景层
         this.background.add(this.gridContainer);
     }

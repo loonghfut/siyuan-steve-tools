@@ -45,6 +45,7 @@
     "@fullcalendar/multimonth": "^6.1.15",
     "@fullcalendar/rrule": "^6.1.15",
     "@fullcalendar/timegrid": "^6.1.15",
+    "@leafer-in/viewport": "^1.4.2",
     "@types/sortablejs": "^1.15.8",
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
