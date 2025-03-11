@@ -1,34 +1,14 @@
-/* 在文件底部添加以下样式 */
-.siyuan-whiteboard-container {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.siyuan-whiteboard-toolbox {
-    display: flex;
-    gap: 8px;
-    padding: 8px;
+.steveTool-whiteboard-container {
     background-color: var(--b3-theme-background);
-    border-bottom: 1px solid var(--b3-border-color);
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
 }
 
-.siyuan-whiteboard-tool {
-    padding: 6px 12px;
-    border-radius: 4px;
-    background-color: var(--b3-theme-surface);
-    border: 1px solid var(--b3-border-color);
-    cursor: pointer;
+.steveTool-whiteboard-toolbar button {
+    transition: background-color 0.2s ease;
 }
 
-.siyuan-whiteboard-tool.active {
-    background-color: var(--b3-theme-primary-light);
-    border-color: var(--b3-theme-primary);
-}
-
-#drawing-canvas {
-    background-color: white;
-    width: 100%;
-    flex-grow: 1;
+.steveTool-whiteboard-toolbar button:hover {
+    background-color: var(--b3-theme-hover) !important;
 }
