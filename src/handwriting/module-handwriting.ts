@@ -196,6 +196,7 @@ export class M_handwriting {
                     rootId: "20250310234002-p8g1pls",
                     render: {
                         breadcrumb: false,
+                        gutter:false,
                     },
                     action: ["cb-get-focus"],
                     mode: "wysiwyg",
