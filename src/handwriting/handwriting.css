@@ -1,75 +1,20 @@
-/* 基本样式 */
+/* 画板样式 */
 .drawflow-canvas {
-  background-color: #f6f6f6;
-  background-image: 
-    linear-gradient(to right, #e0e0e0 1px, transparent 1px),
-    linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
-  background-size: 20px 20px;
+  width: 100%;
+  height: 100%;
   position: relative;
+  overflow: hidden;
 }
 
-.drawflow-toolbar {
-  display: flex;
-  background-color: #f0f0f0;
-  padding: 8px;
-  border-bottom: 1px solid #ddd;
-}
-
-.toolbar-btn {
-  width: 32px;
-  height: 32px;
-  padding: 4px;
-  margin: 0 2px;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.toolbar-btn:hover {
-  background-color: #e6e6e6;
-}
-
-.toolbar-btn.active {
-  background-color: #dbeafe;
-  border-color: #2563eb;
-}
-
-.toolbar-btn .icon {
-  width: 20px;
-  height: 20px;
-}
-
-/* 节点样式 */
-.drawflow-node {
-  border-radius: 4px;
-  border: 1px solid #cacaca;
-  background: white;
+/* Drawflow 节点和连接样式 */
+.drawflow .drawflow-node {
+  background: rgb(101, 71, 71);
+  border: 1px solid #804848;
+  border-radius: 5px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
-.rect-node {
-  min-width: 150px;
-  min-height: 100px;
-}
-
-.circle-node {
-  min-width: 100px;
-  min-height: 100px;
-  border-radius: 50%;
-}
-
-.text-node {
-  border: none;
-  background: transparent;
-  box-shadow: none;
-}
-
-/* 连接线样式 */
-.connection {
-  stroke: #4d85ff;
+.drawflow .connection .main-path {
   stroke-width: 2px;
+  stroke: #4ea9ff;
 }
