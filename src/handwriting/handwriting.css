@@ -1,14 +1,77 @@
-.steveTool-whiteboard-container {
-    background-color: var(--b3-theme-background);
-    overflow: hidden;
-    touch-action: none;
-    user-select: none;
+/* 现代化工具栏样式 */
+.drawflow-toolbar {
+  display: flex;
+  padding: 8px 16px;
+  background: var(--b3-theme-background);
+  border-bottom: 1px solid var(--b3-border-color);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  gap: 8px;
 }
 
-.steveTool-whiteboard-toolbar button {
-    transition: background-color 0.2s ease;
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 4px;
+  background: var(--b3-theme-surface);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.steveTool-whiteboard-toolbar button:hover {
-    background-color: var(--b3-theme-hover) !important;
+.toolbar-btn:hover {
+  background: var(--b3-theme-surface-lighter);
+}
+
+.toolbar-btn.active {
+  background: var(--b3-theme-primary-light);
+  color: var(--b3-theme-on-primary);
+}
+
+.toolbar-btn .icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* 节点样式优化 */
+.drawflow-node {
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--b3-border-color);
+  background: var(--b3-theme-background);
+}
+
+.rect-node {
+  min-width: 150px;
+  min-height: 100px;
+  resize: both;
+  overflow: auto;
+}
+
+.circle-node {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.text-node {
+  padding: 10px;
+  min-width: 100px;
+  min-height: 40px;
+  outline: none;
+}
+
+/* 增加画布样式 */
+.drawflow-canvas {
+  background-color: var(--b3-theme-background-light);
+  background-image: 
+    linear-gradient(var(--b3-border-color-light) 1px, transparent 1px),
+    linear-gradient(90deg, var(--b3-border-color-light) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
