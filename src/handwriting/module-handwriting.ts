@@ -139,145 +139,350 @@ export class M_handwriting {
         const addButtonBtn = document.getElementById(`add-button-${id}`);
         // 获取DOM元素容器
         const domContainer = document.getElementById(`dom-elements-container-${id}`);
-
+    
         if (!addButtonBtn || !domContainer) return;
-
-        // 为每个DOM元素存储位置信息的映射
-        const domElementPositions = new Map<string, { left: number, top: number }>();
+    
         // 生成唯一的DOM元素ID
         let domElementCounter = 0;
-
+    
         // 绑定点击事件
         addButtonBtn.addEventListener('click', () => {
             // 获取画布中心点坐标（在画布坐标系中）
             const vpt = canvas.viewportTransform;
             if (!vpt) return;
-
+    
             // 计算当前视口中心在画布坐标系中的位置
             const centerX = -vpt[4] / vpt[0] + (canvas.getWidth() / 2) / vpt[0];
             const centerY = -vpt[5] / vpt[3] + (canvas.getHeight() / 2) / vpt[3];
-
+    
             // 创建唯一ID
-            const buttonId = `dom-button-${id}-${domElementCounter++}`;
-
+            const domId = `dom-button-${id}-${domElementCounter++}`;
+    
             // 1. 创建一个DOM按钮元素
             const button = document.createElement('button');
-            button.id = buttonId;
+            button.id = domId;
             button.textContent = '可拖拽按钮';
             button.style.cssText = `
                 position: absolute;
-                background: #e8e8e8;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                padding: 6px 12px;
-                cursor: pointer;
                 pointer-events: auto;
+                padding: 8px 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: move; /* 表示可拖动 */
+                transform-origin: left top;
+                touch-action: none; /* 防止移动设备上的默认触摸行为 */
+                user-select: none; /* 防止文本选择 */
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            `;
+            
+            // 添加拖动手柄和缩放手柄
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'drag-handle';
+            dragHandle.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 8px;
+                cursor: move;
+                background-color: rgba(0,0,0,0.1);
+                border-radius: 4px 4px 0 0;
+            `;
+            
+            const resizeHandle = document.createElement('div');
+            resizeHandle.className = 'resize-handle';
+            resizeHandle.style.cssText = `
+                position: absolute;
+                bottom: -5px;
+                right: -5px;
+                width: 10px;
+                height: 10px;
+                background-color: #2196F3;
+                border-radius: 50%;
+                cursor: nwse-resize;
                 z-index: 10;
-                font-size: 14px;
             `;
             
             // 添加点击事件处理器
             button.addEventListener('click', (event) => {
                 event.stopPropagation(); // 防止事件冒泡到画布
-                showMessage(`按钮 ${buttonId} 被点击了!`);
-                // 在这里可以添加更多的点击后的逻辑
+                // 检查是否点击的是手柄部分，如果是，则不触发点击事件
+                if (event.target === button) {
+                    showMessage(`按钮 ${domId} 被点击了!`);
+                    // 在这里可以添加更多的点击后的逻辑
+                }
             });
-
+            
+            button.appendChild(dragHandle);
+            button.appendChild(resizeHandle);
+    
             // 2. 将按钮添加到DOM容器中
             domContainer.appendChild(button);
-
-            // 3. 存储初始位置
-            domElementPositions.set(buttonId, { left: centerX, top: centerY });
-
-            // 4. 创建Fabric.js图像占位符，用于拖拽和定位
-            const rect = new fabric.Rect({
-                left: centerX,
-                top: centerY,
-                width: 100,
-                height: 30,
-                fill: 'rgba(255,255,255,0.01)',
-                stroke: 'rgba(0,0,0,0.2)',
-                strokeWidth: 1,
-                rx: 4,
-                ry: 4,
-                hasControls: true,
-                hasBorders: true,
-                // lockRotation: true, // 防止旋转影响DOM元素定位
-                data: { domId: buttonId } as any // 关联DOM元素ID
-            });
-
-            // 5. 添加到Fabric画布
-            canvas.add(rect);
-
-            // 6. 立即更新DOM元素位置
-            this.updateDomElementPosition(button, rect, vpt);
-
+            
+            // 3. 计算初始位置
+            const initialScreenX = centerX * vpt[0] + vpt[4];
+            const initialScreenY = centerY * vpt[3] + vpt[5];
+            
+            // 4. 设置按钮初始位置
+            button.style.left = `${initialScreenX}px`;
+            button.style.top = `${initialScreenY}px`;
+            
+            // 5. 为按钮添加拖拽功能
+            this.addDraggableToElement(button, dragHandle, canvas, id);
+            
+            // 6. 为按钮添加缩放功能
+            this.addResizableToElement(button, resizeHandle, canvas);
+            
             // 7. 显示提示
-            showMessage('已添加DOM按钮，可拖拽移动位置');
-
-            // 8. 设置移动事件处理
-            rect.on('moving', () => {
-                this.updateDomElementPosition(button, rect, canvas.viewportTransform);
-            });
-
-            rect.on('modified', () => {
-                // 保存新位置
-                if (rect.left !== undefined && rect.top !== undefined) {
-                    domElementPositions.set(buttonId, { left: rect.left, top: rect.top });
-                }
-            });
+            showMessage('已添加DOM按钮，可直接拖拽移动位置或缩放大小');
         });
-
-        // 监听画布变换（平移、缩放）以更新所有DOM元素位置
+        
+        // 监听画布变换（平移、缩放）以更新所有DOM元素的变换矩阵
         canvas.on('after:render', () => {
-            // 获取所有Fabric占位对象
-            const objects = canvas.getObjects().filter(obj => {
-                return obj['data'] && obj['data'].domId;
-            });
-
-            // 更新每个对象关联的DOM元素位置
-            objects.forEach(obj => {
-                const domId = obj['data'].domId;
-                const domElement = document.getElementById(domId);
-                if (domElement) {
-                    this.updateDomElementPosition(domElement, obj, canvas.viewportTransform);
-                }
-            });
+            // 更新DOM容器的变换以匹配画布变换
+            const vpt = canvas.viewportTransform;
+            if (!vpt) return;
+            
+            // 将整个DOM容器的变换设置为与画布相同
+            // 这样容器中的元素会自动跟随画布的平移和缩放
+            domContainer.style.transform = `matrix(${vpt[0]}, ${vpt[1]}, ${vpt[2]}, ${vpt[3]}, ${vpt[4]}, ${vpt[5]})`;
         });
     }
-
+    
     /**
-     * 更新DOM元素位置以匹配Fabric对象位置
-     * @param domElement DOM元素
-     * @param fabricObj Fabric对象
-     * @param viewportTransform 视口变换矩阵
+     * 为元素添加拖拽功能
+     * @param element 要添加拖拽功能的元素
+     * @param handle 拖动手柄元素
+     * @param canvas 相关的Fabric画布
+     * @param id 画布ID
      */
-    private updateDomElementPosition(domElement: HTMLElement, fabricObj: fabric.Object, viewportTransform?: number[] | null) {
-        if (!viewportTransform || fabricObj.left === undefined || fabricObj.top === undefined) return;
-
-        // 1. 获取Fabric对象在画布上的坐标
-        const objLeft = fabricObj.left;
-        const objTop = fabricObj.top;
-
-        // 2. 应用视口变换计算屏幕坐标
-        // 矩阵变换：[x, y, 1] * [vpt0, vpt1, vpt2, vpt3, vpt4, vpt5]
-        const screenX = objLeft * viewportTransform[0] + objTop * viewportTransform[1] + viewportTransform[4];
-        const screenY = objLeft * viewportTransform[2] + objTop * viewportTransform[3] + viewportTransform[5];
-
-        // 3. 考虑对象尺寸的水平居中
-        const objWidth = fabricObj.getScaledWidth() || 100;
-        const offsetX = objWidth / 2 * viewportTransform[0];
-
-        // 4. 设置DOM元素位置
-        domElement.style.left = `${screenX - offsetX}px`;
-        domElement.style.top = `${screenY}px`;
-
-        // 5. 设置缩放 (可选，根据需要)
-        const scale = viewportTransform[0]; // 假设x和y的缩放是一致的
-        domElement.style.transform = `scale(${scale})`;
-        domElement.style.transformOrigin = 'left top';
+    private addDraggableToElement(element: HTMLElement, handle: HTMLElement, canvas: Canvas, id: string) {
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let initialLeft = 0;
+        let initialTop = 0;
+        let elementRect: DOMRect;
+        
+        const startDrag = (e: MouseEvent | TouchEvent) => {
+            isDragging = true;
+            
+            // 获取触摸/鼠标的初始位置
+            if (e instanceof MouseEvent) {
+                startX = e.clientX;
+                startY = e.clientY;
+            } else if (e.touches && e.touches[0]) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+            
+            // 获取元素的初始位置和尺寸
+            elementRect = element.getBoundingClientRect();
+            
+            // 获取元素当前的CSS位置（去掉px单位）
+            const currentLeftStr = element.style.left || '0px';
+            const currentTopStr = element.style.top || '0px';
+            initialLeft = parseFloat(currentLeftStr.replace('px', ''));
+            initialTop = parseFloat(currentTopStr.replace('px', ''));
+            
+            // 添加活动样式
+            element.style.opacity = '0.8';
+            element.style.zIndex = '1000';
+            
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 添加临时事件监听器
+            document.addEventListener('mousemove', moveDrag);
+            document.addEventListener('touchmove', moveDrag, { passive: false });
+            document.addEventListener('mouseup', stopDrag);
+            document.addEventListener('touchend', stopDrag);
+        };
+        
+        const moveDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+            
+            // 计算移动距离
+            let clientX, clientY;
+            if (e instanceof MouseEvent) {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            } else if (e.touches && e.touches[0]) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                return;
+            }
+            
+            // 计算在画布变换下的实际移动距离
+            const vpt = canvas.viewportTransform;
+            if (!vpt) return;
+            
+            // 移动距离需要考虑缩放比例
+            const scale = vpt[0]; // 假设x和y的缩放比例相同
+            const deltaX = (clientX - startX) / scale;
+            const deltaY = (clientY - startY) / scale;
+            
+            // 更新元素位置
+            element.style.left = `${initialLeft + deltaX}px`;
+            element.style.top = `${initialTop + deltaY}px`;
+            
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        
+        const stopDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            // 恢复正常样式
+            element.style.opacity = '1';
+            element.style.zIndex = '';
+            
+            // 移除临时事件监听器
+            document.removeEventListener('mousemove', moveDrag);
+            document.removeEventListener('touchmove', moveDrag);
+            document.removeEventListener('mouseup', stopDrag);
+            document.removeEventListener('touchend', stopDrag);
+            
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        
+        // 添加拖拽事件监听器
+        handle.addEventListener('mousedown', startDrag);
+        handle.addEventListener('touchstart', startDrag, { passive: false });
+        
+        // 避免按钮的点击事件被触摸事件拖拽干扰
+        handle.addEventListener('click', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
     }
-
+    
+        /**
+     * 为元素添加缩放功能
+     * @param element 要添加缩放功能的元素
+     * @param handle 缩放手柄元素
+     * @param canvas 相关的Fabric画布
+     */
+    private addResizableToElement(element: HTMLElement, handle: HTMLElement, canvas: Canvas) {
+        let isResizing = false;
+        let startX = 0;
+        let startY = 0;
+        let startWidth = 0;
+        let startHeight = 0;
+        
+        const startResize = (e: MouseEvent | TouchEvent) => {
+            isResizing = true;
+            
+            // 获取触摸/鼠标的初始位置
+            if (e instanceof MouseEvent) {
+                startX = e.clientX;
+                startY = e.clientY;
+            } else if (e.touches && e.touches[0]) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+            
+            // 获取元素的初始尺寸
+            const rect = element.getBoundingClientRect();
+            // 获取当前实际尺寸（考虑到元素可能已经有了width/height样式）
+            const computedStyle = window.getComputedStyle(element);
+            startWidth = parseFloat(computedStyle.width);
+            startHeight = parseFloat(computedStyle.height);
+            
+            // 如果元素没有明确的宽高，则使用其边界矩形的尺寸
+            if (!startWidth) startWidth = rect.width;
+            if (!startHeight) startHeight = rect.height;
+            
+            // 添加活动样式
+            element.style.opacity = '0.8';
+            
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 添加临时事件监听器
+            document.addEventListener('mousemove', moveResize);
+            document.addEventListener('touchmove', moveResize, { passive: false });
+            document.addEventListener('mouseup', stopResize);
+            document.addEventListener('touchend', stopResize);
+        };
+        
+        const moveResize = (e: MouseEvent | TouchEvent) => {
+            if (!isResizing) return;
+            
+            // 计算新尺寸
+            let clientX, clientY;
+            if (e instanceof MouseEvent) {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            } else if (e.touches && e.touches[0]) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                return;
+            }
+            
+            // 考虑画布缩放比例调整缩放速度
+            const vpt = canvas.viewportTransform;
+            if (!vpt) return;
+            
+            const scale = vpt[0]; // 假设x和y的缩放比例相同
+            const deltaX = (clientX - startX) / scale;
+            const deltaY = (clientY - startY) / scale;
+            
+            // 计算新尺寸，确保最小尺寸
+            const newWidth = Math.max(50, startWidth + deltaX);
+            const newHeight = Math.max(30, startHeight + deltaY);
+            
+            // 更新元素尺寸
+            element.style.width = `${newWidth}px`;
+            element.style.height = `${newHeight}px`;
+            
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        
+        const stopResize = (e: MouseEvent | TouchEvent) => {
+            if (!isResizing) return;
+            isResizing = false;
+            
+            // 恢复正常样式
+            element.style.opacity = '1';
+            
+            // 移除临时事件监听器
+            document.removeEventListener('mousemove', moveResize);
+            document.removeEventListener('touchmove', moveResize);
+            document.removeEventListener('mouseup', stopResize);
+            document.removeEventListener('touchend', stopResize);
+            
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+        };
+        
+        // 添加缩放事件监听器
+        handle.addEventListener('mousedown', startResize);
+        handle.addEventListener('touchstart', startResize, { passive: false });
+        
+        // 避免按钮的点击事件被触摸事件缩放干扰
+        handle.addEventListener('click', (e) => {
+            if (isResizing) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+    }
 
 
     /**
