@@ -45,7 +45,7 @@ export class M_handwriting {
     private async openWhiteBoard() {
         // 生成唯一ID
         // const id = new Date().getTime().toString();
-        const id = "123";
+        const id = "1234";
         // 创建新选项卡
         const whiteBoardTab = await openTab({
             app: this.plugin.app,
@@ -61,324 +61,24 @@ export class M_handwriting {
 
         // 添加画布容器和网格背景
         whiteBoardTab.panelElement.innerHTML = `
-    <div id='steveTool-whiteboard-${id}' class="whiteboard-container" 
-         style="width: 100%; height: 100%; position: relative; overflow: hidden; background-color: #f5f5f5;">
+        <div id='steveTool-whiteboard-${id}' class="whiteboard-container" 
+         style="width: 100%; height: 100%; position: relative; overflow: hidden; background-color: var(--b3-theme-background);">
         <div class="whiteboard-controls" style="position: absolute; top: 10px; right: 10px; z-index: ${window.siyuan.zIndex}; 
-             background-color: rgba(255, 255, 255, 0.7); padding: 5px 10px; border-radius: 4px; font-size: 14px;">
+             background-color: var(--b3-theme-background); padding: 5px 10px; border-radius: 4px; font-size: 14px; color: var(--b3-theme-on-background);">
             <span id="zoom-display-${id}">缩放: 100%</span>
-            <button id="reset-view-${id}" style="margin-left: 10px; background: #e8e8e8; border: 1px solid #ccc; 
-                    border-radius: 4px; padding: 2px 8px; cursor: pointer;">重置视图</button>
-            <button id="add-text-${id}" style="margin-left: 10px; background: #e8e8e8; border: 1px solid #ccc; 
-                    border-radius: 4px; padding: 2px 8px; cursor: pointer;">添加文本</button>
-            <button id="add-button-${id}" style="margin-left: 10px; background: #e8e8e8; border: 1px solid #ccc; 
-                    border-radius: 4px; padding: 2px 8px; cursor: pointer;">添加按钮</button>
+            <button id="reset-view-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
+                border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">重置视图</button>
+            <button id="add-button-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
+                border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">添加按钮</button>
         </div>
         <canvas id='canvas-${id}'></canvas>
         <div id='grid-${id}' class="whiteboard-grid"></div>
         <div id="dom-elements-container-${id}" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
-    </div>`;
+        </div>`;
 
         // 初始化画布
         this.initializeCanvas(id);
     }
-
-    /**
-     * 为无限画板添加数据保存与恢复功能
-     * @param canvas Fabric.js画布实例
-     * @param id 画布ID
-     */
-    private setupSaveAndRestore(canvas: Canvas, id: string) {
-        // 获取控制栏，添加保存按钮
-        const controlsContainer = document.querySelector(`.whiteboard-controls`);
-
-        if (!controlsContainer) return;
-
-        // 创建保存按钮
-        const saveButton = document.createElement('button');
-        saveButton.id = `save-whiteboard-${id}`;
-        saveButton.textContent = '保存';
-        saveButton.style.cssText = `
-            margin-left: 10px; 
-            background: #e8e8e8; 
-            border: 1px solid #ccc; 
-            border-radius: 4px; 
-            padding: 2px 8px; 
-            cursor: pointer;
-        `;
-
-        // 添加保存按钮到控制栏
-        controlsContainer.appendChild(saveButton);
-
-        // 绑定保存按钮点击事件
-        saveButton.addEventListener('click', () => {
-            this.saveWhiteboardData(canvas, id);
-        });
-
-        // 尝试恢复已保存的数据
-        this.restoreWhiteboardData(canvas, id);
-    }
-
-    /**
-     * 保存画板数据
-     * @param canvas Fabric.js画布实例
-     * @param id 画布ID
-     */
-    private async saveWhiteboardData(canvas: Canvas, id: string) {
-        try {
-            // 1. 初始化配置管理器
-            const configManager = new PluginConfig("siyuan-steve-tools", "whiteboard");
-            await configManager.load();
-
-
-            // 2. 收集Canvas中的对象数据
-            const canvasData = canvas.toObject(['id', 'name', 'customType']);
-
-            // 3. 收集DOM元素数据
-            const domElements = document.querySelectorAll(`#dom-elements-container-${id} > div`);
-            const domElementsData: any[] = [];
-
-            domElements.forEach((el: HTMLElement) => {
-                // 仅处理有ID的元素
-                if (el.id) {
-                    // 获取位置和尺寸
-                    const style = window.getComputedStyle(el);
-
-                    // 获取内部编辑器内容
-                    const wrapper = el.querySelector('.protyle-wrapper');
-                    let editorContent = '';
-
-                    if (wrapper) {
-                        const contentElement = wrapper.querySelector('[contenteditable="true"]');
-                        if (contentElement) {
-                            editorContent = contentElement.innerHTML;
-                        } else {
-                            // 尝试获取protyle内容区
-                            const contentBlock = wrapper.querySelector('.protyle-content');
-                            if (contentBlock) {
-                                editorContent = contentBlock.innerHTML;
-                            }
-                        }
-                    }
-
-                    // 收集元素数据
-                    domElementsData.push({
-                        id: el.id,
-                        type: 'protyle-dom',
-                        left: parseFloat(el.style.left || '0'),
-                        top: parseFloat(el.style.top || '0'),
-                        width: parseFloat(style.width),
-                        height: parseFloat(style.height),
-                        editorContent: editorContent,
-                        // 记录protyle所需的参数
-                        blockId: "20250310234002-us3sb9j", // 使用固定ID，或从元素中获取
-                        rootId: "20250310234002-p8g1pls"
-                    });
-                }
-            });
-
-            // 4. 收集视图状态数据
-            const viewportData = {
-                transform: canvas.viewportTransform,
-                zoom: canvas.getZoom()
-            };
-
-            // 5. 合并所有数据
-            const whiteboardData = {
-                id: id,
-                timestamp: new Date().getTime(),
-                canvasData: canvasData,
-                domElementsData: domElementsData,
-                viewportData: viewportData
-            };
-
-            // 6. 保存到思源笔记的存储系统
-            const whiteboardsData = configManager.get("whiteboards", {});
-            whiteboardsData[id] = whiteboardData;
-            configManager.set("whiteboards", whiteboardsData);
-
-            // 7. 保存配置
-            await configManager.save();
-
-            // 显示成功提示
-            showMessage('画板数据保存成功');
-        } catch (error) {
-            console.error('保存画板数据失败:', error);
-            showMessage('保存画板数据失败: ' + (error as Error).message);
-        }
-    }
-
-    /**
-     * 恢复画板数据
-     * @param canvas Fabric.js画布实例
-     * @param id 画布ID
-     */
-    private async restoreWhiteboardData(canvas: Canvas, id: string) {
-        try {
-            // 1. 初始化配置管理器
-            const configManager = new PluginConfig("siyuan-steve-tools", "whiteboard");
-            await configManager.load();
-
-            // 2. 获取保存的数据
-            const whiteboardsData = configManager.get("whiteboards", {});
-            const savedData = whiteboardsData[id];
-
-            if (!savedData) {
-                // 没有保存的数据，这是一个新画板
-                return;
-            }
-
-            // 3. 恢复视图状态
-            if (savedData.viewportData && savedData.viewportData.transform) {
-                canvas.setViewportTransform(savedData.viewportData.transform);
-                this.updateGridPosition(id, savedData.viewportData.transform);
-                this.updateZoomDisplay(id, savedData.viewportData.zoom || 1);
-            }
-
-            // 4. 恢复Canvas对象
-            if (savedData.canvasData) {
-                // 使用loadFromJSON异步加载数据
-                canvas.loadFromJSON(savedData.canvasData, () => {
-                    canvas.renderAll();
-                    console.log('Canvas对象恢复完成');
-                });
-            }
-
-            // 5. 恢复DOM元素
-            if (savedData.domElementsData && Array.isArray(savedData.domElementsData)) {
-                const domContainer = document.getElementById(`dom-elements-container-${id}`);
-                if (!domContainer) return;
-
-                // 异步恢复DOM元素，确保DOM渲染完成
-                setTimeout(() => {
-                    savedData.domElementsData.forEach(itemData => {
-                        if (itemData.type === 'protyle-dom') {
-                            // 创建DOM元素
-                            this.restoreProtyleElement(itemData, canvas, id, domContainer);
-                        }
-                    });
-                }, 100);
-            }
-
-            // 显示成功提示
-            showMessage('画板数据恢复完成');
-        } catch (error) {
-            console.error('恢复画板数据失败:', error);
-            showMessage('恢复画板数据失败: ' + (error as Error).message);
-        }
-    }
-
-    /**
-     * 恢复Protyle编辑器元素
-     * @param itemData 元素数据
-     * @param canvas Fabric.js画布实例
-     * @param id 画布ID
-     * @param domContainer DOM容器元素
-     */
-    private restoreProtyleElement(itemData: any, canvas: Canvas, id: string, domContainer: HTMLElement) {
-        // 1. 创建一个DOM元素
-        const protyledom = document.createElement('div');
-        protyledom.id = itemData.id; // 使用保存的ID
-        protyledom.style.cssText = `
-            position: absolute;
-            width: ${itemData.width}px;
-            height: ${itemData.height}px;
-            left: ${itemData.left}px;
-            top: ${itemData.top}px;
-            background-color: white;
-            border-radius: 6px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-            pointer-events: auto;
-            transform-origin: 0 0;
-            overflow: hidden;
-        `;
-
-        // 2. 创建容器包装器
-        const wrapperDiv = document.createElement('div');
-        wrapperDiv.className = 'protyle-wrapper';
-        wrapperDiv.style.cssText = `
-            position: absolute;
-            top: 8px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        `;
-
-        // 3. 添加拖动手柄和缩放手柄
-        const dragHandle = document.createElement('div');
-        dragHandle.className = 'drag-handle';
-        dragHandle.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 8px;
-            cursor: move;
-            background-color: rgba(0,0,0,0.1);
-            border-radius: 4px 4px 0 0;
-        `;
-
-        const resizeHandle = document.createElement('div');
-        resizeHandle.className = 'resize-handle';
-        resizeHandle.style.cssText = `
-            position: absolute;
-            bottom: -5px;
-            right: -5px;
-            width: 10px;
-            height: 10px;
-            background-color: #2196F3;
-            border-radius: 50%;
-            cursor: nwse-resize;
-            z-index: 100;
-        `;
-
-        // 4. 添加元素到DOM
-        protyledom.appendChild(dragHandle);
-        protyledom.appendChild(resizeHandle);
-        protyledom.appendChild(wrapperDiv);
-        domContainer.appendChild(protyledom);
-
-        // 5. 初始化Protyle编辑器
-        try {
-            const protyle = new Protyle(window.siyuan.ws.app, wrapperDiv, {
-                blockId: itemData.blockId || "20250310234002-us3sb9j",
-                rootId: itemData.rootId || "20250310234002-p8g1pls",
-                render: {
-                    breadcrumb: false,
-                    gutter: false,
-                },
-                action: ["cb-get-focus"],
-                mode: "wysiwyg",
-            });
-
-            // 6. 恢复编辑器内容（如果有）
-            if (itemData.editorContent) {
-                // 稍后设置内容，确保编辑器已加载
-                setTimeout(() => {
-                    const contentEditable = wrapperDiv.querySelector('[contenteditable="true"]');
-                    if (contentEditable) {
-                        contentEditable.innerHTML = itemData.editorContent;
-                    } else {
-                        // 尝试找到内容容器
-                        const contentBlock = wrapperDiv.querySelector('.protyle-content');
-                        if (contentBlock) {
-                            contentBlock.innerHTML = itemData.editorContent;
-                        }
-                    }
-                }, 50);
-            }
-        } catch (e) {
-            console.error("初始化编辑器失败:", e);
-            wrapperDiv.innerHTML = '<div style="padding: 10px;">编辑器初始化失败</div>';
-        }
-
-        // 7. 为按钮添加拖拽和缩放功能
-        this.addDraggableToElement(protyledom, dragHandle, canvas, id);
-        this.addResizableToElement(protyledom, resizeHandle, canvas);
-    }
-
 
 
     /**
@@ -418,18 +118,105 @@ export class M_handwriting {
         // 设置画布平移和缩放功能
         this.setupPanZoom(canvas, id);
 
-        // 设置HTML元素添加功能
-        this.setupHtmlElementAddition(canvas, id);
-
         // 设置DOM元素添加功能
         this.setupDomElementAddition(canvas, id);
 
-        // 设置保存和恢复功能
-        this.setupSaveAndRestore(canvas, id);
+        // 设置思源块拖放功能
+        this.setupSiyuanBlockDrop(canvas, id);
 
         // 设置响应式尺寸
         this.setupResponsiveCanvas(canvas, container);
     }
+
+    /**
+     * 设置思源笔记块的拖放功能
+     * @param canvas Fabric.js画布实例
+     * @param id 画布ID
+     */
+    private setupSiyuanBlockDrop(canvas: Canvas, id: string) {
+        // 获取容器元素
+        const container = document.getElementById(`steveTool-whiteboard-${id}`);
+
+        if (!container) return;
+
+        container.addEventListener('dragstart', (e) => {
+            // 存储被拖拽元素的 ID 或其他标识信息
+            console.log("开始拖放:", e.target);
+            // e.dataTransfer.setData('text/plain', e.target.id); // 例如存储元素 ID
+          });
+
+        // 添加拖拽相关事件监听
+        container.addEventListener('dragover', (e) => {
+            // 阻止默认行为以允许放置
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = 'copy'; // 显示为复制操作
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("接收到拖放事件:", e.dataTransfer!.types);
+            // 记录所有可用的数据类型
+            const types = e.dataTransfer!.types;
+            console.log("拖放数据类型:", types);
+
+            // 检查拖拽数据
+            const text = e.dataTransfer!.getData('text');
+            const html = e.dataTransfer!.getData('text/html');
+            const plainText = e.dataTransfer!.getData('text/plain');
+            const siyuanData = e.dataTransfer!.getData('text/x-siyuan');
+
+            // 显示接收到的数据
+            console.log("接收到拖放数据:");
+            console.log("text:", text);
+            console.log("text/html:", html);
+            console.log("text/plain:", plainText);
+            console.log("text/x-siyuan:", siyuanData);
+
+            // 显示消息提示
+            showMessage('接收到拖放数据，请查看控制台输出');
+
+            // 获取鼠标在画布上的位置
+            const rect = container.getBoundingClientRect();
+            const dropX = e.clientX - rect.left;
+            const dropY = e.clientY - rect.top;
+
+            // 获取当前画布的变换矩阵
+            const vpt = canvas.viewportTransform;
+            if (!vpt) return;
+
+            // 转换为画布坐标系中的位置
+            const canvasX = (dropX - vpt[4]) / vpt[0];
+            const canvasY = (dropY - vpt[5]) / vpt[3];
+
+            console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
+        });
+
+        // 添加一条提示信息
+        const noticeElement = document.createElement('div');
+        noticeElement.style.cssText = `
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background-color: var(--b3-theme-background);
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        pointer-events: none;
+        z-index: ${window.siyuan.zIndex - 1};
+    `;
+        noticeElement.textContent = '您可以将思源笔记中的块拖放到此画板上';
+        container.appendChild(noticeElement);
+
+        // 5秒后淡出提示
+        setTimeout(() => {
+            noticeElement.style.transition = 'opacity 1s';
+            noticeElement.style.opacity = '0';
+            setTimeout(() => noticeElement.remove(), 1000);
+        }, 5000);
+    }
+
+
 
     /**
      * 设置DOM元素添加功能
@@ -470,7 +257,7 @@ export class M_handwriting {
             position: absolute;
             width: 200px;
             height: 150px;
-            background-color: white;
+            background-color:rgba(53, 115, 240, 0.23);
             border-radius: 6px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.15);
             pointer-events: auto; /* 重要：允许元素接收事件 */
@@ -784,99 +571,7 @@ export class M_handwriting {
 
 
 
-    /**
-     * 设置HTML元素添加功能
-     * @param canvas Fabric.js画布实例
-     * @param id 画布ID
-     */
-    private setupHtmlElementAddition(canvas: Canvas, id: string) {
-        // 获取添加文本按钮元素
-        const addTextButton = document.getElementById(`add-text-${id}`);
 
-        // 绑定点击事件
-        if (addTextButton) {
-            addTextButton.addEventListener('click', () => {
-                // 获取画布中心点坐标
-                const vpt = canvas.viewportTransform;
-                if (!vpt) return;
-
-                // 计算当前视口中心在画布坐标系中的位置
-                const centerX = -vpt[4] / vpt[0] + (canvas.getWidth() / 2) / vpt[0];
-                const centerY = -vpt[5] / vpt[3] + (canvas.getHeight() / 2) / vpt[3];
-
-                // 创建可编辑文本元素
-                const text = new fabric.IText('双击编辑文本', {
-                    left: centerX,
-                    top: centerY,
-                    fontSize: 20,
-                    fill: '#333333',
-                    fontFamily: 'Arial',
-                    padding: 5,
-                    backgroundColor: 'rgba(255,255,255,0.8)',
-                    selectable: true,
-                    hasControls: true,
-                    hasBorders: true,
-                    editable: true
-                });
-
-                // 添加到画布
-                canvas.add(text);
-
-                // 激活文本元素
-                canvas.setActiveObject(text);
-
-                // 渲染画布
-                canvas.requestRenderAll();
-
-                // 显示提示
-                showMessage("已添加文本元素，双击可编辑内容，拖拽可移动位置");
-            });
-        }
-
-        // 设置对象移动事件监听（用于细化拖拽交互）
-        canvas.on('object:moving', (opt) => {
-            // 拖动对象时确保对象可视，避免拖出视野范围
-            const obj = opt.target;
-            if (!obj) return;
-
-            // 可选：添加拖拽时的视觉提示
-            if (obj.type === 'i-text') {
-                obj.set('opacity', 0.8); // 拖拽时半透明效果
-            }
-
-            // 渲染画布
-            canvas.requestRenderAll();
-        });
-
-        // 设置对象移动结束事件监听
-        canvas.on('object:modified', (opt) => {
-            const obj = opt.target;
-            if (!obj) return;
-
-            // 恢复正常显示
-            if (obj.type === 'i-text') {
-                obj.set('opacity', 1);
-            }
-
-            // 渲染画布
-            canvas.requestRenderAll();
-        });
-
-        // 双击编辑
-        canvas.on('mouse:dblclick', (opt) => {
-            // 检查是否点击的是文本
-            if (opt.target && opt.target.type === 'i-text') {
-                // 激活文本元素的编辑模式
-                const iTextObject = opt.target as fabric.IText;
-                iTextObject.enterEditing();
-
-                // 如果是初始文本，则全选方便用户直接输入
-                if (iTextObject.text === '双击编辑文本') {
-                    iTextObject.selectAll();
-                }
-            }
-        });
-    }
 
 
 
@@ -898,8 +593,8 @@ export class M_handwriting {
                 pointer-events: none;
                 background-size: 20px 20px;
                 background-image: 
-                    linear-gradient(to right, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+                    linear-gradient(to right, var(--b3-border-color) 1px, transparent 1px),
+                    linear-gradient(to bottom, var(--b3-border-color) 1px, transparent 1px);
                 transform-origin: 0 0;
             }
         `;
