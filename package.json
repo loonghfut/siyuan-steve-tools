@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.749.0",
+    "@frostime/siyuan-plugin-kits": "^1.5.8",
     "@fullcalendar/core": "^6.1.15",
     "@fullcalendar/daygrid": "^6.1.15",
     "@fullcalendar/icalendar": "^6.1.15",

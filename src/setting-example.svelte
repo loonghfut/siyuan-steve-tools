@@ -142,6 +142,14 @@
                     key: "cal-time",
                     value: settings["cal-time"],
                 },
+                {
+                    //2
+                    type: "checkbox",
+                    title: "是否按事件时间创建日记",
+                    description: "启用后会按事件时间的日记创建日程，而不在当天的日记中创建",
+                    key: "cal-create-for-date",
+                    value: settings["cal-create-for-date"],
+                },
                 //高级设置
                 {
                     //9
@@ -666,7 +674,7 @@
 
     const subGroupItemCounts = {
         日程管理: {
-            基础设置: 6,
+            基础设置: 7,
             高级设置: 8,
             ics设置: 6,
             ics分享: 8,

@@ -21,6 +21,7 @@ export const defaultSettings = {
     "cal-show-right-click": false,
     "cal-drag-change": false,//是否允许拖拽改变事件时间
     "cal-time": 1,
+    "cal-create-for-date": true,
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

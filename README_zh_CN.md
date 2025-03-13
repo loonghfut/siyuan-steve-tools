@@ -45,7 +45,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 
 #### 感谢：
 - [wilsons](https://ld246.com/member/wilsons)：开发`生成日历文件ics功能`指导
-- [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板
+- [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板和开发工具包
 - [seanduo](https://github.com/seanduo)：PR
 - [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
 - [空幽]()：打赏支持 `the first ` `the most`

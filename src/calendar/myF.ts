@@ -9,7 +9,9 @@ import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
 import { runblockdata_for_sub, runblockdata_for_time } from './quickadd';
-import { isEventCompleted } from './calendar';
+// import { isEventCompleted } from './calendar';
+import { createDailynote } from '@frostime/siyuan-plugin-kits';
+
 export const statusMap = {
     "未完成": "todo",
     "完成": "done",
@@ -512,9 +514,18 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         return true;
     }
 
-    const daynote_id = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"]);
     //// 创建一个新块
-    steveTools.outlog("daynote_id:::", daynote_id.id);
+    let daynote_id;
+    if (settingdata["cal-create-for-date"]) {
+        daynote_id = await createDailynote(settingdata["cal-create-pos"], new Date(dateStr));
+    } else {
+        daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"])).id;
+    }
+    ////检查是否创建成功
+    if (!daynote_id) {
+        sy.showMessage('未找到日记块');
+        return;
+    }
     const idid = await api.generateSiyuanID() as string;
 
     await api.appendBlock("markdown", `{{{row
@@ -523,7 +534,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
 {: id="${await api.generateSiyuanID() as string}"}
 }}}
-{: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id.id)
+{: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id)
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
     // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
