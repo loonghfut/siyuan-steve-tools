@@ -15,8 +15,8 @@ export class PluginConfig {
     async load(): Promise<void> {
         try {
             const configData = await getFile(this.configPath);
-            // console.log("::::", configData);
-            if (configData && configData?.viewName) {
+            console.log("::::", configData);
+            if (configData) {
                 this.config = configData;
             } else {
                 // 如果配置文件不存在，保存默认配置
