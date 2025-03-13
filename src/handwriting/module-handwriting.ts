@@ -173,7 +173,7 @@ export class M_handwriting {
 
             // 如果没有找到有效的思源块ID，则显示错误信息并退出
             if (!blockId) {
-                showMessage("未找到有效的思源块ID");
+                // showMessage("未找到有效的思源块ID");
                 return;
             }
 
@@ -238,41 +238,6 @@ export class M_handwriting {
 
         // 生成唯一的DOM元素ID
         let domElementCounter = 0;
-
-        // 绑定点击事件
-        addButtonBtn.addEventListener('click', () => {
-            // 获取画布中心点坐标（在画布坐标系中）
-            const vpt = canvas.viewportTransform;
-            if (!vpt) return;
-
-            // 计算当前视口中心在画布坐标系中的位置
-            const centerX = -vpt[4] / vpt[0] + (canvas.getWidth() / 2) / vpt[0];
-            const centerY = -vpt[5] / vpt[3] + (canvas.getHeight() / 2) / vpt[3];
-
-            // 创建唯一ID
-            const domId = `dom-button-${id}-${domElementCounter++}`;
-
-            // 使用封装好的方法创建容器
-            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
-                this.createProtyleContainer(domId, "20250310234002-us3sb9j", { x: centerX, y: centerY });
-
-            // 修改背景色以区分普通块
-            protyledom.style.backgroundColor = "rgba(53, 115, 240, 0.23)";
-
-            // 添加到DOM容器中
-            domContainer.appendChild(protyledom);
-
-            // 使用封装的方法初始化编辑器
-            const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j");
-
-            // 添加拖拽和缩放功能
-            this.addDraggableToElement(protyledom, dragHandle, canvas, id);
-            this.addResizableToElement(protyledom, resizeHandle, canvas);
-
-            // 显示成功消息
-            showMessage('已添加DOM按钮，可直接拖拽移动位置或缩放大小');
-        });
-
         // 添加拖拽创建功能
         this.setupDragToCreateElement(canvas, id, domElementCounter);
 
@@ -288,11 +253,11 @@ export class M_handwriting {
     }
 
     /**
- * 设置拖拽创建元素功能
- * @param canvas Fabric.js画布实例
- * @param id 画布ID
- * @param counter 计数器引用
- */
+     * 设置拖拽创建元素功能
+     * @param canvas Fabric.js画布实例
+     * @param id 画布ID
+     * @param counter 计数器引用
+     */
     private setupDragToCreateElement(canvas: Canvas, id: string, counter: number) {
         const container = document.getElementById(`steveTool-whiteboard-${id}`);
         const domContainer = document.getElementById(`dom-elements-container-${id}`);
@@ -344,9 +309,6 @@ export class M_handwriting {
             // 使用封装好的方法创建容器
             const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
                 this.createProtyleContainer(domId, "20250310234002-us3sb9j", { x: canvasX, y: canvasY });
-
-            // 修改背景色以区分普通块
-            protyledom.style.backgroundColor = "rgba(53, 115, 240, 0.23)";
 
             // 添加到DOM容器中
             domContainer.appendChild(protyledom);
@@ -612,10 +574,10 @@ export class M_handwriting {
 
 
     /**
- * 设置画布的平移和缩放功能
- * @param canvas Fabric.js画布实例
- * @param id 画布ID 
- */
+     * 设置画布的平移和缩放功能
+     * @param canvas Fabric.js画布实例
+     * @param id 画布ID 
+     */
     private setupPanZoom(canvas: Canvas, id: string) {
         // 状态变量
         let isDragging = false;
@@ -818,7 +780,7 @@ export class M_handwriting {
             position: absolute;
             width: 300px;
             height: 200px;
-            background-color: rgba(255, 255, 255, 0.9);
+            background-color: #3573f0;
             border-radius: 6px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.15);
             pointer-events: auto; /* 允许元素接收事件 */
@@ -911,6 +873,7 @@ export class M_handwriting {
             return null;
         }
     }
+
 
 
 
