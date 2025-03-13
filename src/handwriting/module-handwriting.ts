@@ -136,14 +136,9 @@ export class M_handwriting {
     private setupSiyuanBlockDrop(canvas: Canvas, id: string) {
         // 获取容器元素
         const container = document.getElementById(`steveTool-whiteboard-${id}`);
+        const domContainer = document.getElementById(`dom-elements-container-${id}`);
 
-        if (!container) return;
-
-        container.addEventListener('dragstart', (e) => {
-            // 存储被拖拽元素的 ID 或其他标识信息
-            console.log("开始拖放:", e.target);
-            // e.dataTransfer.setData('text/plain', e.target.id); // 例如存储元素 ID
-          });
+        if (!container || !domContainer) return;
 
         // 添加拖拽相关事件监听
         container.addEventListener('dragover', (e) => {
@@ -155,27 +150,34 @@ export class M_handwriting {
         container.addEventListener('drop', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log("接收到拖放事件:", e.dataTransfer!.types);
-            // 记录所有可用的数据类型
+
+            // 记录拖放数据类型
             const types = e.dataTransfer!.types;
             console.log("拖放数据类型:", types);
 
-            // 检查拖拽数据
-            const text = e.dataTransfer!.getData('text');
-            const html = e.dataTransfer!.getData('text/html');
-            const plainText = e.dataTransfer!.getData('text/plain');
-            const siyuanData = e.dataTransfer!.getData('text/x-siyuan');
+            // 尝试提取思源块ID
+            let blockId = '';
+            if (types && types.length > 0) {
+                // 方法1: 从特殊类型中提取
+                for (const type of types) {
+                    if (type.startsWith('application/siyuan-')) {
+                        const matches = type.match(/\d{14}-\w{7}/);
+                        if (matches && matches.length > 0) {
+                            blockId = matches[0];
+                            console.log("提取到块ID:", blockId);
+                            break;
+                        }
+                    }
+                }
+            }
 
-            // 显示接收到的数据
-            console.log("接收到拖放数据:");
-            console.log("text:", text);
-            console.log("text/html:", html);
-            console.log("text/plain:", plainText);
-            console.log("text/x-siyuan:", siyuanData);
+            // 如果没有找到有效的思源块ID，则显示错误信息并退出
+            if (!blockId) {
+                showMessage("未找到有效的思源块ID");
+                return;
+            }
 
-            // 显示消息提示
-            showMessage('接收到拖放数据，请查看控制台输出');
-
+            // 计算画布中的放置坐标
             // 获取鼠标在画布上的位置
             const rect = container.getBoundingClientRect();
             const dropX = e.clientX - rect.left;
@@ -189,31 +191,31 @@ export class M_handwriting {
             const canvasX = (dropX - vpt[4]) / vpt[0];
             const canvasY = (dropY - vpt[5]) / vpt[3];
 
+            // 生成唯一的DOM元素ID
+            const domId = `dom-block-${id}-${Date.now()}`;
+
+            // 创建容器元素
+            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
+                this.createProtyleContainer(domId, blockId, { x: canvasX, y: canvasY });
+
+            // 添加到DOM容器中
+            domContainer.appendChild(protyledom);
+
+            // 初始化Protyle编辑器
+            const protyle = this.initProtyleEditor(wrapperDiv, blockId);
+
+            // 添加拖拽和缩放功能
+            this.addDraggableToElement(protyledom, dragHandle, canvas, id);
+            this.addResizableToElement(protyledom, resizeHandle, canvas);
+
+            // 显示成功消息
+            if (protyle) {
+                showMessage(`已添加块 ${blockId}`);
+            }
+
+            // 记录调试信息
             console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
         });
-
-        // 添加一条提示信息
-        const noticeElement = document.createElement('div');
-        noticeElement.style.cssText = `
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        background-color: var(--b3-theme-background);
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 14px;
-        pointer-events: none;
-        z-index: ${window.siyuan.zIndex - 1};
-    `;
-        noticeElement.textContent = '您可以将思源笔记中的块拖放到此画板上';
-        container.appendChild(noticeElement);
-
-        // 5秒后淡出提示
-        setTimeout(() => {
-            noticeElement.style.transition = 'opacity 1s';
-            noticeElement.style.opacity = '0';
-            setTimeout(() => noticeElement.remove(), 1000);
-        }, 5000);
     }
 
 
@@ -250,105 +252,29 @@ export class M_handwriting {
             // 创建唯一ID
             const domId = `dom-button-${id}-${domElementCounter++}`;
 
-            // 1. 创建一个DOM元素
-            const protyledom = document.createElement('div');
-            protyledom.id = domId;
-            protyledom.style.cssText = `
-            position: absolute;
-            width: 200px;
-            height: 150px;
-            background-color:rgba(53, 115, 240, 0.23);
-            border-radius: 6px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-            pointer-events: auto; /* 重要：允许元素接收事件 */
-            transform-origin: 0 0;
-            overflow: hidden;
-        `;
+            // 使用封装好的方法创建容器
+            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
+                this.createProtyleContainer(domId, "20250310234002-us3sb9j", { x: centerX, y: centerY });
 
-            // Create a container wrapper for better interaction
-            const wrapperDiv = document.createElement('div');
-            wrapperDiv.className = 'protyle-wrapper';
-            wrapperDiv.style.cssText = `
-            position: absolute;
-            top: 8px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        `;
+            // 修改背景色以区分普通块
+            protyledom.style.backgroundColor = "rgba(53, 115, 240, 0.23)";
 
-            try {
-                // Initialize the Protyle editor inside the wrapper
-                const protyle = new Protyle(window.siyuan.ws.app, wrapperDiv, {
-                    blockId: "20250310234002-us3sb9j",
-                    rootId: "20250310234002-p8g1pls",
-                    render: {
-                        breadcrumb: false,
-                        gutter: false,
-                    },
-                    action: ["cb-get-focus"],
-                    mode: "wysiwyg",
-                });
-            } catch (e) {
-                console.error("初始化编辑器失败:", e);
-                wrapperDiv.innerHTML = '<div style="padding: 10px;">编辑器初始化失败</div>';
-            }
-
-            // 添加拖动手柄和缩放手柄
-            const dragHandle = document.createElement('div');
-            dragHandle.className = 'drag-handle';
-            dragHandle.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 8px;
-            cursor: move;
-            background-color: rgba(0,0,0,0.1);
-            border-radius: 4px 4px 0 0;
-        `;
-
-            const resizeHandle = document.createElement('div');
-            resizeHandle.className = 'resize-handle';
-            resizeHandle.style.cssText = `
-            position: absolute;
-            bottom: -5px;
-            right: -5px;
-            width: 10px;
-            height: 10px;
-            background-color: #2196F3;
-            border-radius: 50%;
-            cursor: nwse-resize;
-            z-index: 100;
-        `;
-
-            // 先添加手柄，再添加内容包装器
-            protyledom.appendChild(dragHandle);
-            protyledom.appendChild(resizeHandle);
-            protyledom.appendChild(wrapperDiv);
-
-            // 2. 将protyle添加到DOM容器中
+            // 添加到DOM容器中
             domContainer.appendChild(protyledom);
 
-            // 3. 计算初始位置
-            const initialScreenX = centerX * vpt[0] + vpt[4];
-            const initialScreenY = centerY * vpt[3] + vpt[5];
+            // 使用封装的方法初始化编辑器
+            const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j");
 
-            // 4. 设置按钮初始位置
-            protyledom.style.left = `${initialScreenX}px`;
-            protyledom.style.top = `${initialScreenY}px`;
-
-            // 5. 为按钮添加拖拽功能
+            // 添加拖拽和缩放功能
             this.addDraggableToElement(protyledom, dragHandle, canvas, id);
-
-            // 6. 为按钮添加缩放功能
             this.addResizableToElement(protyledom, resizeHandle, canvas);
 
-            // 7. 显示提示
+            // 显示成功消息
             showMessage('已添加DOM按钮，可直接拖拽移动位置或缩放大小');
         });
+
+        // 添加拖拽创建功能
+        this.setupDragToCreateElement(canvas, id, domElementCounter);
 
         // 监听画布变换（平移、缩放）以更新所有DOM元素的变换矩阵
         canvas.on('after:render', () => {
@@ -360,6 +286,88 @@ export class M_handwriting {
             domContainer.style.transform = `matrix(${vpt[0]}, ${vpt[1]}, ${vpt[2]}, ${vpt[3]}, ${vpt[4]}, ${vpt[5]})`;
         });
     }
+
+    /**
+ * 设置拖拽创建元素功能
+ * @param canvas Fabric.js画布实例
+ * @param id 画布ID
+ * @param counter 计数器引用
+ */
+    private setupDragToCreateElement(canvas: Canvas, id: string, counter: number) {
+        const container = document.getElementById(`steveTool-whiteboard-${id}`);
+        const domContainer = document.getElementById(`dom-elements-container-${id}`);
+        const addButtonBtn = document.getElementById(`add-button-${id}`);
+
+        if (!container || !domContainer || !addButtonBtn) return;
+
+        // 设置按钮为可拖动
+        addButtonBtn.setAttribute('draggable', 'true');
+
+        // 绑定拖拽开始事件
+        addButtonBtn.addEventListener('dragstart', (e) => {
+            // 设置拖拽数据
+            e.dataTransfer!.setData('text/plain', 'create-new-element');
+            e.dataTransfer!.effectAllowed = 'copy';
+        });
+
+        // 容器上监听拖放事件
+        container.addEventListener('dragover', (e) => {
+            // 阻止默认行为以允许放置
+            e.preventDefault();
+            e.dataTransfer!.dropEffect = 'copy';
+        });
+
+        container.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 检查是否是从添加按钮拖拽过来的
+            const dragData = e.dataTransfer!.getData('text/plain');
+            if (dragData !== 'create-new-element') return;
+
+            // 获取鼠标在画布上的位置
+            const rect = container.getBoundingClientRect();
+            const dropX = e.clientX - rect.left;
+            const dropY = e.clientY - rect.top;
+
+            // 获取当前画布的变换矩阵
+            const vpt = canvas.viewportTransform;
+            if (!vpt) return;
+
+            // 转换为画布坐标系中的位置
+            const canvasX = (dropX - vpt[4]) / vpt[0];
+            const canvasY = (dropY - vpt[5]) / vpt[3];
+
+            // 创建唯一ID
+            const domId = `dom-button-${id}-${counter++}`;
+
+            // 使用封装好的方法创建容器
+            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
+                this.createProtyleContainer(domId, "20250310234002-us3sb9j", { x: canvasX, y: canvasY });
+
+            // 修改背景色以区分普通块
+            protyledom.style.backgroundColor = "rgba(53, 115, 240, 0.23)";
+
+            // 添加到DOM容器中
+            domContainer.appendChild(protyledom);
+
+            // 使用封装的方法初始化编辑器
+            const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j");
+
+            // 添加拖拽和缩放功能
+            this.addDraggableToElement(protyledom, dragHandle, canvas, id);
+            this.addResizableToElement(protyledom, resizeHandle, canvas);
+
+            // 显示成功消息
+            showMessage('已添加新元素，可直接拖拽移动位置或缩放大小');
+
+            console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
+        });
+
+        // 添加提示
+        addButtonBtn.setAttribute('title', '拖拽此按钮到画布中创建新元素');
+    }
+
 
     /**
      * 为元素添加拖拽功能
@@ -790,6 +798,126 @@ export class M_handwriting {
     }
 
     /**
+     * 创建一个思源笔记块容器
+     * @param id 唯一ID
+     * @param blockId 思源笔记块ID
+     * @param position 初始位置
+     * @returns 创建的DOM元素
+     */
+    private createProtyleContainer(id: string, blockId: string, position: { x: number, y: number }): {
+        container: HTMLElement,
+        wrapper: HTMLElement,
+        dragHandle: HTMLElement,
+        resizeHandle: HTMLElement
+    } {
+        // 创建主容器
+        const container = document.createElement('div');
+        container.id = id;
+        container.className = 'siyuan-block-container';
+        container.style.cssText = `
+            position: absolute;
+            width: 300px;
+            height: 200px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 6px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+            pointer-events: auto; /* 允许元素接收事件 */
+            transform-origin: 0 0;
+            overflow: hidden;
+            border: 1px solid var(--b3-border-color);
+            left: ${position.x}px;
+            top: ${position.y}px;
+        `;
+
+        // 添加拖动手柄
+        const dragHandle = document.createElement('div');
+        dragHandle.className = 'drag-handle';
+        dragHandle.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            cursor: move;
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 4px 4px 0 0;
+        `;
+
+        // 添加缩放手柄
+        const resizeHandle = document.createElement('div');
+        resizeHandle.className = 'resize-handle';
+        resizeHandle.style.cssText = `
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            width: 10px;
+            height: 10px;
+            background-color: #2196F3;
+            border-radius: 50%;
+            cursor: nwse-resize;
+            z-index: 100;
+        `;
+
+        // 创建容器包装器
+        const wrapper = document.createElement('div');
+        wrapper.className = 'protyle-wrapper';
+        wrapper.style.cssText = `
+            position: absolute;
+            top: 8px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        `;
+
+        // 组装各部分
+        container.appendChild(dragHandle);
+        container.appendChild(resizeHandle);
+        container.appendChild(wrapper);
+
+        return {
+            container,
+            wrapper,
+            dragHandle,
+            resizeHandle
+        };
+    }
+
+    /**
+     * 初始化思源块编辑器
+     * @param wrapper 容器元素
+     * @param blockId 思源块ID
+     * @returns 初始化的Protyle实例或null
+     */
+    private initProtyleEditor(wrapper: HTMLElement, blockId: string): Protyle | null {
+        try {
+            // 创建Protyle
+            const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
+                blockId: blockId,
+                render: {
+                    breadcrumb: false,
+                    gutter: false,
+                },
+                action: ["cb-get-focus"],
+                mode: "wysiwyg",
+            });
+
+            return protyle;
+        } catch (e) {
+            console.error("初始化编辑器失败:", e);
+            wrapper.innerHTML = `<div style="padding: 10px;">加载块 ${blockId} 失败</div>`;
+            return null;
+        }
+    }
+
+
+
+
+
+
+    /**
      * 清理所有画布实例和资源
      */
     private cleanUp() {
@@ -806,4 +934,5 @@ export class M_handwriting {
             element.remove();
         });
     }
+
 }
