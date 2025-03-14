@@ -8,6 +8,7 @@ import { GridManager } from "./canvas/grid-manager";
 import { PanZoomHandler } from "./canvas/pan-zoom-handler";
 import { CanvasManager } from "./canvas/canvas-manager";
 import { ElementInteractions } from "./elements/element-interactions";
+import { api } from "@frostime/siyuan-plugin-kits";
 
 export class M_handwriting {
     private plugin: Plugin;
@@ -54,7 +55,7 @@ export class M_handwriting {
         });
     }
 
-    private addWhiteboardButton(e) {
+    private async addWhiteboardButton(e) {
         const breadcrumb = e.detail.protyle.element.querySelector('.protyle-breadcrumb');
         if (breadcrumb) {
             // Check if the button already exists
@@ -67,9 +68,15 @@ export class M_handwriting {
                 button.title = '在画板中打开';
                 button.style.marginLeft = '8px';
 
+                
                 // Add click event
-                button.addEventListener('click', () => {
-                    this.openWhiteBoard_in(e);
+                button.addEventListener('click', async () => {
+                    let ChildBlocks = await api.getChildBlocks(this.currentid);
+                    console.log(ChildBlocks);
+                    // Extract block IDs into an array
+                    const blockIds = ChildBlocks.filter(block => block?.content?.trim()).map(block => block.id);
+                    console.log("Extracted block IDs:", blockIds);
+                    this.openWhiteBoard_in(e, blockIds);
                 });
 
                 // Add the button to breadcrumb
@@ -82,45 +89,41 @@ export class M_handwriting {
     /**
      * 在当前笔记页中打开画板
      */
-    private async openWhiteBoard_in(e) {
+    private async openWhiteBoard_in(e, defaultBlockIds: string[] = []) {
         // 查找当前页面的内容容器
         const protyleContent = e.detail.protyle.element.querySelector(`.protyle-content.protyle-content--transition`);
-        
         if (!protyleContent) {
             showMessage("无法找到当前页面内容区域");
             return;
         }
-        
         // 获取按钮并准备更新状态
         const button = e.detail.protyle.element.querySelector('.whiteboard-button');
-        
         // 检查画板是否已存在
         let whiteboardContainer = protyleContent.querySelector('.whiteboard-container');
-        
         // 生成唯一ID
         const id = this.currentid;
-        
         if (whiteboardContainer) {
             // 画板已存在，检查当前状态
             if (whiteboardContainer.style.display === 'none') {
                 // 如果画板是隐藏的，显示画板
                 whiteboardContainer.style.display = 'block';
-                
+
                 // 隐藏原始内容
                 const originalContent = protyleContent.querySelectorAll(':scope > :not(.whiteboard-container)');
                 originalContent.forEach(el => {
                     (el as HTMLElement).style.display = 'none';
                 });
-                
+
                 // 隐藏面包屑导航栏
                 const breadcrumbBar = e.detail.protyle.element.querySelector('.protyle-breadcrumb__bar');
                 if (breadcrumbBar) {
                     (breadcrumbBar as HTMLElement).style.display = 'none';
                 }
-                
+                //隐藏protyle-gutters
+
                 // 更新按钮文本
                 if (button) button.innerHTML = '关闭画板';
-                
+
                 // 恢复画布实例（如果已有）
                 const existingCanvas = this.canvasInstances.get(id);
                 if (existingCanvas) {
@@ -129,43 +132,36 @@ export class M_handwriting {
             } else {
                 // 画板是显示的，隐藏画板
                 whiteboardContainer.style.display = 'none';
-                
                 // 显示原始内容
                 const originalContent = protyleContent.querySelectorAll(':scope > :not(.whiteboard-container)');
                 originalContent.forEach(el => {
                     (el as HTMLElement).style.display = '';
                 });
-                
                 // 显示面包屑导航栏
                 const breadcrumbBar = e.detail.protyle.element.querySelector('.protyle-breadcrumb__bar');
                 if (breadcrumbBar) {
                     (breadcrumbBar as HTMLElement).style.display = '';
                 }
-                
                 // 更新按钮文本
                 if (button) button.innerHTML = '画板';
             }
         } else {
             // 画板不存在，创建新的画板
-            
             // 隐藏原始内容
             const originalContent = protyleContent.querySelectorAll(':scope > *');
             originalContent.forEach(el => {
                 (el as HTMLElement).style.display = 'none';
             });
-            
             // 隐藏面包屑导航栏
             const breadcrumbBar = e.detail.protyle.element.querySelector('.protyle-breadcrumb__bar');
             if (breadcrumbBar) {
                 (breadcrumbBar as HTMLElement).style.display = 'none';
             }
-            
             // 创建画板容器
             whiteboardContainer = document.createElement('div');
             whiteboardContainer.id = `steveTool-whiteboard-${id}`;
             whiteboardContainer.className = 'whiteboard-container';
-            (whiteboardContainer as HTMLElement).style.cssText = 'width: 100%; height: calc(100vh - 100px); position: relative; overflow: hidden; background-color: var(--b3-theme-background);';
-            
+            (whiteboardContainer as HTMLElement).style.cssText = 'width: 100%; height: 100%; position: relative; overflow: hidden; background-color: var(--b3-theme-background);';
             // 添加控制元素和画布
             whiteboardContainer.innerHTML = `
             <div class="whiteboard-controls" style="position: absolute; top: 10px; right: 10px; z-index: ${window.siyuan.zIndex}; 
@@ -180,27 +176,32 @@ export class M_handwriting {
             <div id='grid-${id}' class="whiteboard-grid"></div>
             <div id="dom-elements-container-${id}" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
             `;
-            
+
             // 将画板添加到内容区域
             protyleContent.appendChild(whiteboardContainer);
-            
+
             // 初始化画布
             const Mcanvas = new CanvasManager(id, whiteboardContainer as HTMLElement);
             const canvas = Mcanvas.getCanvas();
             this.canvasInstances.set(id, canvas);
-            
             // 设置DOM元素添加功能
             this.setupDomElementAddition(canvas, id);
-            
             // 设置思源块拖放功能
             this.setupSiyuanBlockDrop(canvas, id);
-            
+            // 添加默认块
+            if (defaultBlockIds && defaultBlockIds.length > 0) {
+                const domContainer = document.getElementById(`dom-elements-container-${id}`);
+                if (domContainer) {
+                    this.addDefaultBlocks(canvas, id, defaultBlockIds, domContainer);
+                }
+            }
             // 更新按钮文本
             if (button) button.innerHTML = '关闭画板';
-            
+
             // 显示成功消息
             showMessage("画板已打开");
         }
+
     }
 
 
@@ -549,6 +550,63 @@ export class M_handwriting {
     }
 
     /**
+     * 在画布上添加默认的思源块
+     * @param canvas Fabric.js画布实例
+     * @param id 画布ID
+     * @param blockIds 思源块ID数组
+     * @param domContainer DOM容器元素
+     */
+    private addDefaultBlocks(canvas: Canvas, id: string, blockIds: string[], domContainer: HTMLElement) {
+        if (!blockIds || blockIds.length === 0 || !domContainer) return;
+
+        // 计算每个块的布局位置
+        const margin = 20; // 块之间的间距
+        const startX = 50; // 起始X位置
+        const startY = 50; // 起始Y位置
+        const columns = Math.min(3, blockIds.length); // 最多3列
+        const blockWidth = 300; // 默认块宽度
+        const blockHeight = 200; // 默认块高度
+
+        blockIds.forEach((blockId, index) => {
+            // 计算行和列
+            const col = index % columns;
+            const row = Math.floor(index / columns);
+
+            // 计算位置
+            const x = startX + col * (blockWidth + margin);
+            const y = startY + row * (blockHeight + margin);
+
+            // 生成唯一的DOM元素ID
+            const domId = `dom-default-block-${id}-${index}`;
+
+            // 创建容器元素
+            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
+                this.createProtyleContainer(domId, blockId, { x, y });
+
+            // 自定义宽高（可选）
+            protyledom.style.width = `${blockWidth}px`;
+            protyledom.style.height = `${blockHeight}px`;
+
+            // 添加到DOM容器中
+            domContainer.appendChild(protyledom);
+
+            // 初始化Protyle编辑器
+            const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
+
+            // 添加缩放功能
+            ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
+
+            console.log(`已添加默认块 ${blockId} 在位置(${x}, ${y})`);
+        });
+
+        // 显示成功消息
+        if (blockIds.length > 0) {
+            showMessage(`已添加 ${blockIds.length} 个默认块`);
+        }
+    }
+
+
+    /**
      * 初始化思源块编辑器
      * @param wrapper 容器元素
      * @param blockId 思源块ID
@@ -638,7 +696,7 @@ export class M_handwriting {
                     breadcrumb: false,
                     gutter: false,
                 },
-                action: ["cb-get-focus"],
+                // action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
 
