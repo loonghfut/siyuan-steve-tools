@@ -6,9 +6,9 @@ export class ElementInteractions {
      * @param element 要添加拖拽功能的元素
      * @param handle 拖动手柄元素
      * @param canvas 相关的Fabric画布
-     * @param id 画布ID
+     * @param id? 画布ID
      */
-    static addDraggableToElement(element: HTMLElement, handle: HTMLElement, canvas: Canvas, id: string): void {
+    static addDraggableToElement(element: HTMLElement, handle: HTMLElement, canvas: Canvas, id?: string): void {
         let isDragging = false;
         let startX = 0;
         let startY = 0;

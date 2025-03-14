@@ -4,13 +4,21 @@ import './handwriting.css';
 // 引入 fabric.js 库
 import { Canvas } from 'fabric/fabric-impl';
 import * as fabric from 'fabric';
-import { PluginConfig } from "@/savedata";
+import { GridManager } from "./canvas/grid-manager";
+import { PanZoomHandler } from "./canvas/pan-zoom-handler";
+import { CanvasManager } from "./canvas/canvas-manager";
+import { ElementInteractions } from "./elements/element-interactions";
 
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
     private canvasInstances: Map<string, Canvas> = new Map();
     private activeToolButtons: Map<string, HTMLElement> = new Map();
+    private GridManager: GridManager;
+    private PanZoomHandler: PanZoomHandler;
+    private CanvasManager: CanvasManager;
+
+    private currentid: string = "";
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -37,7 +45,166 @@ export class M_handwriting {
 
     async onLayoutReady(settingdata) {
         // 可以在这里初始化任何需要DOM加载完成后的逻辑
+        this.plugin.eventBus.on('switch-protyle', (e) => {
+            console.log("切换思源块:", e);
+            this.currentid = e.detail.protyle.block.rootID;
+            console.log(this.currentid);
+
+            this.addWhiteboardButton(e);
+        });
     }
+
+    private addWhiteboardButton(e) {
+        const breadcrumb = e.detail.protyle.element.querySelector('.protyle-breadcrumb');
+        if (breadcrumb) {
+            // Check if the button already exists
+            const existingButton = breadcrumb.querySelector('.whiteboard-button');
+            if (!existingButton) {
+                // Create the button
+                const button = document.createElement('button');
+                button.className = 'b3-button b3-button--outline whiteboard-button';
+                button.innerHTML = '画板';
+                button.title = '在画板中打开';
+                button.style.marginLeft = '8px';
+
+                // Add click event
+                button.addEventListener('click', () => {
+                    this.openWhiteBoard_in(e);
+                });
+
+                // Add the button to breadcrumb
+                breadcrumb.appendChild(button);
+            }
+        }
+    }
+
+
+    /**
+     * 在当前笔记页中打开画板
+     */
+    private async openWhiteBoard_in(e) {
+        // 查找当前页面的内容容器
+        const protyleContent = e.detail.protyle.element.querySelector(`.protyle-content.protyle-content--transition`);
+        
+        if (!protyleContent) {
+            showMessage("无法找到当前页面内容区域");
+            return;
+        }
+        
+        // 获取按钮并准备更新状态
+        const button = e.detail.protyle.element.querySelector('.whiteboard-button');
+        
+        // 检查画板是否已存在
+        let whiteboardContainer = protyleContent.querySelector('.whiteboard-container');
+        
+        // 生成唯一ID
+        const id = this.currentid;
+        
+        if (whiteboardContainer) {
+            // 画板已存在，检查当前状态
+            if (whiteboardContainer.style.display === 'none') {
+                // 如果画板是隐藏的，显示画板
+                whiteboardContainer.style.display = 'block';
+                
+                // 隐藏原始内容
+                const originalContent = protyleContent.querySelectorAll(':scope > :not(.whiteboard-container)');
+                originalContent.forEach(el => {
+                    (el as HTMLElement).style.display = 'none';
+                });
+                
+                // 隐藏面包屑导航栏
+                const breadcrumbBar = e.detail.protyle.element.querySelector('.protyle-breadcrumb__bar');
+                if (breadcrumbBar) {
+                    (breadcrumbBar as HTMLElement).style.display = 'none';
+                }
+                
+                // 更新按钮文本
+                if (button) button.innerHTML = '关闭画板';
+                
+                // 恢复画布实例（如果已有）
+                const existingCanvas = this.canvasInstances.get(id);
+                if (existingCanvas) {
+                    existingCanvas.requestRenderAll();
+                }
+            } else {
+                // 画板是显示的，隐藏画板
+                whiteboardContainer.style.display = 'none';
+                
+                // 显示原始内容
+                const originalContent = protyleContent.querySelectorAll(':scope > :not(.whiteboard-container)');
+                originalContent.forEach(el => {
+                    (el as HTMLElement).style.display = '';
+                });
+                
+                // 显示面包屑导航栏
+                const breadcrumbBar = e.detail.protyle.element.querySelector('.protyle-breadcrumb__bar');
+                if (breadcrumbBar) {
+                    (breadcrumbBar as HTMLElement).style.display = '';
+                }
+                
+                // 更新按钮文本
+                if (button) button.innerHTML = '画板';
+            }
+        } else {
+            // 画板不存在，创建新的画板
+            
+            // 隐藏原始内容
+            const originalContent = protyleContent.querySelectorAll(':scope > *');
+            originalContent.forEach(el => {
+                (el as HTMLElement).style.display = 'none';
+            });
+            
+            // 隐藏面包屑导航栏
+            const breadcrumbBar = e.detail.protyle.element.querySelector('.protyle-breadcrumb__bar');
+            if (breadcrumbBar) {
+                (breadcrumbBar as HTMLElement).style.display = 'none';
+            }
+            
+            // 创建画板容器
+            whiteboardContainer = document.createElement('div');
+            whiteboardContainer.id = `steveTool-whiteboard-${id}`;
+            whiteboardContainer.className = 'whiteboard-container';
+            (whiteboardContainer as HTMLElement).style.cssText = 'width: 100%; height: calc(100vh - 100px); position: relative; overflow: hidden; background-color: var(--b3-theme-background);';
+            
+            // 添加控制元素和画布
+            whiteboardContainer.innerHTML = `
+            <div class="whiteboard-controls" style="position: absolute; top: 10px; right: 10px; z-index: ${window.siyuan.zIndex}; 
+                 background-color: var(--b3-theme-background); padding: 5px 10px; border-radius: 4px; font-size: 14px; color: var(--b3-theme-on-background);">
+                <span id="zoom-display-${id}">缩放: 100%</span>
+                <button id="reset-view-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
+                    border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">重置视图</button>
+                <button id="add-button-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
+                    border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">添加按钮</button>
+            </div>
+            <canvas id='canvas-${id}'></canvas>
+            <div id='grid-${id}' class="whiteboard-grid"></div>
+            <div id="dom-elements-container-${id}" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
+            `;
+            
+            // 将画板添加到内容区域
+            protyleContent.appendChild(whiteboardContainer);
+            
+            // 初始化画布
+            const Mcanvas = new CanvasManager(id, whiteboardContainer as HTMLElement);
+            const canvas = Mcanvas.getCanvas();
+            this.canvasInstances.set(id, canvas);
+            
+            // 设置DOM元素添加功能
+            this.setupDomElementAddition(canvas, id);
+            
+            // 设置思源块拖放功能
+            this.setupSiyuanBlockDrop(canvas, id);
+            
+            // 更新按钮文本
+            if (button) button.innerHTML = '关闭画板';
+            
+            // 显示成功消息
+            showMessage("画板已打开");
+        }
+    }
+
+
+
 
     /**
      * 打开白板并初始化画布
@@ -77,55 +244,14 @@ export class M_handwriting {
         </div>`;
 
         // 初始化画布
-        this.initializeCanvas(id);
-    }
-
-
-    /**
-     * 初始化Fabric.js画布
-     * @param id 画布ID
-     */
-    private initializeCanvas(id: string) {
-        // 获取容器和画布元素
-        const container = document.getElementById(`steveTool-whiteboard-${id}`);
-        const canvasEl = document.getElementById(`canvas-${id}`) as HTMLCanvasElement;
-
-        if (!container || !canvasEl) {
-            showMessage("无法创建画板");
-            return;
-        }
-
-        // 设置画布尺寸为容器大小
-        canvasEl.width = container.clientWidth;
-        canvasEl.height = container.clientHeight;
-
-        // 创建Fabric画布实例
-        const canvas = new fabric.Canvas(canvasEl, {
-            backgroundColor: 'transparent', // 透明背景，网格由CSS实现
-            preserveObjectStacking: true,
-            selection: true,
-            renderOnAddRemove: true,
-            // 允许画布内容超出可视区域（实现无限画布的关键）
-            allowTouchScrolling: false
-        });
-
-        // 保存画布实例以便后续使用
+        // this.initializeCanvas(id);
+        const Mcanvas = new CanvasManager(id, whiteBoardTab.panelElement);
+        const canvas = Mcanvas.getCanvas();
         this.canvasInstances.set(id, canvas);
-
-        // 初始化背景网格
-        this.initBackgroundGrid(id);
-
-        // 设置画布平移和缩放功能
-        this.setupPanZoom(canvas, id);
-
         // 设置DOM元素添加功能
         this.setupDomElementAddition(canvas, id);
-
         // 设置思源块拖放功能
         this.setupSiyuanBlockDrop(canvas, id);
-
-        // 设置响应式尺寸
-        this.setupResponsiveCanvas(canvas, container);
     }
 
     /**
@@ -205,7 +331,7 @@ export class M_handwriting {
             const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
 
             // 添加缩放功能（但不添加拖拽功能）
-            this.setupElementInteractions(protyledom, dragHandle, resizeHandle, canvas, id);
+            ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
 
 
             // 显示成功消息
@@ -217,8 +343,6 @@ export class M_handwriting {
             console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
         });
     }
-
-
 
     /**
      * 设置DOM元素添加功能
@@ -303,6 +427,7 @@ export class M_handwriting {
             const canvasX = (dropX - vpt[4]) / vpt[0];
             const canvasY = (dropY - vpt[5]) / vpt[3];
 
+
             // 创建唯一ID
             const domId = `dom-button-${id}-${counter++}`;
 
@@ -316,9 +441,8 @@ export class M_handwriting {
             // 使用封装的方法初始化编辑器
             const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j", id);
 
-            // 添加缩放功能（但不添加拖拽功能）
-            this.setupElementInteractions(protyledom, dragHandle, resizeHandle, canvas, id);
-
+            // 添加缩放功能
+            ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
             // 显示成功消息
             showMessage('已添加新元素，可直接拖拽移动位置或缩放大小');
 
@@ -327,324 +451,6 @@ export class M_handwriting {
 
         // 添加提示
         addButtonBtn.setAttribute('title', '拖拽此按钮到画布中创建新元素');
-    }
-
-
-
-    /**
-     * 为元素添加缩放功能
-     * @param element 要添加缩放功能的元素
-     * @param handle 缩放手柄元素
-     * @param canvas 相关的Fabric画布
-     */
-    private addResizableToElement(element: HTMLElement, handle: HTMLElement, canvas: Canvas) {
-        let isResizing = false;
-        let startX = 0;
-        let startY = 0;
-        let startWidth = 0;
-        let startHeight = 0;
-
-        const startResize = (e: MouseEvent | TouchEvent) => {
-            isResizing = true;
-
-            // 获取触摸/鼠标的初始位置
-            if (e instanceof MouseEvent) {
-                startX = e.clientX;
-                startY = e.clientY;
-            } else if (e instanceof TouchEvent && e.touches && e.touches[0]) {
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
-            }
-
-            // 获取元素的当前样式
-            const computedStyle = window.getComputedStyle(element);
-            startWidth = parseFloat(computedStyle.width);
-            startHeight = parseFloat(computedStyle.height);
-
-            // 阻止事件默认行为和冒泡
-            e.preventDefault();
-            e.stopPropagation();
-
-            // 添加临时事件监听器
-            document.addEventListener('mousemove', moveResize);
-            document.addEventListener('touchmove', moveResize, { passive: false });
-            document.addEventListener('mouseup', stopResize);
-            document.addEventListener('touchend', stopResize);
-
-            // 添加活动样式
-            element.style.opacity = '0.8';
-        };
-
-        const moveResize = (e: MouseEvent | TouchEvent) => {
-            if (!isResizing) return;
-
-            // 获取当前鼠标/触摸位置
-            let clientX, clientY;
-            if (e instanceof MouseEvent) {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            } else if (e instanceof TouchEvent && e.touches && e.touches[0]) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                return;
-            }
-
-            // 考虑画布缩放比例
-            const vpt = canvas.viewportTransform;
-            if (!vpt) return;
-
-            const scale = vpt[0]; // 假设x和y的缩放比例相同
-            const deltaX = (clientX - startX) / scale;
-            const deltaY = (clientY - startY) / scale;
-
-            // 计算新尺寸（确保最小尺寸）
-            const newWidth = Math.max(50, startWidth + deltaX);
-            const newHeight = Math.max(50, startHeight + deltaY);
-
-            // 更新元素尺寸
-            element.style.width = `${newWidth}px`;
-            element.style.height = `${newHeight}px`;
-
-            // 阻止事件默认行为和冒泡
-            e.preventDefault();
-            e.stopPropagation();
-        };
-
-        const stopResize = (e: MouseEvent | TouchEvent) => {
-            if (!isResizing) return;
-            isResizing = false;
-
-            // 移除临时事件监听器
-            document.removeEventListener('mousemove', moveResize);
-            document.removeEventListener('touchmove', moveResize);
-            document.removeEventListener('mouseup', stopResize);
-            document.removeEventListener('touchend', stopResize);
-
-            // 恢复正常样式
-            element.style.opacity = '1';
-
-            // 阻止事件默认行为和冒泡
-            e.preventDefault();
-            e.stopPropagation();
-        };
-
-        // 添加缩放事件监听器
-        handle.addEventListener('mousedown', startResize);
-        handle.addEventListener('touchstart', startResize, { passive: false });
-    }
-
-
-
-
-
-
-
-    /**
-     * 初始化背景网格
-     * @param id 画布ID
-     */
-    private initBackgroundGrid(id: string) {
-        // 创建并添加背景网格样式
-        const styleElement = document.createElement('style');
-        styleElement.id = `grid-style-${id}`;
-        styleElement.textContent = `
-            #grid-${id} {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                pointer-events: none;
-                background-size: 20px 20px;
-                background-image: 
-                    linear-gradient(to right, var(--b3-border-color) 1px, transparent 1px),
-                    linear-gradient(to bottom, var(--b3-border-color) 1px, transparent 1px);
-                transform-origin: 0 0;
-            }
-        `;
-        document.head.appendChild(styleElement);
-    }
-
-
-
-    /**
-     * 设置画布的平移和缩放功能
-     * @param canvas Fabric.js画布实例
-     * @param id 画布ID 
-     */
-    private setupPanZoom(canvas: Canvas, id: string) {
-        // 状态变量
-        let isDragging = false;
-        let lastPosX = 0;
-        let lastPosY = 0;
-
-        // 获取缩放显示元素和重置按钮
-        const zoomDisplay = document.getElementById(`zoom-display-${id}`);
-        const resetViewButton = document.getElementById(`reset-view-${id}`);
-
-        // 初始更新缩放显示
-        this.updateZoomDisplay(id, canvas.getZoom());
-
-        // 绑定重置视图按钮事件
-        if (resetViewButton) {
-            resetViewButton.addEventListener('click', () => {
-                // 重置视口变换为默认状态
-                canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-
-                // 更新网格
-                this.updateGridPosition(id, canvas.viewportTransform || [1, 0, 0, 1, 0, 0]);
-
-                // 更新缩放显示
-                this.updateZoomDisplay(id, 1);
-
-                // 重新渲染画布
-                canvas.requestRenderAll();
-            });
-        }
-
-        // 鼠标按下事件
-        canvas.on('mouse:down', (opt) => {
-            const evt = opt.e;
-
-            // 空格键按下时或中键点击时或在空白处左键点击
-            if (evt instanceof MouseEvent && (evt.button === 1 || (evt.button === 0 && !opt.target))) {
-                isDragging = true;
-                lastPosX = evt.clientX;
-                lastPosY = evt.clientY;
-                canvas.selection = false; // 暂时禁用选择功能
-                canvas.defaultCursor = 'grabbing';
-                evt.preventDefault();
-                evt.stopPropagation();
-            }
-        });
-
-        // 鼠标移动事件
-        canvas.on('mouse:move', (opt) => {
-            if (isDragging) {
-                const evt = opt.e;
-                // 处理不同类型的事件(鼠标或触摸)
-                const clientX = evt instanceof MouseEvent ? evt.clientX :
-                    evt.touches && evt.touches[0] ? evt.touches[0].clientX : lastPosX;
-                const clientY = evt instanceof MouseEvent ? evt.clientY :
-                    evt.touches && evt.touches[0] ? evt.touches[0].clientY : lastPosY;
-
-                const deltaX = clientX - lastPosX;
-                const deltaY = clientY - lastPosY;
-                lastPosX = clientX;
-                lastPosY = clientY;
-
-                // 获取并更新视口变换矩阵
-                const vpt = canvas.viewportTransform;
-                if (!vpt) return;
-
-                // 平移视口
-                vpt[4] += deltaX;
-                vpt[5] += deltaY;
-
-                // 更新画布和网格
-                canvas.requestRenderAll();
-                this.updateGridPosition(id, vpt);
-
-                evt.preventDefault();
-                evt.stopPropagation();
-            }
-        });
-
-        // 鼠标释放事件
-        canvas.on('mouse:up', () => {
-            if (isDragging) {
-                isDragging = false;
-                canvas.selection = true;
-                canvas.defaultCursor = 'default';
-            }
-        });
-
-        // 鼠标滚轮缩放事件
-        canvas.on('mouse:wheel', (opt) => {
-            const evt = opt.e;
-            evt.preventDefault();
-            evt.stopPropagation();
-
-            // 计算缩放系数
-            const delta = evt.deltaY;
-            let zoom = canvas.getZoom();
-            zoom = zoom * (0.999 ** delta);
-
-            // 限制缩放范围
-            zoom = Math.min(Math.max(0.1, zoom), 10);
-
-            // 获取鼠标位置，以此为中心点进行缩放
-            const point = new fabric.Point(evt.offsetX, evt.offsetY);
-
-            // 执行缩放
-            canvas.zoomToPoint(point, zoom);
-
-            // 更新网格
-            const vpt = canvas.viewportTransform;
-            if (vpt) {
-                this.updateGridPosition(id, vpt);
-
-                // 更新缩放显示
-                this.updateZoomDisplay(id, zoom);
-            }
-        });
-    }
-
-    /**
-     * 更新缩放比例显示
-     * @param id 画布ID
-     * @param zoom 缩放比例
-     */
-    private updateZoomDisplay(id: string, zoom: number) {
-        const zoomDisplay = document.getElementById(`zoom-display-${id}`);
-        if (zoomDisplay) {
-            // 将缩放比例转换为百分比并显示
-            const zoomPercent = Math.round(zoom * 100);
-            zoomDisplay.textContent = `缩放: ${zoomPercent}%`;
-        }
-    }
-
-    /**
-     * 更新网格位置和大小以匹配画布变换
-     * @param id 画布ID
-     * @param viewportTransform 视口变换矩阵
-     */
-    private updateGridPosition(id: string, viewportTransform: number[]) {
-        const gridElement = document.getElementById(`grid-${id}`);
-        if (!gridElement) return;
-
-        // 获取当前缩放比例
-        const zoom = viewportTransform[0];
-
-        // 计算网格尺寸，随缩放变化
-        const gridSize = Math.max(10, 20 * zoom);
-
-        // 计算网格偏移量，实现平移效果
-        const offsetX = viewportTransform[4] % gridSize;
-        const offsetY = viewportTransform[5] % gridSize;
-
-        // 应用变换
-        gridElement.style.backgroundSize = `${gridSize}px ${gridSize}px`;
-        gridElement.style.backgroundPosition = `${offsetX}px ${offsetY}px`;
-    }
-
-    /**
-     * 设置画布响应式尺寸
-     * @param canvas Fabric.js画布实例
-     * @param container 容器元素
-     */
-    private setupResponsiveCanvas(canvas: Canvas, container: HTMLElement) {
-        // 使用ResizeObserver监听容器尺寸变化
-        const resizeObserver = new ResizeObserver(() => {
-            // 调整画布尺寸
-            canvas.setWidth(container.clientWidth);
-            canvas.setHeight(container.clientHeight);
-            canvas.renderAll();
-        });
-
-        // 监听容器
-        resizeObserver.observe(container);
     }
 
     /**
@@ -756,10 +562,10 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
-    
+
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
-    
+
             // 创建一个半透明覆盖层，表示元素处于不可交互状态
             const overlayDiv = document.createElement('div');
             overlayDiv.className = 'block-overlay';
@@ -777,7 +583,7 @@ export class M_handwriting {
                 align-items: center;
                 justify-content: center;
             `;
-    
+
             // 创建删除按钮（初始状态为隐藏）- 放在容器元素内
             const deleteButton = document.createElement('button');
             deleteButton.className = 'block-delete-button';
@@ -801,15 +607,15 @@ export class M_handwriting {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                 pointer-events: auto; /* 确保按钮可点击 */
             `;
-    
+
             // 将删除按钮添加到容器元素内，这样它会跟随元素一起移动
             container.appendChild(deleteButton);
-    
+
             // 为删除按钮添加事件监听器
             deleteButton.addEventListener('click', (e) => {
                 e.stopPropagation(); // 阻止事件冒泡
                 e.preventDefault(); // 阻止默认行为
-                
+
                 // 确认删除对话框
                 if (confirm('确定要删除此元素吗？')) {
                     // 从DOM中移除容器元素
@@ -818,13 +624,13 @@ export class M_handwriting {
                     showMessage('元素已删除');
                 }
             });
-    
+
             // 将覆盖层添加到容器
             container.appendChild(overlayDiv);
-    
+
             // 跟踪选择状态
             let isSelected = false;
-    
+
             // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
@@ -835,16 +641,16 @@ export class M_handwriting {
                 action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
-    
+
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 enableInteraction();
             });
-    
+
             // 为覆盖层添加拖拽功能（非选中状态下）
             this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id));
-    
+
             // 点击画布空白处时禁用所有块的交互
             document.addEventListener('click', (e) => {
                 // 检查点击是否在此容器外部
@@ -852,41 +658,41 @@ export class M_handwriting {
                     disableInteraction();
                 }
             });
-    
+
             // 启用交互的函数
             function enableInteraction() {
                 if (isSelected) return;
-    
+
                 // 移除覆盖层
                 overlayDiv.style.display = 'none';
-    
+
                 // 启用交互
                 wrapper.style.pointerEvents = 'auto';
-    
+
                 // 添加选中状态样式
                 container.classList.add('block-selected');
                 container.style.zIndex = '100';
                 isSelected = true;
-    
+
                 // 显示删除按钮
                 deleteButton.style.display = 'block';
             }
-    
+
             // 禁用交互的函数
             function disableInteraction() {
                 if (!isSelected) return;
-    
+
                 // 显示覆盖层
                 overlayDiv.style.display = 'flex';
-    
+
                 // 禁用交互
                 wrapper.style.pointerEvents = 'none';
-    
+
                 // 移除选中状态样式
                 container.classList.remove('block-selected');
                 container.style.zIndex = '';
                 isSelected = false;
-    
+
                 // 隐藏删除按钮
                 deleteButton.style.display = 'none';
             }
@@ -896,25 +702,6 @@ export class M_handwriting {
             wrapper.innerHTML = `<div style="padding: 10px;">加载块 ${blockId} 失败</div>`;
             return null;
         }
-    }
-    /**
-     * 为元素添加拖拽和缩放功能
-     * @param element 要处理的元素
-     * @param dragHandle 拖动手柄元素
-     * @param resizeHandle 缩放手柄元素
-     * @param canvas 相关的Fabric画布
-     * @param id 画布ID
-     */
-    private setupElementInteractions(element: HTMLElement, dragHandle: HTMLElement, resizeHandle: HTMLElement, canvas: Canvas, id: string) {
-        // 为缩放手柄添加缩放功能
-        this.addResizableToElement(element, resizeHandle, canvas);
-
-        // 不需要再将拖拽功能绑定到拖动手柄，因为我们已经通过覆盖层实现了拖拽
-        // 可以隐藏或者移除拖动手柄，或者赋予它其他功能
-
-        // 可选：将拖动手柄改为标题栏或隐藏按钮
-        dragHandle.style.cursor = 'default';
-        dragHandle.title = '双击编辑内容';
     }
 
     /**
@@ -1022,11 +809,6 @@ export class M_handwriting {
         overlayElement.addEventListener('mousedown', startDrag);
         overlayElement.addEventListener('touchstart', startDrag, { passive: true });
     }
-
-
-
-
-
 
     /**
      * 清理所有画布实例和资源

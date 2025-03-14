@@ -1,4 +1,3 @@
-// filepath: c:\Users\dragon\Documents\node\public\siyuan-steve-tools\src\handwriting\canvas\pan-zoom-handler.ts
 import { Canvas } from 'fabric/fabric-impl';
 import * as fabric from 'fabric';
 import { GridManager } from './grid-manager';

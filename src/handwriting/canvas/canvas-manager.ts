@@ -1,4 +1,3 @@
-// filepath: c:\Users\dragon\Documents\node\public\siyuan-steve-tools\src\handwriting\canvas\canvas-manager.ts
 import { Canvas } from 'fabric/fabric-impl';
 import * as fabric from 'fabric';
 import { GridManager } from './grid-manager';

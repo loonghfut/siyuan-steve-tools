@@ -12,6 +12,10 @@ export class ProtyleEditor {
             const protyle = new Protyle(window.siyuan.ws.app, container, {
                 blockId: blockId,
                 mode: 'wysiwyg',
+                render: {
+                    breadcrumb: false,
+                    gutter: false,
+                },
                 typewriterMode: false,
                 after: () => {
                     console.log('Protyle初始化完成:', blockId);
