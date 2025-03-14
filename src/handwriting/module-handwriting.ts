@@ -202,11 +202,11 @@ export class M_handwriting {
             domContainer.appendChild(protyledom);
 
             // 初始化Protyle编辑器
-            const protyle = this.initProtyleEditor(wrapperDiv, blockId);
+            const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
 
-            // 添加拖拽和缩放功能
-            this.addDraggableToElement(protyledom, dragHandle, canvas, id);
-            this.addResizableToElement(protyledom, resizeHandle, canvas);
+            // 添加缩放功能（但不添加拖拽功能）
+            this.setupElementInteractions(protyledom, dragHandle, resizeHandle, canvas, id);
+
 
             // 显示成功消息
             if (protyle) {
@@ -314,11 +314,10 @@ export class M_handwriting {
             domContainer.appendChild(protyledom);
 
             // 使用封装的方法初始化编辑器
-            const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j");
+            const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j", id);
 
-            // 添加拖拽和缩放功能
-            this.addDraggableToElement(protyledom, dragHandle, canvas, id);
-            this.addResizableToElement(protyledom, resizeHandle, canvas);
+            // 添加缩放功能（但不添加拖拽功能）
+            this.setupElementInteractions(protyledom, dragHandle, resizeHandle, canvas, id);
 
             // 显示成功消息
             showMessage('已添加新元素，可直接拖拽移动位置或缩放大小');
@@ -339,13 +338,22 @@ export class M_handwriting {
      * @param id 画布ID
      */
     private addDraggableToElement(element: HTMLElement, handle: HTMLElement, canvas: Canvas, id: string) {
+        // 状态变量
         let isDragging = false;
         let startX = 0;
         let startY = 0;
         let initialLeft = 0;
         let initialTop = 0;
 
+        // 获取所有需要禁用交互的覆盖层
+        const overlayElements = document.querySelectorAll('.block-overlay');
+
+        // 开始拖拽的处理函数
         const startDrag = (e: MouseEvent | TouchEvent) => {
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+
             isDragging = true;
 
             // 获取触摸/鼠标的初始位置
@@ -357,29 +365,60 @@ export class M_handwriting {
                 startY = e.touches[0].clientY;
             }
 
-            // 获取元素当前的CSS位置（去掉px单位）
+            // 获取元素当前的CSS位置（移除px单位）
             const currentLeftStr = element.style.left || '0px';
             const currentTopStr = element.style.top || '0px';
             initialLeft = parseFloat(currentLeftStr);
             initialTop = parseFloat(currentTopStr);
 
+            // 禁用所有其他块的交互，确保拖拽时不会与其他块内容冲突
+            document.querySelectorAll('.block-selected').forEach(selectedEl => {
+                if (selectedEl !== element) {
+                    // 查找并显示覆盖层
+                    const overlay = selectedEl.querySelector('.block-overlay');
+                    if (overlay) {
+                        (overlay as HTMLElement).style.display = 'flex';
+                    }
+
+                    // 查找并禁用wrapper的交互
+                    const wrapper = selectedEl.querySelector('.protyle-wrapper');
+                    if (wrapper) {
+                        (wrapper as HTMLElement).style.pointerEvents = 'none';
+                    }
+
+                    // 移除选中样式
+                    selectedEl.classList.remove('block-selected');
+                }
+            });
+
+            // 添加临时事件监听器
+            document.addEventListener('mousemove', moveDrag, { capture: true });
+            document.addEventListener('touchmove', moveDrag, { capture: true, passive: false });
+            document.addEventListener('mouseup', stopDrag, { capture: true });
+            document.addEventListener('touchend', stopDrag, { capture: true });
+
+            // 添加活动样式
+            element.style.opacity = '0.85';
+            element.style.zIndex = '1000';
+
+            // 添加拖拽中的视觉提示
+            element.classList.add('dragging');
+            document.body.style.cursor = 'grabbing';
+
+            // 如果元素被选中，暂时禁用交互以避免编辑冲突
+            const wrapper = element.querySelector('.protyle-wrapper');
+            if (wrapper && element.classList.contains('block-selected')) {
+                (wrapper as HTMLElement).style.pointerEvents = 'none';
+            }
+        };
+
+        // 拖拽移动处理函数
+        const moveDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+
             // 阻止事件默认行为和冒泡
             e.preventDefault();
             e.stopPropagation();
-
-            // 添加临时事件监听器
-            document.addEventListener('mousemove', moveDrag);
-            document.addEventListener('touchmove', moveDrag, { passive: false });
-            document.addEventListener('mouseup', stopDrag);
-            document.addEventListener('touchend', stopDrag);
-
-            // 添加活动样式
-            element.style.opacity = '0.8';
-            element.style.zIndex = '1000';
-        };
-
-        const moveDrag = (e: MouseEvent | TouchEvent) => {
-            if (!isDragging) return;
 
             // 获取当前鼠标/触摸位置
             let clientX, clientY;
@@ -407,35 +446,87 @@ export class M_handwriting {
             element.style.left = `${initialLeft + deltaX}px`;
             element.style.top = `${initialTop + deltaY}px`;
 
+            // 可选：添加吸附网格效果（每20像素吸附一次）
+            if (e.shiftKey) {
+                const gridSize = 20;
+                const snapLeft = Math.round((initialLeft + deltaX) / gridSize) * gridSize;
+                const snapTop = Math.round((initialTop + deltaY) / gridSize) * gridSize;
+                element.style.left = `${snapLeft}px`;
+                element.style.top = `${snapTop}px`;
+            }
+        };
+
+        // 结束拖拽处理函数
+        const stopDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+
             // 阻止事件默认行为和冒泡
             e.preventDefault();
             e.stopPropagation();
-        };
 
-        const stopDrag = (e: MouseEvent | TouchEvent) => {
-            if (!isDragging) return;
             isDragging = false;
 
             // 移除临时事件监听器
-            document.removeEventListener('mousemove', moveDrag);
-            document.removeEventListener('touchmove', moveDrag);
-            document.removeEventListener('mouseup', stopDrag);
-            document.removeEventListener('touchend', stopDrag);
+            document.removeEventListener('mousemove', moveDrag, { capture: true });
+            document.removeEventListener('touchmove', moveDrag, { capture: true });
+            document.removeEventListener('mouseup', stopDrag, { capture: true });
+            document.removeEventListener('touchend', stopDrag, { capture: true });
 
             // 恢复正常样式
             element.style.opacity = '1';
             element.style.zIndex = '';
+            element.classList.remove('dragging');
+            document.body.style.cursor = '';
 
-            // 阻止事件默认行为和冒泡
-            e.preventDefault();
-            e.stopPropagation();
+            // 记录元素最终位置（用于调试或保存状态）
+            console.log(`Element ${element.id} moved to:`, {
+                left: element.style.left,
+                top: element.style.top
+            });
+
+            // 如果是选中状态，恢复交互功能
+            if (element.classList.contains('block-selected')) {
+                const wrapper = element.querySelector('.protyle-wrapper');
+                if (wrapper) {
+                    (wrapper as HTMLElement).style.pointerEvents = 'auto';
+                }
+            }
         };
 
         // 添加拖拽事件监听器
-        handle.addEventListener('mousedown', startDrag);
+        handle.addEventListener('mousedown', startDrag, { passive: false });
         handle.addEventListener('touchstart', startDrag, { passive: false });
-    }
 
+        // 可选：双击句柄切换选中状态
+        handle.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const overlay = element.querySelector('.block-overlay');
+            if (overlay) {
+                const isDisplayed = (overlay as HTMLElement).style.display !== 'none';
+
+                if (isDisplayed) {
+                    // 模拟点击覆盖层以激活交互
+                    overlay.dispatchEvent(new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    }));
+                } else {
+                    // 禁用交互
+                    (overlay as HTMLElement).style.display = 'flex';
+                    const wrapper = element.querySelector('.protyle-wrapper');
+                    if (wrapper) {
+                        (wrapper as HTMLElement).style.pointerEvents = 'none';
+                    }
+                    element.classList.remove('block-selected');
+                    element.style.zIndex = '';
+                }
+            }
+        });
+
+        // 在元素上添加标记，表示已添加拖拽功能
+        element.setAttribute('data-draggable', 'true');
+    }
     /**
      * 为元素添加缩放功能
      * @param element 要添加缩放功能的元素
@@ -851,11 +942,46 @@ export class M_handwriting {
      * 初始化思源块编辑器
      * @param wrapper 容器元素
      * @param blockId 思源块ID
+     * @param id 画布ID
      * @returns 初始化的Protyle实例或null
      */
-    private initProtyleEditor(wrapper: HTMLElement, blockId: string): Protyle | null {
+    private initProtyleEditor(wrapper: HTMLElement, blockId: string, id: string): Protyle | null {
         try {
-            // 创建Protyle
+            // 获取父容器元素（siyuan-block-container）
+            const container = wrapper.parentElement;
+            if (!container) {
+                throw new Error("找不到父容器元素");
+            }
+
+            // 默认设置为不可交互状态
+            wrapper.style.pointerEvents = 'none';
+
+            // 创建一个半透明覆盖层，表示元素处于不可交互状态
+            const overlayDiv = document.createElement('div');
+            overlayDiv.className = 'block-overlay';
+            overlayDiv.style.cssText = `
+                position: absolute;
+                top: 8px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.1);
+                z-index: 10;
+                cursor: move; /* 默认显示移动光标 */
+                border-radius: 0 0 4px 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+
+
+            // 将覆盖层添加到容器
+            container.appendChild(overlayDiv);
+
+            // 跟踪选择状态
+            let isSelected = false;
+
+            // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
                 render: {
@@ -866,6 +992,73 @@ export class M_handwriting {
                 mode: "wysiwyg",
             });
 
+            // 双击覆盖层激活编辑
+            overlayDiv.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                enableInteraction();
+            });
+
+            // 为覆盖层添加拖拽功能（非选中状态下）
+            this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id));
+
+            // 点击画布空白处时禁用所有块的交互
+            document.addEventListener('click', (e) => {
+                // 检查点击是否在此容器外部
+                if (isSelected && !container.contains(e.target as Node)) {
+                    disableInteraction();
+                }
+            });
+
+            // 启用交互的函数
+            function enableInteraction() {
+                if (isSelected) return;
+
+                // 移除覆盖层
+                overlayDiv.style.display = 'none';
+
+                // 启用交互
+                wrapper.style.pointerEvents = 'auto';
+
+                // 添加选中状态样式
+                container.classList.add('block-selected');
+                container.style.zIndex = '100';
+                isSelected = true;
+
+                // 尝试聚焦编辑器
+                try {
+                    // 选择编辑器内的第一个块
+                    const firstBlock = wrapper.querySelector('[data-node-id]');
+                    if (firstBlock) {
+                        (firstBlock as HTMLElement).click();
+                    }
+                } catch (err) {
+                    console.log("自动聚焦失败:", err);
+                }
+            }
+
+            // 禁用交互的函数
+            function disableInteraction() {
+                if (!isSelected) return;
+
+                // 显示覆盖层
+                overlayDiv.style.display = 'flex';
+
+                // 禁用交互
+                wrapper.style.pointerEvents = 'none';
+
+                // 移除选中状态样式
+                container.classList.remove('block-selected');
+                container.style.zIndex = '';
+                isSelected = false;
+            }
+
+            // 添加Escape键监听，用于退出编辑模式
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && isSelected && document.activeElement && container.contains(document.activeElement)) {
+                    disableInteraction();
+                }
+            });
+
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
@@ -874,6 +1067,132 @@ export class M_handwriting {
         }
     }
 
+    /**
+     * 为元素添加拖拽和缩放功能
+     * @param element 要处理的元素
+     * @param dragHandle 拖动手柄元素
+     * @param resizeHandle 缩放手柄元素
+     * @param canvas 相关的Fabric画布
+     * @param id 画布ID
+     */
+    private setupElementInteractions(element: HTMLElement, dragHandle: HTMLElement, resizeHandle: HTMLElement, canvas: Canvas, id: string) {
+        // 为缩放手柄添加缩放功能
+        this.addResizableToElement(element, resizeHandle, canvas);
+
+        // 不需要再将拖拽功能绑定到拖动手柄，因为我们已经通过覆盖层实现了拖拽
+        // 可以隐藏或者移除拖动手柄，或者赋予它其他功能
+        dragHandle.style.height = '4px'; // 减小手柄高度，减少干扰
+
+        // 可选：将拖动手柄改为标题栏或隐藏按钮
+        dragHandle.style.cursor = 'default';
+        dragHandle.title = '双击编辑内容';
+    }
+
+    /**
+     * 使覆盖层可拖拽（任意位置拖拽元素）
+     * @param overlayElement 覆盖层元素
+     * @param containerElement 容器元素
+     * @param canvas Fabric.js画布实例
+     */
+    private makeElementDraggable(overlayElement: HTMLElement, containerElement: HTMLElement, canvas: Canvas) {
+        // 状态变量
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let initialLeft = 0;
+        let initialTop = 0;
+
+        // 开始拖拽的处理函数
+        const startDrag = (e: MouseEvent | TouchEvent) => {
+            // 阻止事件冒泡但允许默认行为
+            e.stopPropagation();
+
+            isDragging = true;
+
+            // 获取触摸/鼠标的初始位置
+            if (e instanceof MouseEvent) {
+                startX = e.clientX;
+                startY = e.clientY;
+            } else if (e instanceof TouchEvent && e.touches && e.touches[0]) {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            }
+
+            // 获取元素当前的CSS位置
+            const currentLeftStr = containerElement.style.left || '0px';
+            const currentTopStr = containerElement.style.top || '0px';
+            initialLeft = parseFloat(currentLeftStr);
+            initialTop = parseFloat(currentTopStr);
+
+            // 添加临时事件监听器
+            document.addEventListener('mousemove', moveDrag, { capture: true });
+            document.addEventListener('touchmove', moveDrag, { capture: true, passive: false });
+            document.addEventListener('mouseup', stopDrag, { capture: true });
+            document.addEventListener('touchend', stopDrag, { capture: true });
+
+            // 添加活动样式
+            containerElement.style.opacity = '0.85';
+            containerElement.style.zIndex = '1000';
+            document.body.style.cursor = 'grabbing';
+        };
+
+        // 拖拽移动处理函数
+        const moveDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 获取当前鼠标/触摸位置
+            let clientX, clientY;
+            if (e instanceof MouseEvent) {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            } else if (e instanceof TouchEvent && e.touches && e.touches[0]) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                return;
+            }
+
+            // 考虑画布缩放比例
+            const vpt = canvas.viewportTransform;
+            if (!vpt) return;
+
+            const scale = vpt[0]; // 假设x和y的缩放比例相同
+
+            // 计算移动距离（考虑缩放）
+            const deltaX = (clientX - startX) / scale;
+            const deltaY = (clientY - startY) / scale;
+
+            // 更新元素位置
+            containerElement.style.left = `${initialLeft + deltaX}px`;
+            containerElement.style.top = `${initialTop + deltaY}px`;
+        };
+
+        // 结束拖拽处理函数
+        const stopDrag = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+
+            isDragging = false;
+
+            // 移除临时事件监听器
+            document.removeEventListener('mousemove', moveDrag, { capture: true });
+            document.removeEventListener('touchmove', moveDrag, { capture: true });
+            document.removeEventListener('mouseup', stopDrag, { capture: true });
+            document.removeEventListener('touchend', stopDrag, { capture: true });
+
+            // 恢复正常样式
+            containerElement.style.opacity = '1';
+            containerElement.style.zIndex = '';
+            document.body.style.cursor = '';
+        };
+
+        // 添加拖拽事件监听器
+        overlayElement.addEventListener('mousedown', startDrag);
+        overlayElement.addEventListener('touchstart', startDrag, { passive: true });
+    }
 
 
 
