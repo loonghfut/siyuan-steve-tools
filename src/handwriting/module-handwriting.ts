@@ -756,10 +756,16 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
-
+            
+            // 获取DOM元素容器（用于将删除按钮添加到更高层级）
+            const domContainer = document.getElementById(`dom-elements-container-${id}`);
+            if (!domContainer) {
+                throw new Error("找不到DOM容器元素");
+            }
+    
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
-
+    
             // 创建一个半透明覆盖层，表示元素处于不可交互状态
             const overlayDiv = document.createElement('div');
             overlayDiv.className = 'block-overlay';
@@ -777,14 +783,55 @@ export class M_handwriting {
                 align-items: center;
                 justify-content: center;
             `;
-
-
+    
+            // 创建删除按钮（初始状态为隐藏）- 放在DOM容器的直接子元素位置
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'block-delete-button';
+            deleteButton.innerHTML = '×'; // 使用 × 符号作为删除按钮
+            deleteButton.style.cssText = `
+                position: absolute;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                background-color:rgba(255, 0, 4, 0.41);
+                color: white;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+                line-height: 1;
+                cursor: pointer;
+                display: none; /* 初始隐藏 */
+                z-index: 200; /* 非常高的z-index值 */
+                padding: 0;
+                text-align: center;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                pointer-events: auto; /* 确保按钮可点击 */
+            `;
+    
+            // 将删除按钮添加到DOM容器而不是容器元素
+            domContainer.appendChild(deleteButton);
+    
+            // 为删除按钮添加事件监听器
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
+                e.preventDefault(); // 阻止默认行为
+                
+                // 确认删除对话框
+                if (confirm('确定要删除此元素吗？')) {
+                    // 从DOM中移除容器元素和删除按钮
+                    container.remove();
+                    deleteButton.remove();
+                    // 显示删除成功提示
+                    showMessage('元素已删除');
+                }
+            });
+    
             // 将覆盖层添加到容器
             container.appendChild(overlayDiv);
-
+    
             // 跟踪选择状态
             let isSelected = false;
-
+    
             // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
@@ -795,74 +842,88 @@ export class M_handwriting {
                 action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
-
+    
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 enableInteraction();
             });
-
+    
             // 为覆盖层添加拖拽功能（非选中状态下）
             this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id));
-
+    
             // 点击画布空白处时禁用所有块的交互
             document.addEventListener('click', (e) => {
                 // 检查点击是否在此容器外部
-                if (isSelected && !container.contains(e.target as Node)) {
+                if (isSelected && !container.contains(e.target as Node) && e.target !== deleteButton) {
                     disableInteraction();
                 }
             });
-
+    
             // 启用交互的函数
             function enableInteraction() {
                 if (isSelected) return;
-
+    
                 // 移除覆盖层
                 overlayDiv.style.display = 'none';
-
+    
                 // 启用交互
                 wrapper.style.pointerEvents = 'auto';
-
+    
                 // 添加选中状态样式
                 container.classList.add('block-selected');
                 container.style.zIndex = '100';
                 isSelected = true;
-
-                // 尝试聚焦编辑器
-                try {
-                    // 选择编辑器内的第一个块
-                    const firstBlock = wrapper.querySelector('[data-node-id]');
-                    if (firstBlock) {
-                        (firstBlock as HTMLElement).click();
-                    }
-                } catch (err) {
-                    console.log("自动聚焦失败:", err);
-                }
+    
+                // 显示并定位删除按钮
+                const rect = container.getBoundingClientRect();
+                deleteButton.style.left = `${rect.right}px`;
+                deleteButton.style.top = `${rect.top}px`;
+                deleteButton.style.display = 'block';
+                deleteButton.style.transform = 'translate(-160%, -400%)';
             }
-
+    
             // 禁用交互的函数
             function disableInteraction() {
                 if (!isSelected) return;
-
+    
                 // 显示覆盖层
                 overlayDiv.style.display = 'flex';
-
+    
                 // 禁用交互
                 wrapper.style.pointerEvents = 'none';
-
+    
                 // 移除选中状态样式
                 container.classList.remove('block-selected');
                 container.style.zIndex = '';
                 isSelected = false;
+    
+                // 隐藏删除按钮
+                deleteButton.style.display = 'none';
             }
-
+    
             // 添加Escape键监听，用于退出编辑模式
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && isSelected && document.activeElement && container.contains(document.activeElement)) {
                     disableInteraction();
                 }
             });
-
+    
+            // 添加元素移动时更新删除按钮位置的监听
+            const updateButtonPosition = () => {
+                if (isSelected) {
+                    const rect = container.getBoundingClientRect();
+                    deleteButton.style.left = `${rect.right}px`;
+                    deleteButton.style.top = `${rect.top}px`;
+                }
+            };
+            
+            // 当画布缩放或平移时，需要更新按钮位置
+            const canvas = this.canvasInstances.get(id);
+            if (canvas) {
+                canvas.on('after:render', updateButtonPosition);
+            }
+    
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
@@ -870,7 +931,6 @@ export class M_handwriting {
             return null;
         }
     }
-
     /**
      * 为元素添加拖拽和缩放功能
      * @param element 要处理的元素
