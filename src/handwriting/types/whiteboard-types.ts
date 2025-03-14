@@ -1,31 +1,11 @@
-export interface Point {
+export interface WhiteboardPosition {
     x: number;
     y: number;
 }
 
-export interface PenStyle {
-    color: string;
-    width: number;
-}
-
-export interface EraserStyle {
-    width: number;
-}
-
-export interface BackgroundStyle {
-    color: string;
-    gridColor: string;
-    showGrid: boolean;
-}
-
-export interface HistoryItem {
-    type: 'stroke' | 'erase' | 'clear';
-    data: any;
-}
-
-export type ToolType = 'pen' | 'eraser' | 'select';
-
-export interface ToolOptions {
-    pen: PenStyle;
-    eraser: EraserStyle;
+export interface ProtyleContainerElements {
+    container: HTMLElement;
+    wrapper: HTMLElement;
+    dragHandle: HTMLElement;
+    resizeHandle: HTMLElement;
 }

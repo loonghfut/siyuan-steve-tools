@@ -669,7 +669,7 @@ export class M_handwriting {
     } {
         // 创建主容器
         const container = document.createElement('div');
-        container.id = id;
+        container.id = blockId;
         container.className = 'siyuan-block-container';
         container.style.cssText = `
             position: absolute;
@@ -705,8 +705,8 @@ export class M_handwriting {
         resizeHandle.className = 'resize-handle';
         resizeHandle.style.cssText = `
             position: absolute;
-            bottom: -5px;
-            right: -5px;
+            bottom: 0px;
+            right: 0px;
             width: 10px;
             height: 10px;
             background-color: #2196F3;
@@ -756,12 +756,6 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
-            
-            // 获取DOM元素容器（用于将删除按钮添加到更高层级）
-            const domContainer = document.getElementById(`dom-elements-container-${id}`);
-            if (!domContainer) {
-                throw new Error("找不到DOM容器元素");
-            }
     
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
@@ -784,16 +778,16 @@ export class M_handwriting {
                 justify-content: center;
             `;
     
-            // 创建删除按钮（初始状态为隐藏）- 放在DOM容器的直接子元素位置
+            // 创建删除按钮（初始状态为隐藏）- 放在容器元素内
             const deleteButton = document.createElement('button');
             deleteButton.className = 'block-delete-button';
             deleteButton.innerHTML = '×'; // 使用 × 符号作为删除按钮
             deleteButton.style.cssText = `
                 position: absolute;
-                width: 24px;
-                height: 24px;
+                width: 16px;
+                height: 16px;
                 border-radius: 50%;
-                background-color:rgba(255, 0, 4, 0.41);
+                background-color:rgba(255, 77, 80, 0.45);
                 color: white;
                 border: none;
                 font-size: 16px;
@@ -801,15 +795,15 @@ export class M_handwriting {
                 line-height: 1;
                 cursor: pointer;
                 display: none; /* 初始隐藏 */
-                z-index: 200; /* 非常高的z-index值 */
+                z-index: 200;
                 padding: 0;
                 text-align: center;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                 pointer-events: auto; /* 确保按钮可点击 */
             `;
     
-            // 将删除按钮添加到DOM容器而不是容器元素
-            domContainer.appendChild(deleteButton);
+            // 将删除按钮添加到容器元素内，这样它会跟随元素一起移动
+            container.appendChild(deleteButton);
     
             // 为删除按钮添加事件监听器
             deleteButton.addEventListener('click', (e) => {
@@ -818,9 +812,8 @@ export class M_handwriting {
                 
                 // 确认删除对话框
                 if (confirm('确定要删除此元素吗？')) {
-                    // 从DOM中移除容器元素和删除按钮
+                    // 从DOM中移除容器元素
                     container.remove();
-                    deleteButton.remove();
                     // 显示删除成功提示
                     showMessage('元素已删除');
                 }
@@ -875,12 +868,8 @@ export class M_handwriting {
                 container.style.zIndex = '100';
                 isSelected = true;
     
-                // 显示并定位删除按钮
-                const rect = container.getBoundingClientRect();
-                deleteButton.style.left = `${rect.right}px`;
-                deleteButton.style.top = `${rect.top}px`;
+                // 显示删除按钮
                 deleteButton.style.display = 'block';
-                deleteButton.style.transform = 'translate(-160%, -400%)';
             }
     
             // 禁用交互的函数
@@ -901,29 +890,6 @@ export class M_handwriting {
                 // 隐藏删除按钮
                 deleteButton.style.display = 'none';
             }
-    
-            // 添加Escape键监听，用于退出编辑模式
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && isSelected && document.activeElement && container.contains(document.activeElement)) {
-                    disableInteraction();
-                }
-            });
-    
-            // 添加元素移动时更新删除按钮位置的监听
-            const updateButtonPosition = () => {
-                if (isSelected) {
-                    const rect = container.getBoundingClientRect();
-                    deleteButton.style.left = `${rect.right}px`;
-                    deleteButton.style.top = `${rect.top}px`;
-                }
-            };
-            
-            // 当画布缩放或平移时，需要更新按钮位置
-            const canvas = this.canvasInstances.get(id);
-            if (canvas) {
-                canvas.on('after:render', updateButtonPosition);
-            }
-    
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
@@ -945,7 +911,6 @@ export class M_handwriting {
 
         // 不需要再将拖拽功能绑定到拖动手柄，因为我们已经通过覆盖层实现了拖拽
         // 可以隐藏或者移除拖动手柄，或者赋予它其他功能
-        dragHandle.style.height = '4px'; // 减小手柄高度，减少干扰
 
         // 可选：将拖动手柄改为标题栏或隐藏按钮
         dragHandle.style.cursor = 'default';
