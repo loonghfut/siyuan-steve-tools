@@ -1283,7 +1283,11 @@ export class M_handwriting {
             });
     
             // 将覆盖层添加到容器
-            container.appendChild(overlayDiv);
+            // Check if overlay already exists before adding it
+            const existingOverlay = container.querySelector('.block-overlay');
+            if (!existingOverlay) {
+                container.appendChild(overlayDiv);
+            }
     
             // 跟踪选择状态
             let isSelected = false;
