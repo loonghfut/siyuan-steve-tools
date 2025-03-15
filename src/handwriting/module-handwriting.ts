@@ -905,10 +905,6 @@ export class M_handwriting {
                     const blockId = item.blockId;
                     console.log(`回收视窗外块: ${blockId}`);
 
-                    // 从DOM中移除protyle实例但保留容器
-                    item.element.setAttribute('data-initialized', 'recycled');
-
-                    // 生成预览内容
                     try {
                         // 提取当前内容用于预览
                         const contentElement = wrapper.querySelector('.protyle-wysiwyg') ||
@@ -921,6 +917,36 @@ export class M_handwriting {
                             previewContent = previewContent.substring(0, 120);
                         }
 
+                        // 在移除 Protyle 内容前将原有的 Protyle 实例清理
+                        // 查找并清理所有相关的事件监听器和 DOM 元素
+                        const protyleInstances = wrapper.querySelectorAll('[data-subtype="protyle"]');
+                        protyleInstances.forEach(instance => {
+                            // 尝试标记实例为已销毁，以防止重复使用
+                            if (instance['protyle']) {
+                                try {
+                                    // 模拟销毁实例
+                                    if (typeof instance['protyle'].destroy === 'function') {
+                                        instance['protyle'].destroy();
+                                    }
+                                    // 移除所有属性
+                                    Object.keys(instance['protyle']).forEach(key => {
+                                        delete instance['protyle'][key];
+                                    });
+                                    instance['protyle'] = null;
+                                } catch (e) {
+                                    console.warn("清理 Protyle 实例失败", e);
+                                }
+                            }
+                            // 移除元素
+                            instance.remove();
+                        });
+
+                        // 清空 wrapper 内容
+                        wrapper.innerHTML = '';
+
+                        // 从DOM中移除protyle实例但保留容器
+                        item.element.setAttribute('data-initialized', 'recycled');
+
                         // 显示预览内容
                         wrapper.innerHTML = `
                         <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
@@ -930,18 +956,27 @@ export class M_handwriting {
                     `;
 
                         // 添加点击事件以恢复块
-                        wrapper.addEventListener('click', function restoreHandler() {
+                        const clickHandler = function () {
                             // 移除点击事件处理程序，防止重复触发
-                            wrapper.removeEventListener('click', restoreHandler);
+                            wrapper.removeEventListener('click', clickHandler);
 
                             // 恢复块
                             item.element.setAttribute('data-initialized', 'false');
                             recycledStates.delete(item.element);
-                            loadBlock(item.element);
-                        });
+
+                            // 延迟一点加载，以确保旧资源被完全清理
+                            setTimeout(() => {
+                                loadBlock(item.element);
+                            }, 100);
+                        };
+
+                        wrapper.addEventListener('click', clickHandler);
 
                     } catch (err) {
                         console.error("回收块失败:", err);
+                        // 清空内容，强制重新加载
+                        wrapper.innerHTML = '';
+
                         wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-on-surface-light);">
                         内容已回收，点击恢复
                     </div>`;
@@ -950,7 +985,11 @@ export class M_handwriting {
                         wrapper.addEventListener('click', () => {
                             item.element.setAttribute('data-initialized', 'false');
                             recycledStates.delete(item.element);
-                            loadBlock(item.element);
+
+                            // 延迟加载
+                            setTimeout(() => {
+                                loadBlock(item.element);
+                            }, 100);
                         });
                     }
                 });
@@ -1173,13 +1212,9 @@ export class M_handwriting {
      * @param id 画布ID
      * @returns 初始化的Protyle实例或null
      */
-    /**
-     * 初始化思源块编辑器
-     * 优化版本：使用事件委托减少事件监听器数量
-     */
     private initProtyleEditor(wrapper: HTMLElement, blockId: string, id: string): Protyle | null {
         try {
-            // 获取父容器元素
+            // 获取父容器元素（siyuan-block-container）
             const container = wrapper.parentElement;
             if (!container) {
                 throw new Error("找不到父容器元素");
@@ -1191,7 +1226,6 @@ export class M_handwriting {
             // 创建一个半透明覆盖层，表示元素处于不可交互状态
             const overlayDiv = document.createElement('div');
             overlayDiv.className = 'block-overlay';
-            overlayDiv.dataset.blockId = blockId; // 存储块ID方便事件委托时识别
             overlayDiv.style.cssText = `
                 position: absolute;
                 top: 8px;
@@ -1207,11 +1241,10 @@ export class M_handwriting {
                 justify-content: center;
             `;
     
-            // 创建删除按钮（初始状态为隐藏）
+            // 创建删除按钮（初始状态为隐藏）- 放在容器元素内
             const deleteButton = document.createElement('button');
             deleteButton.className = 'block-delete-button';
-            deleteButton.dataset.blockId = blockId; // 存储块ID方便事件委托时识别
-            deleteButton.innerHTML = '×';
+            deleteButton.innerHTML = '×'; // 使用 × 符号作为删除按钮
             deleteButton.style.cssText = `
                 position: absolute;
                 width: 16px;
@@ -1229,15 +1262,31 @@ export class M_handwriting {
                 padding: 0;
                 text-align: center;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-                pointer-events: auto;
+                pointer-events: auto; /* 确保按钮可点击 */
             `;
     
-            // 将覆盖层和删除按钮添加到容器
+            // 将删除按钮添加到容器元素内，这样它会跟随元素一起移动
             container.appendChild(deleteButton);
+    
+            // 为删除按钮添加事件监听器
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止事件冒泡
+                e.preventDefault(); // 阻止默认行为
+    
+                // 确认删除对话框
+                if (confirm('确定要删除此元素吗？')) {
+                    // 从DOM中移除容器元素
+                    container.remove();
+                    // 显示删除成功提示
+                    showMessage('元素已删除');
+                }
+            });
+    
+            // 将覆盖层添加到容器
             container.appendChild(overlayDiv);
     
-            // 标记初始状态
-            container.dataset.selected = 'false';
+            // 跟踪选择状态
+            let isSelected = false;
     
             // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
@@ -1250,115 +1299,100 @@ export class M_handwriting {
                 mode: "wysiwyg",
             });
     
-            // 为覆盖层添加拖拽功能
+            // 双击覆盖层激活编辑
+            overlayDiv.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                enableInteraction();
+            });
+    
+            // 为覆盖层添加拖拽功能（非选中状态下）
             this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id));
     
+            // 点击画布空白处时禁用所有块的交互 - 使用命名函数以便清理
+            const handleDocumentClick = (e: MouseEvent) => {
+                // 检查点击是否在此容器外部
+                if (isSelected && !container.contains(e.target as Node) && e.target !== deleteButton) {
+                    disableInteraction();
+                }
+            };
+    
+            // 添加点击监听
+            document.addEventListener('click', handleDocumentClick);
+            
+            // 存储清理函数，以便之后移除监听器
+            container.dataset.clickHandler = 'true';
+            
+            // 在容器被移除时自动清理监听器
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    for (const node of Array.from(mutation.removedNodes)) {
+                        if (node === container) {
+                            document.removeEventListener('click', handleDocumentClick);
+                            observer.disconnect();
+                            return;
+                        }
+                    }
+                }
+            });
+            
+            observer.observe(container.parentElement!, { childList: true });
+    
+            // 启用交互的函数
+            function enableInteraction() {
+                if (isSelected) return;
+    
+                // 移除覆盖层
+                overlayDiv.style.display = 'none';
+    
+                // 启用交互
+                wrapper.style.pointerEvents = 'auto';
+    
+                // 添加选中状态样式
+                container.classList.add('block-selected');
+                container.style.zIndex = '100';
+                isSelected = true;
+    
+                // 显示删除按钮
+                deleteButton.style.display = 'block';
+            }
+    
+            // 禁用交互的函数
+            function disableInteraction() {
+                if (!isSelected) return;
+    
+                // 显示覆盖层
+                overlayDiv.style.display = 'flex';
+    
+                // 禁用交互
+                wrapper.style.pointerEvents = 'none';
+    
+                // 移除选中状态样式
+                container.classList.remove('block-selected');
+                container.style.zIndex = '';
+                isSelected = false;
+    
+                // 隐藏删除按钮
+                deleteButton.style.display = 'none';
+            }
+            
+            // 记录最后交互时间，用于回收策略
+            container.dataset.lastInteractTime = Date.now().toString();
+            
+            // 当用户与块交互时更新时间戳
+            const updateInteractionTime = () => {
+                container.dataset.lastInteractTime = Date.now().toString();
+            };
+            
+            overlayDiv.addEventListener('mousedown', updateInteractionTime);
+            wrapper.addEventListener('click', updateInteractionTime);
+            wrapper.addEventListener('focus', updateInteractionTime, true);
+            
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
             wrapper.innerHTML = `<div style="padding: 10px;">加载块 ${blockId} 失败</div>`;
             return null;
         }
-    }
-    
-    /**
-     * 初始化一次性事件处理程序
-     * 使用事件委托模式处理所有块的交互
-     */
-    private initEventDelegation(id: string, domContainer: HTMLElement) {
-        // 通过事件委托处理双击事件
-        domContainer.addEventListener('dblclick', (e) => {
-            const overlay = (e.target as HTMLElement).closest('.block-overlay');
-            if (!overlay) return;
-            
-            e.stopPropagation();
-            
-            const container = overlay.parentElement;
-            if (!container) return;
-            
-            this.enableBlockInteraction(container);
-        });
-        
-        // 通过事件委托处理删除按钮点击
-        domContainer.addEventListener('click', (e) => {
-            const deleteButton = (e.target as HTMLElement).closest('.block-delete-button');
-            if (deleteButton) {
-                e.stopPropagation();
-                e.preventDefault();
-                
-                const container = deleteButton.parentElement;
-                if (!container) return;
-                
-                if (confirm('确定要删除此元素吗？')) {
-                    container.remove();
-                    showMessage('元素已删除');
-                }
-                return;
-            }
-            
-            // 处理点击画布空白处，关闭所有活动编辑器
-            const isClickingOutside = !(e.target as HTMLElement).closest('.siyuan-block-container');
-            if (isClickingOutside) {
-                // 关闭所有编辑中的块
-                domContainer.querySelectorAll('.siyuan-block-container[data-selected="true"]').forEach(block => {
-                    this.disableBlockInteraction(block as HTMLElement);
-                });
-            }
-        });
-    }
-    
-    // 启用块交互
-    private enableBlockInteraction(container: HTMLElement) {
-        if (container.dataset.selected === 'true') return;
-        
-        const overlay = container.querySelector('.block-overlay');
-        const wrapper = container.querySelector('.protyle-wrapper');
-        const deleteButton = container.querySelector('.block-delete-button');
-        
-        if (!overlay || !wrapper || !deleteButton) return;
-        
-        // 更新状态
-        container.dataset.selected = 'true';
-        
-        // 移除覆盖层
-        (overlay as HTMLElement).style.display = 'none';
-        
-        // 启用交互
-        (wrapper as HTMLElement).style.pointerEvents = 'auto';
-        
-        // 添加选中状态样式
-        container.classList.add('block-selected');
-        container.style.zIndex = '100';
-        
-        // 显示删除按钮
-        (deleteButton as HTMLElement).style.display = 'block';
-    }
-    
-    // 禁用块交互
-    private disableBlockInteraction(container: HTMLElement) {
-        if (container.dataset.selected !== 'true') return;
-        
-        const overlay = container.querySelector('.block-overlay');
-        const wrapper = container.querySelector('.protyle-wrapper');
-        const deleteButton = container.querySelector('.block-delete-button');
-        
-        if (!overlay || !wrapper || !deleteButton) return;
-        
-        // 更新状态
-        container.dataset.selected = 'false';
-        
-        // 显示覆盖层
-        (overlay as HTMLElement).style.display = 'flex';
-        
-        // 禁用交互
-        (wrapper as HTMLElement).style.pointerEvents = 'none';
-        
-        // 移除选中状态样式
-        container.classList.remove('block-selected');
-        container.style.zIndex = '';
-        
-        // 隐藏删除按钮
-        (deleteButton as HTMLElement).style.display = 'none';
     }
 
     /**
@@ -1452,7 +1486,7 @@ export class M_handwriting {
 
                 // 清除节流计时器
                 dragThrottleTimeout = null;
-            }, 8); // 8ms的节流间隔，约等于120fps
+            }, 80); // 8ms的节流间隔，约等于120fps
         };
 
         // 结束拖拽处理函数
