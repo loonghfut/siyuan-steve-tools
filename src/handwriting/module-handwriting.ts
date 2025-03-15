@@ -127,7 +127,9 @@ export class M_handwriting {
 
                     // 过滤和提取块ID
                     const blockIds = ChildBlocks
-                        .filter(block => block?.type === 'p' && block?.content?.trim())
+                        .filter(block => 
+                            // block?.type === 'p' && 
+                            block?.content?.trim())
                         .map(block => block.id);
 
                     console.log("Extracted block IDs:", blockIds);
@@ -621,8 +623,8 @@ export class M_handwriting {
         const margin = 20;
         const startX = 50;
         const startY = 50;
-        const columns = Math.min(3, blockIds.length);
-        const blockWidth = 300;
+        const columns = Math.min(1, blockIds.length);
+        const blockWidth = 800;
         const blockHeight = 200;
 
         // 如果块数量超过阈值，使用延迟加载方式
@@ -796,7 +798,7 @@ export class M_handwriting {
                 protyledom.style.height = `${blockHeight}px`;
 
                 // 仅对前3个块直接初始化，其余使用延迟加载
-                if (index < 3) {
+                if (index < 10) {
                     // 初始化编辑器
                     const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
                     protyledom.setAttribute('data-initialized', 'true');
@@ -1325,21 +1327,6 @@ export class M_handwriting {
 
             // 存储清理函数，以便之后移除监听器
             container.dataset.clickHandler = 'true';
-
-            // 在容器被移除时自动清理监听器
-            const observer = new MutationObserver((mutations) => {
-                for (const mutation of mutations) {
-                    for (const node of Array.from(mutation.removedNodes)) {
-                        if (node === container) {
-                            document.removeEventListener('click', handleDocumentClick);
-                            observer.disconnect();
-                            return;
-                        }
-                    }
-                }
-            });
-
-            observer.observe(container.parentElement!, { childList: true });
 
             // 启用交互的函数
             function enableInteraction() {
