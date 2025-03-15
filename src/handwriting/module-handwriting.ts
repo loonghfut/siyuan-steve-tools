@@ -1539,6 +1539,11 @@ export class M_handwriting {
 
         // 添加鼠标滚轮缩放功能
         containerElement.addEventListener('wheel', (e) => {
+            // 检查元素是否处于选中状态，如果是则不执行缩放操作
+            if (containerElement.classList.contains('block-selected')) {
+            return; // 元素被选中时，不处理缩放
+            }
+            
             // 阻止事件默认行为和冒泡
             e.preventDefault();
             e.stopPropagation();
@@ -1564,16 +1569,16 @@ export class M_handwriting {
             // 更新网格
             const vpt = canvas.viewportTransform;
             if (vpt) {
-                // 更新网格位置
-                const gridManager = new GridManager(id, canvas);
-                gridManager.updateGridPosition(vpt);
-                
-                // 更新缩放显示
-                const zoomDisplay = document.getElementById(`zoom-display-${id}`);
-                if (zoomDisplay) {
-                    const zoomPercent = Math.round(zoom * 100);
-                    zoomDisplay.textContent = `缩放: ${zoomPercent}%`;
-                }
+            // 更新网格位置
+            const gridManager = new GridManager(id, canvas);
+            gridManager.updateGridPosition(vpt);
+            
+            // 更新缩放显示
+            const zoomDisplay = document.getElementById(`zoom-display-${id}`);
+            if (zoomDisplay) {
+                const zoomPercent = Math.round(zoom * 100);
+                zoomDisplay.textContent = `缩放: ${zoomPercent}%`;
+            }
             }
         }, { passive: false });
     }
