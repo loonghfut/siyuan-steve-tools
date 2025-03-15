@@ -829,10 +829,130 @@ export class M_handwriting {
     // 添加新方法处理延迟初始化
     // 修改 setupLazyInitialization 方法中添加点击事件处理延迟加载的部分
     
+    /**
+     * 设置延迟初始化和视窗内自动加载
+     * @param id 画布ID
+     * @param domContainer DOM容器元素
+     * @param canvas 画布实例
+     */
     private setupLazyInitialization(id: string, domContainer: HTMLElement, canvas: Canvas) {
         // 查找所有未初始化的块
         const unInitializedBlocks = domContainer.querySelectorAll('[data-initialized="false"]');
         
+        if (unInitializedBlocks.length === 0) return;
+        
+        // 保存加载中状态的映射，避免重复加载
+        const loadingStates = new Map<HTMLElement, boolean>();
+        
+        // 批量加载最多同时处理的块数
+        const MAX_CONCURRENT_LOADS = 2;
+        // 当前正在加载的块数量
+        let currentlyLoading = 0;
+        
+        // 优先队列 - 按视窗距离排序等待加载的块
+        const loadingQueue: {element: HTMLElement, priority: number}[] = [];
+        
+        // 检查视窗内需要加载的元素
+        const checkVisibleBlocks = () => {
+            // 如果正在加载的块达到上限，不继续检查
+            if (currentlyLoading >= MAX_CONCURRENT_LOADS) return;
+            
+            // 清空优先队列
+            loadingQueue.length = 0;
+            
+            // 重新计算所有未加载块的优先级
+            domContainer.querySelectorAll('[data-initialized="false"]').forEach((block) => {
+                const blockElement = block as HTMLElement;
+                
+                // 已经在加载中的跳过
+                if (loadingStates.get(blockElement)) return;
+                
+                // 检查是否在视窗内
+                const isVisible = this.isElementInViewport(blockElement, canvas);
+                
+                if (isVisible) {
+                    // 计算到视窗中心的距离作为优先级
+                    const rect = blockElement.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const canvasRect = canvas.getElement().getBoundingClientRect();
+                    const canvasCenterX = canvasRect.left + canvasRect.width / 2;
+                    const canvasCenterY = canvasRect.top + canvasRect.height / 2;
+                    
+                    // 计算距离视窗中心的距离
+                    const distance = Math.sqrt(
+                        Math.pow(centerX - canvasCenterX, 2) + 
+                        Math.pow(centerY - canvasCenterY, 2)
+                    );
+                    
+                    // 添加到优先队列，距离越近优先级越高
+                    loadingQueue.push({ 
+                        element: blockElement,
+                        priority: distance
+                    });
+                }
+            });
+            
+            // 按优先级排序(距离越近越优先)
+            loadingQueue.sort((a, b) => a.priority - b.priority);
+            
+            // 处理队列中的块
+            while (loadingQueue.length > 0 && currentlyLoading < MAX_CONCURRENT_LOADS) {
+                const { element } = loadingQueue.shift()!;
+                loadBlock(element);
+            }
+        };
+        
+        // 异步加载块内容
+        const loadBlock = async (blockElement: HTMLElement) => {
+            if (loadingStates.get(blockElement)) return; // 已在加载中
+            
+            const blockId = blockElement.getAttribute('data-block-id');
+            const wrapper = blockElement.querySelector('.protyle-wrapper');
+            
+            if (!blockId || !wrapper) return;
+            
+            // 标记为加载中
+            loadingStates.set(blockElement, true);
+            currentlyLoading++;
+            
+            // 显示加载状态
+            (wrapper as HTMLElement).innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                <div class="b3-loading"></div>
+            </div>`;
+            
+            try {
+                // 使用延时确保UI更新
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                // 初始化编辑器
+                const protyle = this.initProtyleEditor(wrapper as HTMLElement, blockId, id);
+                
+                if (protyle) {
+                    blockElement.setAttribute('data-initialized', 'true');
+                    console.log(`自动加载了视窗内块: ${blockId}`);
+                } else {
+                    // 初始化失败时显示错误信息
+                    (wrapper as HTMLElement).innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
+                        加载失败，点击重试
+                    </div>`;
+                }
+            } catch (err) {
+                console.error("加载块内容失败:", err);
+                (wrapper as HTMLElement).innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
+                    加载失败，点击重试
+                </div>`;
+            } finally {
+                // 标记为加载完成
+                loadingStates.set(blockElement, false);
+                currentlyLoading--;
+                
+                // 加载完一个块后，检查是否还有其他可见块需要加载
+                setTimeout(checkVisibleBlocks, 100);
+            }
+        };
+        
+        // 为未加载的块添加点击事件处理程序
         unInitializedBlocks.forEach(async block => {
             const blockElement = block as HTMLElement;
             const blockId = blockElement.getAttribute('data-block-id');
@@ -870,28 +990,44 @@ export class M_handwriting {
             // 添加点击事件处理延迟加载
             (wrapper as HTMLElement).addEventListener('click', () => {
                 if (blockElement.getAttribute('data-initialized') === 'true') return;
-                
-                // 显示加载状态
-                (wrapper as HTMLElement).innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
-                    <div class="b3-loading"></div>
-                </div>`;
-                
-                // 延迟100ms初始化编辑器，给UI刷新的机会
-                setTimeout(() => {
-                    // 初始化编辑器
-                    const protyle = this.initProtyleEditor(wrapper as HTMLElement, blockId, id);
-                    
-                    if (protyle) {
-                        blockElement.setAttribute('data-initialized', 'true');
-                    } else {
-                        // 初始化失败时显示错误信息
-                        (wrapper as HTMLElement).innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
-                            加载失败，点击重试
-                        </div>`;
-                    }
-                }, 100);
+                loadBlock(blockElement);
             });
         });
+        
+        // 监听画布事件，平移和缩放后检查视图
+        let viewCheckTimer: number | null = null;
+        const debouncedViewCheck = () => {
+            if (viewCheckTimer) {
+                clearTimeout(viewCheckTimer);
+            }
+            viewCheckTimer = window.setTimeout(() => {
+                checkVisibleBlocks();
+                viewCheckTimer = null;
+            }, 300);
+        };
+        
+        // 监听画布事件
+        canvas.on('mouse:up', debouncedViewCheck);
+        canvas.on('mouse:wheel', debouncedViewCheck);
+        
+        // 初次检查可视区域内的块
+        setTimeout(() => {
+            checkVisibleBlocks();
+        }, 500);
+        
+        // 每3秒周期性检查一次，以防某些边界情况被遗漏
+        const intervalCheckId = window.setInterval(() => {
+            const unloadedBlocksCount = domContainer.querySelectorAll('[data-initialized="false"]').length;
+            if (unloadedBlocksCount === 0) {
+                // 如果所有块都已加载，清除定时器
+                clearInterval(intervalCheckId);
+            } else {
+                checkVisibleBlocks();
+            }
+        }, 3000);
+        
+        // 保存定时器ID，以便可以在需要时清除
+        domContainer.setAttribute('data-interval-id', intervalCheckId.toString());
     }
 
     /**
@@ -1190,6 +1326,64 @@ export class M_handwriting {
     }
 
     /**
+     * 检查给定元素是否在当前视窗内
+     * @param element 要检查的DOM元素
+     * @param canvas 画布实例
+     * @param padding 视窗外的额外检查边距(像素)
+     * @returns 是否在视窗内
+     */
+    private isElementInViewport(element: HTMLElement, canvas: Canvas, padding: number = 200): boolean {
+        if (!canvas || !canvas.viewportTransform) return false;
+        
+        // 获取元素位置和尺寸
+        const rect = element.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        
+        // 获取元素在画布中的位置（考虑缩放和平移）
+        const style = window.getComputedStyle(element);
+        const left = parseFloat(style.left || '0');
+        const top = parseFloat(style.top || '0');
+        
+        // 获取画布变换矩阵
+        const vpt = canvas.viewportTransform;
+        const zoom = vpt[0]; // 假设x和y缩放一致
+        
+        // 计算元素在画布坐标系中的四个角
+        const points = [
+            { x: left, y: top },
+            { x: left + width/zoom, y: top },
+            { x: left, y: top + height/zoom },
+            { x: left + width/zoom, y: top + height/zoom }
+        ];
+        
+        // 获取视窗边界（考虑padding）
+        const viewportWidth = canvas.width! / zoom;
+        const viewportHeight = canvas.height! / zoom;
+        const viewportLeft = -vpt[4] / zoom - padding/zoom;
+        const viewportTop = -vpt[5] / zoom - padding/zoom;
+        const viewportRight = viewportLeft + viewportWidth + 2 * padding/zoom;
+        const viewportBottom = viewportTop + viewportHeight + 2 * padding/zoom;
+        
+        // 检查任一点是否在视窗内
+        for (const point of points) {
+            if (
+                point.x >= viewportLeft && 
+                point.x <= viewportRight && 
+                point.y >= viewportTop && 
+                point.y <= viewportBottom
+            ) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+
+
+
+    /**
      * 清理所有画布实例和资源
      */
     private cleanUp() {
@@ -1197,14 +1391,21 @@ export class M_handwriting {
         this.canvasInstances.forEach((canvas) => {
             canvas.dispose();
         });
-
+    
+        // 清理自动加载的定时器
+        document.querySelectorAll('[data-interval-id]').forEach(element => {
+            const intervalId = parseInt(element.getAttribute('data-interval-id') || '0');
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
+        });
+    
         // 清空实例映射表
         this.canvasInstances.clear();
-
+    
         // 移除可能添加的样式元素
         document.querySelectorAll('[id^="grid-style-"]').forEach(element => {
             element.remove();
         });
     }
-
 }
