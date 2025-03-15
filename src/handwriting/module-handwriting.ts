@@ -1490,7 +1490,7 @@ export class M_handwriting {
 
                 // 清除节流计时器
                 dragThrottleTimeout = null;
-            }, 80); // 8ms的节流间隔，约等于120fps
+            }, 16); // 8ms的节流间隔，约等于120fps
         };
 
         // 结束拖拽处理函数
