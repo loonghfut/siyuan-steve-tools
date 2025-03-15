@@ -67,18 +67,73 @@ export class M_handwriting {
                 button.innerHTML = '画板';
                 button.title = '在画板中打开';
                 button.style.marginLeft = '8px';
-
                 
                 // Add click event
                 button.addEventListener('click', async () => {
                     let ChildBlocks = await api.getChildBlocks(this.currentid);
-                    console.log(ChildBlocks);
-                    // Extract block IDs into an array
-                    const blockIds = ChildBlocks.filter(block => block?.content?.trim()).map(block => block.id);
+                    
+                    // 添加确认对话框，避免误操作加载大量块
+                    if (ChildBlocks.length > 20) {
+                        const confirmed = await new Promise<boolean>(resolve => {
+                            const dialog = document.createElement('div');
+                            dialog.className = 'block-confirm-dialog';
+                            dialog.style.cssText = `
+                                position: fixed;
+                                top: 0;
+                                left: 0;
+                                right: 0;
+                                bottom: 0;
+                                z-index: 99999;
+                                background-color: rgba(0,0,0,0.4);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            `;
+                            
+                            dialog.innerHTML = `
+                                <div style="background: var(--b3-theme-background); border-radius: 6px; padding: 16px; width: 340px; box-shadow: 0 0 20px rgba(0,0,0,0.15);">
+                                    <h3 style="margin-top: 0;">大量块警告</h3>
+                                    <p>当前文档包含 ${ChildBlocks.length} 个块，全部加载可能导致性能问题。</p>
+                                    <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
+                                        <button class="b3-button cancel-btn">取消</button>
+                                        <button class="b3-button b3-button--text optimize-btn">优化加载</button>
+                                        <button class="b3-button b3-button--danger confirm-btn">强制加载全部</button>
+                                    </div>
+                                </div>
+                            `;
+                            
+                            document.body.appendChild(dialog);
+                            
+                            dialog.querySelector('.cancel-btn').addEventListener('click', () => {
+                                document.body.removeChild(dialog);
+                                resolve(false);
+                            });
+                            
+                            dialog.querySelector('.optimize-btn').addEventListener('click', () => {
+                                document.body.removeChild(dialog);
+                                // 仅加载前15个块
+                                ChildBlocks = ChildBlocks.slice(0, 15);
+                                resolve(true);
+                            });
+                            
+                            dialog.querySelector('.confirm-btn').addEventListener('click', () => {
+                                document.body.removeChild(dialog);
+                                resolve(true);
+                            });
+                        });
+                        
+                        if (!confirmed) return;
+                    }
+                    
+                    // 过滤和提取块ID
+                    const blockIds = ChildBlocks
+                        .filter(block => block?.type === 'p' && block?.content?.trim())
+                        .map(block => block.id);
+                    
                     console.log("Extracted block IDs:", blockIds);
                     this.openWhiteBoard_in(e, blockIds);
                 });
-
+    
                 // Add the button to breadcrumb
                 breadcrumb.appendChild(button);
             }
@@ -476,24 +531,26 @@ export class M_handwriting {
     } {
         // 创建主容器
         const container = document.createElement('div');
-        container.id = blockId;
+        container.id = id; // 使用传入的id而不是blockId，避免ID冲突问题
+        container.dataset.blockId = blockId; // 将blockId存储在dataset中
         container.className = 'siyuan-block-container';
         container.style.cssText = `
             position: absolute;
             width: 300px;
             height: 200px;
-            background-color: #3573f0;
+            background-color: var(--b3-theme-background);
             border-radius: 6px;
             box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-            pointer-events: auto; /* 允许元素接收事件 */
+            pointer-events: auto; 
             transform-origin: 0 0;
             overflow: hidden;
             border: 1px solid var(--b3-border-color);
             left: ${position.x}px;
             top: ${position.y}px;
+            will-change: transform, left, top; /* 提高性能提示 */
         `;
-
-        // 添加拖动手柄
+    
+        // 添加拖动手柄，简化样式
         const dragHandle = document.createElement('div');
         dragHandle.className = 'drag-handle';
         dragHandle.style.cssText = `
@@ -503,10 +560,11 @@ export class M_handwriting {
             right: 0;
             height: 8px;
             cursor: move;
-            background-color: rgba(0,0,0,0.1);
+            background-color: rgba(0,0,0,0.08);
             border-radius: 4px 4px 0 0;
+            z-index: 1;
         `;
-
+    
         // 添加缩放手柄
         const resizeHandle = document.createElement('div');
         resizeHandle.className = 'resize-handle';
@@ -521,7 +579,7 @@ export class M_handwriting {
             cursor: nwse-resize;
             z-index: 100;
         `;
-
+    
         // 创建容器包装器
         const wrapper = document.createElement('div');
         wrapper.className = 'protyle-wrapper';
@@ -535,12 +593,12 @@ export class M_handwriting {
             display: flex;
             flex-direction: column;
         `;
-
+    
         // 组装各部分
         container.appendChild(dragHandle);
         container.appendChild(resizeHandle);
         container.appendChild(wrapper);
-
+    
         return {
             container,
             wrapper,
@@ -558,53 +616,283 @@ export class M_handwriting {
      */
     private addDefaultBlocks(canvas: Canvas, id: string, blockIds: string[], domContainer: HTMLElement) {
         if (!blockIds || blockIds.length === 0 || !domContainer) return;
-
+    
         // 计算每个块的布局位置
-        const margin = 20; // 块之间的间距
-        const startX = 50; // 起始X位置
-        const startY = 50; // 起始Y位置
-        const columns = Math.min(3, blockIds.length); // 最多3列
-        const blockWidth = 300; // 默认块宽度
-        const blockHeight = 200; // 默认块高度
-
-        blockIds.forEach((blockId, index) => {
-            // 计算行和列
-            const col = index % columns;
-            const row = Math.floor(index / columns);
-
-            // 计算位置
-            const x = startX + col * (blockWidth + margin);
-            const y = startY + row * (blockHeight + margin);
-
-            // 生成唯一的DOM元素ID
-            const domId = `dom-default-block-${id}-${index}`;
-
-            // 创建容器元素
-            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
-                this.createProtyleContainer(domId, blockId, { x, y });
-
-            // 自定义宽高（可选）
-            protyledom.style.width = `${blockWidth}px`;
-            protyledom.style.height = `${blockHeight}px`;
-
-            // 添加到DOM容器中
-            domContainer.appendChild(protyledom);
-
-            // 初始化Protyle编辑器
-            const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
-
-            // 添加缩放功能
-            ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
-
-            console.log(`已添加默认块 ${blockId} 在位置(${x}, ${y})`);
-        });
-
-        // 显示成功消息
-        if (blockIds.length > 0) {
-            showMessage(`已添加 ${blockIds.length} 个默认块`);
+        const margin = 20; 
+        const startX = 50; 
+        const startY = 50; 
+        const columns = Math.min(3, blockIds.length); 
+        const blockWidth = 300;
+        const blockHeight = 200;
+        
+        // 如果块数量超过阈值，使用延迟加载方式
+        if (blockIds.length > 10) {
+            // 显示提示
+            showMessage(`正在加载 ${blockIds.length} 个块，使用延迟加载方式提高性能...`);
+            
+            // 创建加载指示器
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'whiteboard-loading-indicator';
+            loadingIndicator.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.7);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 4px;
+                z-index: 1000;
+            `;
+            loadingIndicator.innerHTML = `
+                <div>正在加载块 <span id="loading-count-${id}">0</span>/${blockIds.length}</div>
+                <div style="width: 200px; height: 4px; background: rgba(255,255,255,0.3); margin-top: 8px; border-radius: 2px;">
+                    <div id="loading-progress-${id}" style="width: 0%; height: 100%; background: #4CAF50; border-radius: 2px;"></div>
+                </div>
+            `;
+            domContainer.appendChild(loadingIndicator);
+            
+            // 分批处理 + 延迟初始化
+            const batchSize = 3;  // 减小每批处理的块数量
+            let currentIndex = 0;
+            
+            const processNextBatch = () => {
+                const endIndex = Math.min(currentIndex + batchSize, blockIds.length);
+                const batch = blockIds.slice(currentIndex, endIndex);
+            
+                // 处理当前批次的块
+                batch.forEach(async (blockId, batchIndex) => {
+                    const index = currentIndex + batchIndex;
+                    
+                    // 计算行和列
+                    const col = index % columns;
+                    const row = Math.floor(index / columns);
+                
+                    // 计算位置
+                    const x = startX + col * (blockWidth + margin);
+                    const y = startY + row * (blockHeight + margin);
+                
+                    // 创建容器元素，但先不初始化Protyle
+                    const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
+                        this.createProtyleContainer(`dom-default-block-${id}-${index}`, blockId, { x, y });
+                
+                    // 设置尺寸
+                    protyledom.style.width = `${blockWidth}px`;
+                    protyledom.style.height = `${blockHeight}px`;
+                    
+                    // 先添加加载中的占位符
+                    wrapperDiv.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                        <div class="b3-loading"></div>
+                    </div>`;
+                    
+                    // 添加到DOM容器
+                    domContainer.appendChild(protyledom);
+                    
+                    // 添加延迟初始化逻辑
+                    protyledom.setAttribute('data-block-id', blockId);
+                    protyledom.setAttribute('data-initialized', 'false');
+                    
+                    // 尝试获取块内容预览
+                    try {
+                        // 获取块数据但限制加载
+                        const blockData = await api.getBlockByID(blockId);
+                        
+                        if (blockData && blockData.content) {
+                            // 显示内容预览，限制长度
+                            const previewContent = blockData.content.substring(0, 120); // 限制预览长度
+                            wrapperDiv.innerHTML = `
+                                <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
+                                    <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">点击加载完整内容</div>
+                                    <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${blockData.content.length > 120 ? '...' : ''}</div>
+                                </div>
+                            `;
+                        } else {
+                            // 如果无法获取内容，显示默认占位符
+                            wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+                                <span>点击加载块 ${index + 1}</span>
+                            </div>`;
+                        }
+                    } catch (err) {
+                        console.error("获取块预览失败:", err);
+                        wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+                            <span>点击加载块 ${index + 1}</span>
+                        </div>`;
+                    }
+                    
+                    // 只添加缩放功能，不初始化Protyle
+                    ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
+                    
+                    // 更新加载进度显示
+                    const countElement = document.getElementById(`loading-count-${id}`);
+                    const progressElement = document.getElementById(`loading-progress-${id}`);
+                    if (countElement) countElement.textContent = `${index + 1}`;
+                    if (progressElement) progressElement.style.width = `${((index + 1) / blockIds.length) * 100}%`;
+                });
+                
+                // 更新索引
+                currentIndex = endIndex;
+                
+                // 如果还有未处理的块，安排下一批处理
+                if (currentIndex < blockIds.length) {
+                    // 增加延时避免浏览器卡顿
+                    setTimeout(processNextBatch, 100); 
+                } else {
+                    // 全部加载完成，移除加载指示器
+                    setTimeout(() => {
+                        loadingIndicator.remove();
+                        
+                        // 添加块初始化指导
+                        const guide = document.createElement('div');
+                        guide.className = 'whiteboard-guide';
+                        guide.style.cssText = `
+                            position: absolute;
+                            bottom: 20px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: rgba(33, 150, 243, 0.8);
+                            color: white;
+                            padding: 10px 16px;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            z-index: 900;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+                            transition: opacity 0.5s;
+                        `;
+                        guide.innerHTML = '提示: 点击块可按需加载内容，双击已加载的块可编辑';
+                        domContainer.appendChild(guide);
+                        
+                        setTimeout(() => {
+                            guide.style.opacity = '0';
+                            setTimeout(() => guide.remove(), 500);
+                        }, 5000);
+                        
+                        showMessage(`已布局 ${blockIds.length} 个块，点击块可加载内容`);
+                        
+                        // 给所有占位块添加点击事件，延迟初始化
+                        this.setupLazyInitialization(id, domContainer, canvas);
+                    }, 500);
+                }
+            };
+            
+            // 开始处理第一批
+            setTimeout(processNextBatch, 100);
+        } else {
+            // 块数量较少，全部加载，但也使用延迟初始化
+            blockIds.forEach((blockId, index) => {
+                // 计算行和列
+                const col = index % columns;
+                const row = Math.floor(index / columns);
+    
+                // 计算位置
+                const x = startX + col * (blockWidth + margin);
+                const y = startY + row * (blockHeight + margin);
+    
+                // 创建容器元素
+                const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
+                    this.createProtyleContainer(`dom-default-block-${id}-${index}`, blockId, { x, y });
+    
+                // 设置尺寸
+                protyledom.style.width = `${blockWidth}px`;
+                protyledom.style.height = `${blockHeight}px`;
+                
+                // 仅对前3个块直接初始化，其余使用延迟加载
+                if (index < 3) {
+                    // 初始化编辑器
+                    const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
+                    protyledom.setAttribute('data-initialized', 'true');
+                } else {
+                    // 为其余块添加占位符
+                    wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+                        <span>点击加载内容</span>
+                    </div>`;
+                    protyledom.setAttribute('data-block-id', blockId);
+                    protyledom.setAttribute('data-initialized', 'false');
+                }
+    
+                // 添加到DOM容器
+                domContainer.appendChild(protyledom);
+    
+                // 添加缩放功能
+                ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
+            });
+    
+            // 设置延迟初始化
+            this.setupLazyInitialization(id, domContainer, canvas);
+            
+            // 显示成功消息
+            if (blockIds.length > 0) {
+                showMessage(`已加载 ${blockIds.length} 个块，点击块可查看内容`);
+            }
         }
     }
-
+    
+    // 添加新方法处理延迟初始化
+    // 修改 setupLazyInitialization 方法中添加点击事件处理延迟加载的部分
+    
+    private setupLazyInitialization(id: string, domContainer: HTMLElement, canvas: Canvas) {
+        // 查找所有未初始化的块
+        const unInitializedBlocks = domContainer.querySelectorAll('[data-initialized="false"]');
+        
+        unInitializedBlocks.forEach(async block => {
+            const blockElement = block as HTMLElement;
+            const blockId = blockElement.getAttribute('data-block-id');
+            const wrapper = blockElement.querySelector('.protyle-wrapper');
+            
+            if (!blockId || !wrapper) return;
+            
+            // 为未加载的块获取预览内容
+            try {
+                // 获取块内容用于预览显示
+                const blockData = await api.getBlockByID(blockId);
+                
+                if (blockData && blockData.content) {
+                    // 显示内容预览
+                    const previewContent = blockData.content.substring(0, 120); // 限制预览长度
+                    (wrapper as HTMLElement).innerHTML = `
+                        <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
+                            <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">点击加载完整内容</div>
+                            <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${blockData.content.length > 120 ? '...' : ''}</div>
+                        </div>
+                    `;
+                } else {
+                    // 如果无法获取内容，显示默认占位符
+                    (wrapper as HTMLElement).innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+                        <span>点击加载块内容</span>
+                    </div>`;
+                }
+            } catch (err) {
+                console.error("获取块预览失败:", err);
+                (wrapper as HTMLElement).innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+                    <span>点击加载块内容</span>
+                </div>`;
+            }
+            
+            // 添加点击事件处理延迟加载
+            (wrapper as HTMLElement).addEventListener('click', () => {
+                if (blockElement.getAttribute('data-initialized') === 'true') return;
+                
+                // 显示加载状态
+                (wrapper as HTMLElement).innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                    <div class="b3-loading"></div>
+                </div>`;
+                
+                // 延迟100ms初始化编辑器，给UI刷新的机会
+                setTimeout(() => {
+                    // 初始化编辑器
+                    const protyle = this.initProtyleEditor(wrapper as HTMLElement, blockId, id);
+                    
+                    if (protyle) {
+                        blockElement.setAttribute('data-initialized', 'true');
+                    } else {
+                        // 初始化失败时显示错误信息
+                        (wrapper as HTMLElement).innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
+                            加载失败，点击重试
+                        </div>`;
+                    }
+                }, 100);
+            });
+        });
+    }
 
     /**
      * 初始化思源块编辑器
@@ -696,7 +984,7 @@ export class M_handwriting {
                     breadcrumb: false,
                     gutter: false,
                 },
-                // action: ["cb-get-focus"],
+                action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
 
@@ -775,14 +1063,15 @@ export class M_handwriting {
         let startY = 0;
         let initialLeft = 0;
         let initialTop = 0;
-
+        let dragThrottleTimeout = null;
+    
         // 开始拖拽的处理函数
         const startDrag = (e: MouseEvent | TouchEvent) => {
-            // 阻止事件冒泡但允许默认行为
+            // 阻止事件冒泡
             e.stopPropagation();
-
+    
             isDragging = true;
-
+    
             // 获取触摸/鼠标的初始位置
             if (e instanceof MouseEvent) {
                 startX = e.clientX;
@@ -791,79 +1080,111 @@ export class M_handwriting {
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
             }
-
+    
             // 获取元素当前的CSS位置
             const currentLeftStr = containerElement.style.left || '0px';
             const currentTopStr = containerElement.style.top || '0px';
             initialLeft = parseFloat(currentLeftStr);
             initialTop = parseFloat(currentTopStr);
-
-            // 添加临时事件监听器
+    
+            // 使用被动事件监听器提高性能
             document.addEventListener('mousemove', moveDrag, { capture: true });
             document.addEventListener('touchmove', moveDrag, { capture: true, passive: false });
             document.addEventListener('mouseup', stopDrag, { capture: true });
             document.addEventListener('touchend', stopDrag, { capture: true });
-
-            // 添加活动样式
-            containerElement.style.opacity = '0.85';
+    
+            // 添加活动样式，但减少不必要的样式变化
+            containerElement.classList.add('dragging');
             containerElement.style.zIndex = '1000';
-            document.body.style.cursor = 'grabbing';
         };
-
-        // 拖拽移动处理函数
+    
+        // 使用防抖处理拖拽移动，提升性能
         const moveDrag = (e: MouseEvent | TouchEvent) => {
             if (!isDragging) return;
-
+    
             // 阻止事件默认行为和冒泡
             e.preventDefault();
             e.stopPropagation();
-
-            // 获取当前鼠标/触摸位置
-            let clientX, clientY;
-            if (e instanceof MouseEvent) {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            } else if (e instanceof TouchEvent && e.touches && e.touches[0]) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-            } else {
-                return;
-            }
-
-            // 考虑画布缩放比例
-            const vpt = canvas.viewportTransform;
-            if (!vpt) return;
-
-            const scale = vpt[0]; // 假设x和y的缩放比例相同
-
-            // 计算移动距离（考虑缩放）
-            const deltaX = (clientX - startX) / scale;
-            const deltaY = (clientY - startY) / scale;
-
-            // 更新元素位置
-            containerElement.style.left = `${initialLeft + deltaX}px`;
-            containerElement.style.top = `${initialTop + deltaY}px`;
+    
+            if (dragThrottleTimeout) return; // 如果计时器存在，直接返回
+    
+            // 设置节流计时器，提高性能
+            dragThrottleTimeout = setTimeout(() => {
+                // 获取当前鼠标/触摸位置
+                let clientX, clientY;
+                if (e instanceof MouseEvent) {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                } else if (e instanceof TouchEvent && e.touches && e.touches[0]) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    return;
+                }
+    
+                // 考虑画布缩放比例
+                const vpt = canvas.viewportTransform;
+                if (!vpt) return;
+    
+                const scale = vpt[0]; // 假设x和y的缩放比例相同
+    
+                // 计算移动距离（考虑缩放）
+                const deltaX = (clientX - startX) / scale;
+                const deltaY = (clientY - startY) / scale;
+    
+                // 使用transform而不是left/top，提高性能
+                const newLeft = initialLeft + deltaX;
+                const newTop = initialTop + deltaY;
+                
+                // 使用transform代替left/top属性提高性能
+                containerElement.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+                
+                // 清除节流计时器
+                dragThrottleTimeout = null;
+            }, 8); // 8ms的节流间隔，约等于120fps
         };
-
+    
         // 结束拖拽处理函数
         const stopDrag = (e: MouseEvent | TouchEvent) => {
             if (!isDragging) return;
-
+    
             isDragging = false;
-
+            
+            // 清除节流计时器
+            if (dragThrottleTimeout) {
+                clearTimeout(dragThrottleTimeout);
+                dragThrottleTimeout = null;
+            }
+    
             // 移除临时事件监听器
             document.removeEventListener('mousemove', moveDrag, { capture: true });
             document.removeEventListener('touchmove', moveDrag, { capture: true });
             document.removeEventListener('mouseup', stopDrag, { capture: true });
             document.removeEventListener('touchend', stopDrag, { capture: true });
-
+    
+            // 获取当前transform计算的位置
+            const transformStyle = containerElement.style.transform;
+            let deltaX = 0, deltaY = 0;
+            
+            if (transformStyle) {
+                const match = transformStyle.match(/translate3d\(([^,]+)px,\s*([^,]+)px/);
+                if (match) {
+                    deltaX = parseFloat(match[1]);
+                    deltaY = parseFloat(match[2]);
+                }
+            }
+            
+            // 更新实际位置并清除transform
+            containerElement.style.left = `${initialLeft + deltaX}px`;
+            containerElement.style.top = `${initialTop + deltaY}px`;
+            containerElement.style.transform = '';
+            
             // 恢复正常样式
-            containerElement.style.opacity = '1';
+            containerElement.classList.remove('dragging');
             containerElement.style.zIndex = '';
-            document.body.style.cursor = '';
         };
-
-        // 添加拖拽事件监听器
+    
+        // 添加拖拽事件监听器，使用passive提高性能
         overlayElement.addEventListener('mousedown', startDrag);
         overlayElement.addEventListener('touchstart', startDrag, { passive: true });
     }

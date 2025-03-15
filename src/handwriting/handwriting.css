@@ -25,3 +25,27 @@
 .siyuan-block-container:hover .block-overlay {
   background-color: rgba(0, 0, 0, 0.05);
 }
+
+/* 优化块容器性能 */
+.siyuan-block-container {
+  will-change: transform;
+  transition: box-shadow 0.2s ease;
+  contain: layout paint;
+}
+
+.siyuan-block-container.dragging {
+  opacity: 0.85;
+}
+
+/* 预先创建必要的图层 */
+.whiteboard-container {
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+  contain: layout paint style;
+}
+
+/* 优化动画和过渡效果 */
+.block-placeholder,
+.whiteboard-loading-indicator {
+  transition: opacity 0.2s ease;
+}
