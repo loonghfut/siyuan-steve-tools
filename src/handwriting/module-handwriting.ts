@@ -1219,10 +1219,10 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
-    
+
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
-    
+
             // 创建一个半透明覆盖层，表示元素处于不可交互状态
             const overlayDiv = document.createElement('div');
             overlayDiv.className = 'block-overlay';
@@ -1240,7 +1240,7 @@ export class M_handwriting {
                 align-items: center;
                 justify-content: center;
             `;
-    
+
             // 创建删除按钮（初始状态为隐藏）- 放在容器元素内
             const deleteButton = document.createElement('button');
             deleteButton.className = 'block-delete-button';
@@ -1264,15 +1264,15 @@ export class M_handwriting {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                 pointer-events: auto; /* 确保按钮可点击 */
             `;
-    
+
             // 将删除按钮添加到容器元素内，这样它会跟随元素一起移动
             container.appendChild(deleteButton);
-    
+
             // 为删除按钮添加事件监听器
             deleteButton.addEventListener('click', (e) => {
                 e.stopPropagation(); // 阻止事件冒泡
                 e.preventDefault(); // 阻止默认行为
-    
+
                 // 确认删除对话框
                 if (confirm('确定要删除此元素吗？')) {
                     // 从DOM中移除容器元素
@@ -1281,17 +1281,17 @@ export class M_handwriting {
                     showMessage('元素已删除');
                 }
             });
-    
+
             // 将覆盖层添加到容器
             // Check if overlay already exists before adding it
             const existingOverlay = container.querySelector('.block-overlay');
             if (!existingOverlay) {
                 container.appendChild(overlayDiv);
             }
-    
+
             // 跟踪选择状态
             let isSelected = false;
-    
+
             // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
@@ -1302,16 +1302,16 @@ export class M_handwriting {
                 action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
-    
+
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 enableInteraction();
             });
-    
+
             // 为覆盖层添加拖拽功能（非选中状态下）
-            this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id));
-    
+            this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id),id);
+
             // 点击画布空白处时禁用所有块的交互 - 使用命名函数以便清理
             const handleDocumentClick = (e: MouseEvent) => {
                 // 检查点击是否在此容器外部
@@ -1319,13 +1319,13 @@ export class M_handwriting {
                     disableInteraction();
                 }
             };
-    
+
             // 添加点击监听
             document.addEventListener('click', handleDocumentClick);
-            
+
             // 存储清理函数，以便之后移除监听器
             container.dataset.clickHandler = 'true';
-            
+
             // 在容器被移除时自动清理监听器
             const observer = new MutationObserver((mutations) => {
                 for (const mutation of mutations) {
@@ -1338,59 +1338,59 @@ export class M_handwriting {
                     }
                 }
             });
-            
+
             observer.observe(container.parentElement!, { childList: true });
-    
+
             // 启用交互的函数
             function enableInteraction() {
                 if (isSelected) return;
-    
+
                 // 移除覆盖层
                 overlayDiv.style.display = 'none';
-    
+
                 // 启用交互
                 wrapper.style.pointerEvents = 'auto';
-    
+
                 // 添加选中状态样式
                 container.classList.add('block-selected');
                 container.style.zIndex = '100';
                 isSelected = true;
-    
+
                 // 显示删除按钮
                 deleteButton.style.display = 'block';
             }
-    
+
             // 禁用交互的函数
             function disableInteraction() {
                 if (!isSelected) return;
-    
+
                 // 显示覆盖层
                 overlayDiv.style.display = 'flex';
-    
+
                 // 禁用交互
                 wrapper.style.pointerEvents = 'none';
-    
+
                 // 移除选中状态样式
                 container.classList.remove('block-selected');
                 container.style.zIndex = '';
                 isSelected = false;
-    
+
                 // 隐藏删除按钮
                 deleteButton.style.display = 'none';
             }
-            
+
             // 记录最后交互时间，用于回收策略
             container.dataset.lastInteractTime = Date.now().toString();
-            
+
             // 当用户与块交互时更新时间戳
             const updateInteractionTime = () => {
                 container.dataset.lastInteractTime = Date.now().toString();
             };
-            
+
             overlayDiv.addEventListener('mousedown', updateInteractionTime);
             wrapper.addEventListener('click', updateInteractionTime);
             wrapper.addEventListener('focus', updateInteractionTime, true);
-            
+
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
@@ -1405,7 +1405,7 @@ export class M_handwriting {
      * @param containerElement 容器元素
      * @param canvas Fabric.js画布实例
      */
-    private makeElementDraggable(overlayElement: HTMLElement, containerElement: HTMLElement, canvas: Canvas) {
+    private makeElementDraggable(overlayElement: HTMLElement, containerElement: HTMLElement, canvas: Canvas, id: string) {
         // 状态变量
         let isDragging = false;
         let startX = 0;
@@ -1536,6 +1536,46 @@ export class M_handwriting {
         // 添加拖拽事件监听器，使用passive提高性能
         overlayElement.addEventListener('mousedown', startDrag);
         overlayElement.addEventListener('touchstart', startDrag, { passive: true });
+
+        // 添加鼠标滚轮缩放功能
+        containerElement.addEventListener('wheel', (e) => {
+            // 阻止事件默认行为和冒泡
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // 直接调用 PanZoomHandler 中的缩放代码
+            // 计算缩放系数
+            const delta = e.deltaY;
+            let zoom = canvas.getZoom();
+            zoom = zoom * (0.999 ** delta);
+            
+            // 限制缩放范围
+            zoom = Math.min(Math.max(0.1, zoom), 10);
+            
+            // 获取鼠标位置，以此为中心点进行缩放
+            const rect = canvas.getElement().getBoundingClientRect();
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            const point = new fabric.Point(offsetX, offsetY);
+            
+            // 执行缩放
+            canvas.zoomToPoint(point, zoom);
+            
+            // 更新网格
+            const vpt = canvas.viewportTransform;
+            if (vpt) {
+                // 更新网格位置
+                const gridManager = new GridManager(id, canvas);
+                gridManager.updateGridPosition(vpt);
+                
+                // 更新缩放显示
+                const zoomDisplay = document.getElementById(`zoom-display-${id}`);
+                if (zoomDisplay) {
+                    const zoomPercent = Math.round(zoom * 100);
+                    zoomDisplay.textContent = `缩放: ${zoomPercent}%`;
+                }
+            }
+        }, { passive: false });
     }
 
     /**
