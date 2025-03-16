@@ -10,6 +10,29 @@ import { CanvasManager } from "./canvas/canvas-manager";
 import { ElementInteractions } from "./elements/element-interactions";
 import { api } from "@frostime/siyuan-plugin-kits";
 
+const BLOCK_LOADING = {
+    MAX_CONCURRENT_LOADS: 2,      // 同时最多加载的块数量
+    MAX_ACTIVE_BLOCKS: 10,        // 已加载块的最大数量（超过此数量需要回收）
+    VIEWPORT_CHECK_DEBOUNCE: 300, // 视口检查的防抖时间（毫秒）
+    INTERVAL_CHECK_PERIOD: 5000,  // 定期检查间隔时间（毫秒）
+    VIEWPORT_PADDING: 200,        // 视口边缘额外检查的像素范围
+    DRAG_THROTTLE: 16,            // 拖拽更新节流时间（毫秒）
+    INITIAL_PRELOAD_COUNT: 10,    // 初始预加载的块数量
+    BATCH_SIZE: 3                 // 批量加载块的数量
+};
+
+// 块布局配置
+const BLOCK_LAYOUT = {
+    MARGIN: 20,           // 块之间的间距
+    START_X: 50,          // 起始X坐标
+    START_Y: 50,          // 起始Y坐标
+    WIDTH: 800,           // 默认块宽度
+    HEIGHT: 200,          // 默认块高度
+    MAX_COLUMNS: 1        // 最大列数
+};
+
+
+
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -157,21 +180,21 @@ export class M_handwriting {
 
         // 获取按钮
         const button = protyle.element.querySelector('.whiteboard-button');
-        
+
         // 检查画板是否已存在
         let whiteboardContainer = protyleContent.querySelector('.whiteboard-container');
         const id = this.currentid;
-        
+
         // 控制元素显示状态的函数
         const toggleElementsVisibility = (show: boolean) => {
             // 控制原始内容显示/隐藏
             const originalContent = protyleContent.querySelectorAll(':scope > :not(.whiteboard-container)');
             originalContent.forEach(el => (el as HTMLElement).style.display = show ? '' : 'none');
-            
+
             // 控制面包屑导航栏
             const breadcrumbBar = protyle.element.querySelector('.protyle-breadcrumb__bar');
             if (breadcrumbBar) (breadcrumbBar as HTMLElement).style.display = show ? '' : 'none';
-            
+
             // Create or update a style element for controlling visibility
             let styleElement = document.getElementById(`whiteboard-style-${this.currentid}`);
             if (!styleElement) {
@@ -179,14 +202,14 @@ export class M_handwriting {
                 styleElement.id = `whiteboard-style-${this.currentid}`;
                 document.head.appendChild(styleElement);
             }
-            
+
             // Update the CSS rule to show/hide the gutters
             styleElement.textContent = show ? '' : `
                  .protyle-gutters:not(.fn__none) {
                     display: none !important;
                 }
             `;
-            
+
             // 更新按钮文本
             if (button) button.innerHTML = show ? '画板' : '关闭画板';
         };
@@ -194,11 +217,11 @@ export class M_handwriting {
         if (whiteboardContainer) {
             // 画板已存在，切换显示状态
             const isCurrentlyHidden = whiteboardContainer.style.display === 'none';
-            
+
             // 设置新的显示状态
             whiteboardContainer.style.display = isCurrentlyHidden ? 'block' : 'none';
             toggleElementsVisibility(!isCurrentlyHidden);
-            
+
             // 如果显示画板，恢复画布实例
             if (isCurrentlyHidden) {
                 const existingCanvas = this.canvasInstances.get(id);
@@ -207,13 +230,13 @@ export class M_handwriting {
         } else {
             // 画板不存在，创建新的画板
             toggleElementsVisibility(false);
-            
+
             // 创建画板容器
             whiteboardContainer = document.createElement('div');
             whiteboardContainer.id = `steveTool-whiteboard-${id}`;
             whiteboardContainer.className = 'whiteboard-container';
             whiteboardContainer.style.cssText = 'width: 100%; height: 100%; position: relative; overflow: hidden; background-color: var(--b3-theme-background);';
-            
+
             // 添加控制元素和画布
             whiteboardContainer.innerHTML = `
             <div class="whiteboard-controls" style="position: absolute; top: 10px; right: 10px; z-index: ${window.siyuan.zIndex}; 
@@ -236,11 +259,11 @@ export class M_handwriting {
             const Mcanvas = new CanvasManager(id, whiteboardContainer);
             const canvas = Mcanvas.getCanvas();
             this.canvasInstances.set(id, canvas);
-            
+
             // 设置功能
             this.setupDomElementAddition(canvas, id);
             this.setupSiyuanBlockDrop(canvas, id);
-            
+
             // 添加默认块
             if (defaultBlockIds.length > 0) {
                 const domContainer = document.getElementById(`dom-elements-container-${id}`);
@@ -612,15 +635,15 @@ export class M_handwriting {
         if (!blockIds || blockIds.length === 0 || !domContainer) return;
 
         // 计算每个块的布局位置
-        const margin = 20;
-        const startX = 50;
-        const startY = 50;
-        const columns = Math.min(1, blockIds.length);
-        const blockWidth = 800;
-        const blockHeight = 200;
+        const margin = BLOCK_LAYOUT.MARGIN;
+        const startX = BLOCK_LAYOUT.START_X;
+        const startY = BLOCK_LAYOUT.START_Y;
+        const columns = Math.min(BLOCK_LAYOUT.MAX_COLUMNS, blockIds.length);
+        const blockWidth = BLOCK_LAYOUT.WIDTH;
+        const blockHeight = BLOCK_LAYOUT.HEIGHT;
 
         // 如果块数量超过阈值，使用延迟加载方式
-        if (blockIds.length > 10) {
+        if (blockIds.length > BLOCK_LOADING.INITIAL_PRELOAD_COUNT) {
             // 显示提示
             showMessage(`正在加载 ${blockIds.length} 个块，使用延迟加载方式提高性能...`);
 
@@ -647,7 +670,7 @@ export class M_handwriting {
             domContainer.appendChild(loadingIndicator);
 
             // 分批处理 + 延迟初始化
-            const batchSize = 3;  // 减小每批处理的块数量
+            const batchSize = BLOCK_LOADING.BATCH_SIZE;
             let currentIndex = 0;
 
             const processNextBatch = () => {
@@ -790,7 +813,7 @@ export class M_handwriting {
                 protyledom.style.height = `${blockHeight}px`;
 
                 // 仅对前3个块直接初始化，其余使用延迟加载
-                if (index < 10) {
+                if (index < BLOCK_LOADING.INITIAL_PRELOAD_COUNT) {
                     // 初始化编辑器
                     const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
                     protyledom.setAttribute('data-initialized', 'true');
@@ -839,16 +862,16 @@ export class M_handwriting {
         const loadingStates = new Map<HTMLElement, boolean>();
         const recycledStates = new Map<HTMLElement, boolean>();
 
-        // 批量加载最多同时处理的块数
-        const MAX_CONCURRENT_LOADS = 2;
+        const MAX_CONCURRENT_LOADS = BLOCK_LOADING.MAX_CONCURRENT_LOADS;
+        const MAX_ACTIVE_BLOCKS = BLOCK_LOADING.MAX_ACTIVE_BLOCKS;
+        
         // 当前正在加载的块数量
         let currentlyLoading = 0;
 
         // 优先队列 - 按视窗距离排序等待加载的块
         const loadingQueue: { element: HTMLElement, priority: number }[] = [];
 
-        // 已加载块的最大数量（超过此数量需要回收）
-        const MAX_ACTIVE_BLOCKS = 30;
+
 
         // 检查并回收不在视窗内的块
         const recycleOffscreenBlocks = () => {
@@ -1010,7 +1033,7 @@ export class M_handwriting {
                 if (loadingStates.get(blockElement)) return;
 
                 // 检查是否在视窗内
-                const isVisible = this.isElementInViewport(blockElement, canvas);
+                const isVisible = this.isElementInViewport(blockElement, canvas,BLOCK_LOADING.VIEWPORT_PADDING);
 
                 if (isVisible) {
                     // 计算到视窗中心的距离作为优先级
@@ -1167,7 +1190,7 @@ export class M_handwriting {
                 }
 
                 viewCheckTimer = null;
-            }, 300);
+            }, BLOCK_LOADING.VIEWPORT_CHECK_DEBOUNCE);
         };
 
         // 监听画布事件
@@ -1193,7 +1216,7 @@ export class M_handwriting {
             } else {
                 checkVisibleBlocks();
             }
-        }, 5000);  // 延长间隔时间
+        }, BLOCK_LOADING.INTERVAL_CHECK_PERIOD);  // 延长间隔时间
 
         // 保存定时器ID
         domContainer.setAttribute('data-interval-id', intervalCheckId.toString());
@@ -1290,11 +1313,11 @@ export class M_handwriting {
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
                 render: {
-                    breadcrumb: true,
-                    gutter: true,
+                    breadcrumb: false,
+                    gutter: false,
                     breadcrumbDocName: true,
                 },
-                action: ["cb-get-focus"],
+                // action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
 
@@ -1470,7 +1493,7 @@ export class M_handwriting {
 
                 // 清除节流计时器
                 dragThrottleTimeout = null;
-            }, 16); // 8ms的节流间隔，约等于120fps
+            },  BLOCK_LOADING.DRAG_THROTTLE); // 8ms的节流间隔，约等于120fps
         };
 
         // 结束拖拽处理函数
