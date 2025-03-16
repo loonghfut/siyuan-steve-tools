@@ -197,21 +197,6 @@ export class M_handwriting {
             const breadcrumbBar = protyle.element.querySelector('.protyle-breadcrumb__bar');
             if (breadcrumbBar) (breadcrumbBar as HTMLElement).style.display = show ? '' : 'none';
 
-            // Create or update a style element for controlling visibility
-            let styleElement = document.getElementById(`whiteboard-style-${this.currentid}`);
-            if (!styleElement) {
-                styleElement = document.createElement('style');
-                styleElement.id = `whiteboard-style-${this.currentid}`;
-                document.head.appendChild(styleElement);
-            }
-
-            // Update the CSS rule to show/hide the gutters
-            styleElement.textContent = show ? '' : `
-                 .protyle-gutters:not(.fn__none) {
-                    display: none !important;
-                }
-            `;
-
             // 更新按钮文本
             if (button) button.innerHTML = show ? '画板' : '关闭画板';
         };
