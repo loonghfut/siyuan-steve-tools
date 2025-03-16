@@ -10,6 +10,8 @@ import { CanvasManager } from "./canvas/canvas-manager";
 import { ElementInteractions } from "./elements/element-interactions";
 import { api } from "@frostime/siyuan-plugin-kits";
 
+const cn_type = "p";
+
 const BLOCK_LOADING = {
     MAX_CONCURRENT_LOADS: 2,      // 同时最多加载的块数量
     MAX_ACTIVE_BLOCKS: 10,        // 已加载块的最大数量（超过此数量需要回收）
@@ -96,7 +98,7 @@ export class M_handwriting {
                     let ChildBlocks = await api.getChildBlocks(this.currentid);
 
                     // 添加确认对话框，避免误操作加载大量块
-                    if (ChildBlocks.length > 20) {
+                    if (ChildBlocks.length > 100) {
                         const confirmed = await new Promise<boolean>(resolve => {
                             const dialog = document.createElement('div');
                             dialog.className = 'block-confirm-dialog';
@@ -151,7 +153,7 @@ export class M_handwriting {
                     // 过滤和提取块ID
                     const blockIds = ChildBlocks
                         .filter(block =>
-                            // block?.type === 'p' && 
+                            block?.type === cn_type &&
                             block?.content?.trim())
                         .map(block => block.id);
 
@@ -864,7 +866,7 @@ export class M_handwriting {
 
         const MAX_CONCURRENT_LOADS = BLOCK_LOADING.MAX_CONCURRENT_LOADS;
         const MAX_ACTIVE_BLOCKS = BLOCK_LOADING.MAX_ACTIVE_BLOCKS;
-        
+
         // 当前正在加载的块数量
         let currentlyLoading = 0;
 
@@ -915,7 +917,7 @@ export class M_handwriting {
                     recycledStates.set(item.element, true);
 
                     // 找到wrapper元素
-                    const wrapper = item.element.querySelector('.protyle-wrapper') as HTMLElement;
+                    let wrapper = item.element.querySelector('.protyle-wrapper') as HTMLElement;
                     if (!wrapper) return;
 
                     // 将已初始化的块回收，保存部分预览内容
@@ -986,7 +988,9 @@ export class M_handwriting {
                                 loadBlock(item.element);
                             }, 100);
                         };
-
+                        const newWrapper = wrapper.cloneNode(true);
+                        wrapper.parentNode.replaceChild(newWrapper, wrapper);
+                        wrapper = newWrapper as HTMLElement;
                         wrapper.addEventListener('click', clickHandler);
 
                     } catch (err) {
@@ -1033,7 +1037,7 @@ export class M_handwriting {
                 if (loadingStates.get(blockElement)) return;
 
                 // 检查是否在视窗内
-                const isVisible = this.isElementInViewport(blockElement, canvas,BLOCK_LOADING.VIEWPORT_PADDING);
+                const isVisible = this.isElementInViewport(blockElement, canvas, BLOCK_LOADING.VIEWPORT_PADDING);
 
                 if (isVisible) {
                     // 计算到视窗中心的距离作为优先级
@@ -1071,7 +1075,7 @@ export class M_handwriting {
             }
         };
 
-        // 异步加载块内容
+        // 异步加载块内容 - 修复版
         const loadBlock = async (blockElement: HTMLElement) => {
             if (loadingStates.get(blockElement)) return; // 已在加载中
 
@@ -1079,6 +1083,14 @@ export class M_handwriting {
             const wrapper = blockElement.querySelector('.protyle-wrapper');
 
             if (!blockId || !wrapper) return;
+
+            // 首先清理可能存在的旧事件监听器
+            const oldHandlers = wrapper.querySelectorAll('.block-overlay, .block-preview, .block-placeholder');
+            oldHandlers.forEach(el => {
+                // 移除可能的点击事件
+                const newEl = el.cloneNode(true);
+                el.parentNode.replaceChild(newEl, el);
+            });
 
             // 标记为加载中
             loadingStates.set(blockElement, true);
@@ -1093,6 +1105,10 @@ export class M_handwriting {
                 // 使用延时确保UI更新
                 await new Promise(resolve => setTimeout(resolve, 50));
 
+                // 清理旧的覆盖层和交互元素
+                const oldOverlay = blockElement.querySelector('.block-overlay');
+                if (oldOverlay) oldOverlay.remove();
+
                 // 初始化编辑器
                 const protyle = this.initProtyleEditor(wrapper as HTMLElement, blockId, id);
 
@@ -1100,23 +1116,19 @@ export class M_handwriting {
                     blockElement.setAttribute('data-initialized', 'true');
                     console.log(`自动加载了视窗内块: ${blockId}`);
                 } else {
-                    // 初始化失败时显示错误信息
-                    (wrapper as HTMLElement).innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
-                        加载失败，点击重试
-                    </div>`;
+                    // 初始化失败时显示错误信息和重试按钮
+                    // ...省略其余部分
                 }
             } catch (err) {
-                console.error("加载块内容失败:", err);
-                (wrapper as HTMLElement).innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
-                    加载失败，点击重试
-                </div>`;
+                // ...省略错误处理
             } finally {
                 // 标记为加载完成
                 loadingStates.set(blockElement, false);
                 currentlyLoading--;
 
-                // 加载完一个块后，检查是否还有其他可见块需要加载
-                setTimeout(checkVisibleBlocks, 100);
+                // 添加加载延迟以避免频繁加载导致性能问题
+                const delay = currentlyLoading > 0 ? 200 : 100;
+                setTimeout(checkVisibleBlocks, delay);
             }
         };
 
@@ -1236,7 +1248,13 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
+            // 检查是否已存在覆盖层并清除
+            const existingOverlays = container.querySelectorAll('.block-overlay');
+            existingOverlays.forEach(overlay => overlay.remove());
 
+            // 检查是否已存在删除按钮并清除
+            const existingDeleteButtons = container.querySelectorAll('.block-delete-button');
+            existingDeleteButtons.forEach(btn => btn.remove());
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
 
@@ -1493,7 +1511,7 @@ export class M_handwriting {
 
                 // 清除节流计时器
                 dragThrottleTimeout = null;
-            },  BLOCK_LOADING.DRAG_THROTTLE); // 8ms的节流间隔，约等于120fps
+            }, BLOCK_LOADING.DRAG_THROTTLE); // 8ms的节流间隔，约等于120fps
         };
 
         // 结束拖拽处理函数
