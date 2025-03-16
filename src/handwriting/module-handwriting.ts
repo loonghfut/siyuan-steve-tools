@@ -46,7 +46,7 @@ export class M_handwriting {
     private GridManager: GridManager;
     private PanZoomHandler: PanZoomHandler;
     private CanvasManager: CanvasManager;
-    private connectionManagers: Map<string, ConnectionManager> = new Map();
+    // private connectionManagers: Map<string, ConnectionManager> = new Map();
 
     private currentid: string = "";
 
@@ -463,7 +463,7 @@ export class M_handwriting {
 
         // 初始化连线管理器
         const connectionManager = new ConnectionManager(id, domContainer);
-        this.connectionManagers.set(id, connectionManager);
+        // this.connectionManagers.set(id, connectionManager);
 
 
         // 生成唯一的DOM元素ID
@@ -481,10 +481,10 @@ export class M_handwriting {
             domContainer.style.transform = `matrix(${vpt[0]}, ${vpt[1]}, ${vpt[2]}, ${vpt[3]}, ${vpt[4]}, ${vpt[5]})`;
 
             // 更新连线缩放
-            const connectionManager = this.connectionManagers.get(id);
-            if (connectionManager) {
-                connectionManager.updateZoom(vpt[0]);
-            }
+            // const connectionManager = this.connectionManagers.get(id);
+            // if (connectionManager) {
+            //     connectionManager.updateZoom(vpt[0]);
+            // }
 
 
         });
@@ -1584,12 +1584,12 @@ export class M_handwriting {
             wrapper.addEventListener('click', updateInteractionTime);
             wrapper.addEventListener('focus', updateInteractionTime, true);
 
-            const connectionManager = this.connectionManagers.get(id);
-            console.log("初始化编辑器1");
-            if (connectionManager && container) {
-                console.log("初始化编辑器2");
-                connectionManager.initializeElement(container);
-            }
+            // const connectionManager = this.connectionManagers.get(id);
+            // console.log("初始化编辑器1");
+            // if (connectionManager && container) {
+            //     console.log("初始化编辑器2");
+            //     connectionManager.initializeElement(container);
+            // }
 
 
             return protyle;
@@ -1614,7 +1614,7 @@ export class M_handwriting {
         let initialLeft = 0;
         let initialTop = 0;
         let dragThrottleTimeout = null;
-        const connectionManager = this.connectionManagers.get(id);
+        // const connectionManager = this.connectionManagers.get(id);
 
         // 开始拖拽的处理函数
         const startDrag = (e: MouseEvent | TouchEvent) => {
@@ -1691,9 +1691,9 @@ export class M_handwriting {
                 containerElement.style.top = `${newTop}px`;
                 containerElement.style.transform = ''; // 不再使用transform
                 // 更新连接点位置
-                if (connectionManager && containerElement.id) {
-                    connectionManager.updateElement(containerElement.id);
-                }
+                // if (connectionManager && containerElement.id) {
+                //     connectionManager.updateElement(containerElement.id);
+                // }
                 // 清除节流计时器
                 dragThrottleTimeout = null;
             }, BLOCK_LOADING.DRAG_THROTTLE); // 8ms的节流间隔，约等于120fps
@@ -1721,9 +1721,9 @@ export class M_handwriting {
             containerElement.classList.remove('dragging');
             containerElement.style.zIndex = '';
 
-            if (connectionManager && containerElement.id) {
-                connectionManager.updateElement(containerElement.id);
-            }
+            // if (connectionManager && containerElement.id) {
+            //     connectionManager.updateElement(containerElement.id);
+            // }
         };
 
         // 添加拖拽事件监听器，使用passive提高性能
