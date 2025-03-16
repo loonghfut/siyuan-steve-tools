@@ -11,7 +11,7 @@
   background: rgb(101, 71, 71);
   border: 1px solid #804848;
   border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .drawflow .connection .main-path {
@@ -20,8 +20,9 @@
 }
 
 .block-selected {
-  box-shadow: 0 0 0 2px var(--b3-theme-primary), 0 3px 8px rgba(0,0,0,0.15) !important;
+  box-shadow: 0 0 0 2px var(--b3-theme-primary), 0 3px 8px rgba(0, 0, 0, 0.15) !important;
 }
+
 .siyuan-block-container:hover .block-overlay {
   background-color: rgba(0, 0, 0, 0.05);
 }
@@ -53,45 +54,53 @@
 
 /* 连接点样式 */
 .jtk-endpoint {
-    z-index: 50;
-    cursor: pointer !important;
-    opacity: 0.8 !important; /* 默认可见 */
-    transition: transform 0.2s, opacity 0.2s;
+  z-index: 50;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+  /* 默认可见 */
+  transition: transform 0.2s, opacity 0.2s;
 }
 
 .jtk-endpoint:hover {
-    transform: scale(1.5) !important;
-    opacity: 1 !important;
+  transform: scale(1.5) !important;
+  opacity: 1 !important;
 }
 
 .endpoint-source {
-    fill: #2196F3 !important;
+  fill: #2196F3 !important;
 }
 
 .endpoint-target {
-    fill: #4CAF50 !important;
+  fill: #4CAF50 !important;
 }
 
 /* 连接线样式 */
 .jtk-connector {
-    z-index: -1;
-    cursor: default;
+  z-index: -1;
+  cursor: default;
 }
 
 .jtk-connector:hover {
-    z-index: 10;
+  z-index: 10;
 }
 
 /* 保证覆盖jsPlumb默认样式 */
 svg.jtk-endpoint {
-    opacity: 0.8 !important;
+  opacity: 0.8 !important;
 }
 
 /* 当拖动连线时 */
 .jtk-drag-active {
-    cursor: crosshair !important;
+  cursor: crosshair !important;
 }
 
 .jtk-endpoint.jtk-dragging {
-    opacity: 1 !important;
+  opacity: 1 !important;
+}
+
+/* Optimize wysiwyg editor padding */
+.protyle-wrapper .protyle-wysiwyg {
+  padding-inline: 20px !important;
+  /* Uses logical property for better RTL support */
+  contain: content; /* Improves performance */
 }
