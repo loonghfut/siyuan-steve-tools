@@ -387,22 +387,59 @@ export class M_handwriting {
             // 添加到DOM容器中
             domContainer.appendChild(protyledom);
 
-            // 初始化Protyle编辑器
-            const protyle = this.initProtyleEditor(wrapperDiv, blockId, id);
+            // 重要变更：不立即初始化编辑器，而是先设置为未初始化状态
+            protyledom.setAttribute('data-block-id', blockId);
+            protyledom.setAttribute('data-initialized', 'false');
 
-            // 添加缩放功能（但不添加拖拽功能）
+            // 添加临时预览内容
+            wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+    <div class="b3-loading"></div>
+</div>`;
+
+            // 添加缩放功能
             ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
 
+            // 稍后初始化编辑器（异步处理，避免界面卡顿）
+            setTimeout(() => {
+                // 为新拖放的块也应用延迟加载逻辑
+                this.initProtyleEditor(wrapperDiv, blockId, id);
+                protyledom.setAttribute('data-initialized', 'true');
 
-            // 显示成功消息
-            if (protyle) {
+                // 检查是否需要应用回收机制
+                this.checkAndApplyRecyclingSystem(id, domContainer, canvas);
+
+                // 显示成功消息
                 showMessage(`已添加块 ${blockId}`);
-            }
+            }, 100);
 
             // 记录调试信息
             console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
         });
     }
+
+    private checkAndApplyRecyclingSystem(id: string, domContainer: HTMLElement, canvas: Canvas) {
+        // 检查是否已经设置了回收系统
+        const hasIntervalId = domContainer.hasAttribute('data-interval-id');
+
+        if (!hasIntervalId) {
+            // 如果没有设置回收系统，初始化一个
+            this.setupLazyInitialization(id, domContainer, canvas);
+        } else {
+            // 如果已经有回收系统，触发一次视图检查
+            // 查找所有块，包括新添加的和已存在的
+            const allBlocks = domContainer.querySelectorAll('[data-initialized]');
+
+            // 如果块数量超过最大活跃数量，触发回收检测
+            if (allBlocks.length > BLOCK_LOADING.MAX_ACTIVE_BLOCKS) {
+                // 手动触发一次视图检查，强制回收系统检查
+                const event = new CustomEvent('check-blocks-visibility', {
+                    detail: { id: id }
+                });
+                domContainer.dispatchEvent(event);
+            }
+        }
+    }
+
 
     /**
      * 设置DOM元素添加功能
@@ -498,17 +535,32 @@ export class M_handwriting {
             // 添加到DOM容器中
             domContainer.appendChild(protyledom);
 
-            // 使用封装的方法初始化编辑器
-            const protyle = this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j", id);
+            // 重要变更：不立即初始化编辑器，而是先设置为未初始化状态
+            protyledom.setAttribute('data-block-id', "20250310234002-us3sb9j");
+            protyledom.setAttribute('data-initialized', 'false');
+
+            // 添加临时预览内容
+            wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
+     <span>正在加载...</span>
+ </div>`;
 
             // 添加缩放功能
             ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
-            // 显示成功消息
-            showMessage('已添加新元素，可直接拖拽移动位置或缩放大小');
+
+            // 稍后初始化编辑器（异步处理，避免界面卡顿）
+            setTimeout(() => {
+                // 为新拖放的块也应用延迟加载逻辑
+                this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j", id);
+                protyledom.setAttribute('data-initialized', 'true');
+
+                // 确保回收系统知道这个新块
+                this.checkAndApplyRecyclingSystem(id, domContainer, canvas);
+
+                showMessage('已添加新元素，可直接拖拽移动位置或缩放大小');
+            }, 100);
 
             console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
         });
-
         // 添加提示
         addButtonBtn.setAttribute('title', '拖拽此按钮到画布中创建新元素');
     }
@@ -841,6 +893,7 @@ export class M_handwriting {
      */
     private setupLazyInitialization(id: string, domContainer: HTMLElement, canvas: Canvas) {
         // 查找所有未初始化的块
+        console.log("设置延迟初始化和视窗内自动加载");
         const unInitializedBlocks = domContainer.querySelectorAll('[data-initialized="false"]');
 
         if (unInitializedBlocks.length === 0) return;
@@ -1059,6 +1112,10 @@ export class M_handwriting {
                 loadBlock(element);
             }
         };
+
+        domContainer.addEventListener('check-blocks-visibility', () => {
+            checkVisibleBlocks();
+        });
 
         // 异步加载块内容 - 修复版
         const loadBlock = async (blockElement: HTMLElement) => {
