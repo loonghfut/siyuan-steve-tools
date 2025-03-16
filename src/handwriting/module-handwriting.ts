@@ -1120,54 +1120,59 @@ export class M_handwriting {
         // 异步加载块内容 - 修复版
         const loadBlock = async (blockElement: HTMLElement) => {
             if (loadingStates.get(blockElement)) return; // 已在加载中
-
+        
             const blockId = blockElement.getAttribute('data-block-id');
             const wrapper = blockElement.querySelector('.protyle-wrapper');
-
+        
             if (!blockId || !wrapper) return;
-
-            // 首先清理可能存在的旧事件监听器
-            const oldHandlers = wrapper.querySelectorAll('.block-overlay, .block-preview, .block-placeholder');
-            oldHandlers.forEach(el => {
-                // 移除可能的点击事件
-                const newEl = el.cloneNode(true);
-                el.parentNode.replaceChild(newEl, el);
-            });
-
+        
             // 标记为加载中
             loadingStates.set(blockElement, true);
             currentlyLoading++;
-
+        
+            // 创建一个全新的wrapper元素，彻底清除所有旧的事件绑定
+            const newWrapper = wrapper.cloneNode(false) as HTMLElement;
+            wrapper.parentNode.replaceChild(newWrapper, wrapper);
+            
             // 显示加载状态
-            (wrapper as HTMLElement).innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
+            newWrapper.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                 <div class="b3-loading"></div>
             </div>`;
-
+        
             try {
                 // 使用延时确保UI更新
                 await new Promise(resolve => setTimeout(resolve, 50));
-
+        
                 // 清理旧的覆盖层和交互元素
                 const oldOverlay = blockElement.querySelector('.block-overlay');
                 if (oldOverlay) oldOverlay.remove();
-
+        
                 // 初始化编辑器
-                const protyle = this.initProtyleEditor(wrapper as HTMLElement, blockId, id);
-
+                const protyle = this.initProtyleEditor(newWrapper, blockId, id);
+        
                 if (protyle) {
                     blockElement.setAttribute('data-initialized', 'true');
                     console.log(`自动加载了视窗内块: ${blockId}`);
-                } else {
-                    // 初始化失败时显示错误信息和重试按钮
-                    // ...省略其余部分
                 }
             } catch (err) {
-                // ...省略错误处理
+                console.error("加载块失败:", err);
+                newWrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
+                    加载失败，<span class="retry-link" style="text-decoration: underline; cursor: pointer;">点击重试</span>
+                </div>`;
+                
+                // 使用事件委托添加重试链接点击事件
+                newWrapper.addEventListener('click', (e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.classList.contains('retry-link')) {
+                        blockElement.setAttribute('data-initialized', 'false');
+                        loadBlock(blockElement);
+                    }
+                });
             } finally {
                 // 标记为加载完成
                 loadingStates.set(blockElement, false);
                 currentlyLoading--;
-
+        
                 // 添加加载延迟以避免频繁加载导致性能问题
                 const delay = currentlyLoading > 0 ? 200 : 100;
                 setTimeout(checkVisibleBlocks, delay);
@@ -1290,16 +1295,23 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
+            
+            // 清除可能存在的点击事件监听器，避免重复加载
+            const newWrapper = wrapper.cloneNode(true);
+            wrapper.parentNode.replaceChild(newWrapper, wrapper);
+            wrapper = newWrapper as HTMLElement;
+            
             // 检查是否已存在覆盖层并清除
             const existingOverlays = container.querySelectorAll('.block-overlay');
             existingOverlays.forEach(overlay => overlay.remove());
-
+    
             // 检查是否已存在删除按钮并清除
             const existingDeleteButtons = container.querySelectorAll('.block-delete-button');
             existingDeleteButtons.forEach(btn => btn.remove());
+            
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
-
+    
             // 创建一个半透明覆盖层，表示元素处于不可交互状态
             const overlayDiv = document.createElement('div');
             overlayDiv.className = 'block-overlay';
@@ -1317,11 +1329,11 @@ export class M_handwriting {
                 align-items: center;
                 justify-content: center;
             `;
-
-            // 创建删除按钮（初始状态为隐藏）- 放在容器元素内
+    
+            // 创建删除按钮（初始状态为隐藏）
             const deleteButton = document.createElement('button');
             deleteButton.className = 'block-delete-button';
-            deleteButton.innerHTML = '×'; // 使用 × 符号作为删除按钮
+            deleteButton.innerHTML = '×'; 
             deleteButton.style.cssText = `
                 position: absolute;
                 width: 16px;
@@ -1341,34 +1353,30 @@ export class M_handwriting {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                 pointer-events: auto; /* 确保按钮可点击 */
             `;
-
-            // 将删除按钮添加到容器元素内，这样它会跟随元素一起移动
+    
+            // 将删除按钮添加到容器元素内
             container.appendChild(deleteButton);
-
+    
             // 为删除按钮添加事件监听器
             deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation(); // 阻止事件冒泡
-                e.preventDefault(); // 阻止默认行为
-
-                // 确认删除对话框
+                e.stopPropagation(); 
+                e.preventDefault(); 
+    
                 if (confirm('确定要删除此元素吗？')) {
-                    // 从DOM中移除容器元素
                     container.remove();
-                    // 显示删除成功提示
                     showMessage('元素已删除');
                 }
             });
-
+    
             // 将覆盖层添加到容器
-            // Check if overlay already exists before adding it
             const existingOverlay = container.querySelector('.block-overlay');
             if (!existingOverlay) {
                 container.appendChild(overlayDiv);
             }
-
+    
             // 跟踪选择状态
             let isSelected = false;
-
+    
             // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
@@ -1377,83 +1385,81 @@ export class M_handwriting {
                     gutter: false,
                     breadcrumbDocName: true,
                 },
-                // action: ["cb-get-focus"],
                 mode: "wysiwyg",
             });
-
+    
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 enableInteraction();
             });
-
-            // 为覆盖层添加拖拽功能（非选中状态下）
+    
+            // 为覆盖层添加拖拽功能
             this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id), id);
-
-            // 点击画布空白处时禁用所有块的交互 - 使用命名函数以便清理
+    
+            // 点击画布空白处时禁用所有块的交互
             const handleDocumentClick = (e: MouseEvent) => {
-                // 检查点击是否在此容器外部
                 if (isSelected && !container.contains(e.target as Node) && e.target !== deleteButton) {
                     disableInteraction();
                 }
             };
-
+    
             // 添加点击监听
             document.addEventListener('click', handleDocumentClick);
-
+    
             // 存储清理函数，以便之后移除监听器
             container.dataset.clickHandler = 'true';
-
+    
             // 启用交互的函数
             function enableInteraction() {
                 if (isSelected) return;
-
+    
                 // 移除覆盖层
                 overlayDiv.style.display = 'none';
-
+    
                 // 启用交互
                 wrapper.style.pointerEvents = 'auto';
-
+    
                 // 添加选中状态样式
                 container.classList.add('block-selected');
                 container.style.zIndex = '100';
                 isSelected = true;
-
+    
                 // 显示删除按钮
                 deleteButton.style.display = 'block';
             }
-
+    
             // 禁用交互的函数
             function disableInteraction() {
                 if (!isSelected) return;
-
+    
                 // 显示覆盖层
                 overlayDiv.style.display = 'flex';
-
+    
                 // 禁用交互
                 wrapper.style.pointerEvents = 'none';
-
+    
                 // 移除选中状态样式
                 container.classList.remove('block-selected');
                 container.style.zIndex = '';
                 isSelected = false;
-
+    
                 // 隐藏删除按钮
                 deleteButton.style.display = 'none';
             }
-
+    
             // 记录最后交互时间，用于回收策略
             container.dataset.lastInteractTime = Date.now().toString();
-
+    
             // 当用户与块交互时更新时间戳
             const updateInteractionTime = () => {
                 container.dataset.lastInteractTime = Date.now().toString();
             };
-
+    
             overlayDiv.addEventListener('mousedown', updateInteractionTime);
             wrapper.addEventListener('click', updateInteractionTime);
             wrapper.addEventListener('focus', updateInteractionTime, true);
-
+    
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
