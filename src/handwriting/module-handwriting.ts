@@ -20,7 +20,9 @@ const BLOCK_LOADING = {
     VIEWPORT_PADDING: 200,        // 视口边缘额外检查的像素范围
     DRAG_THROTTLE: 16,            // 拖拽更新节流时间（毫秒）
     INITIAL_PRELOAD_COUNT: 10,    // 初始预加载的块数量
-    BATCH_SIZE: 3                 // 批量加载块的数量
+    BATCH_SIZE: 3,                 // 批量加载块的数量
+    RECYCLE_COOLDOWN: 5000,       // 块回收后重新加载的最小时间间隔（毫秒）
+    OFFSCREEN_TIME_THRESHOLD: 2000 // 块离开视窗多久后才考虑回收（毫秒）
 };
 
 // 块布局配置
@@ -919,7 +921,7 @@ export class M_handwriting {
             const initializedBlocks = Array.from(domContainer.querySelectorAll('[data-initialized="true"]')) as HTMLElement[];
 
             if (initializedBlocks.length <= MAX_ACTIVE_BLOCKS) return;
-
+            const now = Date.now();
             // 计算每个块的视窗优先级（视窗内的保留，视窗外按距离排序）
             const blockPriorities = initializedBlocks.map(block => {
                 // 计算块到视窗的距离
@@ -937,22 +939,59 @@ export class M_handwriting {
                     Math.pow(centerY - canvasCenterY, 2)
                 );
 
+                // 获取最后交互时间和最后回收时间
+                const lastInteractTime = parseInt(block.dataset.lastInteractTime || '0');
+                const lastRecycleTime = parseInt(block.dataset.lastRecycleTime || '0');
+
+                // 计算离开视窗的时间（如果在视窗内则为0）
+                const offscreenTime = isVisible ? 0 : (now - lastInteractTime);
+
+                // 计算距离上次回收的时间间隔
+                const timeSinceLastRecycle = now - lastRecycleTime;
+
+
                 return {
                     element: block,
                     isVisible,
                     distance,
-                    blockId: block.getAttribute('data-block-id') || ''
+                    blockId: block.getAttribute('data-block-id') || '',
+                    offscreenTime,
+                    timeSinceLastRecycle
                 };
             });
-
+            // 优先回收条件：
+            // 1. 不在视图内
+            // 2. 离开视窗时间超过阈值
+            // 3. 距离上次回收时间超过冷却期
+            // 4. 距离越远越优先回收
             // 优先回收不在视图内且距离最远的块
-            blockPriorities
-                .filter(item => !item.isVisible) // 只处理不在视图内的块
-                .sort((a, b) => b.distance - a.distance) // 距离越远，优先回收
-                .slice(0, initializedBlocks.length - MAX_ACTIVE_BLOCKS) // 只回收超出上限的部分
+            const blocksToRecycle = blockPriorities
+                .filter(item =>
+                    !item.isVisible &&
+                    item.offscreenTime > BLOCK_LOADING.OFFSCREEN_TIME_THRESHOLD &&
+                    (item.timeSinceLastRecycle > BLOCK_LOADING.RECYCLE_COOLDOWN || item.timeSinceLastRecycle === 0)
+                )
+                .sort((a, b) => b.distance - a.distance); // 距离越远，优先回收
+
+            // 计算需要回收的块数量
+            const recycleCount = Math.min(
+                blocksToRecycle.length,
+                initializedBlocks.length - MAX_ACTIVE_BLOCKS
+            );
+
+            // 如果没有满足条件的块可回收，就不执行回收操作
+            if (recycleCount <= 0) {
+                console.log("没有满足回收条件的块");
+                return;
+            }
+
+            // 只回收需要的数量
+            blocksToRecycle
+                .slice(0, recycleCount)
                 .forEach(item => {
-                    // 标记为已回收
+                    // 标记为已回收并记录回收时间
                     recycledStates.set(item.element, true);
+                    item.element.dataset.lastRecycleTime = now.toString();
 
                     // 找到wrapper元素
                     let wrapper = item.element.querySelector('.protyle-wrapper') as HTMLElement;
@@ -960,7 +999,8 @@ export class M_handwriting {
 
                     // 将已初始化的块回收，保存部分预览内容
                     const blockId = item.blockId;
-                    console.log(`回收视窗外块: ${blockId}`);
+                    console.log(`回收视窗外块: ${blockId}，距离上次回收: ${item.timeSinceLastRecycle}ms`);
+
 
                     try {
                         // 提取当前内容用于预览
@@ -1014,6 +1054,36 @@ export class M_handwriting {
 
                         // 添加点击事件以恢复块
                         const clickHandler = function () {
+                            // 检查冷却时间
+                            const now = Date.now();
+                            const lastRecycleTime = parseInt(item.element.dataset.lastRecycleTime || '0');
+                            const timeSinceRecycle = now - lastRecycleTime;
+
+                            if (timeSinceRecycle < BLOCK_LOADING.RECYCLE_COOLDOWN) {
+                                // 如果冷却时间未到，显示消息但不加载
+                                const remaining = Math.ceil((BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle) / 1000);
+                                wrapper.innerHTML = `
+                                <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
+                                    <div style="font-size: 12px; color: var(--b3-theme-error); margin-bottom: 6px;">请稍候 ${remaining} 秒再试</div>
+                                    <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${previewContent.length >= 120 ? '...' : ''}</div>
+                                </div>
+                                `;
+
+                                setTimeout(() => {
+                                    // 重新显示恢复选项
+                                    wrapper.innerHTML = `
+                                    <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
+                                        <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">内容已回收，点击恢复</div>
+                                        <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${previewContent.length >= 120 ? '...' : ''}</div>
+                                    </div>
+                                    `;
+
+                                    wrapper.addEventListener('click', clickHandler);
+                                }, BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle);
+
+                                return;
+                            }
+
                             // 移除点击事件处理程序，防止重复触发
                             wrapper.removeEventListener('click', clickHandler);
 
@@ -1037,18 +1107,45 @@ export class M_handwriting {
                         wrapper.innerHTML = '';
 
                         wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-on-surface-light);">
-                        内容已回收，点击恢复
-                    </div>`;
+                内容已回收，点击恢复
+            </div>`;
 
                         // 添加点击事件以恢复块
                         wrapper.addEventListener('click', () => {
-                            item.element.setAttribute('data-initialized', 'false');
-                            recycledStates.delete(item.element);
+                            // 检查冷却时间
+                            const now = Date.now();
+                            const lastRecycleTime = parseInt(item.element.dataset.lastRecycleTime || '0');
+                            const timeSinceRecycle = now - lastRecycleTime;
 
-                            // 延迟加载
-                            setTimeout(() => {
-                                loadBlock(item.element);
-                            }, 100);
+                            if (timeSinceRecycle < BLOCK_LOADING.RECYCLE_COOLDOWN) {
+                                const remaining = Math.ceil((BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle) / 1000);
+                                wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
+                        请稍候 ${remaining} 秒再试
+                    </div>`;
+
+                                setTimeout(() => {
+                                    wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-on-surface-light);">
+                            内容已回收，点击恢复
+                            </div>`;
+
+                                    // 重新添加点击事件
+                                    wrapper.addEventListener('click', onClickRecycled);
+                                }, BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle);
+
+                                return;
+                            }
+
+                            function onClickRecycled() {
+                                item.element.setAttribute('data-initialized', 'false');
+                                recycledStates.delete(item.element);
+
+                                // 延迟加载
+                                setTimeout(() => {
+                                    loadBlock(item.element);
+                                }, 100);
+                            }
+
+                            onClickRecycled();
                         });
                     }
                 });
@@ -1120,36 +1217,48 @@ export class M_handwriting {
         // 异步加载块内容 - 修复版
         const loadBlock = async (blockElement: HTMLElement) => {
             if (loadingStates.get(blockElement)) return; // 已在加载中
-        
+            // 检查是否还在回收冷却期
+            const now = Date.now();
+            const lastRecycleTime = parseInt(blockElement.dataset.lastRecycleTime || '0');
+
+            if (lastRecycleTime > 0) {
+                const timeSinceRecycle = now - lastRecycleTime;
+                if (timeSinceRecycle < BLOCK_LOADING.RECYCLE_COOLDOWN) {
+                    console.log(`块${blockElement.dataset.blockId}在冷却期内，跳过加载`);
+                    return;
+                }
+            }
+
             const blockId = blockElement.getAttribute('data-block-id');
             const wrapper = blockElement.querySelector('.protyle-wrapper');
-        
+
             if (!blockId || !wrapper) return;
-        
+
             // 标记为加载中
             loadingStates.set(blockElement, true);
             currentlyLoading++;
-        
+            // 更新交互时间
+            blockElement.dataset.lastInteractTime = now.toString();
             // 创建一个全新的wrapper元素，彻底清除所有旧的事件绑定
             const newWrapper = wrapper.cloneNode(false) as HTMLElement;
             wrapper.parentNode.replaceChild(newWrapper, wrapper);
-            
+
             // 显示加载状态
             newWrapper.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%;">
                 <div class="b3-loading"></div>
             </div>`;
-        
+
             try {
                 // 使用延时确保UI更新
                 await new Promise(resolve => setTimeout(resolve, 50));
-        
+
                 // 清理旧的覆盖层和交互元素
                 const oldOverlay = blockElement.querySelector('.block-overlay');
                 if (oldOverlay) oldOverlay.remove();
-        
+
                 // 初始化编辑器
                 const protyle = this.initProtyleEditor(newWrapper, blockId, id);
-        
+
                 if (protyle) {
                     blockElement.setAttribute('data-initialized', 'true');
                     console.log(`自动加载了视窗内块: ${blockId}`);
@@ -1159,7 +1268,7 @@ export class M_handwriting {
                 newWrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
                     加载失败，<span class="retry-link" style="text-decoration: underline; cursor: pointer;">点击重试</span>
                 </div>`;
-                
+
                 // 使用事件委托添加重试链接点击事件
                 newWrapper.addEventListener('click', (e) => {
                     const target = e.target as HTMLElement;
@@ -1172,7 +1281,7 @@ export class M_handwriting {
                 // 标记为加载完成
                 loadingStates.set(blockElement, false);
                 currentlyLoading--;
-        
+
                 // 添加加载延迟以避免频繁加载导致性能问题
                 const delay = currentlyLoading > 0 ? 200 : 100;
                 setTimeout(checkVisibleBlocks, delay);
@@ -1295,23 +1404,23 @@ export class M_handwriting {
             if (!container) {
                 throw new Error("找不到父容器元素");
             }
-            
+
             // 清除可能存在的点击事件监听器，避免重复加载
             const newWrapper = wrapper.cloneNode(true);
             wrapper.parentNode.replaceChild(newWrapper, wrapper);
             wrapper = newWrapper as HTMLElement;
-            
+
             // 检查是否已存在覆盖层并清除
             const existingOverlays = container.querySelectorAll('.block-overlay');
             existingOverlays.forEach(overlay => overlay.remove());
-    
+
             // 检查是否已存在删除按钮并清除
             const existingDeleteButtons = container.querySelectorAll('.block-delete-button');
             existingDeleteButtons.forEach(btn => btn.remove());
-            
+
             // 默认设置为不可交互状态
             wrapper.style.pointerEvents = 'none';
-    
+
             // 创建一个半透明覆盖层，表示元素处于不可交互状态
             const overlayDiv = document.createElement('div');
             overlayDiv.className = 'block-overlay';
@@ -1329,11 +1438,11 @@ export class M_handwriting {
                 align-items: center;
                 justify-content: center;
             `;
-    
+
             // 创建删除按钮（初始状态为隐藏）
             const deleteButton = document.createElement('button');
             deleteButton.className = 'block-delete-button';
-            deleteButton.innerHTML = '×'; 
+            deleteButton.innerHTML = '×';
             deleteButton.style.cssText = `
                 position: absolute;
                 width: 16px;
@@ -1353,30 +1462,30 @@ export class M_handwriting {
                 box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                 pointer-events: auto; /* 确保按钮可点击 */
             `;
-    
+
             // 将删除按钮添加到容器元素内
             container.appendChild(deleteButton);
-    
+
             // 为删除按钮添加事件监听器
             deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation(); 
-                e.preventDefault(); 
-    
+                e.stopPropagation();
+                e.preventDefault();
+
                 if (confirm('确定要删除此元素吗？')) {
                     container.remove();
                     showMessage('元素已删除');
                 }
             });
-    
+
             // 将覆盖层添加到容器
             const existingOverlay = container.querySelector('.block-overlay');
             if (!existingOverlay) {
                 container.appendChild(overlayDiv);
             }
-    
+
             // 跟踪选择状态
             let isSelected = false;
-    
+
             // 创建Protyle编辑器
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
@@ -1387,79 +1496,79 @@ export class M_handwriting {
                 },
                 mode: "wysiwyg",
             });
-    
+
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {
                 e.stopPropagation();
                 enableInteraction();
             });
-    
+
             // 为覆盖层添加拖拽功能
             this.makeElementDraggable(overlayDiv, container, this.canvasInstances.get(id), id);
-    
+
             // 点击画布空白处时禁用所有块的交互
             const handleDocumentClick = (e: MouseEvent) => {
                 if (isSelected && !container.contains(e.target as Node) && e.target !== deleteButton) {
                     disableInteraction();
                 }
             };
-    
+
             // 添加点击监听
             document.addEventListener('click', handleDocumentClick);
-    
+
             // 存储清理函数，以便之后移除监听器
             container.dataset.clickHandler = 'true';
-    
+
             // 启用交互的函数
             function enableInteraction() {
                 if (isSelected) return;
-    
+
                 // 移除覆盖层
                 overlayDiv.style.display = 'none';
-    
+
                 // 启用交互
                 wrapper.style.pointerEvents = 'auto';
-    
+
                 // 添加选中状态样式
                 container.classList.add('block-selected');
                 container.style.zIndex = '100';
                 isSelected = true;
-    
+
                 // 显示删除按钮
                 deleteButton.style.display = 'block';
             }
-    
+
             // 禁用交互的函数
             function disableInteraction() {
                 if (!isSelected) return;
-    
+
                 // 显示覆盖层
                 overlayDiv.style.display = 'flex';
-    
+
                 // 禁用交互
                 wrapper.style.pointerEvents = 'none';
-    
+
                 // 移除选中状态样式
                 container.classList.remove('block-selected');
                 container.style.zIndex = '';
                 isSelected = false;
-    
+
                 // 隐藏删除按钮
                 deleteButton.style.display = 'none';
             }
-    
+
             // 记录最后交互时间，用于回收策略
             container.dataset.lastInteractTime = Date.now().toString();
-    
+
             // 当用户与块交互时更新时间戳
             const updateInteractionTime = () => {
                 container.dataset.lastInteractTime = Date.now().toString();
             };
-    
+
             overlayDiv.addEventListener('mousedown', updateInteractionTime);
             wrapper.addEventListener('click', updateInteractionTime);
             wrapper.addEventListener('focus', updateInteractionTime, true);
-    
+
             return protyle;
         } catch (e) {
             console.error("初始化编辑器失败:", e);
