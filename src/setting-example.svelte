@@ -31,7 +31,7 @@
                 "高级设置",
                 "ics设置",
                 "ics分享",
-                "邮箱日历",
+                "订阅日历",
                 "视图设置",
             ],
             activeSubGroup: "基础设置",
@@ -385,6 +385,20 @@
                     options: { "": "请先配置QQ邮箱信息" }, // 设置初始静态值
                 },
                 {
+                    type: "checkbox",
+                    title: "启用ics订阅",
+                    description: "启用后可以订阅其他软件的ics文件",
+                    key: "cal-ics-enable-subscribe",
+                    value: settings["cal-ics-enable-subscribe"],
+                },
+                {
+                    type: "textinput",
+                    title: "ics订阅地址",
+                    description: "填写ics订阅地址(请以http(s)://开头)",
+                    key: "cal-ics-subscribe-url",
+                    value: settings["cal-ics-subscribe-url"],
+                },  
+                {
                     type: "textinput",
                     title: "时间槽间隔",
                     description:
@@ -678,7 +692,7 @@
             高级设置: 8,
             ics设置: 6,
             ics分享: 8,
-            邮箱日历: 4,
+            订阅日历: 6,
             视图设置: 5,
             // 不限制
         },

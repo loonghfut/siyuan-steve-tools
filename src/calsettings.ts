@@ -22,6 +22,9 @@ export const defaultSettings = {
     "cal-drag-change": false,//是否允许拖拽改变事件时间
     "cal-time": 1,
     "cal-create-for-date": true,
+    //// ics订阅子模块
+    "cal-ics-enable-subscribe": false,
+    "cal-ics-subscribe-url": "",
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

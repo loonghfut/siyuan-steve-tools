@@ -232,7 +232,7 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
         filterKeys.includes(item.from.viewId)
     );
 
-    if (filteredViewValue.length === 0 && !filterKeys.includes('qqcalendar')) {
+    if (filteredViewValue.length === 0 && !filterKeys.includes('qqcalendar') && !filterKeys.includes('icsSubscription')) {
         sy.showMessage('未找到匹配的视图，请重新选择', -1, "error");
     }
 

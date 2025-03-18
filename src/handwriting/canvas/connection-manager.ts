@@ -79,12 +79,11 @@ export class ConnectionManager {
         });
     }
 
-    // 初始化块元素的连接点
+    // 初始化块元素的连接点 - 使用边框连接
     public initializeElement(element: HTMLElement): void {
-
         if (!element || !element.id) return;
 
-        // 定义连接点的位置和样式
+        // 定义连接点的基本选项
         const commonOptions = {
             maxConnections: -1, // 无限连接
             dragAllowedWhenFull: true,
@@ -93,65 +92,111 @@ export class ConnectionManager {
             enabled: true
         };
 
-        // 定义四个方向的连接点
-        const anchors: { position: AnchorSpec, source: boolean, target: boolean }[] = [
-            { position: 'Left', source: true, target: true },
-            { position: 'Right', source: true, target: true },
-            { position: 'Top', source: true, target: true },
-            { position: 'Bottom', source: true, target: true }
-        ];
-
-        // 添加四个方向的连接点
-        anchors.forEach(anchor => {
-            // 源端点 - 可以作为连线起点
-            if (anchor.source) {
-                this.jsPlumb.addEndpoint(element, {
-                    anchor: anchor.position,
-                    source: false,
-                    target: true,
-                    ...commonOptions,
-                    endpoint: {
-                        type: 'Dot',
-                        options: {
-                            radius: 5,
-                            cssClass: 'endpoint-source'
-                        }
+        // 为元素添加边框类型的源端点(可作为连线起点)
+        this.jsPlumb.addEndpoint(element, {
+            anchor: 'Continuous', // 使用连续锚点，可以在元素周围任意位置创建连接点
+            source: true,
+            target: false,
+            ...commonOptions,
+            endpoint: {
+                type: 'Dot',
+                options: {
+                    radius: 6, // 稍微加大连接点尺寸，便于操作
+                    cssClass: 'endpoint-source',
+                    paintStyle: { 
+                        fill: 'transparent', // 正常状态下不可见
+                        stroke: 'transparent'
                     },
-                    connectorStyle: { stroke: '#2196F3', strokeWidth: 2 },
-                    connectorHoverStyle: { stroke: '#ff4081', strokeWidth: 3 },
-                    connectorOverlays: [
-                        {
-                            type: 'Arrow',
-                            options: {
-                                location: 1,
-                                width: 10,
-                                length: 10
-                            }
-                        }
-                    ]
-                });
-            }
-
-            // 目标端点 - 可以作为连线终点
-            if (anchor.target) {
-                this.jsPlumb.addEndpoint(element, {
-                    anchor: anchor.position,
-                    source: true,
-                    target: false,
-                    ...commonOptions,
-                    endpoint: {
-                        type: 'Dot',
-                        options: {
-                            radius: 5,
-                            cssClass: 'endpoint-target'
-                        }
+                    hoverPaintStyle: { 
+                        fill: '#2196F3', // 鼠标悬停时显示
+                        stroke: '#2196F3' 
                     }
-                });
+                }
             }
         });
 
+        // 为元素添加边框类型的目标端点(可作为连线终点)
+        this.jsPlumb.addEndpoint(element, {
+            anchor: 'Continuous', // 连续锚点
+            source: false,
+            target: true,
+            ...commonOptions,
+            endpoint: {
+                type: 'Dot',
+                options: {
+                    radius: 6,
+                    cssClass: 'endpoint-target',
+                    paintStyle: { 
+                        fill: 'transparent', // 正常状态下不可见
+                        stroke: 'transparent'
+                    },
+                    hoverPaintStyle: { 
+                        fill: '#2196F3', // 鼠标悬停时显示
+                        stroke: '#2196F3' 
+                    }
+                }
+            }
+        });
+
+        // 为源端点添加箭头样式
+        this.jsPlumb.addEndpoint(element, {
+            anchor: 'Continuous',
+            source: true,
+            target: false,
+            ...commonOptions,
+            endpoint: {
+                type: 'Blank', // 使用空白端点
+                options: {
+                    cssClass: 'endpoint-source-arrow'
+                }
+            },
+            connectorOverlays: [
+                {
+                    type: 'Arrow',
+                    options: {
+                        location: 1,
+                        width: 10,
+                        length: 10
+                    }
+                }
+            ]
+        });
+
+        // 添加鼠标交互效果
+        this.addElementHoverEffect(element);
+
         // 当元素移动时，重新绘制连线
         this.jsPlumb.revalidate(element);
+    }
+
+    // 为元素添加鼠标悬停效果，显示边框连接区域
+    private addElementHoverEffect(element: HTMLElement): void {
+        // 创建一个边框指示器
+        const borderIndicator = document.createElement('div');
+        borderIndicator.className = 'connection-border-indicator';
+        borderIndicator.style.cssText = `
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            right: -4px;
+            bottom: -4px;
+            border: 2px dashed #2196F3;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        `;
+        
+        element.appendChild(borderIndicator);
+
+        // 添加悬停效果
+        element.addEventListener('mouseenter', () => {
+            borderIndicator.style.opacity = '0.6';
+        });
+        
+        element.addEventListener('mouseleave', () => {
+            borderIndicator.style.opacity = '0';
+        });
     }
 
     // 添加连线标签和删除按钮

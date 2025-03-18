@@ -445,6 +445,42 @@ export async function run(
 
                         menuContent.appendChild(qqItem);
                     }
+                    // 添加ICS订阅选项
+                    if (moduleInstances['M_calendar']?.icsSubscription) {
+                        const icsItem = document.createElement('div');
+                        icsItem.className = 'view-filter-item';
+
+                        // 创建复选框
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = filterViewId.includes('icsSubscription');
+                        checkbox.className = 'view-filter-checkbox';
+
+                        // 创建标签
+                        const label = document.createElement('span');
+                        label.textContent = 'ICS订阅日历';
+                        label.className = 'view-filter-label';
+
+                        icsItem.appendChild(checkbox);
+                        icsItem.appendChild(label);
+
+                        icsItem.onclick = (e) => {
+                            e.stopPropagation();
+                            if (filterViewId.includes('icsSubscription')) {
+                                filterViewId = filterViewId.filter(id => id !== 'icsSubscription');
+                            } else {
+                                filterViewId.push('icsSubscription');
+                            }
+                            checkbox.checked = filterViewId.includes('icsSubscription');
+
+                            // 保存配置
+                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
+                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+                            moduleInstances['M_calendar'].calConfig.save();
+                        };
+
+                        menuContent.appendChild(icsItem);
+                    }
                     // 添加视图选项
                     viewIDs.forEach(view => {
                         const item = document.createElement('div');
@@ -567,6 +603,24 @@ export async function run(
                 } catch (error) {
                     console.error('Error fetching QQ calendar events:', error);
                     // Continue execution without QQ calendar events
+                }
+                //////////////////////ics订阅////////////////////////
+                try {
+                    if (moduleInstances['M_calendar']?.icsSubscription) {
+                        const icsEvents = moduleInstances['M_calendar'].icsSubscription.getEvents();
+                        if (icsEvents && Array.isArray(icsEvents)) {
+                            // 检查是否需要根据视图筛选
+                            const showIcsEvents = filterViewId.length === 0 || 
+                                filterViewId.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
+                            if (showIcsEvents) {
+                                console.log(`加载了 ${icsEvents.length} 个ICS订阅日历事件`);
+                                allEvents = allEvents.concat(icsEvents);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('加载ICS订阅日历事件失败:', error);
+                    // 继续执行，不影响其他日历数据加载
                 }
 
                 /////////////////////思源////////////////////////

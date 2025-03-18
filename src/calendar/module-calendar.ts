@@ -20,7 +20,7 @@ import { ics_alist } from "./share/alist";
 import { ics_s3 } from "./share/s3";
 import { CalDAVClient } from "./share/qqcaldav";
 import { WebDAVSync } from "./share/webdav";
-
+import { ICSSubscription } from "./share/ics_discribe";
 // import { insertHtml } from "./insertHtml";
 
 
@@ -45,6 +45,7 @@ export class M_calendar {
     public QQCalDAVClient: CalDAVClient;
     public webdavClient: WebDAVSync;
     public qqFullCalendarEvents;
+    public icsSubscription: ICSSubscription;
     async init(settingdata) {
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
@@ -320,6 +321,11 @@ export class M_calendar {
 
 
     private async shareicsinit() {
+        if (settingdata["cal-ics-enable-subscribe"]) {
+            this.icsSubscription = new ICSSubscription([settingdata["cal-ics-subscribe-url"]]);
+            await this.icsSubscription.init();
+            console.log("ST_ics状态:", this.icsSubscription.getEvents());
+        }
         if (settingdata["cal-share"] === "alist") {
             this.alistPlugin = new ics_alist();
             this.alistPlugin.init();
