@@ -37,7 +37,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准，个人能力有限，主观难度较高的可能无法实现或实现效果较差，若介意请不要为此而打赏。   
 
 **当前状态** （建议打赏时留下您的邮箱或链滴名称）打赏者的需求我会优先考虑      
-- 💰 [打赏人数](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) 15（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
+- 💰 [打赏人数](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) 16（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
@@ -53,7 +53,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [博]()：打赏支持 `the third `
 - [林（新塘版）]()：打赏支持 `the fourth `
 - [VeryZHH]()：打赏支持 `the fifth ` 
-- [Jrevea]() , [余**]()：打赏支持 `the newest `
+- [Jrevea]() , [余**](),[yxu**0]()：打赏支持 `the newest `
 [更多。。](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
