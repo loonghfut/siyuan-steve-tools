@@ -52,7 +52,7 @@ export class ICSSubscription {
             }
             
             const icsData = await response.text();
-            console.log('Fetched ICS data:', icsData);
+            // console.log('Fetched ICS data:', icsData);
             return this.parseICSData(icsData, url);
         } catch (error) {
             console.error(`Error fetching ICS from ${url}:`, error);
