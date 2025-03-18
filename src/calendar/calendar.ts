@@ -610,11 +610,24 @@ export async function run(
                         const icsEvents = moduleInstances['M_calendar'].icsSubscription.getEvents();
                         if (icsEvents && Array.isArray(icsEvents)) {
                             // 检查是否需要根据视图筛选
-                            const showIcsEvents = filterViewId.length === 0 || 
+                            const showIcsEvents = filterViewId.length === 0 ||
                                 filterViewId.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
                             if (showIcsEvents) {
                                 console.log(`加载了 ${icsEvents.length} 个ICS订阅日历事件`);
-                                allEvents = allEvents.concat(icsEvents);
+                                // 为每个ICS订阅事件添加不可拖拽属性和标识
+                                const formattedIcsEvents = icsEvents.map(event => ({
+                                    ...event,
+                                    editable: false,         // 设置为不可拖拽
+                                    startEditable: false,     // 不允许修改开始时间
+                                    durationEditable: false,  // 不允许修改持续时间
+                                    resourceEditable: false,  // 不允许修改资源
+                                    classNames: ['ics-subscription-event', 'readonly-event'],  // 添加特殊CSS类
+                                    extendedProps: {
+                                        ...event.extendedProps,
+                                        source: 'icsSubscription'  // 标记来源
+                                    }
+                                }));
+                                allEvents = allEvents.concat(formattedIcsEvents);
                             }
                         }
                     }
