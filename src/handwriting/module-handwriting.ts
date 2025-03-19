@@ -9,32 +9,11 @@ import { PanZoomHandler } from "./canvas/pan-zoom-handler";
 import { CanvasManager } from "./canvas/canvas-manager";
 import { ElementInteractions } from "./elements/element-interactions";
 import { api } from "@frostime/siyuan-plugin-kits";
-import { ConnectionManager } from "./canvas/connection-manager";
+import { addWhiteboardButton, toggleElementsVisibility } from "./function/assist";
+import { add_drag_listener, createProtyleContainer, init_whiteboardContainer } from "./canvas/init";
+import { BLOCK_LAYOUT, BLOCK_LOADING } from "./parameter";
 
-const cn_type = "p";
 
-const BLOCK_LOADING = {
-    MAX_CONCURRENT_LOADS: 2,      // 同时最多加载的块数量
-    MAX_ACTIVE_BLOCKS: 10,        // 已加载块的最大数量（超过此数量需要回收）
-    VIEWPORT_CHECK_DEBOUNCE: 300, // 视口检查的防抖时间（毫秒）
-    INTERVAL_CHECK_PERIOD: 5000,  // 定期检查间隔时间（毫秒）
-    VIEWPORT_PADDING: 200,        // 视口边缘额外检查的像素范围
-    DRAG_THROTTLE: 16,            // 拖拽更新节流时间（毫秒）
-    INITIAL_PRELOAD_COUNT: 10,    // 初始预加载的块数量
-    BATCH_SIZE: 3,                 // 批量加载块的数量
-    RECYCLE_COOLDOWN: 5000,       // 块回收后重新加载的最小时间间隔（毫秒）
-    OFFSCREEN_TIME_THRESHOLD: 2000 // 块离开视窗多久后才考虑回收（毫秒）
-};
-
-// 块布局配置
-const BLOCK_LAYOUT = {
-    MARGIN: 20,           // 块之间的间距
-    START_X: 50,          // 起始X坐标
-    START_Y: 50,          // 起始Y坐标
-    WIDTH: 800,           // 默认块宽度
-    HEIGHT: 200,          // 默认块高度
-    MAX_COLUMNS: 1        // 最大列数
-};
 
 
 
@@ -46,7 +25,6 @@ export class M_handwriting {
     private GridManager: GridManager;
     private PanZoomHandler: PanZoomHandler;
     private CanvasManager: CanvasManager;
-    // private connectionManagers: Map<string, ConnectionManager> = new Map();
 
     private currentid: string = "";
 
@@ -80,102 +58,14 @@ export class M_handwriting {
             this.currentid = e.detail.protyle.block.rootID;
             console.log(this.currentid);
 
-            this.addWhiteboardButton(e);
+            addWhiteboardButton(e);
         });
     }
-
-    private async addWhiteboardButton(e) {
-        const breadcrumb = e.detail.protyle.element.querySelector('.protyle-breadcrumb');
-        if (breadcrumb) {
-            // Check if the button already exists
-            const existingButton = breadcrumb.querySelector('.whiteboard-button');
-            if (!existingButton) {
-                // Create the button
-                const button = document.createElement('button');
-                button.className = 'b3-button b3-button--outline whiteboard-button';
-                button.innerHTML = '画板';
-                button.title = '在画板中打开';
-                button.style.marginLeft = '8px';
-
-                // Add click event
-                button.addEventListener('click', async () => {
-                    let ChildBlocks = await api.getChildBlocks(this.currentid);
-
-                    // 添加确认对话框，避免误操作加载大量块
-                    if (ChildBlocks.length > 100) {
-                        const confirmed = await new Promise<boolean>(resolve => {
-                            const dialog = document.createElement('div');
-                            dialog.className = 'block-confirm-dialog';
-                            dialog.style.cssText = `
-                                position: fixed;
-                                top: 0;
-                                left: 0;
-                                right: 0;
-                                bottom: 0;
-                                z-index: 99999;
-                                background-color: rgba(0,0,0,0.4);
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            `;
-
-                            dialog.innerHTML = `
-                                <div style="background: var(--b3-theme-background); border-radius: 6px; padding: 16px; width: 340px; box-shadow: 0 0 20px rgba(0,0,0,0.15);">
-                                    <h3 style="margin-top: 0;">大量块警告</h3>
-                                    <p>当前文档包含 ${ChildBlocks.length} 个块，全部加载可能导致性能问题。</p>
-                                    <div style="display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end;">
-                                        <button class="b3-button cancel-btn">取消</button>
-                                        <button class="b3-button b3-button--text optimize-btn">优化加载</button>
-                                        <button class="b3-button b3-button--danger confirm-btn">强制加载全部</button>
-                                    </div>
-                                </div>
-                            `;
-
-                            document.body.appendChild(dialog);
-
-                            dialog.querySelector('.cancel-btn').addEventListener('click', () => {
-                                document.body.removeChild(dialog);
-                                resolve(false);
-                            });
-
-                            dialog.querySelector('.optimize-btn').addEventListener('click', () => {
-                                document.body.removeChild(dialog);
-                                // 仅加载前15个块
-                                ChildBlocks = ChildBlocks.slice(0, 15);
-                                resolve(true);
-                            });
-
-                            dialog.querySelector('.confirm-btn').addEventListener('click', () => {
-                                document.body.removeChild(dialog);
-                                resolve(true);
-                            });
-                        });
-
-                        if (!confirmed) return;
-                    }
-
-                    // 过滤和提取块ID
-                    const blockIds = ChildBlocks
-                        .filter(block =>
-                            block?.type === cn_type &&
-                            block?.content?.trim())
-                        .map(block => block.id);
-
-                    console.log("Extracted block IDs:", blockIds);
-                    this.openWhiteBoard_in(e, blockIds);
-                });
-
-                // Add the button to breadcrumb
-                breadcrumb.appendChild(button);
-            }
-        }
-    }
-
 
     /**
      * 在当前笔记页中打开画板
      */
-    private async openWhiteBoard_in(e, defaultBlockIds: string[] = []) {
+    public async openWhiteBoard_in(e, defaultBlockIds: string[] = []) {
         // 查找当前页面的内容容器
         const protyle = e.detail.protyle;
         const protyleContent = protyle.element.querySelector(`.protyle-content.protyle-content--transition`);
@@ -183,35 +73,15 @@ export class M_handwriting {
             showMessage("无法找到当前页面内容区域");
             return;
         }
-
-        // 获取按钮
-        const button = protyle.element.querySelector('.whiteboard-button');
-
         // 检查画板是否已存在
         let whiteboardContainer = protyleContent.querySelector('.whiteboard-container');
-        const id = this.currentid;
-
-        // 控制元素显示状态的函数
-        const toggleElementsVisibility = (show: boolean) => {
-            // 控制原始内容显示/隐藏
-            const originalContent = protyleContent.querySelectorAll(':scope > :not(.whiteboard-container)');
-            originalContent.forEach(el => (el as HTMLElement).style.display = show ? '' : 'none');
-
-            // 控制面包屑导航栏
-            const breadcrumbBar = protyle.element.querySelector('.protyle-breadcrumb__bar');
-            if (breadcrumbBar) (breadcrumbBar as HTMLElement).style.display = show ? '' : 'none';
-
-            // 更新按钮文本
-            if (button) button.innerHTML = show ? '画板' : '关闭画板';
-        };
-
+        const id = e.detail.protyle.block.rootID;
         if (whiteboardContainer) {
             // 画板已存在，切换显示状态
             const isCurrentlyHidden = whiteboardContainer.style.display === 'none';
-
             // 设置新的显示状态
             whiteboardContainer.style.display = isCurrentlyHidden ? 'block' : 'none';
-            toggleElementsVisibility(!isCurrentlyHidden);
+            toggleElementsVisibility(!isCurrentlyHidden, protyle);
 
             // 如果显示画板，恢复画布实例
             if (isCurrentlyHidden) {
@@ -220,34 +90,12 @@ export class M_handwriting {
             }
         } else {
             // 画板不存在，创建新的画板
-            toggleElementsVisibility(false);
+            toggleElementsVisibility(false, protyle);
 
             // 创建画板容器
-            whiteboardContainer = document.createElement('div');
-            whiteboardContainer.id = `steveTool-whiteboard-${id}`;
-            whiteboardContainer.className = 'whiteboard-container';
-            whiteboardContainer.style.cssText = 'width: 100%; height: 100%; position: relative; overflow: hidden; background-color: var(--b3-theme-background);';
-
-            // 添加控制元素和画布
-            whiteboardContainer.innerHTML = `
-            <div class="whiteboard-controls" style="position: absolute; top: 10px; right: 10px; z-index: ${window.siyuan.zIndex}; 
-                 background-color: var(--b3-theme-background); padding: 5px 10px; border-radius: 4px; font-size: 14px; color: var(--b3-theme-on-background);">
-                <span id="zoom-display-${id}">缩放: 100%</span>
-                <button id="reset-view-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
-                    border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">重置视图</button>
-                <button id="add-button-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
-                    border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">添加按钮</button>
-            </div>
-            <canvas id='canvas-${id}'></canvas>
-            <div id='grid-${id}' class="whiteboard-grid"></div>
-            <div id="dom-elements-container-${id}" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
-            `;
-
-            // 将画板添加到内容区域
-            protyleContent.appendChild(whiteboardContainer);
-
+            const whiteboardContainer2 = await init_whiteboardContainer(whiteboardContainer, id, protyleContent);
             // 初始化画布
-            const Mcanvas = new CanvasManager(id, whiteboardContainer);
+            const Mcanvas = new CanvasManager(id, whiteboardContainer2);
             const canvas = Mcanvas.getCanvas();
             this.canvasInstances.set(id, canvas);
 
@@ -262,8 +110,6 @@ export class M_handwriting {
                     this.addDefaultBlocks(canvas, id, defaultBlockIds, domContainer);
                 }
             }
-
-            showMessage("画板已打开");
         }
     }
 
@@ -382,11 +228,11 @@ export class M_handwriting {
             const canvasY = (dropY - vpt[5]) / vpt[3];
 
             // 生成唯一的DOM元素ID
-            const domId = `dom-block-${id}-${Date.now()}`;
+            const domId = `st-${id}-${blockId}`;
 
             // 创建容器元素
             const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
-                this.createProtyleContainer(domId, blockId, { x: canvasX, y: canvasY });
+                createProtyleContainer(domId, blockId, { x: canvasX, y: canvasY });
 
             // 添加到DOM容器中
             domContainer.appendChild(protyledom);
@@ -421,7 +267,7 @@ export class M_handwriting {
         });
     }
 
-    private checkAndApplyRecyclingSystem(id: string, domContainer: HTMLElement, canvas: Canvas) {
+    public checkAndApplyRecyclingSystem(id: string, domContainer: HTMLElement, canvas: Canvas) {
         // 检查是否已经设置了回收系统
         const hasIntervalId = domContainer.hasAttribute('data-interval-id');
 
@@ -452,40 +298,24 @@ export class M_handwriting {
      */
     private setupDomElementAddition(canvas: Canvas, id: string) {
         // 获取添加按钮元素
-        const addButtonBtn = document.getElementById(`add-button-${id}`);
+        const addButtonBtn = document.getElementById(`add-block-${id}`);
         // 获取DOM元素容器
         const domContainer = document.getElementById(`dom-elements-container-${id}`);
-
         if (!addButtonBtn || !domContainer) return;
-
         // 确保DOM容器能接受交互事件
         domContainer.style.pointerEvents = 'none';
-
-        // 初始化连线管理器
-        const connectionManager = new ConnectionManager(id, domContainer);
-        // this.connectionManagers.set(id, connectionManager);
-
-
         // 生成唯一的DOM元素ID
-        let domElementCounter = 0;
+        let blockId = "20250129162816-khbexns";//TODO：后面换成blockId
         // 添加拖拽创建功能
-        this.setupDragToCreateElement(canvas, id, domElementCounter);
+        this.setupDragToCreateElement(canvas, id, blockId);
 
         // 监听画布变换（平移、缩放）以更新所有DOM元素的变换矩阵
         canvas.on('after:render', () => {
             // 更新DOM容器的变换以匹配画布变换
             const vpt = canvas.viewportTransform;
             if (!vpt) return;
-
             // 将整个DOM容器的变换设置为与画布相同
             domContainer.style.transform = `matrix(${vpt[0]}, ${vpt[1]}, ${vpt[2]}, ${vpt[3]}, ${vpt[4]}, ${vpt[5]})`;
-
-            // 更新连线缩放
-            // const connectionManager = this.connectionManagers.get(id);
-            // if (connectionManager) {
-            //     connectionManager.updateZoom(vpt[0]);
-            // }
-
 
         });
     }
@@ -494,90 +324,24 @@ export class M_handwriting {
      * 设置拖拽创建元素功能
      * @param canvas Fabric.js画布实例
      * @param id 画布ID
-     * @param counter 计数器引用
+     * @param blockId 块id
      */
-    private setupDragToCreateElement(canvas: Canvas, id: string, counter: number) {
+    private async setupDragToCreateElement(canvas: Canvas, id: string, blockId: string) {
         const container = document.getElementById(`steveTool-whiteboard-${id}`);
         const domContainer = document.getElementById(`dom-elements-container-${id}`);
-        const addButtonBtn = document.getElementById(`add-button-${id}`);
+        const addButtonBtn = document.getElementById(`add-block-${id}`);
 
         if (!container || !domContainer || !addButtonBtn) return;
-
         // 设置按钮为可拖动
         addButtonBtn.setAttribute('draggable', 'true');
-
         // 绑定拖拽开始事件
         addButtonBtn.addEventListener('dragstart', (e) => {
             // 设置拖拽数据
             e.dataTransfer!.setData('text/plain', 'create-new-element');
             e.dataTransfer!.effectAllowed = 'copy';
         });
+        await add_drag_listener(container, canvas, id, domContainer, blockId);
 
-        // 容器上监听拖放事件
-        container.addEventListener('dragover', (e) => {
-            // 阻止默认行为以允许放置
-            e.preventDefault();
-            e.dataTransfer!.dropEffect = 'copy';
-        });
-
-        container.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            // 检查是否是从添加按钮拖拽过来的
-            const dragData = e.dataTransfer!.getData('text/plain');
-            if (dragData !== 'create-new-element') return;
-
-            // 获取鼠标在画布上的位置
-            const rect = container.getBoundingClientRect();
-            const dropX = e.clientX - rect.left;
-            const dropY = e.clientY - rect.top;
-
-            // 获取当前画布的变换矩阵
-            const vpt = canvas.viewportTransform;
-            if (!vpt) return;
-
-            // 转换为画布坐标系中的位置
-            const canvasX = (dropX - vpt[4]) / vpt[0];
-            const canvasY = (dropY - vpt[5]) / vpt[3];
-
-
-            // 创建唯一ID
-            const domId = `dom-button-${id}-${counter++}`;
-
-            // 使用封装好的方法创建容器
-            const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
-                this.createProtyleContainer(domId, "20250310234002-us3sb9j", { x: canvasX, y: canvasY });
-
-            // 添加到DOM容器中
-            domContainer.appendChild(protyledom);
-
-            // 重要变更：不立即初始化编辑器，而是先设置为未初始化状态
-            protyledom.setAttribute('data-block-id', "20250310234002-us3sb9j");
-            protyledom.setAttribute('data-initialized', 'false');
-
-            // 添加临时预览内容
-            wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
-     <span>正在加载...</span>
- </div>`;
-
-            // 添加缩放功能
-            ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
-
-            // 稍后初始化编辑器（异步处理，避免界面卡顿）
-            setTimeout(() => {
-                // 为新拖放的块也应用延迟加载逻辑
-                this.initProtyleEditor(wrapperDiv, "20250310234002-us3sb9j", id);
-                protyledom.setAttribute('data-initialized', 'true');
-
-                // 确保回收系统知道这个新块
-                this.checkAndApplyRecyclingSystem(id, domContainer, canvas);
-
-                showMessage('已添加新元素，可直接拖拽移动位置或缩放大小');
-            }, 100);
-
-            console.log("拖放位置(画布坐标):", { x: canvasX, y: canvasY });
-        });
         // 添加提示
         addButtonBtn.setAttribute('title', '拖拽此按钮到画布中创建新元素');
     }
@@ -589,96 +353,6 @@ export class M_handwriting {
         this.cleanUp();
     }
 
-    /**
-     * 创建一个思源笔记块容器
-     * @param id 唯一ID
-     * @param blockId 思源笔记块ID
-     * @param position 初始位置
-     * @returns 创建的DOM元素
-     */
-    private createProtyleContainer(id: string, blockId: string, position: { x: number, y: number }): {
-        container: HTMLElement,
-        wrapper: HTMLElement,
-        dragHandle: HTMLElement,
-        resizeHandle: HTMLElement
-    } {
-        // 创建主容器
-        const container = document.createElement('div');
-        container.id = id; // 使用传入的id而不是blockId，避免ID冲突问题
-        container.dataset.blockId = blockId; // 将blockId存储在dataset中
-        container.className = 'siyuan-block-container';
-        container.style.cssText = `
-            position: absolute;
-            width: 300px;
-            height: 200px;
-            background-color: var(--b3-theme-background);
-            border-radius: 6px;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
-            pointer-events: auto; 
-            transform-origin: 0 0;
-            overflow: hidden;
-            border: 1px solid var(--b3-border-color);
-            left: ${position.x}px;
-            top: ${position.y}px;
-            will-change: transform, left, top; /* 提高性能提示 */
-        `;
-
-        // 添加拖动手柄，简化样式
-        const dragHandle = document.createElement('div');
-        dragHandle.className = 'drag-handle';
-        dragHandle.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 8px;
-            cursor: move;
-            background-color: rgba(0,0,0,0.08);
-            border-radius: 4px 4px 0 0;
-            z-index: 1;
-        `;
-
-        // 添加缩放手柄
-        const resizeHandle = document.createElement('div');
-        resizeHandle.className = 'resize-handle';
-        resizeHandle.style.cssText = `
-            position: absolute;
-            bottom: 0px;
-            right: 0px;
-            width: 10px;
-            height: 10px;
-            background-color: #2196F3;
-            border-radius: 50%;
-            cursor: nwse-resize;
-            z-index: 100;
-        `;
-
-        // 创建容器包装器
-        const wrapper = document.createElement('div');
-        wrapper.className = 'protyle-wrapper';
-        wrapper.style.cssText = `
-            position: absolute;
-            top: 8px;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        `;
-
-        // 组装各部分
-        container.appendChild(dragHandle);
-        container.appendChild(resizeHandle);
-        container.appendChild(wrapper);
-
-        return {
-            container,
-            wrapper,
-            dragHandle,
-            resizeHandle
-        };
-    }
 
     /**
      * 在画布上添加默认的思源块
@@ -710,7 +384,6 @@ export class M_handwriting {
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                transform: translate(-50%, -50%);
                 background: rgba(0,0,0,0.7);
                 color: white;
                 padding: 10px 20px;
@@ -747,7 +420,7 @@ export class M_handwriting {
 
                     // 创建容器元素，但先不初始化Protyle
                     const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
-                        this.createProtyleContainer(`dom-default-block-${id}-${index}`, blockId, { x, y });
+                        createProtyleContainer(`st-${id}-${blockId}`, blockId, { x, y });
 
                     // 设置尺寸
                     protyledom.style.width = `${blockWidth}px`;
@@ -764,33 +437,6 @@ export class M_handwriting {
                     // 添加延迟初始化逻辑
                     protyledom.setAttribute('data-block-id', blockId);
                     protyledom.setAttribute('data-initialized', 'false');
-
-                    // 尝试获取块内容预览
-                    try {
-                        // 获取块数据但限制加载
-                        const blockData = await api.getBlockByID(blockId);
-
-                        if (blockData && blockData.content) {
-                            // 显示内容预览，限制长度
-                            const previewContent = blockData.content.substring(0, 120); // 限制预览长度
-                            wrapperDiv.innerHTML = `
-                                <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
-                                    <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">点击加载完整内容</div>
-                                    <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${blockData.content.length > 120 ? '...' : ''}</div>
-                                </div>
-                            `;
-                        } else {
-                            // 如果无法获取内容，显示默认占位符
-                            wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
-                                <span>点击加载块 ${index + 1}</span>
-                            </div>`;
-                        }
-                    } catch (err) {
-                        console.error("获取块预览失败:", err);
-                        wrapperDiv.innerHTML = `<div class="block-placeholder" style="padding: 10px; display: flex; align-items: center; justify-content: center; height: 100%;">
-                            <span>点击加载块 ${index + 1}</span>
-                        </div>`;
-                    }
 
                     // 只添加缩放功能，不初始化Protyle
                     ElementInteractions.addResizableToElement(protyledom, resizeHandle, canvas);
@@ -838,9 +484,7 @@ export class M_handwriting {
                             guide.style.opacity = '0';
                             setTimeout(() => guide.remove(), 500);
                         }, 5000);
-
-                        showMessage(`已布局 ${blockIds.length} 个块，点击块可加载内容`);
-
+                        showMessage(`已布局 ${blockIds.length} 个块`);
                         // 给所有占位块添加点击事件，延迟初始化
                         this.setupLazyInitialization(id, domContainer, canvas);
                     }, 500);
@@ -862,7 +506,7 @@ export class M_handwriting {
 
                 // 创建容器元素
                 const { container: protyledom, wrapper: wrapperDiv, dragHandle, resizeHandle } =
-                    this.createProtyleContainer(`dom-default-block-${id}-${index}`, blockId, { x, y });
+                    createProtyleContainer(`st-${id}-${blockId}`, blockId, { x, y });
 
                 // 设置尺寸
                 protyledom.style.width = `${blockWidth}px`;
@@ -894,7 +538,7 @@ export class M_handwriting {
 
             // 显示成功消息
             if (blockIds.length > 0) {
-                showMessage(`已加载 ${blockIds.length} 个块，点击块可查看内容`);
+                showMessage(`已加载 ${blockIds.length} 个块`);
             }
         }
     }
@@ -1019,6 +663,7 @@ export class M_handwriting {
 
                     try {
                         // 提取当前内容用于预览
+                        console.log("回收块内容:", item.element);
                         const contentElement = wrapper.querySelector('.protyle-wysiwyg') ||
                             wrapper.querySelector('.protyle-content');
 
@@ -1031,11 +676,48 @@ export class M_handwriting {
 
                         // 在移除 Protyle 内容前将原有的 Protyle 实例清理
                         // 查找并清理所有相关的事件监听器和 DOM 元素
-                        const protyleInstances = wrapper.querySelectorAll('[data-subtype="protyle"]');
+                        // Find all Protyle instances that need to be cleaned up
+                        const protyleInstances = [];
+                        
+                        // First try to find by the protyle class
+                        const protyleElements = wrapper.querySelectorAll('.protyle');
+                        if (protyleElements.length > 0) {
+                            protyleElements.forEach(el => protyleInstances.push(el));
+                        }
+                        
+                        // Also look for elements with protyle-content class (the actual content container)
+                        const contentElements = wrapper.querySelectorAll('.protyle-content');
+                        contentElements.forEach(el => {
+                            if (!protyleInstances.includes(el.closest('.protyle'))) {
+                                const protyleParent = el.closest('.protyle');
+                                if (protyleParent) protyleInstances.push(protyleParent);
+                            }
+                        });
+                        
+                        // Check for protyle-wysiwyg elements as well
+                        const wysiwygElements = wrapper.querySelectorAll('.protyle-wysiwyg');
+                        wysiwygElements.forEach(el => {
+                            const protyleContainer = el.closest('.protyle');
+                            if (protyleContainer && !protyleInstances.includes(protyleContainer)) {
+                                protyleInstances.push(protyleContainer);
+                            }
+                        });
+                        console.log("清理 Protyle 实例数量:", protyleInstances.length);
                         protyleInstances.forEach(instance => {
                             // 尝试标记实例为已销毁，以防止重复使用
+                            console.log("清理 Protyle 实例:", instance);
                             if (instance['protyle']) {
                                 try {
+                                    console.log("清理 Protyle 实例:", instance['protyle']);
+                                    // 关闭WebSocket连接
+                                    if (instance['protyle'].ws) {
+                                        try {
+                                            instance['protyle'].ws.close();
+                                            instance['protyle'].ws = null;
+                                        } catch (wsErr) {
+                                            console.warn("关闭WebSocket失败", wsErr);
+                                        }
+                                    }
                                     // 模拟销毁实例
                                     if (typeof instance['protyle'].destroy === 'function') {
                                         instance['protyle'].destroy();
@@ -1412,7 +1094,7 @@ export class M_handwriting {
      * @param id 画布ID
      * @returns 初始化的Protyle实例或null
      */
-    private initProtyleEditor(wrapper: HTMLElement, blockId: string, id: string): Protyle | null {
+    public initProtyleEditor(wrapper: HTMLElement, blockId: string, id: string): Protyle | null {
         try {
             // 获取父容器元素（siyuan-block-container）
             const container = wrapper.parentElement;
