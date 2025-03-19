@@ -60,7 +60,41 @@ export class M_handwriting {
 
             addWhiteboardButton(e);
         });
+        // 启用WebSocket跟踪
+        this.trackWebSockets();
     }
+
+
+    private trackWebSockets() {
+        // 存储所有打开的WebSocket连接
+        if (!window['_debugWebSockets']) {
+            window['_debugWebSockets'] = new Set();
+
+            // 重写WebSocket构造函数以跟踪所有实例
+            const originalWebSocket = window.WebSocket;
+            window.WebSocket = function (url: string, protocols?: string | string[]) {
+                const ws = new originalWebSocket(url, protocols);
+                window['_debugWebSockets'].add(ws);
+
+                // 当连接关闭时从跟踪器中移除
+                ws.addEventListener('close', function () {
+                    window['_debugWebSockets'].delete(ws);
+                    console.log(`WebSocket已关闭，当前剩余连接数: ${window['_debugWebSockets'].size}`);
+                });
+
+                console.log(`新的WebSocket连接，URL: ${url}, 当前连接数: ${window['_debugWebSockets'].size}`);
+                return ws;
+            } as any;
+
+            // 保持原型链
+            window.WebSocket.prototype = originalWebSocket.prototype;
+        }
+
+        console.log(`当前活跃WebSocket连接数: ${window['_debugWebSockets'].size}`);
+        return window['_debugWebSockets'];
+    }
+
+
 
     /**
      * 在当前笔记页中打开画板
@@ -676,32 +710,7 @@ export class M_handwriting {
 
                         // 在移除 Protyle 内容前将原有的 Protyle 实例清理
                         // 查找并清理所有相关的事件监听器和 DOM 元素
-                        // Find all Protyle instances that need to be cleaned up
-                        const protyleInstances = [];
-                        
-                        // First try to find by the protyle class
-                        const protyleElements = wrapper.querySelectorAll('.protyle');
-                        if (protyleElements.length > 0) {
-                            protyleElements.forEach(el => protyleInstances.push(el));
-                        }
-                        
-                        // Also look for elements with protyle-content class (the actual content container)
-                        const contentElements = wrapper.querySelectorAll('.protyle-content');
-                        contentElements.forEach(el => {
-                            if (!protyleInstances.includes(el.closest('.protyle'))) {
-                                const protyleParent = el.closest('.protyle');
-                                if (protyleParent) protyleInstances.push(protyleParent);
-                            }
-                        });
-                        
-                        // Check for protyle-wysiwyg elements as well
-                        const wysiwygElements = wrapper.querySelectorAll('.protyle-wysiwyg');
-                        wysiwygElements.forEach(el => {
-                            const protyleContainer = el.closest('.protyle');
-                            if (protyleContainer && !protyleInstances.includes(protyleContainer)) {
-                                protyleInstances.push(protyleContainer);
-                            }
-                        });
+                        const protyleInstances = wrapper.querySelectorAll('[data-subtype="protyle"]');
                         console.log("清理 Protyle 实例数量:", protyleInstances.length);
                         protyleInstances.forEach(instance => {
                             // 尝试标记实例为已销毁，以防止重复使用
