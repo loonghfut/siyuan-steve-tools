@@ -54,6 +54,7 @@ export const toggleElementsVisibility = (show: boolean, protyle) => {
     const breadcrumbBar = protyle.element.querySelector('.protyle-breadcrumb__bar');
     if (breadcrumbBar) (breadcrumbBar as HTMLElement).style.display = show ? '' : 'none';
 
+    
     // 更新按钮文本
     if (button) button.innerHTML = show ? '画板' : '关闭画板';
 };

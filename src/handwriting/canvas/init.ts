@@ -3,9 +3,9 @@ import { ElementInteractions } from "../elements/element-interactions";
 import { moduleInstances } from "@/index";
 
 //初始化画板容器
-export async function init_whiteboardContainer(whiteboardContainer, id, protyleContent) {
+export async function init_whiteboardContainer(id, protyleContent) {
     // 创建画板容器
-    whiteboardContainer = document.createElement('div');
+    const whiteboardContainer = document.createElement('div');
     whiteboardContainer.id = `steveTool-whiteboard-${id}`;
     whiteboardContainer.className = 'whiteboard-container';
     whiteboardContainer.style.cssText = 'width: 100%; height: 100%; position: relative; overflow: hidden; background-color: var(--b3-theme-background);';

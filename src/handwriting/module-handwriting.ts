@@ -61,7 +61,7 @@ export class M_handwriting {
             addWhiteboardButton(e);
         });
         // 启用WebSocket跟踪
-        this.trackWebSockets();
+        // this.trackWebSockets();
     }
 
 
@@ -102,48 +102,38 @@ export class M_handwriting {
     public async openWhiteBoard_in(e, defaultBlockIds: string[] = []) {
         // 查找当前页面的内容容器
         const protyle = e.detail.protyle;
-        const protyleContent = protyle.element.querySelector(`.protyle-content.protyle-content--transition`);
-        if (!protyleContent) {
-            showMessage("无法找到当前页面内容区域");
-            return;
-        }
-        // 检查画板是否已存在
-        let whiteboardContainer = protyleContent.querySelector('.whiteboard-container');
         const id = e.detail.protyle.block.rootID;
-        if (whiteboardContainer) {
-            // 画板已存在，切换显示状态
-            const isCurrentlyHidden = whiteboardContainer.style.display === 'none';
-            // 设置新的显示状态
-            whiteboardContainer.style.display = isCurrentlyHidden ? 'block' : 'none';
-            toggleElementsVisibility(!isCurrentlyHidden, protyle);
-
-            // 如果显示画板，恢复画布实例
-            if (isCurrentlyHidden) {
-                const existingCanvas = this.canvasInstances.get(id);
-                if (existingCanvas) existingCanvas.requestRenderAll();
+        const whiteBoardTab = await openTab({
+            app: this.plugin.app,
+            custom: {
+                id: "steveTool-whiteboard-" + id,
+                title: id,
+                icon: "iconSTWhiteboard",
+                data: {
+                    text: "steveTool-whiteboard"
+                },
             }
-        } else {
-            // 画板不存在，创建新的画板
-            toggleElementsVisibility(false, protyle);
+        });
+        const protyleContent = whiteBoardTab.panelElement;
 
-            // 创建画板容器
-            const whiteboardContainer2 = await init_whiteboardContainer(whiteboardContainer, id, protyleContent);
-            // 初始化画布
-            const Mcanvas = new CanvasManager(id, whiteboardContainer2);
-            const canvas = Mcanvas.getCanvas();
-            this.canvasInstances.set(id, canvas);
+        // 创建画板容器
+        const whiteboardContainer2 = await init_whiteboardContainer(id, protyleContent);
+        // 初始化画布
+        const Mcanvas = new CanvasManager(id, whiteboardContainer2);
+        const canvas = Mcanvas.getCanvas();
+        this.canvasInstances.set(id, canvas);
 
-            // 设置功能
-            this.setupDomElementAddition(canvas, id);
-            this.setupSiyuanBlockDrop(canvas, id);
+        // 设置功能
+        this.setupDomElementAddition(canvas, id);
+        this.setupSiyuanBlockDrop(canvas, id);
 
-            // 添加默认块
-            if (defaultBlockIds.length > 0) {
-                const domContainer = document.getElementById(`dom-elements-container-${id}`);
-                if (domContainer) {
-                    this.addDefaultBlocks(canvas, id, defaultBlockIds, domContainer);
-                }
+        // 添加默认块
+        if (defaultBlockIds.length > 0) {
+            const domContainer = document.getElementById(`dom-elements-container-${id}`);
+            if (domContainer) {
+                this.addDefaultBlocks(canvas, id, defaultBlockIds, domContainer);
             }
+
         }
     }
 
@@ -171,25 +161,11 @@ export class M_handwriting {
         });
 
         // 添加画布容器和网格背景
-        whiteBoardTab.panelElement.innerHTML = `
-        <div id='steveTool-whiteboard-${id}' class="whiteboard-container" 
-         style="width: 100%; height: 100%; position: relative; overflow: hidden; background-color: var(--b3-theme-background);">
-        <div class="whiteboard-controls" style="position: absolute; top: 10px; right: 10px; z-index: ${window.siyuan.zIndex}; 
-             background-color: var(--b3-theme-background); padding: 5px 10px; border-radius: 4px; font-size: 14px; color: var(--b3-theme-on-background);">
-            <span id="zoom-display-${id}">缩放: 100%</span>
-            <button id="reset-view-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
-                border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">重置视图</button>
-            <button id="add-button-${id}" style="margin-left: 10px; background: var(--b3-theme-background); border: 1px solid #ccc; 
-                border-radius: 4px; padding: 2px 8px; cursor: pointer; color: var(--b3-theme-on-background);">添加按钮</button>
-        </div>
-        <canvas id='canvas-${id}'></canvas>
-        <div id='grid-${id}' class="whiteboard-grid"></div>
-        <div id="dom-elements-container-${id}" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
-        </div>`;
 
+        const whiteboardContainer2 = await init_whiteboardContainer(id, whiteBoardTab.panelElement);
         // 初始化画布
         // this.initializeCanvas(id);
-        const Mcanvas = new CanvasManager(id, whiteBoardTab.panelElement);
+        const Mcanvas = new CanvasManager(id, whiteboardContainer2);
         const canvas = Mcanvas.getCanvas();
         this.canvasInstances.set(id, canvas);
         // 设置DOM元素添加功能
@@ -854,7 +830,7 @@ export class M_handwriting {
 
                 if (protyle) {
                     blockElement.setAttribute('data-initialized', 'true');
-                    console.log(`自动加载了视窗内块: ${blockId}`);
+                    // console.log(`自动加载了视窗内块: ${blockId}`);
                 }
             } catch (err) {
                 console.error("加载块失败:", err);
@@ -1059,16 +1035,6 @@ export class M_handwriting {
             // 将删除按钮添加到容器元素内
             container.appendChild(deleteButton);
 
-            // 为删除按钮添加事件监听器
-            deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-
-                if (confirm('确定要删除此元素吗？')) {
-                    container.remove();
-                    showMessage('元素已删除');
-                }
-            });
 
             // 将覆盖层添加到容器
             const existingOverlay = container.querySelector('.block-overlay');
@@ -1083,7 +1049,7 @@ export class M_handwriting {
             const protyle = new Protyle(window.siyuan.ws.app, wrapper, {
                 blockId: blockId,
                 render: {
-                    breadcrumb: false,
+                    breadcrumb: true,
                     gutter: false,
                     breadcrumbDocName: true,
                 },
@@ -1092,6 +1058,15 @@ export class M_handwriting {
 
             // 将Protyle实例引用存储在容器元素上，方便后续回收时访问
             (container as any).protyle = protyle;
+            // 为删除按钮添加事件监听器
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                // if (confirm('确定要删除此元素吗？')) {
+                container.remove();
+                //     showMessage('元素已删除');
+                // }
+            });
 
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {

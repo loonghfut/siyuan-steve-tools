@@ -52,52 +52,6 @@
 }
 
 
-/* 连接点样式 */
-.jtk-endpoint {
-  z-index: 50;
-  cursor: pointer !important;
-  opacity: 0.8 !important;
-  /* 默认可见 */
-  transition: transform 0.2s, opacity 0.2s;
-}
-
-.jtk-endpoint:hover {
-  transform: scale(1.5) !important;
-  opacity: 1 !important;
-}
-
-.endpoint-source {
-  fill: #2196F3 !important;
-}
-
-.endpoint-target {
-  fill: #4CAF50 !important;
-}
-
-/* 连接线样式 */
-.jtk-connector {
-  z-index: -1;
-  cursor: default;
-}
-
-.jtk-connector:hover {
-  z-index: 10;
-}
-
-/* 保证覆盖jsPlumb默认样式 */
-svg.jtk-endpoint {
-  opacity: 0.8 !important;
-}
-
-/* 当拖动连线时 */
-.jtk-drag-active {
-  cursor: crosshair !important;
-}
-
-.jtk-endpoint.jtk-dragging {
-  opacity: 1 !important;
-}
-
 /* Optimize wysiwyg editor padding */
 .protyle-wrapper .protyle-wysiwyg {
   padding-inline: 20px !important;
