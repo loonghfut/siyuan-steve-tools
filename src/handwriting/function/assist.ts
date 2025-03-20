@@ -23,7 +23,7 @@ export async function addWhiteboardButton(e) {
                 // 过滤和提取块ID
                 const blockIds = ChildBlocks
                     .filter(block =>
-                        block?.type === cn_type &&
+                        // block?.type === cn_type &&
                         block?.content?.trim())
                     .map(block => block.id);
 

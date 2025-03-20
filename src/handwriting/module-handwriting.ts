@@ -683,6 +683,7 @@ export class M_handwriting {
                 .slice(0, recycleCount)
                 .forEach(item => {
                     // 标记为已回收并记录回收时间
+                    console.log("回收块:", item);
                     recycledStates.set(item.element, true);
                     item.element.dataset.lastRecycleTime = now.toString();
 
@@ -697,7 +698,6 @@ export class M_handwriting {
 
                     try {
                         // 提取当前内容用于预览
-                        console.log("回收块内容:", item.element);
                         const contentElement = wrapper.querySelector('.protyle-wysiwyg') ||
                             wrapper.querySelector('.protyle-content');
 
@@ -709,150 +709,37 @@ export class M_handwriting {
                         }
 
                         // 在移除 Protyle 内容前将原有的 Protyle 实例清理
-                        // 查找并清理所有相关的事件监听器和 DOM 元素
-                        const protyleInstances = wrapper.querySelectorAll('[data-subtype="protyle"]');
-                        console.log("清理 Protyle 实例数量:", protyleInstances.length);
-                        protyleInstances.forEach(instance => {
-                            // 尝试标记实例为已销毁，以防止重复使用
-                            console.log("清理 Protyle 实例:", instance);
-                            if (instance['protyle']) {
-                                try {
-                                    console.log("清理 Protyle 实例:", instance['protyle']);
-                                    // 关闭WebSocket连接
-                                    if (instance['protyle'].ws) {
-                                        try {
-                                            instance['protyle'].ws.close();
-                                            instance['protyle'].ws = null;
-                                        } catch (wsErr) {
-                                            console.warn("关闭WebSocket失败", wsErr);
-                                        }
-                                    }
-                                    // 模拟销毁实例
-                                    if (typeof instance['protyle'].destroy === 'function') {
-                                        instance['protyle'].destroy();
-                                    }
-                                    // 移除所有属性
-                                    Object.keys(instance['protyle']).forEach(key => {
-                                        delete instance['protyle'][key];
-                                    });
-                                    instance['protyle'] = null;
-                                } catch (e) {
-                                    console.warn("清理 Protyle 实例失败", e);
-                                }
-                            }
-                            // 移除元素
-                            instance.remove();
-                        });
+                        // 在创建新元素前，销毁Protyle实例，关闭WebSocket
+                        if ((item.element as any).protyle) {
+                            console.log(`销毁块 ${item.blockId} 的Protyle实例`);
+                            (item.element as any).protyle.destroy();
+                            delete (item.element as any).protyle;
+                        }
 
-                        // 清空 wrapper 内容
-                        wrapper.innerHTML = '';
+                        // 创建新的 wrapper 元素替换旧的
+                        const newWrapper = document.createElement('div');
+                        newWrapper.className = wrapper.className;
+                        newWrapper.style.cssText = wrapper.style.cssText;
+
+                        // 设置预览内容
+                        newWrapper.innerHTML = `
+                        <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
+                            <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">内容已回收，点击恢复</div>
+                            <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${previewContent.length >= 120 ? '...' : ''}</div>
+                        </div>`;
+
+                        // 替换元素
+                        wrapper.parentNode.replaceChild(newWrapper, wrapper);
+                        wrapper = newWrapper; // 更新引用
 
                         // 从DOM中移除protyle实例但保留容器
                         item.element.setAttribute('data-initialized', 'recycled');
 
-                        // 显示预览内容
-                        wrapper.innerHTML = `
-                        <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
-                            <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">内容已回收，点击恢复</div>
-                            <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${previewContent.length >= 120 ? '...' : ''}</div>
-                        </div>
-                    `;
-
-                        // 添加点击事件以恢复块
-                        const clickHandler = function () {
-                            // 检查冷却时间
-                            const now = Date.now();
-                            const lastRecycleTime = parseInt(item.element.dataset.lastRecycleTime || '0');
-                            const timeSinceRecycle = now - lastRecycleTime;
-
-                            if (timeSinceRecycle < BLOCK_LOADING.RECYCLE_COOLDOWN) {
-                                // 如果冷却时间未到，显示消息但不加载
-                                const remaining = Math.ceil((BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle) / 1000);
-                                wrapper.innerHTML = `
-                                <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
-                                    <div style="font-size: 12px; color: var(--b3-theme-error); margin-bottom: 6px;">请稍候 ${remaining} 秒再试</div>
-                                    <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${previewContent.length >= 120 ? '...' : ''}</div>
-                                </div>
-                                `;
-
-                                setTimeout(() => {
-                                    // 重新显示恢复选项
-                                    wrapper.innerHTML = `
-                                    <div class="block-preview" style="padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;">
-                                        <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;">内容已回收，点击恢复</div>
-                                        <div style="flex: 1; overflow: hidden; opacity: 0.85;">${previewContent}${previewContent.length >= 120 ? '...' : ''}</div>
-                                    </div>
-                                    `;
-
-                                    wrapper.addEventListener('click', clickHandler);
-                                }, BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle);
-
-                                return;
-                            }
-
-                            // 移除点击事件处理程序，防止重复触发
-                            wrapper.removeEventListener('click', clickHandler);
-
-                            // 恢复块
-                            item.element.setAttribute('data-initialized', 'false');
-                            recycledStates.delete(item.element);
-
-                            // 延迟一点加载，以确保旧资源被完全清理
-                            setTimeout(() => {
-                                loadBlock(item.element);
-                            }, 100);
-                        };
-                        const newWrapper = wrapper.cloneNode(true);
-                        wrapper.parentNode.replaceChild(newWrapper, wrapper);
-                        wrapper = newWrapper as HTMLElement;
-                        wrapper.addEventListener('click', clickHandler);
+                        // // 添加点击事件以恢复块
+                        // wrapper.addEventListener('click', clickHandler);
 
                     } catch (err) {
                         console.error("回收块失败:", err);
-                        // 清空内容，强制重新加载
-                        wrapper.innerHTML = '';
-
-                        wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-on-surface-light);">
-                内容已回收，点击恢复
-            </div>`;
-
-                        // 添加点击事件以恢复块
-                        wrapper.addEventListener('click', () => {
-                            // 检查冷却时间
-                            const now = Date.now();
-                            const lastRecycleTime = parseInt(item.element.dataset.lastRecycleTime || '0');
-                            const timeSinceRecycle = now - lastRecycleTime;
-
-                            if (timeSinceRecycle < BLOCK_LOADING.RECYCLE_COOLDOWN) {
-                                const remaining = Math.ceil((BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle) / 1000);
-                                wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-error);">
-                        请稍候 ${remaining} 秒再试
-                    </div>`;
-
-                                setTimeout(() => {
-                                    wrapper.innerHTML = `<div style="padding: 10px; color: var(--b3-theme-on-surface-light);">
-                            内容已回收，点击恢复
-                            </div>`;
-
-                                    // 重新添加点击事件
-                                    wrapper.addEventListener('click', onClickRecycled);
-                                }, BLOCK_LOADING.RECYCLE_COOLDOWN - timeSinceRecycle);
-
-                                return;
-                            }
-
-                            function onClickRecycled() {
-                                item.element.setAttribute('data-initialized', 'false');
-                                recycledStates.delete(item.element);
-
-                                // 延迟加载
-                                setTimeout(() => {
-                                    loadBlock(item.element);
-                                }, 100);
-                            }
-
-                            onClickRecycled();
-                        });
                     }
                 });
         };
@@ -1202,6 +1089,9 @@ export class M_handwriting {
                 },
                 mode: "wysiwyg",
             });
+
+            // 将Protyle实例引用存储在容器元素上，方便后续回收时访问
+            (container as any).protyle = protyle;
 
             // 双击覆盖层激活编辑
             overlayDiv.addEventListener('dblclick', (e) => {
