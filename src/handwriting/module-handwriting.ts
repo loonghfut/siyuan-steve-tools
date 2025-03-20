@@ -1288,44 +1288,62 @@ export class M_handwriting {
 
         // 添加鼠标滚轮缩放功能
         containerElement.addEventListener('wheel', (e) => {
-            // 检查元素是否处于选中状态，如果是则不执行缩放操作
+            // 检查元素是否处于选中状态，如果是则保持原有行为
             if (containerElement.classList.contains('block-selected')) {
-                return; // 元素被选中时，不处理缩放
+                return; // 元素被选中时，不处理滚轮事件
             }
-
+    
             // 阻止事件默认行为和冒泡
             e.preventDefault();
             e.stopPropagation();
-
-            // 直接调用 PanZoomHandler 中的缩放代码
-            // 计算缩放系数
-            const delta = e.deltaY;
-            let zoom = canvas.getZoom();
-            zoom = zoom * (0.999 ** delta);
-
-            // 限制缩放范围
-            zoom = Math.min(Math.max(0.1, zoom), 10);
-
-            // 获取鼠标位置，以此为中心点进行缩放
-            const rect = canvas.getElement().getBoundingClientRect();
-            const offsetX = e.clientX - rect.left;
-            const offsetY = e.clientY - rect.top;
-            const point = new fabric.Point(offsetX, offsetY);
-
-            // 执行缩放
-            canvas.zoomToPoint(point, zoom);
-
-            // 更新网格
+    
+            // 处理滚轮事件 - 使用与画布相同的行为
+            if (e.ctrlKey) {
+                // Ctrl + 滚轮进行缩放
+                const delta = e.deltaY;
+                let zoom = canvas.getZoom();
+                zoom = zoom * (0.999 ** delta);
+    
+                // 限制缩放范围
+                zoom = Math.min(Math.max(0.1, zoom), 10);
+    
+                // 获取鼠标位置，以此为中心点进行缩放
+                const rect = canvas.getElement().getBoundingClientRect();
+                const offsetX = e.clientX - rect.left;
+                const offsetY = e.clientY - rect.top;
+                const point = new fabric.Point(offsetX, offsetY);
+    
+                // 执行缩放
+                canvas.zoomToPoint(point, zoom);
+            } else {
+                // 仅滚轮平移画布
+                const vpt = canvas.viewportTransform;
+                if (!vpt) return;
+    
+                // 设置平移速度因子
+                const speed = 1.5;
+                
+                // 水平滚动时 (Shift + 滚轮) 平移横向，否则平移纵向
+                if (e.shiftKey) {
+                    vpt[4] -= e.deltaY * speed; // 横向平移
+                } else {
+                    vpt[5] -= e.deltaY * speed; // 纵向平移
+                }
+                
+                canvas.requestRenderAll();
+            }
+    
+            // 更新网格与缩放显示
             const vpt = canvas.viewportTransform;
             if (vpt) {
                 // 更新网格位置
                 const gridManager = new GridManager(id, canvas);
                 gridManager.updateGridPosition(vpt);
-
+    
                 // 更新缩放显示
                 const zoomDisplay = document.getElementById(`zoom-display-${id}`);
                 if (zoomDisplay) {
-                    const zoomPercent = Math.round(zoom * 100);
+                    const zoomPercent = Math.round(canvas.getZoom() * 100);
                     zoomDisplay.textContent = `缩放: ${zoomPercent}%`;
                 }
             }
