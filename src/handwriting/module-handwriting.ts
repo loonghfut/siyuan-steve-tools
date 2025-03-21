@@ -1,6 +1,6 @@
 import * as ic from "@/icon"
 import { openTab, Plugin, showMessage } from "siyuan";
-import './handwriting.css';
+// import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 import { BlockHandler } from './tldraw/block-handler';
 import { addWhiteboardButton } from "./function/assist";
@@ -79,13 +79,13 @@ export class M_handwriting {
         const tldrawManager = new TldrawManager(id, tldrawContainer);
         this.tldrawInstances.set(id, tldrawManager);
         
-        // 初始化块处理器
-        const blockHandler = new BlockHandler(tldrawManager, this.plugin);
+        // // 初始化块处理器
+        // const blockHandler = new BlockHandler(tldrawManager, this.plugin);
         
-        // 如果有默认块，添加它们
-        if (defaultBlockIds.length > 0) {
-            await this.addDefaultBlocks(tldrawManager, id, defaultBlockIds);
-        }
+        // // 如果有默认块，添加它们
+        // if (defaultBlockIds.length > 0) {
+        //     await this.addDefaultBlocks(tldrawManager, id, defaultBlockIds);
+        // }
         
         return tldrawManager;
     }
