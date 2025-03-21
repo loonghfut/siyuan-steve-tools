@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
-详见代码[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
+详见代码[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-3/)
 
 #### 感谢：
 - [wilsons](https://ld246.com/member/wilsons)：开发`生成日历文件ics功能`指导
