@@ -40,7 +40,7 @@ export class CanvasManager {
             preserveObjectStacking: true,
             selection: true,
             renderOnAddRemove: true,
-            allowTouchScrolling: false
+            allowTouchScrolling: true,
         });
     }
     
