@@ -62,7 +62,6 @@ export class TldrawManager {
      */
     private renderTldraw(rootElement: HTMLElement) {
         // 防止外部字体加载的配置
-        console.log('assetUrls', assetUrls);
         // 生成 tldraw 组件，传入store和工具列表（可添加自定义工具）
         const tldrawComponent = (
             <div style={{ position: 'relative', width: '100%', height: '100%' }} className="tldraw__editor">

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import React from 'react';
 import {
 	HTMLContainer,
 	Rectangle2d,
@@ -10,6 +11,7 @@ import {
 import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
 import { ICardShape } from './card-shape-types'
+import { Protyle } from 'siyuan';
 
 // There's a guide at the bottom of this file!
 
@@ -48,38 +50,79 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 	// [6]
 	component(shape: ICardShape) {
-		const bounds = this.editor.getShapeGeometry(shape).bounds
-		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+        const bounds = this.editor.getShapeGeometry(shape).bounds
+        const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 
-		//[a]
-		// eslint-disable-next-line react-hooks/rules-of-hooks
-		const [count, setCount] = useState(0)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [count, setCount] = useState(0)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const protyleRef = useRef<any>(null)
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const containerRef = useRef<HTMLDivElement>(null)
 
-		return (
-			<HTMLContainer
-				id={shape.id}
-				style={{
-					border: '1px solid black',
-					display: 'flex',
-					flexDirection: 'column',
-					alignItems: 'center',
-					justifyContent: 'center',
-					pointerEvents: 'all',
-					backgroundColor: theme[shape.props.color].semi,
-					color: theme[shape.props.color].solid,
-				}}
-			>
-				<h2>Clicks: {count}</h2>
-				<button
-					// [b]
-					onClick={() => setCount((count) => count + 1)}
-					onPointerDown={(e) => e.stopPropagation()}
-				>
-					{bounds.w.toFixed()}x{bounds.h.toFixed()}
-				</button>
-			</HTMLContainer>
-		)
-	}
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        useEffect(() => {
+            // 确保容器和SiYuan API都已加载
+            if (containerRef.current && window.siyuan && window.siyuan.ws && window.siyuan.ws.app) {
+                // 如果已有Protyle实例，先清理
+                if (protyleRef.current) {
+                    // 如果Protyle有销毁方法，调用它
+                    if (protyleRef.current.destroy) {
+                        protyleRef.current.destroy();
+                    }
+                    protyleRef.current = null;
+                }
+
+                // 创建新的Protyle实例
+                const blockId = "20250310234002-us3sb9j"; // 替换为实际的块ID
+                protyleRef.current = new Protyle(window.siyuan.ws.app, containerRef.current, {
+                    blockId: blockId,
+                    render: {
+                        breadcrumb: true,
+                        gutter: false,
+                        breadcrumbDocName: true,
+                    },
+                    mode: "wysiwyg",
+                });
+            }
+
+            // 组件卸载时清理
+            return () => {
+                if (protyleRef.current && protyleRef.current.destroy) {
+                    protyleRef.current.destroy();
+                    protyleRef.current = null;
+                }
+            };
+        }, [shape.id]); // 当shape.id变化时重新挂载
+
+        return (
+            <HTMLContainer
+                id={shape.id}
+                style={{
+                    border: '1px solid black',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'all',
+                    backgroundColor: theme[shape.props.color].semi,
+                    color: theme[shape.props.color].solid,
+                    width: '100%',
+                    height: '100%',
+                    overflow: 'auto'
+                }}
+            >
+                <div 
+                    ref={containerRef} 
+                    style={{
+                        width: '100%', 
+                        height: `${bounds.h - 60}px`, // 减去标题和按钮的高度
+                        overflow: 'auto'
+                    }}
+                ></div>
+            </HTMLContainer>
+        )
+    }
 
 	// [7]
 	indicator(shape: ICardShape) {
