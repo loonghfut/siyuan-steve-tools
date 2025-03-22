@@ -13,7 +13,7 @@ import { cardShapeProps } from './card-shape-props'
 import { ICardShape } from './card-shape-types'
 import { Protyle } from 'siyuan';
 
-// There's a guide at the bottom of this file!
+
 
 export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	static override type = 'card' as const
@@ -53,8 +53,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
         const bounds = this.editor.getShapeGeometry(shape).bounds
         const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const [count, setCount] = useState(0)
+        const [showMask, setShowMask] = useState(true) // 添加状态来控制遮罩的显示
         // eslint-disable-next-line react-hooks/rules-of-hooks
         const protyleRef = useRef<any>(null)
         // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -79,7 +78,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
                     blockId: blockId,
                     render: {
                         breadcrumb: true,
-                        gutter: false,
+                        gutter:true,
                         breadcrumbDocName: true,
                     },
                     mode: "wysiwyg",
@@ -102,23 +101,47 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
                     border: '1px solid black',
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    // alignItems: 'center',
+                    // justifyContent: 'center',
                     pointerEvents: 'all',
                     backgroundColor: theme[shape.props.color].semi,
                     color: theme[shape.props.color].solid,
                     width: '100%',
                     height: '100%',
-                    overflow: 'auto'
+                    overflow: 'hidden'
                 }}
             >
                 <div 
                     ref={containerRef} 
                     style={{
                         width: '100%', 
-                        height: `${bounds.h - 60}px`, // 减去标题和按钮的高度
+						height: '100%',
                         overflow: 'auto'
                     }}
+					onPointerDown={(e) => {
+						// 阻止事件冒泡，防止 tldraw 捕获事件
+						e.stopPropagation();
+					}}
+					onClick={(e) => {
+						// 阻止点击事件冒泡
+						e.stopPropagation();
+					}}
+					onDoubleClick={(e) => {
+						// 阻止双击事件冒泡
+						e.stopPropagation();
+					}}
+					onPointerMove={(e) => {
+						// 对于移动事件，我们也需要阻止冒泡
+						e.stopPropagation();
+					}}
+					onMouseDown={(e) => {
+						// 阻止鼠标按下事件冒泡
+						e.stopPropagation();
+					}}
+					onKeyDown={(e) => {
+						// 阻止键盘事件冒泡
+						e.stopPropagation();
+					}}
                 ></div>
             </HTMLContainer>
         )
