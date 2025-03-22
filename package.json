@@ -50,6 +50,7 @@
     "@jsplumb/common": "^5.13.7",
     "@jsplumb/core": "^5.13.7",
     "@leafer-in/viewport": "^1.4.2",
+    "@tldraw/assets": "^3.11.0",
     "@tldraw/tldraw": "^3.11.0",
     "@types/sortablejs": "^1.15.8",
     "browser-image-compression": "^2.0.2",

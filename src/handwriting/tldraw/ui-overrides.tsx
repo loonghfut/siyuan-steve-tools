@@ -9,7 +9,7 @@ import {
 	useIsToolSelected,
 	useTools,
 } from '@tldraw/tldraw'
-
+import React from 'react';
 // There's a guide at the bottom of this file!
 
 export const uiOverrides: TLUiOverrides = {
