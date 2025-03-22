@@ -36,6 +36,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			w: 300,
 			h: 300,
 			color: 'black',
+			showMask: true,
 		}
 	}
 
@@ -58,7 +59,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
         const protyleRef = useRef<any>(null)
         // eslint-disable-next-line react-hooks/rules-of-hooks
         const containerRef = useRef<HTMLDivElement>(null)
-
         // eslint-disable-next-line react-hooks/rules-of-hooks
         useEffect(() => {
             // 确保容器和SiYuan API都已加载
@@ -78,7 +78,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
                     blockId: blockId,
                     render: {
                         breadcrumb: true,
-                        gutter:true,
+                        gutter: false,
                         breadcrumbDocName: true,
                     },
                     mode: "wysiwyg",

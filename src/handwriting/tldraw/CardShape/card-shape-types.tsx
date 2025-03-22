@@ -6,6 +6,7 @@ export type ICardShape = TLBaseShape<
 	{
 		w: number
 		h: number
-		color: TLDefaultColorStyle
+		color: TLDefaultColorStyle,
+		showMask: boolean
 	}
 >
