@@ -64,29 +64,28 @@ export class M_handwriting {
                 },
             }
         });
-        
+
         // 获取面板元素并初始化tldraw
         const panelElement = whiteBoardTab.panelElement;
-        
+
         // 创建tldraw容器
         const tldrawContainer = document.createElement('div');
         tldrawContainer.id = `tldraw-container-${id}`;
         tldrawContainer.style.width = '100%';
         tldrawContainer.style.height = '100%';
         panelElement.appendChild(tldrawContainer);
-        
+        let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
+        // 过滤和提取块ID
+        const blockIds = ChildBlocks
+            .filter(block =>
+                // block?.type === cn_type &&
+                block?.content?.trim())
+            .map(block => block.id);
+
+        console.log("Extracted block IDs:", blockIds);
         // 初始化TldrawManager
-        const tldrawManager = new TldrawManager(id, tldrawContainer);
+        const tldrawManager = new TldrawManager(id, tldrawContainer, blockIds);
         this.tldrawInstances.set(id, tldrawManager);
-        
-        // // 初始化块处理器
-        // const blockHandler = new BlockHandler(tldrawManager, this.plugin);
-        
-        // // 如果有默认块，添加它们
-        // if (defaultBlockIds.length > 0) {
-        //     await this.addDefaultBlocks(tldrawManager, id, defaultBlockIds);
-        // }
-        
         return tldrawManager;
     }
 
@@ -96,7 +95,7 @@ export class M_handwriting {
     private async openWhiteBoard() {
         // 生成唯一ID
         const id = "main-whiteboard";
-        
+
         // 创建新选项卡
         const whiteBoardTab = await openTab({
             app: this.plugin.app,
@@ -112,80 +111,22 @@ export class M_handwriting {
 
         // 获取面板元素并初始化tldraw
         const panelElement = whiteBoardTab.panelElement;
-        
+
         // 创建tldraw容器
         const tldrawContainer = document.createElement('div');
         tldrawContainer.id = `tldraw-container-${id}`;
         tldrawContainer.style.width = '100%';
         tldrawContainer.style.height = '100%';
         panelElement.appendChild(tldrawContainer);
-        
+
         // 初始化TldrawManager
         const tldrawManager = new TldrawManager(id, tldrawContainer);
         this.tldrawInstances.set(id, tldrawManager);
-        
+
         // 初始化块处理器
         const blockHandler = new BlockHandler(tldrawManager, this.plugin);
     }
 
-    /**
-     * 添加默认块到画布
-     */
-    private async addDefaultBlocks(tldrawManager: TldrawManager, id: string, blockIds: string[]) {
-        if (!blockIds || blockIds.length === 0) return;
-
-        // 显示加载提示
-        showMessage(`正在加载 ${blockIds.length} 个块...`);
-
-        // 计算每个块的布局位置
-        const margin = BLOCK_LAYOUT.MARGIN;
-        const startX = BLOCK_LAYOUT.START_X;
-        const startY = BLOCK_LAYOUT.START_Y;
-        const columns = Math.min(BLOCK_LAYOUT.MAX_COLUMNS, blockIds.length);
-        const blockWidth = BLOCK_LAYOUT.WIDTH;
-        const blockHeight = BLOCK_LAYOUT.HEIGHT;
-
-        // 批量处理块
-        const batchSize = 5;
-        for (let i = 0; i < blockIds.length; i += batchSize) {
-            const batch = blockIds.slice(i, i + batchSize);
-            
-            // 并行处理当前批次的块
-            await Promise.all(batch.map(async (blockId, batchIndex) => {
-                const index = i + batchIndex;
-                
-                // 计算行列位置
-                const col = index % columns;
-                const row = Math.floor(index / columns);
-                
-                // 计算坐标
-                const x = startX + col * (blockWidth + margin);
-                const y = startY + row * (blockHeight + margin);
-                
-                try {
-                    // 获取块数据用于预览
-                    const blockData = await api.getBlockByID(blockId);
-                    
-                    // 添加块到画布
-                    await tldrawManager.addSiyuanBlock(blockId, {
-                        x,
-                        y,
-                        width: blockWidth,
-                        height: blockHeight,
-                        content: blockData?.content || '加载中...'
-                    });
-                    
-                } catch (err) {
-                    console.error(`添加块 ${blockId} 失败:`, err);
-                }
-            }));
-            
-            // 添加延迟以避免UI冻结
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        showMessage(`已布局 ${blockIds.length} 个块`);
-    }
 
     /**
      * 插件卸载时的清理工作
@@ -195,7 +136,7 @@ export class M_handwriting {
         this.tldrawInstances.forEach(instance => {
             instance.destroy();
         });
-        
+
         // 清空实例映射表
         this.tldrawInstances.clear();
     }

@@ -6,7 +6,8 @@ export const cardShapeProps: RecordProps<ICardShape> = {
 	w: T.number,
 	h: T.number,
 	color: DefaultColorStyle,
-	showMask: T.boolean
+	showMask: T.boolean,
+	blockId: T.string,
 }
 
 // To generate your own custom styles, check out the custom styles example.

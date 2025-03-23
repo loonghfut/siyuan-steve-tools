@@ -11,16 +11,9 @@ import {
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
+import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
 
-const assetUrls = getAssetUrls({baseUrl:'plugins/siyuan-steve-tools/asset/'})
-
-export interface SiyuanBlockProps {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    content?: string;
-}
+const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
 // There's a guide at the bottom of this file!
@@ -37,9 +30,11 @@ export class TldrawManager {
     private tldrawComponent
     private customTools: any[] = [];
     private root: any; // 添加 root 属性
-    constructor(id: string, container: HTMLElement) {
+    private blockIds: string[] = [];
+    constructor(id: string, container: HTMLElement,blockIds?: string[]) {
         this.id = id;
         this.container = container;
+        this.blockIds = blockIds;
         // 初始化tldraw
         this.initialize();
     }
@@ -62,6 +57,7 @@ export class TldrawManager {
      */
     private renderTldraw(rootElement: HTMLElement) {
         // 防止外部字体加载的配置
+        const blockIds = this.blockIds;
         // 生成 tldraw 组件，传入store和工具列表（可添加自定义工具）
         const tldrawComponent = (
             <div style={{ position: 'relative', width: '100%', height: '100%' }} className="tldraw__editor">
@@ -74,7 +70,16 @@ export class TldrawManager {
                     overrides={uiOverrides}
                     // Pass in the new Keybaord Shortcuts component
                     components={components}
-
+                    onMount={(editor) => {
+                        // 初始化带有 blockIds 的卡片
+                        initCardsWithBlockIds(editor, blockIds, {
+                          startX: 50,
+                          startY: 50,
+                          columns: 2,
+                          width: 400,
+                          height: 300
+                        })
+                      }}
                     assetUrls={assetUrls}
                 />
             </div>
@@ -90,91 +95,6 @@ export class TldrawManager {
     }
 
     /**
-     * 设置事件监听器
-     */
-    private setupEventListeners() {
-        // 添加拖放事件监听
-        this.container.addEventListener('dragover', this.handleDragOver);
-        this.container.addEventListener('drop', this.handleDrop);
-
-        // 添加其他必要的事件监听
-    }
-
-    /**
-     * 处理拖动悬停事件
-     */
-    private handleDragOver = (e: DragEvent) => {
-        e.preventDefault();
-        e.dataTransfer!.dropEffect = 'copy';
-    }
-
-    /**
-     * 处理拖放事件
-     */
-    private handleDrop = (e: DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // 提取思源块ID
-        const types = e.dataTransfer!.types;
-        let blockId = '';
-
-        if (types && types.length > 0) {
-            for (const type of types) {
-                if (type.startsWith('application/siyuan-')) {
-                    const matches = type.match(/\d{14}-\w{7}/);
-                    if (matches && matches.length > 0) {
-                        blockId = matches[0];
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!blockId) return;
-
-        // 获取拖放位置
-        const rect = this.container.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // 添加块到画布
-        this.addSiyuanBlock(blockId, {
-            x,
-            y,
-            width: 300,
-            height: 200
-        });
-    }
-
-    /**
-     * 添加思源块到画布
-     */
-    public async addSiyuanBlock(blockId: string, props: SiyuanBlockProps) {
-        // 这里实际需要与tldraw API集成来创建和添加形状
-        console.log(`添加思源块 ${blockId} 到位置 (${props.x}, ${props.y})`);
-
-        // 实际实现时，需要使用tldraw的createShape和其他API
-        // 例如：
-        /*
-        const app = this.tldrawComponent?.app;
-        if (app) {
-            app.createShape({
-                type: 'siyuan-block',
-                x: props.x,
-                y: props.y,
-                props: {
-                    blockId,
-                    width: props.width,
-                    height: props.height,
-                    content: props.content
-                }
-            });
-        }
-        */
-    }
-
-    /**
      * 获取tldraw实例
      */
     public getTldraw() {
@@ -185,9 +105,6 @@ export class TldrawManager {
      * 销毁tldraw实例和清理资源
      */
     public destroy() {
-        // 移除事件监听
-        this.container.removeEventListener('dragover', this.handleDragOver);
-        this.container.removeEventListener('drop', this.handleDrop);
 
         // 清空容器
         this.container.innerHTML = '';

@@ -7,6 +7,7 @@ export type ICardShape = TLBaseShape<
 		w: number
 		h: number
 		color: TLDefaultColorStyle,
-		showMask: boolean
+		showMask: boolean,
+		blockId: string // 添加 blockId 属性
 	}
 >

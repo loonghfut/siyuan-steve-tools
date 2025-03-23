@@ -29,7 +29,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	override canResize(_shape: ICardShape) {
 		return true
 	}
-
+	override canEdit() {
+		return true
+	}
 	// [4]
 	getDefaultProps(): ICardShape['props'] {
 		return {
@@ -37,6 +39,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			h: 300,
 			color: 'black',
 			showMask: true,
+			blockId: ''
 		}
 	}
 
@@ -51,101 +54,125 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 	// [6]
 	component(shape: ICardShape) {
-        const bounds = this.editor.getShapeGeometry(shape).bounds
-        const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+		const bounds = this.editor.getShapeGeometry(shape).bounds
+		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+		const isEditing = this.editor.getEditingShapeId() === shape.id;
+		const [isEditingState, setIsEditingState] = useState(isEditing);
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const protyleRef = useRef<any>(null)
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const containerRef = useRef<HTMLDivElement>(null)
 
-        const [showMask, setShowMask] = useState(true) // 添加状态来控制遮罩的显示
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const protyleRef = useRef<any>(null)
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const containerRef = useRef<HTMLDivElement>(null)
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        useEffect(() => {
-            // 确保容器和SiYuan API都已加载
-            if (containerRef.current && window.siyuan && window.siyuan.ws && window.siyuan.ws.app) {
-                // 如果已有Protyle实例，先清理
-                if (protyleRef.current) {
-                    // 如果Protyle有销毁方法，调用它
-                    if (protyleRef.current.destroy) {
-                        protyleRef.current.destroy();
-                    }
-                    protyleRef.current = null;
-                }
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		useEffect(() => {
+			setIsEditingState(isEditing);
+		}, [isEditing]);
 
-                // 创建新的Protyle实例
-                const blockId = "20250310234002-us3sb9j"; // 替换为实际的块ID
-                protyleRef.current = new Protyle(window.siyuan.ws.app, containerRef.current, {
-                    blockId: blockId,
-                    render: {
-                        breadcrumb: true,
-                        gutter: false,
-                        breadcrumbDocName: true,
-                    },
-                    mode: "wysiwyg",
-                });
-            }
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		useEffect(() => {
+			// 确保容器和SiYuan API都已加载
+			if (containerRef.current && window.siyuan && window.siyuan.ws && window.siyuan.ws.app) {
+				// 如果已有Protyle实例，先清理
+				if (protyleRef.current) {
+					// 如果Protyle有销毁方法，调用它
+					if (protyleRef.current.destroy) {
+						protyleRef.current.destroy();
+					}
+					protyleRef.current = null;
+				}
 
-            // 组件卸载时清理
-            return () => {
-                if (protyleRef.current && protyleRef.current.destroy) {
-                    protyleRef.current.destroy();
-                    protyleRef.current = null;
-                }
-            };
-        }, [shape.id]); // 当shape.id变化时重新挂载
+				// 创建新的Protyle实例
+				const blockId = shape.props.blockId || "20250310234002-us3sb9j"; // 使用形状的 blockId 或默认值//TODO
+				protyleRef.current = new Protyle(window.siyuan.ws.app, containerRef.current, {
+					blockId: blockId,
+					render: {
+						breadcrumb: true,
+						gutter: true,
+						breadcrumbDocName: true,
+					},
+					mode: "wysiwyg",
+				});
+			}
 
-        return (
-            <HTMLContainer
-                id={shape.id}
-                style={{
-                    border: '1px solid black',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    // alignItems: 'center',
-                    // justifyContent: 'center',
-                    pointerEvents: 'all',
-                    backgroundColor: theme[shape.props.color].semi,
-                    color: theme[shape.props.color].solid,
-                    width: '100%',
-                    height: '100%',
-                    overflow: 'hidden'
-                }}
-            >
-                <div 
-                    ref={containerRef} 
-                    style={{
-                        width: '100%', 
+			// 组件卸载时清理
+			return () => {
+				if (protyleRef.current && protyleRef.current.destroy) {
+					protyleRef.current.destroy();
+					protyleRef.current = null;
+				}
+			};
+		}, [shape.id, shape.props.blockId]); // 添加 shape.props.blockId 作为依赖项
+		const handleWheel = (e: React.WheelEvent) => {
+			if (isEditingState) {
+				e.stopPropagation(); // 在编辑模式下阻止滚轮事件冒泡
+			}
+		};
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		// useEffect(() => {
+		// 	// 添加键盘事件监听器，用于在按下Escape键时退出编辑模式
+		// 	// const handleKeyDown = (e: KeyboardEvent) => {
+		// 	// 	if (isEditingState && e.key === 'Escape') {
+		// 	// 		this.editor.setEditingShape(null);
+		// 	// 		setIsEditingState(false);
+		// 	// 	}
+		// 	// };
+
+		// 	// window.addEventListener('keydown', handleKeyDown);
+		// 	// return () => {
+		// 	// 	window.addEventListener('keydown', handleKeyDown);
+		// 	// };
+		// }, [isEditingState]);
+
+		// 处理双击事件进入编辑模式
+		const handleDoubleClick = (e: React.MouseEvent) => {
+			if (!isEditingState) {
+				e.stopPropagation();
+				this.editor.setEditingShape(shape.id);
+				setIsEditingState(true);
+			}
+		};
+
+		// 处理鼠标事件
+		const handlePointerEvent = (e: React.PointerEvent) => {
+			if (isEditingState) {
+				e.stopPropagation(); // 在编辑模式下阻止事件冒泡
+			}
+		};
+
+		return (
+			<HTMLContainer
+				id={shape.id}
+				style={{
+					border: '1px solid black',
+					display: 'flex',
+					flexDirection: 'column',
+					pointerEvents: 'auto',
+					backgroundColor: theme[shape.props.color].semi,
+					color: theme[shape.props.color].solid,
+					width: '100%',
+					height: '100%',
+					overflow: 'hidden',
+					// 编辑状态时添加高亮边框
+					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
+					cursor: isEditingState ? 'text' : 'default',
+				}}
+				onDoubleClick={handleDoubleClick}
+				onPointerDown={handlePointerEvent}
+				onPointerMove={handlePointerEvent}
+				onPointerUp={handlePointerEvent}
+				onWheel={handleWheel}
+			>
+				<div
+					ref={containerRef}
+					style={{
+						width: '100%',
 						height: '100%',
-                        overflow: 'auto'
-                    }}
-					onPointerDown={(e) => {
-						// 阻止事件冒泡，防止 tldraw 捕获事件
-						e.stopPropagation();
+						overflow: 'auto'
 					}}
-					onClick={(e) => {
-						// 阻止点击事件冒泡
-						e.stopPropagation();
-					}}
-					onDoubleClick={(e) => {
-						// 阻止双击事件冒泡
-						e.stopPropagation();
-					}}
-					onPointerMove={(e) => {
-						// 对于移动事件，我们也需要阻止冒泡
-						e.stopPropagation();
-					}}
-					onMouseDown={(e) => {
-						// 阻止鼠标按下事件冒泡
-						e.stopPropagation();
-					}}
-					onKeyDown={(e) => {
-						// 阻止键盘事件冒泡
-						e.stopPropagation();
-					}}
-                ></div>
-            </HTMLContainer>
-        )
-    }
+				></div>
+			</HTMLContainer>
+		)
+	}
 
 	// [7]
 	indicator(shape: ICardShape) {
