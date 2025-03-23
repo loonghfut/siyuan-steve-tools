@@ -31,3 +31,7 @@
 .tldraw {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
+
+.tlui-button__tool[data-value="note"] {
+  display: none;
+}

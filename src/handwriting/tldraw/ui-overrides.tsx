@@ -15,6 +15,7 @@ import React from 'react';
 export const uiOverrides: TLUiOverrides = {
 	tools(editor, tools) {
 		// Create a tool item in the ui's context.
+		console.log('tools', tools)
 		tools.card = {
 			id: 'card',
 			icon: 'color',
@@ -26,6 +27,11 @@ export const uiOverrides: TLUiOverrides = {
 		}
 		return tools
 	},
+	// actions(editor, actions) {
+	// 	console.log('actions', actions)
+	// 	delete actions['']
+	// 	return actions
+	// }
 }
 
 export const components: TLComponents = {
