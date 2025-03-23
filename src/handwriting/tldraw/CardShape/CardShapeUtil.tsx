@@ -99,7 +99,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 {: id="${await api.generateSiyuanID() as string}"}
 }}}
-{: id="${idid}" }`, daynote_id)
+{: id="${idid}" custom-st-tldraw="1" }`, daynote_id)
 						// const id = iddata[0].doOperations[0].id;
 						blockId = idid;
 					}
