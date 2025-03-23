@@ -11,7 +11,9 @@ import {
 import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
 import { ICardShape } from './card-shape-types'
-import { Protyle } from 'siyuan';
+import { Protyle, showMessage } from 'siyuan';
+import * as api from '@/api';
+import { settingdata } from '@/index';
 
 
 
@@ -81,17 +83,43 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					protyleRef.current = null;
 				}
 
+				const createBlockIfNeeded = async () => {
+					let blockId = shape.props.blockId;
+					if (!blockId) {
+						const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"])).id
+						if (!daynote_id) {
+							showMessage('未找到日记块');
+							return;
+						}
+						const idid = await api.generateSiyuanID() as string;
+
+						await api.appendBlock("markdown", `{{{row
+
+{: id="${await api.generateSiyuanID() as string}"}
+
+{: id="${await api.generateSiyuanID() as string}"}
+}}}
+{: id="${idid}" }`, daynote_id)
+						// const id = iddata[0].doOperations[0].id;
+						blockId = idid;
+					}
+					if (!blockId) {
+						showMessage('未找到块');
+						return;
+					}
+					protyleRef.current = new Protyle(window.siyuan.ws.app, containerRef.current, {
+						blockId: blockId,
+						render: {
+							breadcrumb: true,
+							gutter: true,
+							breadcrumbDocName: true,
+						},
+						action:["cb-get-focus"],
+						mode: "wysiwyg",
+					});
+				};
 				// 创建新的Protyle实例
-				const blockId = shape.props.blockId || "20250310234002-us3sb9j"; // 使用形状的 blockId 或默认值//TODO
-				protyleRef.current = new Protyle(window.siyuan.ws.app, containerRef.current, {
-					blockId: blockId,
-					render: {
-						breadcrumb: true,
-						gutter: true,
-						breadcrumbDocName: true,
-					},
-					mode: "wysiwyg",
-				});
+				createBlockIfNeeded();
 			}
 
 			// 组件卸载时清理
@@ -107,22 +135,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				e.stopPropagation(); // 在编辑模式下阻止滚轮事件冒泡
 			}
 		};
-		// eslint-disable-next-line react-hooks/rules-of-hooks
-		// useEffect(() => {
-		// 	// 添加键盘事件监听器，用于在按下Escape键时退出编辑模式
-		// 	// const handleKeyDown = (e: KeyboardEvent) => {
-		// 	// 	if (isEditingState && e.key === 'Escape') {
-		// 	// 		this.editor.setEditingShape(null);
-		// 	// 		setIsEditingState(false);
-		// 	// 	}
-		// 	// };
-
-		// 	// window.addEventListener('keydown', handleKeyDown);
-		// 	// return () => {
-		// 	// 	window.addEventListener('keydown', handleKeyDown);
-		// 	// };
-		// }, [isEditingState]);
-
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
@@ -146,7 +158,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					border: '1px solid black',
 					display: 'flex',
 					flexDirection: 'column',
-					pointerEvents: 'auto',
+					pointerEvents: isEditingState ? 'auto' : 'none',
 					backgroundColor: theme[shape.props.color].semi,
 					color: theme[shape.props.color].solid,
 					width: '100%',
