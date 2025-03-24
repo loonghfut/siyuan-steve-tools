@@ -81,6 +81,8 @@ export class TldrawManager {
                     components={components}
                     onMount={(editor) => {
                         // 初始化带有 blockIds 的卡片
+                        editor.updateInstanceState({})
+                        editor.user.updateUserPreferences({ animationSpeed: 0 })
                         initCardsWithBlockIds(editor, blockIds, {
                             startX: 50,
                             startY: 50,

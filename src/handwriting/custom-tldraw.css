@@ -1,37 +1,23 @@
 
-/* 定义本地字体 */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 400;
-  src: local('Inter'), 
-       url('./fonts/Inter-Regular.woff2') format('woff2');
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 500;
-  src: local('Inter Medium'), 
-       url('./fonts/Inter-Medium.woff2') format('woff2');
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 600;
-  src: local('Inter SemiBold'), 
-       url('./fonts/Inter-SemiBold.woff2') format('woff2');
-  font-display: swap;
-}
-
-/* 覆盖TLDraw的字体设置 */
-.tldraw {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-}
-
 .tlui-button__tool[data-value="note"] {
   display: none;
+}
+
+
+
+/* 调整所有使用mask属性的图标大小 */
+.tlui-icon[style*="mask: url"] {
+  /* 覆盖mask属性，保持原始URL但缩小尺寸 */
+  mask-size: 80% !important;
+  -webkit-mask-size: 80% !important;
+  /* 添加居中属性 */
+  mask-position: center !important;
+  -webkit-mask-position: center !important;
+}
+
+/* 确保按钮图标容器本身也居中对齐 */
+.tlui-button__icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
