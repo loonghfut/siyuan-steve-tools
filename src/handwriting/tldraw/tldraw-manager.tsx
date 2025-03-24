@@ -6,6 +6,7 @@ import { CardShapeUtil } from './CardShape/CardShapeUtil'
 import { components, uiOverrides } from './ui-overrides'
 import {
     Tldraw,
+    TldrawOptions,
     TLUiOverrides,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
@@ -31,7 +32,7 @@ export class TldrawManager {
     private customTools: any[] = [];
     private root: any; // 添加 root 属性
     private blockIds: string[] = [];
-    constructor(id: string, container: HTMLElement,blockIds?: string[]) {
+    constructor(id: string, container: HTMLElement, blockIds?: string[]) {
         this.id = id;
         this.container = container;
         this.blockIds = blockIds;
@@ -52,6 +53,10 @@ export class TldrawManager {
         this.renderTldraw(root);
     }
 
+    private options: Partial<TldrawOptions> = {
+        createTextOnCanvasDoubleClick: false,
+        maxFontsToLoadBeforeRender: 10,
+    }
     /**
      * 渲染tldraw组件
      */
@@ -70,18 +75,20 @@ export class TldrawManager {
                     tools={customTools}
                     // Pass in any overrides to the user interface
                     overrides={uiOverrides}
+                    options={this.options}
+                    inferDarkMode={isDarkTheme()}
                     // Pass in the new Keybaord Shortcuts component
                     components={components}
                     onMount={(editor) => {
                         // 初始化带有 blockIds 的卡片
                         initCardsWithBlockIds(editor, blockIds, {
-                          startX: 50,
-                          startY: 50,
-                          columns: 2,
-                          width: 400,
-                          height: 300
+                            startX: 50,
+                            startY: 50,
+                            columns: 2,
+                            width: 400,
+                            height: 300
                         })
-                      }}
+                    }}
                     assetUrls={assetUrls}
                 />
             </div>
@@ -117,4 +124,9 @@ export class TldrawManager {
 
         this.tldrawComponent = null;
     }
+}
+
+function isDarkTheme(): boolean {
+    // 思源笔记暗色主题通常通过 data-theme 属性判断
+    return document.documentElement.getAttribute('data-theme-mode') === 'dark';
 }
