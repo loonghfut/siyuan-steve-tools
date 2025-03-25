@@ -112,6 +112,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						render: {
 							breadcrumb: true,
 							gutter: true,
+							title:true,
 							breadcrumbDocName: true,
 						},
 						action: ["cb-get-focus"],
@@ -148,9 +149,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 添加滚轮事件处理
 		const handleWheel = (e: React.WheelEvent) => {
 			if (isEditingState) {
-				e.stopPropagation(); // 防止滚轮事件影响画布
+			  e.stopPropagation();
+			  e.preventDefault(); // 同时阻止默认行为
+			  return false; // 进一步阻止事件传播
 			}
-		};
+		  };
 
 		return (
 			<HTMLContainer
@@ -186,6 +189,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						position: 'relative',
 						isolation: 'isolate',
 						touchAction: isEditingState ? 'auto' : 'none',
+						contain: 'strict', // 强力隔离
 					}}
 				></div>
 			</HTMLContainer>
