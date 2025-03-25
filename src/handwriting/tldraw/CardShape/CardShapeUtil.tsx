@@ -130,11 +130,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 			};
 		}, [shape.id, shape.props.blockId]); // 添加 shape.props.blockId 作为依赖项
-		const handleWheel = (e: React.WheelEvent) => {
-			if (isEditingState) {
-				e.stopPropagation(); // 在编辑模式下阻止滚轮事件冒泡
-			}
-		};
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
@@ -158,9 +153,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					border: '1px solid black',
 					display: 'flex',
 					flexDirection: 'column',
-					pointerEvents: isEditingState ? 'auto' : 'none',
 					backgroundColor: theme[shape.props.color].semi,
 					color: theme[shape.props.color].solid,
+					pointerEvents:'none',
 					width: '100%',
 					height: '100%',
 					overflow: 'hidden',
@@ -172,14 +167,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				onPointerDown={handlePointerEvent}
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
-				onWheel={handleWheel}
 			>
 				<div
 					ref={containerRef}
 					style={{
 						width: '100%',
 						height: '100%',
-						overflow: 'auto'
+						overflow: 'auto',
+						pointerEvents: isEditingState ? 'all' : 'none',
 					}}
 				></div>
 			</HTMLContainer>

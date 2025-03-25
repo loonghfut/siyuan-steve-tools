@@ -112,29 +112,36 @@ export class ics_s3 {
         if (!this.s3Client) {
             throw new Error('ST_S3 客户端未初始化');
         }
-
-        let body: Buffer | string | Blob;
+    
+        let body: any;
         let contentType = 'text/plain';
-
+    
         try {
             if (content instanceof Blob) {
-                // 将 Blob 转换为 ArrayBuffer 再转换为 Buffer
+                // 将所有Blob转换为ArrayBuffer再处理，这在Node和浏览器环境中都有效
                 const arrayBuffer = await content.arrayBuffer();
-                body = Buffer.from(arrayBuffer);
+                
+                if (typeof Buffer !== 'undefined') {
+                    // Node.js环境
+                    body = Buffer.from(arrayBuffer);
+                } else {
+                    // 浏览器环境 - 使用Uint8Array而不是直接使用Blob
+                    body = new Uint8Array(arrayBuffer);
+                }
                 contentType = content.type || 'application/octet-stream';
             } else if (typeof content === 'string') {
                 body = content;
             } else {
                 throw new Error('不支持的内容类型');
             }
-
+    
             const command = new PutObjectCommand({
                 Bucket: this.bucket,
                 Key: key,
                 Body: body,
                 ContentType: contentType
             });
-
+    
             await this.s3Client.send(command);
             console.log(`ST_s3上传文件成功: ${key}`);
         } catch (error) {
