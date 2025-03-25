@@ -114,7 +114,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							gutter: true,
 							breadcrumbDocName: true,
 						},
-						action:["cb-get-focus"],
+						action: ["cb-get-focus"],
 						mode: "wysiwyg",
 					});
 				};
@@ -139,10 +139,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			}
 		};
 
-		// 处理鼠标事件
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {
 				e.stopPropagation(); // 在编辑模式下阻止事件冒泡
+			}
+		};
+
+		// 添加滚轮事件处理
+		const handleWheel = (e: React.WheelEvent) => {
+			if (isEditingState) {
+				e.stopPropagation(); // 防止滚轮事件影响画布
 			}
 		};
 
@@ -155,11 +161,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					flexDirection: 'column',
 					backgroundColor: theme[shape.props.color].semi,
 					color: theme[shape.props.color].solid,
-					pointerEvents:'none',
+					// 只有在非编辑状态时才禁用指针事件
+					pointerEvents: isEditingState ? 'auto' : 'none',
 					width: '100%',
 					height: '100%',
 					overflow: 'hidden',
-					// 编辑状态时添加高亮边框
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 				}}
@@ -167,6 +173,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				onPointerDown={handlePointerEvent}
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
+				onWheel={handleWheel} // 添加滚轮事件处理
 			>
 				<div
 					ref={containerRef}
@@ -175,6 +182,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						height: '100%',
 						overflow: 'auto',
 						pointerEvents: isEditingState ? 'all' : 'none',
+						// 创建独立的坐标上下文
+						position: 'relative',
+						isolation: 'isolate',
+						touchAction: isEditingState ? 'auto' : 'none',
 					}}
 				></div>
 			</HTMLContainer>

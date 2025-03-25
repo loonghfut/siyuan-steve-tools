@@ -19,16 +19,16 @@ export async function addWhiteboardButton(e) {
 
             // Add click event
             button.addEventListener('click', async () => {
-                let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
-                // 过滤和提取块ID
-                const blockIds = ChildBlocks
-                    .filter(block =>
-                        // block?.type === cn_type &&
-                        block?.content?.trim())
-                    .map(block => block.id);
+                // let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
+                // // 过滤和提取块ID
+                // const blockIds = ChildBlocks
+                //     .filter(block =>
+                //         // block?.type === cn_type &&
+                //         block?.content?.trim())
+                //     .map(block => block.id);
 
-                console.log("Extracted block IDs:", blockIds);
-                moduleInstances['M_handwriting'].openWhiteBoard_in(e, blockIds);
+                // console.log("Extracted block IDs:", blockIds);
+                moduleInstances['M_handwriting'].openWhiteBoard_in(e);
             });
 
             // Add the button to breadcrumb

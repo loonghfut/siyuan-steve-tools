@@ -36,6 +36,7 @@ export class TldrawManager {
         this.id = id;
         this.container = container;
         this.blockIds = blockIds;
+        console.log('blockIds:QQ', blockIds);
         // 初始化tldraw
         this.initialize();
     }
@@ -63,6 +64,7 @@ export class TldrawManager {
     private renderTldraw(rootElement: HTMLElement) {
         // 防止外部字体加载的配置
         const blockIds = this.blockIds;
+        console.log('blockIds:QQ@@', blockIds);
         const id = this.id;
         // 生成 tldraw 组件，传入store和工具列表（可添加自定义工具）
         const tldrawComponent = (
@@ -86,9 +88,6 @@ export class TldrawManager {
                         initCardsWithBlockIds(editor, blockIds, {
                             startX: 50,
                             startY: 50,
-                            columns: 2,
-                            width: 400,
-                            height: 300
                         })
                     }}
                     assetUrls={assetUrls}

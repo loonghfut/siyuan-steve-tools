@@ -50,7 +50,7 @@ export class M_handwriting {
     /**
      * 在当前笔记页中打开画板
      */
-    public async openWhiteBoard_in(e, defaultBlockIds: string[] = []) {
+    public async openWhiteBoard_in(e) {
         // 查找当前页面的内容容器
         const id = e.detail.protyle.block.rootID;
         const whiteBoardTab = await openTab({
@@ -84,7 +84,7 @@ export class M_handwriting {
 
         console.log("Extracted block IDs:", blockIds);
         // 初始化TldrawManager
-        const tldrawManager = new TldrawManager(id, tldrawContainer, blockIds);
+        const tldrawManager = new TldrawManager(id, tldrawContainer, [e.detail.protyle.block.rootID]);
         this.tldrawInstances.set(id, tldrawManager);
         return tldrawManager;
     }
