@@ -69,7 +69,20 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
-
+		useEffect(() => {
+			const container = containerRef.current;
+			if (container && isEditingState) {
+			  const handleInternalWheel = (e: WheelEvent) => {
+				e.stopPropagation();
+				// 允许默认滚动行为
+			  };
+			  
+			  container.addEventListener('wheel', handleInternalWheel, { passive: true });
+			  return () => {
+				container.removeEventListener('wheel', handleInternalWheel);
+			  };
+			}
+		  }, [isEditingState]);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		useEffect(() => {
 			// 确保容器和SiYuan API都已加载
@@ -114,6 +127,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							gutter: true,
 							title:true,
 							breadcrumbDocName: true,
+							scroll:false,
 						},
 						action: ["cb-get-focus"],
 						mode: "wysiwyg",
@@ -148,11 +162,22 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		// 添加滚轮事件处理
 		const handleWheel = (e: React.WheelEvent) => {
-			if (isEditingState) {
-			  e.stopPropagation();
-			  e.preventDefault(); // 同时阻止默认行为
-			  return false; // 进一步阻止事件传播
-			}
+			// console.log('滚轮事件');
+			// if (isEditingState) {
+			// 	// 阻止事件冒泡到TLDraw画布
+			// 	e.stopPropagation();
+				
+			// 	// 不要阻止默认行为，这样内部滚动条还能正常工作
+			// 	// e.preventDefault() 删除这行
+				
+			// 	// 检查是否在containerRef内部
+			// 	if (containerRef.current && containerRef.current.contains(e.target as Node)) {
+			// 	  // 允许内部滚动发生，不做额外处理
+			// 	} else {
+			// 	  // 对于container本身但不是内部元素的滚动，可以考虑阻止默认行为
+			// 	  e.preventDefault();
+			// 	}
+			//   }
 		  };
 
 		return (
@@ -165,10 +190,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					backgroundColor: theme[shape.props.color].semi,
 					color: theme[shape.props.color].solid,
 					// 只有在非编辑状态时才禁用指针事件
+					position: 'relative',
+					isolation: 'isolate',
 					pointerEvents: isEditingState ? 'auto' : 'none',
 					width: '100%',
 					height: '100%',
-					overflow: 'hidden',
+					overflow: 'auto',
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 				}}
@@ -183,7 +210,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					style={{
 						width: '100%',
 						height: '100%',
-						overflow: 'auto',
+						overflow: 'hidden',
 						pointerEvents: isEditingState ? 'all' : 'none',
 						// 创建独立的坐标上下文
 						position: 'relative',
