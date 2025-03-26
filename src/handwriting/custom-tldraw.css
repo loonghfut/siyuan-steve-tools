@@ -24,9 +24,9 @@
 /* 添加以下样式 */
 .tldraw__editor {
   .protyle-gutters {
-    top: 50px !important;
-    left: 8px !important;
-    /* display: none ; */
+    /* top: 50px !important; */
+    /* left: 8px !important; */
+    display: none ;
   }
 
   .protyle-toolbar {

@@ -56,7 +56,7 @@ export function initCardsWithBlockIds(
       y: startY ,
       props: {
         w: 800,
-        h: 1500,
+        h: 1200,
         color: 'black',
         showMask: true,
         blockId: blockId,

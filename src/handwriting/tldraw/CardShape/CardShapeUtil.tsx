@@ -92,6 +92,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 如果Protyle有销毁方法，调用它
 					if (protyleRef.current.destroy) {
 						protyleRef.current.destroy();
+						console.log('bbbbbbbbbb',protyleRef.current.protyle.wysiwyg);
 					}
 					protyleRef.current = null;
 				}
@@ -120,7 +121,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						showMessage('未找到块');
 						return;
 					}
-					protyleRef.current = new Protyle(window.siyuan.ws.app, containerRef.current, {
+					 const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
 						render: {
 							breadcrumb: true,
@@ -132,6 +133,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						action: ["cb-get-focus"],
 						mode: "wysiwyg",
 					});
+					protyleRef.current = pt;
+					console.log('aaaaaaaaaaaa',pt.protyle.wysiwyg);
 				};
 				// 创建新的Protyle实例
 				createBlockIfNeeded();
@@ -160,26 +163,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			}
 		};
 
-		// 添加滚轮事件处理
-		const handleWheel = (e: React.WheelEvent) => {
-			// console.log('滚轮事件');
-			// if (isEditingState) {
-			// 	// 阻止事件冒泡到TLDraw画布
-			// 	e.stopPropagation();
-				
-			// 	// 不要阻止默认行为，这样内部滚动条还能正常工作
-			// 	// e.preventDefault() 删除这行
-				
-			// 	// 检查是否在containerRef内部
-			// 	if (containerRef.current && containerRef.current.contains(e.target as Node)) {
-			// 	  // 允许内部滚动发生，不做额外处理
-			// 	} else {
-			// 	  // 对于container本身但不是内部元素的滚动，可以考虑阻止默认行为
-			// 	  e.preventDefault();
-			// 	}
-			//   }
-		  };
-
 		return (
 			<HTMLContainer
 				id={shape.id}
@@ -203,7 +186,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				onPointerDown={handlePointerEvent}
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
-				onWheel={handleWheel} // 添加滚轮事件处理
 			>
 				<div
 					ref={containerRef}
