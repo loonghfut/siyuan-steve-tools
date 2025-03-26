@@ -1,21 +1,9 @@
-import { BaseBoxShapeTool, TLClickEventInfo, TLShape, TLWheelEventInfo } from '@tldraw/tldraw'
+import { BaseBoxShapeTool} from '@tldraw/tldraw'
 export class CardShapeTool extends BaseBoxShapeTool {
 	static override id = 'card'
 	static override initial = 'idle'
 	override shapeType = 'card'
-	// override onDoubleClick(_info: TLClickEventInfo) {
-	// 	// you can handle events in handlers like this one;
-	// 	// check the BaseBoxShapeTool source as an example
-	// 	console.log('double click', _info)
-	// }
-	// override onWheel(info: TLWheelEventInfo): void {
-	// 	// you can handle events in handlers like this one;
-	// 	// check the BaseBoxShapeTool source as an example
-	// 	console.log('wheel', info)
-	// }
-
 }
-
 /*
 This file contains our custom tool. The tool is a StateNode with the `id` "card".
 

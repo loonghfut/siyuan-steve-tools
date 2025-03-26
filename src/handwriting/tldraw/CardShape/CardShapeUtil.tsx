@@ -103,6 +103,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 检查DOM元素上是否已存储blockId
 					if (containerRef.current) {
 						const storedBlockId = containerRef.current.getAttribute('data-block-id');
+						console.log('storedBlockId', storedBlockId);
 						if (storedBlockId) {
 							blockId = storedBlockId;
 						}
@@ -149,7 +150,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							gutter: true,
 							// title:true,
 							breadcrumbDocName: true,
-							// scroll:false,
+							scroll:false,
 						},
 						action: ["cb-get-focus"],
 						mode: "wysiwyg",

@@ -16,14 +16,16 @@ import { getAssetUrls } from '@tldraw/assets/selfHosted'
 import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
 import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
 import * as api from '@/api'; 
+import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
+import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils,CardShapeUtil]
-const customTools = [CardShapeTool]
+const customShapeUtils = [...defaultShapeUtils,CardShapeUtil,SlideShapeUtil]
+const customTools = [CardShapeTool,SlideShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */

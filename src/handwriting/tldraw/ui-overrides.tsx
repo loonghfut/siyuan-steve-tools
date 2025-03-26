@@ -6,10 +6,13 @@ import {
 	TLComponents,
 	TLUiOverrides,
 	TldrawUiMenuItem,
+	computed,
 	useIsToolSelected,
 	useTools,
 } from '@tldraw/tldraw'
 import React from 'react';
+import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
+import { SlidesPanel } from './SlideShape/SlidesPanel';
 // There's a guide at the bottom of this file!
 
 export const uiOverrides: TLUiOverrides = {
@@ -25,22 +28,64 @@ export const uiOverrides: TLUiOverrides = {
 				editor.setCurrentTool('card')
 			},
 		}
+		tools.slide = {
+			id: 'slide',
+			icon: 'group',
+			label: 'Slide',
+			kbd: 's',
+			onSelect: () => editor.setCurrentTool('slide'),
+		}
 		return tools
 	},
-	// actions(editor, actions) {
-	// 	console.log('actions', actions)
-	// 	delete actions['']
-	// 	return actions
-	// }
+	actions(editor, actions) {
+		const $slides = computed('slides', () => getSlides(editor))
+		return {
+			...actions,
+			'next-slide': {
+				id: 'next-slide',
+				label: 'Next slide',
+				kbd: 'right',
+				onSelect() {
+					const slides = $slides.get()
+					const currentSlide = $currentSlide.get()
+					const index = slides.findIndex((s) => s.id === currentSlide?.id)
+					const nextSlide = slides[index + 1] ?? currentSlide ?? slides[0]
+					if (nextSlide) {
+						editor.stopCameraAnimation()
+						moveToSlide(editor, nextSlide)
+					}
+				},
+			},
+			'previous-slide': {
+				id: 'previous-slide',
+				label: 'Previous slide',
+				kbd: 'left',
+				onSelect() {
+					const slides = $slides.get()
+					const currentSlide = $currentSlide.get()
+					const index = slides.findIndex((s) => s.id === currentSlide?.id)
+					const previousSlide = slides[index - 1] ?? currentSlide ?? slides[slides.length - 1]
+					if (previousSlide) {
+						editor.stopCameraAnimation()
+						moveToSlide(editor, previousSlide)
+					}
+				},
+			},
+		}
+	},
 }
 
 export const components: TLComponents = {
+	HelperButtons: SlidesPanel,
+	Minimap: null,
 	Toolbar: (props) => {
 		const tools = useTools()
 		const isCardSelected = useIsToolSelected(tools['card'])
+		const isSlideSelected = useIsToolSelected(tools['slide'])
 		return (
 			<DefaultToolbar {...props}>
 				<TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
+				<TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
 				<DefaultToolbarContent />
 			</DefaultToolbar>
 		)
@@ -50,6 +95,7 @@ export const components: TLComponents = {
 		return (
 			<DefaultKeyboardShortcutsDialog {...props}>
 				<TldrawUiMenuItem {...tools['card']} />
+				<TldrawUiMenuItem {...tools['slide']} />
 				<DefaultKeyboardShortcutsDialogContent />
 			</DefaultKeyboardShortcutsDialog>
 		)
