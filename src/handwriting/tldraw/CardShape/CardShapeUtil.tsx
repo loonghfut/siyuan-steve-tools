@@ -122,7 +122,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						const idid = await api.generateSiyuanID() as string;
 
-						await api.appendBlock("markdown", `{{{row
+						const redata =await api.appendBlock("markdown", `{{{row
 
 {: id="${await api.generateSiyuanID() as string}"}
 
@@ -130,7 +130,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 }}}
 {: id="${idid}" custom-st-tldraw="1" }`, daynote_id)
 						// const id = iddata[0].doOperations[0].id;
-						blockId = idid;
+						blockId = redata[0].doOperations[0].id;
+						console.log('redata', redata);
 					}
 					if (!blockId) {
 						showMessage('未找到块');
@@ -138,33 +139,27 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 
 					// 将blockId存储到DOM元素上以便后续使用
-					if (containerRef.current) {
-						containerRef.current.setAttribute('data-block-id', blockId);
-					}
+					// if (containerRef.current) {
+					// 	containerRef.current.setAttribute('data-block-id', blockId);
+					// }
 
 					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
-						rootId: blockId,
+						// rootId: blockId,
+						defId: blockId,
 						render: {
 							breadcrumb: true,
 							gutter: true,
 							// title:true,
 							breadcrumbDocName: true,
-							scroll:false,
+							// scroll:false,
 						},
-						action: ["cb-get-focus"],
+						// action: ["cb-get-focus"],
 						mode: "wysiwyg",
 					});
 					protyleRef.current = pt;
 					// console.log('aaaaaaaaaaaa',pt.protyle.wysiwyg);
 					// 如果blockId与props中的不同，可能需要更新shape的props
-					if (blockId !== shape.props.blockId) {
-						this.editor.updateShape({
-							id: shape.id,
-							props: { ...shape.props, blockId },
-							type: shape.type,
-						});
-					}
 				};
 				// 创建新的Protyle实例
 				createBlockIfNeeded();
