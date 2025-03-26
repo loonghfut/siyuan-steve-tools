@@ -74,15 +74,15 @@ export class M_handwriting {
         tldrawContainer.style.width = '100%';
         tldrawContainer.style.height = '100%';
         panelElement.appendChild(tldrawContainer);
-        let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
+        // let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
         // 过滤和提取块ID
-        const blockIds = ChildBlocks
-            .filter(block =>
-                // block?.type === cn_type &&
-                block?.content?.trim())
-            .map(block => block.id);
+        // const blockIds = ChildBlocks
+        //     .filter(block =>
+        //         // block?.type === cn_type &&
+        //         block?.content?.trim())
+        //     .map(block => block.id);
 
-        console.log("Extracted block IDs:", blockIds);
+        // console.log("Extracted block IDs:", blockIds);
         // 初始化TldrawManager
         const tldrawManager = new TldrawManager(id, tldrawContainer, [e.detail.protyle.block.rootID]);
         this.tldrawInstances.set(id, tldrawManager);

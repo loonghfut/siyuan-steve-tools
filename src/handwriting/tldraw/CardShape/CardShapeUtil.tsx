@@ -134,7 +134,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						mode: "wysiwyg",
 					});
 					protyleRef.current = pt;
-					console.log('aaaaaaaaaaaa',pt.protyle.wysiwyg);
+					// console.log('aaaaaaaaaaaa',pt.protyle.wysiwyg);
 				};
 				// 创建新的Protyle实例
 				createBlockIfNeeded();
@@ -194,9 +194,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						height: '100%',
 						overflow: 'hidden',
 						pointerEvents: isEditingState ? 'all' : 'none',
-						// 创建独立的坐标上下文
-						position: 'relative',
-						isolation: 'isolate',
 						touchAction: isEditingState ? 'auto' : 'none',
 						contain: 'strict', // 强力隔离
 					}}
