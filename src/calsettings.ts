@@ -62,6 +62,7 @@ export const defaultSettings = {
     "img-compress-enable": false,
     // 画板模块
     "handwriting-enable": false,
+    "tl-draw-create-note-id": null,
 };
 
 export function getSettings() {

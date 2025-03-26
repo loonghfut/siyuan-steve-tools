@@ -543,10 +543,24 @@
             items: [
                 {
                     type: "checkbox",
-                    title: "启用画板功能（开发中，请勿使用！！）",
+                    title: "启用画板功能（开发中，请勿在重要空间中使用！！）",
                     description: "启用后可以在编辑器中使用画板功能",
                     key: "handwriting-enable",
                     value: settings["handwriting-enable"],
+                },
+                {
+                    //3
+                    type: "select",
+                    title: "画板数据块创建位置",
+                    description: "选择日记本",
+                    key: "tl-draw-create-note-id",
+                    value: settings["tl-draw-create-note-id"],
+                    options: Object.fromEntries(
+                        window.siyuan.notebooks.map((notebook) => [
+                            notebook.id,
+                            notebook.name,
+                        ]),
+                    ),
                 },
                 {
                     type: "button",

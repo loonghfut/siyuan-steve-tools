@@ -115,7 +115,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 
 					if (!blockId) {
-						const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"])).id
+						if(!settingdata["tl-draw-create-note-id"]){
+							showMessage('配置不完整,请检查设置');
+							return;
+						}
+						const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["tl-draw-create-note-id"])).id
 						if (!daynote_id) {
 							showMessage('未找到日记块');
 							return;
