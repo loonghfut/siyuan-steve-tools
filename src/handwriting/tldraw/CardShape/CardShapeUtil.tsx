@@ -72,17 +72,17 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			const container = containerRef.current;
 			if (container && isEditingState) {
-			  const handleInternalWheel = (e: WheelEvent) => {
-				e.stopPropagation();
-				// 允许默认滚动行为
-			  };
-			  
-			  container.addEventListener('wheel', handleInternalWheel, { passive: true });
-			  return () => {
-				container.removeEventListener('wheel', handleInternalWheel);
-			  };
+				const handleInternalWheel = (e: WheelEvent) => {
+					e.stopPropagation();
+					// 允许默认滚动行为
+				};
+
+				container.addEventListener('wheel', handleInternalWheel, { passive: true });
+				return () => {
+					container.removeEventListener('wheel', handleInternalWheel);
+				};
 			}
-		  }, [isEditingState]);
+		}, [isEditingState]);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		useEffect(() => {
 			// 确保容器和SiYuan API都已加载
@@ -92,13 +92,27 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 如果Protyle有销毁方法，调用它
 					if (protyleRef.current.destroy) {
 						protyleRef.current.destroy();
-						console.log('bbbbbbbbbb',protyleRef.current.protyle.wysiwyg);
+						console.log('bbbbbbbbbb', protyleRef.current.protyle.wysiwyg);
 					}
 					protyleRef.current = null;
 				}
 
 				const createBlockIfNeeded = async () => {
-					let blockId = shape.props.blockId;
+					let blockId = null;
+
+					// 检查DOM元素上是否已存储blockId
+					if (containerRef.current) {
+						const storedBlockId = containerRef.current.getAttribute('data-block-id');
+						if (storedBlockId) {
+							blockId = storedBlockId;
+						}
+					}
+
+					// 如果元素上没有找到，则使用shape.props中的blockId
+					if (!blockId) {
+						blockId = shape.props.blockId;
+					}
+
 					if (!blockId) {
 						const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"])).id
 						if (!daynote_id) {
@@ -121,20 +135,35 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						showMessage('未找到块');
 						return;
 					}
-					 const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
+
+					// 将blockId存储到DOM元素上以便后续使用
+					if (containerRef.current) {
+						containerRef.current.setAttribute('data-block-id', blockId);
+					}
+
+					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
+						rootId: blockId,
 						render: {
 							breadcrumb: true,
 							gutter: true,
-							title:true,
+							// title:true,
 							breadcrumbDocName: true,
-							scroll:false,
+							// scroll:false,
 						},
 						action: ["cb-get-focus"],
 						mode: "wysiwyg",
 					});
 					protyleRef.current = pt;
 					// console.log('aaaaaaaaaaaa',pt.protyle.wysiwyg);
+					// 如果blockId与props中的不同，可能需要更新shape的props
+					if (blockId !== shape.props.blockId) {
+						this.editor.updateShape({
+							id: shape.id,
+							props: { ...shape.props, blockId },
+							type: shape.type,
+						});
+					}
 				};
 				// 创建新的Protyle实例
 				createBlockIfNeeded();
