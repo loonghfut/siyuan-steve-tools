@@ -8,19 +8,21 @@ import {
     Tldraw,
     TldrawOptions,
     TLUiOverrides,
+    defaultShapeUtils,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
 import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
-
+import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
+import * as api from '@/api'; 
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [CardShapeUtil]
+const customShapeUtils = [...defaultShapeUtils,CardShapeUtil]
 const customTools = [CardShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
@@ -32,11 +34,20 @@ export class TldrawManager {
     private customTools: any[] = [];
     private root: any; // 添加 root 属性
     private blockIds: string[] = [];
+    private store: any; // 存储 TLDraw 的数据
+    private editor: any; // 引用 TLDraw 编辑器实例
+    private storageKey: string; // 存储键值
+
+    
     constructor(id: string, container: HTMLElement, blockIds?: string[]) {
         this.id = id;
         this.container = container;
-        this.blockIds = blockIds;
-        console.log('blockIds:QQ', blockIds);
+        this.blockIds = blockIds || [];
+        this.storageKey = `tldraw-data-${this.id}`;
+        this.store = createTLStore({
+            shapeUtils: customShapeUtils
+        });
+        
         // 初始化tldraw
         this.initialize();
     }
@@ -44,15 +55,52 @@ export class TldrawManager {
     /**
      * 初始化tldraw组件
      */
-    private initialize() {
+    private async initialize() {
         const root = document.createElement('div');
         root.style.width = '100%';
         root.style.height = '100%';
         this.container.appendChild(root);
 
+        // 加载之前保存的数据
+        await this.loadData();
+
         // 渲染tldraw组件
         this.renderTldraw(root);
     }
+
+     /**
+     * 加载保存的数据
+     */
+     private async loadData() {
+        try {
+            // 从思源笔记的存储中获取数据
+            const data = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
+            
+            if (data) {
+                console.log("dadasss",data);
+                loadSnapshot(this.store, data);
+                console.log('已加载保存的画布数据');
+            }
+        } catch (error) {
+            console.warn('加载画布数据失败或无保存数据', error);
+            // 无保存数据时继续使用空的 store
+        }
+    }
+
+    private async saveData() {
+        try {
+            const snapshot = getSnapshot(this.store);
+            const jsonData = JSON.stringify(snapshot);
+            
+            // 保存到思源笔记的存储中
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            await api.putFile(`/data/storage/petal/sttools/${this.storageKey}.json`,false, blob);
+            console.log('画布数据已保存');
+        } catch (error) {
+            console.error('保存画布数据失败', error);
+        }
+    }
+
 
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: false,
@@ -64,44 +112,60 @@ export class TldrawManager {
     private renderTldraw(rootElement: HTMLElement) {
         // 防止外部字体加载的配置
         const blockIds = this.blockIds;
-        console.log('blockIds:QQ@@', blockIds);
         const id = this.id;
-        // 生成 tldraw 组件，传入store和工具列表（可添加自定义工具）
+        const store = this.store;
+        
+        // 生成 tldraw 组件
         const tldrawComponent = (
             <div style={{ position: 'relative', width: '100%', height: '100%' }} className="tldraw__editor">
                 <Tldraw
-                    persistenceKey={id}
-                    // Pass in the array of custom shape classes
+                    store={store}
                     shapeUtils={customShapeUtils}
-                    // Pass in the array of custom tool classes
                     tools={customTools}
-                    // Pass in any overrides to the user interface
                     overrides={uiOverrides}
                     options={this.options}
                     inferDarkMode={isDarkTheme()}
-                    // Pass in the new Keybaord Shortcuts component
                     components={components}
                     onMount={(editor) => {
-                        // 初始化带有 blockIds 的卡片
-                        editor.updateInstanceState({})
-                        editor.user.updateUserPreferences({ animationSpeed: 0 })
-                        initCardsWithBlockIds(editor, blockIds, {
-                            startX: 50,
-                            startY: 50,
-                        })
+                        this.editor = editor;
+                        // 设置自动保存功能
+                        this.setupAutosave();
+                        
+                        editor.updateInstanceState({});
+                        editor.user.updateUserPreferences({ animationSpeed: 0 });
+                        
+                        // 只有在没有已保存数据的情况下才初始化卡片
+                        if (editor.getCurrentPageShapes().length === 0 && blockIds.length > 0) {
+                            initCardsWithBlockIds(editor, blockIds, {
+                                startX: 50,
+                                startY: 50,
+                            });
+                        }
                     }}
                     assetUrls={assetUrls}
                 />
             </div>
         );
 
-        // 使用新的 createRoot API 替代 ReactDOM.render
+        // 使用新的 createRoot API
         const root = createRoot(rootElement);
         root.render(tldrawComponent);
-
-        // 保存 root 引用以便后续清理
         this.root = root;
+    }
 
+    /**
+     * 设置自动保存功能
+     */
+    private setupAutosave() {
+        if (!this.store) return;
+
+        // 使用节流函数确保不会过于频繁地保存
+        const throttledSave = throttle(() => {
+            this.saveData();
+        }, 2000); // 2秒节流
+
+        // 监听存储变化
+        this.store.listen(throttledSave);
     }
 
     /**
@@ -112,16 +176,25 @@ export class TldrawManager {
     }
 
     /**
+     * 立即保存当前画布状态
+     */
+    public async saveCurrentState() {
+        await this.saveData();
+    }
+    /**
      * 销毁tldraw实例和清理资源
      */
-    public destroy() {
+    public async destroy() {
+        // 销毁前保存当前状态
+        await this.saveData();
 
         // 清空容器
         this.container.innerHTML = '';
 
-        // 销毁React根节点和组件
-        // 根据实际使用的渲染方式来适配
-        ReactDOM.unmountComponentAtNode(this.container);
+        // 销毁React根节点
+        if (this.root) {
+            this.root.unmount();
+        }
 
         this.tldrawComponent = null;
     }
