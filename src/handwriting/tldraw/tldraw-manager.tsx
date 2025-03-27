@@ -134,7 +134,7 @@ export class TldrawManager {
                         this.setupAutosave();
                         
                         editor.updateInstanceState({});
-                        editor.user.updateUserPreferences({ animationSpeed: 0 });
+                        // editor.user.updateUserPreferences({ animationSpeed: 0 });
                         
                         // 只有在没有已保存数据的情况下才初始化卡片
                         if (editor.getCurrentPageShapes().length === 0 && blockIds.length > 0) {
