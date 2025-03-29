@@ -18,7 +18,7 @@ import { SlidesPanel } from './SlideShape/SlidesPanel';
 export const uiOverrides: TLUiOverrides = {
 	tools(editor, tools) {
 		// Create a tool item in the ui's context.
-		console.log('tools', tools)
+		// console.log('tools', tools)
 		tools.card = {
 			id: 'card',
 			icon: 'color',
