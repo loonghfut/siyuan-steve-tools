@@ -5,6 +5,7 @@ import {
 	Rectangle2d,
 	ShapeUtil,
 	TLResizeInfo,
+	TLShape,
 	getDefaultColorTheme,
 	resizeBox,
 } from '@tldraw/tldraw'
@@ -53,7 +54,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			isFilled: true,
 		})
 	}
-
 	// [6]
 	component(shape: ICardShape) {
 		const bounds = this.editor.getShapeGeometry(shape).bounds
@@ -71,6 +71,20 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		}, [isEditing]);
 		useEffect(() => {
 			const container = containerRef.current;
+			const blockId = container?.getAttribute('blockid');
+			// console.log('container', container);
+			// console.log('id', shape.props.blockId, "/n shapeid", shape.id);
+			console.log('blockId', blockId);
+			if (!shape.props.blockId) {
+				this.editor.updateShape({
+					id: shape.id,
+					type: shape.type,
+					props: {
+						...shape.props,
+						blockId: blockId,
+					},
+				});
+			}
 			if (container && isEditingState) {
 				const handleInternalWheel = (e: WheelEvent) => {
 					e.stopPropagation();
@@ -99,23 +113,19 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				const createBlockIfNeeded = async () => {
 					let blockId = null;
-
-					// 检查DOM元素上是否已存储blockId
+					// 如果元素上没有找到，则使用shape.props中的blockId
 					if (containerRef.current) {
-						const storedBlockId = containerRef.current.getAttribute('data-block-id');
-						console.log('storedBlockId', storedBlockId);
-						if (storedBlockId) {
-							blockId = storedBlockId;
-						}
+						blockId = containerRef.current.getAttribute('blockid');
+						console.log('获取到的blockId', blockId);
 					}
 
-					// 如果元素上没有找到，则使用shape.props中的blockId
+					console.log('shape', shape.props.blockId);
 					if (!blockId) {
 						blockId = shape.props.blockId;
 					}
 
 					if (!blockId) {
-						if(!settingdata["tl-draw-create-note-id"]){
+						if (!settingdata["tl-draw-create-note-id"]) {
 							showMessage('配置不完整,请检查设置');
 							return;
 						}
@@ -126,7 +136,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						const idid = await api.generateSiyuanID() as string;
 
-						const redata =await api.appendBlock("markdown", `{{{row
+						const redata = await api.appendBlock("markdown", `{{{row
 
 {: id="${await api.generateSiyuanID() as string}"}
 
@@ -136,17 +146,28 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						// const id = iddata[0].doOperations[0].id;
 						blockId = redata[0].doOperations[0].id;
 						console.log('redata', redata);
+						//延时一会儿，等待块渲染完成
+						console.log("1");
+						console.log('blockId222222221111111', blockId, "iiiiiii/n", shape.id);
+						const eeee = this.editor.updateShape({
+							id: shape.id,
+							type: shape.type,
+							props: {
+								...shape.props,
+								blockId: blockId,
+							},
+						});
+						console.log("2", this.editor.getShape(shape.id));
+						console.log('editor', eeee);
+						console.log('blo2', (this.editor.getShape(shape.id) as ICardShape).props.blockId);
 					}
+
+					await new Promise((resolve) => setTimeout(resolve, 200));
+
 					if (!blockId) {
 						showMessage('未找到块');
 						return;
 					}
-
-					// 将blockId存储到DOM元素上以便后续使用
-					// if (containerRef.current) {
-					// 	containerRef.current.setAttribute('data-block-id', blockId);
-					// }
-
 					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
 						// rootId: blockId,
@@ -162,11 +183,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						mode: "wysiwyg",
 					});
 					protyleRef.current = pt;
-					// console.log('aaaaaaaaaaaa',pt.protyle.wysiwyg);
-					// 如果blockId与props中的不同，可能需要更新shape的props
+					if (containerRef.current) {
+						containerRef.current.setAttribute('blockid', blockId);
+					}
+					// console.log('bbbQQQQQbbb', containerRef);
 				};
 				// 创建新的Protyle实例
 				createBlockIfNeeded();
+
 			}
 
 			// 组件卸载时清理
@@ -176,7 +200,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					protyleRef.current = null;
 				}
 			};
-		}, [shape.id, shape.props.blockId]); // 添加 shape.props.blockId 作为依赖项
+		}, [shape.id]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
@@ -218,6 +242,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			>
 				<div
 					ref={containerRef}
+					blockid={shape.props.blockId}
 					style={{
 						width: '100%',
 						height: '100%',
