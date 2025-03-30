@@ -35,6 +35,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	override canEdit() {
 		return true
 	}
+	override canScroll(_shape: ICardShape){
+		return true
+	}
 	// [4]
 	getDefaultProps(): ICardShape['props'] {
 		return {
@@ -42,7 +45,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			h: 300,
 			color: 'black',
 			showMask: true,
-			blockId: ''
+			blockId: '',
+			isNewlyCreated: true
 		}
 	}
 
@@ -76,14 +80,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			// console.log('container', container);
 			// console.log('id', shape.props.blockId, "/n shapeid", shape.id);
 			// console.log('blockId', blockId);
-			api.getBlockByID(blockId).then((res) => {
-				if (res) {
-					console.log('块存在:', res);
-				} else {
-					showMessage('块不存在,已被删除');
-					this.editor.deleteShape(shape.id);
-				}
-			});
 			if (!shape.props.blockId) {
 				this.editor.updateShape({
 					id: shape.id,
@@ -94,17 +90,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					},
 				});
 			}
-			if (container && isEditingState) {
-				const handleInternalWheel = (e: WheelEvent) => {
-					e.stopPropagation();
-					// 允许默认滚动行为
-				};
-
-				container.addEventListener('wheel', handleInternalWheel, { passive: true });
-				return () => {
-					container.removeEventListener('wheel', handleInternalWheel);
-				};
-			}
+			if (blockId) {
+				api.getBlockByID(blockId).then((res) => {
+					if (res) {
+						// console.log('块存在:', res);
+					} else {
+						showMessage('块不存在,已被删除');
+						this.editor.deleteShape(shape.id);
+					}
+				});
+			} 
 		}, [isEditingState]);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		useEffect(() => {
@@ -158,7 +153,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 {: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
 						// const id = iddata[0].doOperations[0].id;
 						blockId = redata[0].doOperations[0].id;
-						console.log('redata', redata);
+						// console.log('redata', redata);
 						//延时一会儿，等待块渲染完成
 						console.log("1");
 						console.log('blockId222222221111111', blockId, "iiiiiii/n", shape.id);
@@ -170,9 +165,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								blockId: blockId,
 							},
 						});
-						console.log("2", this.editor.getShape(shape.id));
-						console.log('editor', eeee);
-						console.log('blo2', (this.editor.getShape(shape.id) as ICardShape).props.blockId);
+						// console.log("2", this.editor.getShape(shape.id));
+						// console.log('editor', eeee);
+						// console.log('blo2', (this.editor.getShape(shape.id) as ICardShape).props.blockId);
 					}
 
 					await new Promise((resolve) => setTimeout(resolve, 200));
@@ -181,14 +176,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						showMessage('未找到块');
 						return;
 					}
-					api.getBlockByID(blockId).then((res) => {
-						if (res) {
-							console.log('块存在:', res);
-						} else {
-							showMessage('块不存在,已被删除');
-							this.editor.deleteShape(shape.id);
-						}
-					});
 					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
 						// rootId: blockId,

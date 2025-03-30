@@ -39,3 +39,7 @@
 .tldraw__editor .protyle-wysiwyg {
   position: relative;
 }
+
+[custom-st-tldraw="1"] {
+  background-color: #398ecd57 ;
+}
