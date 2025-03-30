@@ -108,6 +108,7 @@ export class TldrawManager {
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: false,
         maxFontsToLoadBeforeRender: 10,
+
     }
     /**
      * 渲染tldraw组件
@@ -120,7 +121,9 @@ export class TldrawManager {
 
         // 生成 tldraw 组件
         const tldrawComponent = (
-            <div style={{ position: 'relative', width: '100%', height: '100%' }} className="tldraw__editor">
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}
+                className="tldraw__editor"
+                data-tldraw-id={this.id}>
                 <Tldraw
                     store={store}
                     shapeUtils={customShapeUtils}
@@ -194,8 +197,7 @@ export class TldrawManager {
                                     blockId: blockId,
                                 },
                             });
-
-                            console.log(`已在(${x}, ${y})位置创建包含块ID ${blockId} 的卡片`);
+                            // console.log(`已在(${x}, ${y})位置创建包含块ID ${blockId} 的卡片`);
                         };
 
                         // 添加拖放事件监听器

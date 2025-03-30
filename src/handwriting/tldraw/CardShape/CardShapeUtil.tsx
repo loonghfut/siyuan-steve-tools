@@ -125,7 +125,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 
 					if (!blockId) {
-						if (!settingdata["tl-draw-create-note-id"]) {
+
+						const editorElement = containerRef.current?.closest('.tldraw__editor');
+						const tldrawId = editorElement?.getAttribute('data-tldraw-id');
+						console.log('当前TLdraw实例ID:', tldrawId);
+						if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
 							showMessage('配置不完整,请检查设置');
 							return;
 						}
@@ -142,7 +146,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 {: id="${await api.generateSiyuanID() as string}"}
 }}}
-{: id="${idid}" custom-st-tldraw="1" }`, daynote_id)
+{: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
 						// const id = iddata[0].doOperations[0].id;
 						blockId = redata[0].doOperations[0].id;
 						console.log('redata', redata);
