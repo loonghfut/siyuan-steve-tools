@@ -1,18 +1,23 @@
 import {
-	DefaultKeyboardShortcutsDialog,
-	DefaultKeyboardShortcutsDialogContent,
-	DefaultToolbar,
-	DefaultToolbarContent,
-	TLComponents,
-	TLUiOverrides,
-	TldrawUiMenuItem,
-	computed,
-	useIsToolSelected,
-	useTools,
+    DefaultKeyboardShortcutsDialog,
+    DefaultKeyboardShortcutsDialogContent,
+    DefaultToolbar,
+    DefaultToolbarContent,
+    TLComponents,
+    TLUiOverrides,
+    TldrawUiMenuItem,
+    computed,
+    useIsToolSelected,
+    useTools,
+    useEditor,
+    useValue,
+    stopEventPropagation
 } from '@tldraw/tldraw'
 import React from 'react';
 import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
+import { showEvent } from '@/calendar/myF';
+import { ICardShape } from './CardShape/card-shape-types';
 // There's a guide at the bottom of this file!
 
 export const uiOverrides: TLUiOverrides = {
@@ -100,7 +105,113 @@ export const components: TLComponents = {
 			</DefaultKeyboardShortcutsDialog>
 		)
 	},
+
+    InFrontOfTheCanvas: () => {
+        const editor = useEditor()
+        
+        // 获取选中元素信息
+        const selectionInfo = useValue(
+            'selection bounds',
+            () => {
+                const selectedShapes = editor.getSelectedShapes()
+                // 只处理单个选中且为卡片类型的情况
+                if (selectedShapes.length !== 1 || selectedShapes[0].type !== 'card') {
+                    return null
+                }
+                
+                const screenBounds = editor.getViewportScreenBounds()
+                const rotatedScreenBounds = editor.getSelectionRotatedScreenBounds()
+                if (!rotatedScreenBounds) return null
+                
+                return {
+                    id: selectedShapes[0].id,
+                    x: rotatedScreenBounds.x - screenBounds.x,
+                    y: rotatedScreenBounds.y - screenBounds.y,
+                    width: rotatedScreenBounds.width,
+                    height: rotatedScreenBounds.height,
+                    rotation: editor.getSelectionRotation() || 0
+                }
+            },
+            [editor]
+        )
+        
+        if (!selectionInfo) return null
+        
+        // 卡片按钮样式
+        const buttonStyle = {
+            width: '32px',
+            height: '32px',
+            margin: '0 4px',
+            borderRadius: '4px',
+            background: 'var(--b3-theme-background)',
+            border: '1px solid var(--b3-border-color)',
+            color: 'var(--b3-theme-on-background)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+        }
+        
+        return (
+            <div
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    transform: `translate(${selectionInfo.x + selectionInfo.width/2 - 62}px, ${selectionInfo.y - 40}px)`,
+                    display: 'flex',
+                    pointerEvents: 'all',
+                    zIndex: 1000
+                }}
+                onPointerDown={stopEventPropagation}
+            >
+                <button
+                    style={buttonStyle}
+                    onClick={() => {
+                        // 编辑卡片内容
+                        editor.setEditingShape(selectionInfo.id)
+                    }}
+                    title="编辑内容"
+                >
+                    ✏️
+                </button>
+                <button
+                    style={buttonStyle}
+                    onClick={() => {
+                        // 复制卡片
+                        editor.duplicateShapes([selectionInfo.id])
+                    }}
+                    title="复制卡片"
+                >
+                    📋
+                </button>
+                <button
+                    style={buttonStyle}
+                    onClick={() => {
+                        // 获取卡片数据并跳转到笔记
+                        const cardShape = editor.getShape(selectionInfo.id);
+                        const blockId = (cardShape as ICardShape)?.props?.blockId || "";
+                        if(!blockId) {
+							console.error("未找到块ID");
+							return;
+						}
+						showEvent(blockId, "", false, true);
+                    }}
+                    title="跳转到笔记"
+                >
+                    ⬇️
+                </button>
+            </div>
+        )
+    }
 }
+
+
+
+
+
+
 
 /* 
 
