@@ -26,14 +26,14 @@ export class M_handwriting {
         `);
 
         // 添加顶栏按钮
-        this.plugin.addTopBar({
-            icon: "iconSTWhiteboard",
-            title: "画板",
-            position: "right",
-            callback: () => {
-                this.openWhiteBoard();
-            }
-        });
+        // this.plugin.addTopBar({
+        //     icon: "iconSTWhiteboard",
+        //     title: "画板",
+        //     position: "right",
+        //     callback: () => {
+        //         this.openWhiteBoard();
+        //     }
+        // });
     }
 
     async onLayoutReady(settingdata) {
