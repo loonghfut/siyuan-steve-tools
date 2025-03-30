@@ -15,7 +15,7 @@ import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
 import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
 import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
-import * as api from '@/api'; 
+import * as api from '@/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
@@ -24,8 +24,8 @@ const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils,CardShapeUtil,SlideShapeUtil]
-const customTools = [CardShapeTool,SlideShapeTool]
+const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SlideShapeUtil]
+const customTools = [CardShapeTool, SlideShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
@@ -39,8 +39,9 @@ export class TldrawManager {
     private store: any; // 存储 TLDraw 的数据
     private editor: any; // 引用 TLDraw 编辑器实例
     private storageKey: string; // 存储键值
+    // 在 TldrawManager 类中添加一个标志
+    private dropHandled;
 
-    
     constructor(id: string, container: HTMLElement, blockIds?: string[]) {
         this.id = id;
         this.container = container;
@@ -49,7 +50,7 @@ export class TldrawManager {
         this.store = createTLStore({
             shapeUtils: customShapeUtils
         });
-        
+
         // 初始化tldraw
         this.initialize();
     }
@@ -70,16 +71,16 @@ export class TldrawManager {
         this.renderTldraw(root);
     }
 
-     /**
-     * 加载保存的数据
-     */
-     private async loadData() {
+    /**
+    * 加载保存的数据
+    */
+    private async loadData() {
         try {
             // 从思源笔记的存储中获取数据
             const data = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
-            
+
             if (data) {
-                console.log("dadasss",data);
+                console.log("dadasss", data);
                 loadSnapshot(this.store, data);
                 console.log('已加载保存的画布数据');
             }
@@ -93,10 +94,10 @@ export class TldrawManager {
         try {
             const snapshot = getSnapshot(this.store);
             const jsonData = JSON.stringify(snapshot);
-            
+
             // 保存到思源笔记的存储中
             const blob = new Blob([jsonData], { type: 'application/json' });
-            await api.putFile(`/data/storage/petal/sttools/${this.storageKey}.json`,false, blob);
+            await api.putFile(`/data/storage/petal/sttools/${this.storageKey}.json`, false, blob);
             console.log('画布数据已保存');
         } catch (error) {
             console.error('保存画布数据失败', error);
@@ -116,7 +117,7 @@ export class TldrawManager {
         const blockIds = this.blockIds;
         const id = this.id;
         const store = this.store;
-        
+
         // 生成 tldraw 组件
         const tldrawComponent = (
             <div style={{ position: 'relative', width: '100%', height: '100%' }} className="tldraw__editor">
@@ -132,10 +133,10 @@ export class TldrawManager {
                         this.editor = editor;
                         // 设置自动保存功能
                         this.setupAutosave();
-                        
+
                         editor.updateInstanceState({});
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
-                        
+
                         // 只有在没有已保存数据的情况下才初始化卡片
                         if (editor.getCurrentPageShapes().length === 0 && blockIds.length > 0) {
                             initCardsWithBlockIds(editor, blockIds, {
@@ -143,6 +144,62 @@ export class TldrawManager {
                                 startY: 50,
                             });
                         }
+                        // 添加全局拖放事件监听
+                        const container = editor.getContainer();
+
+                        const handleDrop = (e: DragEvent) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+
+                            // 增加防重复处理机制
+                            const now = Date.now();
+                            if (this.dropHandled && now - this.dropHandled < 300) {
+                                return;
+                            }
+                            this.dropHandled = now;
+
+                            // 解析拖拽数据
+                            const blockIdo_rigin = e.dataTransfer!.types[0];
+                            // console.log('拖拽的数据类型', blockIdo_rigin);
+                            // 使用正则表达式提取块ID
+                            let blockId = '';
+                            if (blockIdo_rigin.startsWith('application/siyuan')) {
+                                const matches = blockIdo_rigin.match(/(\d{14}-\w{7})/g);
+                                if (matches && matches.length > 0) {
+                                    blockId = matches[0]; // 获取第一个匹配的块ID
+                                    console.log('从数据类型中提取的块ID', blockId);
+                                }
+                            }
+                            if (!blockId) {
+                                console.log('未能识别拖拽的块ID');
+                                return;
+                            }
+
+                            // 获取鼠标在画布上的位置
+                            const { x, y } = editor.screenToPage({
+                                x: e.clientX,
+                                y: e.clientY,
+                            });
+
+                            // 创建新的Card形状
+                            editor.createShape({
+                                type: 'card',
+                                x: x - 150, // 默认宽度的一半，使形状中心在鼠标位置
+                                y: y - 150, // 默认高度的一半
+                                props: {
+                                    w: 300,
+                                    h: 300,
+                                    color: 'black',
+                                    showMask: true,
+                                    blockId: blockId,
+                                },
+                            });
+
+                            console.log(`已在(${x}, ${y})位置创建包含块ID ${blockId} 的卡片`);
+                        };
+
+                        // 添加拖放事件监听器
+                        container.addEventListener('drop', handleDrop);
                     }}
                     assetUrls={assetUrls}
                 />

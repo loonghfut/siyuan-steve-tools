@@ -74,7 +74,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			const blockId = container?.getAttribute('blockid');
 			// console.log('container', container);
 			// console.log('id', shape.props.blockId, "/n shapeid", shape.id);
-			console.log('blockId', blockId);
+			// console.log('blockId', blockId);
 			if (!shape.props.blockId) {
 				this.editor.updateShape({
 					id: shape.id,
@@ -116,10 +116,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 如果元素上没有找到，则使用shape.props中的blockId
 					if (containerRef.current) {
 						blockId = containerRef.current.getAttribute('blockid');
-						console.log('获取到的blockId', blockId);
+						// console.log('获取到的blockId', blockId);
 					}
 
-					console.log('shape', shape.props.blockId);
+					// console.log('shape', shape.props.blockId);
 					if (!blockId) {
 						blockId = shape.props.blockId;
 					}
