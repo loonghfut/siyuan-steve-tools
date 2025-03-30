@@ -118,7 +118,9 @@ export class TldrawManager {
         const blockIds = this.blockIds;
         const id = this.id;
         const store = this.store;
-
+        api.setBlockAttrs(id, {
+            'custom-sttools-tldraw': '1',
+        })
         // 生成 tldraw 组件
         const tldrawComponent = (
             <div style={{ position: 'relative', width: '100%', height: '100%' }}
