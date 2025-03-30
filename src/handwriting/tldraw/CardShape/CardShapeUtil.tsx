@@ -70,11 +70,20 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
 		useEffect(() => {
+			//检查块是否存在
 			const container = containerRef.current;
 			const blockId = container?.getAttribute('blockid');
 			// console.log('container', container);
 			// console.log('id', shape.props.blockId, "/n shapeid", shape.id);
 			// console.log('blockId', blockId);
+			api.getBlockByID(blockId).then((res) => {
+				if (res) {
+					console.log('块存在:', res);
+				} else {
+					showMessage('块不存在,已被删除');
+					this.editor.deleteShape(shape.id);
+				}
+			});
 			if (!shape.props.blockId) {
 				this.editor.updateShape({
 					id: shape.id,
@@ -172,6 +181,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						showMessage('未找到块');
 						return;
 					}
+					api.getBlockByID(blockId).then((res) => {
+						if (res) {
+							console.log('块存在:', res);
+						} else {
+							showMessage('块不存在,已被删除');
+							this.editor.deleteShape(shape.id);
+						}
+					});
 					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
 						// rootId: blockId,
