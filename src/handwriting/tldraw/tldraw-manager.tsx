@@ -18,6 +18,7 @@ import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldr
 import * as api from '@/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
+import { ICardShape } from './CardShape/card-shape-types';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
@@ -189,8 +190,8 @@ export class TldrawManager {
                             // 创建新的Card形状
                             editor.createShape({
                                 type: 'card',
-                                x: x - 150, // 默认宽度的一半，使形状中心在鼠标位置
-                                y: y - 150, // 默认高度的一半
+                                x: x, // 默认宽度的一半，使形状中心在鼠标位置
+                                y: y, // 默认高度的一半
                                 props: {
                                     w: 300,
                                     h: 300,
@@ -199,11 +200,30 @@ export class TldrawManager {
                                     blockId: blockId,
                                 },
                             });
+                            api.setBlockAttrs(blockId, {
+                                'custom-st-tldraw': '1',
+                            });
                             // console.log(`已在(${x}, ${y})位置创建包含块ID ${blockId} 的卡片`);
                         };
 
                         // 添加拖放事件监听器
                         container.addEventListener('drop', handleDrop);
+
+                        // 删除组件块逻辑
+                        editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
+                            // Check if shape is a card shape type
+                            if (shape.type !== 'card') return;
+                            
+                            const cardShape = shape as ICardShape;
+                            const blockId = cardShape.props?.blockId;
+                            if (!blockId) return;
+                            
+                            api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
+                                .then(() => console.log(`Block ${blockId} TLDraw property set to inactive`))
+                                .catch(err => console.error('Failed to update block attributes:', err));
+                        });
+
+
                     }}
                     assetUrls={assetUrls}
                 />
