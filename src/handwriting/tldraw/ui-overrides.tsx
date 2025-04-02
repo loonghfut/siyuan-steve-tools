@@ -206,14 +206,11 @@ export const components: TLComponents = {
                             },
                             position: "right",
                             keepCursor: false,
-                            afterOpen: () => {
-                                // 调整窗口大小//TODO
-                            }
                         });
                     }}
                     title="跳转到笔记"
                 >
-                    ⬇️
+                    🔗
                 </button>
             </div>
         )

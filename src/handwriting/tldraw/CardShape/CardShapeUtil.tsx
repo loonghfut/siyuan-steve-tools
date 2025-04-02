@@ -35,7 +35,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	override canEdit() {
 		return true
 	}
-	override canScroll(_shape: ICardShape){
+	override canScroll(_shape: ICardShape) {
 		return true
 	}
 	// [4]
@@ -99,7 +99,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						this.editor.deleteShape(shape.id);
 					}
 				});
-			} 
+			}
 		}, [isEditingState]);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		useEffect(() => {
@@ -190,6 +190,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						// action: ["cb-get-focus"],
 						mode: "wysiwyg",
 					});
+					// pt.focusBlock(blockId);
 					protyleRef.current = pt;
 					if (containerRef.current) {
 						containerRef.current.setAttribute('blockid', blockId);
@@ -228,7 +229,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			<HTMLContainer
 				id={shape.id}
 				style={{
-					border: '1px solid black',
 					display: 'flex',
 					flexDirection: 'column',
 					backgroundColor: theme[shape.props.color].semi,
@@ -260,7 +260,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						contain: 'strict', // 强力隔离
 					}}
 				></div>
-			</HTMLContainer>
+			</HTMLContainer >
 		)
 	}
 
