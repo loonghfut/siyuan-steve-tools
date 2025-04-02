@@ -18,97 +18,98 @@ import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { showEvent } from '@/calendar/myF';
 import { ICardShape } from './CardShape/card-shape-types';
+import { openTab } from 'siyuan';
 // There's a guide at the bottom of this file!
 
 export const uiOverrides: TLUiOverrides = {
-	tools(editor, tools) {
-		// Create a tool item in the ui's context.
-		// console.log('tools', tools)
-		tools.card = {
-			id: 'card',
-			icon: 'color',
-			label: 'Card',
-			kbd: 'c',
-			onSelect: () => {
-				editor.setCurrentTool('card')
-			},
-		}
-		tools.slide = {
-			id: 'slide',
-			icon: 'group',
-			label: 'Slide',
-			kbd: 's',
-			onSelect: () => editor.setCurrentTool('slide'),
-		}
-		return tools
-	},
-	actions(editor, actions) {
-		const $slides = computed('slides', () => getSlides(editor))
-		return {
-			...actions,
-			'next-slide': {
-				id: 'next-slide',
-				label: 'Next slide',
-				kbd: 'right',
-				onSelect() {
-					const slides = $slides.get()
-					const currentSlide = $currentSlide.get()
-					const index = slides.findIndex((s) => s.id === currentSlide?.id)
-					const nextSlide = slides[index + 1] ?? currentSlide ?? slides[0]
-					if (nextSlide) {
-						editor.stopCameraAnimation()
-						moveToSlide(editor, nextSlide)
-					}
-				},
-			},
-			'previous-slide': {
-				id: 'previous-slide',
-				label: 'Previous slide',
-				kbd: 'left',
-				onSelect() {
-					const slides = $slides.get()
-					const currentSlide = $currentSlide.get()
-					const index = slides.findIndex((s) => s.id === currentSlide?.id)
-					const previousSlide = slides[index - 1] ?? currentSlide ?? slides[slides.length - 1]
-					if (previousSlide) {
-						editor.stopCameraAnimation()
-						moveToSlide(editor, previousSlide)
-					}
-				},
-			},
-		}
-	},
+    tools(editor, tools) {
+        // Create a tool item in the ui's context.
+        // console.log('tools', tools)
+        tools.card = {
+            id: 'card',
+            icon: 'color',
+            label: 'Card',
+            kbd: 'c',
+            onSelect: () => {
+                editor.setCurrentTool('card')
+            },
+        }
+        tools.slide = {
+            id: 'slide',
+            icon: 'group',
+            label: 'Slide',
+            kbd: 's',
+            onSelect: () => editor.setCurrentTool('slide'),
+        }
+        return tools
+    },
+    actions(editor, actions) {
+        const $slides = computed('slides', () => getSlides(editor))
+        return {
+            ...actions,
+            'next-slide': {
+                id: 'next-slide',
+                label: 'Next slide',
+                kbd: 'right',
+                onSelect() {
+                    const slides = $slides.get()
+                    const currentSlide = $currentSlide.get()
+                    const index = slides.findIndex((s) => s.id === currentSlide?.id)
+                    const nextSlide = slides[index + 1] ?? currentSlide ?? slides[0]
+                    if (nextSlide) {
+                        editor.stopCameraAnimation()
+                        moveToSlide(editor, nextSlide)
+                    }
+                },
+            },
+            'previous-slide': {
+                id: 'previous-slide',
+                label: 'Previous slide',
+                kbd: 'left',
+                onSelect() {
+                    const slides = $slides.get()
+                    const currentSlide = $currentSlide.get()
+                    const index = slides.findIndex((s) => s.id === currentSlide?.id)
+                    const previousSlide = slides[index - 1] ?? currentSlide ?? slides[slides.length - 1]
+                    if (previousSlide) {
+                        editor.stopCameraAnimation()
+                        moveToSlide(editor, previousSlide)
+                    }
+                },
+            },
+        }
+    },
 }
 
 export const components: TLComponents = {
-	HelperButtons: SlidesPanel,
-	Minimap: null,
-	Toolbar: (props) => {
-		const tools = useTools()
-		const isCardSelected = useIsToolSelected(tools['card'])
-		const isSlideSelected = useIsToolSelected(tools['slide'])
-		return (
-			<DefaultToolbar {...props}>
-				<TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
-				<TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
-				<DefaultToolbarContent />
-			</DefaultToolbar>
-		)
-	},
-	KeyboardShortcutsDialog: (props) => {
-		const tools = useTools()
-		return (
-			<DefaultKeyboardShortcutsDialog {...props}>
-				<TldrawUiMenuItem {...tools['card']} />
-				<TldrawUiMenuItem {...tools['slide']} />
-				<DefaultKeyboardShortcutsDialogContent />
-			</DefaultKeyboardShortcutsDialog>
-		)
-	},
+    HelperButtons: SlidesPanel,
+    Minimap: null,
+    Toolbar: (props) => {
+        const tools = useTools()
+        const isCardSelected = useIsToolSelected(tools['card'])
+        const isSlideSelected = useIsToolSelected(tools['slide'])
+        return (
+            <DefaultToolbar {...props}>
+                <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
+                <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
+                <DefaultToolbarContent />
+            </DefaultToolbar>
+        )
+    },
+    KeyboardShortcutsDialog: (props) => {
+        const tools = useTools()
+        return (
+            <DefaultKeyboardShortcutsDialog {...props}>
+                <TldrawUiMenuItem {...tools['card']} />
+                <TldrawUiMenuItem {...tools['slide']} />
+                <DefaultKeyboardShortcutsDialogContent />
+            </DefaultKeyboardShortcutsDialog>
+        )
+    },
 
     InFrontOfTheCanvas: () => {
         const editor = useEditor()
-        
+
         // 获取选中元素信息
         const selectionInfo = useValue(
             'selection bounds',
@@ -118,11 +119,11 @@ export const components: TLComponents = {
                 if (selectedShapes.length !== 1 || selectedShapes[0].type !== 'card') {
                     return null
                 }
-                
+
                 const screenBounds = editor.getViewportScreenBounds()
                 const rotatedScreenBounds = editor.getSelectionRotatedScreenBounds()
                 if (!rotatedScreenBounds) return null
-                
+
                 return {
                     id: selectedShapes[0].id,
                     x: rotatedScreenBounds.x - screenBounds.x,
@@ -134,9 +135,9 @@ export const components: TLComponents = {
             },
             [editor]
         )
-        
+
         if (!selectionInfo) return null
-        
+
         // 卡片按钮样式
         const buttonStyle = {
             width: '32px',
@@ -152,14 +153,14 @@ export const components: TLComponents = {
             justifyContent: 'center',
             boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
         }
-        
+
         return (
             <div
                 style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
-                    transform: `translate(${selectionInfo.x + selectionInfo.width/2 - 62}px, ${selectionInfo.y - 40}px)`,
+                    transform: `translate(${selectionInfo.x + selectionInfo.width / 2 - 62}px, ${selectionInfo.y - 40}px)`,
                     display: 'flex',
                     pointerEvents: 'all',
                     zIndex: 1000
@@ -188,15 +189,27 @@ export const components: TLComponents = {
                 </button>
                 <button
                     style={buttonStyle}
-                    onClick={() => {
+                    onClick={async () => {
                         // 获取卡片数据并跳转到笔记
                         const cardShape = editor.getShape(selectionInfo.id);
                         const blockId = (cardShape as ICardShape)?.props?.blockId || "";
-                        if(!blockId) {
-							console.error("未找到块ID");
-							return;
-						}
-						showEvent(blockId, "", false, true);
+                        if (!blockId) {
+                            console.error("未找到块ID");
+                            return;
+                        }
+                        await openTab({
+                            app: window.siyuan.ws.app,
+                            doc: {
+                                id: blockId,
+                                action: ["cb-get-hl", "cb-get-focus"],
+                                zoomIn: true,
+                            },
+                            position: "right",
+                            keepCursor: false,
+                            afterOpen: () => {
+                                // 调整窗口大小//TODO
+                            }
+                        });
                     }}
                     title="跳转到笔记"
                 >

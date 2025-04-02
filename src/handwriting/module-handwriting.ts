@@ -53,11 +53,13 @@ export class M_handwriting {
     public async openWhiteBoard_in(e) {
         // 查找当前页面的内容容器
         const id = e.detail.protyle.block.rootID;
+        // console.log("当前页面的内容容器标题:", e.detail.protyle.title.editElement);
+        const titleText = e.detail.protyle.title.editElement.textContent
         const whiteBoardTab = await openTab({
             app: this.plugin.app,
             custom: {
                 id: "steveTool-whiteboard-" + id,
-                title: id,
+                title: titleText,
                 icon: "iconSTWhiteboard",
                 data: {
                     text: "steveTool-whiteboard"
