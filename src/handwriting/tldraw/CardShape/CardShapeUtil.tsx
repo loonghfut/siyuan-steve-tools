@@ -77,9 +77,18 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			//检查块是否存在
 			const container = containerRef.current;
 			const blockId = container?.getAttribute('blockid');
-			// console.log('container', container);
+			// console.log('containerAAAAAA啊', container);
 			// console.log('id', shape.props.blockId, "/n shapeid", shape.id);
 			// console.log('blockId', blockId);
+			if (protyleRef.current) {
+				if (isEditingState) {
+					protyleRef.current.enable();
+					console.log('进入编辑状态', protyleRef.current.protyle.wysiwyg);
+				} else {
+					protyleRef.current.disable();
+					console.log('退出编辑状态', protyleRef.current.protyle.wysiwyg);
+				}
+			}
 			if (!shape.props.blockId) {
 				this.editor.updateShape({
 					id: shape.id,
@@ -110,7 +119,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 如果Protyle有销毁方法，调用它
 					if (protyleRef.current.destroy) {
 						protyleRef.current.destroy();
-						console.log('bbbbbbbbbb', protyleRef.current.protyle.wysiwyg);
+						// console.log('bbbbbbbbbb', protyleRef.current.protyle.wysiwyg);
 					}
 					protyleRef.current = null;
 				}
@@ -157,7 +166,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						//延时一会儿，等待块渲染完成
 						console.log("1");
 						console.log('blockId222222221111111', blockId, "iiiiiii/n", shape.id);
-						const eeee = this.editor.updateShape({
+						this.editor.updateShape({
 							id: shape.id,
 							type: shape.type,
 							props: {
@@ -165,12 +174,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								blockId: blockId,
 							},
 						});
+
 						// console.log("2", this.editor.getShape(shape.id));
 						// console.log('editor', eeee);
 						// console.log('blo2', (this.editor.getShape(shape.id) as ICardShape).props.blockId);
+						// await new Promise((resolve) => setTimeout(resolve, 200));
 					}
 
-					await new Promise((resolve) => setTimeout(resolve, 200));
 
 					if (!blockId) {
 						showMessage('未找到块');
@@ -178,17 +188,23 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
 						blockId: blockId,
-						// rootId: blockId,
+						rootId: blockId,
 						defId: blockId,
 						render: {
-							breadcrumb: true,
+							breadcrumb: false,
 							gutter: true,
 							// title:true,
-							breadcrumbDocName: true,
+							breadcrumbDocName: false,
 							// scroll:false,
 						},
 						// action: ["cb-get-focus"],
 						mode: "wysiwyg",
+						// typewriterMode: true,
+						after: (protyle: Protyle)=> {
+							console.log('after');
+							protyle.protyle.wysiwyg.preventKeyup = true;
+							// console.log('after', protyle.wysiwyg);
+						} 
 					});
 					// pt.focusBlock(blockId);
 					protyleRef.current = pt;
