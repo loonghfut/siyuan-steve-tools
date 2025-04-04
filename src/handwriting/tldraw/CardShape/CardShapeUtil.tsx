@@ -46,7 +46,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			color: 'black',
 			showMask: true,
 			blockId: '',
-			isNewlyCreated: true
+			isNewlyCreated: true,
+			fontSize: 16, // 默认字体大小
 		}
 	}
 
@@ -65,7 +66,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
-		const protyleRef = useRef<any>(null)
+		const protyleRef = useRef(null)
+
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		const containerRef = useRef<HTMLDivElement>(null)
 
@@ -153,12 +155,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						const idid = await api.generateSiyuanID() as string;
 
-						const redata = await api.appendBlock("markdown", `{{{row
-
-{: id="${await api.generateSiyuanID() as string}"}
-
-{: id="${await api.generateSiyuanID() as string}"}
-}}}
+						const redata = await api.appendBlock("markdown", `#### 
 {: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
 						// const id = iddata[0].doOperations[0].id;
 						blockId = redata[0].doOperations[0].id;
@@ -200,16 +197,22 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						// action: ["cb-get-focus"],
 						mode: "wysiwyg",
 						// typewriterMode: true,
-						after: (protyle: Protyle)=> {
+						after: (protyle: Protyle) => {
 							console.log('after');
 							protyle.protyle.wysiwyg.preventKeyup = true;
+							protyle.resize();
 							// console.log('after', protyle.wysiwyg);
-						} 
+						}
 					});
 					// pt.focusBlock(blockId);
+
 					protyleRef.current = pt;
 					if (containerRef.current) {
 						containerRef.current.setAttribute('blockid', blockId);
+					}
+					// 应用字体大小设置
+					if (pt.protyle && pt.protyle.wysiwyg && pt.protyle.wysiwyg.element) {
+						pt.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
 					}
 					// console.log('bbbQQQQQbbb', containerRef);
 				};
@@ -258,6 +261,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					overflow: 'auto',
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
+					padding: 0,
 				}}
 				onDoubleClick={handleDoubleClick}
 				onPointerDown={handlePointerEvent}
@@ -274,6 +278,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						pointerEvents: isEditingState ? 'all' : 'none',
 						touchAction: isEditingState ? 'auto' : 'none',
 						contain: 'strict', // 强力隔离
+						padding: '0px', // 为内容添加最小边距
 					}}
 				></div>
 			</HTMLContainer >

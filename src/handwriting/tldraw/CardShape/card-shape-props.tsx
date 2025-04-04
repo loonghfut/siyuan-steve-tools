@@ -9,6 +9,7 @@ export const cardShapeProps: RecordProps<ICardShape> = {
 	showMask: T.boolean,
 	blockId: T.string,
 	isNewlyCreated: T.boolean,
+	fontSize: T.number,
 }
 
 // To generate your own custom styles, check out the custom styles example.

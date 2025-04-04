@@ -28,7 +28,11 @@
     /* left: 8px !important; */
     display: none ;
   }
-
+  .protyle-content {
+    overflow: none;
+    flex: 1;
+    scrollbar-gutter: stable;
+  }
   .protyle-toolbar {
     top: 0 !important;
     left: 0 !important;
@@ -38,8 +42,10 @@
 /* 确保包含块使用相对定位 */
 .tldraw__editor .protyle-wysiwyg {
   position: relative;
+  padding: 4px !important;
 }
 
 [custom-st-tldraw="1"] {
   background-color: #398ecd57 ;
 }
+
