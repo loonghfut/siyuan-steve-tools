@@ -154,15 +154,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							return;
 						}
 						const idid = await api.generateSiyuanID() as string;
-
-						const redata = await api.appendBlock("markdown", `#### 
+						//现在时间
+						const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+						const redata = await api.appendBlock("markdown", `#### ${timestamp} 
 {: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
 						// const id = iddata[0].doOperations[0].id;
 						blockId = redata[0].doOperations[0].id;
 						// console.log('redata', redata);
 						//延时一会儿，等待块渲染完成
-						console.log("1");
-						console.log('blockId222222221111111', blockId, "iiiiiii/n", shape.id);
+						// console.log("1");
+						// console.log('blockId222222221111111', blockId, "iiiiiii/n", shape.id);
 						this.editor.updateShape({
 							id: shape.id,
 							type: shape.type,

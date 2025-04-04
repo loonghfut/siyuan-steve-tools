@@ -1,11 +1,9 @@
 import * as ic from "@/icon"
-import { openTab, Plugin, showMessage } from "siyuan";
+import { openTab, Plugin, showMessage, Tab } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 import { BlockHandler } from './tldraw/block-handler';
 import { addWhiteboardButton } from "./function/assist";
-import { api } from "@frostime/siyuan-plugin-kits";
-import { BLOCK_LAYOUT } from "./parameter";
 
 export class M_handwriting {
     private plugin: Plugin;
@@ -25,6 +23,19 @@ export class M_handwriting {
             </symbol>  
         `);
 
+        this.plugin.addTab({
+            type: "steveTool-whiteboard",
+            async init() {
+                console.log("初始化画板选项卡",this);
+                const panelElement = this.element;
+                const tldrawContainer = document.createElement('div');
+                tldrawContainer.id = `tldraw-container-${this.data.rootid}`;
+                tldrawContainer.style.width = '100%';
+                tldrawContainer.style.height = '100%';
+                panelElement.appendChild(tldrawContainer);
+                new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid]);
+            }
+        })
         // 添加顶栏按钮
         // this.plugin.addTopBar({
         //     icon: "iconSTWhiteboard",
@@ -53,81 +64,77 @@ export class M_handwriting {
     public async openWhiteBoard_in(e) {
         // 查找当前页面的内容容器
         const id = e.detail.protyle.block.rootID;
-        // console.log("当前页面的内容容器标题:", e.detail.protyle.title.editElement);
-        const titleText = e.detail.protyle.title.editElement.textContent
+        const tabId = this.plugin.name + "steveTool-whiteboard";
+        const titleText = e.detail.protyle.title.editElement.textContent;
+
         const whiteBoardTab = await openTab({
             app: this.plugin.app,
             custom: {
-                id: "steveTool-whiteboard-" + id,
+                id: tabId,
                 title: titleText,
                 icon: "iconSTWhiteboard",
                 data: {
-                    text: "steveTool-whiteboard"
+                    text: "steveTool-whiteboard" + id,
+                    rootid: id,
+                    // tldrawInstances: this.tldrawInstances,
                 },
-            }
+            },
         });
 
         // 获取面板元素并初始化tldraw
-        const panelElement = whiteBoardTab.panelElement;
+        // const panelElement = whiteBoardTab.panelElement;
 
-        // 创建tldraw容器
-        const tldrawContainer = document.createElement('div');
-        tldrawContainer.id = `tldraw-container-${id}`;
-        tldrawContainer.style.width = '100%';
-        tldrawContainer.style.height = '100%';
-        panelElement.appendChild(tldrawContainer);
-        // let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
-        // 过滤和提取块ID
-        // const blockIds = ChildBlocks
-        //     .filter(block =>
-        //         // block?.type === cn_type &&
-        //         block?.content?.trim())
-        //     .map(block => block.id);
+        // // 创建tldraw容器
+        // const tldrawContainer = document.createElement('div');
+        // tldrawContainer.id = `tldraw-container-${id}`;
+        // tldrawContainer.style.width = '100%';
+        // tldrawContainer.style.height = '100%';
+        // panelElement.appendChild(tldrawContainer);
 
-        // console.log("Extracted block IDs:", blockIds);
-        // 初始化TldrawManager
-        const tldrawManager = new TldrawManager(id, tldrawContainer, [e.detail.protyle.block.rootID]);
-        this.tldrawInstances.set(id, tldrawManager);
-        return tldrawManager;
+        // // 初始化TldrawManager
+        // const tldrawManager = new TldrawManager(id, tldrawContainer, [e.detail.protyle.block.rootID]);
+        // this.tldrawInstances.set(id, tldrawManager);
+        // this.twhiteBoardTabInstances.set(id, whiteBoardTab);
+        // return tldrawManager;
     }
 
     /**
      * 打开白板并初始化画布
      */
-    private async openWhiteBoard() {
-        // 生成唯一ID
-        const id = "main-whiteboard";
+    // private async openWhiteBoard() {
+    //     // 生成唯一ID
+    //     const id = "main-whiteboard";
 
-        // 创建新选项卡
-        const whiteBoardTab = await openTab({
-            app: this.plugin.app,
-            custom: {
-                id: "steveTool-whiteboard-" + id,
-                title: "无限画板",
-                icon: "iconSTWhiteboard",
-                data: {
-                    text: "steveTool-whiteboard"
-                },
-            }
-        });
+    //     // 创建新选项卡
+    //     const whiteBoardTab = await openTab({
+    //         app: this.plugin.app,
+    //         custom: {
+    //             id: "steveTool-whiteboard-" + id,
+    //             title: "无限画板",
+    //             icon: "iconSTWhiteboard",
+    //             data: {
+    //                 text: "steveTool-whiteboard"
+    //             },
+    //         }
+    //     });
 
-        // 获取面板元素并初始化tldraw
-        const panelElement = whiteBoardTab.panelElement;
+    //     // 获取面板元素并初始化tldraw
+    //     const panelElement = whiteBoardTab.panelElement;
 
-        // 创建tldraw容器
-        const tldrawContainer = document.createElement('div');
-        tldrawContainer.id = `tldraw-container-${id}`;
-        tldrawContainer.style.width = '100%';
-        tldrawContainer.style.height = '100%';
-        panelElement.appendChild(tldrawContainer);
+    //     // 创建tldraw容器
+    //     const tldrawContainer = document.createElement('div');
+    //     tldrawContainer.id = `tldraw-container-${id}`;
+    //     tldrawContainer.style.width = '100%';
+    //     tldrawContainer.style.height = '100%';
+    //     panelElement.appendChild(tldrawContainer);
 
-        // 初始化TldrawManager
-        const tldrawManager = new TldrawManager(id, tldrawContainer);
-        this.tldrawInstances.set(id, tldrawManager);
+    //     // 初始化TldrawManager
+    //     const tldrawManager = new TldrawManager(id, tldrawContainer);
+    //     this.tldrawInstances.set(id, tldrawManager);
 
-        // 初始化块处理器
-        const blockHandler = new BlockHandler(tldrawManager, this.plugin);
-    }
+    //     // 初始化块处理器
+    //     const blockHandler = new BlockHandler(tldrawManager, this.plugin);
+    // }
 
 
     /**
