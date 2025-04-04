@@ -10,6 +10,6 @@ export type ICardShape = TLBaseShape<
 		showMask: boolean,
 		blockId: string // 添加 blockId 属性
 		isNewlyCreated?: boolean
-		fontSize: number // 添加字体大小属性
+		fontSize?: number // 添加字体大小属性
 	}
 >

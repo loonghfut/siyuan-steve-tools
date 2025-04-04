@@ -8,8 +8,8 @@ export const cardShapeProps: RecordProps<ICardShape> = {
 	color: DefaultColorStyle,
 	showMask: T.boolean,
 	blockId: T.string,
-	isNewlyCreated: T.boolean,
-	fontSize: T.number,
+	isNewlyCreated: T.optional(T.boolean),
+	fontSize: T.optional(T.number),
 }
 
 // To generate your own custom styles, check out the custom styles example.
