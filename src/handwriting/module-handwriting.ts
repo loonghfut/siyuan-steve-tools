@@ -2,7 +2,6 @@ import * as ic from "@/icon"
 import { openTab, Plugin, showMessage, Tab } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
-import { BlockHandler } from './tldraw/block-handler';
 import { addWhiteboardButton } from "./function/assist";
 
 export class M_handwriting {
