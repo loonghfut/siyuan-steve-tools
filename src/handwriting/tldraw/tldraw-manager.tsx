@@ -223,17 +223,18 @@ export class TldrawManager {
                         container.addEventListener('drop', handleDrop);
 
                         // 删除组件块逻辑
-                        editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
+                        editor.sideEffects.registerAfterDeleteHandler('shape', async (shape) => {
                             // Check if shape is a card shape type
                             if (shape.type !== 'card') return;
 
                             const cardShape = shape as ICardShape;
                             const blockId = cardShape.props?.blockId;
                             if (!blockId) return;
-
-                            api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
-                                .then(() => console.log(`Block ${blockId} TLDraw property set to inactive`))
-                                .catch(err => console.error('Failed to update block attributes:', err));
+                            if (await api.getBlockByID(blockId)) {
+                                api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
+                                    .then()
+                                    .catch(err => console.error('Failed to update block attributes:', err))
+                            };
                         });
 
 
