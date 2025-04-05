@@ -282,7 +282,7 @@ export class TldrawManager {
                 
                 // 应用远程更改到本地存储
                 Meditor.store.mergeRemoteChanges(() => {
-                    // console.log("应用远程TLDraw更改:", event.data.changes.changes);
+                    console.log("应用远程TLDraw更改:", event.data.changes.changes);
                     // 应用收到的变更
                     Meditor.store.applyDiff(event.data.changes.changes); 
                 });

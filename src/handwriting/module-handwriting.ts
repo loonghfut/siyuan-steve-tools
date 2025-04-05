@@ -3,11 +3,11 @@ import { openTab, Plugin, showMessage, Tab } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 import { addWhiteboardButton } from "./function/assist";
-
+const tldrawInstances: Map<string, TldrawManager> = new Map();
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
-    private tldrawInstances: Map<string, TldrawManager> = new Map();
+     
     private currentid: string = "";
 
     constructor(plugin: Plugin) {
@@ -25,14 +25,24 @@ export class M_handwriting {
         this.plugin.addTab({
             type: "steveTool-whiteboard",
             async init() {
-                console.log("初始化画板选项卡",this);
+                console.log("初始化画板选项卡", this);
                 const panelElement = this.element;
                 const tldrawContainer = document.createElement('div');
                 tldrawContainer.id = `tldraw-container-${this.data.rootid}`;
                 tldrawContainer.style.width = '100%';
                 tldrawContainer.style.height = '100%';
                 panelElement.appendChild(tldrawContainer);
-                new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid]);
+                const tl = new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid]);
+                tldrawInstances.set(this.data.rootid, tl);
+            },
+            async destroy() {
+                console.log("销毁画板选项卡", this);
+                const tldrawManager = tldrawInstances.get(this.data.rootid);
+                if (tldrawManager) {
+                    tldrawManager.destroy();
+                    tldrawInstances.delete(this.data.rootid);
+                    console.log("销毁画板实例", this.data.rootid);
+                }
             }
         })
         // 添加顶栏按钮
@@ -141,11 +151,11 @@ export class M_handwriting {
      */
     async onunload() {
         // 销毁所有tldraw实例
-        this.tldrawInstances.forEach(instance => {
+        tldrawInstances.forEach(instance => {
             instance.destroy();
         });
 
         // 清空实例映射表
-        this.tldrawInstances.clear();
+        tldrawInstances.clear();
     }
 }
