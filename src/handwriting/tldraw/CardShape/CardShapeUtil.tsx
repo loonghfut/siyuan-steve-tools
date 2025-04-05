@@ -15,7 +15,9 @@ import { ICardShape } from './card-shape-types'
 import { Protyle, showMessage } from 'siyuan';
 import * as api from '@/api';
 import { settingdata } from '@/index';
-
+let isCreatingBlock = false;
+let lastCreatedBlockId = null;
+let pendingCreationPromise = null;
 
 
 export class CardShapeUtil extends ShapeUtil<ICardShape> {
@@ -140,46 +142,84 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 
 					if (!blockId) {
-
 						const editorElement = containerRef.current?.closest('.tldraw__editor');
 						const tldrawId = editorElement?.getAttribute('data-tldraw-id');
 						console.log('当前TLdraw实例ID:', tldrawId);
+
 						if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
 							showMessage('配置不完整,请检查设置');
 							return;
 						}
-						const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["tl-draw-create-note-id"])).id
-						if (!daynote_id) {
-							showMessage('未找到日记块');
-							return;
-						}
-						const idid = await api.generateSiyuanID() as string;
-						//现在时间
-						const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-						const redata = await api.appendBlock("markdown", `#### ${timestamp} 
-{: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
-						// const id = iddata[0].doOperations[0].id;
-						blockId = redata[0].doOperations[0].id;
-						// console.log('redata', redata);
-						//延时一会儿，等待块渲染完成
-						// console.log("1");
-						// console.log('blockId222222221111111', blockId, "iiiiiii/n", shape.id);
-						this.editor.updateShape({
-							id: shape.id,
-							type: shape.type,
-							props: {
-								...shape.props,
-								blockId: blockId,
-							},
-						});
 
-						// console.log("2", this.editor.getShape(shape.id));
-						// console.log('editor', eeee);
-						// console.log('blo2', (this.editor.getShape(shape.id) as ICardShape).props.blockId);
-						// await new Promise((resolve) => setTimeout(resolve, 200));
+						// 检查是否有其他操作正在创建块
+						if (isCreatingBlock) {
+							// 如果有，等待那个操作完成并使用它创建的块ID
+							try {
+								if (pendingCreationPromise) {
+									blockId = await pendingCreationPromise;
+									if (blockId) {
+										this.editor.updateShape({
+											id: shape.id,
+											type: shape.type,
+											props: {
+												...shape.props,
+												blockId: blockId,
+											},
+										});
+									}
+								}
+							} catch (err) {
+								console.error("等待块创建失败:", err);
+							}
+						} else {
+							// 设置锁，标记正在创建块
+							isCreatingBlock = true;
+
+							try {
+								// 创建一个Promise，其他实例可以等待它
+								pendingCreationPromise = (async () => {
+									const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["tl-draw-create-note-id"])).id
+									if (!daynote_id) {
+										showMessage('未找到日记块');
+										return null;
+									}
+									const idid = await api.generateSiyuanID() as string;
+									const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+
+									const redata = await api.appendBlock("markdown", `#### ${timestamp} 
+{: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
+
+									const newBlockId = redata[0].doOperations[0].id;
+									lastCreatedBlockId = newBlockId;
+									return newBlockId;
+								})();
+
+								// 等待块创建完成
+								blockId = await pendingCreationPromise;
+
+								// 更新当前shape
+								this.editor.updateShape({
+									id: shape.id,
+									type: shape.type,
+									props: {
+										...shape.props,
+										blockId: blockId,
+									},
+								});
+							} catch (error) {
+								console.error("创建块失败:", error);
+							} finally {
+								// 释放锁
+								isCreatingBlock = false;
+								// 一段时间后清除缓存的Promise和ID
+								setTimeout(() => {
+									pendingCreationPromise = null;
+								}, 5000);
+							}
+						}
 					}
 
-
+					// 如果仍然没有blockId，显示错误
 					if (!blockId) {
 						showMessage('未找到块');
 						return;
