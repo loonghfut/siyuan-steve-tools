@@ -21,7 +21,32 @@ export class M_handwriting {
                ${ic.steveTools_whiteboard}
             </symbol>  
         `);
+        this.plugin.eventBus.on('open-siyuan-url-plugin', (e) => {
+            const url = e.detail.url;
+            if (url.startsWith('siyuan://plugins/siyuan-steve-tools/')) {
+                try {
+                    // 提取查询参数部分
+                    const queryString = url.split('?')[1];
+                    if (!queryString) return;
+                    
+                    // 解析查询参数
+                    const params = new URLSearchParams(queryString);
+                    const rootid = params.get('rootid');
+                    const blockid = params.get('blockid');
+                    
+                    console.log('解析思源 URL 参数:', { rootid, blockid });
+                    
+                    // 这里可以根据解析出的参数执行相应操作
+                    if (rootid) {
 
+                    }
+                } catch (error) {
+                    console.error('解析思源 URL 参数出错:', error);
+                }
+            }
+
+
+        });
         this.plugin.addTab({
             type: "steveTool-whiteboard",
             async init() {
@@ -33,15 +58,15 @@ export class M_handwriting {
                 tldrawContainer.style.height = '100%';
                 panelElement.appendChild(tldrawContainer);
                 const tl = new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid]);
-                tldrawInstances.set(this.data.timestamp, tl);
+                (panelElement as any).tldrawManager = tl;
+
             },
             async destroy() {
                 console.log("销毁画板选项卡", this);
-                const tldrawManager = tldrawInstances.get(this.data.timestamp);
+                const tldrawManager = (this.element as any).tldrawManager;
                 if (tldrawManager) {
                     tldrawManager.destroy();
-                    tldrawInstances.delete(this.data.timestamp);
-                    console.log("销毁画板实例", this.data.timestamp);
+                    console.log("销毁画板实例", tldrawManager);
                 }
             }
         })
@@ -86,7 +111,7 @@ export class M_handwriting {
                     text: "steveTool-whiteboard" + id,
                     rootid: id,
                     //时间戳
-                    timestamp: Date.now(),
+                    // timestamp: Date.now(),
                     
                 },
             },

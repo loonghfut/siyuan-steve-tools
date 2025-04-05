@@ -12,6 +12,7 @@ import {
     TLStore,
     Editor,
     createShapeId,
+    TLShapeId,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
@@ -41,7 +42,7 @@ export class TldrawManager {
     private root: any; // 添加 root 属性
     private blockIds: string[] = [];
     private store: TLStore; // 存储 TLDraw 的数据
-    private editor: any; // 引用 TLDraw 编辑器实例
+    private editor: Editor; // 引用 TLDraw 编辑器实例
     private storageKey: string; // 存储键值
     // 在 TldrawManager 类中添加一个标志
     private dropHandled;
@@ -146,7 +147,7 @@ export class TldrawManager {
                         this.setupRealtimeSync(editor);
                         editor.updateInstanceState({});
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
-
+                        // this.editor.navigateToDeepLink();
                         // 只有在没有已保存数据的情况下才初始化卡片
                         if (editor.getCurrentPageShapes().length === 0 && blockIds.length > 0) {
                             initCardsWithBlockIds(editor, blockIds, {
@@ -242,7 +243,7 @@ export class TldrawManager {
     /**
      * 设置实时同步功能
      */
-    private setupRealtimeSync(Meditor:Editor) {
+    private setupRealtimeSync(Meditor: Editor) {
         if (!this.store || !this.editor) return;
         console.log("设置实时同步功能");
         // 创建一个专用于此TLDraw实例的广播频道
@@ -279,14 +280,14 @@ export class TldrawManager {
 
             try {
                 this.applyingRemoteChanges = true;
-                
+
                 // 应用远程更改到本地存储
                 Meditor.store.mergeRemoteChanges(() => {
-                    console.log("应用远程TLDraw更改:", event.data.changes.changes);
+                    // console.log("应用远程TLDraw更改:", event.data.changes.changes);
                     // 应用收到的变更
-                    Meditor.store.applyDiff(event.data.changes.changes); 
+                    Meditor.store.applyDiff(event.data.changes.changes);
                 });
-                
+
             } catch (err) {
                 console.error('应用远程TLDraw更改失败:', err);
             } finally {
@@ -340,6 +341,44 @@ export class TldrawManager {
 
         this.tldrawComponent = null;
     }
+
+    /**
+     * 根据思源块ID查找对应的形状
+     * @param blockId 思源块ID
+     * @returns 对应的形状ID，如果未找到则返回null
+     */
+    public findShapeByBlockId(blockId: string): string | null {
+        if (!this.editor) return null;
+
+        const shapes = this.editor.getCurrentPageShapes();
+        const cardShape = shapes.find(shape =>
+            shape.type === 'card' &&
+            (shape as ICardShape).props?.blockId === blockId
+        );
+
+        return cardShape?.id || null;
+    }
+
+    /**
+     * 导航到包含特定思源块的形状
+     * @param blockId 思源块ID
+     * @returns 是否成功导航
+     */
+    public navigateToBlockShape(blockId: string): boolean {
+        const shapeId = this.findShapeByBlockId(blockId) as TLShapeId;
+        console.log("导航到块形状", shapeId, blockId);
+        if (!shapeId) return false;
+
+        if (this.editor) {
+            // 选中并聚焦到该形状
+            this.editor.select(shapeId);
+            this.editor.zoomToSelection();
+            return true;
+        }
+        return false;
+    }
+
+
 }
 
 function isDarkTheme(): boolean {
