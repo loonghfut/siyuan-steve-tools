@@ -50,6 +50,10 @@ export class M_handwriting {
                             showMessage('未找到此rootid对应的块');
                             return;
                         }
+                        if(docblock.id !== docblock.root_id){
+                            showMessage('当前块不是根块，请检查');
+                            return;
+                        }
                         if (!id) {
                             showMessage('未找到此blockid对应的块');
                             return;
