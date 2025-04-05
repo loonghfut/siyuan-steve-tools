@@ -9,6 +9,9 @@ import {
     TldrawOptions,
     TLUiOverrides,
     defaultShapeUtils,
+    TLStore,
+    Editor,
+    createShapeId,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
@@ -37,11 +40,12 @@ export class TldrawManager {
     private customTools: any[] = [];
     private root: any; // 添加 root 属性
     private blockIds: string[] = [];
-    private store: any; // 存储 TLDraw 的数据
+    private store: TLStore; // 存储 TLDraw 的数据
     private editor: any; // 引用 TLDraw 编辑器实例
     private storageKey: string; // 存储键值
     // 在 TldrawManager 类中添加一个标志
     private dropHandled;
+    private applyingRemoteChanges = false;
 
     constructor(id: string, container: HTMLElement, blockIds?: string[]) {
         this.id = id;
@@ -139,7 +143,7 @@ export class TldrawManager {
                         this.editor = editor;
                         // 设置自动保存功能
                         this.setupAutosave();
-
+                        this.setupRealtimeSync(editor);
                         editor.updateInstanceState({});
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
 
@@ -213,11 +217,11 @@ export class TldrawManager {
                         editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
                             // Check if shape is a card shape type
                             if (shape.type !== 'card') return;
-                            
+
                             const cardShape = shape as ICardShape;
                             const blockId = cardShape.props?.blockId;
                             if (!blockId) return;
-                            
+
                             api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
                                 .then(() => console.log(`Block ${blockId} TLDraw property set to inactive`))
                                 .catch(err => console.error('Failed to update block attributes:', err));
@@ -235,7 +239,62 @@ export class TldrawManager {
         root.render(tldrawComponent);
         this.root = root;
     }
+    /**
+     * 设置实时同步功能
+     */
+    private setupRealtimeSync(Meditor:Editor) {
+        if (!this.store || !this.editor) return;
+        console.log("设置实时同步功能");
+        // 创建一个专用于此TLDraw实例的广播频道
+        const channelName = `tldraw-sync-${this.id}`;
+        const broadcastChannel = new BroadcastChannel(channelName);
 
+        // 为识别消息源，生成一个唯一的会话ID
+        const sessionId = Date.now().toString() + Math.random().toString(36).slice(2);
+
+        // 监听本地变更并广播
+        const unlisten = this.store.listen(
+            (update) => {
+                // 如果当前正在应用远程更改，不广播以避免循环
+                if (this.applyingRemoteChanges) return;
+
+                // 通过广播频道发送更改
+                broadcastChannel.postMessage({
+                    changes: update,
+                    timestamp: Date.now(),
+                    source: sessionId // 使用会话ID标识消息来源
+                });
+            },
+            { scope: 'document', source: 'user' } // 只监听用户操作引起的文档变更
+        );
+
+        // 监听来自其他页签的更新
+        broadcastChannel.onmessage = (event) => {
+            // 忽略自己发出的事件
+            // console.log("收到远程TLDraw更改:", event.data);
+            if (event.data.source === sessionId) {
+                console.log("忽略自己发出的事件AAAA:", event.data.source, sessionId);
+                return;
+            }
+
+            try {
+                this.applyingRemoteChanges = true;
+                
+                // 应用远程更改到本地存储
+                Meditor.store.mergeRemoteChanges(() => {
+                    // console.log("应用远程TLDraw更改:", event.data.changes.changes);
+                    // 应用收到的变更
+                    Meditor.store.applyDiff(event.data.changes.changes); 
+                });
+                
+            } catch (err) {
+                console.error('应用远程TLDraw更改失败:', err);
+            } finally {
+                this.applyingRemoteChanges = false;
+            }
+        };
+        console.log('已设置实时同步功能');
+    }
     /**
      * 设置自动保存功能
      */
