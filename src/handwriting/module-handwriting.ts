@@ -33,15 +33,15 @@ export class M_handwriting {
                 tldrawContainer.style.height = '100%';
                 panelElement.appendChild(tldrawContainer);
                 const tl = new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid]);
-                tldrawInstances.set(this.data.rootid, tl);
+                tldrawInstances.set(this.data.timestamp, tl);
             },
             async destroy() {
                 console.log("销毁画板选项卡", this);
-                const tldrawManager = tldrawInstances.get(this.data.rootid);
+                const tldrawManager = tldrawInstances.get(this.data.timestamp);
                 if (tldrawManager) {
                     tldrawManager.destroy();
-                    tldrawInstances.delete(this.data.rootid);
-                    console.log("销毁画板实例", this.data.rootid);
+                    tldrawInstances.delete(this.data.timestamp);
+                    console.log("销毁画板实例", this.data.timestamp);
                 }
             }
         })
@@ -85,7 +85,9 @@ export class M_handwriting {
                 data: {
                     text: "steveTool-whiteboard" + id,
                     rootid: id,
-                    // tldrawInstances: this.tldrawInstances,
+                    //时间戳
+                    timestamp: Date.now(),
+                    
                 },
             },
         });
