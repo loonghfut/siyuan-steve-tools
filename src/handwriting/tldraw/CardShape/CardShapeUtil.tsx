@@ -126,21 +126,30 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				});
 			}
 			if (blockId) {
-				console.log('检查块是否存在:', blockId);
+				// console.log('检查块是否存在:', blockId);
 				// Add delay before checking if block exists to avoid unnecessary API calls
-				const checkBlockExistence = setTimeout(() => {
-					api.getBlockByID(blockId).then((res) => {
-						if (res) {
-							// console.log('块存在:', res);
-						} else {
-							showMessage('块不存在,已被删除');
-							this.editor.deleteShape(shape.id);
-						}
+				if (shape.props.isNewlyCreated) {
+					this.editor.updateShape({
+						id: shape.id,
+						type: shape.type,
+						props: {
+							...shape.props,
+							isNewlyCreated: false,
+						},
 					});
-				}, 5000); // 1 second delay
-
-				// Clear timeout if component unmounts
-				return () => clearTimeout(checkBlockExistence);
+				} else {
+					const checkBlockExistence = setTimeout(() => {
+						api.getBlockByID(blockId).then((res) => {
+							if (res) {
+								// console.log('块存在:', res);
+							} else {
+								showMessage('块不存在,已被删除');
+								this.editor.deleteShape(shape.id);
+							}
+						});
+					}, 4000);
+					return () => clearTimeout(checkBlockExistence);
+				}
 			}
 		}, [isEditingState]);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
