@@ -15,7 +15,7 @@ export class PluginConfig {
     async load(): Promise<void> {
         try {
             const configData = await getFile(this.configPath);
-            console.log("::::", configData);
+            // console.log("::::", configData);
             if (configData) {
                 this.config = configData;
             } else {

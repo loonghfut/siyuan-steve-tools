@@ -81,7 +81,7 @@ export class M_calendar {
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
         await this.calConfig.load();
-        console.log(this.calConfig.getAll());
+        // console.log(this.calConfig.getAll());
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;

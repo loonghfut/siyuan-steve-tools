@@ -102,7 +102,7 @@ export class M_handwriting {
                 const tldrawManager = (this.element as any).tldrawManager;
                 if (tldrawManager) {
                     tldrawManager.destroy();
-                    console.log("销毁画板实例", tldrawManager);
+                    // console.log("销毁画板实例", tldrawManager);
                 }
             }
         })
@@ -120,9 +120,9 @@ export class M_handwriting {
     async onLayoutReady(settingdata) {
         // 可以在这里初始化任何需要DOM加载完成后的逻辑
         this.plugin.eventBus.on('switch-protyle', (e) => {
-            console.log("切换思源块:", e);
+            // console.log("切换思源块:", e);
             this.currentid = e.detail.protyle.block.rootID;
-            console.log(this.currentid);
+            // console.log(this.currentid);
 
             addWhiteboardButton(e);
         });

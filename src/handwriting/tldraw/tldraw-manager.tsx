@@ -248,7 +248,7 @@ export class TldrawManager {
      */
     private setupRealtimeSync(Meditor: Editor) {
         if (!this.store || !this.editor) return;
-        console.log("设置实时同步功能");
+        // console.log("设置实时同步功能");
         // 创建一个专用于此TLDraw实例的广播频道
         const channelName = `tldraw-sync-${this.id}`;
         const broadcastChannel = new BroadcastChannel(channelName);
@@ -297,7 +297,7 @@ export class TldrawManager {
                 this.applyingRemoteChanges = false;
             }
         };
-        console.log('已设置实时同步功能');
+        // console.log('已设置实时同步功能');
     }
     /**
      * 设置自动保存功能
