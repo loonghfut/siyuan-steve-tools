@@ -31,6 +31,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	override isAspectRatioLocked(_shape: ICardShape) {
 		return false
 	}
+	override hideRotateHandle(_shape: ICardShape) {
+		return false
+	}
 	override canResize(_shape: ICardShape) {
 		return true
 	}
@@ -41,6 +44,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		return true
 	}
 	// [4]
+	override onBeforeUpdate(prev: ICardShape, next: ICardShape) {
+		if (prev.props.blockId && next.props.blockId === '') {
+			next.props.blockId = prev.props.blockId;
+		}
+	}
+
 	getDefaultProps(): ICardShape['props'] {
 		return {
 			w: 300,
@@ -128,7 +137,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							this.editor.deleteShape(shape.id);
 						}
 					});
-				}, 1000); // 1 second delay
+				}, 5000); // 1 second delay
 
 				// Clear timeout if component unmounts
 				return () => clearTimeout(checkBlockExistence);
