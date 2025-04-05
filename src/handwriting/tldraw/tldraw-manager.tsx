@@ -47,9 +47,11 @@ export class TldrawManager {
     // 在 TldrawManager 类中添加一个标志
     private dropHandled;
     private applyingRemoteChanges = false;
+    private title: string;
 
-    constructor(id: string, container: HTMLElement, blockIds?: string[]) {
+    constructor(id: string, container: HTMLElement, blockIds?: string[], title?: string) {
         this.id = id;
+        this.title = title || `画板-${id}`;
         this.container = container;
         this.blockIds = blockIds || [];
         this.storageKey = `tldraw-data-${this.id}`;
@@ -131,7 +133,8 @@ export class TldrawManager {
         const tldrawComponent = (
             <div style={{ position: 'relative', width: '100%', height: '100%' }}
                 className="tldraw__editor"
-                data-tldraw-id={this.id}>
+                data-tldraw-id={this.id}
+                data-tldraw-title={this.title}>
                 <Tldraw
                     store={store}
                     shapeUtils={customShapeUtils}
@@ -347,7 +350,7 @@ export class TldrawManager {
      * @param blockId 思源块ID
      * @returns 对应的形状ID，如果未找到则返回null
      */
-    public findShapeByBlockId(blockId: string): string | null {
+    public findShapeByBlockId(blockId: string): TLShapeId | null {
         if (!this.editor) return null;
 
         const shapes = this.editor.getCurrentPageShapes();
@@ -365,14 +368,14 @@ export class TldrawManager {
      * @returns 是否成功导航
      */
     public navigateToBlockShape(blockId: string): boolean {
-        const shapeId = this.findShapeByBlockId(blockId) as TLShapeId;
+        const shapeId = this.findShapeByBlockId(blockId);
         console.log("导航到块形状", shapeId, blockId);
         if (!shapeId) return false;
 
         if (this.editor) {
             // 选中并聚焦到该形状
             this.editor.select(shapeId);
-            this.editor.zoomToSelection();
+            this.editor.zoomToSelection({ animation: { duration: 200 } });
             return true;
         }
         return false;

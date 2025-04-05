@@ -77,6 +77,18 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
+
+		useEffect(() => {
+            if (protyleRef.current && protyleRef.current.protyle && protyleRef.current.protyle.wysiwyg) {
+                protyleRef.current.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
+            } else if (containerRef.current) {
+                const protyleElement = containerRef.current.querySelector(".protyle-wysiwyg");
+                if (protyleElement) {
+                    (protyleElement as HTMLElement).style.fontSize = `${shape.props.fontSize || 16}px`;
+                }
+            }
+        }, [shape.props.fontSize]);
+
 		useEffect(() => {
 			//检查块是否存在
 			const container = containerRef.current;
@@ -87,10 +99,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			if (protyleRef.current) {
 				if (isEditingState) {
 					protyleRef.current.enable();
-					console.log('进入编辑状态', protyleRef.current.protyle.wysiwyg);
+					// console.log('进入编辑状态', protyleRef.current.protyle.wysiwyg);
 				} else {
 					protyleRef.current.disable();
-					console.log('退出编辑状态', protyleRef.current.protyle.wysiwyg);
+					// console.log('退出编辑状态', protyleRef.current.protyle.wysiwyg);
 				}
 			}
 			if (!shape.props.blockId) {
@@ -104,14 +116,21 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				});
 			}
 			if (blockId) {
-				api.getBlockByID(blockId).then((res) => {
-					if (res) {
-						// console.log('块存在:', res);
-					} else {
-						showMessage('块不存在,已被删除');
-						this.editor.deleteShape(shape.id);
-					}
-				});
+				console.log('检查块是否存在:', blockId);
+				// Add delay before checking if block exists to avoid unnecessary API calls
+				const checkBlockExistence = setTimeout(() => {
+					api.getBlockByID(blockId).then((res) => {
+						if (res) {
+							// console.log('块存在:', res);
+						} else {
+							showMessage('块不存在,已被删除');
+							this.editor.deleteShape(shape.id);
+						}
+					});
+				}, 1000); // 1 second delay
+
+				// Clear timeout if component unmounts
+				return () => clearTimeout(checkBlockExistence);
 			}
 		}, [isEditingState]);
 		// eslint-disable-next-line react-hooks/rules-of-hooks
@@ -144,6 +163,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (!blockId) {
 						const editorElement = containerRef.current?.closest('.tldraw__editor');
 						const tldrawId = editorElement?.getAttribute('data-tldraw-id');
+						const title = editorElement?.getAttribute('data-tldraw-title');
 						console.log('当前TLdraw实例ID:', tldrawId);
 
 						if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
@@ -185,8 +205,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									}
 									const idid = await api.generateSiyuanID() as string;
 									const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-
-									const redata = await api.appendBlock("markdown", `#### ${timestamp} 
+									const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
+									const redata = await api.appendBlock("markdown", `#### [${timestamp}](${link})
 {: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
 
 									const newBlockId = redata[0].doOperations[0].id;
@@ -239,9 +259,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						mode: "wysiwyg",
 						// typewriterMode: true,
 						after: (protyle: Protyle) => {
-							console.log('after');
+							// console.log('after');
 							protyle.protyle.wysiwyg.preventKeyup = true;
-							protyle.resize();
+							// protyle.resize();
 							// console.log('after', protyle.wysiwyg);
 						}
 					});

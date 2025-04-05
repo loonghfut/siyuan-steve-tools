@@ -3,11 +3,12 @@ import { openTab, Plugin, showMessage, Tab } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 import { addWhiteboardButton } from "./function/assist";
+import * as api from "@/api";
 const tldrawInstances: Map<string, TldrawManager> = new Map();
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
-     
+
     private currentid: string = "";
 
     constructor(plugin: Plugin) {
@@ -21,24 +22,55 @@ export class M_handwriting {
                ${ic.steveTools_whiteboard}
             </symbol>  
         `);
-        this.plugin.eventBus.on('open-siyuan-url-plugin', (e) => {
+        this.plugin.eventBus.on('open-siyuan-url-plugin', async (e) => {
+            // console.log("打开思源URL插件:", e);
             const url = e.detail.url;
             if (url.startsWith('siyuan://plugins/siyuan-steve-tools/')) {
                 try {
                     // 提取查询参数部分
                     const queryString = url.split('?')[1];
                     if (!queryString) return;
-                    
+
                     // 解析查询参数
                     const params = new URLSearchParams(queryString);
                     const rootid = params.get('rootid');
                     const blockid = params.get('blockid');
-                    
-                    console.log('解析思源 URL 参数:', { rootid, blockid });
-                    
+                    const title = params.get('title') || "画板" + rootid;
+                    // console.log('解析思源 URL 参数:', { rootid, blockid });
+                    //判断rootid和blockid是否存在
+                    if (!rootid || !blockid) {
+                        showMessage("缺少必要的参数");
+                        return;
+                    }
                     // 这里可以根据解析出的参数执行相应操作
-                    if (rootid) {
+                    if (rootid && blockid) {
+                        const docblock = await api.getBlockByID(rootid);
+                        const id = await api.getBlockByID(blockid);
+                        if (!docblock) {
+                            showMessage('未找到此rootid对应的块');
+                            return;
+                        }
+                        if (!id) {
+                            showMessage('未找到此blockid对应的块');
+                            return;
+                        }
 
+                        const tab = await openTab({
+                            app: this.plugin.app,
+                            custom: {
+                                id: this.plugin.name + "steveTool-whiteboard",
+                                title: title,
+                                icon: "iconSTWhiteboard",
+                                data: {
+                                    text: "steveTool-whiteboard" + rootid,
+                                    rootid: rootid,
+                                },
+                            },
+                            position: "right",
+                        });
+                        const tldrawManager = (tab.panelElement as any).tldrawManager as TldrawManager;
+                        // console.log("tldrawManager", tldrawManager);
+                        tldrawManager.navigateToBlockShape(blockid);
                     }
                 } catch (error) {
                     console.error('解析思源 URL 参数出错:', error);
@@ -50,14 +82,14 @@ export class M_handwriting {
         this.plugin.addTab({
             type: "steveTool-whiteboard",
             async init() {
-                console.log("初始化画板选项卡", this);
+                console.log("初始化画板选项卡", this.tab.title);
                 const panelElement = this.element;
                 const tldrawContainer = document.createElement('div');
                 tldrawContainer.id = `tldraw-container-${this.data.rootid}`;
                 tldrawContainer.style.width = '100%';
                 tldrawContainer.style.height = '100%';
                 panelElement.appendChild(tldrawContainer);
-                const tl = new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid]);
+                const tl = new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid], this.tab.title);
                 (panelElement as any).tldrawManager = tl;
 
             },
@@ -112,7 +144,6 @@ export class M_handwriting {
                     rootid: id,
                     //时间戳
                     // timestamp: Date.now(),
-                    
                 },
             },
         });

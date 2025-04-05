@@ -247,14 +247,14 @@ export const components: TLComponents = {
                             },
                         });
 
-                        // 直接应用到当前DOM元素以立即看到效果
-                        const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
-                        if (cardElement) {
-                            const protyleElement = cardElement.querySelector(".protyle-wysiwyg");
-                            if (protyleElement) {
-                                (protyleElement as HTMLElement).style.fontSize = `${newSize}px`;
-                            }
-                        }
+                        // // 直接应用到当前DOM元素以立即看到效果
+                        // const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
+                        // if (cardElement) {
+                        //     const protyleElement = cardElement.querySelector(".protyle-wysiwyg");
+                        //     if (protyleElement) {
+                        //         (protyleElement as HTMLElement).style.fontSize = `${newSize}px`;
+                        //     }
+                        // }
                     }}
                     title="放大字体"
                 >
@@ -283,14 +283,14 @@ export const components: TLComponents = {
                             },
                         });
 
-                        // 直接应用到当前DOM元素以立即看到效果
-                        const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
-                        if (cardElement) {
-                            const protyleElement = cardElement.querySelector(".protyle-wysiwyg");
-                            if (protyleElement) {
-                                (protyleElement as HTMLElement).style.fontSize = `${newSize}px`;
-                            }
-                        }
+                        // // 直接应用到当前DOM元素以立即看到效果
+                        // const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
+                        // if (cardElement) {
+                        //     const protyleElement = cardElement.querySelector(".protyle-wysiwyg");
+                        //     if (protyleElement) {
+                        //         (protyleElement as HTMLElement).style.fontSize = `${newSize}px`;
+                        //     }
+                        // }
                     }}
                     title="减小字体"
                 >
