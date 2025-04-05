@@ -21,6 +21,7 @@ import { ics_s3 } from "./share/s3";
 import { CalDAVClient } from "./share/qqcaldav";
 import { WebDAVSync } from "./share/webdav";
 import { ICSSubscription } from "./share/ics_discribe";
+import { Calendar } from "@fullcalendar/core";
 // import { insertHtml } from "./insertHtml";
 
 
@@ -31,7 +32,7 @@ let allEvents: EventAttributes[] = [];
 let this_settingdata: any = {};
 let islisten = true;
 let front: "desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile";
-
+const calendarinstance: Map<string, Calendar> = new Map();
 export class M_calendar {
     private plugin: steveTools;
     constructor(plugin: steveTools) {
@@ -46,7 +47,37 @@ export class M_calendar {
     public webdavClient: WebDAVSync;
     public qqFullCalendarEvents;
     public icsSubscription: ICSSubscription;
+
+
     async init(settingdata) {
+        this.plugin.addTab({
+            type: "calendar",
+            async init() {
+                const id = new Date().getTime().toString();
+                let calendar: Calendar
+                this.element.innerHTML = `
+                <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
+                calendar = await run(id);
+                this.data.id = id;
+                calendarinstance.set(id, calendar);
+            },
+            async destroy() {
+                console.log("销毁日历选项卡", this.data.id);
+                const calendar = calendarinstance.get(this.data.id);
+                if (calendar) {
+                    calendar.destroy();
+                    calendarinstance.delete(this.data.id);
+                    console.log("销毁日历实例", this.data.id);
+                }
+            },
+            resize() {
+                console.log("resize", this.data.id);
+                const calendar = calendarinstance.get(this.data.id);
+                if (calendar) {
+                    calendar.updateSize();
+                }
+            },
+        })
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
         await this.calConfig.load();
@@ -443,43 +474,43 @@ export class M_calendar {
 
         // steveTools.outlog(viewValue);
         //时间戳
-        const id = new Date().getTime().toString();
-        let calendar: any;
+        // const id = new Date().getTime().toString();
+        // let calendar: Calendar;
         const tab = await openTab({
             app: window.siyuan.ws.app,
             custom: {
                 icon: "iconSTcal",
                 title: `日程视图`,
-                // data: {
-                //     text: "This is my custom tab",
-                // },
-                id: this.plugin.name + 'calview',
+                id: this.plugin.name + 'calendar',
+                data: {
+                    id: null
+                },
             },
             // position: "right",
             keepCursor: false
         });
-        steveTools.outlog(tab);
-        tab.panelElement.innerHTML = `
-      <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-        calendar = await run(id);
-        const calendarDiv = document.getElementById(`calendar-${id}`);
-        if (calendarDiv) {
-            const resizeObserver = new ResizeObserver(entries => {
-                for (const entry of entries) {
-                    const { width, height } = entry.contentRect;
-                    // steveTools.outlog('Calendar container resized:', width, height);
-                    if (width == 0 || height == 0) {
-                        // resizeObserver.disconnect();
-                        steveTools.outlog('ResizeObserver disconnected');
-                    }
-                    // 如果日历组件有 resize 方法，在这里调用
-                    calendar.updateSize();
-                }
-            });
-            //如果已存在resizeObserver则先断开
-            resizeObserver.disconnect();
-            resizeObserver.observe(calendarDiv);
-        }
+
+        //     tab.panelElement.innerHTML = `
+        //   <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
+        //     calendar = await run(id);
+        //     const calendarDiv = document.getElementById(`calendar-${id}`);
+        //     if (calendarDiv) {
+        //         const resizeObserver = new ResizeObserver(entries => {
+        //             for (const entry of entries) {
+        //                 const { width, height } = entry.contentRect;
+        //                 // steveTools.outlog('Calendar container resized:', width, height);
+        //                 if (width == 0 || height == 0) {
+        //                     // resizeObserver.disconnect();
+        //                     steveTools.outlog('ResizeObserver disconnected');
+        //                 }
+        //                 // 如果日历组件有 resize 方法，在这里调用
+        //                 calendar.updateSize();
+        //             }
+        //         });
+        //         //如果已存在resizeObserver则先断开
+        //         resizeObserver.disconnect();
+        //         resizeObserver.observe(calendarDiv);
+        //     }
 
     }
 
