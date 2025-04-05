@@ -1,7 +1,9 @@
 .tlui-button__tool[data-value="note"] {
   display: none;
 }
-
+.tlui-button__tool[data-value="asset"] {
+  display: none;
+}
 
 
 /* 调整所有使用mask属性的图标大小 */

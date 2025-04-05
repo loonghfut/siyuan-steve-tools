@@ -161,7 +161,7 @@ export class TldrawManager {
                         // 添加全局拖放事件监听
                         const container = editor.getContainer();
 
-                        const handleDrop = (e: DragEvent) => {
+                        const handleDrop = async (e: DragEvent) => {
                             e.preventDefault();
                             e.stopPropagation();
 
@@ -194,8 +194,13 @@ export class TldrawManager {
                                 x: e.clientX,
                                 y: e.clientY,
                             });
-
+                            const idid = await api.generateSiyuanID();
+                            const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+                            const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${idid}&title=${this.title}`;
+                            const aproblock = await api.insertBlock("markdown", `##### [${timestamp}](${link})
+{: id="${idid}" custom-st-tldraw="1" }`, blockId)
                             // 创建新的Card形状
+                            // console.log("创建新的卡片形状",  aproblock[0].doOperations[0].id);
                             editor.createShape({
                                 type: 'card',
                                 x: x, // 默认宽度的一半，使形状中心在鼠标位置
@@ -205,12 +210,12 @@ export class TldrawManager {
                                     h: 300,
                                     color: 'black',
                                     showMask: true,
-                                    blockId: blockId,
+                                    blockId: aproblock[0].doOperations[0].id,
                                 },
                             });
-                            api.setBlockAttrs(blockId, {
-                                'custom-st-tldraw': '1',
-                            });
+                            // api.setBlockAttrs(blockId, {
+                            //     'custom-st-tldraw': '1',
+                            // });
                             // console.log(`已在(${x}, ${y})位置创建包含块ID ${blockId} 的卡片`);
                         };
 
