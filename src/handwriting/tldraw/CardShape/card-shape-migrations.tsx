@@ -60,6 +60,7 @@ export function initCardsWithBlockIds(
         color: 'black',
         showMask: true,
         blockId: blockId,
+        isMain: true,
       },
     }
   })

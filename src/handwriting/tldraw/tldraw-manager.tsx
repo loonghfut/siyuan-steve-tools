@@ -375,7 +375,7 @@ export class TldrawManager {
         if (this.editor) {
             // 选中并聚焦到该形状
             this.editor.select(shapeId);
-            this.editor.zoomToSelection({ animation: { duration: 200 } });
+            this.editor.zoomToSelection({ animation: { duration: 500 } });
             return true;
         }
         return false;

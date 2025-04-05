@@ -50,6 +50,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			blockId: '',
 			isNewlyCreated: true,
 			fontSize: 16, // 默认字体大小
+			isMain: false, // 是否为主卡片
 		}
 	}
 
@@ -79,15 +80,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		}, [isEditing]);
 
 		useEffect(() => {
-            if (protyleRef.current && protyleRef.current.protyle && protyleRef.current.protyle.wysiwyg) {
-                protyleRef.current.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
-            } else if (containerRef.current) {
-                const protyleElement = containerRef.current.querySelector(".protyle-wysiwyg");
-                if (protyleElement) {
-                    (protyleElement as HTMLElement).style.fontSize = `${shape.props.fontSize || 16}px`;
-                }
-            }
-        }, [shape.props.fontSize]);
+			if (protyleRef.current && protyleRef.current.protyle && protyleRef.current.protyle.wysiwyg) {
+				protyleRef.current.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
+			} else if (containerRef.current) {
+				const protyleElement = containerRef.current.querySelector(".protyle-wysiwyg");
+				if (protyleElement) {
+					(protyleElement as HTMLElement).style.fontSize = `${shape.props.fontSize || 16}px`;
+				}
+			}
+		}, [shape.props.fontSize]);
 
 		useEffect(() => {
 			//检查块是否存在
@@ -249,10 +250,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						rootId: blockId,
 						defId: blockId,
 						render: {
-							breadcrumb: false,
+							breadcrumb: shape.props.isMain,
 							gutter: true,
-							// title:true,
-							breadcrumbDocName: false,
+							title: shape.props.isMain,
+							breadcrumbDocName: shape.props.isMain,
 							// scroll:false,
 						},
 						// action: ["cb-get-focus"],
