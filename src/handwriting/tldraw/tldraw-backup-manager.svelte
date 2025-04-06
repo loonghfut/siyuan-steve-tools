@@ -178,7 +178,7 @@
 
         const confirmed = confirm(`确定要将此备份${filename}恢复到画板 "${title || drawingId}" 吗？这将覆盖当前画板数据。`);
         if (!confirmed) return;
-        
+        console.log('恢复备份:', drawingId);
         const success = await tldata.restoreBackup(path, drawingId);
         if (success) {
             showMessage(`备份已恢复到画板 ${title || drawingId}`);

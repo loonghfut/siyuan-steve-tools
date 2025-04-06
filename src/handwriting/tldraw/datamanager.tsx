@@ -64,7 +64,12 @@ export async function deleteBackup(path: string): Promise<boolean> {
 export async function restoreBackup(path: string, id: string): Promise<boolean> {
     try {
         // 获取备份文件内容
-        const data = await api.getFile(path);
+        let data = await api.getFile(path);
+        console.log('备份文件内容:', data);
+        // 转化JSON对象为字符串
+        if (typeof data === 'object') {
+            data = JSON.stringify(data);
+        }
         if (!data) {
             throw new Error('备份文件内容为空');
         }
