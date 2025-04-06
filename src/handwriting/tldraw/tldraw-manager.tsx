@@ -156,12 +156,22 @@ export class TldrawManager {
                                 showMessage('导入数据失败');
                             });
                         });
-                        
-                        editor.on('sttools:backupData', () => {
+
+                        editor.on('sttools:exportData', () => {
                             this.backupData().catch(err => {
                                 console.error('备份数据失败:', err);
                                 showMessage('备份数据失败');
                             });
+                        });
+                        editor.on('sttools:backupData', () => {
+                            this.backupToTrash("手动备份").then((filename) => {
+                                showMessage('备份数据成功，文件名: ' + filename);
+                            }
+                            ).catch(err => {
+                                console.error('备份数据失败:', err);
+                                showMessage('备份数据失败');
+                            }
+                            );
                         });
 
                         editor.updateInstanceState({});
@@ -356,6 +366,7 @@ export class TldrawManager {
     public async backupData(): Promise<void> {
         try {
             // 获取当前画布数据快照
+
             const snapshot = getSnapshot(this.store);
             const jsonData = JSON.stringify(snapshot, null, 2);
 
@@ -607,5 +618,6 @@ export class TldrawManager {
 
 function isDarkTheme(): boolean {
     // 思源笔记暗色主题通常通过 data-theme 属性判断
+    // console.log("判断思源主题", document.documentElement.getAttribute('data-theme-mode'));
     return document.documentElement.getAttribute('data-theme-mode') === 'dark';
 }

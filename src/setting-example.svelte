@@ -146,7 +146,8 @@
                     //2
                     type: "checkbox",
                     title: "是否按事件时间创建日记",
-                    description: "启用后会按事件时间的日记创建日程，而不在当天的日记中创建",
+                    description:
+                        "启用后会按事件时间的日记创建日程，而不在当天的日记中创建",
                     key: "cal-create-for-date",
                     value: settings["cal-create-for-date"],
                 },
@@ -397,7 +398,7 @@
                     description: "填写ics订阅地址(请以http(s)://开头)",
                     key: "cal-ics-subscribe-url",
                     value: settings["cal-ics-subscribe-url"],
-                },  
+                },
                 {
                     type: "textinput",
                     title: "时间槽间隔",
@@ -539,7 +540,9 @@
             ],
         },
         {
-            name: "🛠️画板(测试中)",
+            name: "画板",
+            subGroups: ["基本设置", "备份管理"], // 添加子组
+            activeSubGroup: "基本设置",
             items: [
                 {
                     type: "checkbox",
@@ -561,6 +564,14 @@
                             notebook.name,
                         ]),
                     ),
+                },
+                {
+                    type: "custom", // 自定义组件类型
+                    title: "画板备份管理",
+                    description: "管理所有画板的备份文件",
+                    key: "tldraw-backup-manager",
+                    component: "TldrawBackupManager", // 指定组件名称
+                    value: "", // 不需要值
                 },
             ],
         },
@@ -696,6 +707,10 @@
             订阅日历: 6,
             视图设置: 5,
             // 不限制
+        },
+        "画板": {
+            基本设置: 2, // 复选框和选择框
+            备份管理: 1, // 备份管理组件
         },
         // "docker同步感知": {
         //     "连接设置": 4,

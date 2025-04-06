@@ -13,6 +13,7 @@ interface ISettingItemCore {
     key: string;
     value: any;
     placeholder?: string;
+    component?: string;
     slider?: {
         min: number;
         max: number;

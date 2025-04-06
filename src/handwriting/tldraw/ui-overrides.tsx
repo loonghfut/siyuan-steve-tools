@@ -24,6 +24,7 @@ declare module '@tldraw/tldraw' {
     interface TLEventMap {
         'sttools:importData': () => void
         'sttools:backupData': () => void
+        'sttools:exportData': () => void
     }
 }
 import React from 'react';
@@ -138,6 +139,14 @@ export const components: TLComponents = {
                         readonlyOk
                         onSelect={() => {
                             editor.emit('sttools:importData');
+                        }}
+                    />
+                    <TldrawUiMenuItem
+                        id="exportData"
+                        label="导出数据"
+                        readonlyOk
+                        onSelect={() => {
+                            editor.emit('sttools:exportData');
                         }}
                     />
                 </TldrawUiMenuGroup>

@@ -1,20 +1,14 @@
-.tlui-button__tool[data-value="note"] {
-  display: none;
+
+#_r7__more > button:nth-child(10) {
+  display: none !important;
 }
-.tlui-button__tool[data-value="asset"] {
-  display: none;
+#_r7__more > button:nth-child(9) {
+  display: none !important;
+}
+#radix-\:r2\: > div:nth-child(1) > button:nth-child(5) {
+  display: none !important;
 }
 
-
-/* 调整所有使用mask属性的图标大小 */
-.tlui-icon[style*="mask: url"] {
-  /* 覆盖mask属性，保持原始URL但缩小尺寸 */
-  mask-size: 80% !important;
-  -webkit-mask-size: 80% !important;
-  /* 添加居中属性 */
-  mask-position: center !important;
-  -webkit-mask-position: center !important;
-}
 
 /* 确保按钮图标容器本身也居中对齐 */
 .tlui-button__icon {
@@ -22,7 +16,12 @@
   align-items: center !important;
   justify-content: center !important;
 }
-
+.tlui-buttons__horizontal{
+  position: absolute;
+  *{
+    z-index: 0 !important;
+  }
+}
 /* 添加以下样式 */
 .tldraw__editor {
   .protyle-gutters {
