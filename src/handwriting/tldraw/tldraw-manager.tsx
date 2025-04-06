@@ -23,6 +23,7 @@ import * as api from '@/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 import { ICardShape } from './CardShape/card-shape-types';
+import { showMessage } from 'siyuan';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
@@ -148,6 +149,21 @@ export class TldrawManager {
                         // 设置自动保存功能
                         this.setupAutosave();
                         this.setupRealtimeSync(editor);
+
+                        editor.on('sttools:importData', () => {
+                            this.importData().catch(err => {
+                                console.error('导入数据失败:', err);
+                                showMessage('导入数据失败');
+                            });
+                        });
+                        
+                        editor.on('sttools:backupData', () => {
+                            this.backupData().catch(err => {
+                                console.error('备份数据失败:', err);
+                                showMessage('备份数据失败');
+                            });
+                        });
+
                         editor.updateInstanceState({});
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
                         // this.editor.navigateToDeepLink();
@@ -333,6 +349,205 @@ export class TldrawManager {
     public async saveCurrentState() {
         await this.saveData();
     }
+
+    /**
+         * 备份当前画布数据为JSON文件
+         */
+    public async backupData(): Promise<void> {
+        try {
+            // 获取当前画布数据快照
+            const snapshot = getSnapshot(this.store);
+            const jsonData = JSON.stringify(snapshot, null, 2);
+
+            // 创建Blob对象
+            const blob = new Blob([jsonData], { type: 'application/json' });
+
+            // 创建下载链接
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const filename = `tldraw-backup-${this.id}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            // 清理
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 0);
+
+            return Promise.resolve();
+        } catch (error) {
+            console.error('备份画布数据失败', error);
+            return Promise.reject(error);
+        }
+    }
+    /**
+     * 导入画布数据
+     * @returns Promise
+     */
+    public async importData(): Promise<void> {
+        try {
+            // 创建文件选择器
+            return new Promise<void>((resolve, reject) => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.json';
+                fileInput.style.display = 'none';
+                document.body.appendChild(fileInput);
+
+                // 监听文件选择
+                fileInput.onchange = async (event) => {
+                    try {
+                        const file = (event.target as HTMLInputElement).files?.[0];
+                        if (!file) {
+                            document.body.removeChild(fileInput);
+                            return reject(new Error('未选择文件'));
+                        }
+
+                        // 读取文件内容
+                        const reader = new FileReader();
+                        reader.onload = async (e) => {
+                            try {
+                                // 解析JSON数据
+                                const jsonData = e.target?.result as string;
+                                const data = JSON.parse(jsonData);
+
+                                // 首先保存当前状态作为备份
+                                await this.backupToTrash('导入前备份');
+
+                                // 重置编辑器状态
+                                if (this.editor) {
+                                    // 加载导入的数据快照
+                                    try {
+                                        loadSnapshot(this.store, data);
+
+                                        // 保存导入的数据
+                                        await this.saveData();
+
+                                        showMessage('画布数据导入成功');
+                                        resolve();
+                                    } catch (err) {
+                                        console.error('加载导入数据失败:', err);
+                                        showMessage('导入数据格式错误，请确保是有效的TLDraw备份文件');
+                                        reject(err);
+                                    }
+                                } else {
+                                    reject(new Error('编辑器实例未初始化'));
+                                }
+                            } catch (err) {
+                                console.error('解析导入的JSON数据失败:', err);
+                                showMessage('解析导入文件失败，请确保文件格式正确');
+                                reject(err);
+                            }
+                            document.body.removeChild(fileInput);
+                        };
+
+                        reader.onerror = () => {
+                            console.error('读取文件内容失败');
+                            showMessage('读取文件内容失败');
+                            document.body.removeChild(fileInput);
+                            reject(new Error('读取文件内容失败'));
+                        };
+
+                        // 开始读取文件
+                        reader.readAsText(file);
+                    } catch (err) {
+                        document.body.removeChild(fileInput);
+                        reject(err);
+                    }
+                };
+
+                // 用户取消选择
+                fileInput.onabort = () => {
+                    document.body.removeChild(fileInput);
+                    reject(new Error('用户取消选择文件'));
+                };
+
+                // 触发文件选择对话框
+                fileInput.click();
+            });
+        } catch (err) {
+            console.error('导入画布数据失败:', err);
+            return Promise.reject(err);
+        }
+    }
+    private async backupToTrash(reason: string = '自动备份'): Promise<string> {
+        try {
+            // 确保回收站目录存在
+            try {
+                await api.putFile(`/data/storage/petal/sttools/trash/.gitkeep`, false, new Blob([''], { type: 'text/plain' }));
+            } catch (err) {
+                // 目录可能已存在，忽略错误
+            }
+
+            // 获取当前数据
+            const snapshot = getSnapshot(this.store);
+            const jsonData = JSON.stringify(snapshot);
+
+            // 生成备份文件名
+            const trashFileName = `${this.storageKey}-${reason}-${Date.now()}.json`;
+
+            // 将数据写入回收站
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, blob);
+
+            return trashFileName;
+        } catch (err) {
+            console.error('备份数据到回收站失败:', err);
+            throw err;
+        }
+    }
+    /**
+     * 清除当前画布数据
+     * @param removeStorage 是否也从持久化存储中删除数据
+     */
+    public async clearData(removeStorage: boolean = false): Promise<void> {
+        try {
+            // 先创建备份，以防误操作
+            await this.saveCurrentState();
+
+            // 重置编辑器到空状态
+            if (this.editor) {
+                this.editor.selectAll();
+                this.editor.deleteShapes(this.editor.getSelectedShapes());
+            }
+
+            // 如果需要，从存储中删除持久化数据
+            if (removeStorage) {
+                try {
+                    // Create trash directory if it doesn't exist
+                    try {
+                        await api.putFile(`/data/storage/petal/sttools/trash/.gitkeep`, false, new Blob([''], { type: 'text/plain' }));
+                    } catch (err) {
+                        // Directory likely already exists
+                    }
+
+                    // Get the data content before removal
+                    const dataContent = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
+
+                    // Move to trash with timestamp
+                    const trashFileName = `${this.storageKey}-${Date.now()}.json`;
+                    await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([dataContent], { type: 'application/json' }));
+
+                    // Remove original file
+                    await api.removeFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
+                    showMessage('已将画布数据移动到回收站' + `/data/storage/petal/sttools/trash/${trashFileName}`);
+                } catch (err) {
+                    // 如果文件不存在，忽略错误
+                    console.warn('删除存储文件失败，可能文件不存在', err);
+                }
+            }
+
+            return Promise.resolve();
+        } catch (error) {
+            console.error('清除画布数据失败', error);
+            return Promise.reject(error);
+        }
+    }
+
     /**
      * 销毁tldraw实例和清理资源
      */

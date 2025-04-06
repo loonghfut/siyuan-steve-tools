@@ -12,8 +12,20 @@ import {
     useEditor,
     useValue,
     stopEventPropagation,
-    DefaultStylePanel
+    DefaultStylePanel,
+    DefaultMainMenu,
+    TldrawUiMenuGroup,
+    DefaultMainMenuContent,
+    TLEventMap
 } from '@tldraw/tldraw'
+
+// Extend the TLEventMap interface to include custom events
+declare module '@tldraw/tldraw' {
+    interface TLEventMap {
+        'sttools:importData': () => void
+        'sttools:backupData': () => void
+    }
+}
 import React from 'react';
 import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
@@ -106,7 +118,32 @@ export const components: TLComponents = {
             </DefaultKeyboardShortcutsDialog>
         )
     },
-
+    MainMenu: () => {
+        const editor = useEditor()
+        return (
+            <DefaultMainMenu>
+                <DefaultMainMenuContent />
+                <TldrawUiMenuGroup id="sttools">
+                    <TldrawUiMenuItem
+                        id="backupData"
+                        label="backupData"
+                        readonlyOk
+                        onSelect={() => {
+                            editor.emit('sttools:backupData');
+                        }}
+                    />
+                    <TldrawUiMenuItem
+                        id="importData"
+                        label="importData"
+                        readonlyOk
+                        onSelect={() => {
+                            editor.emit('sttools:importData');
+                        }}
+                    />
+                </TldrawUiMenuGroup>
+            </DefaultMainMenu>
+        )
+    },
     InFrontOfTheCanvas: () => {
         const editor = useEditor()
 
@@ -324,176 +361,7 @@ export const components: TLComponents = {
             </div>
         )
     },
-    // StylePanel: (props) => {
-    //     const editor = useEditor()
-        
-    //     // 检查是否选中了卡片
-    //     const isCardSelected = useValue('selected_shape', () => {
-    //         const selectedShapes = editor.getSelectedShapes()
-    //         return selectedShapes.length === 1 && selectedShapes[0].type === 'card'
-    //     }, [editor])
-        
-    //     // 如果选中了卡片，获取卡片的字体大小
-    //     const fontSize = useValue('font_size', () => {
-    //         if (!isCardSelected) return 16
-    //         const selectedShape = editor.getSelectedShapes()[0] as ICardShape
-    //         return selectedShape.props.fontSize || 16
-    //     }, [editor, isCardSelected])
-        
-    //     return (
-    //         <>
-    //             <DefaultStylePanel {...props} />
-                
-    //             {isCardSelected && (
-    //                 <div style={{ 
-    //                     padding: '0 4px',
-    //                     display: 'flex', 
-    //                     flexDirection: 'column',
-    //                     gap: '4px' 
-    //                 }}>
-    //                     <div style={{ 
-    //                         display: 'flex', 
-    //                         alignItems: 'center', 
-    //                         justifyContent: 'space-between',
-    //                         padding: '0 4px'
-    //                     }}>
-    //                         <span>字体大小</span>
-    //                         <div style={{ display: 'flex', gap: '4px' }}>
-    //                             <button 
-    //                                 style={{
-    //                                     width: '24px',
-    //                                     height: '24px',
-    //                                     display: 'flex',
-    //                                     alignItems: 'center',
-    //                                     justifyContent: 'center',
-    //                                     border: '1px solid var(--b3-border-color)',
-    //                                     borderRadius: '4px',
-    //                                     background: 'var(--b3-theme-background)'
-    //                                 }}
-    //                                 onClick={() => {
-    //                                     // 减小字体
-    //                                     const selectedShapes = editor.getSelectedShapes()
-    //                                     if (selectedShapes.length !== 1 || selectedShapes[0].type !== 'card') return
-                                        
-    //                                     const shape = selectedShapes[0] as ICardShape
-    //                                     const currentSize = shape.props.fontSize || 16
-    //                                     const newSize = Math.max(currentSize - 2, 8)
-                                        
-    //                                     // 更新卡片属性
-    //                                     editor.updateShape({
-    //                                         id: shape.id,
-    //                                         type: 'card',
-    //                                         props: {
-    //                                             ...shape.props,
-    //                                             fontSize: newSize
-    //                                         }
-    //                                     })
-                                        
-    //                                     // 直接应用到DOM元素
-    //                                     const cardElement = document.querySelector(`[data-shape-id="${shape.id}"]`)
-    //                                     if (cardElement) {
-    //                                         const protyleElement = cardElement.querySelector('.protyle-wysiwyg')
-    //                                         if (protyleElement) {
-    //                                             (protyleElement as HTMLElement).style.fontSize = `${newSize}px`
-    //                                         }
-    //                                     }
-    //                                 }}
-    //                             >
-    //                                 A-
-    //                             </button>
-    //                             <span style={{ width: '30px', textAlign: 'center' }}>{fontSize}px</span>
-    //                             <button 
-    //                                 style={{
-    //                                     width: '24px',
-    //                                     height: '24px',
-    //                                     display: 'flex',
-    //                                     alignItems: 'center',
-    //                                     justifyContent: 'center',
-    //                                     border: '1px solid var(--b3-border-color)',
-    //                                     borderRadius: '4px',
-    //                                     background: 'var(--b3-theme-background)'
-    //                                 }}
-    //                                 onClick={() => {
-    //                                     // 增大字体
-    //                                     const selectedShapes = editor.getSelectedShapes()
-    //                                     if (selectedShapes.length !== 1 || selectedShapes[0].type !== 'card') return
-                                        
-    //                                     const shape = selectedShapes[0] as ICardShape
-    //                                     const currentSize = shape.props.fontSize || 16
-    //                                     const newSize = currentSize + 2
-                                        
-    //                                     // 更新卡片属性
-    //                                     editor.updateShape({
-    //                                         id: shape.id,
-    //                                         type: 'card',
-    //                                         props: {
-    //                                             ...shape.props,
-    //                                             fontSize: newSize
-    //                                         }
-    //                                     })
-                                        
-    //                                     // 直接应用到DOM元素
-    //                                     const cardElement = document.querySelector(`[data-shape-id="${shape.id}"]`)
-    //                                     if (cardElement) {
-    //                                         const protyleElement = cardElement.querySelector('.protyle-wysiwyg')
-    //                                         if (protyleElement) {
-    //                                             (protyleElement as HTMLElement).style.fontSize = `${newSize}px`
-    //                                         }
-    //                                     }
-    //                                 }}
-    //                             >
-    //                                 A+
-    //                             </button>
-    //                         </div>
-    //                     </div>
-    //                     <button
-    //                         style={{
-    //                             padding: '4px 8px',
-    //                             borderRadius: '4px',
-    //                             border: '1px solid var(--b3-border-color)',
-    //                             background: 'var(--b3-theme-background)'
-    //                         }}
-    //                         onClick={() => {
-    //                             // 适应内容尺寸
-    //                             const selectedShapes = editor.getSelectedShapes()
-    //                             if (selectedShapes.length !== 1 || selectedShapes[0].type !== 'card') return
-                                
-    //                             const shape = selectedShapes[0] as ICardShape
-                                
-    //                             // 找到卡片元素
-    //                             const cardElement = document.querySelector(`[data-shape-id="${shape.id}"]`)
-    //                             if (!cardElement) return
-                                
-    //                             // 找到内容元素
-    //                             const contentElement = cardElement.querySelector('.protyle-wysiwyg')
-    //                             if (!contentElement) return
-                                
-    //                             // 获取内容尺寸
-    //                             const contentRect = contentElement.getBoundingClientRect()
-                                
-    //                             // 设置新尺寸
-    //                             const newWidth = Math.max(contentRect.width + 40, 200)
-    //                             const newHeight = Math.max(contentRect.height + 40, 100)
-                                
-    //                             // 更新形状
-    //                             editor.updateShape({
-    //                                 id: shape.id,
-    //                                 type: 'card',
-    //                                 props: {
-    //                                     ...shape.props,
-    //                                     w: newWidth,
-    //                                     h: newHeight
-    //                                 }
-    //                             })
-    //                         }}
-    //                     >
-    //                         适应内容尺寸
-    //                     </button>
-    //                 </div>
-    //             )}
-    //         </>
-    //     )
-    // },
+
 }
 
 
