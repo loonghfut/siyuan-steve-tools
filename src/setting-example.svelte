@@ -539,11 +539,11 @@
             ],
         },
         {
-            name: "🛠️画板(开发中。。)",
+            name: "🛠️画板(测试中)",
             items: [
                 {
                     type: "checkbox",
-                    title: "启用画板功能（开发中，请勿在重要空间中使用！！）",
+                    title: "启用画板功能（测试中，请勿在重要空间中使用！！）",
                     description: "启用后可以在编辑器中使用画板功能",
                     key: "handwriting-enable",
                     value: settings["handwriting-enable"],
@@ -551,8 +551,8 @@
                 {
                     //3
                     type: "select",
-                    title: "画板数据块创建位置",
-                    description: "选择日记本",
+                    title: "画板数据块备用创建位置",
+                    description: "选择日记本，备用创建位置",
                     key: "tl-draw-create-note-id",
                     value: settings["tl-draw-create-note-id"],
                     options: Object.fromEntries(
@@ -561,19 +561,6 @@
                             notebook.name,
                         ]),
                     ),
-                },
-                {
-                    type: "button",
-                    title: "button",
-                    description: "This is a button",
-                    key: "e",
-                    value: "Click Button",
-                    button: {
-                        label: "Click Me",
-                        callback: () => {
-                            showMessage("Hello, world!");
-                        },
-                    },
                 },
             ],
         },

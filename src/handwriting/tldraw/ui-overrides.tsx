@@ -126,7 +126,7 @@ export const components: TLComponents = {
                 <TldrawUiMenuGroup id="sttools">
                     <TldrawUiMenuItem
                         id="backupData"
-                        label="backupData"
+                        label="备份数据"
                         readonlyOk
                         onSelect={() => {
                             editor.emit('sttools:backupData');
@@ -134,7 +134,7 @@ export const components: TLComponents = {
                     />
                     <TldrawUiMenuItem
                         id="importData"
-                        label="importData"
+                        label="导入备份数据"
                         readonlyOk
                         onSelect={() => {
                             editor.emit('sttools:importData');
