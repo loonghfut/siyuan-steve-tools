@@ -22,6 +22,8 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
 压缩媒体资源后再导入思源。  
+5. tldraw画板：
+模仿AFFINE，深度绑定思源的tldraw画板，支持嵌入思源块和链接跳转
 
 #### 目前主要是我自己使用，实在没精力和动力去制作详细教程（简单的使用方式会在滴链发）。要是您希望我能制作教程，不妨通过[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)或者给项目点个 [star](https://github.com/loonghfut/siyuan-steve-tools) 来鼓励鼓励，这对我来说会是很大的动力，若长期没有打赏和star，后续的功能交互提示可能会很潦草，还请见谅。
 #### 下面表格列出了一些我用不上但是可能对你有用的功能和教程（还未开发和制作，达到条件后开始制作）（若你用不上，忽略即可）
@@ -37,7 +39,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 注：需提前说明的是，功能与教程的最终呈现效果，或许会与您的预期存在差异，实际情况请以最终成品为准，个人能力有限，主观难度较高的可能无法实现或实现效果较差，若介意请不要为此而打赏。   
 
 **当前状态** （建议打赏时留下您的邮箱或链滴名称）打赏者的需求我会优先考虑      
-- 💰 [打赏人数](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) 19（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
+- 💰 [打赏人数](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) 20（每次更新插件时更新） [详细(32小时内更新进度)](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 - [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools.svg?style=social&label=Star)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 
 #### 更新日志
@@ -53,12 +55,12 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [博]()：打赏支持 `the third `
 - [林（新塘版）]()：打赏支持 `the fourth `
 - [VeryZHH]()：打赏支持 `the fifth ` 
-- [Goffin 峰](),[剑舞者舞剑](),[三克*]()：打赏支持 `the newest `
+- [Goffin 峰](),[修远](),[VeryZHH*]()：打赏支持 `the newest `
 [更多。。](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 #### 说明
 - 本项目使用了基于 MIT 许可证的代码。
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
-
+- 画板视图基于tldraw开发，感谢tldraw的开发者。
 #### 打赏
 如果你觉得这个项目对你有帮助，欢迎打赏，以激励我更好的维护和更新这个项目。  
 <img src="https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png" alt="图片描述" width="200" />
