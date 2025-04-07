@@ -183,6 +183,7 @@
         if (success) {
             showMessage(`备份已恢复到画板 ${title || drawingId}`);
         }
+        api.refresh();
     }
 
     // 删除备份
