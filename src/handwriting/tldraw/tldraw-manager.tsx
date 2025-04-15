@@ -117,7 +117,7 @@ export class TldrawManager {
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: false,
         maxFontsToLoadBeforeRender: 10,
-
+        
     }
     /**
      * 渲染tldraw组件

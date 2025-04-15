@@ -77,13 +77,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const [isEditingState, setIsEditingState] = useState(isEditing);
-		// eslint-disable-next-line react-hooks/rules-of-hooks
+		
 		const protyleRef = useRef(null)
 
-		// eslint-disable-next-line react-hooks/rules-of-hooks
+		
 		const containerRef = useRef<HTMLDivElement>(null)
 
-		// eslint-disable-next-line react-hooks/rules-of-hooks
+		
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
