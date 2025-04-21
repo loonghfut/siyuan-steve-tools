@@ -63,6 +63,11 @@ export const defaultSettings = {
     // 画板模块
     "handwriting-enable": false,
     "tl-draw-create-note-id": null,
+    // LifeLog模块
+    "lifelog-enable": true,
+    "lifelog-debug": false,  // 是否启用调试日志
+    "lifelog-paths": ["/daily", "/journals/"],  // 监听的文档路径
+    "lifelog-time-format": "HH:mm",  // 时间格式
 };
 
 export function getSettings() {
