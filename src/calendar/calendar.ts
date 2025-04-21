@@ -18,6 +18,9 @@ import * as myF from './myF';
 import { showMessage } from 'siyuan';
 import { createFloatingCalendar } from './createFloatingCalendar';
 import { updateAttrViewCell_pro } from '@/api';
+import { getCategoryColor, lifelogColors} from '../styles/colors';
+
+import { LifelogView } from './lifelog-view';
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
@@ -42,16 +45,36 @@ export async function init_viewValue(data: { viewId: string, viewName: string })
     filterViewId = data.viewId ? data.viewId.split(',') : [];
 }
 
+// 新增变量，用于保存原始的时间槽间隔
+let lastSavedLifelogSlotDuration: string;
 
 export async function run(
     id: string,
     initialView = 'dayGridMonth',
     S_viewID = "",
-    cleft = 'prev,next today viewFilter',
+    cleft = 'prev,next today viewFilter lifelogToggle',
     cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
     ccenter = 'title',
 ) {
-    filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
+    // filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
+    const savedViewId = moduleInstances['M_calendar'].calConfig.get('viewId');
+    filterViewId = savedViewId ? savedViewId.split(',') : [];
+    // 从配置中读取保存的 SlotDuration，有lifelog view的时候的使用缓存的slotDuration
+    // 当没有lifelogview的时候，直接使用设置的默认值
+    const savedSlotDuration = moduleInstances['M_calendar'].calConfig.get('slotDuration');
+    let defaultSlotDuration = validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00');
+    let currentSlotDuration = defaultSlotDuration;
+
+    if (filterViewId.includes('lifelog')) {
+        lastSavedLifelogSlotDuration = savedSlotDuration 
+            ? validateTimeFormat(savedSlotDuration, defaultSlotDuration) 
+            : defaultSlotDuration;
+        currentSlotDuration = lastSavedLifelogSlotDuration;
+    } else {
+        currentSlotDuration = defaultSlotDuration;
+    }
+    let updatedCleft = cleft;
+
     let calendarEl: HTMLElement;
     if (id === "1") {
         // 创建悬浮容器
@@ -64,6 +87,44 @@ export async function run(
         console.error('Calendar container not found');
         return;
     }
+
+    // 添加鼠标滚轮事件监听器
+    calendarEl.addEventListener('wheel', (e) => {
+        // 判断是否按住 Ctrl 键
+        if (!e.ctrlKey) {
+            return;
+        }
+        e.preventDefault();
+        const currentSlotDuration = calendar.getOption('slotDuration') as string;
+        const [hours, minutes, seconds] = currentSlotDuration.split(':').map(Number);
+        const totalMinutes = hours * 60 + minutes + seconds / 60;
+
+        // 定义缩放步长，这里设置为 10 分钟
+        const step = 10;
+        let newTotalMinutes;
+
+        if (e.deltaY < 0) {
+            // 向上滚动，时间间隔缩小
+            newTotalMinutes = Math.max(totalMinutes - step, 10); // 最小为 10 分钟
+        } else {
+            // 向下滚动，时间间隔放大
+            newTotalMinutes = totalMinutes + step;
+        }
+
+        const newHours = Math.floor(newTotalMinutes / 60);
+        const newMinutes = Math.round(newTotalMinutes % 60);
+        const newSlotDuration = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}:00`;
+
+        // 更新日历的 slotDuration
+        calendar.setOption('slotDuration', newSlotDuration);
+        if (filterViewId.includes('lifelog')) {
+            // 仅在有 lifelog 视图时更新 lastSavedLifelogSlotDuration 并保存
+            lastSavedLifelogSlotDuration = newSlotDuration;
+            moduleInstances['M_calendar'].calConfig.set('slotDuration', newSlotDuration);
+            moduleInstances['M_calendar'].calConfig.save();
+        }
+    });
+
     const calendar = new Calendar(calendarEl, {
         plugins: [
             interactionPlugin,
@@ -81,7 +142,7 @@ export async function run(
         editable: true,
         nowIndicator: true,
         firstDay: settingdata["cal-week-start"] === "sunday" ? 0 : 1,
-        slotDuration: validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00'),
+        slotDuration: currentSlotDuration,
         slotMinTime: validateTimeFormat(settingdata["cal-slot-min-time"], '00:00:00'),
         slotMaxTime: validateTimeFormat(settingdata["cal-slot-max-time"], '24:00:00'),
         snapDuration: validateTimeFormat(settingdata["cal-snap-duration"], '00:15:00'),
@@ -481,6 +542,46 @@ export async function run(
 
                         menuContent.appendChild(icsItem);
                     }
+                    if (moduleInstances['M_lifelog']?.enabled) {
+                        const lifelogItem = document.createElement('div');
+                        lifelogItem.className = 'view-filter-item';
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        // 根据 filterViewId 动态设置选中状态
+                        checkbox.checked = filterViewId.includes('lifelog'); 
+                        checkbox.className = 'view-filter-checkbox';
+
+                        const label = document.createElement('span');
+                        label.textContent = 'Lifelog 记录';
+                        label.className = 'view-filter-label';
+
+                        lifelogItem.appendChild(checkbox);
+                        lifelogItem.appendChild(label);
+
+                        lifelogItem.onclick = (e) => {
+                            e.stopPropagation();
+                            if (filterViewId.includes('lifelog')) {
+                                filterViewId = filterViewId.filter(id => id !== 'lifelog');
+                                calendar.setOption('slotDuration', lastSavedLifelogSlotDuration);
+                            } else {
+                                filterViewId.push('lifelog');
+                                calendar.setOption('slotDuration', '00:10:00');
+                            }
+                            checkbox.checked = filterViewId.includes('lifelog');
+
+                            // 保存配置
+                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
+                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+                            moduleInstances['M_calendar'].calConfig.save();
+
+                            calendar.refetchEvents();
+                        };
+
+
+                        menuContent.appendChild(lifelogItem);
+                    }
+
                     // 添加视图选项
                     viewIDs.forEach(view => {
                         const item = document.createElement('div');
@@ -572,9 +673,33 @@ export async function run(
                     }
                 },
             },
+            // 添加 Lifelog 自定义按钮
+            lifelogToggle: {
+                text: 'Lifelog',
+                click: async function () {
+                    if (filterViewId.includes('lifelog')) {
+                        filterViewId = filterViewId.filter(id => id !== 'lifelog');
+                        // 退出 lifelog 视图，恢复默认时间槽间隔
+                        calendar.setOption('slotDuration', defaultSlotDuration);
+                    } else {
+                        filterViewId.push('lifelog');
+                        // 加载 lifelog 视图，设置时间槽间隔为保存的值或默认值
+                        calendar.setOption('slotDuration', lastSavedLifelogSlotDuration);
+                    }
+    
+                    // 保存配置
+                    moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
+                    moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+                    moduleInstances['M_calendar'].calConfig.save();
+    
+                    await calendar.refetchEvents();
+                    await refreshKanban();
+                }
+            }
         },
+        // 将 lifelogToggle 按钮添加到工具栏
         headerToolbar: {
-            left: cleft,
+            left: updatedCleft,
             center: ccenter,
             right: cright
         },
@@ -636,6 +761,39 @@ export async function run(
                     // 继续执行，不影响其他日历数据加载
                 }
 
+                /////////////////////Lifelog////////////////////////
+                try {
+                    const showLifelogEvents = filterViewId.includes('lifelog');
+                    if (showLifelogEvents) { 
+                        const lifelogEvents = await LifelogView.getLifelogEvents(info.start, info.end);     
+                        console.log('是否显示 Lifelog 事件:', showLifelogEvents);
+                        console.log('当前过滤视图:', filterViewId);
+                        console.log('当前视图类型:', calendar.view.type);
+
+                        if (lifelogEvents && Array.isArray(lifelogEvents)) {
+                            console.log(`加载了 ${lifelogEvents.length} 个 Lifelog 事件`);
+                            const formattedLifelogEvents = lifelogEvents.map(event => ({
+                                ...event,
+                                editable: false,
+                                startEditable: false,
+                                durationEditable: false,
+                                resourceEditable: false,
+                                display: 'auto',
+                                allDay: false,
+                                extendedProps: {
+                                    ...event.extendedProps,
+                                    source: 'lifelog',
+                                    viewId: 'lifelog'
+                                }
+                            }));
+
+                            allEvents = allEvents.concat(formattedLifelogEvents);
+                        }
+                    }
+                } catch (error) {
+                    console.error('加载 Lifelog 事件失败:', error);
+                }
+
                 /////////////////////思源////////////////////////
                 // 1. 获取引用ID
                 av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
@@ -649,8 +807,10 @@ export async function run(
                 // 2. 获取视图ID
                 const viewIDs_zq = await myF.getViewId(av_ids_zq);
                 const viewIDs = await myF.getViewId(av_ids);
-                if (!viewIDs?.length) {
-                    console.warn('No view IDs found');
+
+                // 修改视图ID检查逻辑
+                if (!viewIDs?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription')) {
+                    console.warn('No view IDs found and no special views selected');
                     successCallback([]);
                     return;
                 }
@@ -723,23 +883,24 @@ export async function run(
                 });
             }
             // 设置样式
-            //// 设置随机背景色
-            // Use event's ID or title as a unique identifier for color
-            const uniqueId = info.event.id || info.event.title;
-            // Create a hash of the uniqueId to get a number
-            const hash = Array.from(uniqueId).reduce((acc, char) => {
-                return char.charCodeAt(0) + ((acc << 5) - acc);
-            }, 0);
+            const source = info.event.extendedProps.source;
+            let colorConfig;
 
-            // Use hash as index for color and get both background and text colors
-            const [backgroundColor, textColor] = getColors(Math.abs(hash));
-            info.el.style.backgroundColor = backgroundColor;
-
+            if (source === 'lifelog') {
+                const type = info.event.extendedProps.logType || '固定';
+                colorConfig = lifelogColors[type] || lifelogColors['固定'];        
+            } else {
+                const priority = info.event.extendedProps.priority || '无';
+                colorConfig = getCategoryColor(priority);
+                info.el.style.borderLeft = `2px solid ${colorConfig.border}`;
+            }
+            // 应用颜色
+            info.el.style.backgroundColor = colorConfig.background;
             // Also apply text color to child elements
             const timeEl = info.el.querySelector('.fc-event-time');
             const titleEl = info.el.querySelector('.fc-event-title');
-            if (timeEl) (timeEl as HTMLElement).style.color = textColor;
-            if (titleEl) (titleEl as HTMLElement).style.color = textColor;
+            if (timeEl) (timeEl as HTMLElement).style.color = colorConfig.text;
+            if (titleEl) (titleEl as HTMLElement).style.color = colorConfig.text;
 
             if (info.event.extendedProps.isRecurring && info.event.extendedProps.source !== 'qqcalendar') {
                 const isCompleted = isEventCompleted(info.event);
@@ -813,8 +974,8 @@ export async function run(
                 content: `
                     <div class="event-tooltip">
                         <span class="event-tooltip__title"
-                            data-type="block-ref" 
-                            data-id="${info.event.extendedProps.blockId || ''}" 
+                            data-type="block-ref"
+                            data-id="${info.event.extendedProps.blockId || ''}"
                         >
                             ${info.event.title}
                         </span>
@@ -1008,7 +1169,7 @@ function hsl2rgb(h: number, s: number, l: number): number[] { // Copied from htt
 var colourIsLight = function (r: number, g: number, b: number) { // Copied from https://codepen.io/WebSeed/full/pvgqEq/
 
     // Counting the perceptive luminance
-    // human eye favors green color... 
+    // human eye favors green color...
     var a = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return (a < 0.5);
 }

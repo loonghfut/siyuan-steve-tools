@@ -28,6 +28,7 @@ import { M_sync } from "./sync/module-sync";
 import { M_ai } from "./ai/ai";
 import { M_handwriting } from "./handwriting/module-handwriting";
 import { M_imageCompression } from "./ImageCompression/module-imageCompression";
+import { M_lifelog } from "./lifelog/module-lifelog";
 
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";
@@ -44,6 +45,7 @@ export let moduleInstances: {
     M_ai?: M_ai;
     M_handwriting?: M_handwriting;
     M_imageCompression?: M_imageCompression;
+    M_lifelog?: M_lifelog;  // 添加新模块
 } = {};
 
 export default class steveTools extends Plugin {
@@ -75,6 +77,11 @@ export default class steveTools extends Plugin {
             console.log("画板模块加载");
         }
 
+        if (data["lifelog-enable"] == true) {
+            this.loadModule(M_lifelog, 'M_lifelog');
+            console.log("LifeLog模块加载");
+        }
+
     }
 
     // private isMobile: boolean;
@@ -83,7 +90,7 @@ export default class steveTools extends Plugin {
         this.addIcons(`
     <symbol id="iconST" viewBox="0 0 512 512">
        ${ic.steveTools_icon}
-    </symbol>  
+    </symbol>
         `);
 
         this.addTopBar({

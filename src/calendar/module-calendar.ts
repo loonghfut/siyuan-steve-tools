@@ -39,6 +39,7 @@ export class M_calendar {
         this.plugin = plugin;
     }
     private isUpdating: boolean = false;
+    private isSettingAttrs: boolean = false;  // 添加属性声明
     public av_ids: any;
     public calConfig: M_caldata;
     public alistPlugin: ics_alist;
@@ -88,7 +89,7 @@ export class M_calendar {
         this.plugin.addIcons(`
     <symbol id="iconSTcal" viewBox="0 0 500 500">
        ${ic.steveTools_cal}
-    </symbol>  
+    </symbol>
     <symbol id="iconSTcalKanban" viewBox="0 0 802 802">
         ${ic.steveTools_cal_kanban}
     </symbol>
@@ -171,7 +172,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'today,viewFilter,prev,next', '');
+                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'today,lifelogToggle,viewFilter,prev,next', '');
                 }, 100);
             },
         });
@@ -186,28 +187,37 @@ export class M_calendar {
                 }
                 // if (1) { return; }
                 const msg = JSON.parse(e.data);
-                if (msg.cmd === "transactions") {
+                if (msg.cmd === "syncing") {
                     // steveTools.outlog(msg);
-                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃，无法稳定复现
-                        // steveTools.outlog("更新了一个属性视图");
-                        const avids = await this.getAVreferenceid();
-                        //加上周期
-                        const avids_zq = await this.getAVreferenceid('周期');
-                        steveTools.outlog(avids);
-                        if (avids.includes(msg.data[0].doOperations[0].avID) || avids_zq.includes(msg.data[0].doOperations[0].avID)) {
-                            steveTools.outlog("更新了日程信息");
-                            //延时执行
-                            if (!this.isUpdating) {
-                                this.isUpdating = true;
-                                setTimeout(async () => {
-                                    await this.getEventsFromSiYuanDatabase();
-                                    console.log("更新日历文件<2>");
-                                    this.isUpdating = false;
-                                }, 10000);
-                            }
-                        } else {
-                            // steveTools.outlog("avID 不在 avids 数组中");
-                        }
+                    // if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃，无法稳定复现
+                    //     // steveTools.outlog("更新了一个属性视图");
+                    //     const avids = await this.getAVreferenceid();
+                    //     //加上周期
+                    //     const avids_zq = await this.getAVreferenceid('周期');
+                    //     steveTools.outlog(avids);
+                    //     if (avids.includes(msg.data[0].doOperations[0].avID) || avids_zq.includes(msg.data[0].doOperations[0].avID)) {
+                    //         steveTools.outlog("更新了日程信息");
+                    //         //延时执行
+                    //         if (!this.isUpdating) {
+                    //             this.isUpdating = true;
+                    //             setTimeout(async () => {
+                    //                 await this.getEventsFromSiYuanDatabase();
+                    //                 console.log("更新日历文件<2>");
+                    //                 this.isUpdating = false;
+                    //             }, 10000);
+                    //         }
+                    //     } else {
+                    //         // steveTools.outlog("avID 不在 avids 数组中");
+                    //     }
+                    steveTools.outlog("更新了日程信息");
+                    //延时执行
+                    if (!this.isUpdating) {
+                        this.isUpdating = true;
+                        setTimeout(async () => {
+                            await this.getEventsFromSiYuanDatabase();
+                            console.log("更新日历文件<2>");
+                            this.isUpdating = false;
+                        }, 3000);
                     }
 
                 }
@@ -215,10 +225,10 @@ export class M_calendar {
             });
 
             //每15分钟调用一次await this.getEventsFromSiYuanDatabase()
-            setInterval(async () => {
-                await this.getEventsFromSiYuanDatabase()
-                steveTools.outlog("自动更新日历文件<1>");
-            }, 900000);
+            // setInterval(async () => {
+            //     await this.getEventsFromSiYuanDatabase()
+            //     steveTools.outlog("自动更新日历文件<1>");
+            // }, 900000);
         }
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
         //实现看板实时更新
@@ -237,12 +247,20 @@ export class M_calendar {
                     if (msg?.data?.[0]?.doOperations?.[0]?.avID &&
                         msg?.data?.[0]?.doOperations?.[0]?.data?.mSelect?.[0]?.content &&
                         msg?.data?.[0]?.doOperations?.[0]?.rowID) {
-                        //判断是否为事件（判断是否是日程数据库的事件）
-                        if (this.av_ids.map(item => item.id).includes(msg.data[0].doOperations[0].avID)) {
+                        //判断是否为事件（判断是否是日程数据库的事件）且是否修改的是状态列
+                        if (this.av_ids.map(item => item.id).includes(msg.data[0].doOperations[0].avID) ) {
                             const status = msg.data[0]?.doOperations[0]?.data?.mSelect[0]?.content;
                             const blockID = msg.data[0]?.doOperations[0]?.rowID;
-                            console.log("status", status, blockID);
-                            await api.setBlockAttrs(blockID, { "custom-st-event": myF.statusMap[status] });//TODO优化，防止二次触发
+                            console.log("status", status, blockID, myF.statusMap[status])
+
+                            if (myF.statusMap[status] && !this.isSettingAttrs) {
+                                this.isSettingAttrs = true;
+                                try {
+                                    await api.setBlockAttrs(blockID, { "custom-st-event": myF.statusMap[status] });
+                                } finally {
+                                    this.isSettingAttrs = false;
+                                }
+                            }
                         }
                     }
                     // }
@@ -252,7 +270,7 @@ export class M_calendar {
                     const data = msg.data[0].doOperations[0].data;
                     if (data.startsWith('<div data-marker')) {
                         // console.log('asd', data);
-                        refreshKanban();
+                        // refreshKanban();
                         console.log("update");
                     }
                 }
@@ -662,8 +680,8 @@ export class M_calendar {
 
     }
     async getAVreferenceid_pro(forwhat: string = '日程') {
-        const sqlStr = `SELECT markdown, content 
-        FROM blocks 
+        const sqlStr = `SELECT markdown, content
+        FROM blocks
         WHERE name = '${forwhat}'
         AND markdown LIKE '%NodeAttributeView%data-av-id%';`;
 
