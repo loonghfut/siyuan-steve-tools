@@ -268,7 +268,7 @@
                     type: "checkbox",
                     title: "自动更新ics文件",
                     description:
-                        "启用后每10分钟更新一次(需保证前端运行)，且每次编辑日程数据后自动更新(插件出问题首先关闭此选项）",
+                        "启用后再同步触发后3s自动更新ics文件",
                     key: "cal-auto-update",
                     value: settings["cal-auto-update"],
                 },
@@ -593,6 +593,32 @@
                 },
             ],
         },
+        {
+            name: "LifeLog",
+            items: [
+                {
+                    type: "checkbox",
+                    title: "启用 LifeLog",
+                    description: "启用后可以记录日记中的时间记录",
+                    key: "lifelog-enable",
+                    value: settings["lifelog-enable"],
+                },
+                {
+                    type: "checkbox",
+                    title: "启用调试日志",
+                    description: "启用后会在控制台输出详细的调试信息",
+                    key: "lifelog-debug",
+                    value: settings["lifelog-debug"],
+                },
+                {
+                    type: "textinput",
+                    title: "监听路径",
+                    description: "多个路径用英文逗号分隔，如: /daily/,/journals/",
+                    key: "lifelog-paths",
+                    value: settings["lifelog-paths"],
+                },
+            ],
+        },
     ];
 
     let focusGroup = groups[0].name;
@@ -628,6 +654,10 @@
 
     async function saveSettings() {
         await plugin.saveData(myfile, settings);
+        // 更新 LifeLog 模块的设置
+        if (moduleInstances["M_lifelog"]) {
+            moduleInstances["M_lifelog"].updateSettings(settings);
+        }
     }
 
     onMount(async () => {

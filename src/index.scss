@@ -498,8 +498,6 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 }
 
 .kanban-column {
-
-    // Common styles for all columns
     &-未完成,
     &-进行中,
     &-完成 {
@@ -517,39 +515,33 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
         }
     }
 
-    // Specific styles for each column
     &-未完成 {
         h2 {
-            color: $text-color-info;
+            color: var(--b3-card-info-color);
         }
-
         .kanban-card {
-            background-color: $background-color-info;
-            border-left: 2px solid $text-color-info;
+            background-color: #596c7036;
+            border-left: 2px solid var(--b3-card-info-color);
         }
     }
 
     &-进行中 {
         h2 {
-            color: $text-color-processing;
+            color: #3573f0;
         }
-
         .kanban-card {
-            background-color: $background-color-processing;
-            border-left: 2px solid $text-color-processing;
-
+            background-color: #3478c83d;
+            border-left: 2px solid #3573f0;
         }
     }
 
     &-完成 {
         h2 {
-            color: $text-color-success;
+            color: var(--b3-theme-success);
         }
-
         .kanban-card {
-            background-color: $background-color-success;
-            border-left: 2px solid $text-color-success;
-
+            background-color: #4b8c8a3d;
+            border-left: 2px solid var(--b3-theme-success);
         }
     }
 }
@@ -920,6 +912,44 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 }
 
 
-//画板模块
+body[data-lifelog-enabled] {
+    [data-type="NodeParagraph"][custom-lifelog-type] {
+        padding: 4px;
 
+        &[custom-lifelog-type="固"], &[custom-lifelog-type="固定"] {
+            border-bottom: 1px solid #D3D3D3;
+            background-color: rgba(211, 211, 211, 0.05);
+        }
 
+        &[custom-lifelog-type="增"], &[custom-lifelog-type="学习"],
+        &[custom-lifelog-type="阅读"], &[custom-lifelog-type="事业"] {
+            border-bottom: 1px solid #90EE90;
+            background-color: rgba(144, 238, 144, 0.05);
+        }
+
+        &[custom-lifelog-type="工作"] {
+            border-bottom: 1px solid #FFD700;
+            background-color: rgba(255, 215, 0, 0.05);
+        }
+
+        &[custom-lifelog-type="荒废"], &[custom-lifelog-type="废"],
+        &[custom-lifelog-type="娱乐"], &[custom-lifelog-type="玩"] {
+            border-bottom: 1px solid #FF0000;
+            background-color: rgba(255, 0, 0, 0.05);
+        }
+
+        &[custom-lifelog-type="家庭"], &[custom-lifelog-type="家"] {
+            border-bottom: 1px solid rgb(71, 255, 248);
+            background-color: rgba(71, 255, 248, 0.05);
+        }
+
+        &[custom-lifelog-type="朋友"], &[custom-lifelog-type="友"] {
+            border-bottom: 1px solid rgb(156, 123, 85);
+            background-color: rgba(156, 123, 85, 0.05);
+        }
+
+        &:hover {
+            background-color: var(--b3-theme-hover);
+        }
+    }
+}
