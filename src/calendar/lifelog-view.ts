@@ -11,6 +11,7 @@ export class LifelogView {
 
             const events: EventInput[] = [];
             const currentDate = new Date(start);
+            let lastDayLastEventEndTime = '23:59:59';  // 默认起始时间
 
             // 循环遍历从开始日期到结束日期的每一天
             while (currentDate <= end) {
@@ -49,49 +50,54 @@ export class LifelogView {
                    .filter(([_, data]) => data[ATTRS.time] && data[ATTRS.date])
                    .sort((a, b) => a[1][ATTRS.time].localeCompare(b[1][ATTRS.time]));
 
-                let lastEndTime = '23:59:59';
-                if (events.length > 0) {
-                    lastEndTime = events[events.length - 1].end?.toLocaleTimeString('zh-CN', { hour12: false }) || '23:59:59';
-                }
-
                 for (let i = 0; i < items.length; i++) {
                     const [blockId, data] = items[i];
                     const endTime = data[ATTRS.time];
-                    let startTime;
+                    let eventStartTime, eventStartDate;
 
                     if (i === 0) {
-                        if (lastEndTime === '23:59:59') {
-                            startTime = '00:00:00';
-                        } else {
-                            startTime = lastEndTime;
-                        }
+                        eventStartTime = lastDayLastEventEndTime;
+                        // 如果是当天第一个事件且开始时间是前一天的结束时间
+                        // 则需要使用前一天的日期
+                        const prevDate = new Date(currentDate);
+                        prevDate.setDate(prevDate.getDate() - 1);
+                        eventStartDate = prevDate.toISOString().split('T')[0].replace(/-/g, '/');
                     } else {
-                        startTime = items[i - 1][1][ATTRS.time];
+                        eventStartTime = items[i - 1][1][ATTRS.time];
+                        eventStartDate = dateStr;
                     }
 
-                    const formattedDate = dateStr.replace(/\//g, '-');
-                    const [year, month, day] = formattedDate.split('-').map(Number);
-                    const [startHour, startMinute] = startTime.split(':').map(Number);
+                    const formattedStartDate = eventStartDate.replace(/\//g, '-');
+                    const formattedEndDate = dateStr.replace(/\//g, '-');
+
+                    const [startYear, startMonth, startDay] = formattedStartDate.split('-').map(Number);
+                    const [endYear, endMonth, endDay] = formattedEndDate.split('-').map(Number);
+                    const [startHour, startMinute] = eventStartTime.split(':').map(Number);
                     const [endHour, endMinute] = endTime.split(':').map(Number);
 
                     const eventData = {
                         id: blockId,
                         title: `${data[ATTRS.type]}: ${data[ATTRS.content]}`,
-                        start: new Date(year, month - 1, day, startHour, startMinute),
-                        end: new Date(year, month - 1, day, endHour, endMinute),
+                        start: new Date(startYear, startMonth - 1, startDay, startHour, startMinute),
+                        end: new Date(endYear, endMonth - 1, endDay, endHour, endMinute),
                         allDay: false,
                         extendedProps: {
                             type: 'lifelog',
                             logType: data[ATTRS.type],
                             content: data[ATTRS.content],
-                            blockId: blockId, 
+                            blockId: blockId,
                         }
                     };
 
                     events.push(eventData);
                 }
 
-                // 推进到下一天
+                // 更新lastDayLastEventEndTime为当天最后一个事件的结束时间
+                // 如果当天没有事件，保持上一次的lastDayLastEventEndTime不变
+                if (items.length > 0) {
+                    lastDayLastEventEndTime = items[items.length - 1][1][ATTRS.time];
+                }
+
                 currentDate.setDate(currentDate.getDate() + 1);
             }
 
