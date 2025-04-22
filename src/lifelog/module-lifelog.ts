@@ -175,7 +175,7 @@ export class M_lifelog {
 
         // 修改段落过滤逻辑
         let paragraphs = changes.filter(p => {
-            if (!p.action === "update" || !p.data) return false;
+            if (p.action !== "update" || !p.data) return false;
             // 确保 data 是字符串类型
             const data = typeof p.data === 'string' ? p.data : JSON.stringify(p.data);
             // 检查 data 字段是否包含 NodeParagraph
