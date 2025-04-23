@@ -609,17 +609,10 @@
                     value: settings["lifelog-debug"],
                 },
                 {
-                    type: "textinput",
-                    title: "监听路径",
-                    description: "多个路径用英文逗号分隔，如: /daily/,/journals/",
-                    key: "lifelog-paths",
-                    value: settings["lifelog-paths"],
-                },
-                {
                     type: "hint",
-                    title: "提示",
+                    title: "感谢",
                     description:
-                        "此功能由 BoysFight 贡献",
+                        "此功能由 BoysFight PR贡献",
                     key: "lifelog-hint",
                     value: "",
                 },
