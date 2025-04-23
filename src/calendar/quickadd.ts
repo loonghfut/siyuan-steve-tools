@@ -107,11 +107,12 @@ export function runblockdata_for_time(content: string): string | null {
     // 支持“下午4点”“今天下午4点”等描述
     const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)?/;
     // 支持“下午4点”“4点”“16:00”等
-    const timePattern = /(上午|下午|中午|晚上)?\s*(\d{1,2})点(?:\s*(\d{1,2})分)?|(\d{1,2})[:|：](\d{1,2})/;
+    const timePattern = /(上午|下午|中午|晚上)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2})\s*分)?|(\d{1,2})\s*[:|：]\s*(\d{1,2})/;
 
     const dateMatch = content.match(datePattern);
     const timeMatch = content.match(timePattern);
-
+    console.log('dateMatch', dateMatch);
+    console.log('timeMatch', timeMatch);
     if (!dateMatch) return null;
 
     let targetDate = dayjs();
