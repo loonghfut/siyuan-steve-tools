@@ -1,4 +1,4 @@
-import steveTools, { settingdata } from "@/index";
+import steveTools, { frontEnd, settingdata } from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import { RRule } from 'rrule';
 import * as api from "@/api"
@@ -297,7 +297,12 @@ export class M_calendar {
             run("1");
         }
         //
-        await this.shareicsinit();
+        //配置实现只在某一端上传ics
+        const selectToPics = this_settingdata["SelectTOPics"];
+        if (!selectToPics || selectToPics === frontEnd) {
+            await this.shareicsinit();
+        }
+
         if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"] && this_settingdata["cal-qq-enable"]) {
             this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
             await this.QQCalDAVClient.init();
@@ -744,34 +749,36 @@ export class M_calendar {
                 //TODO:周期事件的周期处理改为数据库单选
                 await this.addEventToGlobal(result_zq);
             }
-
-
-
             await this.uploadAllEventsToFile(eventsPath);
             await this.generateICSFromEventsFile(eventsPath, calendarpath);
-            if (settingdata["cal-share"] === "alist") {
-                await this.alistPlugin.upload_ics();
-                console.log("alist_ics");
-            }
-            if (settingdata["cal-share"] === "s3") {
-                const ics = await api.getFileBlob(calendarpath)
-                const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                await this.s3Client.uploadFile(calendarpath2, file);
-            }
-            if (settingdata["cal-share"] === "s3-diy") {
-                const ics = await api.getFileBlob(calendarpath)
-                const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                await this.s3Client.uploadFile(calendarpath2, file);
-            }
-            if (settingdata["cal-share"] === "webdav") {
-                const ics = await api.getFileBlob(calendarpath)
-                const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                await this.webdavClient.uploadFile(settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
+            
+            const selectToPics = this_settingdata["SelectTOPics"];
+            if (!selectToPics || selectToPics === frontEnd) {
+                if (settingdata["cal-share"] === "alist") {
+                    await this.alistPlugin.upload_ics();
+                    console.log("alist_ics");
+                }
+                if (settingdata["cal-share"] === "s3") {
+                    const ics = await api.getFileBlob(calendarpath)
+                    const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                    await this.s3Client.uploadFile(calendarpath2, file);
+                }
+                if (settingdata["cal-share"] === "s3-diy") {
+                    const ics = await api.getFileBlob(calendarpath)
+                    const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                    await this.s3Client.uploadFile(calendarpath2, file);
+                }
+                if (settingdata["cal-share"] === "webdav") {
+                    const ics = await api.getFileBlob(calendarpath)
+                    const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                    await this.webdavClient.uploadFile(settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
+                }
             }
         } catch (error) {
             console.error('生成日历文件时发生错误:', error);
             throw error;
         }
+
     }
 
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { moduleInstances } from "./index";
+    import { frontEnd, moduleInstances } from "./index";
     import { showMessage } from "siyuan";
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
@@ -305,6 +305,14 @@
                         "s3-diy": "s3-diy(自定义桶)(推荐)",
                         webdav: "WebDAV(通用协议)",
                     },
+                },
+                {
+                    //14
+                    type: "textinput",
+                    title: "触发上传ics文件的思源平台",
+                    description: `当前平台：${frontEnd} （不填则全平台触发）`,
+                    key: "SelectTOPics",
+                    value: settings["SelectTOPics"],
                 },
                 {
                     //14
@@ -749,8 +757,8 @@
         日程管理: {
             基础设置: 7,
             高级设置: 8,
-            ics设置: 6,
-            ics分享: 8,
+            ics设置: 7,
+            ics分享: 9,
             订阅日历: 6,
             视图设置: 5,
             // 不限制

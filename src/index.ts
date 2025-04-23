@@ -3,6 +3,7 @@ import {
     // showMessage,
     // confirm,
     Dialog,
+    getFrontend,
     // Menu,
     // openTab,
     // adaptHotkey,
@@ -33,7 +34,7 @@ import { M_lifelog } from "./lifelog/module-lifelog";
 // import * as api from "@/api"
 import SettingExample from "@/setting-example.svelte";
 
-
+export let frontEnd;
 
 let islog = false;
 const myfile = "steveTools.json";
@@ -49,6 +50,7 @@ export let moduleInstances: {
 } = {};
 
 export default class steveTools extends Plugin {
+
     // private modules: any[];
     private loadModule(ModuleClass: any, moduleName: string) {
         const moduleInstance = new ModuleClass(this);//解释：new ModuleClass(this)相当于new ModuleClass(steveTools)
@@ -87,6 +89,7 @@ export default class steveTools extends Plugin {
     // private isMobile: boolean;
     // private settingUtils: SettingUtils;
     async onload() {
+        frontEnd = getFrontend();
         this.addIcons(`
     <symbol id="iconST" viewBox="0 0 512 512">
        ${ic.steveTools_icon}

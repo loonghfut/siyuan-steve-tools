@@ -70,6 +70,8 @@ export const defaultSettings = {
     "lifelog-debug": false,  // 是否启用调试日志
     "lifelog-paths": ["/daily", "/journals/"],  // 监听的文档路径
     "lifelog-time-format": "HH:mm",  // 时间格式
+    //https://github.com/loonghfut/siyuan-steve-tools/issues/44
+    "SelectTOPics": "",  
 };
 
 export function getSettings() {
