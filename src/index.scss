@@ -498,6 +498,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 }
 
 .kanban-column {
+
     &-未完成,
     &-进行中,
     &-完成 {
@@ -517,31 +518,34 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
     &-未完成 {
         h2 {
-            color: var(--b3-card-info-color);
+            color: $text-color-info;
         }
+
         .kanban-card {
-            background-color: #596c7036;
-            border-left: 2px solid var(--b3-card-info-color);
+            background-color: $background-color-info;
+            border-left: 2px solid $text-color-info;
         }
     }
 
     &-进行中 {
         h2 {
-            color: #3573f0;
+            color: $text-color-processing;
         }
+
         .kanban-card {
-            background-color: #3478c83d;
-            border-left: 2px solid #3573f0;
+            background-color: $background-color-processing;
+            border-left: 2px solid $text-color-processing;
         }
     }
 
     &-完成 {
         h2 {
-            color: var(--b3-theme-success);
+            color: $text-color-success;
         }
+
         .kanban-card {
-            background-color: #4b8c8a3d;
-            border-left: 2px solid var(--b3-theme-success);
+            background-color: $background-color-success;
+            border-left: 2px solid $text-color-success;
         }
     }
 }
@@ -853,7 +857,8 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
         border-bottom: 0px;
         height: calc((100vh - 132px) / 24);
     }
-    .fc-daygrid-day-events{
+
+    .fc-daygrid-day-events {
         min-height: 0em !important;
         margin-bottom: 0em !important;
     }
@@ -916,13 +921,16 @@ body[data-lifelog-enabled] {
     [data-type="NodeParagraph"][custom-lifelog-type] {
         padding: 4px;
 
-        &[custom-lifelog-type="固"], &[custom-lifelog-type="固定"] {
+        &[custom-lifelog-type="固"],
+        &[custom-lifelog-type="固定"] {
             border-bottom: 1px solid #D3D3D3;
             background-color: rgba(211, 211, 211, 0.05);
         }
 
-        &[custom-lifelog-type="增"], &[custom-lifelog-type="学习"],
-        &[custom-lifelog-type="阅读"], &[custom-lifelog-type="事业"] {
+        &[custom-lifelog-type="增"],
+        &[custom-lifelog-type="学习"],
+        &[custom-lifelog-type="阅读"],
+        &[custom-lifelog-type="事业"] {
             border-bottom: 1px solid #90EE90;
             background-color: rgba(144, 238, 144, 0.05);
         }
@@ -932,18 +940,22 @@ body[data-lifelog-enabled] {
             background-color: rgba(255, 215, 0, 0.05);
         }
 
-        &[custom-lifelog-type="荒废"], &[custom-lifelog-type="废"],
-        &[custom-lifelog-type="娱乐"], &[custom-lifelog-type="玩"] {
+        &[custom-lifelog-type="荒废"],
+        &[custom-lifelog-type="废"],
+        &[custom-lifelog-type="娱乐"],
+        &[custom-lifelog-type="玩"] {
             border-bottom: 1px solid #FF0000;
             background-color: rgba(255, 0, 0, 0.05);
         }
 
-        &[custom-lifelog-type="家庭"], &[custom-lifelog-type="家"] {
+        &[custom-lifelog-type="家庭"],
+        &[custom-lifelog-type="家"] {
             border-bottom: 1px solid rgb(71, 255, 248);
             background-color: rgba(71, 255, 248, 0.05);
         }
 
-        &[custom-lifelog-type="朋友"], &[custom-lifelog-type="友"] {
+        &[custom-lifelog-type="朋友"],
+        &[custom-lifelog-type="友"] {
             border-bottom: 1px solid rgb(156, 123, 85);
             background-color: rgba(156, 123, 85, 0.05);
         }
