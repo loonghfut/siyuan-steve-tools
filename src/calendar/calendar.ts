@@ -720,7 +720,7 @@ export async function run(
                 /////////////////////Lifelog////////////////////////
                 try {
                     const showLifelogEvents = filterViewId.includes('lifelog');
-                    if (showLifelogEvents) {
+                    if (showLifelogEvents && moduleInstances['M_lifelog']?.enabled) {
                         const lifelogEvents = await LifelogView.getLifelogEvents(info.start, info.end);
                         console.log('是否显示 Lifelog 事件:', showLifelogEvents);
                         console.log('当前过滤视图:', filterViewId);
