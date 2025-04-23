@@ -1016,7 +1016,7 @@ function displayStatusDropZone(calendarEl: HTMLElement, info) {
             statusDropZone.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
         }
     } else {
-        statusDropZone.innerHTML = '<div>拖放到此处将事件标记为"归档"</div>';
+        statusDropZone.innerHTML = '<div>拖放到标题处将事件标记为"归档"</div>';
         statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
     }
 
