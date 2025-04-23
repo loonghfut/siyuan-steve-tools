@@ -849,17 +849,6 @@ export async function run(
                 const priority = info.event.extendedProps.priority || '无';
                 colorConfig = getCategoryColor(priority);
                 // info.el.style.borderLeft = `2px solid ${colorConfig.border}`;
-                //// 设置随机背景色
-                // Use event's ID or title as a unique identifier for color
-                // const uniqueId = info.event.title;
-                // // Create a hash of the uniqueId to get a number
-                // const hash = Array.from(uniqueId).reduce((acc, char) => {
-                //     return char.charCodeAt(0) + ((acc << 5) - acc);
-                // }, 0);
-
-                // // Use hash as index for color and get both background and text colors
-                // const [backgroundColor, textColor] = getColors(Math.abs(hash));
-                // info.el.style.backgroundColor = backgroundColor;
             }
             // 应用颜色
             info.el.style.backgroundColor = colorConfig.background;
@@ -884,22 +873,22 @@ export async function run(
                 if (info && info.event && info.event.extendedProps && info.event.extendedProps.status === '完成') {
                     // 应用完成状态的样式
                     info.el.style.textDecoration = 'line-through';
+                    if (settingdata["cal-event-color"]) {
+                        try {
+                            // 调暗背景色
+                            const uniqueId = info.event.extendedProps.priority as string || '无';
+                            const hash = Array.from(uniqueId).reduce((acc, char) => {
+                                return char.charCodeAt(0) + ((acc << 5) - acc);
+                            }, 0);
+                            const [backgroundColor] = getColors(Math.abs(hash));
 
-                    try {
-                        // 调暗背景色
-                        const uniqueId = info.event.id || info.event.title;
-                        const hash = Array.from(uniqueId).reduce((acc, char) => {
-                            return char.charCodeAt(0) + ((acc << 5) - acc);
-                        }, 0);
-                        const [backgroundColor] = getColors(Math.abs(hash));
-
-                        // 将背景色转换为 RGBA 格式并降低不透明度
-                        info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
-                    } catch (colorError) {
-                        console.error('背景色处理错误:', colorError);
-                        console.log('事件数据:', info.event);
+                            // 将背景色转换为 RGBA 格式并降低不透明度
+                            info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
+                        } catch (colorError) {
+                            console.error('背景色处理错误:', colorError);
+                            console.log('事件数据:', info.event);
+                        }
                     }
-
                     try {
                         // 应用其他样式
                         const titleEl = info.el.querySelector('.fc-event-title');

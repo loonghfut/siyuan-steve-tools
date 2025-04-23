@@ -5,6 +5,7 @@ export const defaultSettings = {
     "cal-get-url": "Click Button",
     "cal-reset": "Click Button",
     "cal-auto-update": true,
+    "cal-auto-syncing-update": false,
     "cal-hand-update": true,
     "cal-view-night": false,
     "cal-hand": "ces",

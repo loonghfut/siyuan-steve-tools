@@ -268,9 +268,18 @@
                     type: "checkbox",
                     title: "自动更新ics文件",
                     description:
-                        "启用后再同步触发后3s自动更新ics文件",
+                        "启用后每次修改日程触发自动更新ics文件",
                     key: "cal-auto-update",
                     value: settings["cal-auto-update"],
+                },
+                {
+                    //7
+                    type: "checkbox",
+                    title: "同步更新ics文件",
+                    description:
+                        "启用后每次同步完后触发自动更新ics文件",
+                    key: "cal-auto-syncing-update",
+                    value: settings["cal-auto-syncing-update"],
                 },
                 {
                     //8
