@@ -50,6 +50,7 @@ export const defaultSettings = {
     "cal-slot-min-time": "00:00:00",
     "cal-slot-max-time": "24:00:00",
     "cal-snap-duration": "00:30:00",
+    "cal-event-color": true,
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

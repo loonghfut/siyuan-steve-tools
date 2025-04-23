@@ -18,9 +18,11 @@ import * as myF from './myF';
 import { showMessage } from 'siyuan';
 import { createFloatingCalendar } from './createFloatingCalendar';
 import { updateAttrViewCell_pro } from '@/api';
-import { getCategoryColor, lifelogColors} from '../styles/colors';
 
+//审查ok
+import { getCategoryColor, lifelogColors } from '../lifelog/styles/colors';
 import { LifelogView } from './lifelog-view';
+//审查ok
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
@@ -34,6 +36,8 @@ export let viewName = "";
 export let viewId = "";
 // export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
 // let ishandrefetchEvents = true;
+//用于保存原始的时间槽间隔
+let lastSavedLifelogSlotDuration: string;
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
 }
@@ -45,35 +49,17 @@ export async function init_viewValue(data: { viewId: string, viewName: string })
     filterViewId = data.viewId ? data.viewId.split(',') : [];
 }
 
-// 新增变量，用于保存原始的时间槽间隔
-let lastSavedLifelogSlotDuration: string;
 
 export async function run(
     id: string,
     initialView = 'dayGridMonth',
     S_viewID = "",
-    cleft = 'prev,next today viewFilter lifelogToggle',
+    cleft = 'prev,next today viewFilter',
     cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
     ccenter = 'title',
 ) {
-    // filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
-    const savedViewId = moduleInstances['M_calendar'].calConfig.get('viewId');
-    filterViewId = savedViewId ? savedViewId.split(',') : [];
-    // 从配置中读取保存的 SlotDuration，有lifelog view的时候的使用缓存的slotDuration
-    // 当没有lifelogview的时候，直接使用设置的默认值
-    const savedSlotDuration = moduleInstances['M_calendar'].calConfig.get('slotDuration');
-    let defaultSlotDuration = validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00');
-    let currentSlotDuration = defaultSlotDuration;
+    filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
 
-    if (filterViewId.includes('lifelog')) {
-        lastSavedLifelogSlotDuration = savedSlotDuration 
-            ? validateTimeFormat(savedSlotDuration, defaultSlotDuration) 
-            : defaultSlotDuration;
-        currentSlotDuration = lastSavedLifelogSlotDuration;
-    } else {
-        currentSlotDuration = defaultSlotDuration;
-    }
-    let updatedCleft = cleft;
 
     let calendarEl: HTMLElement;
     if (id === "1") {
@@ -114,15 +100,8 @@ export async function run(
         const newHours = Math.floor(newTotalMinutes / 60);
         const newMinutes = Math.round(newTotalMinutes % 60);
         const newSlotDuration = `${String(newHours).padStart(2, '0')}:${String(newMinutes).padStart(2, '0')}:00`;
-
         // 更新日历的 slotDuration
         calendar.setOption('slotDuration', newSlotDuration);
-        if (filterViewId.includes('lifelog')) {
-            // 仅在有 lifelog 视图时更新 lastSavedLifelogSlotDuration 并保存
-            lastSavedLifelogSlotDuration = newSlotDuration;
-            moduleInstances['M_calendar'].calConfig.set('slotDuration', newSlotDuration);
-            moduleInstances['M_calendar'].calConfig.save();
-        }
     });
 
     const calendar = new Calendar(calendarEl, {
@@ -142,7 +121,7 @@ export async function run(
         editable: true,
         nowIndicator: true,
         firstDay: settingdata["cal-week-start"] === "sunday" ? 0 : 1,
-        slotDuration: currentSlotDuration,
+        slotDuration: validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00'),
         slotMinTime: validateTimeFormat(settingdata["cal-slot-min-time"], '00:00:00'),
         slotMaxTime: validateTimeFormat(settingdata["cal-slot-max-time"], '24:00:00'),
         snapDuration: validateTimeFormat(settingdata["cal-snap-duration"], '00:15:00'),
@@ -549,7 +528,7 @@ export async function run(
                         const checkbox = document.createElement('input');
                         checkbox.type = 'checkbox';
                         // 根据 filterViewId 动态设置选中状态
-                        checkbox.checked = filterViewId.includes('lifelog'); 
+                        checkbox.checked = filterViewId.includes('lifelog');
                         checkbox.className = 'view-filter-checkbox';
 
                         const label = document.createElement('span');
@@ -673,33 +652,10 @@ export async function run(
                     }
                 },
             },
-            // 添加 Lifelog 自定义按钮
-            lifelogToggle: {
-                text: 'Lifelog',
-                click: async function () {
-                    if (filterViewId.includes('lifelog')) {
-                        filterViewId = filterViewId.filter(id => id !== 'lifelog');
-                        // 退出 lifelog 视图，恢复默认时间槽间隔
-                        calendar.setOption('slotDuration', defaultSlotDuration);
-                    } else {
-                        filterViewId.push('lifelog');
-                        // 加载 lifelog 视图，设置时间槽间隔为保存的值或默认值
-                        calendar.setOption('slotDuration', lastSavedLifelogSlotDuration);
-                    }
-    
-                    // 保存配置
-                    moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
-                    moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
-                    moduleInstances['M_calendar'].calConfig.save();
-    
-                    await calendar.refetchEvents();
-                    await refreshKanban();
-                }
-            }
         },
         // 将 lifelogToggle 按钮添加到工具栏
         headerToolbar: {
-            left: updatedCleft,
+            left: cleft,
             center: ccenter,
             right: cright
         },
@@ -764,8 +720,8 @@ export async function run(
                 /////////////////////Lifelog////////////////////////
                 try {
                     const showLifelogEvents = filterViewId.includes('lifelog');
-                    if (showLifelogEvents) { 
-                        const lifelogEvents = await LifelogView.getLifelogEvents(info.start, info.end);     
+                    if (showLifelogEvents) {
+                        const lifelogEvents = await LifelogView.getLifelogEvents(info.start, info.end);
                         console.log('是否显示 Lifelog 事件:', showLifelogEvents);
                         console.log('当前过滤视图:', filterViewId);
                         console.log('当前视图类型:', calendar.view.type);
@@ -888,11 +844,22 @@ export async function run(
 
             if (source === 'lifelog') {
                 const type = info.event.extendedProps.logType || '固定';
-                colorConfig = lifelogColors[type] || lifelogColors['固定'];        
+                colorConfig = lifelogColors[type] || lifelogColors['固定'];
             } else {
                 const priority = info.event.extendedProps.priority || '无';
                 colorConfig = getCategoryColor(priority);
-                info.el.style.borderLeft = `2px solid ${colorConfig.border}`;
+                // info.el.style.borderLeft = `2px solid ${colorConfig.border}`;
+                //// 设置随机背景色
+                // Use event's ID or title as a unique identifier for color
+                // const uniqueId = info.event.title;
+                // // Create a hash of the uniqueId to get a number
+                // const hash = Array.from(uniqueId).reduce((acc, char) => {
+                //     return char.charCodeAt(0) + ((acc << 5) - acc);
+                // }, 0);
+
+                // // Use hash as index for color and get both background and text colors
+                // const [backgroundColor, textColor] = getColors(Math.abs(hash));
+                // info.el.style.backgroundColor = backgroundColor;
             }
             // 应用颜色
             info.el.style.backgroundColor = colorConfig.background;

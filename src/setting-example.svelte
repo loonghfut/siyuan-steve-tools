@@ -442,6 +442,13 @@
                         sunday: "周日",
                     },
                 },
+                {
+                    type: "checkbox",
+                    title: "事件颜色样式切换",
+                    description: "启用后事件颜色样式切换",
+                    key: "cal-event-color",
+                    value: settings["cal-event-color"],
+                },
             ],
         },
         {
@@ -576,24 +583,6 @@
             ],
         },
         {
-            name: "✨敬请期待。。",
-            items: [
-                {
-                    type: "button",
-                    title: "button",
-                    description: "This is a button",
-                    key: "e",
-                    value: "Click Button",
-                    button: {
-                        label: "Click Me",
-                        callback: () => {
-                            showMessage("Hello, world!");
-                        },
-                    },
-                },
-            ],
-        },
-        {
             name: "LifeLog",
             items: [
                 {
@@ -616,6 +605,32 @@
                     description: "多个路径用英文逗号分隔，如: /daily/,/journals/",
                     key: "lifelog-paths",
                     value: settings["lifelog-paths"],
+                },
+                {
+                    type: "hint",
+                    title: "提示",
+                    description:
+                        "此功能由 BoysFight 贡献",
+                    key: "lifelog-hint",
+                    value: "",
+                },
+            ],
+        },
+        {
+            name: "✨敬请期待。。",
+            items: [
+                {
+                    type: "button",
+                    title: "button",
+                    description: "This is a button",
+                    key: "e",
+                    value: "Click Button",
+                    button: {
+                        label: "Click Me",
+                        callback: () => {
+                            showMessage("Hello, world!");
+                        },
+                    },
                 },
             ],
         },
