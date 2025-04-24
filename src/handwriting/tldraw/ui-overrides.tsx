@@ -90,6 +90,7 @@ export const uiOverrides: TLUiOverrides = {
                     }
                 },
             },
+            // 'toggle-grid': { ...actions['toggle-grid'], kbd: '' },
         }
     },
 }

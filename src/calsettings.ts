@@ -66,12 +66,14 @@ export const defaultSettings = {
     "handwriting-enable": false,
     "tl-draw-create-note-id": null,
     // LifeLog模块
-    "lifelog-enable": true,
+    "lifelog-enable": false,
     "lifelog-debug": false,  // 是否启用调试日志
     "lifelog-paths": ["/daily", "/journals/"],  // 监听的文档路径
     "lifelog-time-format": "HH:mm",  // 时间格式
     //https://github.com/loonghfut/siyuan-steve-tools/issues/44
     "SelectTOPics": "",  
+    //白板配置
+    "isGridMode": false, // 是否开启网格模式
 };
 
 export function getSettings() {

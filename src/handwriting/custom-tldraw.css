@@ -10,18 +10,7 @@
 } */
 
 
-/* 确保按钮图标容器本身也居中对齐 */
-.tlui-button__icon {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-.tlui-buttons__horizontal{
-  position: absolute;
-  *{
-    z-index: 0 !important;
-  }
-}
+
 /* 添加以下样式 */
 .tldraw__editor {
   .protyle-gutters {

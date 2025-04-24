@@ -590,6 +590,13 @@
                     ),
                 },
                 {
+                    type: "checkbox",
+                    title: "启用画板网格背景",
+                    description: "启用后画板默认会有网格背景",
+                    key: "isGridMode",
+                    value: settings["isGridMode"],
+                },
+                {
                     type: "custom", // 自定义组件类型
                     title: "画板备份管理",
                     description: "管理所有画板的备份文件",
@@ -764,7 +771,7 @@
             // 不限制
         },
         "画板": {
-            基本设置: 2, // 复选框和选择框
+            基本设置: 3, // 复选框和选择框
             备份管理: 1, // 备份管理组件
         },
         // "docker同步感知": {

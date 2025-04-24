@@ -24,6 +24,7 @@ import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage } from 'siyuan';
+import { settingdata } from '@/index';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
@@ -117,12 +118,13 @@ export class TldrawManager {
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: false,
         maxFontsToLoadBeforeRender: 10,
-        
+
     }
     /**
      * 渲染tldraw组件
      */
     private renderTldraw(rootElement: HTMLElement) {
+        const isGridMode = settingdata['isGridMode'] || false; // 是否网格模式
         // 防止外部字体加载的配置
         const blockIds = this.blockIds;
         const id = this.id;
@@ -149,11 +151,6 @@ export class TldrawManager {
                         // 设置自动保存功能
                         this.setupAutosave();
                         this.setupRealtimeSync(editor);
-
-
-                        
-
-
                         editor.on('sttools:importData', () => {
                             this.importData().catch(err => {
                                 console.error('导入数据失败:', err);
@@ -178,7 +175,7 @@ export class TldrawManager {
                             );
                         });
 
-                        editor.updateInstanceState({});
+                        editor.updateInstanceState({ isGridMode: isGridMode });
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
                         // this.editor.navigateToDeepLink();
                         // 只有在没有已保存数据的情况下才初始化卡片
