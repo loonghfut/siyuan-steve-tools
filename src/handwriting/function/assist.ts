@@ -1,5 +1,3 @@
-import * as api from "@/api";
-import { BLOCK_LAYOUT, cn_type } from "../parameter";
 import { moduleInstances } from "@/index";
 import { showMessage } from "siyuan";
 

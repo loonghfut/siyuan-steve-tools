@@ -150,6 +150,10 @@ export class TldrawManager {
                         this.setupAutosave();
                         this.setupRealtimeSync(editor);
 
+
+                        
+
+
                         editor.on('sttools:importData', () => {
                             this.importData().catch(err => {
                                 console.error('导入数据失败:', err);
