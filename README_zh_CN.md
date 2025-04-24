@@ -24,7 +24,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 压缩媒体资源后再导入思源。  
 5. tldraw画板：  
 模仿AFFINE，深度绑定思源的tldraw画板，支持嵌入思源块和链接跳转
-6. Lifelog：（开源替代，如需更好体验请使用叶归插件）  
+6. Lifelog：（开源替代，如需更好体验请使用叶归插件[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。
 
 #### 目前主要是我自己使用，实在没精力和动力去制作详细教程（简单的使用方式会在滴链发）。要是您希望我能制作教程，不妨通过[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)或者给项目点个 [star](https://github.com/loonghfut/siyuan-steve-tools) 来鼓励鼓励，这对我来说会是很大的动力，若长期没有打赏和star，后续的功能交互提示可能会很潦草，还请见谅。
@@ -61,12 +61,11 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [叠*清嘉](),[修远](),[VeryZHH*]()：打赏支持 `the newest `
 [更多。。](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 #### 说明
-- 本项目使用了基于 MIT 许可证的代码。
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
 - 画板视图基于tldraw开发，感谢tldraw的开发者。
 #### 打赏
 如果你觉得这个项目对你有帮助，欢迎打赏，以激励我更好的维护和更新这个项目。  
-<img src="https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png" alt="图片描述" width="200" />
+<img src="https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png" alt="图片描述" width="300" />
 
 
 #### 免责声明
