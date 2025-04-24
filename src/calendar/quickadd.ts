@@ -168,7 +168,7 @@ export function runblockdata_for_time(content: string): string | null {
         targetDate = targetDate.hour(hours).minute(minutes);
     } else {
         // 如果没有指定时间，默认设置为当天 08:00
-        targetDate = targetDate.hour(8).minute(0);
+        return null;
     }
 
     return targetDate.format('YYYY-MM-DDTHH:mm');
@@ -190,6 +190,25 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
     return results;
 }
 
+/**
+ * 从内容中提取分类信息，支持 #分类名 或 分类: 分类名
+ * 返回第一个匹配的分类名字符串，未匹配返回空字符串
+ */
+export function runblockdata_for_category(content: string): string {
+    // 匹配 #分类名
+    const hashPattern = /#([\u4e00-\u9fa5\w\-]+)/;
+    const hashMatch = content.match(hashPattern);
+    if (hashMatch) {
+        return hashMatch[1];
+    }
+    // 匹配 分类: 分类名
+    const colonPattern = /分类[:：]\s*([\u4e00-\u9fa5\w\-]+)/;
+    const colonMatch = content.match(colonPattern);
+    if (colonMatch) {
+        return colonMatch[1];
+    }
+    return '';
+}
 
 
 
