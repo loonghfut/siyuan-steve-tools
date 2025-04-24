@@ -507,7 +507,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
         const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
-        if(categoryKeyID){
+        if(categoryKeyID && categorie){
             const categoryData: ISelectOption[] = [{ content: categorie }];
             await api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select");
         }
