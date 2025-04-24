@@ -210,7 +210,7 @@ export const components: TLComponents = {
                     transform: `translate(${selectionInfo.x + selectionInfo.width / 2 - 115}px, ${selectionInfo.y - 40}px)`,
                     display: 'flex',
                     pointerEvents: 'all',
-                    zIndex: 1000
+                    zIndex: 1
                 }}
                 onPointerDown={stopEventPropagation}
             >

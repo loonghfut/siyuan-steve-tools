@@ -8,7 +8,17 @@
 #radix-\:r2\: > div:nth-child(1) > button:nth-child(5) {
   display: none !important;
 } */
-
+.tl-container {
+  --layer-above: 1;
+  --layer-focused-input: 10;
+  --layer-menu-click-capture: 250;
+  --layer-panels: 1;
+  --layer-menus: 400;
+  --layer-toasts: 650;
+  --layer-cursor: 700;
+  --layer-header-footer: 999;
+  --layer-following-indicator: 1000;
+}
 
 
 /* 添加以下样式 */
