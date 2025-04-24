@@ -97,7 +97,7 @@ export const uiOverrides: TLUiOverrides = {
 
 export const components: TLComponents = {
     HelperButtons: SlidesPanel,
-    Minimap: null,
+    // Minimap: null,
     Toolbar: (props) => {
         const tools = useTools()
         const isCardSelected = useIsToolSelected(tools['card'])
