@@ -19,6 +19,7 @@ export type SlideShape = TLBaseShape<
 	{
 		w: number
 		h: number
+		name: string // 添加 name 属性
 	}
 >
 
@@ -27,6 +28,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 	static override props: RecordProps<SlideShape> = {
 		w: T.number,
 		h: T.number,
+		name: T.string, // 添加 name 属性
 	}
 
 	override canBind() {
@@ -40,6 +42,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		return {
 			w: 720,
 			h: 480,
+			name: 'Slide', // 设置默认名称
 		}
 	}
 
@@ -87,7 +90,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		return (
 			<>
 				<div onPointerDown={handleLabelPointerDown} className="slide-shape-label">
-					{`Slide ${index + 1}`}
+					{shape.props.name || `Slide`}
 				</div>
 				<SVGContainer>
 					<g

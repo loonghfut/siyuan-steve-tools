@@ -1,5 +1,6 @@
 import { TldrawUiButton, stopEventPropagation, track, useEditor, useValue } from '@tldraw/tldraw'
 import { moveToSlide, useCurrentSlide, useSlides } from './useSlides'
+// import { SlideShape } from './SlideShapeUtil' // 导入 SlideShape 类型
 
 export const SlidesPanel = track(() => {
 	const editor = useEditor()
@@ -23,7 +24,7 @@ export const SlidesPanel = track(() => {
 							outline: isSelected ? 'var(--color-selection-stroke) solid 1.5px' : 'none',
 						}}
 					>
-						{`Slide ${i + 1}`}
+						{slide.props.name || `Slide ${i + 1}`} 
 					</TldrawUiButton>
 				)
 			})}
