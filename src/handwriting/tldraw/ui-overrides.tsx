@@ -19,7 +19,9 @@ import {
     TLEventMap,
     track, // 导入 track
     useRelevantStyles,
-    DefaultStylePanelContent, // 导入 useRelevantStyles
+    DefaultStylePanelContent,
+    DefaultQuickActions,
+    DefaultQuickActionsContent, // 导入 useRelevantStyles
 } from '@tldraw/tldraw'
 
 // Extend the TLEventMap interface to include custom events
@@ -212,10 +214,34 @@ const CustomStylePanel = track(() => {
     );
 });
 
+function CustomQuickActions() {
+    const editor = useEditor()
+    const container = editor.getContainer();
+    const editorElement = container?.closest('.tldraw__editor');
+    const rootId = editorElement?.getAttribute('data-tldraw-id');
+    return (
+        <DefaultQuickActions>
+            <DefaultQuickActionsContent />
+            <div>
+                <TldrawUiMenuItem id="heading" icon="heading" label="文档" onSelect={() => {
+                    openTab({
+                        app: window.siyuan.ws.app,
+                        doc: {
+                            id: rootId,
+                        }, 
+                        position: "right",
+                    });
+                }} />
+            </div>
+        </DefaultQuickActions>
+    )
+}
 
 
 export const components: TLComponents = {
     HelperButtons: SlidesPanel,
+    QuickActions: CustomQuickActions,
+    StylePanel: CustomStylePanel,
     // Minimap: null,
     Toolbar: (props) => {
         const tools = useTools()
@@ -273,7 +299,7 @@ export const components: TLComponents = {
             </DefaultMainMenu>
         )
     },
-    StylePanel: CustomStylePanel,
+
     InFrontOfTheCanvas: () => {
         const editor = useEditor()
 

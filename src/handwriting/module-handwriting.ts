@@ -19,7 +19,7 @@ export class M_handwriting {
     async init(settingdata) {
         // 添加图标
         this.plugin.addIcons(`
-            <symbol id="iconSTWhiteboard" viewBox="0 0 500 500">
+            <symbol id="iconSTWhiteboard" viewBox="0 0 24 24">
                ${ic.steveTools_whiteboard}
             </symbol>  
         `);
