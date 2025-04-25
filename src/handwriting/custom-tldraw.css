@@ -64,6 +64,9 @@
   /* ... 其他现有样式 ... */
   max-height: 400px; /* 设置一个最大高度，例如 400px */
   overflow-y: auto; /* 当内容超出最大高度时显示垂直滚动条 */
+  max-width: 120px; /* 设置最大宽度，例如 320px */
+  word-break: break-all; /* 长单词或URL换行 */
+  white-space: normal; /* 允许文本换行 */
   /* 'scroll-light' 类可能已经定义了滚动条样式，如果没有，你可以在这里添加 */
 }
 
