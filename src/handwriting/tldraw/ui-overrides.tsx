@@ -16,7 +16,10 @@ import {
     DefaultMainMenu,
     TldrawUiMenuGroup,
     DefaultMainMenuContent,
-    TLEventMap
+    TLEventMap,
+    track, // 导入 track
+    useRelevantStyles,
+    DefaultStylePanelContent, // 导入 useRelevantStyles
 } from '@tldraw/tldraw'
 
 // Extend the TLEventMap interface to include custom events
@@ -31,6 +34,7 @@ import React from 'react';
 import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ICardShape } from './CardShape/card-shape-types';
+import { SlideShape } from './SlideShape/SlideShapeUtil';
 import { openTab } from 'siyuan';
 // There's a guide at the bottom of this file!
 
@@ -95,6 +99,83 @@ export const uiOverrides: TLUiOverrides = {
     },
 }
 
+const CustomStylePanel = track(() => {
+    const editor = useEditor()
+    const selectedShapes = useValue('selected shapes', () => editor.getSelectedShapes(), [editor])
+    const styles = useRelevantStyles()
+
+    const isSingleSlideSelected = selectedShapes.length === 1 && selectedShapes[0].type === 'slide';
+    const slideShape = isSingleSlideSelected ? (selectedShapes[0] as SlideShape) : null;
+
+    const handleNameChange = React.useCallback(
+        (e: React.ChangeEvent<HTMLInputElement>) => {
+            if (slideShape) {
+                // 使用事务来确保撤销/重做能正确处理连续输入
+                editor.batch(() => {
+                    editor.updateShape({
+                        id: slideShape.id,
+                        type: 'slide',
+                        props: { name: e.target.value },
+                    });
+                })
+            }
+        },
+        [editor, slideShape]
+    );
+
+    const handleNameBlur = React.useCallback(
+        (e: React.FocusEvent<HTMLInputElement>) => {
+            if (slideShape && slideShape.props.name !== e.target.value.trim()) {
+                editor.updateShape({
+                    id: slideShape.id,
+                    type: 'slide',
+                    props: { name: e.target.value.trim() },
+                });
+            }
+        },
+        [editor, slideShape]
+    );
+
+    // 处理键盘事件，例如 Enter 确认，Escape 取消
+    const handleKeyDown = React.useCallback(
+        (e: React.KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter') {
+                e.currentTarget.blur(); // 触发 blur 保存最终值（如果需要 trim）
+            } else if (e.key === 'Escape') {
+                // 如果需要恢复到修改前的值，需要额外状态管理，
+                // 当前实现是 Escape 后直接 blur，会保存当前输入框的值
+                e.currentTarget.blur();
+            }
+        },
+        []
+    );
+
+
+    return (
+        <DefaultStylePanel>
+            {/* 渲染默认的样式控件 */}
+            <DefaultStylePanelContent styles={styles} />
+            
+            {isSingleSlideSelected && slideShape && (
+                <div className="tlui-style-panel__section"> {/* 移除 styles={styles}，因为父级已经处理 */}
+                    <input
+                        className="tlui-input slide-name-input"
+                        type="text"
+                        value={slideShape.props.name}
+                        onChange={handleNameChange}
+                        onBlur={handleNameBlur}
+                        onKeyDown={handleKeyDown}
+                        onPointerDown={stopEventPropagation}
+                        spellCheck={false}
+                    />
+                </div>
+            )}
+        </DefaultStylePanel>
+    );
+});
+
+
+
 export const components: TLComponents = {
     HelperButtons: SlidesPanel,
     // Minimap: null,
@@ -154,6 +235,7 @@ export const components: TLComponents = {
             </DefaultMainMenu>
         )
     },
+    StylePanel: CustomStylePanel,
     InFrontOfTheCanvas: () => {
         const editor = useEditor()
 
