@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import React, { useCallback, useState, useRef, useEffect } from 'react' // 导入 React hooks
 import {
 	Geometry2d,
 	RecordProps,
@@ -11,6 +11,8 @@ import {
 	getPerfectDashProps,
 	resizeBox,
 	useValue,
+	stopEventPropagation, // 导入 stopEventPropagation
+	useEditor, // 导入 useEditor
 } from '@tldraw/tldraw'
 import { moveToSlide, useSlides } from './useSlides'
 
@@ -42,7 +44,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		return {
 			w: 720,
 			h: 480,
-			name: 'Slide', // 设置默认名称
+			name: 'New Slide', // 设置默认名称
 		}
 	}
 
@@ -57,15 +59,17 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 	override onRotate(initial: SlideShape) {
 		return initial
 	}
-
+	// override canEdit() {
+	// 	return true
+	// }
 	override onResize(shape: SlideShape, info: TLResizeInfo<SlideShape>) {
 		return resizeBox(shape, info)
 	}
 
-	override onDoubleClick(shape: SlideShape) {
-		moveToSlide(this.editor, shape)
-		this.editor.selectNone()
-	}
+	// override onDoubleClick(shape: SlideShape) {
+	// 	moveToSlide(this.editor, shape)
+	// 	this.editor.selectNone()
+	// }
 
 	override onDoubleClickEdge(shape: SlideShape) {
 		moveToSlide(this.editor, shape)
@@ -74,24 +78,124 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 
 	component(shape: SlideShape) {
 		const bounds = this.editor.getShapeGeometry(shape).bounds
-
+		const editor = useEditor() // 获取 editor 实例
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		const zoomLevel = useValue('zoom level', () => this.editor.getZoomLevel(), [this.editor])
 
 		// eslint-disable-next-line react-hooks/rules-of-hooks
-		const slides = useSlides()
-		const index = slides.findIndex((s) => s.id === shape.id)
+		// const slides = useSlides()
+		// const index = slides.findIndex((s) => s.id === shape.id)
+		// --- State for inline editing ---
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const [isEditing, setIsEditing] = useState(false)
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const [editText, setEditText] = useState(shape.props.name)
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const inputRef = useRef<HTMLInputElement>(null)
+		// --- End State ---
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		useEffect(() => {
+			// Update local text state if the shape's name prop changes externally
+			if (!isEditing) {
+				setEditText(shape.props.name)
+			}
+		}, [shape.props.name, isEditing])
 
 		// eslint-disable-next-line react-hooks/rules-of-hooks
-		const handleLabelPointerDown = useCallback(() => this.editor.select(shape.id), [shape.id])
+		useEffect(() => {
+			// Focus input when editing starts
+			if (isEditing && inputRef.current) {
+				inputRef.current.focus()
+				inputRef.current.select()
+			}
+		}, [isEditing])
+
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		// const handleLabelPointerDown = useCallback(
+		// 	(e: React.PointerEvent) => {
+		// 		// Prevent selecting the shape when clicking the label if already editing
+		// 		if (isEditing) {
+		// 			stopEventPropagation(e)
+		// 			return
+		// 		}
+		// 		// Allow selecting the shape otherwise
+		// 		editor.select(shape.id)
+		// 	},
+		// 	[editor, shape.id, isEditing]
+		// )
+
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		// const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+		// 	console.log('Double click on label')
+		// 	stopEventPropagation(e) // Prevent canvas double click actions
+		// 	// Select the shape if not already selected when starting to edit
+		// 	if (!editor.getSelectedShapeIds().includes(shape.id)) {
+		// 		editor.select(shape.id)
+		// 	}
+		// 	setIsEditing(true)
+		// }, [editor, shape.id])
+
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+			setEditText(e.target.value)
+		}, [])
+
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const handleBlur = useCallback(() => {
+			if (editText.trim() === '') {
+				// Revert if empty
+				setEditText(shape.props.name)
+			} else if (editText !== shape.props.name) {
+				// Save changes
+				editor.updateShape({
+					id: shape.id,
+					type: 'slide',
+					props: { name: editText.trim() },
+				})
+			}
+			setIsEditing(false)
+		}, [editor, shape.id, shape.props.name, editText])
+
+		// eslint-disable-next-line react-hooks/rules-of-hooks
+		const handleKeyDown = useCallback(
+			(e: React.KeyboardEvent<HTMLInputElement>) => {
+				if (e.key === 'Enter') {
+					e.currentTarget.blur() // Trigger blur to save
+				} else if (e.key === 'Escape') {
+					setEditText(shape.props.name) // Revert
+					setIsEditing(false)
+					e.currentTarget.blur()
+				}
+			},
+			[shape.props.name]
+		)
+
+
+
 
 		if (!bounds) return null
 
 		return (
 			<>
-				<div onPointerDown={handleLabelPointerDown} className="slide-shape-label">
-					{shape.props.name || `Slide`}
-				</div>
+                <div
+                    className="slide-shape-label"
+                    style={{
+                        position: 'absolute',
+                        top: `calc(-25px / ${zoomLevel})`, // Adjust position based on zoom
+                        left: 0,
+                        width: shape.props.w,
+                        textAlign: 'center',
+                        cursor: 'default', // Change cursor as it's not directly editable here
+                        zIndex: 1,
+                        fontSize: `calc(12px / ${zoomLevel})`, // Adjust font size based on zoom
+                        pointerEvents: 'none', // Prevent label from interfering with selection
+                        color: 'var(--color-text)', // Ensure visibility
+                    }}
+                >
+                    {shape.props.name || `Slide`}
+                </div>
+
 				<SVGContainer>
 					<g
 						style={{
