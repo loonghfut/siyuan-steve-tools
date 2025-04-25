@@ -58,3 +58,25 @@
   margin: 8px;
   font-size: 16px;
 }
+
+
+.slides-panel {
+  /* ... 其他现有样式 ... */
+  max-height: 400px; /* 设置一个最大高度，例如 400px */
+  overflow-y: auto; /* 当内容超出最大高度时显示垂直滚动条 */
+  /* 'scroll-light' 类可能已经定义了滚动条样式，如果没有，你可以在这里添加 */
+}
+
+/* 如果 'scroll-light' 类没有定义滚动条样式，你可以添加类似下面的规则 (适用于 Webkit 浏览器) */
+.slides-panel::-webkit-scrollbar {
+  width: 6px; /* 滚动条宽度 */
+}
+
+.slides-panel::-webkit-scrollbar-thumb {
+  background-color: var(--color-muted-1); /* 滚动条滑块颜色 */
+  border-radius: 3px; /* 滚动条滑块圆角 */
+}
+
+.slides-panel::-webkit-scrollbar-track {
+  background-color: transparent; /* 滚动条轨道背景色 */
+}
