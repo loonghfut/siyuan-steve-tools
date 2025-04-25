@@ -40,10 +40,28 @@ export class M_handwriting {
                     const title = params.get('title') || "画板" + rootid;
                     // console.log('解析思源 URL 参数:', { rootid, blockid });
                     //判断rootid和blockid是否存在
+                    if (rootid && blockid === null) {
+                        await openTab({
+                            app: this.plugin.app,
+                            custom: {
+                                id: this.plugin.name + "steveTool-whiteboard",
+                                title: title,
+                                icon: "iconSTWhiteboard",
+                                data: {
+                                    text: "steveTool-whiteboard" + rootid,
+                                    rootid: rootid,
+                                },
+                            },
+                            position: "right",
+                        });
+                        return;
+                    }
+
                     if (!rootid || !blockid) {
                         showMessage("缺少必要的参数");
                         return;
                     }
+
                     // 这里可以根据解析出的参数执行相应操作
                     if (rootid && blockid) {
                         const docblock = await api.getBlockByID(rootid);
@@ -76,11 +94,14 @@ export class M_handwriting {
                         });
                         const tldrawManager = (tab.panelElement as any).tldrawManager as TldrawManager;
                         // console.log("tldrawManager", tldrawManager);
-                        if (shapeid) {
-                            tldrawManager.navigateToBlockShape(blockid, shapeid as TLShapeId);
-                        }else{
-                            tldrawManager.navigateToBlockShape(blockid);
-                        }
+                        // 延时500毫秒后再导航
+                        setTimeout(() => {
+                            if (shapeid) {
+                                tldrawManager.navigateToBlockShape(blockid, shapeid as TLShapeId);
+                            } else if (blockid) {
+                                tldrawManager.navigateToBlockShape(blockid);
+                            }
+                        }, 50);
                     }
                 } catch (error) {
                     console.error('解析思源 URL 参数出错:', error);

@@ -54,10 +54,42 @@
 }
 
 
-.slide-name-input{
+.slide-name-input {
   margin: 8px;
   font-size: 16px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
 }
+
+.tlui-input {
+  background: none;
+  margin-top: -3px;
+  position: relative;
+  z-index: var(--layer-above);
+  height: 0px;
+  max-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: inherit;
+  color: var(--color-text-1);
+  padding: var(--space-4);
+  padding-left: 0;
+  border: none;
+  outline: none;
+  text-overflow: ellipsis;
+  width: 100%;
+  user-select: all;
+  text-rendering: optimizeLegibility;
+  -webkit-user-select: auto!important;
+}
+
+
+
 
 .slides-panel {
   /* ... 其他现有样式 ... */

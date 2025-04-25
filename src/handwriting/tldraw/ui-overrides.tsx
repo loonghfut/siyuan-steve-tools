@@ -37,7 +37,7 @@ import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ICardShape } from './CardShape/card-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
-import { openTab } from 'siyuan';
+import { openTab, showMessage } from 'siyuan';
 // There's a guide at the bottom of this file!
 
 export const uiOverrides: TLUiOverrides = {
@@ -169,14 +169,14 @@ const CustomStylePanel = track(() => {
 
             try {
                 await navigator.clipboard.writeText(url);
-                alert('幻灯片链接已复制到剪贴板!'); // 简单反馈
+                showMessage('幻灯片链接已复制到剪贴板!'); // 简单反馈
                 console.log('Link copied:', url);
             } catch (err) {
                 console.error('无法复制链接: ', err);
-                alert('复制链接失败。');
+                showMessage('复制链接失败。', -1, "error");
             }
         } else if (rootId === '') {
-            alert('无法生成链接：缺少 rootId。');
+            showMessage('无法生成链接：缺少 rootId。', -1, "error");
             console.error('Cannot copy link: rootId is not set.');
         }
     }, [editor, slideShape, rootId]); // 添加依赖项
@@ -219,17 +219,28 @@ function CustomQuickActions() {
     const container = editor.getContainer();
     const editorElement = container?.closest('.tldraw__editor');
     const rootId = editorElement?.getAttribute('data-tldraw-id');
+    const title = editorElement?.getAttribute('data-tldraw-title');
     return (
         <DefaultQuickActions>
             <DefaultQuickActionsContent />
             <div>
-                <TldrawUiMenuItem id="heading" icon="heading" label="文档" onSelect={() => {
+                <TldrawUiMenuItem id="heading" icon="heading" label="打开文档" onSelect={() => {
                     openTab({
                         app: window.siyuan.ws.app,
                         doc: {
                             id: rootId,
-                        }, 
+                        },
                         position: "right",
+                    });
+                }} />
+            </div>
+            <div>
+                <TldrawUiMenuItem id="external-link" icon="external-link" label="复制白板链接" onSelect={() => {
+                    const url = `[画板:${title}](siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title})`;
+                    navigator.clipboard.writeText(url).then(() => {
+                        showMessage('链接已复制到剪贴板!');
+                    }).catch(err => {
+                        console.error('无法复制链接: ', err);
                     });
                 }} />
             </div>
