@@ -107,6 +107,15 @@ const CustomStylePanel = track(() => {
     const isSingleSlideSelected = selectedShapes.length === 1 && selectedShapes[0].type === 'slide';
     const slideShape = isSingleSlideSelected ? (selectedShapes[0] as SlideShape) : null;
 
+    // --- 获取 rootId ---
+
+    const container = editor.getContainer();
+    const editorElement = container?.closest('.tldraw__editor');
+    const rootId = editorElement?.getAttribute('data-tldraw-id');
+    const title = editorElement?.getAttribute('data-tldraw-title');
+    const blockId = rootId;
+
+
     const handleNameChange = React.useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
             if (slideShape) {
@@ -150,12 +159,32 @@ const CustomStylePanel = track(() => {
         []
     );
 
+    const handleCopyLink = React.useCallback(async () => {
+        if (slideShape && rootId !== '') { // 检查 rootId 是否已设置
+            const shapeId = slideShape.id;
+            // 使用幻灯片名称，如果为空则使用 rootId 作为后备标题
+            const url = `[${slideShape.props.name}](siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${shapeId})`;
+
+            try {
+                await navigator.clipboard.writeText(url);
+                alert('幻灯片链接已复制到剪贴板!'); // 简单反馈
+                console.log('Link copied:', url);
+            } catch (err) {
+                console.error('无法复制链接: ', err);
+                alert('复制链接失败。');
+            }
+        } else if (rootId === '') {
+            alert('无法生成链接：缺少 rootId。');
+            console.error('Cannot copy link: rootId is not set.');
+        }
+    }, [editor, slideShape, rootId]); // 添加依赖项
+
 
     return (
         <DefaultStylePanel>
             {/* 渲染默认的样式控件 */}
             <DefaultStylePanelContent styles={styles} />
-            
+
             {isSingleSlideSelected && slideShape && (
                 <div className="tlui-style-panel__section"> {/* 移除 styles={styles}，因为父级已经处理 */}
                     <input
@@ -168,6 +197,15 @@ const CustomStylePanel = track(() => {
                         onPointerDown={stopEventPropagation}
                         spellCheck={false}
                     />
+                    <button
+                        className="tlui-button" // 使用 tldraw 风格的按钮类名 (可能需要调整)
+                        onClick={handleCopyLink}
+                        onPointerDown={stopEventPropagation} // 阻止事件冒泡
+                        style={{ marginTop: '-8px', width: '100%' }} // 添加边距并充满宽度
+                        disabled={rootId === ''} // 如果 rootId 未设置则禁用
+                    >
+                        复制链接
+                    </button>
                 </div>
             )}
         </DefaultStylePanel>

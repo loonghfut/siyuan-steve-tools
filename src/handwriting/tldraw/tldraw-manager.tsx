@@ -596,13 +596,16 @@ export class TldrawManager {
     }
 
     /**
-     * 导航到包含特定思源块的形状
+     * 导航到包含特定思源块的形状(二选一)
      * @param blockId 思源块ID
+     * @param shapeId 形状ID（可选）
      * @returns 是否成功导航
      */
-    public navigateToBlockShape(blockId: string): boolean {
-        const shapeId = this.findShapeByBlockId(blockId);
-        console.log("导航到块形状", shapeId, blockId);
+    public navigateToBlockShape(blockId: string, shapeId = "" as TLShapeId): boolean {
+        if(shapeId === "") {
+            shapeId = this.findShapeByBlockId(blockId);
+        }
+        console.log("导航到形状", shapeId, blockId);
         if (!shapeId) return false;
 
         if (this.editor) {

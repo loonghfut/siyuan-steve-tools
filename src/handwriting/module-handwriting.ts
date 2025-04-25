@@ -4,6 +4,7 @@ import { openTab, Plugin, showMessage, Tab } from "siyuan";
 import { TldrawManager } from './tldraw/tldraw-manager';
 import { addWhiteboardButton } from "./function/assist";
 import * as api from "@/api";
+import { TLShapeId } from "@tldraw/tldraw";
 const tldrawInstances: Map<string, TldrawManager> = new Map();
 export class M_handwriting {
     private plugin: Plugin;
@@ -35,6 +36,7 @@ export class M_handwriting {
                     const params = new URLSearchParams(queryString);
                     const rootid = params.get('rootid');
                     const blockid = params.get('blockid');
+                    const shapeid = params.get('shapeid');
                     const title = params.get('title') || "画板" + rootid;
                     // console.log('解析思源 URL 参数:', { rootid, blockid });
                     //判断rootid和blockid是否存在
@@ -50,7 +52,7 @@ export class M_handwriting {
                             showMessage('未找到此rootid对应的块');
                             return;
                         }
-                        if(docblock.id !== docblock.root_id){
+                        if (docblock.id !== docblock.root_id) {
                             showMessage('当前块不是根块，请检查');
                             return;
                         }
@@ -74,7 +76,11 @@ export class M_handwriting {
                         });
                         const tldrawManager = (tab.panelElement as any).tldrawManager as TldrawManager;
                         // console.log("tldrawManager", tldrawManager);
-                        tldrawManager.navigateToBlockShape(blockid);
+                        if (shapeid) {
+                            tldrawManager.navigateToBlockShape(blockid, shapeid as TLShapeId);
+                        }else{
+                            tldrawManager.navigateToBlockShape(blockid);
+                        }
                     }
                 } catch (error) {
                     console.error('解析思源 URL 参数出错:', error);
