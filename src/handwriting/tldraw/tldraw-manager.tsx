@@ -257,11 +257,22 @@ export class TldrawManager {
                             const cardShape = shape as ICardShape;
                             const blockId = cardShape.props?.blockId;
                             if (!blockId) return;
-                            if (await api.getBlockByID(blockId)) {
-                                api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
-                                    .then()
-                                    .catch(err => console.error('Failed to update block attributes:', err))
-                            };
+
+                            // 检查画布上是否还存在引用相同 blockId 的卡片
+                            const remainingCardsWithSameBlockId = editor.getCurrentPageShapes()
+                                .filter(s => s.type === 'card' && (s as ICardShape).props?.blockId === blockId);
+
+                            // 只有当没有其他卡片引用此 blockId 时，才更新块属性
+                            if (remainingCardsWithSameBlockId.length === 0) {
+                                if (await api.getBlockByID(blockId)) {
+                                    api.deleteBlock(blockId)
+                                    // api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
+                                    //     .then(() => console.log(`Block attribute updated for ${blockId} as it's no longer referenced.`))
+                                    //     .catch(err => console.error('Failed to update block attributes:', err));
+                                }
+                            } else {
+                                console.log(`Block attribute for ${blockId} not updated as other cards still reference it.`);
+                            }
                         });
 
 
