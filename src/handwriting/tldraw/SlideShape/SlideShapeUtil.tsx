@@ -21,7 +21,7 @@ export type SlideShape = TLBaseShape<
 	{
 		w: number
 		h: number
-		name: string // 添加 name 属性
+		name?: string // 添加 name 属性
 	}
 >
 
@@ -30,7 +30,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 	static override props: RecordProps<SlideShape> = {
 		w: T.number,
 		h: T.number,
-		name: T.string, // 添加 name 属性
+		name: T.optional(T.string), // 添加 name 属性
 	}
 
 	override canBind() {
@@ -178,23 +178,23 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 
 		return (
 			<>
-                <div
-                    className="slide-shape-label"
-                    style={{
-                        position: 'absolute',
-                        top: `calc(-25px / ${zoomLevel})`, // Adjust position based on zoom
-                        left: 0,
-                        width: shape.props.w,
-                        textAlign: 'center',
-                        cursor: 'default', // Change cursor as it's not directly editable here
-                        zIndex: 1,
-                        fontSize: `calc(12px / ${zoomLevel})`, // Adjust font size based on zoom
-                        pointerEvents: 'none', // Prevent label from interfering with selection
-                        color: 'var(--color-text)', // Ensure visibility
-                    }}
-                >
-                    {shape.props.name || `Slide`}
-                </div>
+				<div
+					className="slide-shape-label"
+					style={{
+						position: 'absolute',
+						top: `calc(-25px / ${zoomLevel})`, // Adjust position based on zoom
+						left: 0,
+						width: shape.props.w,
+						textAlign: 'center',
+						cursor: 'default', // Change cursor as it's not directly editable here
+						zIndex: 1,
+						fontSize: `calc(12px / ${zoomLevel})`, // Adjust font size based on zoom
+						pointerEvents: 'none', // Prevent label from interfering with selection
+						color: 'var(--color-text)', // Ensure visibility
+					}}
+				>
+					{shape.props.name || `Slide`}
+				</div>
 
 				<SVGContainer>
 					<g
