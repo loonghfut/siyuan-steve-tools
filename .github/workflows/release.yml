@@ -3,7 +3,7 @@ name: Tag and Release on Push to Main
 on:
   push:
     branches:
-      - main-2
+      - main-2222222222
 
 jobs:
   tag:
@@ -59,7 +59,7 @@ jobs:
         uses: pnpm/action-setup@v4
         id: pnpm-install
         with:
-          version: 8
+          version: 9.6.0
           run_install: false
 
       - name: Get pnpm store directory

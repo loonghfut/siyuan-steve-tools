@@ -36,9 +36,19 @@ export class CalDAVClient {
     }
 
     async init() {
-        try{
-        await this.client.login();
-        }catch(e){
+        try {
+            await this.client.login();
+            // Add this test before login
+            try {
+                console.log('Testing fetch directly...');
+                await fetch('https://v.qq.com'); // Use a simple, known-working URL
+                console.log('Direct fetch test successful.');
+            } catch (fetchError) {
+                console.error('Direct fetch test failed:', fetchError);
+                showMessage('内部 fetch 测试失败', -1, 'error');
+            }
+            // End of test
+        } catch (e) {
             console.error('QQ日历登录失败:', e);
             showMessage('QQ日历登录失败，请检查网络，QQ邮箱配置', -1, 'error');
         }
