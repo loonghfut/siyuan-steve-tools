@@ -6,7 +6,7 @@ BUILD_DIR="dev"
 # 打包后的 zip 文件名
 PACKAGE_NAME="package.zip"
 # 远程 Git 仓库别名
-REMOTE_NAME="siyuan-steve-tools"
+REMOTE_NAME="origin"
 # --- 配置结束 ---
 
 # 0. 检查工具
@@ -17,15 +17,15 @@ command -v 7z >/dev/null 2>&1 || { echo >&2 "错误：未找到 zip 命令。请
 
 # 1. 获取版本号/标签名
 # 尝试从 package.json 读取 version
-VERSION=$(node -p "require('./package.json').version")
+VERSION=$(node -p "require('./plugin.json').version")
 if [ -z "$VERSION" ]; then
-  echo "错误：无法从 package.json 读取版本号。"
+  echo "错误：无法从 plugin.json 读取版本号。"
   read -p "请输入要创建的标签名 (例如 v1.0.0): " TAG_NAME
 else
   TAG_NAME="v$VERSION"
-  echo "从 package.json 检测到版本: $VERSION，将使用标签: $TAG_NAME"
-  read -p "确认使用此标签吗? (y/N): " confirm
-  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+  echo "从 plugin.json 检测到版本: $VERSION，将使用标签: $TAG_NAME"
+  read -p "确认使用此标签吗? (Y/n): " confirm
+  if [[ "$confirm" =~ ^[Nn]$ ]]; then
     read -p "请输入要创建的标签名: " TAG_NAME
   fi
 fi
