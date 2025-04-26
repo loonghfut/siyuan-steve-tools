@@ -37,6 +37,7 @@ export class PluginConfig {
             const configString = JSON.stringify(this.config, null, 2);
             const blob = new Blob([configString], { type: 'application/json' });
             await putFile(this.configPath, false, blob);
+            console.log("配置文件保存成功:", this.configPath);
         } catch (error) {
             console.error("保存配置文件失败:", error);
             throw error;
