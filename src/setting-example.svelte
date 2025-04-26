@@ -267,8 +267,7 @@
                     //7
                     type: "checkbox",
                     title: "自动更新ics文件",
-                    description:
-                        "启用后每次修改日程触发自动更新ics文件",
+                    description: "启用后每次修改日程触发自动更新ics文件",
                     key: "cal-auto-update",
                     value: settings["cal-auto-update"],
                 },
@@ -276,8 +275,7 @@
                     //7
                     type: "checkbox",
                     title: "同步更新ics文件",
-                    description:
-                        "启用后每次同步完后触发自动更新ics文件",
+                    description: "启用后每次同步完后触发自动更新ics文件",
                     key: "cal-auto-syncing-update",
                     value: settings["cal-auto-syncing-update"],
                 },
@@ -565,7 +563,7 @@
         },
         {
             name: "画板",
-            subGroups: ["基本设置", "备份管理"], // 添加子组
+            subGroups: ["基本设置", "备份管理", "引用管理"], // 添加子组
             activeSubGroup: "基本设置",
             items: [
                 {
@@ -611,6 +609,14 @@
                     component: "TldrawBackupManager", // 指定组件名称
                     value: "", // 不需要值
                 },
+                {
+                    type: "custom", // 自定义组件类型
+                    title: "画板引用管理",
+                    description: "管理未引用的画板,点击标题切换模式",
+                    key: "tldraw-reference-manager",
+                    component: "TldrawReferenceManager", // 指定组件名称
+                    value: "", // 不需要值
+                },
             ],
         },
         {
@@ -633,8 +639,7 @@
                 {
                     type: "hint",
                     title: "感谢",
-                    description:
-                        "此功能由 BoysFight PR贡献",
+                    description: "此功能由 BoysFight PR贡献",
                     key: "lifelog-hint",
                     value: "",
                 },
@@ -777,9 +782,10 @@
             视图设置: 5,
             // 不限制
         },
-        "画板": {
+        画板: {
             基本设置: 4, // 复选框和选择框
             备份管理: 1, // 备份管理组件
+            引用管理: 1, // 引用管理组件
         },
         // "docker同步感知": {
         //     "连接设置": 4,

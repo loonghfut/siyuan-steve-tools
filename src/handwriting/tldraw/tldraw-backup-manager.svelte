@@ -334,13 +334,13 @@
         padding-right: 30px;
     }
     
-    .search-icon {
+    /* .search-icon {
         position: absolute;
         right: 8px;
         top: 50%;
         transform: translateY(-50%);
         color: var(--b3-theme-on-surface-light);
-    }
+    } */
     
     .backup-list-container {
         flex: 1;

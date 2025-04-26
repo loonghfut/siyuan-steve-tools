@@ -9,7 +9,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import TldrawBackupManager from '@/handwriting/tldraw/tldraw-backup-manager.svelte';
-    
+    import TldrawReferenceManager from '@/handwriting/tldraw/tldraw-reference-manager.svelte';
     import Form from './Form';
 
     export let group: string;
@@ -52,18 +52,15 @@
         </Form.Wrap>
         {#if item.type === "custom" && item.component === "TldrawBackupManager"}
         <div class="b3-label">
-            <!-- <div class="fn__flex">
-                <div class="fn__flex-1">
-                    {#if item.title}
-                        <label for={item.key}>{item.title}</label>
-                    {/if}
-                    {#if item.description}
-                        <div class="b3-label__text">{item.description}</div>
-                    {/if}
-                </div>
-            </div> -->
             <div class="fn__flex-1 fn__flex-column">
                 <TldrawBackupManager />
+            </div>
+        </div>
+        {/if}
+        {#if item.type === "custom" && item.component === "TldrawReferenceManager"}
+        <div class="b3-label">
+            <div class="fn__flex-1 fn__flex-column">
+                <TldrawReferenceManager />
             </div>
         </div>
     {/if}
