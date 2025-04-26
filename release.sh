@@ -36,10 +36,28 @@ if [ -z "$TAG_NAME" ]; then
 fi
 
 # 2. 检查标签是否已存在
+TAG_EXISTS_LOCALLY=false
+TAG_EXISTS_REMOTELY=false
+SKIP_TAG_OPERATIONS=false
+
 if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-  echo "警告：标签 '$TAG_NAME' 在本地已存在。"
-  read -p "是否继续? (y/N): " confirm_tag
-  if [[ ! "$confirm_tag" =~ ^[Yy]$ ]]; then
+  TAG_EXISTS_LOCALLY=true
+fi
+if git ls-remote --tags "$REMOTE_NAME" | grep -q "refs/tags/$TAG_NAME$"; then
+  TAG_EXISTS_REMOTELY=true
+fi
+
+if [ "$TAG_EXISTS_LOCALLY" = true ] || [ "$TAG_EXISTS_REMOTELY" = true ]; then
+  echo "警告：标签 '$TAG_NAME' 已存在 (本地: $TAG_EXISTS_LOCALLY, 远程: $TAG_EXISTS_REMOTELY)。"
+  read -p "是否跳过标签创建和推送，直接进行 GitHub Release 创建/更新和附件上传? (y/N): " confirm_skip_tag
+  if [[ "$confirm_skip_tag" =~ ^[Yy]$ ]]; then
+    SKIP_TAG_OPERATIONS=true
+    if [ "$TAG_EXISTS_REMOTELY" = true ] && [ "$TAG_EXISTS_LOCALLY" = false ]; then
+      echo "--- 正在从远程获取标签 '$TAG_NAME' ---"
+      git fetch "$REMOTE_NAME" tag "$TAG_NAME" || { echo >&2 "错误：从远程获取标签失败。"; exit 1; }
+    fi
+    echo "将跳过 Git 标签创建和推送步骤。"
+  else
     echo "操作中止。"
     exit 0
   fi
@@ -77,11 +95,14 @@ rm -f "$PACKAGE_NAME"
 echo "--- 打包完成: $PACKAGE_NAME ---"
 
 # 7. 创建并推送 Git 标签
-echo "--- 创建 Git 标签 ---"
-git tag -a "$TAG_NAME" -m "Release $TAG_NAME" || { echo >&2 "错误：创建 Git 标签失败。"; exit 1; }
-echo "--- 推送 Git 标签 ---"
-git push "$REMOTE_NAME" "$TAG_NAME" || { echo >&2 "错误：推送 Git 标签失败。"; exit 1; }
-
+if [ "$SKIP_TAG_OPERATIONS" != "true" ]; then
+  echo "--- 创建 Git 标签 ---"
+  git tag -a "$TAG_NAME" -m "Release $TAG_NAME" || { echo >&2 "错误：创建 Git 标签失败。"; exit 1; }
+  echo "--- 推送 Git 标签 ---"
+  git push "$REMOTE_NAME" "$TAG_NAME" || { echo >&2 "错误：推送 Git 标签失败。"; exit 1; }
+else
+  echo "--- 跳过 Git 标签创建和推送 ---"
+fi
 # 8. 创建 GitHub Release 并上传附件
 echo "--- 创建 GitHub Release 并上传附件 ---"
 # 获取上一个 Release 标签
