@@ -47,11 +47,11 @@ fi
 # 可以在这里添加检查远程标签的逻辑: git ls-remote --tags $REMOTE_NAME | grep "refs/tags/$TAG_NAME"
 
 # 3. 确保工作目录干净 (可选但推荐)
-# if ! git diff --quiet || ! git diff --cached --quiet; then
-#   echo "错误：工作目录或暂存区有未提交的更改。请先提交或储藏更改。"
-#   exit 1
-# fi
-# echo "工作目录干净。"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "错误：工作目录或暂存区有未提交的更改。请先提交或储藏更改。"
+  exit 1
+fi
+echo "工作目录干净。"
 
 # 4. 安装依赖 (如果需要构建步骤，请取消注释)
 # echo "--- 安装依赖 ---"
