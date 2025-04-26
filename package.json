@@ -13,7 +13,8 @@
     "make-link": "node --no-warnings ./scripts/make_dev_link.js",
     "make-link-win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/elevate.ps1 -scriptPath ./scripts/make_dev_link.js",
     "make-install": "pnpm run build && node --no-warnings ./scripts/make_install.js",
-    "update-version": "node --no-warnings ./scripts/update_version.js"
+    "update-version": "node --no-warnings ./scripts/update_version.js",
+    "release": "bash ./release.sh"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.0",
