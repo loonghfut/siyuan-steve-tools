@@ -13,7 +13,7 @@ REMOTE_NAME="siyuan-steve-tools"
 command -v pnpm >/dev/null 2>&1 || { echo >&2 "错误：未找到 pnpm。请先安装。"; exit 1; }
 command -v git >/dev/null 2>&1 || { echo >&2 "错误：未找到 git。请先安装。"; exit 1; }
 command -v gh >/dev/null 2>&1 || { echo >&2 "错误：未找到 GitHub CLI (gh)。请先安装并使用 'gh auth login' 登录。"; exit 1; }
-command -v zip >/dev/null 2>&1 || { echo >&2 "错误：未找到 zip 命令。请先安装。"; exit 1; }
+# command -v 7z >/dev/null 2>&1 || { echo >&2 "错误：未找到 zip 命令。请先安装。"; exit 1; }
 
 # 1. 获取版本号/标签名
 # 尝试从 package.json 读取 version
@@ -71,7 +71,7 @@ echo "--- 开始打包 '$BUILD_DIR' 目录 ---"
 # 删除旧包（如果存在）
 rm -f "$PACKAGE_NAME"
 # 进入要打包的目录进行打包，避免 zip 包含父目录结构
-(cd "$BUILD_DIR" && zip -r "../$PACKAGE_NAME" .) || { echo >&2 "错误：打包失败。"; exit 1; }
+(cd "$BUILD_DIR" && 7z a -r "../$PACKAGE_NAME" .) || { echo >&2 "错误：使用 7z 打包失败。"; exit 1; }
 # 或者，如果不进入目录：
 # zip -r "$PACKAGE_NAME" "$BUILD_DIR" || { echo >&2 "错误：打包失败。"; exit 1; }
 echo "--- 打包完成: $PACKAGE_NAME ---"
