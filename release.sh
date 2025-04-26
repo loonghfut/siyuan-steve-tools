@@ -52,11 +52,16 @@ if [ "$TAG_EXISTS_LOCALLY" = true ] || [ "$TAG_EXISTS_REMOTELY" = true ]; then
   read -p "是否跳过标签创建和推送，直接进行 GitHub Release 创建/更新和附件上传? (y/N): " confirm_skip_tag
   if [[ "$confirm_skip_tag" =~ ^[Yy]$ ]]; then
     SKIP_TAG_OPERATIONS=true
-    if [ "$TAG_EXISTS_REMOTELY" = true ] && [ "$TAG_EXISTS_LOCALLY" = false ]; then
+    # 如果标签只在本地存在，则需要先推送到远程
+    if [ "$TAG_EXISTS_LOCALLY" = true ] && [ "$TAG_EXISTS_REMOTELY" = false ]; then
+      echo "--- 标签 '$TAG_NAME' 只存在于本地，正在推送到远程 '$REMOTE_NAME' ---"
+      git push "$REMOTE_NAME" "$TAG_NAME" || { echo >&2 "错误：推送本地存在的标签 '$TAG_NAME' 失败。"; exit 1; }
+    # 如果标签只在远程存在，则需要先拉取到本地 (确保 git log 能正确工作)
+    elif [ "$TAG_EXISTS_REMOTELY" = true ] && [ "$TAG_EXISTS_LOCALLY" = false ]; then
       echo "--- 正在从远程获取标签 '$TAG_NAME' ---"
-      git fetch "$REMOTE_NAME" tag "$TAG_NAME" || { echo >&2 "错误：从远程获取标签失败。"; exit 1; }
+      git fetch "$REMOTE_NAME" tag "$TAG_NAME" --no-tags || { echo >&2 "错误：从远程获取标签失败。"; exit 1; } # 使用 --no-tags 避免获取不必要的其他标签
     fi
-    echo "将跳过 Git 标签创建和推送步骤。"
+    echo "将跳过 Git 标签创建和推送步骤 (如果需要，已确保标签存在于远程)。"
   else
     echo "操作中止。"
     exit 0
