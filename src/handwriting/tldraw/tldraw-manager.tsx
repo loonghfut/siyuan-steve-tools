@@ -58,7 +58,7 @@ export class TldrawManager {
         this.blockIds = blockIds || [];
         this.storageKey = `tldraw-data-${this.id}`;
         this.store = createTLStore({
-            shapeUtils: customShapeUtils
+            shapeUtils: customShapeUtils,
         });
 
         // 初始化tldraw
@@ -509,6 +509,7 @@ export class TldrawManager {
             // 获取当前数据
             const snapshot = getSnapshot(this.store);
             const jsonData = JSON.stringify(snapshot);
+            console.log('备份数据:', jsonData);
 
             // 生成备份文件名
             const trashFileName = `${this.storageKey}-${reason}-${Date.now()}.json`;
@@ -613,7 +614,7 @@ export class TldrawManager {
      * @returns 是否成功导航
      */
     public navigateToBlockShape(blockId: string, shapeId = "" as TLShapeId): boolean {
-        if(shapeId === "") {
+        if (shapeId === "") {
             shapeId = this.findShapeByBlockId(blockId);
         }
         console.log("导航到形状", shapeId, blockId);

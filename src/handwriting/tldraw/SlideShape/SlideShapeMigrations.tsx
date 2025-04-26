@@ -1,0 +1,26 @@
+import { createShapePropsMigrationIds, createShapePropsMigrationSequence } from '@tldraw/tldraw'
+
+
+const versions = createShapePropsMigrationIds(
+  // this must match the shape type in the shape definition
+  'slide',
+  {
+    Addv: 1,
+  }
+)
+
+// Migrations for the custom card shape (optional but very helpful)
+export const slideShapeMigrations = createShapePropsMigrationSequence({
+  sequence: [
+    {
+      id: versions.Addv,
+      up(props) {
+        // it is safe to mutate the props object here
+        props.version = 'v1'
+      },
+      down(props) {
+        delete props.version
+      },
+    },
+  ],
+})

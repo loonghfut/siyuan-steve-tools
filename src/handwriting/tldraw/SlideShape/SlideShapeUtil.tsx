@@ -15,6 +15,7 @@ import {
 	useEditor, // 导入 useEditor
 } from '@tldraw/tldraw'
 import { moveToSlide, useSlides } from './useSlides'
+import { slideShapeMigrations } from './SlideShapeMigrations'
 
 export type SlideShape = TLBaseShape<
 	'slide',
@@ -22,6 +23,7 @@ export type SlideShape = TLBaseShape<
 		w: number
 		h: number
 		name?: string // 添加 name 属性
+		version?: number // 添加 version 属性定义
 	}
 >
 
@@ -31,7 +33,9 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		w: T.number,
 		h: T.number,
 		name: T.optional(T.string), // 添加 name 属性
+		version: T.optional(T.number), // 添加 version 属性定义
 	}
+	static override migrations = slideShapeMigrations
 
 	override canBind() {
 		return false
@@ -45,6 +49,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 			w: 720,
 			h: 480,
 			name: 'New Slide', // 设置默认名称
+			version: 1, // 设置默认版本
 		}
 	}
 
