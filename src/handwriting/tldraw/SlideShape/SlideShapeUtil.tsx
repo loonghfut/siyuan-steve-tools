@@ -49,7 +49,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 			w: 720,
 			h: 480,
 			name: 'New Slide', // 设置默认名称
-			version: 1, // 设置默认版本
+			// version: 1, // 设置默认版本
 		}
 	}
 

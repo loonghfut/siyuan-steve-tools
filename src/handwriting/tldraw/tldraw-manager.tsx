@@ -17,7 +17,7 @@ import {
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
-import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
+import { cardShapeMigrations, initCardsWithBlockIds } from './CardShape/card-shape-migrations';
 import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
 import * as api from '@/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
@@ -73,30 +73,66 @@ export class TldrawManager {
         root.style.width = '100%';
         root.style.height = '100%';
         this.container.appendChild(root);
+        try {
+            // 加载之前保存的数据
+            await this.loadData();
+            // 只有在加载成功后才渲染
+            this.renderTldraw(root);
+        } catch (error) {
+            // 加载数据失败，停止初始化并显示错误信息
+            console.error("初始化 Tldraw 失败，无法加载数据:", error);
+            showMessage("加载画板数据失败，请检查数据文件或联系开发者。", 5000, "error");
 
-        // 加载之前保存的数据
-        await this.loadData();
+            // 在 root 中显示错误信息和强制加载按钮
+            root.innerHTML = `
+                <div style="padding: 20px; color: red; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                    <p>加载画板数据失败，请检查控制台获取更多信息。</p>
+                    <p style="color: orange; margin-top: 10px;">您可以强制创建一个新的空白画板，但这将导致无法加载的数据丢失。</p>
+                    <button id="force-load-tldraw-${this.id}" style="margin-top: 15px; padding: 8px 15px; cursor: pointer;">强制创建新画板</button>
+                </div>
+            `;
 
-        // 渲染tldraw组件
-        this.renderTldraw(root);
+            // 为按钮添加事件监听器
+            const forceLoadButton = root.querySelector(`#force-load-tldraw-${this.id}`);
+            if (forceLoadButton) {
+                forceLoadButton.addEventListener('click', () => {
+                    // 清空错误信息
+                    root.innerHTML = '';
+                    // 渲染一个新的 Tldraw 实例
+                    showMessage("正在创建新的空白画板...", 3000, "info");
+                    this.renderTldraw(root);
+                });
+            }
+        }
     }
 
     /**
     * 加载保存的数据
+    * @returns Promise<boolean> 是否加载成功
     */
-    private async loadData() {
+    private async loadData(): Promise<boolean> {
         try {
             // 从思源笔记的存储中获取数据
             const data = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
 
             if (data) {
-                console.log("dadasss", data);
-                loadSnapshot(this.store, data);
-                console.log('已加载保存的画布数据');
+                console.log("加载到数据", data);
+                // 尝试解析和加载快照
+                try {
+                    loadSnapshot(this.store, data);
+                    console.log('已加载保存的画布数据');
+                    return true; // 加载成功
+                } catch (parseError) {
+                    console.error('解析或加载快照失败', parseError);
+                    // 如果解析或加载失败，也视为加载失败，抛出错误
+                    throw new Error('加载画布数据失败：数据格式错误');
+                }
             }
+            return true; // 没有数据也算成功（使用空状态）
         } catch (error) {
-            console.warn('加载画布数据失败或无保存数据', error);
-            // 无保存数据时继续使用空的 store
+            console.error('加载画布数据失败', error);
+            // 抛出错误，中断后续操作
+            throw error;
         }
     }
 

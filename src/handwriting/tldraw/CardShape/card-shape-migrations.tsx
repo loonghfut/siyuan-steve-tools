@@ -16,7 +16,7 @@ export const cardShapeMigrations = createShapePropsMigrationSequence({
       id: versions.Addv,
       up(props) {
         // it is safe to mutate the props object here
-        props.version = 'v1'
+        props.version = 1
       },
       down(props) {
         delete props.version
