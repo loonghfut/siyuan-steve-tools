@@ -2,7 +2,7 @@
 
 # --- 配置 ---
 # 要打包的目录 (例如 dev 或 dist)
-BUILD_DIR="dev"
+BUILD_DIR="dist"
 # 打包后的 zip 文件名
 PACKAGE_NAME="package.zip"
 # 远程 Git 仓库别名
