@@ -39,6 +39,7 @@ export class CalDAVClient {
         try {
             await this.client.login();
             // Add this test before login
+            //TODO: Remove later
             try {
                 console.log('Testing fetch directly...');
                 await fetch('https://v.qq.com'); // Use a simple, known-working URL
