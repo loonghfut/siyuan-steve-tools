@@ -13,7 +13,7 @@ REMOTE_NAME="siyuan-steve-tools"
 command -v pnpm >/dev/null 2>&1 || { echo >&2 "错误：未找到 pnpm。请先安装。"; exit 1; }
 command -v git >/dev/null 2>&1 || { echo >&2 "错误：未找到 git。请先安装。"; exit 1; }
 command -v gh >/dev/null 2>&1 || { echo >&2 "错误：未找到 GitHub CLI (gh)。请先安装并使用 'gh auth login' 登录。"; exit 1; }
-# command -v 7z >/dev/null 2>&1 || { echo >&2 "错误：未找到 zip 命令。请先安装。"; exit 1; }
+command -v 7z >/dev/null 2>&1 || { echo >&2 "错误：未找到 zip 命令。请先安装。"; exit 1; }
 
 # 1. 获取版本号/标签名
 # 尝试从 package.json 读取 version
