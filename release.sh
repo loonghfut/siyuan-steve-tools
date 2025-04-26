@@ -84,13 +84,24 @@ git push "$REMOTE_NAME" "$TAG_NAME" || { echo >&2 "错误：推送 Git 标签失
 
 # 8. 创建 GitHub Release 并上传附件
 echo "--- 创建 GitHub Release 并上传附件 ---"
-gh release create "$TAG_NAME" "$PACKAGE_NAME" --notes "Release $TAG_NAME" --title "$TAG_NAME" || { echo >&2 "错误：创建 GitHub Release 或上传附件失败。"; exit 1; }
+# 获取上一个 Release 标签
+PREV_TAG=$(git tag --sort=-creatordate | grep -v "^$TAG_NAME$" | head -n 1)
+
+if [ -n "$PREV_TAG" ]; then
+  # 获取上一个 Release 标签到当前标签之间的所有提交
+  RELEASE_NOTES=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s (%an)" --reverse)
+else
+  # 如果没有上一个标签，则获取所有提交
+  RELEASE_NOTES=$(git log --pretty=format:"- %s (%an)" --reverse)
+fi
+
+gh release create "$TAG_NAME" "$PACKAGE_NAME" --notes "$RELEASE_NOTES" --title "$TAG_NAME" || { echo >&2 "错误：创建 GitHub Release 或上传附件失败。"; exit 1; }
 
 echo "--- 发布成功！---"
 echo "标签 '$TAG_NAME' 已创建并推送。"
 echo "GitHub Release 已创建，并已上传 '$PACKAGE_NAME'。"
 
 # 9. 清理 (可选)
-# rm "$PACKAGE_NAME"
+rm "$PACKAGE_NAME"
 
 exit 0
