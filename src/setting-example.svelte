@@ -597,6 +597,13 @@
                     value: settings["isGridMode"],
                 },
                 {
+                    type: "checkbox",
+                    title: "复制链接标题",
+                    description: "启用后复制链接时会包含标题",
+                    key: "copyLinkTitle",
+                    value: settings["copyLinkTitle"],
+                },
+                {
                     type: "custom", // 自定义组件类型
                     title: "画板备份管理",
                     description: "管理所有画板的备份文件",
@@ -771,7 +778,7 @@
             // 不限制
         },
         "画板": {
-            基本设置: 3, // 复选框和选择框
+            基本设置: 4, // 复选框和选择框
             备份管理: 1, // 备份管理组件
         },
         // "docker同步感知": {

@@ -38,6 +38,7 @@ import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ICardShape } from './CardShape/card-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
 import { openTab, showMessage } from 'siyuan';
+import { settingdata } from '@/index';
 // There's a guide at the bottom of this file!
 
 export const uiOverrides: TLUiOverrides = {
@@ -165,8 +166,12 @@ const CustomStylePanel = track(() => {
         if (slideShape && rootId !== '') { // 检查 rootId 是否已设置
             const shapeId = slideShape.id;
             // 使用幻灯片名称，如果为空则使用 rootId 作为后备标题
-            const url = `[${slideShape.props.name}](siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${shapeId})`;
-
+            let url: string;
+            if (settingdata['copyLinkTitle']) {
+                url = `[slide:${slideShape.props.name}](siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${shapeId})`;
+            } else {
+                url = `siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${shapeId}`
+            }
             try {
                 await navigator.clipboard.writeText(url);
                 showMessage('幻灯片链接已复制到剪贴板!'); // 简单反馈
@@ -236,7 +241,12 @@ function CustomQuickActions() {
             </div>
             <div>
                 <TldrawUiMenuItem id="external-link" icon="external-link" label="复制白板链接" onSelect={() => {
-                    const url = `[画板:${title}](siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title})`;
+                    let url: string;
+                    if (settingdata['copyLinkTitle']) {
+                        url = `[画板:${title}](siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title})`;
+                    } else {
+                        url = `siyuan://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title}`
+                    }
                     navigator.clipboard.writeText(url).then(() => {
                         showMessage('链接已复制到剪贴板!');
                     }).catch(err => {
