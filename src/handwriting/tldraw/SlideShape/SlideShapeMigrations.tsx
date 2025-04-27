@@ -6,6 +6,7 @@ const versions = createShapePropsMigrationIds(
   'slide',
   {
     Addv: 1,
+    Addcolor: 2,
   }
 )
 
@@ -20,6 +21,16 @@ export const slideShapeMigrations = createShapePropsMigrationSequence({
       },
       down(props) {
         delete props.version
+      },
+    },
+    {
+      id: versions.Addcolor,
+      up(props) {
+        // it is safe to mutate the props object here
+        props.color = 'black'
+      },
+      down(props) {
+        delete props.color
       },
     },
   ],
