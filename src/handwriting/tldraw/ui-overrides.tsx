@@ -61,6 +61,15 @@ export const uiOverrides: TLUiOverrides = {
             kbd: 's',
             onSelect: () => editor.setCurrentTool('slide'),
         }
+        tools['mindmap-node'] = {
+            id: 'mindmap-node',
+            icon: 'activity', // 你可以选择一个更合适的图标
+            label: 'MindMap Node',
+            kbd: 'm', // 设置键盘快捷键
+            onSelect: () => {
+                editor.setCurrentTool('mindmap-node')
+            },
+        }
         return tools
     },
     actions(editor, actions) {
@@ -268,10 +277,12 @@ export const components: TLComponents = {
         const tools = useTools()
         const isCardSelected = useIsToolSelected(tools['card'])
         const isSlideSelected = useIsToolSelected(tools['slide'])
+        // const isMindMapNodeSelected = useIsToolSelected(tools['mindmap-node'])
         return (
             <DefaultToolbar {...props}>
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
+                {/* <TldrawUiMenuItem {...tools['mindmap-node']} isSelected={isMindMapNodeSelected} /> */}
                 <DefaultToolbarContent />
             </DefaultToolbar>
         )
