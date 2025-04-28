@@ -282,7 +282,7 @@ export const components: TLComponents = {
             <DefaultToolbar {...props}>
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
-                {/* <TldrawUiMenuItem {...tools['mindmap-node']} isSelected={isMindMapNodeSelected} /> */}
+            
                 <DefaultToolbarContent />
             </DefaultToolbar>
         )
