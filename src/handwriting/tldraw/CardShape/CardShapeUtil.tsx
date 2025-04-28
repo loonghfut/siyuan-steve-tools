@@ -345,7 +345,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
-					border: `1px solid ${theme[shape.props.color].solid}`, // 添加颜色边框
+					border: `3px solid ${theme[shape.props.color].solid}`, // 添加颜色边框
 					borderRadius: '10px', // 增加圆角
 				}}
 				onDoubleClick={handleDoubleClick}
