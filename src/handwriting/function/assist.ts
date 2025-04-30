@@ -13,7 +13,7 @@ export async function addWhiteboardButton(e) {
             button.className = 'b3-button b3-button--outline whiteboard-button';
             button.innerHTML = '画板';
             button.title = '在画板中打开';
-            button.style.marginLeft = '8px';
+            button.style.marginLeft = '4px';
 
             // Add click event
             button.addEventListener('click', async () => {
