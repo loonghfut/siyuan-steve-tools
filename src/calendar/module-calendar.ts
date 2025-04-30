@@ -14,7 +14,7 @@ export let linkToCalendar = '';
 import * as myF from "./myF";
 import { handleAddButtonClick, refreshKanban } from "./kanban";
 import { globalOpen2 } from "./myK";
-import { getCursorElement } from "./quickadd";
+import { addquikaddButton, getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
 import { ics_alist } from "./share/alist";
 import { ics_s3 } from "./share/s3";
@@ -292,6 +292,13 @@ export class M_calendar {
     }
 
     async onLayoutReady() {
+        this.plugin.eventBus.on('switch-protyle', (e) => {
+            // console.log("切换思源块:", e);
+            // this.currentid = e.detail.protyle.block.rootID;
+            // console.log(this.currentid);
+            addquikaddButton(e);
+        });
+
         //悬浮显示
         if (this_settingdata["cal-show-float-view"]) {
             run("1");
@@ -751,7 +758,7 @@ export class M_calendar {
             }
             await this.uploadAllEventsToFile(eventsPath);
             await this.generateICSFromEventsFile(eventsPath, calendarpath);
-            
+
             const selectToPics = this_settingdata["SelectTOPics"];
             if (!selectToPics || selectToPics === frontEnd) {
                 if (settingdata["cal-share"] === "alist") {

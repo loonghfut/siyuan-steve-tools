@@ -332,4 +332,45 @@ export async function quickadd_event_more_sub(listItemsdata: BlockTreeResult['li
     }
 }
 
+export async function addquikaddButton(e) {
+    const breadcrumb = e.detail.protyle.element.querySelector('.protyle-breadcrumb');
+    if (breadcrumb) {
+        // Check if the button container already exists
+        const existingButtonContainer = breadcrumb.querySelector('.quikadd-container');
+        if (!existingButtonContainer) {
+            // Find the "more" button to insert before
+            const moreButton = breadcrumb.querySelector('button[data-type="more"]');
 
+            // Create a container for the icon, using a span or div instead of button
+            const iconContainer = document.createElement('span'); // Use span or div as a non-button container
+            iconContainer.className = 'quikadd-container'; // Add a class for identification
+            // Use an <i> tag for the icon, assuming 'iconSelect' is a valid icon class
+            iconContainer.innerHTML = `<div class="protyle-breadcrumb block__icon ariaLabel quikadd" aria-label="点击 <span class='ft__on-surface'>一键识别日程</span>">
+    <svg><use xlink:href="#iconCalendar"></use></svg>
+</div>`;
+
+            // Find the clickable element (the div with class 'quikadd')
+            const clickableIcon = iconContainer.querySelector('.quikadd');
+
+            if (clickableIcon) {
+                // Add click event listener to the icon div
+                clickableIcon.addEventListener('click', async () => {
+                    // Add your click logic here
+                    console.log('Quick add icon clicked!');
+                    showMessage('Quick add icon clicked!');
+                    // Example: Call your quick add logic
+                    // await handleQuickAddLogic();
+                });
+            } else {
+                console.error("Could not find the clickable icon element.");
+            }
+
+            // Insert the icon container before the "more" button if it exists, otherwise append to breadcrumb
+            if (moreButton) {
+                breadcrumb.insertBefore(iconContainer, moreButton);
+            } else {
+                breadcrumb.appendChild(iconContainer); // Fallback if "more" button isn't found
+            }
+        }
+    }
+}
