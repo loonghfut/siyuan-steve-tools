@@ -603,8 +603,8 @@
                 },
                 {
                     type: "checkbox",
-                    title: "同步删除",
-                    description: "启用后在画板删除块时会同步删除时间戳（开启后部分情况无法撤回）",
+                    title: "同步删除(不建议启用)",
+                    description: "启用后在画板删除块时会同步删除笔记中的块（无法撤回）",
                     key: "SyncDelete",
                     value: settings["SyncDelete"],
                 },

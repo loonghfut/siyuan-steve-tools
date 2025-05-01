@@ -239,7 +239,7 @@ export class TldrawManager {
 
                             // 解析拖拽数据
                             const blockIdo_rigin = e.dataTransfer!.types[0];
-                            // console.log('拖拽的数据类型', blockIdo_rigin);
+                            // console.log('拖拽的数据类型', e);
                             // 使用正则表达式提取块ID
                             let blockId = '';
                             if (blockIdo_rigin.startsWith('application/siyuan')) {
@@ -261,9 +261,19 @@ export class TldrawManager {
                             });
                             const idid = await api.generateSiyuanID();
                             const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-                            const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${idid}&title=${this.title}`;
-                            const aproblock = await api.insertBlock("markdown", `##### [${timestamp}](${link})
+                            let aproblock: string;
+                            if (blockIdo_rigin.includes('nodeheading')) {
+                                aproblock = blockId;
+                                const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const content = (await api.getBlockByID(blockId)).markdown;
+                                await api.updateBlock("markdown",`${content}[📜](${link})`, aproblock)
+                            }
+                            else {
+                                aproblock = idid as string;
+                                const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                await api.insertBlock("markdown", `##### [${timestamp}](${link})[📜](${link})
 {: id="${idid}" custom-st-tldraw="1" }`, blockId)
+                            }
                             // 创建新的Card形状
                             // console.log("创建新的卡片形状",  aproblock[0].doOperations[0].id);
                             editor.createShape({
@@ -275,7 +285,7 @@ export class TldrawManager {
                                     h: 300,
                                     color: 'black',
                                     showMask: true,
-                                    blockId: aproblock[0].doOperations[0].id,
+                                    blockId: aproblock,
                                 },
                             });
                             // api.setBlockAttrs(blockId, {
