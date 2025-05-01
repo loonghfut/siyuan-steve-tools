@@ -33,8 +33,8 @@ const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SlideShapeUtil,MindMapNodeShapeUtil]
-const customTools = [CardShapeTool, SlideShapeTool,MindMapNodeTool]
+const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SlideShapeUtil, MindMapNodeShapeUtil]
+const customTools = [CardShapeTool, SlideShapeTool, MindMapNodeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
@@ -296,17 +296,22 @@ export class TldrawManager {
                             const blockId = cardShape.props?.blockId;
                             if (!blockId) return;
 
-                            // 检查画布上是否还存在引用相同 blockId 的卡片
-                            const remainingCardsWithSameBlockId = editor.getCurrentPageShapes()
+                            // 获取所有页面上的所有形状
+                            const allShapes = editor.store.query.records('shape').get();
+                            // 检查所有页面上是否还存在引用相同 blockId 的卡片
+                            const remainingCardsWithSameBlockId = allShapes
                                 .filter(s => s.type === 'card' && (s as ICardShape).props?.blockId === blockId);
 
                             // 只有当没有其他卡片引用此 blockId 时，才更新块属性
                             if (remainingCardsWithSameBlockId.length === 0) {
                                 if (await api.getBlockByID(blockId)) {
-                                    api.deleteBlock(blockId)
-                                    // api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
-                                    //     .then(() => console.log(`Block attribute updated for ${blockId} as it's no longer referenced.`))
-                                    //     .catch(err => console.error('Failed to update block attributes:', err));
+                                    if (settingdata['SyncDelete']) {
+                                        api.deleteBlock(blockId)
+                                    } else {
+                                        api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
+                                            .then(() => console.log(`Block attribute updated for ${blockId} as it's no longer referenced.`))
+                                            .catch(err => console.error('Failed to update block attributes:', err));
+                                    }
                                 }
                             } else {
                                 console.log(`Block attribute for ${blockId} not updated as other cards still reference it.`);

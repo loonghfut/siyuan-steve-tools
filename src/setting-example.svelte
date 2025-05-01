@@ -602,6 +602,13 @@
                     value: settings["copyLinkTitle"],
                 },
                 {
+                    type: "checkbox",
+                    title: "同步删除",
+                    description: "启用后在画板删除块时会同步删除时间戳（开启后部分情况无法撤回）",
+                    key: "SyncDelete",
+                    value: settings["SyncDelete"],
+                },
+                {
                     type: "custom", // 自定义组件类型
                     title: "画板备份管理",
                     description: "管理所有画板的备份文件",
@@ -783,7 +790,7 @@
             // 不限制
         },
         画板: {
-            基本设置: 4, // 复选框和选择框
+            基本设置: 5, // 复选框和选择框
             备份管理: 1, // 备份管理组件
             引用管理: 1, // 引用管理组件
         },
