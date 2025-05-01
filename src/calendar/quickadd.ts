@@ -105,7 +105,7 @@ export function runblockdata_for_time(content: string): string | null {
     if (content === '') {
         return null;
     }
-    console.log('runblockdata_for_time', content);
+    // console.log('runblockdata_for_time', content);
     // 支持“下午4点”“今天下午4点”等描述
     const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)/;
     // 支持“下午4点”“4点”“16:00”等
@@ -116,8 +116,8 @@ export function runblockdata_for_time(content: string): string | null {
 
     const dateMatch = content.match(datePattern);
     const timeMatch = content.match(timePattern);
-    console.log('dateMatch', dateMatch);
-    console.log('timeMatch', timeMatch);
+    // console.log('dateMatch', dateMatch);
+    // console.log('timeMatch', timeMatch);
     if (!dateMatch) return null;
 
     let targetDate = dayjs();
@@ -385,7 +385,7 @@ export async function addquikaddButton(e) {
                 // Add click event listener to the icon div
                 clickableIcon.addEventListener('click', async () => {
                     let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
-                    console.log('ChildBlocks', ChildBlocks);
+                    // console.log('ChildBlocks', ChildBlocks);
                     const idsWithSchedule = ChildBlocks
                         .filter(block => block.content && block.content.includes('@日程'))
                         .map(block => block.id);
@@ -400,11 +400,13 @@ export async function addquikaddButton(e) {
 
                     for (const blockId of idsWithSchedule) {
                         try {
-                            console.log(`Processing block: ${blockId}`);
+                            // console.log(`Processing block: ${blockId}`);
+                            showMessage(`正在处理块 ${blockId}`,-1, 'info','@日程');
                             // Call handleAddButtonClick for the current block ID
                             const success = await handleAddButtonClick('', { isdirect: true, directid: blockId });
                             if (success) {
                                 // showMessage(`成功处理块 ${blockId}`);
+                                showMessage(`成功处理块 ${blockId}`,-1, 'info','@日程');
                             } else {
                                 // Assuming handleAddButtonClick returns false or similar on non-success without throwing an error
                                 showMessage(`处理块 ${blockId} 未标记为成功`, 3000, 'info');
@@ -419,7 +421,7 @@ export async function addquikaddButton(e) {
                         }
                     }
 
-                    showMessage('所有包含"@日程"的块处理完毕。');
+                    showMessage('所有包含"@日程"的块处理完毕。',3000, 'info','@日程');
                 });
             } else {
                 console.error("Could not find the clickable icon element.");
