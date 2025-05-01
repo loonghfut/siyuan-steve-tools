@@ -209,12 +209,12 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
 }
 
 /**
- * 从内容中提取分类信息，支持 #分类名 或 分类: 分类名
+ * 从内容中提取分类信息，支持 #分类名# 或 分类: 分类名
  * 返回第一个匹配的分类名字符串，未匹配返回空字符串
  */
 export function runblockdata_for_category(content: string): string {
-    // 匹配 #分类名
-    const hashPattern = /#([\u4e00-\u9fa5\w\-]+)/;
+    // 匹配 #分类名#
+    const hashPattern = /#([\u4e00-\u9fa5\w\-]+)#/; // Changed pattern
     const hashMatch = content.match(hashPattern);
     if (hashMatch) {
         return hashMatch[1];
