@@ -3,6 +3,7 @@ import { IProtyle, showMessage, subMenu } from 'siyuan';
 import { allKBEvents, handleAddButtonClick } from './kanban';
 import { updateAttrViewCell_pro } from '@/api';
 import { findEventByPublicId, run_getsubevents } from './myK';
+import { api } from '@frostime/siyuan-plugin-kits';
 
 interface BlockNode {
     id: string;
@@ -104,10 +105,14 @@ export function runblockdata_for_time(content: string): string | null {
     if (content === '') {
         return null;
     }
+    console.log('runblockdata_for_time', content);
     // 支持“下午4点”“今天下午4点”等描述
-    const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)?/;
+    const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)/;
     // 支持“下午4点”“4点”“16:00”等
-    const timePattern = /(上午|下午|中午|晚上)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2})\s*分)?|(\d{1,2})\s*[:|：]\s*(\d{1,2})/;
+    // 排除 HH:MM:SS, :MM:SS, 以及部分匹配如 00:32:32 中的 32:32
+    // (?<![:\d]) 确保 HH:MM 前面不是冒号或数字
+    // (?![:|：|\d]) 确保 HH:MM 后面不是冒号或数字
+    const timePattern = /(上午|下午|中午|晚上)?\s*(\d{1,2})\s*点(?:\s*(\d{1,2})\s*分)?|(?<![:\d])(\d{1,2})\s*[:|：]\s*(\d{1,2})(?![:|：|\d])/;
 
     const dateMatch = content.match(datePattern);
     const timeMatch = content.match(timePattern);
@@ -151,23 +156,36 @@ export function runblockdata_for_time(content: string): string | null {
     // 处理时间部分
     if (timeMatch) {
         let hours = 8, minutes = 0;
-        if (timeMatch[2]) {
+        // 注意：由于在 HH:MM 前面加了 lookbehind，捕获组的索引可能需要调整
+        // 检查 timeMatch 数组的内容来确定正确的索引
+        // 假设 "X点X分" 仍然是 1, 2, 3
+        // 假设 "HH:MM" 现在是 4, 5 (因为 lookbehind 不计入捕获组)
+        if (timeMatch[2]) { // 匹配 "X点X分" 格式
             hours = parseInt(timeMatch[2]);
             minutes = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
-            // 处理上午/下午/中午/晚上
             const period = timeMatch[1];
             if (period === '下午' || period === '晚上') {
                 if (hours < 12) hours += 12;
             } else if (period === '中午') {
                 if (hours < 11) hours += 12;
+                else if (hours === 12) hours = 12;
+            } else if (period === '上午') {
+                 if (hours === 12) hours = 0;
             }
-        } else if (timeMatch[4] && timeMatch[5]) {
+        } else if (timeMatch[4] && timeMatch[5]) { // 匹配 "HH:MM" 格式
             hours = parseInt(timeMatch[4]);
             minutes = parseInt(timeMatch[5]);
         }
-        targetDate = targetDate.hour(hours).minute(minutes);
+        // 确保小时和分钟在有效范围内
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+             targetDate = targetDate.hour(hours).minute(minutes).second(0).millisecond(0); // 清除秒和毫秒
+        } else {
+             console.warn(`无效的时间格式: ${timeMatch[0]}`);
+             return null;
+        }
+
     } else {
-        // 如果没有指定时间，默认设置为当天 08:00
+        // 如果没有指定时间，返回 null
         return null;
     }
 
@@ -355,11 +373,42 @@ export async function addquikaddButton(e) {
             if (clickableIcon) {
                 // Add click event listener to the icon div
                 clickableIcon.addEventListener('click', async () => {
-                    // Add your click logic here
-                    console.log('Quick add icon clicked!');
-                    showMessage('Quick add icon clicked!');
-                    // Example: Call your quick add logic
-                    // await handleQuickAddLogic();
+                    let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
+                    console.log('ChildBlocks', ChildBlocks);
+                    const idsWithSchedule = ChildBlocks
+                        .filter(block => block.content && block.content.includes('@日程'))
+                        .map(block => block.id);
+
+                    console.log('包含"@日程"的块ID:', idsWithSchedule);
+                    if (idsWithSchedule.length === 0) {
+                        showMessage('未找到包含"@日程"的块。');
+                        return;
+                    }
+
+                    // showMessage(`开始处理 ${idsWithSchedule.length} 个包含"@日程"的块...`);
+
+                    for (const blockId of idsWithSchedule) {
+                        try {
+                            console.log(`Processing block: ${blockId}`);
+                            // Call handleAddButtonClick for the current block ID
+                            const success = await handleAddButtonClick('', { isdirect: true, directid: blockId });
+                            if (success) {
+                                // showMessage(`成功处理块 ${blockId}`);
+                            } else {
+                                // Assuming handleAddButtonClick returns false or similar on non-success without throwing an error
+                                showMessage(`处理块 ${blockId} 未标记为成功`, 3000, 'info');
+                            }
+                            // Add a delay to prevent potential issues with rapid processing, similar to quickadd_event_more_main
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } catch (error) {
+                            console.error(`处理块 ${blockId} 时出错:`, error);
+                            showMessage(`处理块 ${blockId} 时出错: ${error.message || error}`, 5000, 'error');
+                            // Optional: Add a delay even after an error before processing the next one
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                    }
+
+                    showMessage('所有包含"@日程"的块处理完毕。');
                 });
             } else {
                 console.error("Could not find the clickable icon element.");
