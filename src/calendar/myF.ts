@@ -8,7 +8,7 @@ import { moduleInstances } from '@/index';
 import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
-import { runblockdata_for_category, runblockdata_for_sub, runblockdata_for_time } from './quickadd';
+import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_time } from './quickadd';
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
 
@@ -493,6 +493,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const ce = runblockdata_for_time(blockdata?.kramdown);
         const minsub = runblockdata_for_sub(blockdata?.kramdown);
         const categorie = runblockdata_for_category(blockdata?.kramdown);
+        const note = runblockdata_for_note(blockdata?.kramdown);
         let ismain = false;
         if (minsub.length > 0) {
             ismain = true;
@@ -507,9 +508,13 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
         const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
+        const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
         if(categoryKeyID && categorie){
             const categoryData: ISelectOption[] = [{ content: categorie }];
             await api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select");
+        }
+        if(noteKeyID && note){
+            await api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, note, "text");
         }
         const datata = await api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date");
         const selectdata: ISelectOption[] = [{ content: status }];
@@ -634,6 +639,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
             const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
+            const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
             //// 新：用户自定义改动开始时间,优先级,分类
             const category2 = (document.getElementById('st-category') as HTMLSelectElement).value;
             const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
@@ -646,6 +652,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const ce = runblockdata_for_time(blockdata?.kramdown);
             const minsub = runblockdata_for_sub(blockdata?.kramdown);
             const category1 = runblockdata_for_category(blockdata?.kramdown);
+            const note = runblockdata_for_note(blockdata?.kramdown);
             // 手动输入分类优先
             const category = category1 || category2;
             let ismain = false;
@@ -663,6 +670,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const categoryData: ISelectOption[] = [{ content: category }];
             console.log("selectdata", selectdata);
             ///////////更新属性////////////////////
+            if(noteKeyID && note){
+                await api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, note, "text");
+            }
             if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
                 await api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, categoryData, "select");
             }

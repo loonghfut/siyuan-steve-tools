@@ -170,7 +170,7 @@ export function runblockdata_for_time(content: string): string | null {
                 if (hours < 11) hours += 12;
                 else if (hours === 12) hours = 12;
             } else if (period === '上午') {
-                 if (hours === 12) hours = 0;
+                if (hours === 12) hours = 0;
             }
         } else if (timeMatch[4] && timeMatch[5]) { // 匹配 "HH:MM" 格式
             hours = parseInt(timeMatch[4]);
@@ -178,10 +178,10 @@ export function runblockdata_for_time(content: string): string | null {
         }
         // 确保小时和分钟在有效范围内
         if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-             targetDate = targetDate.hour(hours).minute(minutes).second(0).millisecond(0); // 清除秒和毫秒
+            targetDate = targetDate.hour(hours).minute(minutes).second(0).millisecond(0); // 清除秒和毫秒
         } else {
-             console.warn(`无效的时间格式: ${timeMatch[0]}`);
-             return null;
+            console.warn(`无效的时间格式: ${timeMatch[0]}`);
+            return null;
         }
 
     } else {
@@ -196,7 +196,7 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
     // 使用正则表达式全局匹配所有 [X] 或 [ ] 及后面的事件内容，考虑markdown列表格式
     const taskRegex = /^\s*\*\s*\{:[^}]*\}\s*\[(X| )\]\s*(.+?)(?=\s*\{:|$)/gm;
     const results: { subevent: string, completed: boolean }[] = [];
-    
+
     let match;
     while ((match = taskRegex.exec(content)) !== null) {
         results.push({
@@ -204,7 +204,7 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
             completed: match[1] === 'X'
         });
     }
-    
+
     return results;
 }
 
@@ -228,7 +228,18 @@ export function runblockdata_for_category(content: string): string {
     return '';
 }
 
-
+export function runblockdata_for_note(content: string): string {
+    // 匹配包含"@描述"的文本行
+    const notePattern = /([^\n]+)@描述/;
+    const noteMatch = content.match(notePattern);
+    
+    if (noteMatch && noteMatch[1]) {
+        // 返回删除了"@描述"的文本内容，并去除首尾空格
+        return noteMatch[1].trim();
+    }
+    
+    return '';
+}
 
 
 
@@ -274,7 +285,7 @@ async function quickadd_event_more_main(listItemsdata: BlockTreeResult['listItem
     for (const item of listItemsdata) {
         if (item.id) {
             try {
-                 isok = await handleAddButtonClick("", {
+                isok = await handleAddButtonClick("", {
                     directid: item.id,
                     isdirect: true
                 });
@@ -284,8 +295,8 @@ async function quickadd_event_more_main(listItemsdata: BlockTreeResult['listItem
                         resolve(void 0);
                     }, 1000);
                 });
-                if(isok){
-                    isok=false;
+                if (isok) {
+                    isok = false;
                     showMessage(`成功处理列表项 ${item.id}`);
                     continue;
                 }
