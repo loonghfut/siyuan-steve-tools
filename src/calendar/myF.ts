@@ -113,10 +113,12 @@ function extractDataFromTable(data: any, isZQ = false) {
                 // 提取开始时间
                 if (columnMap.has('开始时间') && row.cells) {
                     const timeCell = row.cells[columnMap.get('开始时间').index];
+                    const dateValue = timeCell?.value?.date;
                     rowData['开始时间'] = {
-                        start: timeCell?.value?.date?.content || null,
-                        end: timeCell?.value?.date?.content2 || null,
-                        keyID: timeCell?.value?.keyID || ''
+                        start: dateValue?.content || null,
+                        end: dateValue?.hasEndDate ? (dateValue?.content2 || null) : null,
+                        keyID: timeCell?.value?.keyID || '',
+                        hasEndDate: dateValue?.hasEndDate || false // Store the hasEndDate value
                     };
                 }
                 // 提取优先级
@@ -246,7 +248,7 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
 export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]) {
     const events = [];
     const addedEventIds = new Set();
-    steveTools.outlog("viewData:::", viewData_zq);
+    console.log("viewData:::", viewData);
     // 处理普通事件
     for (const view of viewData) {
         for (const item of view.data) {
@@ -259,7 +261,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     const startDate = new Date(parseInt(item['开始时间'].start));
                     const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
 
-                    const isAllDay = !endDate ||
+                    const isAllDay =
+                        // !endDate ||
                         (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
                         (endDate && startDate.getTime() === endDate.getTime());
@@ -509,11 +512,11 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
         const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
-        if(categoryKeyID && categorie){
+        if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
             await api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select");
         }
-        if(noteKeyID && note){
+        if (noteKeyID && note) {
             await api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, note, "text");
         }
         const datata = await api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date");
@@ -670,7 +673,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const categoryData: ISelectOption[] = [{ content: category }];
             console.log("selectdata", selectdata);
             ///////////更新属性////////////////////
-            if(noteKeyID && note){
+            if (noteKeyID && note) {
                 await api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, note, "text");
             }
             if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
