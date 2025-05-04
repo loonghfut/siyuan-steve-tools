@@ -716,6 +716,40 @@ export async function addBlockToDatabase_pro(id: string, avID: string, protyle?:
     Protyle.prototype.transaction(doOperations, undoOperations);
 }
 
+interface UpdateMainKeyParams {
+    avID: string;
+    keyID: string;
+    content: string;
+    blockID: string;
+}
+
+// Modify the function to accept an object parameter
+export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            try {
+                const { avID, keyID, content, blockID } = params; // Destructure the parameters
+                const url = '/api/av/setAttributeViewBlockAttr';
+                const payload = {
+                    avID: avID,
+                    keyID: keyID,
+                    rowID: blockID,
+                    value: {
+                        block: {
+                            content: content,
+                            id: blockID
+                        },
+                        isDetached: false // Assuming this remains false, adjust if needed
+                    }
+                };
+                const result = await request(url, payload);
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        }, 2000); // Delay execution by 2000 milliseconds (2 seconds)
+    });
+}
 
 
 export async function updateAttrViewCell_pro(

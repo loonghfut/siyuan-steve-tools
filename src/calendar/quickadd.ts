@@ -241,6 +241,19 @@ export function runblockdata_for_note(content: string): string {
     return '';
 }
 
+export function runblockdata_for_title(content: string): string {
+    // 匹配包含"@描述"的文本行
+    const notePattern = /([^\n]+)@日程/;
+    const noteMatch = content.match(notePattern);
+    
+    if (noteMatch && noteMatch[1]) {
+        // 返回删除了"@描述"的文本内容，并去除首尾空格
+        return noteMatch[1].trim();
+    }
+    
+    return '';
+}
+
 
 
 

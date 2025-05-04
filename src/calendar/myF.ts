@@ -8,7 +8,7 @@ import { moduleInstances } from '@/index';
 import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
-import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_time } from './quickadd';
+import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_time, runblockdata_for_title } from './quickadd';
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
 
@@ -490,7 +490,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     }
     if (direct.isdirect) {
         // console.log("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
-        if(await checkBlockInEvent(direct.directid, to_db_id)) {
+        if (await checkBlockInEvent(direct.directid, to_db_id)) {
             console.log("目标数据库已存在此事件");
             return;
         }
@@ -501,6 +501,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const minsub = runblockdata_for_sub(blockdata?.kramdown);
         const categorie = runblockdata_for_category(blockdata?.kramdown);
         const note = runblockdata_for_note(blockdata?.kramdown);
+        const title = runblockdata_for_title(blockdata?.kramdown);
+        console.log("title:::", title);
         let ismain = false;
         if (minsub.length > 0) {
             ismain = true;
@@ -516,6 +518,16 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
         const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
+        const titleKeyID = await getKeyIDfromViewValue(viewValue, '事件', to_db_id);
+        if (titleKeyID && title) {
+            console.log("titleKeyID:::", titleKeyID);
+            await api.updatemainkey({
+                avID:to_db_id,
+                blockID: direct.directid,
+                keyID: titleKeyID,
+                content: title,
+            });
+        }
         if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
             await api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select");
@@ -760,7 +772,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
 export async function checkBlockInEvent(blockId: string, to_db_id: string) {
     const attrs = await api.getBlockAttrs(blockId);
-    console.log("attrs", attrs);
+    // console.log("attrs", attrs);
     // 判断 "custom-avs" 是否存在
     if ("custom-avs" in attrs) {
         const avsValue = attrs["custom-avs"];
