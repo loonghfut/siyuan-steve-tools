@@ -106,6 +106,14 @@ export const uiOverrides: TLUiOverrides = {
                     }
                 },
             },
+            'zoom-in': {
+                ...actions['zoom-in'], // Keep default behavior
+                kbd: '', 
+            },
+            'zoom-out': {
+                ...actions['zoom-out'], // Keep default behavior
+                kbd: '', 
+            },
             // 'toggle-grid': { ...actions['toggle-grid'], kbd: '' },
         }
     },
