@@ -23,6 +23,7 @@ $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
 //事件块背景
 .sb,
+.list,
 .li,
 .p {
     &[custom-st-event="todo"] {
