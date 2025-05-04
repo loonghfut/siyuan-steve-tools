@@ -489,7 +489,11 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         return;
     }
     if (direct.isdirect) {
-
+        // console.log("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
+        if(await checkBlockInEvent(direct.directid, to_db_id)) {
+            console.log("目标数据库已存在此事件");
+            return;
+        }
         //块时间处理
         const blockdata = await api.getBlockKramdown(direct.directid);
         // console.log("blockdata:::", blockdata.kramdown);
@@ -754,7 +758,23 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
 }
 
-
+export async function checkBlockInEvent(blockId: string, to_db_id: string) {
+    const attrs = await api.getBlockAttrs(blockId);
+    console.log("attrs", attrs);
+    // 判断 "custom-avs" 是否存在
+    if ("custom-avs" in attrs) {
+        const avsValue = attrs["custom-avs"];
+        // 将 "custom-avs" 的值按逗号分割成数组
+        const avsList = avsValue.split(',');
+        // 判断 to_db_id 是否在数组中
+        const isInEvent = avsList.includes(to_db_id);
+        // console.log("Is block in the specified event database?", isInEvent);
+        return isInEvent;
+    }
+    // 如果 "custom-avs" 不存在，则返回 false
+    // console.log("Is block in the specified event database?", false);
+    return false;
+}
 
 export async function updateEventInDatabase(
     info: any,
