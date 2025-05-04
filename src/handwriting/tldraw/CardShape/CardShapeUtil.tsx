@@ -62,6 +62,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			isNewlyCreated: true,
 			fontSize: 16, // 默认字体大小
 			isMain: false, // 是否为主卡片
+			refreshNonce: Date.now(), // 用于之后强制刷新
 			// version: 1, // 版本号
 		}
 	}

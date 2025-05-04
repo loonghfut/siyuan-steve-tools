@@ -12,6 +12,7 @@ export const cardShapeProps: RecordProps<ICardShape> = {
 	fontSize: T.optional(T.number),
 	isMain: T.optional(T.boolean),
 	version: T.optional(T.number), // 添加 vision 属性
+	refreshNonce: T.optional(T.number), // 添加 refreshNonce 属性
 }
 
 // To generate your own custom styles, check out the custom styles example.

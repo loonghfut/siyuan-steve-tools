@@ -6,6 +6,7 @@ const versions = createShapePropsMigrationIds(
   'card',
   {
     Addv: 1,
+    AddrefreshNonce:2,
   }
 )
 
@@ -20,6 +21,16 @@ export const cardShapeMigrations = createShapePropsMigrationSequence({
       },
       down(props) {
         delete props.version
+      },
+    },
+    {
+      id: versions.AddrefreshNonce,
+      up(props) {
+        // it is safe to mutate the props object here
+        props.refreshNonce = Date.now()
+      },
+      down(props) {
+        delete props.refreshNonce
       },
     },
   ],

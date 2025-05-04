@@ -413,12 +413,11 @@ export const components: TLComponents = {
                 <button
                     style={buttonStyle}
                     onClick={() => {
-                        // 复制卡片
-                        editor.duplicateShapes([selectionInfo.id])
+                        showMessage('开发中。。。');
                     }}
-                    title="复制卡片"
+                    title="刷新卡片"
                 >
-                    📋
+                    🔄
                 </button>
                 <button
                     style={buttonStyle}
@@ -479,15 +478,6 @@ export const components: TLComponents = {
                                 fontSize: newSize,
                             },
                         });
-
-                        // // 直接应用到当前DOM元素以立即看到效果
-                        // const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
-                        // if (cardElement) {
-                        //     const protyleElement = cardElement.querySelector(".protyle-wysiwyg");
-                        //     if (protyleElement) {
-                        //         (protyleElement as HTMLElement).style.fontSize = `${newSize}px`;
-                        //     }
-                        // }
                     }}
                     title="放大字体"
                 >
@@ -515,15 +505,6 @@ export const components: TLComponents = {
                                 fontSize: newSize,
                             },
                         });
-
-                        // // 直接应用到当前DOM元素以立即看到效果
-                        // const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
-                        // if (cardElement) {
-                        //     const protyleElement = cardElement.querySelector(".protyle-wysiwyg");
-                        //     if (protyleElement) {
-                        //         (protyleElement as HTMLElement).style.fontSize = `${newSize}px`;
-                        //     }
-                        // }
                     }}
                     title="减小字体"
                 >
