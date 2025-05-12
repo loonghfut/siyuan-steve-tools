@@ -132,7 +132,7 @@ export class M_lifelog {
             const dailyChanges = [];
             for (const change of changes) {
                 // 先检查 action 类型
-                if (change.action !== "update" || !change.data) {
+                if ((change.action !== "update" && change.action !== "insert") || !change.data) {
                     continue;
                 }
                 if (!change.id) {
@@ -175,7 +175,7 @@ export class M_lifelog {
 
         // 修改段落过滤逻辑
         let paragraphs = changes.filter(p => {
-            if (p.action !== "update" || !p.data) return false;
+            if ((p.action !== "update" && p.action !== "insert") || !p.data) return false; // 允许 "insert" 和 "update"
             // 确保 data 是字符串类型
             const data = typeof p.data === 'string' ? p.data : JSON.stringify(p.data);
             // 检查 data 字段是否包含 NodeParagraph

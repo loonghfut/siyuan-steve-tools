@@ -107,7 +107,7 @@ export function runblockdata_for_time(content: string): string | null {
     }
     // console.log('runblockdata_for_time', content);
     // 支持“下午4点”“今天下午4点”等描述
-    const datePattern = /(明天|后天|今天|下周|下月|(\d{1,2})月(\d{1,2})号|(\d{1,2})号)/;
+    const datePattern = /(今天|本日|明天|明日|后天|大后天|昨天|昨日|前天|下周|下星期|下个星期|上周|上星期|上个星期|下月|下个月|上月|上个月|(\d{1,2})月(\d{1,2})[号日]|(\d{1,2})[号日])/;
     // 支持“下午4点”“4点”“16:00”等
     // 排除 HH:MM:SS, :MM:SS, 以及部分匹配如 00:32:32 中的 32:32
     // (?<![:\d]) 确保 HH:MM 前面不是冒号或数字
@@ -126,18 +126,40 @@ export function runblockdata_for_time(content: string): string | null {
     if (dateMatch[1]) {
         switch (dateMatch[1]) {
             case '今天':
+            case '本日':
                 break;
             case '明天':
+            case '明日':
                 targetDate = targetDate.add(1, 'day');
                 break;
             case '后天':
+            case '大后天':
                 targetDate = targetDate.add(2, 'day');
                 break;
+            case '昨天':
+            case '昨日':
+                targetDate = targetDate.subtract(1, 'day');
+                break;
+            case '前天':
+                targetDate = targetDate.subtract(2, 'day');
+                break;
             case '下周':
+            case '下星期':
+            case '下个星期':
                 targetDate = targetDate.add(1, 'week');
                 break;
+            case '上周':
+            case '上星期':
+            case '上个星期':
+                targetDate = targetDate.subtract(1, 'week');
+                break;
             case '下月':
+            case '下个月':
                 targetDate = targetDate.add(1, 'month');
+                break;
+            case '上月':
+            case '上个月':
+                targetDate = targetDate.subtract(1, 'month');
                 break;
             default:
                 if (dateMatch[2] && dateMatch[3]) {
@@ -185,8 +207,8 @@ export function runblockdata_for_time(content: string): string | null {
         }
 
     } else {
-        // 如果没有指定时间，返回 null
-        return null;
+        // 如果没有时间部分，默认设置为 8 点
+        targetDate = targetDate.hour(8).minute(0).second(0).millisecond(0);
     }
 
     return targetDate.format('YYYY-MM-DDTHH:mm');
