@@ -12,12 +12,38 @@ import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub,
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
 
-export const statusMap = {
+export const statusMap = new Proxy({
+    // 保留原有的映射关系作为已知状态
     "未完成": "todo",
-    "完成": "done",
+    "完成": "done", 
     "进行中": "inprogress",
     "归档": "archive",
-};
+}, {
+    get: (target, prop) => {
+        // 如果是已知状态，返回预设映射
+        if (typeof prop === 'string' && prop in target) {
+            return target[prop];
+        }
+        
+        // 对于未知状态，生成一个规范化的代码
+        if (typeof prop === 'string') {
+            // 将中文或其他语言的状态名转换为英文标识符:
+            // 1. 转换为小写
+            // 2. 移除空格和特殊字符
+            // 3. 如果是纯中文或其他非拉丁字符，使用拼音首字母或生成唯一标识
+            const code = prop
+                .toLowerCase()
+                .replace(/\s+/g, '')
+                .replace(/[^\w\u4e00-\u9fa5]/gi, '');
+            
+            // 如果处理后为空字符串，返回默认状态
+            return code || 'todo';
+        }
+        
+        // 任何异常情况返回默认状态
+        return 'todo';
+    }
+});
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
 
