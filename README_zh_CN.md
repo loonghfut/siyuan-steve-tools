@@ -12,7 +12,7 @@ STEVETOOLS
  若介意请勿使用。
 #### ！！寒假已结束，后面新功能的开发会放缓，大三学业繁忙，后面的空闲时间大概率只会修复bug，除非你带着[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)催更（包括alist附件管理，数据库属性显示插件）！！
 ### 若发现BUG或者有好的建议，欢迎提issue或者pr。
-[问题反馈](https://www.yuque.com/forms/share/360faa58-b547-4d6c-bdbc-681216e80895)
+### [问题反馈处](https://www.yuque.com/forms/share/360faa58-b547-4d6c-bdbc-681216e80895)
 
 #### 目前工具
 1. 日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
