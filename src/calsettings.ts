@@ -76,6 +76,8 @@ export const defaultSettings = {
     "isGridMode": false, // 是否开启网格模式
     "copyLinkTitle": true, // 是否复制标题
     'SyncDelete': false, // 是否同步删除
+    //插件通用配置
+    "PluginUsageStatistics": true, // 是否开启插件使用统计
 };
 
 export function getSettings() {

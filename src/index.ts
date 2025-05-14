@@ -89,7 +89,7 @@ export default class steveTools extends Plugin {
     // private isMobile: boolean;
     // private settingUtils: SettingUtils;
     async onload() {
-        api.getFromApi2("");
+
         frontEnd = window.siyuan.config.system.os;
         this.addIcons(`
     <symbol id="iconST" viewBox="0 0 512 512">
@@ -110,6 +110,10 @@ export default class steveTools extends Plugin {
         for (const moduleName in moduleInstances) {
             steveTools.outlog("init--" + moduleName);
             await moduleInstances[moduleName]?.init?.(settingdata);
+        }
+        if (settingdata["PluginUsageStatistics"]) {
+            console.log("统计");
+            api.getFromApi2("");
         }
 
     }

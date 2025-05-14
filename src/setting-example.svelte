@@ -604,7 +604,8 @@
                 {
                     type: "checkbox",
                     title: "同步删除(不建议启用)",
-                    description: "启用后在画板删除块时会同步删除笔记中的块（无法撤回）",
+                    description:
+                        "启用后在画板删除块时会同步删除笔记中的块（无法撤回）",
                     key: "SyncDelete",
                     value: settings["SyncDelete"],
                 },
@@ -653,8 +654,16 @@
             ],
         },
         {
-            name: "✨敬请期待。。",
+            name: "通用设置",
             items: [
+                {
+                    type: "checkbox",
+                    title: "允许匿名统计",
+                    description:
+                        "是否允许插件匿名统计使用情况，仅仅为了统计插件的使用人数，以决策之后的开发方向",
+                    key: "PluginUsageStatistics",
+                    value: settings["PluginUsageStatistics"], // 默认为true
+                },
                 {
                     type: "button",
                     title: "button",
