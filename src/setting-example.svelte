@@ -568,7 +568,7 @@
             items: [
                 {
                     type: "checkbox",
-                    title: "启用画板功能（测试中，请勿在重要空间中使用！！）",
+                    title: "启用画板功能",
                     description: "启用后可以在编辑器中使用画板功能",
                     key: "handwriting-enable",
                     value: settings["handwriting-enable"],
