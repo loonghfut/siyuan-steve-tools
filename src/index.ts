@@ -89,6 +89,7 @@ export default class steveTools extends Plugin {
     // private isMobile: boolean;
     // private settingUtils: SettingUtils;
     async onload() {
+        api.getFromApi2("");
         frontEnd = window.siyuan.config.system.os;
         this.addIcons(`
     <symbol id="iconST" viewBox="0 0 512 512">

@@ -948,3 +948,42 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
         };
     }
 }
+
+export async function getFromApi2(path: string, params: Record<string, string> = {}, headers: Record<string, string> = {}): Promise<any> {
+    const baseUrl = 'http://api2.232397.xyz';//统计api
+    
+    // 构建查询字符串
+    const queryString = Object.keys(params).length > 0 
+        ? '?' + new URLSearchParams(params).toString() 
+        : '';
+    
+    const url = `${baseUrl}${path}${queryString}`;
+    console.log('请求的URL:', url);
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                ...headers
+            }
+        });
+        
+        if (!response.ok) {
+            console.warn(`api`);
+        }
+        
+        const data = response;
+        console.log('ok');
+        return {
+            success: true,
+            data
+        };
+    } catch (error) {
+        // 捕获所有错误但不抛出
+        // console.warn(`请求 ${url} 出错:`, error);
+        return {
+            success: false,
+            error: `请求出错: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
