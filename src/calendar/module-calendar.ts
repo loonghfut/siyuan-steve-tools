@@ -433,9 +433,9 @@ export class M_calendar {
             label: "日历视图",
             click: async () => {
                 if (front == "browser-mobile" || front == "mobile") {
-                    await this.openRiChengViewDialog(true, "", "dayGridMonth");
+                    await this.openRiChengViewDialog(true, "", settingdata["cal-default-view"]);
                 } else {
-                    await this.openRiChengView();
+                    await this.openRiChengView(settingdata["cal-default-view"]);
                 }
             }
         });
@@ -444,9 +444,9 @@ export class M_calendar {
             label: "看板视图",
             click: async () => {
                 if (front == "browser-mobile" || front == "mobile") {
-                    await this.openRiChengViewDialog(true, "", "kanban");
+                    await this.openRiChengViewDialog(true, "", settingdata["kanban-default-view"]);
                 } else {
-                    await this.openRiChengView("kanban");
+                    await this.openRiChengView(settingdata["kanban-default-view"]);
                 }
             }
         });

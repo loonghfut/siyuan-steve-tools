@@ -464,6 +464,32 @@
                     key: "cal-event-color",
                     value: settings["cal-event-color"],
                 },
+                {
+                    type: "select",
+                    title: "默认日历视图模式",
+                    description: "选择日历默认打开的视图模式",
+                    key: "cal-default-view",
+                    value: settings["cal-default-view"],
+                    options: {
+                        multiMonthYear: "MultiMonthYear",
+                        dayGridMonth: "DayGridMonth",
+                        timeGridWeek: "TimeGridWeek",
+                        timeGridThreeDays: "TimeGridThreeDays",
+                        timeGridDay: "TimeGridDay",
+                    },
+                },
+                {
+                    type: "select",
+                    title: "默认看板视图模式",
+                    description: "选择看板默认打开的视图模式",
+                    key: "kanban-default-view",
+                    value: settings["kanban-default-view"],
+                    options: {
+                        weekkanban: "WeekKanban",
+                        kanban: "Kanban",
+                        yearkanban: "YearKanban",
+                    },
+                },
             ],
         },
         {
@@ -795,7 +821,7 @@
             ics设置: 7,
             ics分享: 9,
             订阅日历: 6,
-            视图设置: 6,
+            视图设置: 8,
             // 不限制
         },
         画板: {
