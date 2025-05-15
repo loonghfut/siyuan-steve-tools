@@ -958,7 +958,7 @@ export async function getFromApi2(path: string, params: Record<string, string> =
         : '';
     
     const url = `${baseUrl}${path}${queryString}`;
-    console.log('请求的URL:', url);
+    // console.log('请求的URL:', url);
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -972,8 +972,8 @@ export async function getFromApi2(path: string, params: Record<string, string> =
             console.warn(`api`);
         }
         
-        const data = response;
-        console.log('ok');
+        const data =await response.text();
+        // console.log('ok');
         return {
             success: true,
             data

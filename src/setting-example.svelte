@@ -686,20 +686,28 @@
                     type: "checkbox",
                     title: "允许匿名统计",
                     description:
-                        "是否允许插件匿名统计使用情况，仅仅为了统计插件的使用人数，以决策之后的开发方向",
+                        "是否允许插件匿名统计使用情况，仅仅为了统计插件的使用人数，以决策之后的开发方向（只发起了一个get请求[细节见插件源码]，不会发送任何隐私数据）",
                     key: "PluginUsageStatistics",
                     value: settings["PluginUsageStatistics"], // 默认为true
                 },
                 {
                     type: "button",
-                    title: "button",
-                    description: "This is a button",
+                    title: "今日本插件使用情况",
+                    description: "查看本插件的使用情况",
                     key: "e",
-                    value: "Click Button",
+                    value: "查看",
                     button: {
-                        label: "Click Me",
-                        callback: () => {
-                            showMessage("Hello, world!");
+                        label: "查看",
+                        callback: async () => {
+                            if (!settings["PluginUsageStatistics"]) {
+                                showMessage(
+                                    "请先允许匿名统计才能查看此插件的使用情况",
+                                );
+                                return;
+                            }
+                            const data = await myapi.getFromApi2("/admin");
+                            // console.log(data);
+                            showMessage(`人数：${data.data}`);
                         },
                     },
                 },
