@@ -53,7 +53,7 @@ export const defaultSettings = {
     "cal-snap-duration": "00:30:00",
     "cal-event-color": true,
     "kanban-default-view": "kanban",
-    "cal-default-view": "DayGridMonth",
+    "cal-default-view": "dayGridMonth",
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

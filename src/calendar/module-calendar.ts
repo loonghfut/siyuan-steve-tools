@@ -58,7 +58,7 @@ export class M_calendar {
                 let calendar: Calendar
                 this.element.innerHTML = `
                 <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-                calendar = await run(id);
+                calendar = await run(id,settingdata["cal-default-view"]);
                 this.data.id = id;
                 calendarinstance.set(id, calendar);
             },
@@ -86,7 +86,7 @@ export class M_calendar {
                 let calendar: Calendar
                 this.element.innerHTML = `
                 <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-                calendar = await run(id, "kanban");
+                calendar = await run(id, settingdata["kanban-default-view"] || "kanban");
                 this.data.id = id;
                 calendarinstance.set(id, calendar);
             },
@@ -435,7 +435,7 @@ export class M_calendar {
                 if (front == "browser-mobile" || front == "mobile") {
                     await this.openRiChengViewDialog(true, "", settingdata["cal-default-view"]);
                 } else {
-                    await this.openRiChengView(settingdata["cal-default-view"]);
+                    await this.openRiChengView();
                 }
             }
         });
@@ -446,7 +446,7 @@ export class M_calendar {
                 if (front == "browser-mobile" || front == "mobile") {
                     await this.openRiChengViewDialog(true, "", settingdata["kanban-default-view"]);
                 } else {
-                    await this.openRiChengView(settingdata["kanban-default-view"]);
+                    await this.openRiChengView("kanban");
                 }
             }
         });
