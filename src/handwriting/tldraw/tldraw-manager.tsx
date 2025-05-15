@@ -79,6 +79,7 @@ export class TldrawManager {
             // 加载之前保存的数据
             await this.loadData();
             // 只有在加载成功后才渲染
+            console.log("加载数据成功，开始渲染Tldraw");
             this.renderTldraw(root);
         } catch (error) {
             // 加载数据失败，停止初始化并显示错误信息
@@ -690,3 +691,15 @@ function isDarkTheme(): boolean {
     // console.log("判断思源主题", document.documentElement.getAttribute('data-theme-mode'));
     return document.documentElement.getAttribute('data-theme-mode') === 'dark';
 }
+
+//暴露给全局
+// const waytotldraw = {
+//     TldrawManager
+// }
+// declare global {
+//     interface Window {
+//         tldraw: typeof waytotldraw;
+//     }
+// }
+// window.tldraw=waytotldraw;
+
