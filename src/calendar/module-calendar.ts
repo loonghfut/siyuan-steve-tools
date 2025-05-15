@@ -22,7 +22,7 @@ import { CalDAVClient } from "./share/qqcaldav";
 import { WebDAVSync } from "./share/webdav";
 import { ICSSubscription } from "./share/ics_discribe";
 import { Calendar } from "@fullcalendar/core";
-// import { insertHtml } from "./insertHtml";
+import { insertHtml, THIS } from "./insertHtml";
 
 
 
@@ -376,12 +376,14 @@ export class M_calendar {
         //     id: "ST_calendar_slash_kanban",
         //     callback: async (protyle) => {
         //         console.log("添加日程", protyle);
-        //         const Hdata=await insertHtml();
-        //         const ca = await run("", 'dayGridMonth')
-        //         protyle.insert(`${ca.el.outerHTML}`,true,true);
-
+        //         const Hdata = await insertHtml();
+        //         // const ca = await run("", 'dayGridMonth')
+        //         protyle.insert(`${Hdata.html}`, true, true);
+        //         const MTHIS = await THIS(Hdata.blockIdData.id);
+        //         console.log("MTHIS", MTHIS);
+        //         await run("2", 'dayGridMonth', '', 'prev,next today','multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban','title',MTHIS.shadowRoot) 
         //     }
-        // },{
+        // }, {
         //     filter: ["rl", "日历"],
         //     html: "插入日历",
         //     id: "ST_calendar_slash_calendar",
