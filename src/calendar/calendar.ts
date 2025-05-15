@@ -67,7 +67,7 @@ export async function run(
         // 创建悬浮容器
         const Fcalendar = createFloatingCalendar(calendarEl);
         calendarEl = Fcalendar.element;
-    } else if (id === "2") {
+    } else if (id === "2") {//日历内插入视图逻辑
         calendarEl = elementca.getElementById(`calendar-2`);
     }
     else {

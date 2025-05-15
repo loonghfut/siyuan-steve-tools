@@ -2,7 +2,7 @@ import steveTools, { frontEnd, settingdata } from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import { RRule } from 'rrule';
 import * as api from "@/api"
-import { showMessage, openTab, Dialog, getFrontend } from "siyuan";
+import { showMessage, openTab, Dialog, getFrontend, confirm, Menu } from "siyuan";
 import * as ic from "@/icon"
 import "./event_style.scss";
 declare const siyuan: any;
@@ -79,6 +79,34 @@ export class M_calendar {
                 }
             },
         })
+        this.plugin.addTab({
+            type: "kanban",
+            async init() {
+                const id = new Date().getTime().toString();
+                let calendar: Calendar
+                this.element.innerHTML = `
+                <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
+                calendar = await run(id, "kanban");
+                this.data.id = id;
+                calendarinstance.set(id, calendar);
+            },
+            async destroy() {
+                console.log("销毁日历选项卡", this.data.id);
+                const calendar = calendarinstance.get(this.data.id);
+                if (calendar) {
+                    calendar.destroy();
+                    calendarinstance.delete(this.data.id);
+                    console.log("销毁日历实例", this.data.id);
+                }
+            },
+            resize() {
+                console.log("resize", this.data.id);
+                const calendar = calendarinstance.get(this.data.id);
+                if (calendar) {
+                    calendar.updateSize();
+                }
+            },
+        })
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
         await this.calConfig.load();
@@ -115,16 +143,18 @@ export class M_calendar {
             });
         }
         if (this_settingdata["cal-show-view"] == true) {
-            this.plugin.addTopBar({
+            const topBarElement = this.plugin.addTopBar({
                 icon: "iconCalendar",
-                title: "日程视图",
+                title: "日程看板视图",
                 position: "left",
                 callback: async () => {
-                    if (front == "browser-mobile" || front == "mobile") {
-                        await this.openRiChengViewDialog(true);
-                    } else {
-                        await this.openRiChengView();
-                    }
+                    let rect = topBarElement.getBoundingClientRect();
+                    this.addMenu(rect);
+                    // if (front == "browser-mobile" || front == "mobile") {
+                    //     await this.openRiChengViewDialog(true);
+                    // } else {
+                    //     await this.openRiChengView();
+                    // }
                 }
             });
         }
@@ -394,7 +424,42 @@ export class M_calendar {
         // }]
     }
 
+    private addMenu(rect?: DOMRect) {
+        const menu = new Menu("topBarCAL", () => {
 
+        });
+        menu.addItem({
+            icon: "iconSTcal",
+            label: "日历视图",
+            click: async () => {
+                if (front == "browser-mobile" || front == "mobile") {
+                    await this.openRiChengViewDialog(true, "", "dayGridMonth");
+                } else {
+                    await this.openRiChengView();
+                }
+            }
+        });
+        menu.addItem({
+            icon: "iconSTcalKanban",
+            label: "看板视图",
+            click: async () => {
+                if (front == "browser-mobile" || front == "mobile") {
+                    await this.openRiChengViewDialog(true, "", "kanban");
+                } else {
+                    await this.openRiChengView("kanban");
+                }
+            }
+        });
+        if (front == "browser-mobile" || front == "mobile") {
+            menu.fullscreen();
+        } else {
+            menu.open({
+                x: rect.right,
+                y: rect.bottom,
+                isLeft: true,
+            });
+        }
+    }
 
     private async shareicsinit() {
         if (settingdata["cal-ics-enable-subscribe"]) {
@@ -490,7 +555,7 @@ export class M_calendar {
         }, 500); // 延迟 500 毫秒
     }
 
-    async openRiChengViewDialog(isMobile: boolean = false, viewID = "") {
+    async openRiChengViewDialog(isMobile: boolean = false, viewID = "", initialView = "dayGridMonth") {
 
         const id = new Date().getTime().toString();
         let calendar: any;
@@ -508,32 +573,48 @@ export class M_calendar {
 
         setTimeout(async () => {
             if (viewID) {
-                calendar = await run(id, 'dayGridMonth', viewID, 'prev,next today');
+                calendar = await run(id, initialView, viewID, 'prev,next today');
             } else {
-                calendar = await run(id, 'dayGridMonth');
+                calendar = await run(id, initialView);
             }
         }, 100);
     }
 
-    async openRiChengView() {
+    async openRiChengView(initialView = "dayGridMonth") {
 
         // steveTools.outlog(viewValue);
         //时间戳
         // const id = new Date().getTime().toString();
         // let calendar: Calendar;
-        const tab = await openTab({
-            app: window.siyuan.ws.app,
-            custom: {
-                icon: "iconSTcal",
-                title: `日程视图`,
-                id: this.plugin.name + 'calendar',
-                data: {
-                    id: null
+        if (initialView == "dayGridMonth") {
+            const tab = await openTab({
+                app: window.siyuan.ws.app,
+                custom: {
+                    icon: "iconSTcal",
+                    title: `日程视图`,
+                    id: this.plugin.name + 'calendar',
+                    data: {
+                        id: null
+                    },
                 },
-            },
-            // position: "right",
-            keepCursor: false
-        });
+                // position: "right",
+                keepCursor: false
+            });
+        }else {
+            const tab = await openTab({
+                app: window.siyuan.ws.app,
+                custom: {
+                    icon: "iconSTcalKanban",
+                    title: `看板视图`,
+                    id: this.plugin.name + 'kanban',
+                    data: {
+                        id: null
+                    },
+                },
+                // position: "right",
+                keepCursor: false
+            });
+        }
 
         //     tab.panelElement.innerHTML = `
         //   <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
