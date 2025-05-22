@@ -58,7 +58,7 @@ export class M_calendar {
                 let calendar: Calendar
                 this.element.innerHTML = `
                 <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-                calendar = await run(id,settingdata["cal-default-view"]);
+                calendar = await run(id, settingdata["cal-default-view"]);
                 this.data.id = id;
                 calendarinstance.set(id, calendar);
             },
@@ -297,13 +297,41 @@ export class M_calendar {
                     //更新背景色
                     if (msg?.data?.[0]?.doOperations?.[0]?.avID &&
                         msg?.data?.[0]?.doOperations?.[0]?.data?.mSelect?.[0]?.content &&
-                        msg?.data?.[0]?.doOperations?.[0]?.rowID) {
+                        msg?.data?.[0]?.doOperations?.[0]?.rowID &&
+                        msg?.data?.[0]?.doOperations?.[0]?.keyID) { // 检查 keyID 是否存在
+
+                        const operationDetails = msg.data[0].doOperations[0];
+                        const avID = operationDetails.avID;
+                        const columnKeyID = operationDetails.keyID; // 变化的列ID
+                        const blockID = operationDetails.rowID; // 行ID，即块ID
+                        const statusValue = operationDetails.data.mSelect[0].content;
+
                         //判断是否为事件（判断是否是日程数据库的事件）
-                        if (this.av_ids.map(item => item.id).includes(msg.data[0].doOperations[0].avID)) {
-                            const status = msg.data[0]?.doOperations[0]?.data?.mSelect[0]?.content;
-                            const blockID = msg.data[0]?.doOperations[0]?.rowID;
-                            console.log("status", status, blockID);
-                            await api.setBlockAttrs(blockID, { "custom-st-event": myF.statusMap[status] });//TODO优化，防止二次触发
+                        if (this.av_ids.map(item => item.id).includes(avID)) {
+                            try {
+                                // 获取属性视图的列信息
+                                const avDetails = await api.getAttributeViewKeys(blockID);
+                                // console.log("avDetails", avDetails);
+                                // 查找名为“状态”的属性列 (key) 的定义
+                                let statusKeyDefinition;
+                                // console.log("avDetails.keyValues2121", avDetails[0].keyValues);
+                                if (avDetails && avDetails[0].keyValues) {
+                                    // console.log("avDetails.keyValues", avDetails[0].keyValues);
+                                    const statusKeyValue = avDetails[0].keyValues.find(kv => kv.key && kv.key.name === "状态");
+                                    // console.log("statusKeyValue", statusKeyValue);
+                                    if (statusKeyValue) {
+                                        // console.log("statusKeyValue", statusKeyValue);
+                                        statusKeyDefinition = statusKeyValue.key;
+                                    }
+                                }
+                                // 如果找到了“状态”列，并且其ID与当前变化的列ID一致
+                                if (statusKeyDefinition && statusKeyDefinition.id === columnKeyID) {
+                                    console.log(`'状态'列 (ID: ${columnKeyID}) 发生变化: ${statusValue}, BlockID: ${blockID}`);
+                                    await api.setBlockAttrs(blockID, { "custom-st-event": myF.statusMap[statusValue] });//TODO优化，防止二次触发
+                                }
+                            } catch (error) {
+                                console.error("处理'状态'列数据变化时出错:", error);
+                            }
                         }
                     }
                     // }
@@ -600,7 +628,7 @@ export class M_calendar {
                 // position: "right",
                 keepCursor: false
             });
-        }else {
+        } else {
             const tab = await openTab({
                 app: window.siyuan.ws.app,
                 custom: {
