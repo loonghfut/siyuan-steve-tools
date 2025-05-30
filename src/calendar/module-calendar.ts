@@ -421,7 +421,11 @@ export class M_calendar {
                     console.log("c", cursorElementId);
                 }
                 console.log("cursorElement", cursorElementId);
-                const blockId = cursorElementId || pro?.breadcrumb?.id;
+                const blockId = cursorElementId
+                if(!blockId) {
+                    showMessage("请先选中一个块", 3000, "error");
+                    return;
+                }
                 // console.log("pro", blockId);
                 // console.log("创建日程（光标所在块）", blockId);
                 handleAddButtonClick('', { isdirect: true, directid: blockId });

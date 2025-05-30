@@ -216,7 +216,7 @@ export function runblockdata_for_time(content: string): string | null {
 
 export function runblockdata_for_sub(content: string): { subevent: string, completed: boolean }[] {
     // 使用正则表达式全局匹配所有 [X] 或 [ ] 及后面的事件内容，考虑markdown列表格式
-    const taskRegex = /^\s*\*\s*\{:[^}]*\}\s*\[(X| )\]\s*(.+?)(?=\s*\{:|$)/gm;
+    const taskRegex = /^\s*\-\s*\{:[^}]*\}\s*\[(X| )\]\s*(.+?)(?=\s*\{:|$)/gm;
     const results: { subevent: string, completed: boolean }[] = [];
 
     let match;
