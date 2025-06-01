@@ -26,6 +26,10 @@ export const defaultSettings = {
     //// ics订阅子模块
     "cal-ics-enable-subscribe": false,
     "cal-ics-subscribe-url": "",
+    ////// ics订阅子模块导入到文档
+    "cal-ics-subscribe-import": false,
+    "cal-ics-subscribe-import-path": "",//暂时不处理
+    "cal-ics-subscribe-import-note-id": null,
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

@@ -31,6 +31,7 @@
                 "高级设置",
                 "ics设置",
                 "ics分享",
+                "qq邮箱日历",
                 "订阅日历",
                 "视图设置",
             ],
@@ -413,6 +414,26 @@
                     description: "填写ics订阅地址(请以http(s)://开头)",
                     key: "cal-ics-subscribe-url",
                     value: settings["cal-ics-subscribe-url"],
+                },
+                {
+                    type: "checkbox",
+                    title: "启用ics订阅导入",
+                    description: "启用后可以将ics订阅的日程导入到思源笔记中",
+                    key: "cal-ics-subscribe-import",
+                    value: settings["cal-ics-subscribe-import"],
+                },
+                {
+                    type: "select",
+                    title: "ics订阅导入的日记本",
+                    description: "选择ics订阅导入的日记本",
+                    key: "cal-ics-subscribe-import-note-id",
+                    value: settings["cal-ics-subscribe-import-note-id"],
+                    options: Object.fromEntries(
+                        window.siyuan.notebooks.map((notebook) => [
+                            notebook.id,
+                            notebook.name,
+                        ]),
+                    ),
                 },
                 {
                     type: "textinput",
@@ -828,7 +849,8 @@
             高级设置: 8,
             ics设置: 7,
             ics分享: 9,
-            订阅日历: 6,
+            qq邮箱日历: 4,
+            订阅日历: 4,
             视图设置: 8,
             // 不限制
         },
