@@ -263,10 +263,14 @@ export class ICSImporter {
      */
     private async checkEventExists(documentId: string, uid: string): Promise<boolean> {
         try {
+            // const sqlStr = `
+            //     SELECT id FROM blocks 
+            //     WHERE root_id = '${documentId}' 
+            //     AND ial LIKE '%${uid}%'
+            // `;
             const sqlStr = `
                 SELECT id FROM blocks 
-                WHERE root_id = '${documentId}' 
-                AND ial LIKE '%${uid}%'
+                WHERE ial LIKE '%${uid}%'
             `;
             const result = await api.sql(sqlStr);
             return result.length > 0;
