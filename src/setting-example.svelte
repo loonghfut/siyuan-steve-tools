@@ -436,6 +436,17 @@
                     ),
                 },
                 {
+                    type: "select",
+                    title: "ics订阅导入的日记本",
+                    description: "选择ics订阅导入的日记本",
+                    key: "cal-ics-import-mode",
+                    value: settings["cal-ics-import-mode"],
+                    options:{
+                        "single-document": "导入到当日日记本",
+                        "daily-notes": "根据事件日期导入",
+                    }
+                },
+                {
                     type: "textinput",
                     title: "时间槽间隔",
                     description:
@@ -850,7 +861,7 @@
             ics设置: 7,
             ics分享: 9,
             qq邮箱日历: 4,
-            订阅日历: 4,
+            订阅日历: 5,
             视图设置: 8,
             // 不限制
         },

@@ -30,6 +30,7 @@ export const defaultSettings = {
     "cal-ics-subscribe-import": false,
     "cal-ics-subscribe-import-path": "",//暂时不处理
     "cal-ics-subscribe-import-note-id": null,
+    "cal-ics-import-mode": "single-document", 
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

@@ -1,6 +1,7 @@
 import * as api from "@/api";
 import { showMessage } from "siyuan";
 import steveTools, { settingdata } from "@/index";
+import { createDailynote } from "@frostime/siyuan-plugin-kits";
 
 interface ICSEvent {
     uid: string;
@@ -28,26 +29,40 @@ export class ICSImporter {
     async init() {
         console.log('ICSImporter init called');
         //获取日记id
-        this.plugin.addTopBar({
+this.plugin.addTopBar({
             icon: "iconSTcal",
-            title: "导入ICS日程",
+            title: "导入ICS日程", // 标题可以考虑根据模式动态变化或在设置中说明
             position: "right",
             callback: async () => {
-                if (!this.settings['cal-ics-subscribe-import-note-id']) {
-                    showMessage('请先设置导入日记的ID', 3000, 'error');
-                    return;
-                }
-                if (!this.settings['cal-ics-subscribe-url']) {
+                const icsUrl = this.settings['cal-ics-subscribe-url'];
+                // 此 ID 始终为笔记本 ID
+                const notebookIdForImport = this.settings['cal-ics-subscribe-import-note-id']; 
+                // 从设置中读取导入模式，默认为 'single-document'
+                const importMode = this.settings['cal-ics-import-mode'] || 'single-document'; 
+
+                if (!icsUrl) {
                     showMessage('请先设置ICS订阅URL', 3000, 'error');
                     return;
                 }
-                const dayid = await api.createDailyNote(window.siyuan.ws.app.appId, this.settings['cal-ics-subscribe-import-note-id'])
-                console.log('创建的日记ID:', dayid);
-                if (!dayid.id) {
-                    showMessage('无法创建日记，请检查设置的ID是否正确', 3000, 'error');
+                if (!notebookIdForImport) {
+                    // 统一提示信息，因为 notebookIdForImport 始终是笔记本ID
+                    showMessage('请先设置用于导入操作的笔记本ID', 3000, 'error');
                     return;
                 }
-                await this.importFromICS(this.settings['cal-ics-subscribe-url'], dayid.id);
+
+                if (importMode === 'daily-notes') {
+                    await this.importEventsToDailyNotes(icsUrl, notebookIdForImport);
+                } else { // 'single-document' 模式 (原行为：在指定笔记本中创建新日记)
+                    // 为今天在指定的笔记本中创建一个新的日记文档
+                    const dailyNoteResponse = await api.createDailyNote(window.siyuan.ws.app.appId, notebookIdForImport);
+                    console.log('创建的日记ID (单文档模式):', dailyNoteResponse);
+                    if (!dailyNoteResponse || !dailyNoteResponse.id) {
+                        showMessage('无法创建日记 (单文档模式)，请检查设置的笔记本ID是否正确', 3000, 'error');
+                        return;
+                    }
+                    // 将所有日程导入到这个新创建的日记文档中
+                    await this.importEventsToDocument(icsUrl, dailyNoteResponse.id);
+                }
             }
         })
     }
@@ -153,40 +168,40 @@ export class ICSImporter {
         }
     }
 
-    /**
-     * 解析日期时间
-     */
-    private parseDateTime(dateTimeStr: string, params: Record<string, string>): Date {
-        // 处理日期格式：YYYYMMDD 或 YYYYMMDDTHHMMSS 或 YYYYMMDDTHHMMSSZ
-        let cleanStr = dateTimeStr.replace(/[TZ]/g, '');
+    // /**
+    //  * 解析日期时间
+    //  */
+    // private parseDateTime(dateTimeStr: string, params: Record<string, string>): Date {
+    //     // 处理日期格式：YYYYMMDD 或 YYYYMMDDTHHMMSS 或 YYYYMMDDTHHMMSSZ
+    //     let cleanStr = dateTimeStr.replace(/[TZ]/g, '');
 
-        if (cleanStr.length === 8) {
-            // 仅日期 YYYYMMDD
-            const year = parseInt(cleanStr.substring(0, 4));
-            const month = parseInt(cleanStr.substring(4, 6)) - 1;
-            const day = parseInt(cleanStr.substring(6, 8));
-            return new Date(year, month, day);
-        } else if (cleanStr.length >= 14) {
-            // 日期时间 YYYYMMDDHHMMSS
-            const year = parseInt(cleanStr.substring(0, 4));
-            const month = parseInt(cleanStr.substring(4, 6)) - 1;
-            const day = parseInt(cleanStr.substring(6, 8));
-            const hour = parseInt(cleanStr.substring(8, 10));
-            const minute = parseInt(cleanStr.substring(10, 12));
-            const second = parseInt(cleanStr.substring(12, 14));
+    //     if (cleanStr.length === 8) {
+    //         // 仅日期 YYYYMMDD
+    //         const year = parseInt(cleanStr.substring(0, 4));
+    //         const month = parseInt(cleanStr.substring(4, 6)) - 1;
+    //         const day = parseInt(cleanStr.substring(6, 8));
+    //         return new Date(year, month, day);
+    //     } else if (cleanStr.length >= 14) {
+    //         // 日期时间 YYYYMMDDHHMMSS
+    //         const year = parseInt(cleanStr.substring(0, 4));
+    //         const month = parseInt(cleanStr.substring(4, 6)) - 1;
+    //         const day = parseInt(cleanStr.substring(6, 8));
+    //         const hour = parseInt(cleanStr.substring(8, 10));
+    //         const minute = parseInt(cleanStr.substring(10, 12));
+    //         const second = parseInt(cleanStr.substring(12, 14));
 
-            const date = new Date(year, month, day, hour, minute, second);
+    //         const date = new Date(year, month, day, hour, minute, second);
 
-            // 如果是UTC时间（以Z结尾），转换为本地时间
-            if (dateTimeStr.endsWith('Z')) {
-                return new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-            }
+    //         // 如果是UTC时间（以Z结尾），转换为本地时间
+    //         if (dateTimeStr.endsWith('Z')) {
+    //             return new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    //         }
 
-            return date;
-        }
+    //         return date;
+    //     }
 
-        return new Date();
-    }
+    //     return new Date();
+    // }
 
     /**
      * 反转义文本
@@ -292,6 +307,137 @@ export class ICSImporter {
         } catch (error) {
             console.error('检查事件是否存在时出错:', error);
             return false;
+        }
+    }
+
+      /**
+     * 解析日期时间
+     * 优化了对 UTC 和全天事件的处理
+     */
+    private parseDateTime(dateTimeStr: string, params: Record<string, string>): Date {
+        const year = parseInt(dateTimeStr.substring(0, 4));
+        const month = parseInt(dateTimeStr.substring(4, 6)) - 1; // JS months are 0-11
+        const day = parseInt(dateTimeStr.substring(6, 8));
+
+        if (params.VALUE === 'DATE' || dateTimeStr.length === 8) { // 全天事件
+            // 对于全天事件，它代表一整天。
+            // new Date(year, month, day) 会在本地时间的 00:00:00 创建它。
+            return new Date(year, month, day);
+        }
+
+        // 期望格式 YYYYMMDDTHHMMSS 或 YYYYMMDDTHHMMSSZ
+        if (dateTimeStr.length < 15 || dateTimeStr.indexOf('T') !== 8) { // 时间部分长度不足或格式不正确
+            console.warn(`不支持的日期时间格式: ${dateTimeStr}, 将仅使用日期部分。`);
+            return new Date(year, month, day); // 回退到仅日期
+        }
+
+        const hour = parseInt(dateTimeStr.substring(9, 11));
+        const minute = parseInt(dateTimeStr.substring(11, 13));
+        const second = parseInt(dateTimeStr.substring(13, 15));
+
+        if (dateTimeStr.endsWith('Z')) {
+            // UTC 时间
+            return new Date(Date.UTC(year, month, day, hour, minute, second));
+        } else {
+            // 本地时间 (或浮动时间，解释为本地时间)
+            // 注意：此实现未处理带有 TZID 参数的复杂时区情况。
+            // 如需完整 TZID 支持，建议使用专门的 iCalendar 解析库。
+            return new Date(year, month, day, hour, minute, second);
+        }
+    }
+
+    /**
+     * 新增：按事件日期将日程分别导入到不同的日记中
+     */
+    async importEventsToDailyNotes(icsUrl: string, notebookIdForDailyNotes: string): Promise<void> {
+        try {
+            showMessage('开始获取ICS文件 (日记模式)...', 3000, 'info');
+            const icsContent = await this.fetchICSContent(icsUrl);
+            showMessage('开始解析日程数据 (日记模式)...', 3000, 'info');
+            const events = this.parseICSContent(icsContent);
+
+            if (events.length === 0) {
+                showMessage('未找到任何日程事件 (日记模式)', 3000);
+                return;
+            }
+
+            showMessage(`解析到 ${events.length} 个日程事件，开始按日期导入到日记...`, 3000, 'info');
+
+            let importedCount = 0;
+            let skippedCount = 0;
+            // 缓存 YYYYMMDD -> dailyNoteId，避免重复调用 createDailyNote
+            const dailyNoteCache = new Map<string, string>(); 
+
+            for (const event of events) {
+                if (!event.startTime) {
+                    console.warn(`事件 "${event.title}" (UID: ${event.uid}) 没有开始时间，无法按日期导入，已跳过。`);
+                    skippedCount++;
+                    continue;
+                }
+
+                const eventYear = event.startTime.getFullYear();
+                const eventMonth = (event.startTime.getMonth() + 1).toString().padStart(2, '0');
+                const eventDay = event.startTime.getDate().toString().padStart(2, '0');
+                // Siyuan API createDailyNote 需要的 forDate 格式: YYYYMMDD
+                const forDateSiyuan = `${eventYear}${eventMonth}${eventDay}`; 
+
+                let dailyNoteId = dailyNoteCache.get(forDateSiyuan);
+
+                if (!dailyNoteId) {
+                    try {
+                        console.log(`尝试为日期 ${forDateSiyuan} 在笔记本 ${notebookIdForDailyNotes} 中创建/获取日记`);
+                        const dateForNote = new Date(eventYear, parseInt(eventMonth) - 1, parseInt(eventDay));
+                        const dailyNoteResponse = await createDailynote(notebookIdForDailyNotes, dateForNote);
+                        if (!dailyNoteResponse) {
+                            showMessage(`无法为日期 ${forDateSiyuan} 创建或获取日记，跳过事件: ${event.title}`, 5000);
+                            skippedCount++;
+                            continue;
+                        }
+                        dailyNoteId = dailyNoteResponse;
+                        dailyNoteCache.set(forDateSiyuan, dailyNoteId);
+                        console.log(`获取/创建日期 ${forDateSiyuan} 的日记ID: ${dailyNoteId}`);
+                    } catch (e) {
+                        const errorMessage = e instanceof Error ? e.message : String(e);
+                        console.error(`为日期 ${forDateSiyuan} 创建日记失败:`, e);
+                        showMessage(`为日期 ${forDateSiyuan} 创建日记失败: ${errorMessage}`, 5000, 'error');
+                        skippedCount++; // 如果日记创建失败，则跳过此事件
+                        continue; 
+                    }
+                }
+
+                // 检查事件是否已在目标日记中存在
+                const exists = await this.checkEventExists(dailyNoteId, event.uid);
+                if (exists) {
+                    skippedCount++;
+                    console.log(`跳过已存在的日程: ${event.title} (UID: ${event.uid}) 于日记 ${dailyNoteId}`);
+                    continue;
+                }
+
+                const blockContent = this.generateEventBlock(event);
+                try {
+                    await api.prependBlock("markdown", blockContent, dailyNoteId);
+                    importedCount++;
+                } catch (e) {
+                    const errorMessage = e instanceof Error ? e.message : String(e);
+                    console.error(`将事件 "${event.title}" 导入到日记 ${dailyNoteId} 失败:`, e);
+                    showMessage(`导入事件 "${event.title}" 失败: ${errorMessage}`, 3000, 'error');
+                    skippedCount++; // 导入失败也计入跳过
+                }
+                
+                // 添加小延时避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 100)); 
+            }
+
+            showMessage(
+                `日记模式导入完成！新增 ${importedCount} 个日程，跳过 ${skippedCount} 个日程。`,
+                5000,
+                importedCount > 0 || events.length === 0 ? 'info' : 'error' // 如果没有事件或有导入成功则为info
+            );
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('按日记导入ICS日程失败:', error);
+            showMessage(`按日记导入失败: ${errorMessage}`, -1, 'error');
         }
     }
 
