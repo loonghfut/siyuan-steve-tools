@@ -240,11 +240,26 @@ export class ICSImporter {
             'CONFIRMED': '已确认',
             'CANCELLED': '已取消'
         };
-        content += `状态： ${statusMap[event.status] || '未知'}\n\n`;
+        if (event.status && statusMap[event.status]) {
+            content += `状态： ${statusMap[event.status]}\n\n`;
+        }
 
         // 添加描述
         if (event.description) {
-            content += `描述：\n\n${event.description}\n\n`;
+            // Regex to find URLs
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            let processedDescription = event.description;
+            let match;
+            // Store matches to avoid modifying the string while iterating
+            const matches = [];
+            while ((match = urlRegex.exec(event.description)) !== null) {
+            matches.push(match[0]);
+            }
+            // Replace URLs with Markdown links
+            matches.forEach(url => {
+            processedDescription = processedDescription.replace(url, `[${url}](${url})`);
+            });
+            content += `描述：\n\n${processedDescription}\n\n`;
         }
 
         // 添加重复规则
@@ -318,9 +333,9 @@ export class ICSImporter {
 
                 // 生成超级块内容
                 const blockContent = this.generateEventBlock(event);
-                console.log(`生成超级块内容: ${blockContent}`);
+                // console.log(`生成超级块内容: ${blockContent}`);
                 // 插入到文档
-                await api.appendBlock("markdown", blockContent, documentId);
+                await api.prependBlock("markdown", blockContent,documentId);
                 importedCount++;
 
                 // 添加小延时避免请求过快
