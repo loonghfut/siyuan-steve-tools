@@ -30,7 +30,7 @@ export class ICSImporter {
         console.log('ICSImporter init called');
         //获取日记id
 this.plugin.addTopBar({
-            icon: "iconSTcal",
+            icon: "iconArrowDown",
             title: "导入ICS日程", // 标题可以考虑根据模式动态变化或在设置中说明
             position: "right",
             callback: async () => {
