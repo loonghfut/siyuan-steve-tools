@@ -29,16 +29,16 @@ export class ICSImporter {
     async init() {
         console.log('ICSImporter init called');
         //获取日记id
-this.plugin.addTopBar({
+        this.plugin.addTopBar({
             icon: "iconArrowDown",
             title: "导入ICS日程", // 标题可以考虑根据模式动态变化或在设置中说明
             position: "right",
             callback: async () => {
                 const icsUrl = this.settings['cal-ics-subscribe-url'];
                 // 此 ID 始终为笔记本 ID
-                const notebookIdForImport = this.settings['cal-ics-subscribe-import-note-id']; 
+                const notebookIdForImport = this.settings['cal-ics-subscribe-import-note-id'];
                 // 从设置中读取导入模式，默认为 'single-document'
-                const importMode = this.settings['cal-ics-import-mode'] || 'single-document'; 
+                const importMode = this.settings['cal-ics-import-mode'] || 'single-document';
 
                 if (!icsUrl) {
                     showMessage('请先设置ICS订阅URL', 3000, 'error');
@@ -65,6 +65,11 @@ this.plugin.addTopBar({
                 }
             }
         })
+
+        // 在后台检查ICS更新
+        this.checkForUpdatesInBackground().catch(err => {
+            console.error("后台ICS更新检查出错:", err);
+        });
     }
 
 
@@ -268,11 +273,11 @@ this.plugin.addTopBar({
             // Store matches to avoid modifying the string while iterating
             const matches = [];
             while ((match = urlRegex.exec(event.description)) !== null) {
-            matches.push(match[0]);
+                matches.push(match[0]);
             }
             // Replace URLs with Markdown links
             matches.forEach(url => {
-            processedDescription = processedDescription.replace(url, `[${url}](${url})`);
+                processedDescription = processedDescription.replace(url, `[${url}](${url})`);
             });
             content += `描述：\n\n${processedDescription}\n\n`;
         }
@@ -310,10 +315,92 @@ this.plugin.addTopBar({
         }
     }
 
-      /**
-     * 解析日期时间
-     * 优化了对 UTC 和全天事件的处理
+    /**
+    * 获取所有已导入到思源笔记中的ICS事件UID
+    */
+    private async getAllImportedEventUIDs(): Promise<Set<string>> {
+        const importedUIDs = new Set<string>();
+        try {
+            // 查询包含特定自定义属性的块
+            // 假设 'attributes' 列存储块的属性
+            const sqlStr = `
+                SELECT ial FROM blocks 
+                WHERE ial LIKE '%custom-ics-event="true"%' 
+                  AND ial LIKE '%custom-ics-id=%'
+            `;
+            const results: { ial: string }[] = await api.sql(sqlStr);
+
+            const uidRegex = /custom-ics-id="([^"]+)"/;
+            for (const row of results) {
+                if (row.ial) {
+                    const match = row.ial.match(uidRegex);
+                    if (match && match[1]) {
+                        importedUIDs.add(match[1]);
+                    }
+                }
+            }
+
+
+            // console.log(`Found ${importedUIDs.size} imported event UIDs from SiYuan.`);
+        } catch (error) {
+            console.error('获取已导入ICS事件UID时出错:', error);
+            showMessage('获取已导入日程列表失败，更新检查可能不准确。', 3000, 'error');
+        }
+        // console.log("已导入的UIDs:");
+        // for (const uid of importedUIDs) {
+        //     console.log(uid);
+        // }
+        return importedUIDs;
+    }
+
+    /**
+     * 在后台检查ICS源是否有更新
      */
+    private async checkForUpdatesInBackground() {
+        console.log('开始在后台检查ICS更新...');
+        const icsUrl = this.settings['cal-ics-subscribe-url'];
+        if (!icsUrl) {
+            console.log('ICS订阅URL未设置，跳过更新检查。');
+            return;
+        }
+
+        try {
+            const icsContent = await this.fetchICSContent(icsUrl);
+            const remoteEvents = this.parseICSContent(icsContent);
+
+            if (remoteEvents.length === 0) {
+                console.log('远程ICS源中未找到事件。');
+                return;
+            }
+
+            const remoteEventUIDs = new Set(remoteEvents.map(event => event.uid));
+            const localEventUIDs = await this.getAllImportedEventUIDs();
+
+            let newEventCount = 0;
+            for (const uid of remoteEventUIDs) {
+                if (!localEventUIDs.has(uid)) {
+                    newEventCount++;
+                }
+            }
+
+            if (newEventCount > 0) {
+                showMessage(`检测到 ${newEventCount} 个新的ICS日程。请点击顶栏按钮手动导入。`, 7000, 'info');
+            } else {
+                console.log('未检测到新的ICS日程。');
+                // 可选：如果需要，可以显示“无更新”的消息
+                // showMessage('ICS日程已是最新。', 3000, 'info');
+            }
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('后台检查ICS更新时出错:', error);
+            showMessage(`检查ICS日程更新失败: ${errorMessage}`, 5000, 'error');
+        }
+    }
+    /**
+   * 解析日期时间
+   * 优化了对 UTC 和全天事件的处理
+   */
     private parseDateTime(dateTimeStr: string, params: Record<string, string>): Date {
         const year = parseInt(dateTimeStr.substring(0, 4));
         const month = parseInt(dateTimeStr.substring(4, 6)) - 1; // JS months are 0-11
@@ -366,7 +453,7 @@ this.plugin.addTopBar({
             let importedCount = 0;
             let skippedCount = 0;
             // 缓存 YYYYMMDD -> dailyNoteId，避免重复调用 createDailyNote
-            const dailyNoteCache = new Map<string, string>(); 
+            const dailyNoteCache = new Map<string, string>();
 
             for (const event of events) {
                 if (!event.startTime) {
@@ -379,7 +466,7 @@ this.plugin.addTopBar({
                 const eventMonth = (event.startTime.getMonth() + 1).toString().padStart(2, '0');
                 const eventDay = event.startTime.getDate().toString().padStart(2, '0');
                 // Siyuan API createDailyNote 需要的 forDate 格式: YYYYMMDD
-                const forDateSiyuan = `${eventYear}${eventMonth}${eventDay}`; 
+                const forDateSiyuan = `${eventYear}${eventMonth}${eventDay}`;
 
                 let dailyNoteId = dailyNoteCache.get(forDateSiyuan);
 
@@ -401,7 +488,7 @@ this.plugin.addTopBar({
                         console.error(`为日期 ${forDateSiyuan} 创建日记失败:`, e);
                         showMessage(`为日期 ${forDateSiyuan} 创建日记失败: ${errorMessage}`, 5000, 'error');
                         skippedCount++; // 如果日记创建失败，则跳过此事件
-                        continue; 
+                        continue;
                     }
                 }
 
@@ -423,9 +510,9 @@ this.plugin.addTopBar({
                     showMessage(`导入事件 "${event.title}" 失败: ${errorMessage}`, 3000, 'error');
                     skippedCount++; // 导入失败也计入跳过
                 }
-                
+
                 // 添加小延时避免请求过快
-                await new Promise(resolve => setTimeout(resolve, 100)); 
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
 
             showMessage(
@@ -481,7 +568,7 @@ this.plugin.addTopBar({
                 const blockContent = this.generateEventBlock(event);
                 // console.log(`生成超级块内容: ${blockContent}`);
                 // 插入到文档
-                await api.prependBlock("markdown", blockContent,documentId);
+                await api.prependBlock("markdown", blockContent, documentId);
                 importedCount++;
 
                 // 添加小延时避免请求过快
