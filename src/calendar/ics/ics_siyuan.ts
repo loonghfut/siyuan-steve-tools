@@ -243,7 +243,7 @@ export class ICSImporter {
         if (event.isAllDay) {
             content += `日期： ${startTimeStr}\n\n`;
         } else {
-            content += `开始时间： ${startTimeStr}\n\n`;
+            content += `开始时间： ${startTimeStr}  `;
             if (endTimeStr) {
                 content += `结束时间： ${endTimeStr}\n\n`;
             }
@@ -279,7 +279,7 @@ export class ICSImporter {
             matches.forEach(url => {
                 processedDescription = processedDescription.replace(url, `[${url}](${url})`);
             });
-            content += `描述：\n\n${processedDescription}\n\n`;
+            content += `描述：${processedDescription}\n\n`;
         }
 
         // 添加重复规则
