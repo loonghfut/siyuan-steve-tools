@@ -1,5 +1,5 @@
 import * as api from "@/api";
-import { fetchGet, IWebSocketData, showMessage } from "siyuan";
+import { fetchGet, fetchSyncPost, IWebSocketData, showMessage } from "siyuan";
 import steveTools, { settingdata } from "@/index";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 
@@ -76,25 +76,65 @@ export class ICSImporter {
     /**
      * 从URL获取ICS文件内容
      */
-    private async fetchICSContent(url: string): Promise<string> {
-        try {
-            return await new Promise<string>((resolve, reject) => {
-                fetchGet(url, (response: any) => { 
-                    // console.log('获取到ICS文件内容:', response);
-                    if (!response || typeof response !== 'string') {
-                        reject(new Error('获取到的ICS文件内容无效或格式错误'));
-                        return;
-                    }
-                    resolve(response);
-                });
-            });
-        } catch (error) {
-            console.error('获取ICS文件失败:', error);
-            // 确保 error 是一个 Error 实例
-            const err = error instanceof Error ? error : new Error(String(error));
-            throw new Error(`无法获取ICS文件: ${err.message}`);
+private async fetchICSContent(url: string): Promise<string> {
+    try {
+        // 参数验证
+        if (!url || typeof url !== 'string') {
+            throw new Error('URL参数无效');
         }
+
+        // 使用fetchSyncPost进行同步调用
+        const response = await fetchSyncPost("/api/network/forwardProxy", {
+            url: url,
+            method: "GET",
+            timeout: 15000, // 15秒超时，ICS文件可能较大
+            contentType: "text/calendar",
+            headers: [
+                { "User-Agent": "SiYuan-Plugin-Calendar/1.0" },
+                { "Accept": "text/calendar, text/plain, application/octet-stream, */*" },
+                { "Cache-Control": "no-cache" } // 避免缓存问题
+            ],
+            responseEncoding: "text"
+        });
+
+        // 检查响应
+        if (response.code !== 0) {
+            throw new Error(response.msg || '代理请求失败');
+        }
+
+        // 检查HTTP状态
+        if (response.data.status >= 400) {
+            throw new Error(`HTTP ${response.data.status}: 无法访问ICS文件`);
+        }
+
+        const icsContent = response.data.body;
+
+        // 内容验证
+        if (!this.validateICSContent(icsContent)) {
+            throw new Error('获取到的内容不是有效的ICS格式');
+        }
+
+        return icsContent;
+
+    } catch (error) {
+        console.error('获取ICS文件失败:', { url, error });
+        const err = error instanceof Error ? error : new Error(String(error));
+        throw new Error(`无法获取ICS文件 (${url}): ${err.message}`);
     }
+}
+
+// 辅助方法：验证ICS内容
+private validateICSContent(content: any): content is string {
+    if (!content || typeof content !== 'string') {
+        return false;
+    }
+    
+    // 检查ICS文件的基本结构
+    const hasCalendarStart = content.includes('BEGIN:VCALENDAR');
+    const hasCalendarEnd = content.includes('END:VCALENDAR');
+    
+    return hasCalendarStart && hasCalendarEnd;
+}
 
     /**
      * 解析ICS文件内容
