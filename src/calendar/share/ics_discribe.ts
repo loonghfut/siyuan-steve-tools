@@ -1,5 +1,6 @@
 import { EventInput } from '@fullcalendar/core';
 import ICAL from 'ical.js';
+import { fetchSyncPost } from 'siyuan';
 
 export class ICSSubscription {
     private subscriptionUrls: string[] = [];
@@ -44,18 +45,53 @@ export class ICSSubscription {
         return this.events;
     }
     
-    private async fetchAndParseICS(url: string): Promise<EventInput[]> {
+private async fetchAndParseICS(url: string): Promise<EventInput[]> {
         try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch ICS file: ${response.statusText}`);
+            // 参数验证
+            if (!url || typeof url !== 'string') {
+                console.error('URL参数无效:', url);
+                throw new Error('URL参数无效');
             }
-            
-            const icsData = await response.text();
-            // console.log('Fetched ICS data:', icsData);
-            return this.parseICSData(icsData, url);
+
+            // 使用fetchSyncPost进行同步调用
+            const response = await fetchSyncPost("/api/network/forwardProxy", {
+                url: url,
+                method: "GET",
+                timeout: 15000, // 15秒超时，ICS文件可能较大
+                contentType: "text/calendar", // 期望的响应类型
+                headers: [
+                    { "User-Agent": "SiYuan-Plugin-Calendar/1.0" },
+                    { "Accept": "text/calendar, text/plain, application/octet-stream, */*" },
+                    { "Cache-Control": "no-cache" } // 避免缓存问题
+                ],
+                responseEncoding: "text" // 期望的响应编码
+            });
+
+            // 检查代理请求本身的响应
+            if (response.code !== 0) {
+                console.error(`代理请求失败 for ${url}:`, response.msg);
+                throw new Error(response.msg || '代理请求失败');
+            }
+
+            // 检查通过代理获取到的远程HTTP状态
+            if (response.data && response.data.status >= 400) {
+                console.error(`HTTP error for ${url}:`, response.data.status, response.data.body);
+                throw new Error(`HTTP ${response.data.status}: 无法访问ICS文件`);
+            }
+
+            const icsContent = response.data.body;
+
+            // 内容验证 (如果需要，您需要实现 validateICSContent 方法)
+            // if (!this.validateICSContent(icsContent)) {
+            //     console.error('获取到的内容不是有效的ICS格式 for url:', url);
+            //     throw new Error('获取到的内容不是有效的ICS格式');
+            // }
+
+            return this.parseICSData(icsContent, url);
+
         } catch (error) {
-            console.error(`Error fetching ICS from ${url}:`, error);
+            console.error(`Error fetching or parsing ICS from ${url}:`, error);
+            // 保持与原 fetchAndParseICS 行为一致，出错时返回空数组
             return [];
         }
     }
