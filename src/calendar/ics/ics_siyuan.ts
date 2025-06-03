@@ -1,5 +1,5 @@
 import * as api from "@/api";
-import { showMessage } from "siyuan";
+import { fetchGet, IWebSocketData, showMessage } from "siyuan";
 import steveTools, { settingdata } from "@/index";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 
@@ -78,14 +78,21 @@ export class ICSImporter {
      */
     private async fetchICSContent(url: string): Promise<string> {
         try {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return await response.text();
+            return await new Promise<string>((resolve, reject) => {
+                fetchGet(url, (response: any) => { 
+                    // console.log('获取到ICS文件内容:', response);
+                    if (!response || typeof response !== 'string') {
+                        reject(new Error('获取到的ICS文件内容无效或格式错误'));
+                        return;
+                    }
+                    resolve(response);
+                });
+            });
         } catch (error) {
             console.error('获取ICS文件失败:', error);
-            throw new Error(`无法获取ICS文件: ${error.message}`);
+            // 确保 error 是一个 Error 实例
+            const err = error instanceof Error ? error : new Error(String(error));
+            throw new Error(`无法获取ICS文件: ${err.message}`);
         }
     }
 
