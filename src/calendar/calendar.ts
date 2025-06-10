@@ -176,7 +176,9 @@ export async function run(
             } else if (clicks2 === 2) {
                 clearTimeout(clickTimeout);
                 clicks2 = 0;
+                console.log("双击事件", info.event);
                 if (info.event._def.extendedProps.isRecurring) {
+                    console.log("周期条件进入");
                     if (info.event._def.extendedProps.source === 'qqcalendar') {
                         console.log("qqcalendar", info.event.id);
                         myF.updataqqcalendar(info);
@@ -200,8 +202,9 @@ export async function run(
             // console.log('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
             let rootid;
-            if (filterViewId.includes('qqcalendar') && (!filterViewId.some(id => id !== 'qqcalendar'))) {
+            if (filterViewId.includes('qqcalendar')) {
                 rootid = 'qqcalendar'; // 特殊标识，用于在createEventInDatabase中区分
+                console.log("QQ日历事件创建");
             } else {
                 rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
             }

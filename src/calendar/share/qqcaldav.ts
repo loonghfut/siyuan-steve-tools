@@ -412,7 +412,7 @@ export class CalDAVClient {
                     source: 'qqcalendar',
                     description: description,
                     status: '未完成',
-                    isRecurring: !!rruleMatch,
+                    isRecurring: true,
 
                     allDay: isAllDay,
                 }
