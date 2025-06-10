@@ -7,13 +7,13 @@ interface CalendarEvent {
     end: Date | null;
     timeZone: string;
     allDay: boolean;
-    rrule: string;
+    rrule?: string;
     extendedProps: {
         source: string;
         description: string;
         status: string;
         isRecurring: boolean;
-        rrule: string;
+        rrule?: string;
         allDay: boolean;
     };
 }
