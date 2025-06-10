@@ -67,6 +67,9 @@ export class CalDAVClient {
         if (method === 'REPORT' && path.startsWith('/calendar/')) {
             // 获取事件时使用不同的基础URL
             url = `https://dav.qq.com${path}`;
+        } else if ((method === 'PUT' || method === 'DELETE') && path.includes('.ics')) {
+            // 创建、更新、删除事件时，直接使用 dav.qq.com
+            url = `https://dav.qq.com${path}`;
         } else {
             // 其他请求使用原来的serverUrl
             url = `${this.serverUrl}${path}`;
@@ -302,7 +305,7 @@ export class CalDAVClient {
 
                     if (calendarDataMatch) {
                         let icsData = calendarDataMatch[1].trim();
-                        
+
                         // 解码XML实体（QQ邮箱返回的数据包含XML实体编码）
                         icsData = icsData
                             .replace(/&#x0D;&#x0A;/g, '\r\n')  // 替换回车换行
@@ -313,15 +316,15 @@ export class CalDAVClient {
                             .replace(/&gt;/g, '>')           // 替换>符号
                             .replace(/&quot;/g, '"')         // 替换引号
                             .replace(/&apos;/g, "'");        // 替换单引号
-                        
+
                         console.log('解码后的ICS数据:', icsData.substring(0, 300) + '...');
-                        
+
                         const parsedEvents = this.parseICSData(icsData);
                         events.push(...parsedEvents);
                     }
                 }
             }
-            
+
             console.log(`成功解析 ${events.length} 个事件`);
         } catch (error) {
             console.error('解析事件XML失败:', error);
@@ -339,7 +342,7 @@ export class CalDAVClient {
 
             if (veventMatches) {
                 console.log(`找到 ${veventMatches.length} 个VEVENT块`);
-                
+
                 for (const veventBlock of veventMatches) {
                     const veventData = veventBlock.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/)?.[1];
 
@@ -404,13 +407,13 @@ export class CalDAVClient {
                 end: end,
                 timeZone: 'local',
                 allDay: isAllDay,
-  
+
                 extendedProps: {
                     source: 'qqcalendar',
                     description: description,
                     status: '未完成',
                     isRecurring: !!rruleMatch,
-                  
+
                     allDay: isAllDay,
                 }
             };
@@ -511,5 +514,132 @@ export class CalDAVClient {
 
         return icsData.join('\r\n');
     }
+    /**
+         * 更新已有事件
+         * @param calendarUrl 日历URL
+         * @param uid 事件UID
+         * @param event 更新的事件数据
+         */
+    async updateEvent(calendarUrl: string, uid: string, event: {
+        title?: string;
+        description?: string;
+        start?: Date;
+        end?: Date;
+        isAllDay?: boolean;
+        recurrenceRule?: string;
+    }): Promise<boolean> {
+        if (!calendarUrl || !uid) {
+            showMessage('参数不完整', -1, 'error');
+            throw new Error('参数不完整');
+        }
 
+        try {
+            // 先获取当前事件
+            const events = await this.getEvents(calendarUrl);
+
+            // 查找匹配UID的事件
+            const targetEvent = events.find(e => e.id === uid);
+            if (!targetEvent) {
+                console.error('未找到要修改的事件:', uid);
+                showMessage('未找到要修改的事件', -1, 'error');
+                return false;
+            }
+
+            // 构建更新后的事件数据
+            const updatedEvent = {
+                title: event.title || targetEvent.title,
+                description: event.description || targetEvent.extendedProps.description,
+                start: event.start || targetEvent.start!,
+                end: event.end || targetEvent.end!,
+                isAllDay: event.isAllDay ?? targetEvent.allDay,
+                recurrenceRule: event.recurrenceRule || targetEvent.rrule
+            };
+
+            // 删除旧事件并创建新事件
+            await this.deleteEvent(calendarUrl, uid);
+            await this.createEvent(calendarUrl, updatedEvent);
+
+            showMessage('事件已成功更新', 3000, 'info');
+            return true;
+        } catch (error) {
+            console.error('更新QQ日历事件失败:', error);
+            showMessage('更新QQ日历事件失败', -1, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * 删除事件
+     * @param calendarUrl 日历URL
+     * @param uid 事件UID
+     */
+    async deleteEvent(calendarUrl: string, uid: string): Promise<boolean> {
+        if (!calendarUrl || !uid) {
+            showMessage('参数不完整', -1, 'error');
+            throw new Error('参数不完整');
+        }
+
+        try {
+            // 构建事件URL
+            let eventUrl = calendarUrl;
+            if (!eventUrl.endsWith('/')) {
+                eventUrl += '/';
+            }
+            eventUrl += `${uid}.ics`;
+
+            // DELETE 请求删除事件
+            const response = await this.makeRequest('DELETE', eventUrl);
+
+            if (response.ok || response.status === 404) {
+                showMessage('事件已成功删除', 3000, 'info');
+                return true;
+            } else {
+                throw new Error(`删除失败: ${response.status} ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('删除QQ日历事件失败:', error);
+            showMessage('删除QQ日历事件失败', -1, 'error');
+            throw error;
+        }
+    }
+    /**
+     * 创建新事件（简化版本）
+     * @param calendarUrl 日历URL
+     * @param event 事件数据
+     */
+    async createEvent_new(calendarUrl: string, event: {
+        summary: string;
+        start: Date;
+        end: Date;
+        description?: string;
+        allDay?: boolean;
+    }): Promise<string> {
+        return await this.createEvent(calendarUrl, {
+            title: event.summary,
+            description: event.description,
+            start: event.start,
+            end: event.end,
+            isAllDay: event.allDay
+        });
+    }
+
+    /**
+     * 生成唯一ID
+     */
+    private generateUID(): string {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    /**
+     * 格式化日期为iCalendar格式
+     */
+    private formatDate(date: Date, allDay: boolean = false): string {
+        if (allDay) {
+            return date.toISOString().replace(/[-:]/g, '').split('T')[0];
+        }
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    }
 }
