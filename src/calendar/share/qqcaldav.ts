@@ -279,6 +279,7 @@ export class CalDAVClient {
 
             // 解析事件数据
             const events = this.parseEventsFromXML(xmlText);
+            console.log(`解析到 ${events.length} 个事件AAAAAAAAAAAAAAAAAAAAAAAA`);
             return events;
         } catch (error) {
             console.error('获取日历事件失败:', error);
@@ -291,19 +292,37 @@ export class CalDAVClient {
         const events: CalendarEvent[] = [];
 
         try {
-            const responseMatches = xmlText.match(/<D:response[^>]*>([\s\S]*?)<\/D:response>/g);
+            // 处理不同命名空间前缀 - 使用 [A-Z]: 来匹配任意前缀
+            const responseMatches = xmlText.match(/<[A-Z]:response[^>]*>([\s\S]*?)<\/[A-Z]:response>/g);
 
             if (responseMatches) {
                 for (const responseMatch of responseMatches) {
-                    const calendarDataMatch = responseMatch.match(/<C:calendar-data[^>]*>([\s\S]*?)<\/C:calendar-data>/);
+                    // 查找calendar-data标签，可能有不同的命名空间前缀（如D:calendar-data）
+                    const calendarDataMatch = responseMatch.match(/<[A-Z]:calendar-data[^>]*>([\s\S]*?)<\/[A-Z]:calendar-data>/);
 
                     if (calendarDataMatch) {
-                        const icsData = calendarDataMatch[1].trim();
+                        let icsData = calendarDataMatch[1].trim();
+                        
+                        // 解码XML实体（QQ邮箱返回的数据包含XML实体编码）
+                        icsData = icsData
+                            .replace(/&#x0D;&#x0A;/g, '\r\n')  // 替换回车换行
+                            .replace(/&#x0D;/g, '\r')         // 替换回车
+                            .replace(/&#x0A;/g, '\n')         // 替换换行
+                            .replace(/&amp;/g, '&')          // 替换&符号
+                            .replace(/&lt;/g, '<')           // 替换<符号
+                            .replace(/&gt;/g, '>')           // 替换>符号
+                            .replace(/&quot;/g, '"')         // 替换引号
+                            .replace(/&apos;/g, "'");        // 替换单引号
+                        
+                        console.log('解码后的ICS数据:', icsData.substring(0, 300) + '...');
+                        
                         const parsedEvents = this.parseICSData(icsData);
                         events.push(...parsedEvents);
                     }
                 }
             }
+            
+            console.log(`成功解析 ${events.length} 个事件`);
         } catch (error) {
             console.error('解析事件XML失败:', error);
         }
@@ -319,16 +338,22 @@ export class CalDAVClient {
             const veventMatches = icsData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/g);
 
             if (veventMatches) {
+                console.log(`找到 ${veventMatches.length} 个VEVENT块`);
+                
                 for (const veventBlock of veventMatches) {
                     const veventData = veventBlock.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/)?.[1];
 
                     if (veventData) {
+                        console.log('处理VEVENT数据:', veventData.substring(0, 200) + '...');
                         const event = this.parseVEventData(veventData);
                         if (event) {
+                            console.log('成功解析事件:', event.title);
                             events.push(event);
                         }
                     }
                 }
+            } else {
+                console.log('未找到VEVENT块');
             }
         } catch (error) {
             console.error('解析ICS数据失败:', error);
@@ -344,6 +369,8 @@ export class CalDAVClient {
             const uid = veventData.match(/UID:(.+?)(?:\r\n|\n|$)/)?.[1];
             const description = veventData.match(/DESCRIPTION:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
             const rruleMatch = veventData.match(/RRULE:(.+?)(?:\r\n|\n|$)/)?.[1];
+
+            console.log(`解析事件: ${summary}, UID: ${uid}`);
 
             // 解析开始时间
             let start: Date | null = null;
@@ -370,28 +397,32 @@ export class CalDAVClient {
             // 判断是否为全天事件
             const isAllDay = !!dtstart && !dtstart.includes('T');
 
-            return {
+            const event = {
                 id: uid || '',
                 title: summary,
                 start: start,
                 end: end,
                 timeZone: 'local',
                 allDay: isAllDay,
-                rrule: rruleMatch || '',
+  
                 extendedProps: {
                     source: 'qqcalendar',
                     description: description,
                     status: '未完成',
                     isRecurring: !!rruleMatch,
-                    rrule: rruleMatch || '',
+                  
                     allDay: isAllDay,
                 }
             };
+
+            console.log('解析完成的事件:', event);
+            return event;
         } catch (error) {
             console.error('解析事件数据失败:', error);
             return null;
         }
     }
+
 
     async createEvent(calendarUrl: string, event: {
         title: string;
@@ -481,5 +512,4 @@ export class CalDAVClient {
         return icsData.join('\r\n');
     }
 
-    // 其他方法可以类似地使用原生fetch重写...
 }
