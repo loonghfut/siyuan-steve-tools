@@ -31,23 +31,29 @@ export class CalDAVClient {
     private headers: { [key: string]: string };
 
     constructor(username: string, password: string) {
+        // 修改为正确的QQ邮箱CalDAV服务器地址
         this.serverUrl = 'https://dav.qq.com/.well-known/caldav';
         this.credentials = { username, password };
-        
+
         // 构建Basic认证头
         const auth = btoa(`${username}:${password}`);
         this.headers = {
             'Authorization': `Basic ${auth}`,
             'Content-Type': 'application/xml; charset=utf-8',
-            'User-Agent': 'SiYuan-Steve-Tools/1.0'
+            'User-Agent': 'SiYuan-Steve-Tools/1.0',
+            'Depth': '1'
         };
     }
 
     async init() {
         try {
-            // 测试连接
+            // 测试连接 - 先测试根路径
             await this.makeRequest('OPTIONS', '/');
             console.log('QQ日历连接成功');
+
+            // 尝试获取当前用户信息
+            const userInfo = await this.getCurrentUser();
+            console.log('用户信息:', userInfo);
         } catch (e) {
             console.error('QQ日历登录失败:', e);
             showMessage('QQ日历登录失败，请检查网络，QQ邮箱配置', -1, 'error');
@@ -55,16 +61,34 @@ export class CalDAVClient {
     }
 
     private async makeRequest(method: string, path: string, body?: string): Promise<Response> {
-        const url = `${this.serverUrl}${path}`;
-        
+        // 对于获取事件的请求，需要特殊处理URL
+        let url: string;
+
+        if (method === 'REPORT' && path.startsWith('/calendar/')) {
+            // 获取事件时使用不同的基础URL
+            url = `https://dav.qq.com${path}`;
+        } else {
+            // 其他请求使用原来的serverUrl
+            url = `${this.serverUrl}${path}`;
+        }
+
         try {
+            const requestHeaders = { ...this.headers };
+
+            // 为PROPFIND和REPORT请求添加Depth头
+            if (method === 'PROPFIND' || method === 'REPORT') {
+                requestHeaders['Depth'] = '1';
+            }
+
             const response = await fetch(url, {
                 method,
-                headers: this.headers,
+                headers: requestHeaders,
                 body: body || undefined,
             });
 
-            if (!response.ok) {
+            console.log(`${method} ${url} - Status: ${response.status}`);
+
+            if (!response.ok && response.status !== 207) { // 207 Multi-Status is OK for WebDAV
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
@@ -75,25 +99,62 @@ export class CalDAVClient {
         }
     }
 
-    async getCalendars(): Promise<DAVCalendar[]> {
+    // 获取当前用户信息
+    async getCurrentUser(): Promise<string> {
         try {
-            // PROPFIND 请求获取日历列表
             const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
-<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+<D:propfind xmlns:D="DAV:">
     <D:prop>
-        <D:displayname />
-        <D:resourcetype />
-        <C:calendar-description />
-        <D:getctag />
+        <D:current-user-principal />
     </D:prop>
 </D:propfind>`;
 
-            const response = await this.makeRequest('PROPFIND', '/cgi-bin/caldav/user/', propfindBody);
+            const response = await this.makeRequest('PROPFIND', '/', propfindBody);
             const xmlText = await response.text();
-            
-            // 解析XML响应
-            const calendars = this.parseCalendarsFromXML(xmlText);
-            return calendars;
+            console.log('Current user response:', xmlText);
+
+            // 解析用户主路径
+            const principalMatch = xmlText.match(/<D:current-user-principal[^>]*>\s*<D:href[^>]*>(.*?)<\/D:href>/);
+            return principalMatch ? principalMatch[1] : '/cgi-bin/caldav/user/';
+        } catch (error) {
+            console.error('获取用户信息失败:', error);
+            return '/cgi-bin/caldav/user/';
+        }
+    }
+
+    async getCalendars(): Promise<DAVCalendar[]> {
+        try {
+            // 先获取用户的主路径
+            const userPrincipal = await this.getCurrentUser();
+            console.log('User principal:', userPrincipal);
+
+            // 尝试多个可能的路径
+            const possiblePaths = [
+                userPrincipal,
+                '/cgi-bin/caldav/user/',
+                '/cgi-bin/caldav/',
+                '/caldav/',
+                `${userPrincipal}calendar/`,
+                '/cgi-bin/caldav/user/calendar/'
+            ];
+
+            for (const path of possiblePaths) {
+                try {
+                    console.log(`尝试路径: ${path}`);
+                    const calendars = await this.tryGetCalendarsFromPath(path);
+                    if (calendars.length > 0) {
+                        console.log(`成功从路径 ${path} 获取到 ${calendars.length} 个日历`);
+                        return calendars;
+                    }
+                } catch (error) {
+                    console.log(`路径 ${path} 失败:`, error.message);
+                    continue;
+                }
+            }
+
+            console.log('所有路径都失败了，返回空数组');
+            showMessage('未找到可用的日历，请检查QQ邮箱日历设置', -1, 'error');
+            return [];
         } catch (error) {
             console.error('获取日历列表失败:', error);
             showMessage('获取日历列表失败，请检查网络，QQ邮箱配置', -1, 'error');
@@ -101,31 +162,82 @@ export class CalDAVClient {
         }
     }
 
+    private async tryGetCalendarsFromPath(path: string): Promise<DAVCalendar[]> {
+        // PROPFIND 请求获取日历列表
+        const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+    <D:prop>
+        <D:displayname />
+        <D:resourcetype />
+        <C:calendar-description />
+        <D:getctag />
+        <C:supported-calendar-component-set />
+    </D:prop>
+</D:propfind>`;
+
+        const response = await this.makeRequest('PROPFIND', path, propfindBody);
+        const xmlText = await response.text();
+        console.log(`Path ${path} response:`, xmlText);
+
+        // 解析XML响应
+        const calendars = this.parseCalendarsFromXML(xmlText);
+        return calendars;
+    }
+
     private parseCalendarsFromXML(xmlText: string): DAVCalendar[] {
         const calendars: DAVCalendar[] = [];
-        
+
         try {
-            // 使用正则表达式解析XML（简单处理）
-            const responseMatches = xmlText.match(/<D:response[^>]*>([\s\S]*?)<\/D:response>/g);
-            
+            // 使用正则表达式解析XML（处理不同的命名空间前缀）
+            const responseMatches = xmlText.match(/<[A-Z]:response[^>]*>([\s\S]*?)<\/[A-Z]:response>/g);
+
             if (responseMatches) {
                 for (const responseMatch of responseMatches) {
-                    const hrefMatch = responseMatch.match(/<D:href[^>]*>(.*?)<\/D:href>/);
-                    const displayNameMatch = responseMatch.match(/<D:displayname[^>]*>(.*?)<\/D:displayname>/);
-                    const resourceTypeMatch = responseMatch.match(/<C:calendar\s*\/>/);
-                    
-                    if (hrefMatch && displayNameMatch && resourceTypeMatch) {
+                    const hrefMatch = responseMatch.match(/<[A-Z]:href[^>]*>(.*?)<\/[A-Z]:href>/);
+                    const displayNameMatch = responseMatch.match(/<[A-Z]:displayname[^>]*>(.*?)<\/[A-Z]:displayname>/);
+                    const ctagMatch = responseMatch.match(/<[A-Z]:getctag[^>]*>(.*?)<\/[A-Z]:getctag>/);
+                    const descriptionMatch = responseMatch.match(/<[A-Z]:calendar-description[^>]*>(.*?)<\/[A-Z]:calendar-description>/);
+
+                    // 检查是否为日历资源 - 查找 <D:calendar /> 或其他变体
+                    const isCalendar = responseMatch.match(/<[A-Z]:calendar\s*\/?>/) ||
+                        responseMatch.includes('calendar') &&
+                        responseMatch.match(/<[A-Z]:comp\s+name="VEVENT"/);
+
+                    // 过滤掉非日历项目（inbox、outbox等）
+                    const isValidCalendar = hrefMatch && displayNameMatch && isCalendar &&
+                        !hrefMatch[1].includes('/inbox/') &&
+                        !hrefMatch[1].includes('/outbox/') &&
+                        !hrefMatch[1].includes('%40') && // 过滤用户主目录
+                        hrefMatch[1].endsWith('/') &&
+                        displayNameMatch[1].trim() !== '';
+
+                    if (isValidCalendar) {
+                        let url = hrefMatch[1];
+
+                        // 保持原始URL格式，不添加.ics后缀
+                        // url从 /calendar/F23atnjU6_DDnQtpjZoAACm/ 保持为这个格式
+
+                        const displayName = displayNameMatch[1];
+                        const ctag = ctagMatch ? ctagMatch[1] : undefined;
+                        const description = descriptionMatch ? descriptionMatch[1] : undefined;
+
+                        console.log(`找到日历: ${displayName} - ${url}`);
+
                         calendars.push({
-                            url: hrefMatch[1],
-                            displayName: displayNameMatch[1],
+                            url: url,
+                            displayName: displayName,
+                            ctag: ctag,
+                            description: description
                         });
                     }
                 }
             }
+
+            console.log(`总共解析到 ${calendars.length} 个日历`);
         } catch (error) {
             console.error('解析日历XML失败:', error);
         }
-        
+
         return calendars;
     }
 
@@ -136,6 +248,17 @@ export class CalDAVClient {
         }
 
         try {
+            // 构建正确的获取事件URL
+            // 从 /calendar/F23atnjU6_DDnQtpjZoAACm/ 转换为正确的请求URL
+            let requestUrl = calendarUrl;
+
+            // 确保URL以/结尾
+            if (!requestUrl.endsWith('/')) {
+                requestUrl += '/';
+            }
+
+            console.log(`获取日历事件: ${requestUrl}`);
+
             // REPORT 请求获取事件
             const reportBody = `<?xml version="1.0" encoding="utf-8" ?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
@@ -150,9 +273,10 @@ export class CalDAVClient {
     </C:filter>
 </C:calendar-query>`;
 
-            const response = await this.makeRequest('REPORT', calendarUrl, reportBody);
+            const response = await this.makeRequest('REPORT', requestUrl, reportBody);
             const xmlText = await response.text();
-            
+            console.log('事件响应:', xmlText);
+
             // 解析事件数据
             const events = this.parseEventsFromXML(xmlText);
             return events;
@@ -165,14 +289,14 @@ export class CalDAVClient {
 
     private parseEventsFromXML(xmlText: string): CalendarEvent[] {
         const events: CalendarEvent[] = [];
-        
+
         try {
             const responseMatches = xmlText.match(/<D:response[^>]*>([\s\S]*?)<\/D:response>/g);
-            
+
             if (responseMatches) {
                 for (const responseMatch of responseMatches) {
                     const calendarDataMatch = responseMatch.match(/<C:calendar-data[^>]*>([\s\S]*?)<\/C:calendar-data>/);
-                    
+
                     if (calendarDataMatch) {
                         const icsData = calendarDataMatch[1].trim();
                         const parsedEvents = this.parseICSData(icsData);
@@ -183,21 +307,21 @@ export class CalDAVClient {
         } catch (error) {
             console.error('解析事件XML失败:', error);
         }
-        
+
         return events;
     }
 
     private parseICSData(icsData: string): CalendarEvent[] {
         const events: CalendarEvent[] = [];
-        
+
         try {
             // 匹配事件数据块
             const veventMatches = icsData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/g);
-            
+
             if (veventMatches) {
                 for (const veventBlock of veventMatches) {
                     const veventData = veventBlock.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/)?.[1];
-                    
+
                     if (veventData) {
                         const event = this.parseVEventData(veventData);
                         if (event) {
@@ -209,7 +333,7 @@ export class CalDAVClient {
         } catch (error) {
             console.error('解析ICS数据失败:', error);
         }
-        
+
         return events;
     }
 
