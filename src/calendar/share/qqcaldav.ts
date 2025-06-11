@@ -32,7 +32,7 @@ export class CalDAVClient {
 
     constructor(username: string, password: string) {
         // 修改为正确的QQ邮箱CalDAV服务器地址
-        this.serverUrl = 'https://dav.qq.com/.well-known/caldav';
+        this.serverUrl = 'https://dav.qq.com/calendar';
         this.credentials = { username, password };
 
         // 构建Basic认证头
@@ -40,7 +40,7 @@ export class CalDAVClient {
         this.headers = {
             'Authorization': `Basic ${auth}`,
             'Content-Type': 'application/xml; charset=utf-8',
-            'User-Agent': 'SiYuan-Steve-Tools/1.0',
+            'User-Agent': 'SiYuan/3.1.32 https://b3log.org/siyuan Electron Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) SiYuan/3.1.32 Chrome/134.0.6998.205 Electron/35.5.0 Safari/537.36',
             'Depth': '1'
         };
     }
@@ -67,11 +67,15 @@ export class CalDAVClient {
         if (method === 'REPORT' && path.startsWith('/calendar/')) {
             // 获取事件时使用不同的基础URL
             url = `https://dav.qq.com${path}`;
+            // url = `http://localhost:3001`;
         } else if ((method === 'PUT' || method === 'DELETE') && path.includes('.ics')) {
             // 创建、更新、删除事件时，直接使用 dav.qq.com
+            // url = `http://localhost:3001`;
             url = `https://dav.qq.com${path}`;
+
         } else {
             // 其他请求使用原来的serverUrl
+            // url = `http://localhost:3001`;
             url = `${this.serverUrl}${path}`;
         }
 
@@ -83,22 +87,124 @@ export class CalDAVClient {
                 requestHeaders['Depth'] = '1';
             }
 
-            const response = await fetch(url, {
-                method,
-                headers: requestHeaders,
-                body: body || undefined,
-            });
-
-            console.log(`${method} ${url} - Status: ${response.status}`);
-
-            if (!response.ok && response.status !== 207) { // 207 Multi-Status is OK for WebDAV
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // 将 headers 转换为 forwardProxy API 期望的格式
+            const proxyHeaders: Array<{ [key: string]: string }> = [];
+            for (const key in requestHeaders) {
+                if (Object.prototype.hasOwnProperty.call(requestHeaders, key)) {
+                    proxyHeaders.push({ [key]: requestHeaders[key] });
+                }
             }
 
-            return response;
+            const proxyPayload: {
+                url: string;
+                method: string;
+                headers: Array<{ [key: string]: string }>;
+                payload?: string;
+                payloadEncoding?: string;
+                responseEncoding?: string;
+                timeout: number;
+                contentType?: string; // 可选，如果 CalDAV 的 Content-Type 需要通过此字段指定
+            } = {
+                url: url,
+                method: method,
+                headers: proxyHeaders, // CalDAV 请求的头部，包括 Content-Type
+                // payloadEncoding: "text", // CalDAV body 通常是 XML/ICS 文本
+                // responseEncoding: "text", // 期望代理返回文本格式的 body
+                timeout: 15000 ,// 设置代理请求超时时间 (毫秒)
+                contentType: requestHeaders['Content-Type'] 
+            };
+
+            if (body !== undefined) {
+                proxyPayload.payload = body;
+                console.log(`代理请求 ${method} ${url} - Payload:`, body);
+            }
+            // 如果 CalDAV 的 Content-Type 需要通过 proxyPayload.contentType 指定，可以在这里设置
+            proxyPayload.contentType = requestHeaders['Content-Type'] || 'application/xml; charset=utf-8';
+
+
+            // 假设代理 API 部署在 "/api/network/forwardProxy"
+            const proxyApiUrl = "/api/network/forwardProxy";
+
+            const proxyApiResponse = await fetch(proxyApiUrl, {
+                method: 'POST', // forwardProxy API 自身使用 POST 方法
+                headers: {
+                    'Content-Type': 'application/json', // 发送给代理 API 的请求体是 JSON
+                },
+                body: JSON.stringify(proxyPayload),
+            });
+
+            if (!proxyApiResponse.ok) {
+                const errorText = await proxyApiResponse.text();
+                console.error(`代理请求 ${proxyApiUrl} 失败: ${proxyApiResponse.status} ${proxyApiResponse.statusText}`, errorText);
+                throw new Error(`代理请求失败: ${proxyApiResponse.status} ${proxyApiResponse.statusText} - ${errorText}`);
+            }
+
+            const proxyResult = await proxyApiResponse.json();
+
+            // 检查代理本身是否报告错误 (gulu.Ret 结构)
+            if (proxyResult.code !== 0 && proxyResult.code !== undefined) {
+                console.error(`代理转发错误 ${method} ${url}: ${proxyResult.msg}`, proxyResult.data);
+                // 根据代理返回的错误信息构造一个 Response 对象或直接抛出错误
+                // 为了与原有逻辑兼容，尝试从 proxyResult.data 中获取状态码
+                const errorStatus = proxyResult.data?.status || 503; // Service Unavailable or custom
+                const errorStatusText = proxyResult.msg || `Proxy forwarding error`;
+                const errorBody = proxyResult.data?.body || proxyResult.msg || `Proxy error: ${errorStatusText}`;
+
+                // 返回一个表示代理错误的 Response 对象
+                return new Response(errorBody, {
+                    status: errorStatus,
+                    statusText: this.getStatusText(errorStatus, errorStatusText),
+                    headers: new Headers(proxyResult.data?.headers || {}),
+                });
+            }
+
+            // 代理成功转发请求，并从目标服务器获取了响应
+            if (proxyResult.data && proxyResult.data.status !== undefined) {
+                const actualStatus = proxyResult.data.status;
+                const actualBody = proxyResult.data.body; // 已经是字符串，因为 responseEncoding: "text"
+                const actualHeaders = new Headers(proxyResult.data.headers || {});
+
+                console.log(`${method} ${url} (通过代理) - Status: ${actualStatus}`);
+
+                // 创建一个模拟原始 fetch 返回的 Response 对象
+                const emulatedResponse = new Response(actualBody, {
+                    status: actualStatus,
+                    statusText: this.getStatusText(actualStatus, proxyResult.data.statusText), // 尝试使用代理提供的statusText
+                    headers: actualHeaders,
+                });
+
+                // 原有的状态检查逻辑
+                if (!emulatedResponse.ok && emulatedResponse.status !== 207) { // 207 Multi-Status is OK for WebDAV
+                    throw new Error(`HTTP ${emulatedResponse.status}: ${emulatedResponse.statusText} (来自 ${url} 通过代理)`);
+                }
+                return emulatedResponse;
+            } else {
+                // 代理返回了预料之外的结构
+                console.error(`未预期的代理响应结构 ${method} ${url}:`, proxyResult);
+                throw new Error(`未预期的代理响应结构。代理返回: ${JSON.stringify(proxyResult)}`);
+            }
+
         } catch (error) {
-            console.error(`请求失败 ${method} ${url}:`, error);
+            console.error(`请求失败 ${method} ${url} (通过代理):`, error);
             throw error;
+        }
+    }
+
+    // 辅助函数：获取状态码对应的文本描述
+    private getStatusText(status: number, defaultText?: string): string {
+        if (defaultText && defaultText.trim() !== "") return defaultText;
+        switch (status) {
+            case 200: return 'OK';
+            case 201: return 'Created';
+            case 204: return 'No Content';
+            case 207: return 'Multi-Status';
+            case 400: return 'Bad Request';
+            case 401: return 'Unauthorized';
+            case 403: return 'Forbidden';
+            case 404: return 'Not Found';
+            case 500: return 'Internal Server Error';
+            case 503: return 'Service Unavailable';
+            default: return 'Status ' + status;
         }
     }
 
@@ -134,11 +240,11 @@ export class CalDAVClient {
             // 尝试多个可能的路径
             const possiblePaths = [
                 userPrincipal,
-                '/cgi-bin/caldav/user/',
-                '/cgi-bin/caldav/',
+                // '/cgi-bin/caldav/user/',
+                // '/cgi-bin/caldav/',
                 '/caldav/',
-                `${userPrincipal}calendar/`,
-                '/cgi-bin/caldav/user/calendar/'
+                `/`,
+                // '/cgi-bin/caldav/user/calendar/'
             ];
 
             for (const path of possiblePaths) {
