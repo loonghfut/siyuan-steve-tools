@@ -43,7 +43,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 - [博]()：打赏支持 `the third `
 - [林（新塘版）]()：打赏支持 `the fourth `
 - [VeryZHH]()：打赏支持 `the fifth ` 
-- [5kyfkr](),[nco](),[啦啦啦]()：打赏支持 `the newest `
+- [5kyfkr](),[nco](),[谭*]()：打赏支持 `the newest `
 [更多。。](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
 #### 说明
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
