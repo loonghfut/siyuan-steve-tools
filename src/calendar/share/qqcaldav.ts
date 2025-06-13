@@ -32,7 +32,7 @@ export class CalDAVClient {
 
     constructor(username: string, password: string) {
         // 修改为正确的QQ邮箱CalDAV服务器地址
-        this.serverUrl = 'https://dav.qq.com/calendar';
+        this.serverUrl = 'https://dav.qq.com'; // Unified base URL
         this.credentials = { username, password };
 
         // 构建Basic认证头
@@ -61,23 +61,18 @@ export class CalDAVClient {
     }
 
     private async makeRequest(method: string, path: string, body?: string): Promise<Response> {
-        // 对于获取事件的请求，需要特殊处理URL
-        let url: string;
+        // 统一 URL 构建逻辑
+        let pathSuffix = path;
+        const isEventSpecificPath = (method === 'REPORT' && path.startsWith('/calendar/')) ||
+            ((method === 'PUT' || method === 'DELETE') && path.includes('.ics'));
 
-        if (method === 'REPORT' && path.startsWith('/calendar/')) {
-            // 获取事件时使用不同的基础URL
-            url = `https://dav.qq.com${path}`;
-            // url = `http://localhost:3001`;
-        } else if ((method === 'PUT' || method === 'DELETE') && path.includes('.ics')) {
-            // 创建、更新、删除事件时，直接使用 dav.qq.com
-            // url = `http://localhost:3001`;
-            url = `https://dav.qq.com${path}`;
-
-        } else {
-            // 其他请求使用原来的serverUrl
-            // url = `http://localhost:3001`;
-            url = `${this.serverUrl}${path}`;
+        if (!isEventSpecificPath) {
+            // 对于非事件特定路径（如 PROPFIND, OPTIONS），路径是相对于 /calendar 端点的
+            // this.serverUrl (https://dav.qq.com) + /calendar + original path
+            pathSuffix = `/calendar${path}`; 
         }
+
+        const url = `${this.serverUrl}${pathSuffix}`;
 
         try {
             const requestHeaders = { ...this.headers };
@@ -110,8 +105,8 @@ export class CalDAVClient {
                 headers: proxyHeaders, // CalDAV 请求的头部，包括 Content-Type
                 // payloadEncoding: "text", // CalDAV body 通常是 XML/ICS 文本
                 // responseEncoding: "text", // 期望代理返回文本格式的 body
-                timeout: 15000 ,// 设置代理请求超时时间 (毫秒)
-                contentType: requestHeaders['Content-Type'] 
+                timeout: 15000,// 设置代理请求超时时间 (毫秒)
+                contentType: requestHeaders['Content-Type']
             };
 
             if (body !== undefined) {

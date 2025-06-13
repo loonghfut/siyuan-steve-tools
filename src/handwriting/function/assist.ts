@@ -10,10 +10,9 @@ export async function addWhiteboardButton(e) {
         if (!existingButton) {
             // Create the button
             const button = document.createElement('button');
-            button.className = 'b3-button b3-button--outline whiteboard-button';
-            button.innerHTML = '画板';
-            button.title = '在画板中打开';
-            button.style.marginLeft = '4px';
+            button.className = 'block__icon fn__flex-center ariaLabel whiteboard-button'; 
+            button.innerHTML = '<svg class="item__graphic"><use xlink:href="#iconSTWhiteboard"></use></svg>';
+            button.setAttribute('aria-label', '在画板中打开'); 
 
             // Add click event
             button.addEventListener('click', async () => {
@@ -52,7 +51,7 @@ export const toggleElementsVisibility = (show: boolean, protyle) => {
     const breadcrumbBar = protyle.element.querySelector('.protyle-breadcrumb__bar');
     if (breadcrumbBar) (breadcrumbBar as HTMLElement).style.display = show ? '' : 'none';
 
-    
+
     // 更新按钮文本
     if (button) button.innerHTML = show ? '画板' : '关闭画板';
 };

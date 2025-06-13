@@ -396,79 +396,62 @@ export async function quickadd_event_more_sub(listItemsdata: BlockTreeResult['li
     }
 }
 
+
 export async function addquikaddButton(e) {
     const breadcrumb = e.detail.protyle.element.querySelector('.protyle-breadcrumb');
     if (breadcrumb) {
-        // Check if the button container already exists
-        const existingButtonContainer = breadcrumb.querySelector('.quikadd-container');
-        if (!existingButtonContainer) {
+        // Check if the button already exists
+        const existingButton = breadcrumb.querySelector('.quikadd-button'); // Changed selector
+        if (!existingButton) {
             // Find the "more" button to insert before
             const moreButton = breadcrumb.querySelector('button[data-type="more"]');
 
-            // Create a container for the icon, using a span or div instead of button
-            const iconContainer = document.createElement('span'); // Use span or div as a non-button container
-            iconContainer.className = 'quikadd-container'; // Add a class for identification
-            // Use an <i> tag for the icon, assuming 'iconSelect' is a valid icon class
-            iconContainer.innerHTML = `<div class="protyle-breadcrumb block__icon ariaLabel quikadd" aria-label="点击 <span class='ft__on-surface'>一键识别日程</span>">
-    <svg><use xlink:href="#iconCalendar"></use></svg>
-</div>`;
+            // Create the button element
+            const button = document.createElement('button');
+            button.className = 'block__icon fn__flex-center ariaLabel quikadd-button'; // Mimic class structure and add identifier
+            button.setAttribute('aria-label', '一键识别日程'); // Set aria-label
+            button.innerHTML = '<svg class="item__graphic"><use xlink:href="#iconCalendar"></use></svg>'; // Set SVG icon
 
-            // Find the clickable element (the div with class 'quikadd')
-            const clickableIcon = iconContainer.querySelector('.quikadd');
+            // Add click event listener to the button
+            button.addEventListener('click', async () => {
+                let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
+                const idsWithSchedule = ChildBlocks
+                    .filter(block => block.content && block.content.includes('@日程'))
+                    .map(block => block.id);
 
-            if (clickableIcon) {
-                // Add click event listener to the icon div
-                clickableIcon.addEventListener('click', async () => {
-                    let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
-                    // console.log('ChildBlocks', ChildBlocks);
-                    const idsWithSchedule = ChildBlocks
-                        .filter(block => block.content && block.content.includes('@日程'))
-                        .map(block => block.id);
+                console.log('包含"@日程"的块ID:', idsWithSchedule);
+                if (idsWithSchedule.length === 0) {
+                    showMessage('未找到包含"@日程"的块。');
+                    return;
+                }
 
-                    console.log('包含"@日程"的块ID:', idsWithSchedule);
-                    if (idsWithSchedule.length === 0) {
-                        showMessage('未找到包含"@日程"的块。');
-                        return;
-                    }
-
-                    // showMessage(`开始处理 ${idsWithSchedule.length} 个包含"@日程"的块...`);
-
-                    for (const blockId of idsWithSchedule) {
-                        try {
-                            // console.log(`Processing block: ${blockId}`);
-                            showMessage(`正在处理块 ${blockId}`,-1, 'info','@日程');
-                            // Call handleAddButtonClick for the current block ID
-                            const success = await handleAddButtonClick('', { isdirect: true, directid: blockId });
-                            if (success) {
-                                // showMessage(`成功处理块 ${blockId}`);
-                                showMessage(`成功处理块 ${blockId}`,-1, 'info','@日程');
-                            } else {
-                                // Assuming handleAddButtonClick returns false or similar on non-success without throwing an error
-                                showMessage(`处理块 ${blockId} 未标记为成功`, 3000, 'info');
-                            }
-                            // Add a delay to prevent potential issues with rapid processing, similar to quickadd_event_more_main
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        } catch (error) {
-                            console.error(`处理块 ${blockId} 时出错:`, error);
-                            showMessage(`处理块 ${blockId} 时出错: ${error.message || error}`, 5000, 'error');
-                            // Optional: Add a delay even after an error before processing the next one
-                            await new Promise(resolve => setTimeout(resolve, 500));
+                for (const blockId of idsWithSchedule) {
+                    try {
+                        showMessage(`正在处理块 ${blockId}`, -1, 'info', '@日程');
+                        const success = await handleAddButtonClick('', { isdirect: true, directid: blockId });
+                        if (success) {
+                            showMessage(`成功处理块 ${blockId}`, -1, 'info', '@日程');
+                        } else {
+                            showMessage(`处理块 ${blockId} 未标记为成功`, 3000, 'info');
                         }
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } catch (error) {
+                        console.error(`处理块 ${blockId} 时出错:`, error);
+                        showMessage(`处理块 ${blockId} 时出错: ${error.message || error}`, 5000, 'error');
+                        await new Promise(resolve => setTimeout(resolve, 500));
                     }
+                }
+                showMessage('所有包含"@日程"的块处理完毕。', 3000, 'info', '@日程');
+            });
 
-                    showMessage('所有包含"@日程"的块处理完毕。',3000, 'info','@日程');
-                });
-            } else {
-                console.error("Could not find the clickable icon element.");
-            }
-
-            // Insert the icon container before the "more" button if it exists, otherwise append to breadcrumb
+            // Insert the button before the "more" button if it exists, otherwise append to breadcrumb
             if (moreButton) {
-                breadcrumb.insertBefore(iconContainer, moreButton);
+                breadcrumb.insertBefore(button, moreButton);
             } else {
-                breadcrumb.appendChild(iconContainer); // Fallback if "more" button isn't found
+                breadcrumb.appendChild(button); // Fallback if "more" button isn't found
             }
         }
     }
 }
+
 
