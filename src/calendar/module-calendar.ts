@@ -550,7 +550,7 @@ export class M_calendar {
                 if (!targetSpan.nextSibling || !(targetSpan.nextSibling instanceof HTMLElement) || !targetSpan.nextSibling.classList.contains('st-plugin-button')) {
                     // 创建一个新的按钮元素
                     const button = document.createElement('button');
-                    button.innerText = '日程视图';
+                    button.innerHTML = '<svg><use xlink:href="#iconCalendar"></use></svg>';
                     button.className = 'block__icon ariaLabel st-plugin-button'; // 确保样式统一，并添加一个标识类
 
                     // 添加按钮点击事件
