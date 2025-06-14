@@ -19,6 +19,7 @@ export class ICSImporter {
     private plugin: steveTools;
     private processedEventUIDs: Set<string> = new Set();
     private settings: any;
+    private topBarButton: any; // 添加对顶栏按钮的引用
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -29,7 +30,7 @@ export class ICSImporter {
     async init() {
         console.log('ICSImporter init called');
         //获取日记id
-        this.plugin.addTopBar({
+        this.topBarButton = this.plugin.addTopBar({
             icon: "iconArrowDown",
             title: "导入ICS日程", // 标题可以考虑根据模式动态变化或在设置中说明
             position: "right",
@@ -50,21 +51,27 @@ export class ICSImporter {
                     return;
                 }
 
-                if (importMode === 'daily-notes') {
-                    await this.importEventsToDailyNotes(icsUrl, notebookIdForImport);
-                } else { // 'single-document' 模式 (原行为：在指定笔记本中创建新日记)
-                    // 为今天在指定的笔记本中创建一个新的日记文档
-                    const dailyNoteResponse = await api.createDailyNote(window.siyuan.ws.app.appId, notebookIdForImport);
-                    console.log('创建的日记ID (单文档模式):', dailyNoteResponse);
-                    if (!dailyNoteResponse || !dailyNoteResponse.id) {
-                        showMessage('无法创建日记 (单文档模式)，请检查设置的笔记本ID是否正确', 3000, 'error');
-                        return;
+                // 同步开始时恢复原图标
+                this.updateTopBarIcon("iconArrowDown");
+
+                try {
+                    if (importMode === 'daily-notes') {
+                        await this.importEventsToDailyNotes(icsUrl, notebookIdForImport);
+                    } else {
+                        const dailyNoteResponse = await api.createDailyNote(window.siyuan.ws.app.appId, notebookIdForImport);
+                        console.log('创建的日记ID (单文档模式):', dailyNoteResponse);
+                        if (!dailyNoteResponse || !dailyNoteResponse.id) {
+                            showMessage('无法创建日记 (单文档模式)，请检查设置的笔记本ID是否正确', 3000, 'error');
+                            return;
+                        }
+                        // 将所有日程导入到这个新创建的日记文档中
+                        await this.importEventsToDocument(icsUrl, dailyNoteResponse.id);
                     }
-                    // 将所有日程导入到这个新创建的日记文档中
-                    await this.importEventsToDocument(icsUrl, dailyNoteResponse.id);
+                } finally {
+                    console.log('导入操作完成');
                 }
             }
-        })
+        });
 
         // 在后台检查ICS更新
         this.checkForUpdatesInBackground().catch(err => {
@@ -72,6 +79,17 @@ export class ICSImporter {
         });
     }
 
+    /**
+     * 更新顶栏按钮图标
+     */
+    private updateTopBarIcon(iconName: string) {
+        if (this.topBarButton) {
+            const svgUse = this.topBarButton.querySelector('svg use');
+            if (svgUse) {
+                svgUse.setAttribute('xlink:href', `#${iconName}`);
+            }
+        }
+    }
 
     /**
      * 从URL获取ICS文件内容
@@ -431,11 +449,15 @@ export class ICSImporter {
             }
 
             if (newEventCount > 0) {
+                // 更换图标为历史图标，表示有新内容
+                this.updateTopBarIcon("iconHistory");
+
                 showMessage(`检测到 ${newEventCount} 个新的ICS日程。请点击顶栏按钮手动导入。`, 7000, 'info');
+
             } else {
                 console.log('未检测到新的ICS日程。');
-                // 可选：如果需要，可以显示“无更新”的消息
-                // showMessage('ICS日程已是最新。', 3000, 'info');
+                // 确保图标是原始状态
+                this.updateTopBarIcon("iconArrowDown");
             }
 
         } catch (error) {
