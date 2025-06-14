@@ -143,12 +143,12 @@ export function runblockdata_for_note(content: string): string {
     // 匹配包含"@描述"的文本行
     const notePattern = /([^\n]+)@描述/;
     const noteMatch = content.match(notePattern);
-    
+
     if (noteMatch && noteMatch[1]) {
         // 返回删除了"@描述"的文本内容，并去除首尾空格
         return noteMatch[1].trim();
     }
-    
+
     return '';
 }
 
@@ -156,12 +156,12 @@ export function runblockdata_for_title(content: string): string {
     // 匹配包含"@描述"的文本行
     const notePattern = /([^\n]+)@日程/;
     const noteMatch = content.match(notePattern);
-    
+
     if (noteMatch && noteMatch[1]) {
         // 返回删除了"@描述"的文本内容，并去除首尾空格
         return noteMatch[1].trim();
     }
-    
+
     return '';
 }
 
@@ -348,7 +348,7 @@ export async function addquikaddButton(e) {
 
 //////////////时间解析/////////////
 function mapDayCharToJsDay(dayChar: string): number {
-// ...existing code...
+    // ...existing code...
     switch (dayChar) {
         case '一': return 1; // Monday
         case '二': return 2; // Tuesday
@@ -362,7 +362,7 @@ function mapDayCharToJsDay(dayChar: string): number {
 }
 
 function parseDateFromString(dateMatch: RegExpMatchArray | null, initialDate: dayjs.Dayjs): dayjs.Dayjs {
-// ...existing code...
+    // ...existing code...
     let targetDate = initialDate;
     if (!dateMatch) return targetDate;
 
@@ -436,7 +436,7 @@ function parseDateFromString(dateMatch: RegExpMatchArray | null, initialDate: da
             return initialDate;
         }
 
-        let tempTargetDate = initialDate; 
+        let tempTargetDate = initialDate;
         if (weekPrefix === '下周') {
             tempTargetDate = tempTargetDate.add(1, 'week');
         } else if (weekPrefix === '上周') {
@@ -571,9 +571,9 @@ function parseTimeFromString(timeMatch: RegExpMatchArray | null, initialDate: da
         } else if (period === '中午') {
             // e.g., 中午1点 (parsed as 1) -> 13. 中午12点 (parsed as 12) -> 12.
             if (hours >= 1 && hours <= 4) { // Typically 中午1点 to 中午4点 implies PM
-                 if (hours < 12) hours += 12; // Ensure it doesn't affect 12 itself
-            } else if (hours < 11 && hours !==0) { // For other early hours if context implies it, e.g. 中午1点
-                 hours += 12;
+                if (hours < 12) hours += 12; // Ensure it doesn't affect 12 itself
+            } else if (hours < 11 && hours !== 0) { // For other early hours if context implies it, e.g. 中午1点
+                hours += 12;
             }
             // 中午12点 is 12:00. No change needed if hours is 12.
         } else if (period === '上午') {
@@ -647,3 +647,88 @@ export function runblockdata_for_time(content: string): string | null {
 
     return finalDateWithTime.format('YYYY-MM-DDTHH:mm');
 }
+
+
+
+export async function runblockdata_for_time_ai(content: string): Promise<string | null> {
+    if (content === '') {
+        return null;
+    }
+
+    const apiKey = window.siyuan.config.ai.openAI.apiKey;
+
+    if (!apiKey) {
+        console.error("DeepSeek API key is not set. Please set the DEEPSEEK_API_KEY environment variable.");
+        // 回退到原始解析器
+        console.warn("Falling back to original parser due to missing DeepSeek API key.");
+        return runblockdata_for_time(content);
+    }
+
+    const today = dayjs().format('YYYY-MM-DD');
+    const prompt = `
+You are an AI assistant specialized in extracting date and time information from Chinese text.
+The current date is ${today}.
+From the user's text, extract the specific date and time.
+Interpret relative terms like "明天", "下周三", "后天下午3点".
+If only a date is found, use 00:00 for the time.
+If only a time is found, assume the date is the current date unless specified otherwise (e.g., "明天下午").
+If a period like "下午" or "晚上" is mentioned without a specific hour, use a common representation (e.g., 下午 -> 14:00, 晚上 -> 20:00).
+Your response MUST be a single line containing EITHER:
+1. The extracted date and time in "YYYY-MM-DDTHH:mm" format.
+2. The exact string "null" if no reliable date and time can be extracted.
+Do not add any other explanations or text.
+
+User text: "${content}"
+
+Your response:
+    `;
+
+    try {
+        const response = await fetch(`${window.siyuan.config.ai.openAI.apiBaseURL}`, { // DeepSeek API endpoint
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                model: `${window.siyuan.config.ai.openAI.apiModel}`, // 替换为实际的 DeepSeek 模型名称
+                messages: [
+                    { role: "system", content: "You are an expert at parsing dates and times from Chinese text and formatting them according to instructions." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: `${window.siyuan.config.ai.openAI.apiTemperature}`,
+                max_tokens: `${window.siyuan.config.ai.openAI.apiMaxTokens}`,
+
+            }),
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            console.error(`DeepSeek API error: ${response.status} ${response.statusText}`, errorBody);
+            console.warn(`DeepSeek API error. Falling back to original parser for content: "${content}".`);
+            return runblockdata_for_time(content);
+        }
+
+        const completion = await response.json();
+        const aiResponse = completion.choices[0]?.message?.content?.trim();
+
+        if (aiResponse && aiResponse.toLowerCase() !== "null") {
+            const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+            if (dateTimeRegex.test(aiResponse)) {
+                return aiResponse;
+            } else {
+                console.warn(`DeepSeek AI returned a malformed date-time: "${aiResponse}" for content: "${content}". Falling back to original parser.`);
+                return runblockdata_for_time(content);
+            }
+        } else {
+            console.log(`DeepSeek AI could not parse date/time from content: "${content}". Falling back to original parser.`);
+            return runblockdata_for_time(content);
+        }
+
+    } catch (error) {
+        console.error("Error calling DeepSeek API:", error);
+        console.warn(`DeepSeek API call failed. Falling back to original parser for content: "${content}".`);
+        return runblockdata_for_time(content);
+    }
+}
+
