@@ -49,3 +49,17 @@ export interface ProjectData {
     tasks: Task[];
     columns: Column[];
 }
+
+
+//转换数据函数
+//将Project[]转换为
+export function convertProjectsToRecord(projects: Project[]): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const project of projects) {
+        if (project.id) {
+            result[project.id] = project.name;
+        }
+    }
+    console.log("转换后的项目数据:", result);
+    return result;
+}

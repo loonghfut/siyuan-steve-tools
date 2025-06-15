@@ -30,7 +30,7 @@ import { Dida365Service } from "./dida/dida_serv";
 
 // import { openNewWindowById } from "./myK";
 let allEvents: EventAttributes[] = [];
-
+export let DidaService: Dida365Service | null = null; 
 let this_settingdata: any = {};
 let islisten = true;
 let front: "desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile";
@@ -366,7 +366,7 @@ export class M_calendar {
         //
         //dida
         if(this_settingdata["cal-dida-enable"] && this_settingdata["cal-dida-token"]){
-            new Dida365Service(this_settingdata["cal-dida-token"]);
+            DidaService = new Dida365Service(this_settingdata["cal-dida-token"], this.plugin);
         }
         //dida
         //配置实现只在某一端上传ics

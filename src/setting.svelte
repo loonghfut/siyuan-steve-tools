@@ -5,6 +5,8 @@
     import SettingPanel from "@/libs/components/setting-panel.svelte";
     import * as myapi from "@/api";
     import { getSettings } from "./setting_data";
+    import { DidaService } from "./calendar/module-calendar";
+    import { convertProjectsToRecord } from "./calendar/dida/dida_interface";
 
     export let plugin;
     export let myfile;
@@ -442,10 +444,10 @@
                     description: "选择ics订阅导入的日记本",
                     key: "cal-ics-import-mode",
                     value: settings["cal-ics-import-mode"],
-                    options:{
+                    options: {
                         "single-document": "导入到当日日记本",
                         "daily-notes": "根据事件日期导入",
-                    }
+                    },
                 },
                 {
                     type: "textinput",
@@ -536,6 +538,20 @@
                     description: "滴答清单的API token",
                     key: "cal-dida-token",
                     value: settings["cal-dida-token"],
+                },
+                {
+                    type: "select",
+                    title: "设置未完成清单",
+                    description: "选择滴答清单的未完成清单id",
+                    key: "cal-dida-unfinished-list",
+                    value: { "": "加载中" },
+                },
+                {
+                    type: "select",
+                    title: "设置已完成清单",
+                    description: "选择滴答清单的已完成清单id",
+                    key: "cal-dida-finished-list",
+                    value: { "": "加载中" },
                 },
             ],
         },
@@ -848,6 +864,37 @@
                     console.error("Error loading QQ calendars:", error);
                 }
             });
+             // Load Dida lists asynchronously
+            Promise.resolve().then(async () => {
+                try {
+                    const projects = await DidaService.getAllProjects();
+                    const projectRecords = convertProjectsToRecord(projects);
+
+                    if (projectRecords) {
+                        // Update unfinished list options
+                        const unfinishedListItem = groups[0].items.find(
+                            (item) => item.key === "cal-dida-unfinished-list",
+                        );
+                        if (unfinishedListItem) {
+                            unfinishedListItem.options = projectRecords;
+                        }
+
+                        // Update finished list options
+                        const finishedListItem = groups[0].items.find(
+                            (item) => item.key === "cal-dida-finished-list",
+                        );
+                        if (finishedListItem) {
+                            finishedListItem.options = projectRecords;
+                        }
+
+                        updateGroupItems();
+                    } else {
+                        console.warn("No Dida projects found.");
+                    }
+                } catch (error) {
+                    console.error("Error loading Dida lists:", error);
+                }
+            });
             updateGroupItems();
             await saveSettings();
         } else {
@@ -878,7 +925,7 @@
             qq邮箱日历: 4,
             订阅日历: 5,
             视图设置: 8,
-            滴答清单: 2,
+            滴答清单: 4,
             // 不限制
         },
         画板: {

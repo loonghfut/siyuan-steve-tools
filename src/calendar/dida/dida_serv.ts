@@ -1,20 +1,38 @@
 import { showMessage } from "siyuan";
 import { Dida365ApiClient } from "./dida_api";
-import { Task } from "./dida_interface";
+import { Project, Task } from "./dida_interface";
+import steveTools from "@/index";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
+    private plugin: steveTools;
 
-    constructor(token: string) {
+    constructor(token: string, plugin: steveTools) {
+        this.plugin = plugin;
         this.apiClient = new Dida365ApiClient(token);
-        if(!token || token.trim() === "") {
-            showMessage("Dida365 fallback: Token is empty or invalid.",-1, "error");
+        if (!token || token.trim() === "") {
+            showMessage("Dida365 fallback: Token is empty or invalid.", -1, "error");
             return;
         }
-
         // 初始化时可以进行一些验证或设置
         this.isTokenValid();
         console.log("Dida365Service initialized");
+        this.init();
+    }
+
+    /**
+     * 初始化 Dida365Service，进行必要的设置或验证。
+     */
+    private async init() {
+        this.plugin.addTopBar({
+            icon: "iconArrowDown",
+            title: "导入dida", // 标题可以考虑根据模式动态变化或在设置中说明
+            position: "right",
+            callback: async () => {
+                const data = await this.getAllUndoneTasks();
+                console.log("获取到的所有任务数据:", data);
+            }
+        });
     }
 
     /**
@@ -24,7 +42,7 @@ export class Dida365Service {
     async isTokenValid(): Promise<boolean> {
         try {
             const projects = await this.apiClient.getUserProjects();
-            console.log("Dida365 API Token 验证成功，获取到的项目数量:", projects ? projects.length : 0);   
+            console.log("Dida365 API Token 验证成功，获取到的项目数量:", projects ? projects.length : 0);
             return Array.isArray(projects) && projects.length > 0;
         } catch (error) {
             console.error("Dida365 API Token 验证失败:", error instanceof Error ? error.message : String(error));
@@ -76,6 +94,36 @@ export class Dida365Service {
             return taskTitle.includes(query);
         });
     }
+
+    /**
+     * 获取指定项目的所有任务。
+     * @param projectId 项目ID。
+     * @returns Promise<Task[]> 返回该项目下的所有任务。
+     */
+    async getTasksByProject(projectId: string): Promise<Task[]> {
+        try {
+            const projectData = await this.apiClient.getProjectWithData(projectId);
+            return projectData ? projectData.tasks : [];
+        } catch (error) {
+            console.error(`获取项目 ${projectId} 的任务失败:`, error instanceof Error ? error.message : String(error));
+            return [];
+        }
+    }
+    /**
+     * 获取所有项目。
+     * @returns Promise<Project[]> 返回所有项目的数组。
+     */
+    async getAllProjects(): Promise<Project[]> {
+        try {
+            const projects = await this.apiClient.getUserProjects();
+            return projects || [];
+        } catch (error) {
+            console.error("获取所有项目失败:", error instanceof Error ? error.message : String(error));
+            return [];
+        }
+    }
+
+
 
     /**
      * 获取底层的 Dida365ApiClient 实例，以便直接调用其方法。

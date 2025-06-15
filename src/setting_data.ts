@@ -40,6 +40,8 @@ export const defaultSettings = {
     //// dida子模块
     "cal-dida-enable": false,
     "cal-dida-token": "",
+    "cal-dida-unfinished-list": "",
+    "cal-dida-finished-list": "",
     //// s3子模块
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId": "",
