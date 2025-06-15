@@ -32,7 +32,7 @@ import { M_imageCompression } from "./ImageCompression/module-imageCompression";
 import { M_lifelog } from "./lifelog/module-lifelog";
 
 // import * as api from "@/api"
-import SettingExample from "@/setting-example.svelte";
+import SettingExample from "@/setting.svelte";
 
 export let frontEnd;
 

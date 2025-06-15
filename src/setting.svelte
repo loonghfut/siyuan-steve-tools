@@ -4,7 +4,7 @@
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
     import * as myapi from "@/api";
-    import { getSettings } from "./calsettings";
+    import { getSettings } from "./setting_data";
 
     export let plugin;
     export let myfile;
@@ -34,6 +34,7 @@
                 "qq邮箱日历",
                 "订阅日历",
                 "视图设置",
+                "滴答清单",
             ],
             activeSubGroup: "基础设置",
             items: [
@@ -522,6 +523,20 @@
                         yearkanban: "YearKanban",
                     },
                 },
+                {
+                    type: "checkbox",
+                    title: "启用滴答清单同步",
+                    description: "启用后可以同步滴答清单的任务",
+                    key: "cal-dida-enable",
+                    value: settings["cal-dida-enable"],
+                },
+                {
+                    type: "textinput",
+                    title: "滴答清单token",
+                    description: "滴答清单的API token",
+                    key: "cal-dida-token",
+                    value: settings["cal-dida-token"],
+                },
             ],
         },
         {
@@ -863,6 +878,7 @@
             qq邮箱日历: 4,
             订阅日历: 5,
             视图设置: 8,
+            滴答清单: 2,
             // 不限制
         },
         画板: {

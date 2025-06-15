@@ -24,6 +24,7 @@ import { ICSSubscription } from "./share/ics_discribe";
 import { Calendar } from "@fullcalendar/core";
 import { insertHtml, THIS } from "./insertHtml";
 import { ICSImporter } from "./ics/ics_siyuan";
+import { Dida365Service } from "./dida/dida_serv";
 
 
 
@@ -355,9 +356,6 @@ export class M_calendar {
 
     async onLayoutReady() {
         this.plugin.eventBus.on('switch-protyle', (e) => {
-            // console.log("切换思源块:", e);
-            // this.currentid = e.detail.protyle.block.rootID;
-            // console.log(this.currentid);
             addquikaddButton(e);
         });
 
@@ -366,6 +364,11 @@ export class M_calendar {
             run("1");
         }
         //
+        //dida
+        if(this_settingdata["cal-dida-enable"] && this_settingdata["cal-dida-token"]){
+            new Dida365Service(this_settingdata["cal-dida-token"]);
+        }
+        //dida
         //配置实现只在某一端上传ics
         const selectToPics = this_settingdata["SelectTOPics"];
         if (!selectToPics || selectToPics === frontEnd) {

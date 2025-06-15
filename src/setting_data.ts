@@ -37,6 +37,9 @@ export const defaultSettings = {
     "cal-share": "",
     "cal-qq-calendar-url": "",
     "cal-qq-enable": false,
+    //// dida子模块
+    "cal-dida-enable": false,
+    "cal-dida-token": "",
     //// s3子模块
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId": "",
