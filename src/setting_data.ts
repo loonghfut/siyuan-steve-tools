@@ -42,6 +42,7 @@ export const defaultSettings = {
     "cal-dida-token": "",
     "cal-dida-unfinished-list": "",
     "cal-dida-finished-list": "",
+    "cal-dida-db-id": "", // 新增滴答清单同步数据库id
     //// s3子模块
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId": "",

@@ -553,6 +553,13 @@
                     key: "cal-dida-finished-list",
                     value: { "": "加载中" },
                 },
+                {
+                    type:"textinput",
+                    title: "滴答清单同步数据库id",
+                    description: "滴答清单同步的数据库id",
+                    key: "cal-dida-db-id",
+                    value: settings["cal-dida-db-id"],
+                }
             ],
         },
         {
@@ -925,7 +932,7 @@
             qq邮箱日历: 4,
             订阅日历: 5,
             视图设置: 8,
-            滴答清单: 4,
+            滴答清单: 5,
             // 不限制
         },
         画板: {

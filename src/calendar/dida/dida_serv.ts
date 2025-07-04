@@ -1,11 +1,14 @@
 import { showMessage } from "siyuan";
 import { Dida365ApiClient } from "./dida_api";
 import { Project, Task } from "./dida_interface";
-import steveTools from "@/index";
+import steveTools, { settingdata } from "@/index";
+import { getViewId, getViewValue } from "../myF";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, updateAttrViewCell_pro, updatemainkey } from "@/api";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
+    private avId: string | null = null; // 用于存储滴答清单同步的数据库ID
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -29,11 +32,377 @@ export class Dida365Service {
             title: "导入dida", // 标题可以考虑根据模式动态变化或在设置中说明
             position: "right",
             callback: async () => {
-                const data = await this.getAllUndoneTasks();
+                const data = await this.getAllTasks();
                 console.log("获取到的所有任务数据:", data);
+                await this.syncTasksToSiyuan();
             }
         });
+        await this.init_av();
     }
+    private async init_av() {
+        this.avId = settingdata["cal-dida-db-id"]
+        if (!this.avId || this.avId.trim() === "") {
+            showMessage("Dida365Service: avId is not set or is empty.");
+            return;
+        }
+        const data = await getViewId([this.avId]);
+        console.log("获取到的 avId 数据:", data);
+        const viewValue = await getViewValue(data);
+        console.log("获取到的 avId 对应的值:", viewValue);
+
+    }
+    async syncTasksToSiyuan(): Promise<void> {
+        try {
+            // 获取滴答清单的所有任务
+            const didaTasks = await this.getAllTasks();
+
+            // 获取思源数据库的现有数据
+            if (!this.avId) {
+                showMessage("数据库ID未设置，无法同步", -1, "error");
+                return;
+            }
+
+            const data = await getViewId([this.avId]);
+            const viewValue = await getViewValue(data);
+
+            if (!viewValue || !Array.isArray(viewValue) || viewValue.length === 0) {
+                showMessage("无法获取数据库视图数据", -1, "error");
+                return;
+            }
+
+            const viewData = viewValue[0];
+            const existingTasks = viewData.data || [];
+
+            // 创建现有任务的映射表（基于事件标题）
+            const existingTasksMap = new Map();
+            existingTasks.forEach((task: any) => {
+                if (task.事件?.content) {
+                    existingTasksMap.set(task.事件.content, task);
+                }
+            });
+
+            let syncCount = 0;
+            let updateCount = 0;
+
+            // 处理每个滴答清单任务
+            for (const didaTask of didaTasks) {
+                if (!didaTask.title) continue;
+
+                const existingTask = existingTasksMap.get(didaTask.title);
+
+                // 构建任务数据
+                const taskData = this.buildTaskData(didaTask, existingTask);
+
+                if (existingTask) {
+                    // 更新现有任务
+                    await this.updateSiyuanTask(existingTask, taskData);
+                    updateCount++;
+                } else {
+                    // 创建新任务
+                    await this.createSiyuanTask(taskData);
+                    syncCount++;
+                }
+            }
+
+            showMessage(`同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`, 3000);
+
+        } catch (error) {
+            console.error("同步滴答清单任务失败:", error);
+            showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error");
+        }
+    }
+
+    /**
+     * 构建任务数据
+     */
+    private buildTaskData(didaTask: Task, existingTask?: any) {
+        // 转换优先级
+        const getPriority = (priority: number) => {
+            switch (priority) {
+                case 0: return "无";
+                case 1: return "低";
+                case 3: return "中";
+                case 5: return "高";
+                default: return "无";
+            }
+        };
+
+        // 转换状态
+        const getStatus = (status: number) => {
+            return status === 0 ? "todo" : "done";
+        };
+
+        // 转换时间
+        const getTimeRange = (dueDate?: string, startDate?: string) => {
+            let start: number | undefined;
+            let end: number | undefined;
+
+            if (startDate) {
+                start = new Date(startDate).getTime();
+            }
+            if (dueDate) {
+                end = new Date(dueDate).getTime();
+            }
+
+            return { start, end, hasEndDate: !!end };
+        };
+
+        const timeRange = getTimeRange(didaTask.dueDate, didaTask.startDate);
+
+        return {
+            事件: {
+                content: didaTask.title || "",
+                keyID: existingTask?.事件?.keyID
+            },
+            开始时间: timeRange.start || timeRange.end ? {
+                start: timeRange.start,
+                end: timeRange.end,
+                hasEndDate: timeRange.hasEndDate,
+                keyID: existingTask?.开始时间?.keyID
+            } : undefined,
+            优先级: {
+                content: getPriority(didaTask.priority || 0),
+                keyID: existingTask?.优先级?.keyID
+            },
+            状态: {
+                content: getStatus(didaTask.status || 0),
+                keyID: existingTask?.状态?.keyID
+            },
+            描述: {
+                content: didaTask.content || "",
+                keyID: existingTask?.描述?.keyID
+            }
+        };
+    }
+    /**
+     * 创建思源笔记任务
+     */
+    private async createSiyuanTask(taskData: any): Promise<void> {
+        try {
+            if (!this.avId) {
+                console.error("数据库ID未设置");
+                return;
+            }
+
+            // 创建一个新的块
+            const blockId = await generateSiyuanID() as string;
+            
+            // 根据配置确定创建位置
+            let targetId;
+            if (settingdata["cal-create-for-date"]) {
+                // 创建到日记中
+                const today = new Date();
+                targetId = await this.createDailynote(settingdata["cal-create-pos"], today);
+            } else {
+                // 创建到指定位置
+                targetId = (await createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"])).id;
+            }
+
+            if (!targetId) {
+                console.error("无法确定创建位置");
+                return;
+            }
+
+            // 创建块内容
+            const statusCustomAttr = taskData.状态?.content === "done" ? "done" : "todo";
+            await appendBlock(
+                "markdown", 
+                `{{{row
+${taskData.事件?.content || "新建任务"}
+
+{: id="${await generateSiyuanID() as string}"}
+
+{: id="${await generateSiyuanID() as string}"}
+}}}
+{: id="${blockId}" custom-st-event="${statusCustomAttr}"}`, 
+                targetId
+            );
+
+            // 添加到数据库
+            await addBlockToDatabase_pro(blockId, this.avId);
+
+            // 获取 viewValue 用于获取 keyID
+            const data = await getViewId([this.avId]);
+            const viewValue = await getViewValue(data);
+
+            // 更新各个字段
+            await this.updateTaskFields(blockId, taskData, viewValue);
+
+            console.log("成功创建新任务:", taskData.事件?.content);
+
+        } catch (error) {
+            console.error("创建思源任务失败:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * 更新思源笔记任务
+     */
+    private async updateSiyuanTask(existingTask: any, newTaskData: any): Promise<void> {
+        try {
+            if (!this.avId || !existingTask.事件?.id) {
+                console.error("缺少必要的ID信息");
+                return;
+            }
+
+            const blockId = existingTask.事件.id;
+
+            // 获取 viewValue 用于获取 keyID
+            const data = await getViewId([this.avId]);
+            const viewValue = await getViewValue(data);
+
+            // 更新各个字段
+            await this.updateTaskFields(blockId, newTaskData, viewValue);
+
+            // 更新块的自定义属性（状态）
+            const statusCustomAttr = newTaskData.状态?.content === "done" ? "done" : "todo";
+            await setBlockAttrs(blockId, {
+                "custom-st-event": statusCustomAttr
+            });
+
+            console.log("成功更新任务:", newTaskData.事件?.content);
+
+        } catch (error) {
+            console.error("更新思源任务失败:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * 更新任务字段的通用方法
+     */
+    private async updateTaskFields(blockId: string, taskData: any, viewValue: any): Promise<void> {
+        try {
+            // 获取各字段的 keyID
+            const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', this.avId);
+            const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间', this.avId);
+            const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级', this.avId);
+            const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态', this.avId);
+            const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
+
+            // 更新事件标题
+            if (eventKeyID && taskData.事件?.content) {
+                await updatemainkey({
+                    avID: this.avId,
+                    blockID: blockId,
+                    keyID: eventKeyID,
+                    content: taskData.事件.content,
+                });
+            }
+
+            // 更新开始时间
+            if (timeKeyID && taskData.开始时间) {
+                const timeValue = this.formatTimeForSiyuan(taskData.开始时间);
+                await updateAttrViewCell_pro(
+                    blockId, 
+                    this.avId, 
+                    timeKeyID, 
+                    timeValue, 
+                    "date"
+                );
+            }
+
+            // 更新优先级
+            if (priorityKeyID && taskData.优先级?.content) {
+                const priorityData = [{ content: taskData.优先级.content }];
+                await updateAttrViewCell_pro(
+                    blockId, 
+                    this.avId, 
+                    priorityKeyID, 
+                    priorityData, 
+                    "select"
+                );
+            }
+
+            // 更新状态
+            if (statusKeyID && taskData.状态?.content) {
+                const statusData = [{ content: taskData.状态.content }];
+                await updateAttrViewCell_pro(
+                    blockId, 
+                    this.avId, 
+                    statusKeyID, 
+                    statusData, 
+                    "select"
+                );
+            }
+
+            // 更新描述
+            if (descKeyID && taskData.描述?.content) {
+                await updateAttrViewCell_pro(
+                    blockId, 
+                    this.avId, 
+                    descKeyID, 
+                    taskData.描述.content, 
+                    "text"
+                );
+            }
+
+        } catch (error) {
+            console.error("更新任务字段失败:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * 格式化时间为思源笔记所需格式
+     */
+    private formatTimeForSiyuan(timeData: any): string {
+        if (!timeData) return "";
+
+        if (timeData.start) {
+            const startDate = new Date(timeData.start);
+            let result = startDate.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+
+            if (timeData.end && timeData.hasEndDate) {
+                const endDate = new Date(timeData.end);
+                result += ` - ${endDate.toISOString().slice(0, 16)}`;
+            }
+
+            return result;
+        }
+
+        return "";
+    }
+
+    /**
+     * 获取字段的 keyID（从 viewValue 中）
+     */
+    private async getKeyIDfromViewValue(viewValue: any, fieldName: string, dbId: string): Promise<string | null> {
+        try {
+            if (!viewValue || !Array.isArray(viewValue) || viewValue.length === 0) {
+                return null;
+            }
+
+            const viewData = viewValue[0];
+            if (!viewData.data || !Array.isArray(viewData.data) || viewData.data.length === 0) {
+                return null;
+            }
+
+            // 从第一条数据中获取字段的 keyID
+            const firstRecord = viewData.data[0];
+            if (firstRecord[fieldName] && firstRecord[fieldName].keyID) {
+                return firstRecord[fieldName].keyID;
+            }
+
+            return null;
+        } catch (error) {
+            console.error(`获取字段 ${fieldName} 的 keyID 失败:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * 创建日记（如果需要）
+     */
+    private async createDailynote(parentId: string, date: Date): Promise<string> {
+        // 这里需要根据您的日记创建逻辑来实现
+        // 暂时使用简单的创建方式
+        return (await createDailyNote(window.siyuan.ws.app.appId, parentId)).id;
+    }
+
+
+
 
     /**
      * 检测 Dida365 API Token 是否有效。
@@ -54,7 +423,7 @@ export class Dida365Service {
      * 注意：此方法会为每个项目单独调用一次API以获取其任务数据。
      * @returns Promise<Task[]> 一个包含所有未完成任务的数组。
      */
-    async getAllUndoneTasks(): Promise<Task[]> {
+    async getAllTasks(): Promise<Task[]> {
         const allTasks: Task[] = [];
         const projects = await this.apiClient.getUserProjects();
 
@@ -77,7 +446,6 @@ export class Dida365Service {
         }
         return allTasks;
     }
-
     /**
      * 在所有未完成任务中按标题搜索任务。
      * @param titleQuery 要搜索的标题关键词。
@@ -85,7 +453,7 @@ export class Dida365Service {
      * @returns Promise<Task[]> 匹配的任务数组。
      */
     async findTasksByTitle(titleQuery: string, caseSensitive: boolean = false): Promise<Task[]> {
-        const allUndoneTasks = await this.getAllUndoneTasks();
+        const allUndoneTasks = await this.getAllTasks();
         const query = caseSensitive ? titleQuery : titleQuery.toLowerCase();
 
         return allUndoneTasks.filter(task => {
@@ -94,7 +462,6 @@ export class Dida365Service {
             return taskTitle.includes(query);
         });
     }
-
     /**
      * 获取指定项目的所有任务。
      * @param projectId 项目ID。
@@ -122,9 +489,6 @@ export class Dida365Service {
             return [];
         }
     }
-
-
-
     /**
      * 获取底层的 Dida365ApiClient 实例，以便直接调用其方法。
      * @returns Dida365ApiClient 实例。
