@@ -317,8 +317,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     const isAllDay =
                         // !endDate ||
                         (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
-                            (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
-                        (endDate && startDate.getTime() === endDate.getTime());
+                            (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0)));
+                            
                     let kramdown = "";
                     if (item['主事件']?.content || false) {
                         kramdown = (await api.getBlockKramdown(eventId)).kramdown;

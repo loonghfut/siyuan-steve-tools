@@ -13,6 +13,7 @@ export class Dida365Service {
     private todoListId: string | null = null; // 用于存储未完成任务列表ID
     private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
     private taskCache: Map<string, Task> = new Map(); // 新增：用于缓存滴答任务
+    private isSyncing = false; // 新增同步锁
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -62,6 +63,7 @@ export class Dida365Service {
 
 
     async syncTasksToSiyuan(): Promise<void> {
+        this.isSyncing = true; // 开始同步，锁定
         try {
             // 获取滴答清单的所有任务
             const didaTasks = await this.getAllTasks();
@@ -119,6 +121,8 @@ export class Dida365Service {
         } catch (error) {
             console.error("同步滴答清单任务失败:", error);
             showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error");
+        } finally {
+            this.isSyncing = false; // 同步结束，解锁
         }
     }
 
@@ -459,10 +463,16 @@ ${taskData.事件?.content || "新建任务"}
      */
     private setupSiyuanUpdateListener(): void {
         this.plugin.eventBus.on("ws-main", (e) => {
-            setTimeout(() => {
-                this.handleSiyuanUpdate(e);
-            }, 2000); // 延迟2秒
+            if (!this.isSyncing) {
+                this.handleSiyuanUpdate_dalay(e);
+            }
         });
+    }
+
+    private async handleSiyuanUpdate_dalay(e) {
+        setTimeout(() => {
+            this.handleSiyuanUpdate(e);
+        }, 3000); // 延迟3秒
     }
 
     /**
@@ -471,7 +481,6 @@ ${taskData.事件?.content || "新建任务"}
     private handleSiyuanUpdate = async (e: any) => {
         const msg = e.detail;
         if (msg.cmd !== "transactions") return;
-
         const operation = msg.data?.[0]?.doOperations?.[0];
         if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs")) {
             return;
@@ -520,11 +529,13 @@ ${taskData.事件?.content || "新建任务"}
                 }
                 if (siyuanTask.开始时间) {
                     updatePayload.startDate = siyuanTask.开始时间.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined;
-                    updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined;
-                    updatePayload.isAllDay = false;
+                    // updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
+                    // updatePayload.isAllDay = false;
+                    updatePayload.timeZone = "Asia/Shanghai"; 
                 } else {
                     updatePayload.startDate = undefined;
                     updatePayload.dueDate = undefined;
+                    updatePayload.timeZone = "Asia/Shanghai";
                 }
                 if (siyuanTask.状态?.content) {
                     const targetProjectId = siyuanTask.状态.content === 'done' ? this.doneListId : this.todoListId;
