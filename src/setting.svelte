@@ -559,6 +559,25 @@
                     description: "滴答清单同步的数据库id",
                     key: "cal-dida-db-id",
                     value: settings["cal-dida-db-id"],
+                },
+                {
+                    type: "select",
+                    title: "滴答清单同步模式",
+                    description: "选择滴答清单同步的模式",
+                    key: "cal-dida-sync-mode",
+                    value: settings["cal-dida-sync-mode"],
+                    options: {
+                        "auto": "自动同步",
+                        "manual": "手动同步",
+                        "all": "自动+手动同步",
+                    },
+                },
+                {
+                    type: "number",
+                    title: "自动同步间隔",
+                    description: "滴答清单自动同步的时间间隔(单位：分钟)",
+                    key: "cal-dida-sync-interval",
+                    value: settings["cal-dida-sync-interval"],
                 }
             ],
         },
@@ -932,7 +951,7 @@
             qq邮箱日历: 4,
             订阅日历: 5,
             视图设置: 8,
-            滴答清单: 5,
+            滴答清单: 7,
             // 不限制
         },
         画板: {

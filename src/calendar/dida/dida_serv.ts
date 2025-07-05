@@ -34,16 +34,26 @@ export class Dida365Service {
      * 初始化 Dida365Service，进行必要的设置或验证。
      */
     private async init() {
-        this.plugin.addTopBar({
-            icon: "iconArrowDown",
-            title: "导入dida", // 标题可以考虑根据模式动态变化或在设置中说明
-            position: "right",
-            callback: async () => {
-                // const data = await this.getAllTasks();
-                // console.log("获取到的所有任务数据:", data);
-                await this.syncTasksToSiyuan();
-            }
-        });
+        if (settingdata["cal-dida-sync-mode"] === "all" || settingdata["cal-dida-sync-mode"] === "manual") {
+            this.plugin.addTopBar({
+                icon: "iconMp",
+                title: "导入滴答清单数据", // 标题可以考虑根据模式动态变化或在设置中说明
+                position: "right",
+                callback: async () => {
+                    // const data = await this.getAllTasks();
+                    // console.log("获取到的所有任务数据:", data);
+                    await this.syncTasksToSiyuan();
+                }
+            });
+        };
+        if (settingdata["cal-dida-sync-mode"] === "auto" || settingdata["cal-dida-sync-mode"] === "all") {
+            // 自动同步模式，设置定时器
+            setInterval(async () => {
+                if (!this.isSyncing) { // 仅在未同步时执行
+                    await this.syncTasksToSiyuan();
+                }
+            }, settingdata["cal-dida-sync-interval"] * 60 * 1000); // 转换为毫秒
+        };
         await this.init_av();
         await this.getAllTasks(); // 初始化时加载滴答任务缓存
         this.setupSiyuanUpdateListener(); // 2025/7/5新增：设置思源更新监听器
@@ -272,6 +282,7 @@ export class Dida365Service {
 ${taskData.事件?.content || "新建任务"}
 
 {: id="${await generateSiyuanID() as string}"}
+${taskData.描述?.content || "描述"}
 
 {: id="${await generateSiyuanID() as string}"}
 }}}
@@ -531,7 +542,7 @@ ${taskData.事件?.content || "新建任务"}
                     updatePayload.startDate = siyuanTask.开始时间.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined;
                     // updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
                     // updatePayload.isAllDay = false;
-                    updatePayload.timeZone = "Asia/Shanghai"; 
+                    updatePayload.timeZone = "Asia/Shanghai";
                 } else {
                     updatePayload.startDate = undefined;
                     updatePayload.dueDate = undefined;

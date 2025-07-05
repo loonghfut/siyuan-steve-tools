@@ -43,6 +43,8 @@ export const defaultSettings = {
     "cal-dida-unfinished-list": "",
     "cal-dida-finished-list": "",
     "cal-dida-db-id": "", // 新增滴答清单同步数据库id
+    "cal-dida-sync-mode": "auto", 
+    "cal-dida-sync-interval": 5, // 同步间隔时间（分钟）
     //// s3子模块
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId": "",
