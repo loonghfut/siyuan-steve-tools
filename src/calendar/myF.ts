@@ -103,140 +103,158 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
 
 
 function extractDataFromTable(data: any, isZQ = false) {
-    // 数据有效性检查
-    if (!data || !data.columns || !Array.isArray(data.columns) || !data.rows) {
-        console.warn('Invalid data structure received:', data);
+    const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
+    const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
+
+    if (!isGalleryView && !isTableView) {
+        console.warn('Invalid or unrecognized data structure received:', data);
         return [];
     }
 
     // 1. 创建字段映射
-    const columnMap = new Map();
-    try {
-        data.columns.forEach((col: any, index: number) => {
-            if (col && col.name) {
-                columnMap.set(col.name, {
-                    index: index,
-                    id: col.id
-                });
-            }
-        });
+    const fieldMap = new Map();
+    const fields = isGalleryView ? data.fields : data.columns;
+    fields.forEach((field: any, index: number) => {
+        if (field && field.name) {
+            fieldMap.set(field.name, {
+                id: field.id,
+                index: index // index is for Table view
+            });
+        }
+    });
 
-        // 2. 提取数据
-        const result = data.rows.map((row: any) => {
+    // 2. 提取数据
+    const items = isGalleryView ? data.cards : data.rows;
+    if (!items || !Array.isArray(items)) {
+        return [];
+    }
+
+    try {
+        const result = items.map((item: any) => {
             const rowData: any = {};
+            let getCell;
+
+            if (isGalleryView) {
+                // For Gallery view, create a map from keyID to value for quick lookup
+                const valueMap = new Map();
+                item.values.forEach((v: any) => {
+                    if (v.value?.keyID) {
+                        valueMap.set(v.value.keyID, v.value);
+                    }
+                });
+                getCell = (fieldName: string) => {
+                    const field = fieldMap.get(fieldName);
+                    return field ? valueMap.get(field.id) : undefined;
+                };
+            } else { // isTableView
+                // For Table view, get cell by index
+                getCell = (fieldName: string) => {
+                    const field = fieldMap.get(fieldName);
+                    return field && item.cells ? item.cells[field.index]?.value : undefined;
+                };
+            }
 
             try {
                 // 提取事件
-                if (columnMap.has('事件') && row.cells) {
-                    const eventCell = row.cells[columnMap.get('事件').index];
+                const eventCell = getCell('事件');
+                if (eventCell) {
                     rowData['事件'] = {
-                        content: eventCell?.value?.block?.content || '',
-                        id: eventCell?.value?.block?.id || '',
-                        keyID: eventCell?.value?.keyID || ''
+                        content: eventCell.block?.content || '',
+                        id: eventCell.block?.id || item.id || '', // Fallback to item.id for gallery
+                        keyID: eventCell.keyID || ''
                     };
                 }
 
                 // 提取开始时间
-                if (columnMap.has('开始时间') && row.cells) {
-                    const timeCell = row.cells[columnMap.get('开始时间').index];
-                    const dateValue = timeCell?.value?.date;
+                const timeCell = getCell('开始时间');
+                if (timeCell) {
+                    const dateValue = timeCell.date;
                     rowData['开始时间'] = {
                         start: dateValue?.content || null,
                         end: dateValue?.hasEndDate ? (dateValue?.content2 || null) : null,
-                        keyID: timeCell?.value?.keyID || '',
-                        hasEndDate: dateValue?.hasEndDate || false // Store the hasEndDate value
+                        keyID: timeCell.keyID || '',
+                        hasEndDate: dateValue?.hasEndDate || false
                     };
                 }
+
                 // 提取优先级
-                if (columnMap.has('优先级') && row.cells) {
-                    const priorityCell = row.cells[columnMap.get('优先级').index];
+                const priorityCell = getCell('优先级');
+                if (priorityCell) {
                     rowData['优先级'] = {
-                        content: priorityCell?.value?.mSelect?.[0]?.content || '',
-                        keyID: priorityCell?.value?.keyID || ''
+                        content: priorityCell.mSelect?.[0]?.content || '',
+                        keyID: priorityCell.keyID || ''
                     };
                 }
 
                 // 提取分类
-                if (columnMap.has('分类') && row.cells) {
-                    const categoryCell = row.cells[columnMap.get('分类').index];
+                const categoryCell = getCell('分类');
+                if (categoryCell) {
                     rowData['分类'] = {
-                        content: categoryCell?.value?.mSelect?.[0]?.content || '',
-                        keyID: categoryCell?.value?.keyID || ''
+                        content: categoryCell.mSelect?.[0]?.content || '',
+                        keyID: categoryCell.keyID || ''
                     };
                 }
 
-                // 提取子级
-                if (columnMap.has('关联') && row.cells) {
-                    const subCell = row.cells[columnMap.get('关联').index];
+                // 提取子级 (关联)
+                const subCell = getCell('关联');
+                if (subCell) {
                     rowData['子级'] = {
-                        contents: subCell?.value?.relation?.contents || '',
-                        ids: subCell?.value?.relation?.blockIDs || '',
-                        keyID: subCell?.value?.keyID || '',
+                        contents: subCell.relation?.contents || '',
+                        ids: subCell.relation?.blockIDs || '',
+                        keyID: subCell.keyID || '',
                     };
                 }
 
                 //提取是否主事件
-                if (columnMap.has('主事件') && row.cells) {
-                    const mainCell = row.cells[columnMap.get('主事件').index];
+                const mainCell = getCell('主事件');
+                if (mainCell) {
                     rowData['主事件'] = {
-                        content: mainCell?.value?.checkbox?.checked || false,
-                        keyID: mainCell?.value?.keyID || ''
+                        content: mainCell.checkbox?.checked || false,
+                        keyID: mainCell.keyID || ''
                     };
                 }
 
-                // 提取状态
+                // 提取状态或周期性事件的字段
                 if (isZQ) {
-                    if (columnMap.has('重复规则') && row.cells) {
-                        const ruleCell = row.cells[columnMap.get('重复规则').index];
-                        rowData['重复规则'] = {
-                            content: ruleCell?.value?.text?.content || '',
-                            keyID: ruleCell?.value?.keyID || ''
-                        };
-                    } else {
-                        rowData['重复规则'] = {
-                            content: '',
-                            keyID: ''
-                        };
-                    }
+                    const ruleCell = getCell('重复规则');
+                    rowData['重复规则'] = {
+                        content: ruleCell?.text?.content || '',
+                        keyID: ruleCell?.keyID || ''
+                    };
 
-                    if (columnMap.has('持续时间') && row.cells) {
-                        const numCell = row.cells[columnMap.get('持续时间').index];
-                        rowData['持续时间'] = {
-                            content: numCell?.value?.number?.content || '',
-                            keyID: numCell?.value?.keyID || ''
-                        };
-                    }
-                    if (columnMap.has('完成日期') && row.cells) {
-                        const endCell = row.cells[columnMap.get('完成日期').index];
-                        // console.log("endCell", endCell);
-                        rowData['完成日期'] = {
-                            content: endCell?.value?.text?.content || '',
-                            keyID: endCell?.value?.keyID || ''
-                        };
-                    }
+                    const numCell = getCell('持续时间');
+                    rowData['持续时间'] = {
+                        content: numCell?.number?.content || '',
+                        keyID: numCell?.keyID || ''
+                    };
 
+                    const endCell = getCell('完成日期');
+                    rowData['完成日期'] = {
+                        content: endCell?.text?.content || '',
+                        keyID: endCell?.keyID || ''
+                    };
                 } else {
-                    if (columnMap.has('状态') && row.cells) {
-                        const statusCell = row.cells[columnMap.get('状态').index];
+                    const statusCell = getCell('状态');
+                    if (statusCell) {
                         rowData['状态'] = {
-                            content: statusCell?.value?.mSelect?.[0]?.content || '',
-                            keyID: statusCell?.value?.keyID || ''
+                            content: statusCell.mSelect?.[0]?.content || '',
+                            keyID: statusCell.keyID || ''
                         };
                     }
                 }
 
                 // 提取描述
-                if (columnMap.has('描述') && row.cells) {
-                    const descCell = row.cells[columnMap.get('描述').index];
+                const descCell = getCell('描述');
+                if (descCell) {
                     rowData['描述'] = {
-                        content: descCell?.value?.text?.content || '',
-                        keyID: descCell?.value?.keyID || ''
+                        content: descCell.text?.content || '',
+                        keyID: descCell.keyID || ''
                     };
                 }
 
                 return rowData;
             } catch (error) {
-                console.error('Error processing row:', error);
+                console.error('Error processing row/card:', item, error);
                 return {};
             }
         });

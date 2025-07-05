@@ -4,6 +4,7 @@ import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, updateAttrViewCell_pro, updatemainkey } from "@/api";
+import { formatLocalDate } from "./siyuan_api";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
@@ -70,8 +71,8 @@ export class Dida365Service {
                 return;
             }
 
-            const viewData = viewValue[0];
-            const existingTasks = viewData.data || [];
+            // 遍历所有 viewValue，合并所有任务数据
+            const existingTasks = viewValue.flatMap(view => view.data || []);
 
             // 创建现有任务的映射表（基于事件标题）
             const existingTasksMap = new Map();
@@ -89,14 +90,14 @@ export class Dida365Service {
                 if (!didaTask.title) continue;
 
                 const existingTask = existingTasksMap.get(didaTask.title);
-
-                // 构建任务数据
                 const taskData = this.buildTaskData(didaTask, existingTask);
 
                 if (existingTask) {
-                    // 更新现有任务
-                    await this.updateSiyuanTask(existingTask, taskData);
-                    updateCount++;
+                    // 比较任务数据，仅在有变化时更新
+                    if (this.isTaskChanged(taskData, existingTask)) {
+                        await this.updateSiyuanTask(existingTask, taskData);
+                        updateCount++;
+                    }
                 } else {
                     // 创建新任务
                     await this.createSiyuanTask(taskData);
@@ -110,6 +111,36 @@ export class Dida365Service {
             console.error("同步滴答清单任务失败:", error);
             showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error");
         }
+    }
+
+    /**
+     * 比较新旧任务数据是否有变化
+     */
+    private isTaskChanged(newTaskData: any, oldSiyuanTask: any): boolean {
+        // 比较优先级
+        // console.log("比较事件", newTaskData, oldSiyuanTask);
+        if (newTaskData.优先级.content !== oldSiyuanTask.优先级?.content) {
+            console.log("优先级变化", newTaskData.优先级.content, oldSiyuanTask.优先级?.content);
+            return true;
+        }
+        // 比较状态
+        if (newTaskData.状态.content !== oldSiyuanTask.状态?.content) {
+            console.log("状态变化", newTaskData.状态.content, oldSiyuanTask.状态?.content);
+            return true;
+        }
+        // 比较描述
+        if ((newTaskData.描述.content || "") !== (oldSiyuanTask.描述?.content || "")) {
+            console.log("描述变化", newTaskData.描述.content, oldSiyuanTask.描述?.content);
+            return true;
+        }
+        // 比较时间
+        const newTime = newTaskData.开始时间;
+        const oldTime = oldSiyuanTask.开始时间;
+        if (newTime?.start !== oldTime?.start || newTime?.end !== oldTime?.end) {
+            console.log("时间变化", newTime, oldTime);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -186,7 +217,7 @@ export class Dida365Service {
 
             // 创建一个新的块
             const blockId = await generateSiyuanID() as string;
-            
+
             // 根据配置确定创建位置
             let targetId;
             if (settingdata["cal-create-for-date"]) {
@@ -206,7 +237,7 @@ export class Dida365Service {
             // 创建块内容
             const statusCustomAttr = taskData.状态?.content === "done" ? "done" : "todo";
             await appendBlock(
-                "markdown", 
+                "markdown",
                 `{{{row
 ${taskData.事件?.content || "新建任务"}
 
@@ -214,7 +245,7 @@ ${taskData.事件?.content || "新建任务"}
 
 {: id="${await generateSiyuanID() as string}"}
 }}}
-{: id="${blockId}" custom-st-event="${statusCustomAttr}"}`, 
+{: id="${blockId}" custom-st-event="${statusCustomAttr}"}`,
                 targetId
             );
 
@@ -293,24 +324,29 @@ ${taskData.事件?.content || "新建任务"}
 
             // 更新开始时间
             if (timeKeyID && taskData.开始时间) {
-                const timeValue = this.formatTimeForSiyuan(taskData.开始时间);
-                await updateAttrViewCell_pro(
-                    blockId, 
-                    this.avId, 
-                    timeKeyID, 
-                    timeValue, 
-                    "date"
-                );
+                const startTime = formatLocalDate(taskData.开始时间.start);
+                const endTime = taskData.开始时间.end && taskData.开始时间.hasEndDate ? formatLocalDate(taskData.开始时间.end) : undefined;
+
+                if (startTime) {
+                    await updateAttrViewCell_pro(
+                        blockId,
+                        this.avId,
+                        timeKeyID,
+                        startTime,
+                        "date",
+                        endTime
+                    );
+                }
             }
 
             // 更新优先级
             if (priorityKeyID && taskData.优先级?.content) {
                 const priorityData = [{ content: taskData.优先级.content }];
                 await updateAttrViewCell_pro(
-                    blockId, 
-                    this.avId, 
-                    priorityKeyID, 
-                    priorityData, 
+                    blockId,
+                    this.avId,
+                    priorityKeyID,
+                    priorityData,
                     "select"
                 );
             }
@@ -319,10 +355,10 @@ ${taskData.事件?.content || "新建任务"}
             if (statusKeyID && taskData.状态?.content) {
                 const statusData = [{ content: taskData.状态.content }];
                 await updateAttrViewCell_pro(
-                    blockId, 
-                    this.avId, 
-                    statusKeyID, 
-                    statusData, 
+                    blockId,
+                    this.avId,
+                    statusKeyID,
+                    statusData,
                     "select"
                 );
             }
@@ -330,10 +366,10 @@ ${taskData.事件?.content || "新建任务"}
             // 更新描述
             if (descKeyID && taskData.描述?.content) {
                 await updateAttrViewCell_pro(
-                    blockId, 
-                    this.avId, 
-                    descKeyID, 
-                    taskData.描述.content, 
+                    blockId,
+                    this.avId,
+                    descKeyID,
+                    taskData.描述.content,
                     "text"
                 );
             }
@@ -344,26 +380,6 @@ ${taskData.事件?.content || "新建任务"}
         }
     }
 
-    /**
-     * 格式化时间为思源笔记所需格式
-     */
-    private formatTimeForSiyuan(timeData: any): string {
-        if (!timeData) return "";
-
-        if (timeData.start) {
-            const startDate = new Date(timeData.start);
-            let result = startDate.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
-
-            if (timeData.end && timeData.hasEndDate) {
-                const endDate = new Date(timeData.end);
-                result += ` - ${endDate.toISOString().slice(0, 16)}`;
-            }
-
-            return result;
-        }
-
-        return "";
-    }
 
     /**
      * 获取字段的 keyID（从 viewValue 中）
