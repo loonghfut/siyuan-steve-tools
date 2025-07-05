@@ -38,3 +38,25 @@ export const formatLocalDate = (timestamp: number) => {
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
+
+// 辅助函数：将时间戳格式化为滴答API要求的格式 (e.g., "2019-11-13T03:00:00+0800")
+export const formatDateForDida = (timestamp: number): string | undefined => {
+    if (!timestamp) return undefined;
+
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+
+    const offsetMinutes = date.getTimezoneOffset();
+    const offsetSign = offsetMinutes <= 0 ? '+' : '-';
+    const offsetHours = Math.abs(offsetMinutes / 60);
+    const offsetPaddedHours = Math.floor(offsetHours).toString().padStart(2, '0');
+    const offsetPaddedMinutes = (Math.abs(offsetMinutes) % 60).toString().padStart(2, '0');
+    const timezoneOffset = `${offsetSign}${offsetPaddedHours}${offsetPaddedMinutes}`;
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${timezoneOffset}`;
+};

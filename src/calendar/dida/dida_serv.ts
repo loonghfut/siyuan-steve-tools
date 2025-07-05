@@ -4,7 +4,7 @@ import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, updateAttrViewCell_pro, updatemainkey } from "@/api";
-import { formatLocalDate } from "./siyuan_api";
+import { formatDateForDida, formatLocalDate } from "./siyuan_api";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
@@ -12,6 +12,7 @@ export class Dida365Service {
     private avId: string | null = null; // 用于存储滴答清单同步的数据库ID
     private todoListId: string | null = null; // 用于存储未完成任务列表ID
     private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
+    private taskCache: Map<string, Task> = new Map(); // 新增：用于缓存滴答任务
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -24,7 +25,7 @@ export class Dida365Service {
         }
         // 初始化时可以进行一些验证或设置
         this.isTokenValid();
-        console.log("Dida365Service initialized",this.doneListId, this.todoListId);
+        console.log("Dida365Service initialized", this.doneListId, this.todoListId);
         this.init();
     }
 
@@ -43,6 +44,7 @@ export class Dida365Service {
             }
         });
         await this.init_av();
+        this.setupSiyuanUpdateListener(); // 2025/7/5新增：设置思源更新监听器
     }
     private async init_av() {
         this.avId = settingdata["cal-dida-db-id"]
@@ -56,6 +58,8 @@ export class Dida365Service {
         console.log("获取到的 avId 对应的值:", viewValue);
 
     }
+
+
     async syncTasksToSiyuan(): Promise<void> {
         try {
             // 获取滴答清单的所有任务
@@ -153,10 +157,10 @@ export class Dida365Service {
         const oldEnd = oldTime?.end || null;
 
         if (newStart !== oldStart || newEnd !== oldEnd) {
-            console.log("时间变化", {start: newStart, end: newEnd}, {start: oldStart, end: oldEnd});
+            console.log("时间变化", { start: newStart, end: newEnd }, { start: oldStart, end: oldEnd });
             return true;
         }
-        
+
         return false;
     }
 
@@ -449,9 +453,106 @@ ${taskData.事件?.content || "新建任务"}
         // 暂时使用简单的创建方式
         return (await createDailyNote(window.siyuan.ws.app.appId, parentId)).id;
     }
+    /**
+         * 设置思源数据库更新的监听器，以实现从思源到滴答清单的同步。
+     */
+    private setupSiyuanUpdateListener(): void {
+        this.plugin.eventBus.on("ws-main", this.handleSiyuanUpdate);
+    }
 
+    /**
+     * 处理来自思源 WebSocket 的消息，判断是否需要更新滴答任务。
+     */
+    private handleSiyuanUpdate = async (e: any) => {
+        const msg = e.detail;
+        if (msg.cmd !== "transactions") return;
 
+        const operation = msg.data?.[0]?.doOperations?.[0];
+        if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs")) {
+            return;
+        }
 
+        // 检查是否是我们正在监听的数据库
+        if (operation.avID !== this.avId) {
+            return;
+        }
+
+        const blockId = operation.rowID;
+        if (!blockId) return;
+
+        try {
+            // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
+            const viewData = await getViewValue([{ rootid: this.avId, viewId: '', name: '' }]);
+            const allTasks = viewData.flatMap(view => view.data || []);
+            const siyuanTask = allTasks.find((task: any) => task.事件?.id === blockId);
+
+            if (!siyuanTask || !siyuanTask.didaID?.content) {
+                return;
+            }
+
+            const didaTaskId = siyuanTask.didaID.content;
+            // 从缓存中获取任务的 projectId
+            const cachedTask = this.taskCache.get(didaTaskId);
+            if (!cachedTask) {
+                console.warn(`任务 ${didaTaskId} 不在缓存中，无法反向同步。`);
+                return;
+            }
+            const currentProjectId = cachedTask.projectId;
+
+            // 2. 构建要发送到滴答清单的更新数据
+            const updatePayload: Partial<Task> = {};
+
+            // 3. 转换思源数据到滴答格式
+            if (siyuanTask.事件?.content) {
+                updatePayload.title = siyuanTask.事件.content;
+            }
+            if (siyuanTask.描述?.content) {
+                updatePayload.content = siyuanTask.描述.content;
+            }
+            if (siyuanTask.优先级?.content) {
+                const priorityMap: { [key: string]: 0 | 1 | 3 | 5 } = { "无": 0, "低": 1, "中": 3, "高": 5 };
+                updatePayload.priority = priorityMap[siyuanTask.优先级.content];
+            }
+            if (siyuanTask.开始时间) {
+                // 使用本地时间格式化，避免时区问题
+                updatePayload.startDate = siyuanTask.开始时间.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined;
+                updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined;
+                updatePayload.isAllDay = false;
+            } else {
+                updatePayload.startDate = undefined;
+                updatePayload.dueDate = undefined;
+            }
+
+            // 4. 处理状态变更（通过更新 projectId 实现移动）
+            if (siyuanTask.状态?.content) {
+                const targetProjectId = siyuanTask.状态.content === 'done' ? this.doneListId : this.todoListId;
+                if (targetProjectId && currentProjectId !== targetProjectId) {
+                    updatePayload.projectId = targetProjectId;
+                }
+            }
+
+            // 5. 发送更新请求 (如果需要更新)
+            if (Object.keys(updatePayload).length > 0) {
+                // 使用现有的 updateTask API
+                await this.apiClient.updateTask(didaTaskId, {
+                    ...updatePayload,
+                    id: didaTaskId,
+                    projectId: updatePayload.projectId || currentProjectId // 必须提供 projectId
+                });
+
+                // 更新缓存
+                if (updatePayload.projectId) {
+                    cachedTask.projectId = updatePayload.projectId;
+                }
+
+                console.log(`思源任务 [${blockId}] 的变更已同步到滴答任务 [${didaTaskId}]`);
+                showMessage("滴答任务已更新", 2000);
+            }
+
+        } catch (error) {
+            console.error("从思源同步到滴答失败:", error);
+        }
+    };
 
     /**
      * 检测 Dida365 API Token 是否有效。
@@ -475,6 +576,7 @@ ${taskData.事件?.content || "新建任务"}
     async getAllTasks(): Promise<Task[]> {
         const allTasks: Task[] = [];
         const projects = await this.apiClient.getUserProjects();
+        this.taskCache.clear(); // 清空旧缓存
 
         if (!projects) {
             return [];
@@ -486,6 +588,11 @@ ${taskData.事件?.content || "新建任务"}
                     const projectData = await this.apiClient.getProjectWithData(project.id);
                     if (projectData && projectData.tasks && projectData.tasks.length > 0) {
                         allTasks.push(...projectData.tasks);
+                        projectData.tasks.forEach(task => {
+                            if (task.id) {
+                                this.taskCache.set(task.id, task);
+                            }
+                        });
                     }
                 } catch (error) {
                     console.warn(`获取项目 "${project.name}" (ID: ${project.id}) 的任务失败:`, error instanceof Error ? error.message : String(error));
