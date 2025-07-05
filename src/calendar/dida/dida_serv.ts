@@ -74,11 +74,11 @@ export class Dida365Service {
             // 遍历所有 viewValue，合并所有任务数据
             const existingTasks = viewValue.flatMap(view => view.data || []);
 
-            // 创建现有任务的映射表（基于事件标题）
+            // 创建现有任务的映射表（基于 didaID）
             const existingTasksMap = new Map();
             existingTasks.forEach((task: any) => {
-                if (task.事件?.content) {
-                    existingTasksMap.set(task.事件.content, task);
+                if (task.didaID?.content) {
+                    existingTasksMap.set(task.didaID.content, task);
                 }
             });
 
@@ -87,9 +87,9 @@ export class Dida365Service {
 
             // 处理每个滴答清单任务
             for (const didaTask of didaTasks) {
-                if (!didaTask.title) continue;
+                if (!didaTask.id) continue;
 
-                const existingTask = existingTasksMap.get(didaTask.title);
+                const existingTask = existingTasksMap.get(didaTask.id);
                 const taskData = this.buildTaskData(didaTask, existingTask);
 
                 if (existingTask) {
@@ -117,6 +117,11 @@ export class Dida365Service {
      * 比较新旧任务数据是否有变化
      */
     private isTaskChanged(newTaskData: any, oldSiyuanTask: any): boolean {
+        // 比较事件标题
+        if (newTaskData.事件.content !== oldSiyuanTask.事件?.content) {
+            console.log("事件标题变化", newTaskData.事件.content, oldSiyuanTask.事件?.content);
+            return true;
+        }
         // 比较优先级
         // console.log("比较事件", newTaskData, oldSiyuanTask);
         if (newTaskData.优先级.content !== oldSiyuanTask.优先级?.content) {
@@ -181,6 +186,10 @@ export class Dida365Service {
         const timeRange = getTimeRange(didaTask.dueDate, didaTask.startDate);
 
         return {
+            didaID: {
+                content: didaTask.id || "",
+                keyID: existingTask?.didaID?.keyID
+            },
             事件: {
                 content: didaTask.title || "",
                 keyID: existingTask?.事件?.keyID
@@ -306,11 +315,23 @@ ${taskData.事件?.content || "新建任务"}
     private async updateTaskFields(blockId: string, taskData: any, viewValue: any): Promise<void> {
         try {
             // 获取各字段的 keyID
+            const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID', this.avId);
             const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', this.avId);
             const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间', this.avId);
             const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级', this.avId);
             const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态', this.avId);
             const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
+
+            // 更新 didaID (通常只在创建时写入)
+            if (didaIdKeyID && taskData.didaID?.content) {
+                await updateAttrViewCell_pro(
+                    blockId,
+                    this.avId,
+                    didaIdKeyID,
+                    taskData.didaID.content,
+                    "text"
+                );
+            }
 
             // 更新事件标题
             if (eventKeyID && taskData.事件?.content) {

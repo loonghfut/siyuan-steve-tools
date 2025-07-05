@@ -252,6 +252,15 @@ function extractDataFromTable(data: any, isZQ = false) {
                     };
                 }
 
+                // 2025/7/5新增：提取 didaID
+                const didaIdCell = getCell('didaID');
+                if (didaIdCell) {
+                    rowData['didaID'] = {
+                        content: didaIdCell.text?.content || '',
+                        keyID: didaIdCell.keyID || ''
+                    };
+                }
+
                 return rowData;
             } catch (error) {
                 console.error('Error processing row/card:', item, error);
