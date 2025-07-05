@@ -10,17 +10,21 @@ export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
     private avId: string | null = null; // 用于存储滴答清单同步的数据库ID
+    private todoListId: string | null = null; // 用于存储未完成任务列表ID
+    private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
         this.apiClient = new Dida365ApiClient(token);
+        this.todoListId = settingdata["cal-dida-unfinished-list"] || null;
+        this.doneListId = settingdata["cal-dida-finished-list"] || null;
         if (!token || token.trim() === "") {
             showMessage("Dida365 fallback: Token is empty or invalid.", -1, "error");
             return;
         }
         // 初始化时可以进行一些验证或设置
         this.isTokenValid();
-        console.log("Dida365Service initialized");
+        console.log("Dida365Service initialized",this.doneListId, this.todoListId);
         this.init();
     }
 
@@ -141,10 +145,18 @@ export class Dida365Service {
         // 比较时间
         const newTime = newTaskData.开始时间;
         const oldTime = oldSiyuanTask.开始时间;
-        if (newTime?.start !== oldTime?.start || newTime?.end !== oldTime?.end) {
-            console.log("时间变化", newTime, oldTime);
+
+        // 将 undefined 和 null 统一视为 null，以便正确比较“未设置”状态
+        const newStart = newTime?.start || null;
+        const newEnd = newTime?.end || null;
+        const oldStart = oldTime?.start || null;
+        const oldEnd = oldTime?.end || null;
+
+        if (newStart !== oldStart || newEnd !== oldEnd) {
+            console.log("时间变化", {start: newStart, end: newEnd}, {start: oldStart, end: oldEnd});
             return true;
         }
+        
         return false;
     }
 
@@ -164,8 +176,8 @@ export class Dida365Service {
         };
 
         // 转换状态
-        const getStatus = (status: number) => {
-            return status === 0 ? "todo" : "done";
+        const getStatus = (projectId: string) => {
+            return projectId === this.doneListId ? "done" : "todo";
         };
 
         // 转换时间
@@ -205,7 +217,7 @@ export class Dida365Service {
                 keyID: existingTask?.优先级?.keyID
             },
             状态: {
-                content: getStatus(didaTask.status || 0),
+                content: getStatus(didaTask.projectId),
                 keyID: existingTask?.状态?.keyID
             },
             描述: {
