@@ -21,6 +21,29 @@ $priority-color-high: var(--b3-card-error-color);
 $priority-color-low-background: var(--b3-card-success-background);
 $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
+
+// 2025/7/6
+
+#st-category,
+#st-priority {
+    background-color: var(--b3-theme-background) !important;
+    color: var(--b3-theme-on-background) !important;
+    border: 1px solid var(--b3-theme-divider);
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+
+    option {
+        background-color: var(--b3-theme-background) !important;
+        color: var(--b3-theme-on-background) !important;
+    }
+
+    &:focus {
+        outline: 1px solid var(--b3-theme-primary);
+    }
+}
+
+
+
 //事件块背景
 .sb,
 .list,

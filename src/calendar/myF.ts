@@ -15,7 +15,7 @@ import { createDailynote } from '@frostime/siyuan-plugin-kits';
 export const statusMap = new Proxy({
     // 保留原有的映射关系作为已知状态
     "未完成": "todo",
-    "完成": "done", 
+    "完成": "done",
     "进行中": "inprogress",
     "归档": "archive",
 }, {
@@ -24,7 +24,7 @@ export const statusMap = new Proxy({
         if (typeof prop === 'string' && prop in target) {
             return target[prop];
         }
-        
+
         // 对于未知状态，生成一个规范化的代码
         if (typeof prop === 'string') {
             // 将中文或其他语言的状态名转换为英文标识符:
@@ -35,11 +35,11 @@ export const statusMap = new Proxy({
                 .toLowerCase()
                 .replace(/\s+/g, '')
                 .replace(/[^\w\u4e00-\u9fa5]/gi, '');
-            
+
             // 如果处理后为空字符串，返回默认状态
             return code || 'todo';
         }
-        
+
         // 任何异常情况返回默认状态
         return 'todo';
     }
@@ -318,7 +318,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         // !endDate ||
                         (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0)));
-                            
+
                     let kramdown = "";
                     if (item['主事件']?.content || false) {
                         kramdown = (await api.getBlockKramdown(eventId)).kramdown;
@@ -575,7 +575,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         if (titleKeyID && title) {
             console.log("titleKeyID:::", titleKeyID);
             await api.updatemainkey({
-                avID:to_db_id,
+                avID: to_db_id,
                 blockID: direct.directid,
                 keyID: titleKeyID,
                 content: title,
@@ -962,19 +962,21 @@ async function getCategories(dbId: string): Promise<string[]> {
     try {
         const view = await api.renderAttributeView(dbId);
 
+        // 兼容表格和画廊视图
+        const columnsOrFields = view.view?.columns || view.view?.fields || [];
         // 查找分类列
-        const categoryColumn = view.view?.columns?.find(col => col.name === '分类');
+        const categoryColumn = columnsOrFields.find((col: any) => col.name === '分类');
         if (!categoryColumn) return ['无'];
 
         // 直接从选项中获取分类名称
-        const categories = categoryColumn.options?.map(option => option.name) || [];
+        const categories = categoryColumn.options?.map((option: any) => option.name) || [];
 
         // 如果没有预设选项，返回默认值
         if (!categories.length) {
             return ['无'];
         }
 
-        // 返回排序后的分类列表（不包含"无"）
+        // 返回排序后的分类列表
         return categories.sort();
     } catch (error) {
         console.error('获取分类列表失败:', error);
@@ -1220,14 +1222,19 @@ export function updataqqcalendar(info) {
 // 获取数据库中已有的优先级列表
 async function getPriorities(dbId: string): Promise<string[]> {
     try {
+        // console.log('获取优先级列表:', dbId);
         const view = await api.renderAttributeView(dbId);
+        // console.log('获取优先级列表:', view);
 
+        // 兼容表格和画廊视图
+        const columnsOrFields = view.view?.columns || view.view?.fields || [];
         // 查找优先级列
-        const priorityColumn = view.view?.columns?.find(col => col.name === '优先级');
+        const priorityColumn = columnsOrFields.find((col: any) => col.name === '优先级');
+        // console.log('获取优先级列表:', priorityColumn);
         if (!priorityColumn) return ['无'];
 
         // 直接从选项中获取优先级名称
-        const priorities = priorityColumn.options?.map(option => option.name) || [];
+        const priorities = priorityColumn.options?.map((option: any) => option.name) || [];
 
         // 如果没有预设选项，返回默认值
         if (!priorities.length) {
@@ -1235,6 +1242,7 @@ async function getPriorities(dbId: string): Promise<string[]> {
         }
 
         // 返回排序后的优先级列表
+        // console.log('获取优先级列表:', priorities);
         return priorities.sort();
     } catch (error) {
         console.error('获取优先级列表失败:', error);
