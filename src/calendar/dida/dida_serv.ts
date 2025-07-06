@@ -14,6 +14,7 @@ export class Dida365Service {
     private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
     private taskCache: Map<string, Task> = new Map(); // 新增：用于缓存滴答任务
     private isSyncing = false; // 新增同步锁
+    private creatingDidaIds: Set<string> = new Set();
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -279,7 +280,7 @@ export class Dida365Service {
             await appendBlock(
                 "markdown",
                 `{{{row
-${taskData.事件?.content || "新建任务"}
+#### ${taskData.事件?.content || "新建任务"}
 
 {: id="${await generateSiyuanID() as string}"}
 ${taskData.描述?.content || "描述"}
@@ -568,48 +569,68 @@ ${taskData.描述?.content || "描述"}
 
             } else {
                 // --- 新增任务的逻辑 ---
-                const taskTitle = siyuanTask.事件?.content || "新建任务";
-                console.log(`检测到新的思源任务 [${taskTitle}]，正在创建滴答任务...`);
-
-                // 确定目标清单，如果状态未定，则默认为未完成清单
-                let targetProjectId = siyuanTask.状态?.content === 'done' ? this.doneListId : this.todoListId;
-                if (!targetProjectId) {
-                    console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
-                    targetProjectId = this.todoListId;
+                if (this.creatingDidaIds.has(blockId)) {
+                    console.warn(`任务 [${blockId}] 正在创建中，跳过重复处理。`);
+                    return; // 正在处理，防止重复
                 }
-
-                // 如果连默认的未完成清单ID都没有设置，则无法继续
-                if (!targetProjectId) {
-                    showMessage("无法创建任务：未设置默认的未完成清单ID。", -1, "error");
-                    return;
-                }
-
-                const createTaskPayload: Omit<Task, 'id' | 'status' | 'completedTime'> & { projectId: string } = {
-                    projectId: targetProjectId,
-                    title: siyuanTask.事件.content,
-                    content: siyuanTask.描述?.content || undefined,
-                    priority: siyuanTask.优先级?.content ? { "无": 0, "低": 1, "中": 3, "高": 5 }[siyuanTask.优先级.content] : 0,
-                    startDate: siyuanTask.开始时间?.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined,
-                    dueDate: siyuanTask.开始时间?.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined,
-                };
-
-                const newDidaTask = await this.apiClient.createTask(createTaskPayload);
-
-                if (newDidaTask && newDidaTask.id) {
-                    // 将新生成的 didaID 写回思源数据库
-                    const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID', this.avId);
-                    if (didaIdKeyID) {
-                        await updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, newDidaTask.id, "text");
-                        // 更新缓存
-                        this.taskCache.set(newDidaTask.id, newDidaTask);
-                        console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]`);
-                        showMessage("新任务已同步到滴答清单", 2000);
-                    } else {
-                        console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
-                        showMessage("无法写回滴答任务ID，请检查数据库是否有名为 'didaID' 的列", -1, "error");
+                this.creatingDidaIds.add(blockId);
+                try {
+                    // 再次获取最新的 viewData，确保 didaID 还未写入
+                    const latestViewData = await getViewValue([{ rootid: this.avId, viewId: '', name: '' }]);
+                    const latestTask = latestViewData.flatMap(view => view.data || []).find((task: any) => task.事件?.id === blockId);
+                    if (latestTask?.didaID?.content) {
+                        // 已经有 didaID，说明刚刚写入成功，直接返回
+                        console.log(`任务 [${blockId}] 已经有 didaID，跳过创建。`);
+                        return;
                     }
+                    const taskTitle = siyuanTask.事件?.content || "新建任务";
+                    console.log(`检测到新的思源任务 [${taskTitle}]，正在创建滴答任务...`);
+
+                    // 确定目标清单，如果状态未定，则默认为未完成清单
+                    let targetProjectId = siyuanTask.状态?.content === 'done' ? this.doneListId : this.todoListId;
+                    if (!targetProjectId) {
+                        console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
+                        targetProjectId = this.todoListId;
+                    }
+
+                    // 如果连默认的未完成清单ID都没有设置，则无法继续
+                    if (!targetProjectId) {
+                        showMessage("无法创建任务：未设置默认的未完成清单ID。", -1, "error");
+                        return;
+                    }
+
+                    const createTaskPayload: Omit<Task, 'id' | 'status' | 'completedTime'> & { projectId: string } = {
+                        projectId: targetProjectId,
+                        title: siyuanTask.事件.content,
+                        content: siyuanTask.描述?.content || undefined,
+                        priority: siyuanTask.优先级?.content ? { "无": 0, "低": 1, "中": 3, "高": 5 }[siyuanTask.优先级.content] : 0,
+                        startDate: siyuanTask.开始时间?.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined,
+                        dueDate: siyuanTask.开始时间?.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined,
+                    };
+
+                    const newDidaTask = await this.apiClient.createTask(createTaskPayload);
+
+                    if (newDidaTask && newDidaTask.id) {
+                        // 将新生成的 didaID 写回思源数据库
+                        const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID', this.avId);
+                        if (didaIdKeyID) {
+                            await updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, newDidaTask.id, "text");
+                            // 更新缓存
+                            this.taskCache.set(newDidaTask.id, newDidaTask);
+                            console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]`);
+                            showMessage("新任务已同步到滴答清单", 2000);
+                        } else {
+                            console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
+                            showMessage("无法写回滴答任务ID，请检查数据库是否有名为 'didaID' 的列", -1, "error");
+                        }
+                    }
+                } finally {
+                    setTimeout(() => {
+                        this.creatingDidaIds.delete(blockId); // 处理完成，移除锁
+                    }, 2000);
                 }
             }
+
 
         } catch (error) {
             console.error("从思源同步到滴答失败:", error);
