@@ -562,7 +562,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         }
         if (ce) {
             dateStr = ce;
+            // console.log("ce:::", ce);
         }
+        // console.log("dateStr:::", dateStr);
         //块时间处理
 
         await api.addBlockToDatabase_pro(direct.directid, to_db_id);
@@ -572,6 +574,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
         const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
         const titleKeyID = await getKeyIDfromViewValue(viewValue, '事件', to_db_id);
+        const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
         if (titleKeyID && title) {
             console.log("titleKeyID:::", titleKeyID);
             await api.updatemainkey({
@@ -591,6 +594,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const datata = await api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date");
         const selectdata: ISelectOption[] = [{ content: status }];
         // console.log("selectdata", selectdata);
+        // 2025/7/5新增默认添加优先级
+        await api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, [{ content: "无" }], "select");
         await api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select");
         await api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, ismain, "checkbox");
         sy.showMessage('已添加事件', 2000, "info", "1");

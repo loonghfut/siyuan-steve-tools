@@ -933,7 +933,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
 
     if (dateStr.includes('T')) {
         // 对于带时间的格式，end时间设为1小时后
-        const n = settingdata['cal-time'] ? settingdata['cal-time'] : 1;
+        const n = settingdata['cal-time'] ? settingdata['cal-time'] : 0;//默认为 0
         const ONE_HOUR_MS = n * 60 * 60 * 1000; // 1小时的毫秒数
         return {
             start: date.getTime(),
@@ -951,12 +951,12 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
 
 export async function getFromApi2(path: string, params: Record<string, string> = {}, headers: Record<string, string> = {}): Promise<any> {
     const baseUrl = 'http://api2.232397.xyz';//统计api
-    
+
     // 构建查询字符串
-    const queryString = Object.keys(params).length > 0 
-        ? '?' + new URLSearchParams(params).toString() 
+    const queryString = Object.keys(params).length > 0
+        ? '?' + new URLSearchParams(params).toString()
         : '';
-    
+
     const url = `${baseUrl}${path}${queryString}`;
     // console.log('请求的URL:', url);
     try {
@@ -967,12 +967,12 @@ export async function getFromApi2(path: string, params: Record<string, string> =
                 ...headers
             }
         });
-        
+
         if (!response.ok) {
             console.warn(`api`);
         }
-        
-        const data =await response.text();
+
+        const data = await response.text();
         // console.log('ok');
         return {
             success: true,
