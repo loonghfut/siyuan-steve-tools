@@ -280,10 +280,10 @@ export class Dida365Service {
             await appendBlock(
                 "markdown",
                 `{{{row
-#### ${taskData.事件?.content || "新建任务"}
+${"#### "+taskData.事件?.content || "新建任务"}
 
 {: id="${await generateSiyuanID() as string}"}
-${taskData.描述?.content || "描述"}
+${taskData.描述?.content || "描述：暂无"}
 
 {: id="${await generateSiyuanID() as string}"}
 }}}
