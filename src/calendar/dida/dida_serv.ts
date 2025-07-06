@@ -197,7 +197,7 @@ export class Dida365Service {
 
         // 转换状态
         const getStatus = (projectId: string) => {
-            return projectId === this.doneListId ? "done" : "todo";
+            return projectId === this.doneListId ? "完成" : "未完成";
         };
 
         // 转换时间
@@ -276,7 +276,7 @@ export class Dida365Service {
             }
 
             // 创建块内容
-            const statusCustomAttr = taskData.状态?.content === "done" ? "done" : "todo";
+            const statusCustomAttr = taskData.状态?.content === "完成" ? "done" : "todo";
             await appendBlock(
                 "markdown",
                 `{{{row
@@ -329,7 +329,7 @@ ${taskData.描述?.content || "描述"}
             await this.updateTaskFields(blockId, newTaskData, viewValue);
 
             // 更新块的自定义属性（状态）
-            const statusCustomAttr = newTaskData.状态?.content === "done" ? "done" : "todo";
+            const statusCustomAttr = newTaskData.状态?.content === "完成" ? "done" : "todo";
             await setBlockAttrs(blockId, {
                 "custom-st-event": statusCustomAttr
             });
@@ -550,7 +550,7 @@ ${taskData.描述?.content || "描述"}
                     updatePayload.timeZone = "Asia/Shanghai";
                 }
                 if (siyuanTask.状态?.content) {
-                    const targetProjectId = siyuanTask.状态.content === 'done' ? this.doneListId : this.todoListId;
+                    const targetProjectId = siyuanTask.状态.content === '完成' ? this.doneListId : this.todoListId;
                     if (targetProjectId && currentProjectId !== targetProjectId) {
                         updatePayload.projectId = targetProjectId;
                     }
@@ -587,7 +587,7 @@ ${taskData.描述?.content || "描述"}
                     console.log(`检测到新的思源任务 [${taskTitle}]，正在创建滴答任务...`);
 
                     // 确定目标清单，如果状态未定，则默认为未完成清单
-                    let targetProjectId = siyuanTask.状态?.content === 'done' ? this.doneListId : this.todoListId;
+                    let targetProjectId = siyuanTask.状态?.content === '完成' ? this.doneListId : this.todoListId;
                     if (!targetProjectId) {
                         console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
                         targetProjectId = this.todoListId;
