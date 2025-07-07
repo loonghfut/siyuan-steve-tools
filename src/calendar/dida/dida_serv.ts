@@ -49,6 +49,11 @@ export class Dida365Service {
         };
         if (settingdata["cal-dida-sync-mode"] === "auto" || settingdata["cal-dida-sync-mode"] === "all") {
             // 自动同步模式，设置定时器
+            setTimeout(async () => {
+                if (!this.isSyncing) { // 首次延迟10秒后同步一次
+                    await this.syncTasksToSiyuan();
+                }
+            }, 10000);
             setInterval(async () => {
                 if (!this.isSyncing) { // 仅在未同步时执行
                     await this.syncTasksToSiyuan();
@@ -75,6 +80,7 @@ export class Dida365Service {
 
     async syncTasksToSiyuan(): Promise<void> {
         this.isSyncing = true; // 开始同步，锁定
+        showMessage("正在同步滴答清单任务，请稍候...", -1, "info", "dida-sync");
         try {
             // 获取滴答清单的所有任务
             const didaTasks = await this.getAllTasks();
@@ -127,13 +133,14 @@ export class Dida365Service {
                 }
             }
 
-            showMessage(`同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`, 3000);
+            showMessage(`同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`, 3000, "info", "dida-sync");
 
         } catch (error) {
             console.error("同步滴答清单任务失败:", error);
-            showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error");
+            showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error", "dida-sync");
         } finally {
             this.isSyncing = false; // 同步结束，解锁
+            // showMessage("滴答清单任务同步已完成", 2000, "info", "dida-sync");
         }
     }
 
@@ -280,7 +287,7 @@ export class Dida365Service {
             await appendBlock(
                 "markdown",
                 `{{{row
-${"#### "+taskData.事件?.content || "新建任务"}
+${"#### " + taskData.事件?.content || "新建任务"}
 
 {: id="${await generateSiyuanID() as string}"}
 ${taskData.描述?.content || "描述：暂无"}
