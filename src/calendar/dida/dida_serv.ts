@@ -11,7 +11,7 @@ export class Dida365Service {
     private plugin: steveTools;
     private avId: string | null = null; // 用于存储滴答清单同步的数据库ID
     private todoListId: string | null = null; // 用于存储未完成任务列表ID
-    private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
+    // private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
     private taskCache: Map<string, Task> = new Map(); // 新增：用于缓存滴答任务
     private isSyncing = false; // 新增同步锁
     private creatingDidaIds: Set<string> = new Set();
@@ -20,14 +20,14 @@ export class Dida365Service {
         this.plugin = plugin;
         this.apiClient = new Dida365ApiClient(token);
         this.todoListId = settingdata["cal-dida-unfinished-list"] || null;
-        this.doneListId = settingdata["cal-dida-finished-list"] || null;
+        // this.doneListId = settingdata["cal-dida-finished-list"] || null;
         if (!token || token.trim() === "") {
             showMessage("Dida365 fallback: Token is empty or invalid.", -1, "error");
             return;
         }
         // 初始化时可以进行一些验证或设置
         this.isTokenValid();
-        console.log("Dida365Service initialized", this.doneListId, this.todoListId);
+        console.log("Dida365Service initialized", this.todoListId);
         this.init();
     }
 
@@ -203,8 +203,15 @@ export class Dida365Service {
         };
 
         // 转换状态
-        const getStatus = (projectId: string) => {
-            return projectId === this.doneListId ? "完成" : "未完成";
+        const getStatus = (task: Task) => {
+            // 如果标签中包含“完成”，则状态为“完成”
+            if (task.tags?.includes("完成")) {
+                return "完成";
+            } else if (task.tags?.includes("进行中")) {
+                return "进行中";
+            } else {
+                return "未完成"
+            }
         };
 
         // 转换时间
@@ -244,7 +251,7 @@ export class Dida365Service {
                 keyID: existingTask?.优先级?.keyID
             },
             状态: {
-                content: getStatus(didaTask.projectId),
+                content: getStatus(didaTask),
                 keyID: existingTask?.状态?.keyID
             },
             描述: {
@@ -540,6 +547,8 @@ ${taskData.描述?.content || "描述：暂无"}
                 const updatePayload: Partial<Task> = {};
 
                 // 转换思源数据到滴答格式
+                // 默认值
+                updatePayload.status = 0;
                 if (siyuanTask.事件?.content) updatePayload.title = siyuanTask.事件.content;
                 if (siyuanTask.描述?.content) updatePayload.content = siyuanTask.描述.content;
                 if (siyuanTask.优先级?.content) {
@@ -548,8 +557,8 @@ ${taskData.描述?.content || "描述：暂无"}
                 }
                 if (siyuanTask.开始时间) {
                     updatePayload.startDate = siyuanTask.开始时间.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined;
-                    // updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
-                    // updatePayload.isAllDay = false;
+                    updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
+                    updatePayload.isAllDay = false;
                     updatePayload.timeZone = "Asia/Shanghai";
                 } else {
                     updatePayload.startDate = undefined;
@@ -557,10 +566,22 @@ ${taskData.描述?.content || "描述：暂无"}
                     updatePayload.timeZone = "Asia/Shanghai";
                 }
                 if (siyuanTask.状态?.content) {
-                    const targetProjectId = siyuanTask.状态.content === '完成' ? this.doneListId : this.todoListId;
-                    if (targetProjectId && currentProjectId !== targetProjectId) {
-                        updatePayload.projectId = targetProjectId;
+                    let currentTags = cachedTask.tags || [];
+                    const newStatus = siyuanTask.状态.content;
+
+                    // 先移除所有可能的状态标签，以保留其他用户自定义标签
+                    let updatedTags = currentTags.filter(tag => tag !== '完成' && tag !== '进行中' && tag !== '未完成');
+
+                    // 根据新的状态添加相应的标签
+                    if (newStatus === '完成') {
+                        updatedTags.push('完成');
+                    } else if (newStatus === '进行中') {
+                        updatedTags.push('进行中');
+                    } else if (newStatus === '未完成') {
+                        updatedTags.push('未完成');
                     }
+
+                    updatePayload.tags = updatedTags;
                 }
 
                 if (Object.keys(updatePayload).length > 0) {
@@ -594,11 +615,12 @@ ${taskData.描述?.content || "描述：暂无"}
                     console.log(`检测到新的思源任务 [${taskTitle}]，正在创建滴答任务...`);
 
                     // 确定目标清单，如果状态未定，则默认为未完成清单
-                    let targetProjectId = siyuanTask.状态?.content === '完成' ? this.doneListId : this.todoListId;
-                    if (!targetProjectId) {
-                        console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
-                        targetProjectId = this.todoListId;
-                    }
+                    // 2025/7/5 修改：根据状态标签来确定目标清单，不再设置多个清单了
+                    let targetProjectId = this.todoListId 
+                    // if (!targetProjectId) {
+                    //     console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
+                    //     targetProjectId = this.todoListId;
+                    // }
 
                     // 如果连默认的未完成清单ID都没有设置，则无法继续
                     if (!targetProjectId) {
@@ -613,6 +635,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         priority: siyuanTask.优先级?.content ? { "无": 0, "低": 1, "中": 3, "高": 5 }[siyuanTask.优先级.content] : 0,
                         startDate: siyuanTask.开始时间?.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined,
                         dueDate: siyuanTask.开始时间?.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined,
+                        tags: siyuanTask.状态?.content ? [siyuanTask.状态.content] : [],
                     };
 
                     const newDidaTask = await this.apiClient.createTask(createTaskPayload);
@@ -665,7 +688,8 @@ ${taskData.描述?.content || "描述：暂无"}
     async getAllTasks(): Promise<Task[]> {
         const allTasks: Task[] = [];
         // 合并两个设置项为一个数组，过滤空值
-        const projectIds = [settingdata["cal-dida-unfinished-list"], settingdata["cal-dida-finished-list"]].filter(Boolean);
+        // const projectIds = [settingdata["cal-dida-unfinished-list"], settingdata["cal-dida-finished-list"]].filter(Boolean);
+        const projectIds = [this.todoListId];
         this.taskCache.clear(); // 清空旧缓存
 
         if (projectIds.length === 0) {

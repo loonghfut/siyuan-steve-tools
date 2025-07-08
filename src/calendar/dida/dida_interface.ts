@@ -26,6 +26,7 @@ export interface Task {
     startDate?: string; // "yyyy-MM-dd'T'HH:mm:ssZ"
     status?: 0 | 2; // Normal: 0, Completed: 2
     timeZone?: string;
+    tags?: string[]; // Example: ["tag1", "tag2"]
 }
 export interface Project {
     id?: string;

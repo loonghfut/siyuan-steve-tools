@@ -541,18 +541,18 @@
                 },
                 {
                     type: "select",
-                    title: "设置未完成清单",
-                    description: "选择滴答清单的未完成清单id",
+                    title: "设置要同步的清单",
+                    description: "选择滴答清单的清单",
                     key: "cal-dida-unfinished-list",
                     value: { "": "加载中" },
                 },
-                {
-                    type: "select",
-                    title: "设置已完成清单",
-                    description: "选择滴答清单的已完成清单id",
-                    key: "cal-dida-finished-list",
-                    value: { "": "加载中" },
-                },
+                // {
+                //     type: "select",
+                //     title: "设置已完成清单",
+                //     description: "选择滴答清单的已完成清单id",
+                //     key: "cal-dida-finished-list",
+                //     value: { "": "加载中" },
+                // },
                 {
                     type:"textinput",
                     title: "滴答清单同步数据库id",
