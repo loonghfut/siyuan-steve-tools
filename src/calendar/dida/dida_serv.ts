@@ -164,6 +164,17 @@ export class Dida365Service {
             console.log("状态变化", newTaskData.状态.content, oldSiyuanTask.状态?.content);
             return true;
         }
+        // 比较标签
+        const newTags = newTaskData.标签.content || [];
+        const oldTags = oldSiyuanTask.标签?.content || [];
+        // 将标签转换为字符串数组以便比较
+        const newTagContents = newTags.map((tag: any) => tag.content).sort();
+        const oldTagContents = oldTags.map((tag: any) => tag).sort();
+        console.log("比较标签", newTagContents, oldTagContents);
+        if (newTagContents.join(",") !== oldTagContents.join(",")) {
+            console.log("标签变化", newTagContents, oldTagContents);
+            return true;
+        }
         // 比较描述
         if ((newTaskData.描述.content || "") !== (oldSiyuanTask.描述?.content || "")) {
             console.log("描述变化", newTaskData.描述.content, oldSiyuanTask.描述?.content);
@@ -353,7 +364,7 @@ ${taskData.描述?.content || "描述：暂无"}
             const viewValue = await getViewValue(data);
 
             // 更新各个字段
-            await this.updateTaskFields(blockId, newTaskData, viewValue);
+            await this.updateTaskFields(blockId, newTaskData, viewValue, existingTask);
 
             // 更新块的自定义属性（状态）
             const statusCustomAttr = newTaskData.状态?.content === "完成" ? "done" : "todo";
@@ -372,7 +383,7 @@ ${taskData.描述?.content || "描述：暂无"}
     /**
      * 更新任务字段的通用方法
      */
-    private async updateTaskFields(blockId: string, taskData: any, viewValue: any): Promise<void> {
+    private async updateTaskFields(blockId: string, taskData: any, viewValue: any, existingTask?: any): Promise<void> {
         try {
             // 获取各字段的 keyID
             const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID', this.avId);
@@ -384,7 +395,7 @@ ${taskData.描述?.content || "描述：暂无"}
             const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
 
             // 更新 didaID (通常只在创建时写入)
-            if (didaIdKeyID && taskData.didaID?.content) {
+            if (didaIdKeyID && taskData.didaID?.content && !existingTask?.didaID?.content) {
                 await updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -395,7 +406,7 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             // 更新事件标题
-            if (eventKeyID && taskData.事件?.content) {
+            if (eventKeyID && taskData.事件?.content && taskData.事件.content !== existingTask?.事件?.content) {
                 await updatemainkey({
                     avID: this.avId,
                     blockID: blockId,
@@ -405,24 +416,29 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             // 更新开始时间
-            if (timeKeyID && taskData.开始时间) {
-                const startTime = formatLocalDate(taskData.开始时间.start);
-                const endTime = taskData.开始时间.end && taskData.开始时间.hasEndDate ? formatLocalDate(taskData.开始时间.end) : undefined;
+            const newTime = taskData.开始时间;
+            const oldTime = existingTask?.开始时间;
+            const newStart = newTime?.start || null;
+            const newEnd = newTime?.end || null;
+            const oldStart = oldTime?.start || null;
+            const oldEnd = oldTime?.end || null;
 
-                if (startTime) {
-                    await updateAttrViewCell_pro(
-                        blockId,
-                        this.avId,
-                        timeKeyID,
-                        startTime,
-                        "date",
-                        endTime
-                    );
-                }
+            if (timeKeyID && (newStart !== oldStart || newEnd !== oldEnd)) {
+                const startTime = newTime?.start ? formatLocalDate(newTime.start) : undefined;
+                const endTime = newTime?.end && newTime?.hasEndDate ? formatLocalDate(newTime.end) : undefined;
+
+                await updateAttrViewCell_pro(
+                    blockId,
+                    this.avId,
+                    timeKeyID,
+                    startTime,
+                    "date",
+                    endTime
+                );
             }
 
             // 更新优先级
-            if (priorityKeyID && taskData.优先级?.content) {
+            if (priorityKeyID && taskData.优先级?.content && taskData.优先级.content !== existingTask?.优先级?.content) {
                 const priorityData = [{ content: taskData.优先级.content }];
                 await updateAttrViewCell_pro(
                     blockId,
@@ -434,7 +450,7 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             // 更新状态
-            if (statusKeyID && taskData.状态?.content) {
+            if (statusKeyID && taskData.状态?.content && taskData.状态.content !== existingTask?.状态?.content) {
                 const statusData = [{ content: taskData.状态.content }];
                 await updateAttrViewCell_pro(
                     blockId,
@@ -446,7 +462,10 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             // 更新标签
-            if (tagKeyID && taskData.标签?.content) {
+            const newTags = (taskData.标签?.content || []).map((t: any) => t.content).sort().join(',');
+            const oldTags = (existingTask?.标签?.content || []).sort().join(',');
+            if (tagKeyID && taskData.标签?.content && newTags !== oldTags) {
+                console.log("更新标签：", taskData.标签.content);
                 await updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -457,7 +476,7 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             // 更新描述
-            if (descKeyID && taskData.描述?.content) {
+            if (descKeyID && taskData.描述?.content && taskData.描述.content !== existingTask?.描述?.content) {
                 await updateAttrViewCell_pro(
                     blockId,
                     this.avId,
