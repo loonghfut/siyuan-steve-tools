@@ -3,7 +3,7 @@ import { Dida365ApiClient } from "./dida_api";
 import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
-import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, updateAttrViewCell_pro, updatemainkey } from "@/api";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api";
 import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 
 export class Dida365Service {
@@ -80,7 +80,7 @@ export class Dida365Service {
 
     async syncTasksToSiyuan(): Promise<void> {
         this.isSyncing = true; // 开始同步，锁定
-        showMessage("正在同步滴答清单任务，请稍候...", -1, "info", "dida-sync");
+        showStatusMessage("正在同步滴答清单任务，请稍候...", 10000, "dida-sync");
         try {
             // 获取滴答清单的所有任务
             const didaTasks = await this.getAllTasks();
@@ -133,7 +133,7 @@ export class Dida365Service {
                 }
             }
 
-            showMessage(`同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`, 3000, "info", "dida-sync");
+            showStatusMessage(`同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`, 3000, "dida-sync");
 
         } catch (error) {
             console.error("同步滴答清单任务失败:", error);
@@ -614,7 +614,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     });
                     if (updatePayload.projectId) cachedTask.projectId = updatePayload.projectId;
                     console.log(`思源任务 [${blockId}] 的变更已同步到滴答任务 [${didaTaskId}]`);
-                    showMessage("滴答任务已更新", 2000);
+                    showStatusMessage("滴答任务已更新", 2000);
                 }
 
             } else {
@@ -670,7 +670,7 @@ ${taskData.描述?.content || "描述：暂无"}
                             // 更新缓存
                             this.taskCache.set(newDidaTask.id, newDidaTask);
                             console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]`);
-                            showMessage("新任务已同步到滴答清单", 2000);
+                            showStatusMessage("新任务已同步到滴答清单", 2000);
                         } else {
                             console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
                             showMessage("无法写回滴答任务ID，请检查数据库是否有名为 'didaID' 的列", -1, "error");

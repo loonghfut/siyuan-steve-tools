@@ -20,6 +20,16 @@ $priority-color-low-background: var(--b3-card-success-background);
 $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
 
+.custom-st-status-message {
+    color: var(--b3-theme-on-surface);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    padding-left: 5px;
+    font-size: 12px;
+}
+
+
 div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     border: none !important;
 }

@@ -996,27 +996,45 @@ export async function getFromApi2(path: string, params: Record<string, string> =
     }
 }
 
-
-export async function showStatusMessage(message: string, timeout: number = 3000) {
-    const statusDiv = document.createElement('div');
-    statusDiv.className = 'status__msg';
-    statusDiv.textContent = message;
-
-    // 移除已有的消息
-    document.querySelectorAll('.status__msg').forEach(el => el.remove());
-
-    // 将新消息添加到状态栏
-    const statusContainer = document.querySelector('.status');
-    if (statusContainer) {
-        statusContainer.appendChild(statusDiv);
-    } else {
-        // Fallback to body if .status is not found
-        document.body.appendChild(statusDiv);
+// **************************************** Status Bar ****************************************
+export async function showStatusMessage(message: string, timeout: number = 3000, id?: string) {
+    const statusContainer = document.getElementById('status');
+    if (!statusContainer) {
+        console.warn("Status bar container (#status) not found.");
+        return;
     }
+
+    let customStatusDiv: HTMLDivElement | null = null;
+
+    if (id) {
+        customStatusDiv = document.querySelector(`.custom-st-status-message[data-id="${id}"]`);
+    }
+
+    if (customStatusDiv) {
+        // 如果存在相同 ID 的消息，则更新内容
+        customStatusDiv.textContent = message;
+    } else {
+        // 否则创建新的消息
+        customStatusDiv = document.createElement('div');
+        customStatusDiv.className = 'custom-st-status-message'; // 使用自定义的 class 名称
+        if (id) {
+            customStatusDiv.dataset.id = id; // 存储 ID
+        }
+        customStatusDiv.textContent = message;
+
+        // 添加点击事件监听器
+        customStatusDiv.addEventListener('click', () => {
+            customStatusDiv?.remove();
+        });
+
+        // 将新消息添加到状态栏的开头
+        statusContainer.prepend(customStatusDiv);
+    }
+
 
     if (timeout > 0) {
         setTimeout(() => {
-            statusDiv.remove();
+            customStatusDiv?.remove();
         }, timeout);
     }
 }
