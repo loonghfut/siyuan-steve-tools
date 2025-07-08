@@ -39,7 +39,7 @@ export const formatLocalDate = (timestamp: number) => {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
-// 辅助函数：将时间戳格式化为滴答API要求的格式 (e.g., "2019-11-13T03:00:00+0800")
+// 辅助函数：将时间戳格式化为滴答API要求的格式 (e.g., "2025-07-08T01:31:00.000+0000")
 export const formatDateForDida = (timestamp: number): string | undefined => {
     if (!timestamp) return undefined;
 
@@ -50,6 +50,7 @@ export const formatDateForDida = (timestamp: number): string | undefined => {
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     const seconds = date.getSeconds().toString().padStart(2, '0');
+    const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
 
     const offsetMinutes = date.getTimezoneOffset();
     const offsetSign = offsetMinutes <= 0 ? '+' : '-';
@@ -58,5 +59,30 @@ export const formatDateForDida = (timestamp: number): string | undefined => {
     const offsetPaddedMinutes = (Math.abs(offsetMinutes) % 60).toString().padStart(2, '0');
     const timezoneOffset = `${offsetSign}${offsetPaddedHours}${offsetPaddedMinutes}`;
 
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${timezoneOffset}`;
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${milliseconds}${timezoneOffset}`;
 };
+
+export const formatDateToISO = (dateInput: any): string | undefined => {
+    if (!dateInput) return undefined;
+
+    let date: Date;
+
+    // 处理不同类型的日期输入
+    if (dateInput instanceof Date) {
+        date = dateInput;
+    } else if (typeof dateInput === 'string') {
+        date = new Date(dateInput);
+    } else if (typeof dateInput === 'number') {
+        date = new Date(dateInput);
+    } else {
+        return undefined;
+    }
+
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+        return undefined;
+    }
+
+    // 转换为 ISO 格式并替换时区为 +0000
+    return date.toISOString().replace('Z', '+0000');
+}

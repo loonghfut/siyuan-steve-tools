@@ -195,6 +195,16 @@ function extractDataFromTable(data: any, isZQ = false) {
                     };
                 }
 
+                // 提取标签
+                const tagCell = getCell('标签');
+                if (tagCell) {
+                    // console.log("tagCell:::", tagCell);
+                    rowData['标签'] = {
+                        content: tagCell.mSelect?.map((item: ISelectOption) => item.content) || [],
+                        keyID: tagCell.keyID || ''
+                    };
+                }
+
                 // 提取子级 (关联)
                 const subCell = getCell('关联');
                 if (subCell) {
@@ -260,7 +270,7 @@ function extractDataFromTable(data: any, isZQ = false) {
                         keyID: didaIdCell.keyID || ''
                     };
                 }
-
+                // console.log("rowData:::", rowData);
                 return rowData;
             } catch (error) {
                 console.error('Error processing row/card:', item, error);

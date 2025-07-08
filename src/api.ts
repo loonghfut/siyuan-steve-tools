@@ -765,7 +765,7 @@ export async function updateAttrViewCell_pro(
         },
         action: string
     },
-    type: 'date' | 'select' | 'relation' | 'checkbox' | 'text',
+    type: 'date' | 'select' | 'relation' | 'checkbox' | 'text' | 'mSelect',
     endtime?: string
 ) {
     const doOperations: IOperation[] = [];
@@ -792,6 +792,14 @@ export async function updateAttrViewCell_pro(
         case 'select':
             cellData = {
                 type: "select",
+                id: newId,
+                mSelect: value as ISelectOption[]
+            };
+            break;
+
+        case 'mSelect':
+            cellData = {
+                type: "mSelect",
                 id: newId,
                 mSelect: value as ISelectOption[]
             };

@@ -4,7 +4,7 @@ import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, updateAttrViewCell_pro, updatemainkey } from "@/api";
-import { formatDateForDida, formatLocalDate } from "./siyuan_api";
+import { formatDateForDida, formatDateToISO, formatLocalDate } from "./siyuan_api";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
@@ -581,8 +581,8 @@ ${taskData.描述?.content || "描述：暂无"}
                     updatePayload.priority = priorityMap[siyuanTask.优先级.content];
                 }
                 if (siyuanTask.开始时间) {
-                    updatePayload.startDate = siyuanTask.开始时间.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined;
-                    updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
+                    updatePayload.startDate = siyuanTask.开始时间.start ? formatDateToISO(siyuanTask.开始时间.start) : undefined;
+                    updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateToISO(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
                     updatePayload.isAllDay = false;
                     updatePayload.timeZone = "Asia/Shanghai";
                 } else {
@@ -593,7 +593,9 @@ ${taskData.描述?.content || "描述：暂无"}
 
                 // 处理状态和标签
                 const newStatus = siyuanTask.状态?.content;
-                const tagsFromSiyuan = (siyuanTask.标签?.content || []).map((item: any) => item.content);
+                // console.log("标签：：：", siyuanTask.标签?.content);
+                const tagsFromSiyuan = (siyuanTask.标签?.content || []).map((item: any) => item);
+                // console.log("标签：：：", tagsFromSiyuan);
                 const statusTags = [];
                 if (newStatus === '完成') {
                     statusTags.push('完成');
@@ -653,8 +655,8 @@ ${taskData.描述?.content || "描述：暂无"}
                         title: siyuanTask.事件.content,
                         content: siyuanTask.描述?.content || undefined,
                         priority: siyuanTask.优先级?.content ? { "无": 0, "低": 1, "中": 3, "高": 5 }[siyuanTask.优先级.content] : 0,
-                        startDate: siyuanTask.开始时间?.start ? formatDateForDida(siyuanTask.开始时间.start) : undefined,
-                        dueDate: siyuanTask.开始时间?.end ? formatDateForDida(siyuanTask.开始时间.end) : undefined,
+                        startDate: siyuanTask.开始时间?.start ? formatDateToISO(siyuanTask.开始时间.start) : undefined,
+                        dueDate: siyuanTask.开始时间?.end ? formatDateToISO(siyuanTask.开始时间.end) : undefined,
                         tags: siyuanTask.状态?.content ? [siyuanTask.状态.content] : [],
                     };
 

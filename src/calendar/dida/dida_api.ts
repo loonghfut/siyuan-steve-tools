@@ -53,11 +53,12 @@ export class Dida365ApiClient {
         });
     }
 
-    async completeTask(projectId: string, taskId: string): Promise<void> {
-        await this.request<null>(`/project/${projectId}/task/${taskId}/complete`, {
-            method: 'POST',
-        });
-    }
+    //无法获取到已完成的事件故不使用此api
+    // async completeTask(projectId: string, taskId: string): Promise<void> {
+    //     await this.request<null>(`/project/${projectId}/task/${taskId}/complete`, {
+    //         method: 'POST',
+    //     });
+    // }
 
     async deleteTask(projectId: string, taskId: string): Promise<void> {
         await this.request<null>(`/project/${projectId}/task/${taskId}`, {
