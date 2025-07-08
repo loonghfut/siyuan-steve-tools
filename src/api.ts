@@ -995,3 +995,28 @@ export async function getFromApi2(path: string, params: Record<string, string> =
         };
     }
 }
+
+
+export async function showStatusMessage(message: string, timeout: number = 3000) {
+    const statusDiv = document.createElement('div');
+    statusDiv.className = 'status__msg';
+    statusDiv.textContent = message;
+
+    // 移除已有的消息
+    document.querySelectorAll('.status__msg').forEach(el => el.remove());
+
+    // 将新消息添加到状态栏
+    const statusContainer = document.querySelector('.status');
+    if (statusContainer) {
+        statusContainer.appendChild(statusDiv);
+    } else {
+        // Fallback to body if .status is not found
+        document.body.appendChild(statusDiv);
+    }
+
+    if (timeout > 0) {
+        setTimeout(() => {
+            statusDiv.remove();
+        }, timeout);
+    }
+}
