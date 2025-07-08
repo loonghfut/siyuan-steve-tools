@@ -4,7 +4,7 @@ import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, updateAttrViewCell_pro, updatemainkey } from "@/api";
-import { formatDateForDida, formatDateToISO, formatLocalDate } from "./siyuan_api";
+import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
