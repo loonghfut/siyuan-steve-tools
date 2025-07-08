@@ -137,7 +137,7 @@ export default class steveTools extends Plugin {
         setdialog = new Dialog({
             title: "steveTools设置",
             content: `<div id="SettingPanel" style="height: 100%;"></div>`,
-            width: "800px",
+            width: "900px",
             destroyCallback: (options) => {
                 console.log("destroyCallback", options);
                 //You'd better destroy the component when the dialog is closed
