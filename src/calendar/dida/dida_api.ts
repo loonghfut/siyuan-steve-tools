@@ -3,6 +3,8 @@ import { Task, Project, ProjectData } from "./dida_interface";
 export class Dida365ApiClient {
     private baseUrl = "https://api.dida365.com/open/v1";
     private token: string;
+    // 更新缓存结构，用于存储请求体和对应的响应
+    private updateTaskCache: Map<string, { requestBody: string, response: Task }> = new Map();
 
     constructor(token: string) {
         this.token = token;
@@ -47,10 +49,28 @@ export class Dida365ApiClient {
     }
 
     async updateTask(taskId: string, taskData: Partial<Task> & { id: string, projectId: string }): Promise<Task> {
-        return this.request<Task>(`/task/${taskId}`, {
+        const requestBody = JSON.stringify(taskData);
+        const cachedData = this.updateTaskCache.get(taskId);
+
+        // 检查缓存：如果请求体与上次相同，则直接返回缓存的响应数据
+        if (cachedData && cachedData.requestBody === requestBody) {
+            console.log(`Task ${taskId} data has not changed. Returning cached response.`);
+            return Promise.resolve(cachedData.response);
+        }
+
+        // 如果没有缓存或数据已更改，则执行API请求
+        const updatedTask = await this.request<Task>(`/task/${taskId}`, {
             method: 'POST',
-            body: JSON.stringify(taskData),
+            body: requestBody,
         });
+
+        // 请求成功后，更新缓存，同时存储请求体和响应数据
+        this.updateTaskCache.set(taskId, {
+            requestBody: requestBody,
+            response: updatedTask
+        });
+
+        return updatedTask;
     }
 
     //无法获取到已完成的事件故不使用此api
