@@ -213,6 +213,15 @@ export class Dida365Service {
                 return "未完成"
             }
         };
+        // 提取标签，排除状态标签
+        const getTags = (task: Task) => {
+            const statusTags = ["完成", "进行中", "未完成"];
+            if (!task.tags) {
+                return [];
+            }
+            return task.tags.filter(tag => !statusTags.includes(tag));
+        };
+
 
         // 转换时间
         const getTimeRange = (dueDate?: string, startDate?: string) => {
@@ -253,6 +262,10 @@ export class Dida365Service {
             状态: {
                 content: getStatus(didaTask),
                 keyID: existingTask?.状态?.keyID
+            },
+            标签: {
+                content: getTags(didaTask).map(tag => ({ content: tag })),
+                keyID: existingTask?.标签?.keyID
             },
             描述: {
                 content: didaTask.content || "",
@@ -367,6 +380,7 @@ ${taskData.描述?.content || "描述：暂无"}
             const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间', this.avId);
             const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级', this.avId);
             const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态', this.avId);
+            const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', this.avId);
             const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
 
             // 更新 didaID (通常只在创建时写入)
@@ -428,6 +442,17 @@ ${taskData.描述?.content || "描述：暂无"}
                     statusKeyID,
                     statusData,
                     "select"
+                );
+            }
+
+            // 更新标签
+            if (tagKeyID && taskData.标签?.content) {
+                await updateAttrViewCell_pro(
+                    blockId,
+                    this.avId,
+                    tagKeyID,
+                    taskData.标签.content,
+                    "mSelect"
                 );
             }
 
@@ -565,24 +590,19 @@ ${taskData.描述?.content || "描述：暂无"}
                     updatePayload.dueDate = undefined;
                     updatePayload.timeZone = "Asia/Shanghai";
                 }
-                if (siyuanTask.状态?.content) {
-                    let currentTags = cachedTask.tags || [];
-                    const newStatus = siyuanTask.状态.content;
 
-                    // 先移除所有可能的状态标签，以保留其他用户自定义标签
-                    let updatedTags = currentTags.filter(tag => tag !== '完成' && tag !== '进行中' && tag !== '未完成');
-
-                    // 根据新的状态添加相应的标签
-                    if (newStatus === '完成') {
-                        updatedTags.push('完成');
-                    } else if (newStatus === '进行中') {
-                        updatedTags.push('进行中');
-                    } else if (newStatus === '未完成') {
-                        updatedTags.push('未完成');
-                    }
-
-                    updatePayload.tags = updatedTags;
+                // 处理状态和标签
+                const newStatus = siyuanTask.状态?.content;
+                const tagsFromSiyuan = (siyuanTask.标签?.content || []).map((item: any) => item.content);
+                const statusTags = [];
+                if (newStatus === '完成') {
+                    statusTags.push('完成');
+                } else if (newStatus === '进行中') {
+                    statusTags.push('进行中');
+                } else {
+                    statusTags.push('未完成');
                 }
+                updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
 
                 if (Object.keys(updatePayload).length > 0) {
                     await this.apiClient.updateTask(didaTaskId, {
@@ -616,7 +636,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
                     // 确定目标清单，如果状态未定，则默认为未完成清单
                     // 2025/7/5 修改：根据状态标签来确定目标清单，不再设置多个清单了
-                    let targetProjectId = this.todoListId 
+                    let targetProjectId = this.todoListId
                     // if (!targetProjectId) {
                     //     console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
                     //     targetProjectId = this.todoListId;
