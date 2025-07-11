@@ -33,6 +33,7 @@ import { M_lifelog } from "./lifelog/module-lifelog";
 
 // import * as api from "@/api"
 import SettingExample from "@/setting.svelte";
+import { PluginConfig } from "./savedata";
 
 export let frontEnd;
 
@@ -50,7 +51,7 @@ export let moduleInstances: {
 } = {};
 
 export default class steveTools extends Plugin {
-
+    private pluginConfig: PluginConfig;
     // private modules: any[];
     private loadModule(ModuleClass: any, moduleName: string) {
         const moduleInstance = new ModuleClass(this);//解释：new ModuleClass(this)相当于new ModuleClass(steveTools)
@@ -62,7 +63,7 @@ export default class steveTools extends Plugin {
             console.log("日历模块加载");
             if (settingdata["PluginUsageStatistics"]) {
                 // console.log("统计");
-                api.getFromApi2("/STcal");
+                api.getFromApi2("/STcal",null, null, this.pluginConfig);
             }
         }
         if (data["sync-enable"] == true) {
@@ -83,7 +84,7 @@ export default class steveTools extends Plugin {
             console.log("画板模块加载");
             if (settingdata["PluginUsageStatistics"]) {
                 // console.log("统计");
-                api.getFromApi2("/SThandwriting");
+                api.getFromApi2("/SThandwriting", null, null, this.pluginConfig);
             }
         }
 
@@ -97,7 +98,7 @@ export default class steveTools extends Plugin {
     // private isMobile: boolean;
     // private settingUtils: SettingUtils;
     async onload() {
-
+        this.pluginConfig = new PluginConfig(this.name, "M_steveTools");
         frontEnd = window.siyuan.config.system.os;
         this.addIcons(`
     <symbol id="iconST" viewBox="0 0 512 512">

@@ -970,16 +970,35 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
     }
 }
 
-export async function getFromApi2(path: string, params: Record<string, string> = {}, headers: Record<string, string> = {}): Promise<any> {
-    const baseUrl = 'http://api2.232397.xyz';//统计api
+import { PluginConfig } from "./savedata";
 
-    // 构建查询字符串
+// 传入 PluginConfig 实例
+export async function getFromApi2(
+    path: string,
+    params: Record<string, string> = {},
+    headers: Record<string, string> = {},
+    pluginConfig?: PluginConfig // 
+): Promise<any> {
+    const baseUrl = 'http://api2.232397.xyz';
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `getFromApi2_${path}`;
+
+    // 检查配置文件中的日期
+    if (pluginConfig) {
+        const lastDate = pluginConfig.get<string>(key, "");
+        if (lastDate === today) {
+            return {
+                success: false,
+                error: '今日已请求，无需重复发送'
+            };
+        }
+    }
+
     const queryString = Object.keys(params).length > 0
         ? '?' + new URLSearchParams(params).toString()
         : '';
 
     const url = `${baseUrl}${path}${queryString}`;
-    // console.log('请求的URL:', url);
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -994,14 +1013,18 @@ export async function getFromApi2(path: string, params: Record<string, string> =
         }
 
         const data = await response.text();
-        // console.log('ok');
+
+        // 请求成功后记录日期到配置
+        if (pluginConfig) {
+            pluginConfig.set(key, today);
+            await pluginConfig.save();
+        }
+
         return {
             success: true,
             data
         };
     } catch (error) {
-        // 捕获所有错误但不抛出
-        // console.warn(`请求 ${url} 出错:`, error);
         return {
             success: false,
             error: `请求出错: ${error instanceof Error ? error.message : String(error)}`
