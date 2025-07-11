@@ -440,14 +440,67 @@
                 },
                 {
                     type: "select",
-                    title: "ics订阅导入的日记本",
-                    description: "选择ics订阅导入的日记本",
+                    title: "ics订阅导入模式",
+                    description: "选择ics订阅导入模式",
                     key: "cal-ics-import-mode",
                     value: settings["cal-ics-import-mode"],
                     options: {
                         "single-document": "导入到当日日记本",
                         "daily-notes": "根据事件日期导入",
                     },
+                },
+                {
+                    type: "checkbox",
+                    title: "添加到数据库",
+                    description: "启用后，ICS导入的日程块会自动添加到指定的数据库中",
+                    key: "cal-ics-add-to-database",
+                    value: settings["cal-ics-add-to-database"],
+                },
+                {
+                    type: "select",
+                    title: "ICS导入数据库",
+                    description: "选择ICS导入时要添加到的数据库",
+                    key: "cal-ics-database-id",
+                    value: settings["cal-ics-database-id"],
+                    options: (() => {
+                        try {
+                            if (
+                                !moduleInstances["M_calendar"] ||
+                                !moduleInstances["M_calendar"].av_ids
+                            ) {
+                                console.warn(
+                                    "Calendar module or av_ids not initialized",
+                                );
+                                return { "": "无可用数据库" };
+                            }
+                            const ids = moduleInstances["M_calendar"].av_ids;
+                            if (!Array.isArray(ids) || ids.length === 0) {
+                                return {
+                                    "": "无可用数据库请先导入日程周期模板",
+                                };
+                            }
+                            return Object.fromEntries(
+                                ids
+                                    .map((database) => {
+                                        if (!database?.id || !database?.name) {
+                                            console.warn(
+                                                "Invalid database entry:",
+                                                database,
+                                            );
+                                            return ["", "无效数据库"];
+                                        }
+                                        return [database.id, database.name];
+                                    })
+                                    .filter((entry) => entry[0] !== ""),
+                            );
+                        } catch (error) {
+                            console.error(
+                                "Error processing ICS database options:",
+                                error,
+                            );
+                            return { "": "加载数据库出错" };
+                        }
+                    })(),
                 },
                 {
                     type: "textinput",
@@ -949,7 +1002,7 @@
             ics设置: 7,
             ics分享: 9,
             qq邮箱日历: 4,
-            订阅日历: 5,
+            订阅日历: 7,
             视图设置: 8,
             滴答清单: 6,
             // 不限制

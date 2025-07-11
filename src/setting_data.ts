@@ -30,7 +30,9 @@ export const defaultSettings = {
     "cal-ics-subscribe-import": false,
     "cal-ics-subscribe-import-path": "",//暂时不处理
     "cal-ics-subscribe-import-note-id": null,
-    "cal-ics-import-mode": "single-document", 
+    "cal-ics-import-mode": "single-document",
+    "cal-ics-add-to-database": false, // 是否将ICS导入的块添加到数据库
+    "cal-ics-database-id": null, // ICS导入时使用的数据库ID 
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

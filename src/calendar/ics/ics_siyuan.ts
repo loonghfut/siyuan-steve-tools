@@ -1,7 +1,8 @@
 import * as api from "@/api";
-import { fetchGet, fetchSyncPost, IWebSocketData, showMessage } from "siyuan";
-import steveTools, { settingdata } from "@/index";
+import { fetchSyncPost, showMessage } from "siyuan";
+import steveTools, { settingdata, moduleInstances } from "@/index";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
+import { getViewId, getViewValue } from "../myF";
 
 interface ICSEvent {
     uid: string;
@@ -13,11 +14,11 @@ interface ICSEvent {
     isAllDay: boolean;
     recurrence?: string;
     status: 'TENTATIVE' | 'CONFIRMED' | 'CANCELLED';
+    tags?: string[];
 }
 
 export class ICSImporter {
     private plugin: steveTools;
-    private processedEventUIDs: Set<string> = new Set();
     private settings: any;
     private topBarButton: any; // 添加对顶栏按钮的引用
 
@@ -361,7 +362,7 @@ export class ICSImporter {
     /**
      * 检查文档中是否已存在指定UID的日程
      */
-    private async checkEventExists(documentId: string, uid: string): Promise<boolean> {
+    private async checkEventExists(_documentId: string, uid: string): Promise<boolean> {
         try {
             // const sqlStr = `
             //     SELECT id FROM blocks 
@@ -531,6 +532,19 @@ export class ICSImporter {
                     continue;
                 }
 
+                // https://github.com/loonghfut/siyuan-steve-tools/issues/73
+                // 识别标签
+                if (event.description && event.description.includes('#')) {
+                    // 匹配所有 #标签，支持中文、英文、数字
+                    const tagMatches = event.description.match(/#([\u4e00-\u9fa5\w]+)/g);
+                    if (tagMatches) {
+                        // 去掉#号，只保留标签内容
+                        event.tags = tagMatches.map(tag => tag.replace(/^#/, ''));
+                    } else {
+                        event.tags = [];
+                    }
+                }
+
                 const eventYear = event.startTime.getFullYear();
                 const eventMonth = (event.startTime.getMonth() + 1).toString().padStart(2, '0');
                 const eventDay = event.startTime.getDate().toString().padStart(2, '0');
@@ -571,7 +585,24 @@ export class ICSImporter {
 
                 const blockContent = this.generateEventBlock(event);
                 try {
-                    await api.prependBlock("markdown", blockContent, dailyNoteId);
+                    const result = await api.prependBlock("markdown", blockContent, dailyNoteId);
+
+                    // 如果插入成功且启用了数据库功能，添加到数据库
+                    if (result && this.settings['cal-ics-add-to-database']) {
+                        // 从返回结果中获取新创建的块ID
+                        let newBlockId = null;
+                        if (Array.isArray(result) && result.length > 0 && result[0].doOperations && result[0].doOperations.length > 0) {
+                            newBlockId = result[0].doOperations[0].id;
+                        }
+
+                        if (newBlockId) {
+                            await this.addBlockToDatabase(newBlockId, event);
+                            console.log(`已将ICS事件 "${event.title}" 添加到数据库 (日记模式)`);
+                        } else {
+                            console.warn(`无法获取新创建块的ID，跳过添加到数据库 (日记模式): ${event.title}`);
+                        }
+                    }
+
                     importedCount++;
                 } catch (e) {
                     const errorMessage = e instanceof Error ? e.message : String(e);
@@ -637,7 +668,24 @@ export class ICSImporter {
                 const blockContent = this.generateEventBlock(event);
                 // console.log(`生成超级块内容: ${blockContent}`);
                 // 插入到文档
-                await api.prependBlock("markdown", blockContent, documentId);
+                const result = await api.prependBlock("markdown", blockContent, documentId);
+
+                // 如果插入成功且启用了数据库功能，添加到数据库
+                if (result && this.settings['cal-ics-add-to-database']) {
+                    // 从返回结果中获取新创建的块ID
+                    let newBlockId = null;
+                    if (Array.isArray(result) && result.length > 0 && result[0].doOperations && result[0].doOperations.length > 0) {
+                        newBlockId = result[0].doOperations[0].id;
+                    }
+
+                    if (newBlockId) {
+                        await this.addBlockToDatabase(newBlockId, event);
+                        console.log(`已将ICS事件 "${event.title}" 添加到数据库`);
+                    } else {
+                        console.warn(`无法获取新创建块的ID，跳过添加到数据库: ${event.title}`);
+                    }
+                }
+
                 importedCount++;
 
                 // 添加小延时避免请求过快
@@ -667,5 +715,163 @@ export class ICSImporter {
         }
 
         await this.importEventsToDocument(icsUrl, documentId);
+    }
+
+    /**
+     * 将块添加到指定数据库
+     */
+    private async addBlockToDatabase(blockId: string, event: ICSEvent): Promise<void> {
+        // 检查是否启用数据库功能
+        if (!this.settings['cal-ics-add-to-database']) {
+            return;
+        }
+
+        const databaseId = this.settings['cal-ics-database-id'];
+        if (!databaseId) {
+            console.warn('ICS导入：未设置数据库ID，跳过添加到数据库');
+            return;
+        }
+
+        try {
+            // 添加块到数据库
+            await api.addBlockToDatabase_pro(blockId, databaseId);
+            console.log(`成功将块 ${blockId} 添加到数据库 ${databaseId}`);
+
+            // 添加小延时确保块已添加到数据库
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // 获取数据库的视图信息以便更新属性
+            try {
+                const viewValue = await this.getViewValueForDatabase(databaseId);
+                if (viewValue) {
+                    await this.updateDatabaseAttributes(blockId, databaseId, event, viewValue);
+                }
+            } catch (error) {
+                console.warn('更新数据库属性时出错:', error);
+                // 不抛出错误，因为块已经成功添加到数据库
+            }
+
+        } catch (error) {
+            console.error(`添加块到数据库失败 (blockId: ${blockId}, databaseId: ${databaseId}):`, error);
+            // 不抛出错误，避免影响导入流程
+        }
+    }
+
+    /**
+     * 获取数据库的视图信息
+     */
+    private async getViewValueForDatabase(databaseId: string): Promise<any> {
+        try {
+            // 获取模块实例
+            const calendarModule = moduleInstances?.['M_calendar'];
+            if (!calendarModule) {
+                console.warn('无法获取日历模块实例');
+                return null;
+            }
+
+            // 获取可用的数据库信息
+            const avIds = await calendarModule.getAVreferenceid_pro();
+            if (!avIds || avIds.length === 0) {
+                console.warn('无法获取数据库引用ID');
+                return null;
+            }
+
+            // 查找对应的数据库
+            const targetDb = avIds.find(db => db.id === databaseId);
+            if (!targetDb) {
+                console.warn(`未找到数据库 ${databaseId}`);
+                return null;
+            }
+
+            // 获取视图ID
+            const avIdStrings = avIds.map(db => db.id);
+            const viewIDs = await getViewId(avIdStrings);
+            if (!viewIDs || viewIDs.length === 0) {
+                console.warn('无法获取视图ID');
+                return null;
+            }
+
+            // 获取视图值
+            const viewValue = await getViewValue(viewIDs);
+            return viewValue;
+
+        } catch (error) {
+            console.error('获取数据库视图信息失败:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 从视图数据中获取字段ID（简化版本）
+     */
+    private async getKeyIDfromViewValue(viewValue: any, keyName: string, databaseId: string): Promise<string | undefined> {
+        try {
+            if (!viewValue || !Array.isArray(viewValue)) {
+                return undefined;
+            }
+
+            // 查找指定数据库的视图数据
+            for (const view of viewValue) {
+                if (view?.from?.rootid === databaseId && view?.data) {
+                    for (const item of view.data) {
+                        if (item && item[keyName] && item[keyName].keyID) {
+                            return item[keyName].keyID;
+                        }
+                    }
+                }
+            }
+
+            return undefined;
+        } catch (error) {
+            console.error(`获取字段ID失败 (keyName: ${keyName}):`, error);
+            return undefined;
+        }
+    }
+
+    /**
+     * 更新数据库中块的属性
+     */
+    private async updateDatabaseAttributes(blockId: string, databaseId: string, event: ICSEvent, viewValue: any): Promise<void> {
+        try {
+            console.log(`更新数据库属性ICSICS`, event);
+
+            // 更新标题
+            const titleKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', databaseId);
+            if (titleKeyID && event.title) {
+                await api.updateAttrViewCell_pro(blockId, databaseId, titleKeyID, event.title, "text");
+            }
+
+            // 更新开始时间和结束时间
+            const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间', databaseId);
+            if (timeKeyID && event.startTime) {
+                const dateStr = event.startTime instanceof Date ? event.startTime.toISOString() : event.startTime;
+                const endStr = event.endTime instanceof Date ? event.endTime.toISOString() : event.endTime;
+                await api.updateAttrViewCell_pro(blockId, databaseId, timeKeyID, dateStr, "date", endStr);
+            }
+
+            // 更新分类为"ICS导入"
+            const categoryKeyID = await this.getKeyIDfromViewValue(viewValue, '分类', databaseId);
+            if (categoryKeyID) {
+                const categoryData = [{ content: "ICS导入" }];
+                await api.updateAttrViewCell_pro(blockId, databaseId, categoryKeyID, categoryData, "select");
+            }
+
+            // 跟新标签
+            const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', databaseId);
+            if (tagKeyID && event.tags && event.tags.length > 0) {
+                const tagData = event.tags.map(tag => ({ content: tag }));
+                await api.updateAttrViewCell_pro(blockId, databaseId, tagKeyID, tagData, "mSelect");
+            }
+
+            // 更新描述
+            const noteKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', databaseId);
+            if (noteKeyID && event.description) {
+                await api.updateAttrViewCell_pro(blockId, databaseId, noteKeyID, event.description, "text");
+            }
+
+        } catch (error) {
+            console.error('更新数据库属性失败:', error);
+            // 不抛出错误，避免影响导入流程
+        }
     }
 }

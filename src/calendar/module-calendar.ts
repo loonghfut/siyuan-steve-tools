@@ -1221,7 +1221,7 @@ function transformEvents(inputEvents, isZQ: boolean = false) {
                 transformedEvents.push({
                     ...baseEvent,
                     end: timestampToArray(event.开始时间.end),
-                    status: event.状态.content === "完成" ? "CONFIRMED" : "TENTATIVE"
+                    status: event.状态?.content === "完成" ? "CONFIRMED" : "TENTATIVE"
                 });
             }
         });
