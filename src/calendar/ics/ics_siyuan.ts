@@ -327,9 +327,14 @@ export class ICSImporter {
             'CANCELLED': '已取消'
         };
         if (event.status && statusMap[event.status]) {
-            content += `状态： ${statusMap[event.status]}\n\n`;
+            content += `状态： ${statusMap[event.status]}    `;
         }
-
+        // 添加标签
+        if (event.tags && event.tags.length > 0) {
+            content += `标签： ${event.tags.map(tag => `#${tag}`).join(' ')}\n\n`;
+        }else{
+            content += `\n\n`;
+        }
         // 添加描述
         if (event.description) {
             // Regex to find URLs
