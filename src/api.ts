@@ -994,8 +994,9 @@ export async function getFromApi2(
         }
     }
 
-    const queryString = Object.keys(params).length > 0
-        ? '?' + new URLSearchParams(params).toString()
+    const safeParams = params ?? {};
+    const queryString = Object.keys(safeParams).length > 0
+        ? '?' + new URLSearchParams(safeParams).toString()
         : '';
 
     const url = `${baseUrl}${path}${queryString}`;
