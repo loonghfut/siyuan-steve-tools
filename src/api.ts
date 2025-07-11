@@ -894,7 +894,7 @@ export async function updateAttrViewCell_pro(
                 queuedDoOperations = []; // 清空队列
             }
             transactionTimer = null; // 重置计时器
-        }, 2000); // 2秒延迟
+        }, 1000); // 间隔延迟
     }
 }
 
