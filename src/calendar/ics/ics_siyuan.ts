@@ -540,10 +540,13 @@ export class ICSImporter {
                     if (tagMatches) {
                         // 去掉#号，只保留标签内容
                         event.tags = tagMatches.map(tag => tag.replace(/^#/, ''));
+                        // 去除原文中的标签和其后紧挨的逗号（英文和中文逗号）
+                        event.description = event.description.replace(/#([\u4e00-\u9fa5\w]+)[,，]?/g, '').trim();
                     } else {
                         event.tags = [];
                     }
                 }
+                console.log(`处理事件:taggggg `, event.tags);
 
                 const eventYear = event.startTime.getFullYear();
                 const eventMonth = (event.startTime.getMonth() + 1).toString().padStart(2, '0');
@@ -663,6 +666,22 @@ export class ICSImporter {
                     console.log(`跳过已存在的日程: ${event.title} (UID: ${event.uid})`);
                     continue;
                 }
+
+                // https://github.com/loonghfut/siyuan-steve-tools/issues/73
+                // 识别标签
+                if (event.description && event.description.includes('#')) {
+                    // 匹配所有 #标签，支持中文、英文、数字
+                    const tagMatches = event.description.match(/#([\u4e00-\u9fa5\w]+)/g);
+                    if (tagMatches) {
+                        // 去掉#号，只保留标签内容
+                        event.tags = tagMatches.map(tag => tag.replace(/^#/, ''));
+                        // 去除原文中的标签和其后紧挨的逗号（英文和中文逗号）
+                        event.description = event.description.replace(/#([\u4e00-\u9fa5\w]+)[,，]?/g, '').trim();
+                    } else {
+                        event.tags = [];
+                    }
+                }
+                console.log(`处理事件:taggggg `, event.tags);
 
                 // 生成超级块内容
                 const blockContent = this.generateEventBlock(event);
