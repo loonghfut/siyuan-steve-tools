@@ -985,8 +985,11 @@ export async function getFromApi2(
 
     // 检查配置文件中的日期
     if (pluginConfig) {
-        const lastDate = pluginConfig.get<string>(key, "");
+        await pluginConfig.load();
+        const lastDate = pluginConfig.get<string>(key);
+        console.log(`api2ok`);
         if (lastDate === today) {
+            // console.warn(`getFromApi2: 今日已请求，无需重复发送`);
             return {
                 success: false,
                 error: '今日已请求，无需重复发送'
