@@ -752,6 +752,9 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
 }
 
 
+let queuedDoOperations: IOperation[] = [];
+let transactionTimer: ReturnType<typeof setTimeout> | null = null;
+
 export async function updateAttrViewCell_pro(
     id: string,
     avID: string,
@@ -882,7 +885,17 @@ export async function updateAttrViewCell_pro(
             .slice(0, 14)
     });
 
-    Protyle.prototype.transaction(doOperations, []);
+    queuedDoOperations.push(...doOperations);
+
+    if (!transactionTimer) {
+        transactionTimer = setTimeout(() => {
+            if (queuedDoOperations.length > 0) {
+                Protyle.prototype.transaction(queuedDoOperations, []);
+                queuedDoOperations = []; // 清空队列
+            }
+            transactionTimer = null; // 重置计时器
+        }, 2000); // 2秒延迟
+    }
 }
 
 function transformBlockData(input: any[]): any[] {
