@@ -851,8 +851,8 @@
                     value: settings["PluginUsageStatistics"], // 默认为true
                 },
                 {
-                    type: "number",
-                    title: "数据库操作延迟时间",
+                    type: "slider",
+                    title: "数据库操作延迟时间(建议调为500)",
                     description:
                         "数据库批量处理的延迟时间，单位：毫秒。较小的值会处理得更快速但更容易出错",
                     key: "transaction-delay",
