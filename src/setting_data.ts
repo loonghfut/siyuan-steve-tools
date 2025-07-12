@@ -32,7 +32,16 @@ export const defaultSettings = {
     "cal-ics-subscribe-import-note-id": null,
     "cal-ics-import-mode": "single-document",
     "cal-ics-add-to-database": false, // 是否将ICS导入的块添加到数据库
-    "cal-ics-database-id": null, // ICS导入时使用的数据库ID 
+    "cal-ics-database-id": null, // ICS导入时使用的数据库ID
+    "cal-ics-custom-template": `### {{title}}
+
+开始时间： {{startTime}}
+结束时间： {{endTime}}
+地点： {{location}}
+状态： {{status}}
+标签： {{tags}}
+描述：{{description}}
+重复规则： {{recurrence}}`, // ICS导入块的自定义模板（只包含内容部分） 
     //// qq邮箱子模块
     "cal-qq-code": "",
     "cal-qq-email": "",

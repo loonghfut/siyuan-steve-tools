@@ -452,7 +452,8 @@
                 {
                     type: "checkbox",
                     title: "添加到数据库",
-                    description: "启用后，ICS导入的日程块会自动添加到指定的数据库中",
+                    description:
+                        "启用后，ICS导入的日程块会自动添加到指定的数据库中",
                     key: "cal-ics-add-to-database",
                     value: settings["cal-ics-add-to-database"],
                 },
@@ -501,6 +502,23 @@
                             return { "": "加载数据库出错" };
                         }
                     })(),
+                },
+                {
+                    type: "textarea",
+                    title: "ICS导入模板",
+                    description: `自定义ICS导入块的内容格式。支持的占位符：
+{{title}} - 事件标题
+{{startTime}} - 开始时间  
+{{endTime}} - 结束时间
+{{location}} - 地点
+{{description}} - 描述
+{{status}} - 状态
+{{recurrence}} - 重复规则
+{{tags}} - 标签
+`,
+                    key: "cal-ics-custom-template",
+                    direction: "row",
+                    value: settings["cal-ics-custom-template"],
                 },
                 {
                     type: "textinput",
@@ -607,7 +625,7 @@
                 //     value: { "": "加载中" },
                 // },
                 {
-                    type:"textinput",
+                    type: "textinput",
                     title: "滴答清单同步数据库id",
                     description: "滴答清单同步的数据库id",
                     key: "cal-dida-db-id",
@@ -620,9 +638,9 @@
                     key: "cal-dida-sync-mode",
                     value: settings["cal-dida-sync-mode"],
                     options: {
-                        "auto": "自动同步",
-                        "manual": "手动同步",
-                        "all": "自动+手动同步",
+                        auto: "自动同步",
+                        manual: "手动同步",
+                        all: "自动+手动同步",
                     },
                 },
                 {
@@ -631,7 +649,7 @@
                     description: "滴答清单自动同步的时间间隔(单位：分钟)",
                     key: "cal-dida-sync-interval",
                     value: settings["cal-dida-sync-interval"],
-                }
+                },
             ],
         },
         {
@@ -943,7 +961,7 @@
                     console.error("Error loading QQ calendars:", error);
                 }
             });
-             // Load Dida lists asynchronously
+            // Load Dida lists asynchronously
             Promise.resolve().then(async () => {
                 try {
                     const projects = await DidaService.getAllProjects();
@@ -1002,7 +1020,7 @@
             ics设置: 7,
             ics分享: 9,
             qq邮箱日历: 4,
-            订阅日历: 7,
+            订阅日历: 8,
             视图设置: 8,
             滴答清单: 6,
             // 不限制

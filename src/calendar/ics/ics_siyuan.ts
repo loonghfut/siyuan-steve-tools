@@ -319,72 +319,100 @@ export class ICSImporter {
     }
 
     /**
+     * 简单的模板变量替换
+     */
+    private renderTemplate(template: string, data: any): string {
+        let result = template;
+
+        // 处理普通占位符 {{variable}}
+        result = result.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+            const value = data[key];
+            if (value === undefined || value === null || value === '') {
+                return '';
+            }
+            return String(value);
+        });
+
+        // 移除空行（包含只有空格的行）
+        result = result.replace(/^\s*[\r\n]/gm, '').replace(/\n\s*\n/g, '\n');
+
+        return result;
+    }
+
+    /**
      * 生成日程超级块内容
      */
     private generateEventBlock(event: ICSEvent): string {
-        const startTimeStr = this.formatDateTime(event.startTime, event.isAllDay);
+        // 获取自定义模板内容，如果没有则使用默认内容
+        const contentTemplate = this.settings['cal-ics-custom-template'] || this.getDefaultContentTemplate();
+        
+        // 准备模板数据
+        const startTimeStr = event.startTime ? this.formatDateTime(event.startTime, event.isAllDay) : '';
         const endTimeStr = event.endTime ? this.formatDateTime(event.endTime, event.isAllDay) : '';
-
-        let content = `{{{row\n`;
-        content += `### ${event.title}\n\n`;
-
-        // 添加时间信息
-        if (event.isAllDay) {
-            content += `日期： ${startTimeStr}\n\n`;
-        } else {
-            content += `开始时间： ${startTimeStr}  `;
-            if (endTimeStr) {
-                content += `结束时间： ${endTimeStr}\n\n`;
-            }
-        }
-
-        // 添加地点
-        if (event.location) {
-            content += `地点： ${event.location}\n\n`;
-        }
-
-        // 添加状态
+        
+        // 处理状态映射
         const statusMap = {
             'TENTATIVE': '待定',
             'CONFIRMED': '已确认',
             'CANCELLED': '已取消'
         };
-        if (event.status && statusMap[event.status]) {
-            content += `状态： ${statusMap[event.status]}    `;
-        }
-        // 添加标签
-        if (event.tags && event.tags.length > 0) {
-            content += `标签： ${event.tags.map(tag => `#${tag}`).join(' ')}\n\n`;
-        }else{
-            content += `\n\n`;
-        }
-        // 添加描述
-        if (event.description) {
-            // Regex to find URLs
+        const statusText = event.status && statusMap[event.status] ? statusMap[event.status] : '';
+        
+        // 处理描述中的URL链接
+        let processedDescription = event.description || '';
+        if (processedDescription) {
             const urlRegex = /(https?:\/\/[^\s]+)/g;
-            let processedDescription = event.description;
+            const matches: string[] = [];
             let match;
-            // Store matches to avoid modifying the string while iterating
-            const matches = [];
-            while ((match = urlRegex.exec(event.description)) !== null) {
+            while ((match = urlRegex.exec(event.description || '')) !== null) {
                 matches.push(match[0]);
             }
-            // Replace URLs with Markdown links
             matches.forEach(url => {
                 processedDescription = processedDescription.replace(url, `[${url}](${url})`);
             });
-            content += `描述：${processedDescription}\n\n`;
         }
+        
+        // 处理标签
+        const tagsText = event.tags && event.tags.length > 0 ? 
+            event.tags.map(tag => `#${tag}`).join(' ') : '';
+        
+        const templateData = {
+            title: event.title || '',
+            startTime: startTimeStr,
+            endTime: endTimeStr,
+            location: event.location || '',
+            description: processedDescription,
+            status: statusText,
+            recurrence: event.recurrence || '',
+            tags: tagsText
+        };
+        
+        // 渲染用户自定义的内容部分
+        const renderedContent = this.renderTemplate(contentTemplate, templateData);
+        
+        // 包装成超级块并添加必要的属性
+        return `{{{row
+${renderedContent}
+}}}
+{: custom-ics-id="${event.uid}" custom-ics-event="true"}
 
-        // 添加重复规则
-        if (event.recurrence) {
-            content += `重复规则： ${event.recurrence}\n\n`;
-        }
+{: custom-ics-id="null" }
+`;
+    }
 
-        // 添加唯一标识符（隐藏在属性中）
-        content += `}}}\n{: custom-ics-id="${event.uid}" custom-ics-event="true"}`;
+    /**
+     * 获取默认模板内容（不包含超级块包装）
+     */
+    private getDefaultContentTemplate(): string {
+        return `### {{title}}
 
-        return content;
+开始时间： {{startTime}}
+结束时间： {{endTime}}
+地点： {{location}}
+状态： {{status}}
+标签： {{tags}}
+描述：{{description}}
+重复规则： {{recurrence}}`;
     }
 
     /**
