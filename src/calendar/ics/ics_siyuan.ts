@@ -187,7 +187,30 @@ export class ICSImporter {
             }
         }
 
-        return events;
+        // 按开始时间排序事件
+        return this.sortEventsByTime(events);
+    }
+
+    /**
+     * 按开始时间对事件进行排序
+     */
+    private sortEventsByTime(events: ICSEvent[]): ICSEvent[] {
+        return events.sort((a, b) => {
+            // 如果事件没有开始时间，排在最后
+            if (!a.startTime && !b.startTime) return 0;
+            if (!a.startTime) return 1;
+            if (!b.startTime) return -1;
+
+            // 按开始时间降序排序（最新的在前）
+            const timeA = a.startTime.getTime();
+            const timeB = b.startTime.getTime();
+            
+            if (timeA > timeB) return -1;
+            if (timeA < timeB) return 1;
+            
+            // 如果开始时间相同，按标题排序保证稳定性
+            return a.title.localeCompare(b.title);
+        });
     }
 
     /**
