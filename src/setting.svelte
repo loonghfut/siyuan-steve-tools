@@ -851,6 +851,19 @@
                     value: settings["PluginUsageStatistics"], // 默认为true
                 },
                 {
+                    type: "number",
+                    title: "数据库操作延迟时间",
+                    description:
+                        "数据库批量处理的延迟时间，单位：毫秒。较小的值会处理得更快速但更容易出错",
+                    key: "transaction-delay",
+                    value: settings["transaction-delay"],
+                    slider: {
+                        min: 200,
+                        max: 5000,
+                        step: 100,
+                    },
+                },
+                {
                     type: "button",
                     title: "今日本插件使用情况",
                     description: "查看本插件的使用情况",

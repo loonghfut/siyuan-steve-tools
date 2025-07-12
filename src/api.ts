@@ -894,7 +894,7 @@ export async function updateAttrViewCell_pro(
                 queuedDoOperations = []; // 清空队列
             }
             transactionTimer = null; // 重置计时器
-        }, 1000); // 间隔延迟
+        }, settingdata['transaction-delay'] || 1000); // 使用设置中的延迟时间，默认1000毫秒
     }
 }
 
