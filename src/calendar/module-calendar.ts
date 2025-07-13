@@ -1,7 +1,7 @@
 import steveTools, { frontEnd, settingdata } from "@/index";
 import { createEvents, EventAttributes } from 'ics';
 import { RRule } from 'rrule';
-import * as api from "@/api"
+import * as api from "@/api/api"
 import { showMessage, openTab, Dialog, getFrontend, confirm, Menu } from "siyuan";
 import * as ic from "@/icon"
 import "./event_style.scss";

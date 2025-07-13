@@ -1,5 +1,5 @@
 import { Plugin } from "siyuan";
-import { getBlockAttrs, setBlockAttrs, getHPathByID } from "../api";  // 修改导入
+import { getBlockAttrs, setBlockAttrs, getHPathByID } from "../api/api";  // 修改导入
 
 // 常量定义
 const LIFELOG_PREFIX = 'custom-lifelog-';

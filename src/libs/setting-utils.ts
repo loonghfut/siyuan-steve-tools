@@ -6,7 +6,7 @@
  * @LastEditTime : 2024-05-21 16:57:53
  * @Description  : 
  */
-import * as api from "@/api"
+import * as api from "@/api/api"
 import { Plugin, Setting } from 'siyuan';
 
 

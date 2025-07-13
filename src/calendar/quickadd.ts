@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import { IProtyle, showMessage, subMenu } from 'siyuan';
 import { allKBEvents, handleAddButtonClick } from './kanban';
-import { updateAttrViewCell_pro } from '@/api';
+import { updateAttrViewCell_pro } from '@/api/api';
 import { findEventByPublicId, run_getsubevents } from './myK';
 import { api } from '@frostime/siyuan-plugin-kits';
 

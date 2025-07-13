@@ -19,7 +19,7 @@ import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
 import { cardShapeMigrations, initCardsWithBlockIds } from './CardShape/card-shape-migrations';
 import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
-import * as api from '@/api';
+import * as api from '@/api/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 import { ICardShape } from './CardShape/card-shape-types';

@@ -3,7 +3,7 @@ import { Dida365ApiClient } from "./dida_api";
 import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
-import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 
 export class Dida365Service {

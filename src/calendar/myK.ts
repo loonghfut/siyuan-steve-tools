@@ -1,6 +1,6 @@
 import { showMessage, openWindow, Protyle } from "siyuan";
 import { KBCalendarEvent, NestedKBCalendarEvent } from "./interface";
-import * as api from "@/api";
+import * as api from "@/api/api";
 import { allKBEvents } from "./kanban";
 import { showEvent } from "./myF";
 import { settingdata } from '@/index';

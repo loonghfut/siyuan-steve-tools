@@ -3,7 +3,7 @@
     import { showMessage } from "siyuan";
     import { onMount } from "svelte";
     import SettingPanel from "@/libs/components/setting-panel.svelte";
-    import * as myapi from "@/api";
+    import * as myapi from "@/api/api";
     import { getSettings } from "./setting_data";
     import { DidaService } from "./calendar/module-calendar";
     import { convertProjectsToRecord } from "./calendar/dida/dida_interface";

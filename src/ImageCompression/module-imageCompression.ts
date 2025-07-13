@@ -1,5 +1,5 @@
 import steveTools from "@/index";
-import * as api from "@/api"
+import * as api from "@/api/api"
 import { IProtyle, showMessage } from "siyuan";
 import imageCompression from 'browser-image-compression';
 declare const siyuan: any;

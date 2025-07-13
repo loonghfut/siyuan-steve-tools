@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import * as tldata from './datamanager';
     import { showMessage } from 'siyuan';
-    import * as api from '@/api';
+    import * as api from '@/api/api';
 
     // 添加搜索关键词
     let searchQuery: string = '';

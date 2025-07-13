@@ -1,4 +1,4 @@
-import { generateSiyuanID } from "@/api";
+import { generateSiyuanID } from "@/api/api";
 
 
 export async function insertHtml() {

@@ -1,4 +1,4 @@
-import * as api from "@/api";
+import * as api from "@/api/api";
 import { fetchSyncPost, showMessage } from "siyuan";
 import steveTools, { settingdata, moduleInstances } from "@/index";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";

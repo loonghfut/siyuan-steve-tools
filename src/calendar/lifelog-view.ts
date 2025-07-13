@@ -1,5 +1,5 @@
 import { EventInput } from '@fullcalendar/core';
-import { getBlockAttrs, sql } from '../api';
+import { getBlockAttrs, sql } from '../api/api';
 import { ATTRS } from '../lifelog/module-lifelog';
 
 export class LifelogView {

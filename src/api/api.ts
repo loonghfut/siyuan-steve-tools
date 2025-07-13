@@ -9,7 +9,7 @@
 import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
 import { IOperation, Protyle } from "siyuan";
 import { ISelectOption } from "@/calendar/interface";
-import { settingdata } from ".";
+import { settingdata } from "..";
 
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
@@ -970,7 +970,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
     }
 }
 
-import { PluginConfig } from "./savedata";
+import { PluginConfig } from "../savedata";
 
 // 传入 PluginConfig 实例
 export async function getFromApi2(

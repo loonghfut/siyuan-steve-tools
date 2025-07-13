@@ -1,4 +1,4 @@
-import { getFileBlob } from "@/api";
+import { getFileBlob } from "@/api/api";
 import { showMessage } from "siyuan";
 import { calendarpath } from "../module-calendar";
 

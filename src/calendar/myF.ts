@@ -1,4 +1,4 @@
-import * as api from '@/api';
+import * as api from '@/api/api';
 import { ViewItem } from '@/calendar/interface';
 import * as sy from 'siyuan'
 import { settingdata } from '@/index';

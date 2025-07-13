@@ -14,7 +14,7 @@ import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
 import { ICardShape } from './card-shape-types'
 import { Protyle, showMessage } from 'siyuan';
-import * as api from '@/api';
+import * as api from '@/api/api';
 import { settingdata } from '@/index';
 
 let isCreatingBlock = false;

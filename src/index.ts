@@ -21,7 +21,7 @@ import {
     // fetchPost
 } from "siyuan";
 import "@/index.scss";
-import * as api from "@/api";
+import * as api from "@/api/api";
 // import { ModuleA } from "./libs/moduleA";
 import * as ic from "@/icon"
 import { M_calendar } from "./calendar/module-calendar";

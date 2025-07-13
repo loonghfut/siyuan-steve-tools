@@ -3,7 +3,7 @@ import { openTab, Plugin, showMessage, Tab } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 import { addWhiteboardButton } from "./function/assist";
-import * as api from "@/api";
+import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
 const tldrawInstances: Map<string, TldrawManager> = new Map();
 export class M_handwriting {

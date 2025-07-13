@@ -1,5 +1,5 @@
 import steveTools from "@/index";
-import * as api from "@/api"
+import * as api from "@/api/api"
 import { showMessage } from "siyuan";
 declare const siyuan: any;
 

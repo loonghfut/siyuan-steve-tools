@@ -1,4 +1,4 @@
-import { getFile, putFile } from "./api";
+import { getFile, putFile } from "./api/api";
 
 export class PluginConfig {
     private configPath: string;
