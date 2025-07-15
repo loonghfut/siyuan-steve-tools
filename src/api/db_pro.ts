@@ -1,5 +1,3 @@
-
-
 // ============== AVManager 类实现 ==============
 
 import {
@@ -27,6 +25,9 @@ export class AVManager {
     private baseURL: string = '';
     private defaultHeaders: { [key: string]: string };
     private timeout: number;
+    // 键缓存，用于减少API调用
+    private keyCache: Map<string, { keys: AttributeViewKey[], timestamp: number }> = new Map();
+    private cacheTimeout: number = 1 * 60 * 1000; // 1分钟缓存
 
     constructor(baseURL = '', options: AVManagerOptions = {}) {
         this.baseURL = baseURL;
@@ -91,6 +92,52 @@ export class AVManager {
             }
             console.error(`API调用失败 [${endpoint}]:`, error);
             throw error;
+        }
+    }
+
+    // ============== 缓存相关方法 ==============
+
+    /**
+     * 获取属性视图键（带缓存）
+     * @param avID - 属性视图ID
+     * @param forceRefresh - 是否强制刷新缓存
+     * @returns 键列表
+     */
+    private async getAttributeViewKeysWithCache(avID: string, forceRefresh: boolean = false): Promise<AttributeViewKey[]> {
+        const now = Date.now();
+        const cached = this.keyCache.get(avID);
+
+        if (!forceRefresh && cached && (now - cached.timestamp) < this.cacheTimeout) {
+            return cached.keys;
+        }
+
+        const keys = await this.getAttributeViewKeysByAvID(avID);
+        this.keyCache.set(avID, { keys, timestamp: now });
+        return keys;
+    }
+
+    /**
+     * 根据键名查找键ID
+     * @param avID - 属性视图ID
+     * @param keyName - 键名称
+     * @returns 键对象
+     */
+    private async findKeyByName(avID: string, keyName: string): Promise<AttributeViewKey> {
+        const keys = await this.getAttributeViewKeysWithCache(avID);
+        const key = keys.find(k => k.name === keyName);
+        if (!key) throw new Error(`未找到名称为 ${keyName} 的属性键`);
+        return key;
+    }
+
+    /**
+     * 清除键缓存
+     * @param avID - 属性视图ID（可选，不传则清除所有缓存）
+     */
+    clearKeyCache(avID?: string): void {
+        if (avID) {
+            this.keyCache.delete(avID);
+        } else {
+            this.keyCache.clear();
         }
     }
 
@@ -227,6 +274,7 @@ export class AVManager {
         keyType?: KeyType;
         keyIcon?: string;
         previousKeyID?: string;
+        previousKeyName?: string;
     } = {}): Promise<void> {
         if (!avID) throw new Error('avID不能为空');
 
@@ -236,16 +284,26 @@ export class AVManager {
             throw new Error(`无效的键类型: ${keyType}`);
         }
 
+        // 处理previousKeyID，优先使用previousKeyName
+        let previousKeyID = options.previousKeyID || '';
+        if (options.previousKeyName) {
+            const previousKey = await this.findKeyByName(avID, options.previousKeyName);
+            previousKeyID = previousKey.id;
+        }
+
         const params = {
             avID,
             keyID: options.keyID || this.generateId(),
             keyName: options.keyName || '新字段',
             keyType,
             keyIcon: options.keyIcon || '',
-            previousKeyID: options.previousKeyID || ''
+            previousKeyID
         };
 
-        return await this.request('addAttributeViewKey', params);
+        const result = await this.request('addAttributeViewKey', params);
+        // 添加键后清除缓存
+        this.clearKeyCache(avID);
+        return result;
     }
 
     /**
@@ -256,7 +314,10 @@ export class AVManager {
      */
     async removeAttributeViewKey(avID: string, keyID: string, removeRelationDest: boolean = false): Promise<void> {
         if (!avID || !keyID) throw new Error('avID和keyID不能为空');
-        return await this.request('removeAttributeViewKey', { avID, keyID, removeRelationDest });
+        const result = await this.request('removeAttributeViewKey', { avID, keyID, removeRelationDest });
+        // 删除键后清除缓存
+        this.clearKeyCache(avID);
+        return result;
     }
 
     /**
@@ -264,6 +325,7 @@ export class AVManager {
      * @param avID - 属性视图ID
      * @param keyName - 键名称
      * @param removeRelationDest - 是否删除关联目标
+     * ok
      */
     async removeAttributeViewKeyByName(avID: string, keyName: string, removeRelationDest: boolean = false): Promise<void> {
         if (!avID || !keyName) throw new Error('avID和keyName不能为空');
@@ -276,28 +338,36 @@ export class AVManager {
     /**
      * 排序属性视图键
      * @param avID - 属性视图ID
-     * @param keyID - 键ID
-     * @param previousKeyID - 前一个键ID
+     * @param keyName - 键名称
+     * @param previousKeyName - 前一个键名称
      */
-    async sortAttributeViewKey(avID: string, keyID: string, previousKeyID: string): Promise<void> {
-        if (!avID || !keyID) throw new Error('avID和keyID不能为空');
-        return await this.request('sortAttributeViewKey', { avID, keyID, previousKeyID: previousKeyID || '' });
+    async sortAttributeViewKey(avID: string, keyName: string, previousKeyName: string): Promise<void> {
+        if (!avID || !keyName) throw new Error('avID和keyName不能为空');
+        const key = await this.findKeyByName(avID, keyName);
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.request('sortAttributeViewKey', {
+            avID,
+            keyID: key.id,
+            previousKeyID: previousKey?.id || ''
+        });
     }
 
     /**
      * 排序视图中的属性键
      * @param avID - 属性视图ID
-     * @param keyID - 键ID
-     * @param previousKeyID - 前一个键ID
+     * @param keyName - 键名称
+     * @param previousKeyName - 前一个键名称
      * @param viewID - 视图ID
      */
-    async sortAttributeViewViewKey(avID: string, keyID: string, previousKeyID: string, viewID: string = ''): Promise<void> {
-        if (!avID || !keyID) throw new Error('avID和keyID不能为空');
+    async sortAttributeViewViewKey(avID: string, keyName: string, previousKeyName: string, viewID: string = ''): Promise<void> {
+        if (!avID || !keyName) throw new Error('avID和keyName不能为空');
+        const key = await this.findKeyByName(avID, keyName);
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
         return await this.request('sortAttributeViewViewKey', {
             avID,
             viewID,
-            keyID,
-            previousKeyID: previousKeyID || ''
+            keyID: key.id,
+            previousKeyID: previousKey?.id || ''
         });
     }
 
@@ -379,7 +449,31 @@ export class AVManager {
         if (!avID || !Array.isArray(blocksValues)) {
             throw new Error('avID不能为空，blocksValues必须是数组');
         }
-        return await this.request('appendAttributeViewDetachedBlocksWithValues', { avID, blocksValues });
+
+        // 转换keyName为keyID
+        const processedBlocksValues = await Promise.all(
+            blocksValues.map(async (blockValues) => {
+                return await Promise.all(
+                    blockValues.map(async (value) => {
+                        // 如果提供了keyName但没有keyID，则查找keyID
+                        if (value.keyName && !value.keyID) {
+                            const key = await this.findKeyByName(avID, value.keyName);
+                            return { ...value, keyID: key.id };
+                        }
+                        // 如果既没有keyName也没有keyID，抛出错误
+                        if (!value.keyID && !value.keyName) {
+                            throw new Error(`每个属性值必须包含keyID或keyName`);
+                        }
+                        return value;
+                    })
+                );
+            })
+        );
+
+        return await this.request('appendAttributeViewDetachedBlocksWithValues', { 
+            avID, 
+            blocksValues: processedBlocksValues 
+        });
     }
 
     /**
@@ -417,16 +511,17 @@ export class AVManager {
     /**
      * 设置块属性
      * @param avID - 属性视图ID
-     * @param keyID - 键ID
+     * @param keyName - 键名称
      * @param rowID - 行ID
      * @param value - 值
      * @returns 设置结果
      */
-    async setBlockAttribute(avID: string, keyID: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse> {
-        if (!avID || !keyID || !rowID) {
-            throw new Error('avID、keyID和rowID不能为空');
+    async setBlockAttribute(avID: string, keyName: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse> {
+        if (!avID || !keyName || !rowID) {
+            throw new Error('avID、keyName和rowID不能为空');
         }
-        return await this.request('setAttributeViewBlockAttr', { avID, keyID, rowID, value });
+        const key = await this.findKeyByName(avID, keyName);
+        return await this.request('setAttributeViewBlockAttr', { avID, keyID: key.id, rowID, value });
     }
 
     // ============== 数据库视图操作 ==============
@@ -523,56 +618,69 @@ export class AVManager {
 
     // ============== 便捷操作方法 ==============
 
-    async createTextKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'text', previousKeyID });
+    async createTextKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'text', previousKeyID: previousKey?.id || '' });
     }
 
-    async createNumberKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'number', previousKeyID });
+    async createNumberKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'number', previousKeyID: previousKey?.id || '' });
     }
 
-    async createDateKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'date', previousKeyID });
+    async createDateKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'date', previousKeyID: previousKey?.id || '' });
     }
 
-    async createSelectKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'select', previousKeyID });
+    async createSelectKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'select', previousKeyID: previousKey?.id || '' });
     }
 
-    async createMSelectKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'mSelect', previousKeyID });
+    async createMSelectKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'mSelect', previousKeyID: previousKey?.id || '' });
     }
 
-    async createRelationKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'relation', previousKeyID });
+    async createRelationKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'relation', previousKeyID: previousKey?.id || '' });
     }
 
-    async createCheckboxKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'checkbox', previousKeyID });
+    async createCheckboxKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'checkbox', previousKeyID: previousKey?.id || '' });
     }
 
-    async createUrlKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'url', previousKeyID });
+    async createUrlKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'url', previousKeyID: previousKey?.id || '' });
     }
 
-    async createEmailKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'email', previousKeyID });
+    async createEmailKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'email', previousKeyID: previousKey?.id || '' });
     }
 
-    async createPhoneKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'phone', previousKeyID });
+    async createPhoneKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'phone', previousKeyID: previousKey?.id || '' });
     }
 
-    async createTemplateKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'template', previousKeyID });
+    async createTemplateKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'template', previousKeyID: previousKey?.id || '' });
     }
 
-    async createCreatedKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'created', previousKeyID });
+    async createCreatedKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'created', previousKeyID: previousKey?.id || '' });
     }
 
-    async createUpdatedKey(avID: string, keyName: string, previousKeyID: string = ''): Promise<void> {
-        return await this.addAttributeViewKey(avID, { keyName, keyType: 'updated', previousKeyID });
+    async createUpdatedKey(avID: string, keyName: string, previousKeyName: string = ''): Promise<void> {
+        const previousKey = previousKeyName ? await this.findKeyByName(avID, previousKeyName) : null;
+        return await this.addAttributeViewKey(avID, { keyName, keyType: 'updated', previousKeyID: previousKey?.id || '' });
     }
 
     // ============== 批量操作方法 ==============
@@ -621,7 +729,7 @@ export class AVManager {
      * @returns 更新结果
      */
     async batchUpdateCells(avID: string, updates: Array<{
-        keyID: string;
+        keyName: string;
         rowID: string;
         value: any;
     }>): Promise<Array<{ success: boolean; result?: any; error?: string }>> {
@@ -630,7 +738,7 @@ export class AVManager {
         const results = [];
         for (const update of updates) {
             try {
-                const result = await this.setBlockAttribute(avID, update.keyID, update.rowID, update.value);
+                const result = await this.setBlockAttribute(avID, update.keyName, update.rowID, update.value);
                 results.push({ success: true, result });
             } catch (error) {
                 results.push({ success: false, error: error.message });
@@ -700,25 +808,26 @@ export class AVManager {
                 return await this.manager.addAttributeViewKey(this.avID, options);
             },
 
-            async removeKey(keyID, removeRelationDest = false) {
-                return await this.manager.removeAttributeViewKey(this.avID, keyID, removeRelationDest);
+            async removeKey(keyName, removeRelationDest = false) {
+                return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
             },
 
             async removeKeyByName(keyName, removeRelationDest = false) {
                 return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
             },
 
-            async addBlocks(sources, options = {}) {
-                return await this.manager.addAttributeViewBlocks(this.avID, sources, options);
+            async addBlocks(blocksValues: AttributeViewValue[][]) {
+                return await this.manager.appendDetachedBlocksWithValues(this.avID, blocksValues);
             },
 
             async removeBlocks(srcIDs) {
                 return await this.manager.removeAttributeViewBlocks(this.avID, srcIDs);
             },
 
-            async setCell(keyID, rowID, value) {
-                return await this.manager.setBlockAttribute(this.avID, keyID, rowID, value);
+            async setCell(keyName, rowID, value) {
+                return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value);
             },
+
 
             async getKeys() {
                 return await this.manager.getAttributeViewKeysByAvID(this.avID);
@@ -744,6 +853,72 @@ export class AVManager {
                 return await this.manager.getCurrentImages(this.avID, options);
             }
         };
+    }
+
+    // ============== 使用示例 ==============
+    
+    /**
+     * 使用示例：添加数据块及其值
+     * @param avID - 属性视图ID
+     * @returns 使用示例
+     */
+    async addBlocksExample(avID: string): Promise<void> {
+        // 示例：添加一个包含不同类型数据的块
+        const blocksValues = [[
+            // 主键类型（block类型）
+            {
+                keyName: "事件",
+                name: "事件",
+                block: {
+                    content: "新建事件标题"
+                }
+            },
+            // 文字类型
+            {
+                keyName: "描述",
+                name: "描述",
+                text: {
+                    content: "这是一个测试事件"
+                }
+            },
+            // 数字类型
+            {
+                keyName: "优先级",
+                name: "优先级",
+                number: {
+                    content: 1
+                }
+            },
+            // 日期类型
+            {
+                keyName: "开始时间",
+                name: "开始时间",
+                date: {
+                    content: Date.now(),
+                    hasEndDate: true,
+                    isNotTime: false
+                }
+            },
+            // 复选框类型
+            {
+                keyName: "已完成",
+                name: "已完成",
+                checkbox: {
+                    checked: false
+                }
+            },
+            // 单选类型
+            {
+                keyName: "状态",
+                name: "状态",
+                select: {
+                    content: "进行中",
+                    color: "var(--b3-card-info-color)"
+                }
+            }
+        ]];
+
+        await this.appendDetachedBlocksWithValues(avID, blocksValues);
     }
 }
 

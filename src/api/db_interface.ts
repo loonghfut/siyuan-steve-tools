@@ -57,22 +57,71 @@ export interface KeyOption {
 }
 
 export interface AttributeViewValue {
-    keyID: string;
-    id: string;
-    blockID: string;
-    type: KeyType;
-    text?: string;
-    number?: number;
-    date?: number;
-    checkbox?: boolean;
-    url?: string;
-    email?: string;
-    phone?: string;
-    mSelect?: string[];
-    relation?: string[];
-    template?: string;
-    created?: number;
-    updated?: number;
+    keyID?: string;
+    keyName?: string;
+    name: string;
+    // 主键类型（block类型）
+    block?: {
+        content: string;
+        blockID?: string;
+    };
+    // 文字类型
+    text?: {
+        content?: string;
+    };
+    // 数字类型
+    number?: {
+        content?: number;
+    };
+    // 日期类型
+    date?: {
+        content?: number;
+        hasEndDate?: boolean;
+        isNotTime?: boolean;
+    };
+    // 复选框类型
+    checkbox?: {
+        checked?: boolean;
+    };
+    // URL类型
+    url?: {
+        content?: string;
+    };
+    // 邮箱类型
+    email?: {
+        content?: string;
+    };
+    // 电话类型
+    phone?: {
+        content?: string;
+    };
+    // 多选类型
+    mSelect?: Array<{
+        content: string;
+        color: string;
+    }>;
+    // 关联类型
+    relation?: Array<{
+        blockID: string;
+        content: string;
+    }>;
+    // 模板类型
+    template?: {
+        content?: string;
+    };
+    // 创建时间类型
+    created?: {
+        content?: number;
+    };
+    // 更新时间类型
+    updated?: {
+        content?: number;
+    };
+    // 单选类型
+    select?: {
+        content: string;
+        color: string;
+    };
 }
 
 export interface AttributeViewRow {
@@ -117,7 +166,8 @@ export type KeyType =
     | 'phone'
     | 'template'
     | 'created'
-    | 'updated';
+    | 'updated'
+    | 'block';
 
 // 请求参数类型
 export interface SetAttrViewGroupRequest {
@@ -338,19 +388,16 @@ export interface IAVOperator {
         keyType?: KeyType;
         keyIcon?: string;
         previousKeyID?: string;
+        previousKeyName?: string;
     }): Promise<void>;
 
-    removeKey(keyID: string, removeRelationDest?: boolean): Promise<void>;
+    removeKey(keyName: string, removeRelationDest?: boolean): Promise<void>;
     removeKeyByName(keyName: string, removeRelationDest?: boolean): Promise<void>;
-    addBlocks(sources: BlockSource[], options?: {
-        blockID?: string;
-        previousID?: string;
-        ignoreFillFilter?: boolean;
-    }): Promise<void>;
+    addBlocks(blocksValues: AttributeViewValue[][]): Promise<void>;
 
     removeBlocks(srcIDs: string[]): Promise<void>;
 
-    setCell(keyID: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse>;
+    setCell(keyName: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse>;
 
     getKeys(): Promise<AttributeViewKey[]>;
 

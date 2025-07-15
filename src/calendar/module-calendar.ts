@@ -506,15 +506,26 @@ export class M_calendar {
                 // this.calendarAV.addKey({ keyName: "测试3" ,keyType:"date"});
                 // this.calendarAV.addKey({ keyName: "测试4" ,keyType:"select"});
                 // this.calendarAV.addKey({ keyName: "测试5" ,keyType:"text"});
-                // this.calendarAV.addKey({ keyName: "测试6" ,keyType:"number"});
-                // this.calendarAV.addKey({ keyName: "测试7" ,keyType:"mSelect"});
-                this.calendarAV.addKey({ keyName: "测试8" ,keyType:"relation"});
-                this.calendarAV.addBlocks(
-                    [{ id: "20250113212408-akkvj6a" },
-                    { id: this.calendarAV.manager.generateId(), content: '任务2', markdown: '# 任务2' }],
-                    {
-                        blockID: "20250113200532-ygf6abu",
-                    })
+                // this.calendarAV.addKey({ keyName: "测试8", keyType: "number" });
+                // this.calendarAV.addKey({ keyName: "测试7", keyType: "mSelect" });
+                // this.calendarAV.removeKey("测试8");
+
+                // 使用正确的数据格式
+                this.calendarAV.addBlocks([[{
+                    keyName: "事件",
+                    name: "事件",
+                    block: {
+                        content: "大苏打",
+                        blockID: "20250113212408-akkvj6a"
+                    }
+                }, {
+                    keyName: "描述",
+                    name: "描述",
+                    text: {
+                        content: "这是一个测试事件"
+                    }
+                },]]);
+
                 const keys = await this.calendarAV.getKeys();
                 console.log("keys", keys);
             }
