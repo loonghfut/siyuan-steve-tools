@@ -85,7 +85,7 @@
                                 !moduleInstances["M_calendar"].av_ids
                             ) {
                                 console.warn(
-                                    "Calendar module or av_ids not initialized",
+                                    "Calendar module or av_ids not initialized",moduleInstances["M_calendar"]
                                 );
                                 return { "": "无可用数据库" };
                             }

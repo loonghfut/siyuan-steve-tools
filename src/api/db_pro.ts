@@ -2,25 +2,26 @@
 
 // ============== AVManager 类实现 ==============
 
-import { AttributeViewKey, 
-         AttributeViewValue, 
-         AVManagerOptions, 
-         BlockSource, 
-         DuplicateAttributeViewBlockResponse, 
-         GetAttributeViewFilterSortResponse, 
-         GetAttributeViewPrimaryKeyValuesResponse, 
-         GetAttributeViewResponse, 
-         GetMirrorDatabaseBlocksResponse, 
-         IAVOperator, 
-         KeyType, 
-         LayoutType, 
-         RenderAttributeViewResponse, 
-         SearchAttributeViewNonRelationKeyResponse, 
-         SearchAttributeViewRelationKeyResponse, 
-         SearchAttributeViewResponse, 
-         SetAttributeViewBlockAttrResponse, 
-         ViewGroup,
-        } from "./db_interface";
+import {
+    AttributeViewKey,
+    AttributeViewValue,
+    AVManagerOptions,
+    BlockSource,
+    DuplicateAttributeViewBlockResponse,
+    GetAttributeViewFilterSortResponse,
+    GetAttributeViewPrimaryKeyValuesResponse,
+    GetAttributeViewResponse,
+    GetMirrorDatabaseBlocksResponse,
+    IAVOperator,
+    KeyType,
+    LayoutType,
+    RenderAttributeViewResponse,
+    SearchAttributeViewNonRelationKeyResponse,
+    SearchAttributeViewRelationKeyResponse,
+    SearchAttributeViewResponse,
+    SetAttributeViewBlockAttrResponse,
+    ViewGroup,
+} from "./db_interface";
 
 export class AVManager {
     private baseURL: string = '';
@@ -38,8 +39,24 @@ export class AVManager {
 
     // 生成符合SiYuan规范的随机ID
     generateId(): string {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+        // 生成时间戳部分
+        const now = new Date();
+        const timestamp = now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0') +
+            String(now.getSeconds()).padStart(2, '0');
+        // 生成随机字符串部分
+        const chars = 'abcdefghijklmnopqrstuvwxyz';
+        let randomStr = '';
+        for (let i = 0; i < 7; i++) {
+            randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        // 组合ID
+        return `${timestamp}-${randomStr}`;
     }
+
 
     // 通用请求方法，包含超时和重试机制
     async request(endpoint: string, data: any = {}): Promise<any> {
@@ -53,19 +70,19 @@ export class AVManager {
                 body: JSON.stringify(data),
                 signal: controller.signal
             });
-            
+
             clearTimeout(timeoutId);
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const result = await response.json();
-            
+
             if (result.code !== 0) {
                 throw new Error(result.msg || '请求失败');
             }
-            
+
             return result.data;
         } catch (error) {
             clearTimeout(timeoutId);
@@ -78,11 +95,12 @@ export class AVManager {
     }
 
     // ============== 属性视图基础操作 ==============
-    
+
     /**
      * 获取属性视图信息
      * @param avID - 属性视图ID
      * @returns 属性视图信息
+     * ok
      */
     async getAttributeView(avID: string): Promise<GetAttributeViewResponse> {
         if (!avID) throw new Error('avID不能为空');
@@ -100,7 +118,7 @@ export class AVManager {
         options: { viewID?: string; page?: number; pageSize?: number; query?: any } = {}
     ): Promise<RenderAttributeViewResponse> {
         if (!avID) throw new Error('avID不能为空');
-        
+
         const params = {
             id: avID,
             viewID: options.viewID || undefined,
@@ -108,14 +126,14 @@ export class AVManager {
             pageSize: options.pageSize || -1,
             query: options.query || undefined
         };
-        
+
         // 移除undefined值
         Object.keys(params).forEach(key => {
             if (params[key] === undefined) {
                 delete params[key];
             }
         });
-        
+
         return await this.request('renderAttributeView', params);
     }
 
@@ -151,12 +169,12 @@ export class AVManager {
         if (!avID || !blockID || !layoutType) {
             throw new Error('avID、blockID和layoutType不能为空');
         }
-        
+
         const validLayouts = this.getLayoutTypes();
         if (!validLayouts.includes(layoutType)) {
             throw new Error(`无效的布局类型: ${layoutType}`);
         }
-        
+
         return await this.request('changeAttrViewLayout', { avID, blockID, layoutType });
     }
 
@@ -179,16 +197,18 @@ export class AVManager {
      * 获取属性视图键列表
      * @param avID - 属性视图ID
      * @returns 键列表
+     * ?
      */
-    async getAttributeViewKeys(avID: string): Promise<AttributeViewKey[]> {
-        if (!avID) throw new Error('avID不能为空');
-        return await this.request('getAttributeViewKeys', { id: avID });
+    async getAttributeViewKeys(blockID: string): Promise<AttributeViewKey[]> {
+        if (!blockID) throw new Error('avID不能为空');
+        return await this.request('getAttributeViewKeys', { id: blockID });
     }
 
     /**
      * 根据avID获取属性视图键
      * @param avID - 属性视图ID
      * @returns 键列表
+     * ok
      */
     async getAttributeViewKeysByAvID(avID: string): Promise<AttributeViewKey[]> {
         if (!avID) throw new Error('avID不能为空');
@@ -199,6 +219,7 @@ export class AVManager {
      * 添加属性视图键
      * @param avID - 属性视图ID
      * @param options - 键选项
+     * ok
      */
     async addAttributeViewKey(avID: string, options: {
         keyID?: string;
@@ -208,13 +229,13 @@ export class AVManager {
         previousKeyID?: string;
     } = {}): Promise<void> {
         if (!avID) throw new Error('avID不能为空');
-        
+
         const keyType = options.keyType || 'text';
         const validTypes = this.getKeyTypes();
         if (!validTypes.includes(keyType)) {
             throw new Error(`无效的键类型: ${keyType}`);
         }
-        
+
         const params = {
             avID,
             keyID: options.keyID || this.generateId(),
@@ -223,7 +244,7 @@ export class AVManager {
             keyIcon: options.keyIcon || '',
             previousKeyID: options.previousKeyID || ''
         };
-        
+
         return await this.request('addAttributeViewKey', params);
     }
 
@@ -236,6 +257,20 @@ export class AVManager {
     async removeAttributeViewKey(avID: string, keyID: string, removeRelationDest: boolean = false): Promise<void> {
         if (!avID || !keyID) throw new Error('avID和keyID不能为空');
         return await this.request('removeAttributeViewKey', { avID, keyID, removeRelationDest });
+    }
+
+    /**
+     * 根据属性名称删除属性视图键
+     * @param avID - 属性视图ID
+     * @param keyName - 键名称
+     * @param removeRelationDest - 是否删除关联目标
+     */
+    async removeAttributeViewKeyByName(avID: string, keyName: string, removeRelationDest: boolean = false): Promise<void> {
+        if (!avID || !keyName) throw new Error('avID和keyName不能为空');
+        const keys = await this.getAttributeViewKeysByAvID(avID);
+        const key = keys.find(k => k.name === keyName);
+        if (!key) throw new Error(`未找到名称为 ${keyName} 的属性键`);
+        return await this.removeAttributeViewKey(avID, key.id, removeRelationDest);
     }
 
     /**
@@ -258,11 +293,11 @@ export class AVManager {
      */
     async sortAttributeViewViewKey(avID: string, keyID: string, previousKeyID: string, viewID: string = ''): Promise<void> {
         if (!avID || !keyID) throw new Error('avID和keyID不能为空');
-        return await this.request('sortAttributeViewViewKey', { 
-            avID, 
-            viewID, 
-            keyID, 
-            previousKeyID: previousKeyID || '' 
+        return await this.request('sortAttributeViewViewKey', {
+            avID,
+            viewID,
+            keyID,
+            previousKeyID: previousKeyID || ''
         });
     }
 
@@ -304,7 +339,7 @@ export class AVManager {
         if (!avID || !Array.isArray(sources)) {
             throw new Error('avID不能为空，sources必须是数组');
         }
-        
+
         const params = {
             avID,
             srcs: sources,
@@ -312,14 +347,14 @@ export class AVManager {
             previousID: options.previousID || undefined,
             ignoreFillFilter: options.ignoreFillFilter !== false
         };
-        
+
         // 移除undefined值
         Object.keys(params).forEach(key => {
             if (params[key] === undefined) {
                 delete params[key];
             }
         });
-        
+
         return await this.request('addAttributeViewBlocks', params);
     }
 
@@ -359,21 +394,21 @@ export class AVManager {
         keyword?: string;
     } = {}): Promise<GetAttributeViewPrimaryKeyValuesResponse> {
         if (!avID) throw new Error('avID不能为空');
-        
+
         const params = {
             id: avID,
             page: options.page || 1,
             pageSize: options.pageSize || -1,
             keyword: options.keyword || undefined
         };
-        
+
         // 移除undefined值
         Object.keys(params).forEach(key => {
             if (params[key] === undefined) {
                 delete params[key];
             }
         });
-        
+
         return await this.request('getAttributeViewPrimaryKeyValues', params);
     }
 
@@ -469,20 +504,20 @@ export class AVManager {
         query?: string;
     } = {}): Promise<string[]> {
         if (!avID) throw new Error('avID不能为空');
-        
+
         const params = {
             id: avID,
             viewID: options.viewID || undefined,
             query: options.query || undefined
         };
-        
+
         // 移除undefined值
         Object.keys(params).forEach(key => {
             if (params[key] === undefined) {
                 delete params[key];
             }
         });
-        
+
         return await this.request('getCurrentAttrViewImages', params);
     }
 
@@ -559,14 +594,14 @@ export class AVManager {
         ignoreFillFilter?: boolean;
     } = {}): Promise<void> {
         if (!Array.isArray(blocks)) throw new Error('blocks必须是数组');
-        
+
         const sources = blocks.map(block => ({
             id: block.id || this.generateId(),
             content: block.content || '',
             markdown: block.markdown || '',
             ...block
         }));
-        
+
         return await this.addAttributeViewBlocks(avID, sources, options);
     }
 
@@ -591,7 +626,7 @@ export class AVManager {
         value: any;
     }>): Promise<Array<{ success: boolean; result?: any; error?: string }>> {
         if (!Array.isArray(updates)) throw new Error('updates必须是数组');
-        
+
         const results = [];
         for (const update of updates) {
             try {
@@ -620,8 +655,8 @@ export class AVManager {
      */
     getKeyTypes(): KeyType[] {
         return [
-            'text', 'number', 'date', 'select', 'mSelect', 
-            'relation', 'checkbox', 'url', 'email', 'phone', 
+            'text', 'number', 'date', 'select', 'mSelect',
+            'relation', 'checkbox', 'url', 'email', 'phone',
             'template', 'created', 'updated'
         ];
     }
@@ -653,55 +688,58 @@ export class AVManager {
      */
     withAV(avID: string): IAVOperator {
         if (!avID) throw new Error('avID不能为空');
-        
+
         return {
             avID,
             manager: this,
-            
             async render(options = {}) {
                 return await this.manager.renderAttributeView(this.avID, options);
             },
-            
+
             async addKey(options = {}) {
                 return await this.manager.addAttributeViewKey(this.avID, options);
             },
-            
+
             async removeKey(keyID, removeRelationDest = false) {
                 return await this.manager.removeAttributeViewKey(this.avID, keyID, removeRelationDest);
             },
-            
+
+            async removeKeyByName(keyName, removeRelationDest = false) {
+                return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
+            },
+
             async addBlocks(sources, options = {}) {
                 return await this.manager.addAttributeViewBlocks(this.avID, sources, options);
             },
-            
+
             async removeBlocks(srcIDs) {
                 return await this.manager.removeAttributeViewBlocks(this.avID, srcIDs);
             },
-            
+
             async setCell(keyID, rowID, value) {
                 return await this.manager.setBlockAttribute(this.avID, keyID, rowID, value);
             },
-            
+
             async getKeys() {
-                return await this.manager.getAttributeViewKeys(this.avID);
+                return await this.manager.getAttributeViewKeysByAvID(this.avID);
             },
-            
+
             async getPrimaryKeys(options = {}) {
                 return await this.manager.getPrimaryKeyValues(this.avID, options);
             },
-            
+
             async duplicate() {
                 return await this.manager.duplicateAttributeView(this.avID);
             },
-            
+
             async getFilterSort(blockID) {
                 return await this.manager.getFilterSort(this.avID, blockID);
             },
-            
+
             async getMirrorBlocks() {
                 return await this.manager.getMirrorDatabaseBlocks(this.avID);
             },
-            
+
             async getCurrentImages(options = {}) {
                 return await this.manager.getCurrentImages(this.avID, options);
             }
@@ -710,17 +748,17 @@ export class AVManager {
 }
 
 // 导出类
-export default AVManager;
+// export default AVManager;
 
-// 兼容性导出
-declare global {
-    interface Window {
-        AVManager: typeof AVManager;
-    }
-}
+// // 兼容性导出
+// declare global {
+//     interface Window {
+//         AVManager: typeof AVManager;
+//     }
+// }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = AVManager;
-} else if (typeof window !== 'undefined') {
-    window.AVManager = AVManager;
-}
+// if (typeof module !== 'undefined' && module.exports) {
+//     module.exports = AVManager;
+// } else if (typeof window !== 'undefined') {
+//     window.AVManager = AVManager;
+// }

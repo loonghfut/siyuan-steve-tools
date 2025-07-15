@@ -3,7 +3,7 @@
  * 提供对属性视图（Attribute View）的完整操作接口
  */
 
-import AVManager from "./db_pro";
+import { AVManager } from "./db_pro";
 
 // ============== 类型定义 ==============
 
@@ -104,19 +104,19 @@ export interface Sort {
 // 枚举类型
 export type LayoutType = 'table' | 'board' | 'calendar' | 'gallery';
 
-export type KeyType = 
-    | 'text' 
-    | 'number' 
-    | 'date' 
-    | 'select' 
-    | 'mSelect' 
-    | 'relation' 
-    | 'checkbox' 
-    | 'url' 
-    | 'email' 
-    | 'phone' 
-    | 'template' 
-    | 'created' 
+export type KeyType =
+    | 'text'
+    | 'number'
+    | 'date'
+    | 'select'
+    | 'mSelect'
+    | 'relation'
+    | 'checkbox'
+    | 'url'
+    | 'email'
+    | 'phone'
+    | 'template'
+    | 'created'
     | 'updated';
 
 // 请求参数类型
@@ -324,14 +324,14 @@ export interface SetAttributeViewBlockAttrResponse {
 export interface IAVOperator {
     avID: string;
     manager: AVManager;
-    
+
     render(options?: {
         viewID?: string;
         page?: number;
         pageSize?: number;
         query?: string;
     }): Promise<RenderAttributeViewResponse>;
-    
+
     addKey(options?: {
         keyID?: string;
         keyName?: string;
@@ -339,33 +339,33 @@ export interface IAVOperator {
         keyIcon?: string;
         previousKeyID?: string;
     }): Promise<void>;
-    
+
     removeKey(keyID: string, removeRelationDest?: boolean): Promise<void>;
-    
+    removeKeyByName(keyName: string, removeRelationDest?: boolean): Promise<void>;
     addBlocks(sources: BlockSource[], options?: {
         blockID?: string;
         previousID?: string;
         ignoreFillFilter?: boolean;
     }): Promise<void>;
-    
+
     removeBlocks(srcIDs: string[]): Promise<void>;
-    
+
     setCell(keyID: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse>;
-    
+
     getKeys(): Promise<AttributeViewKey[]>;
-    
+
     getPrimaryKeys(options?: {
         page?: number;
         pageSize?: number;
         keyword?: string;
     }): Promise<GetAttributeViewPrimaryKeyValuesResponse>;
-    
+
     duplicate(): Promise<DuplicateAttributeViewBlockResponse>;
-    
+
     getFilterSort(blockID: string): Promise<GetAttributeViewFilterSortResponse>;
-    
+
     getMirrorBlocks(): Promise<GetMirrorDatabaseBlocksResponse>;
-    
+
     getCurrentImages(options?: {
         viewID?: string;
         query?: string;

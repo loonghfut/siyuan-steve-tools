@@ -25,12 +25,14 @@ import { Calendar } from "@fullcalendar/core";
 import { insertHtml, THIS } from "./insertHtml";
 import { ICSImporter } from "./ics/ics_siyuan";
 import { Dida365Service } from "./dida/dida_serv";
+import { AVManager } from "@/api/db_pro";
+import { IAVOperator } from "@/api/db_interface";
 
 
 
 // import { openNewWindowById } from "./myK";
 let allEvents: EventAttributes[] = [];
-export let DidaService: Dida365Service | null = null; 
+export let DidaService: Dida365Service | null = null;
 let this_settingdata: any = {};
 let islisten = true;
 let front: "desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile";
@@ -50,7 +52,7 @@ export class M_calendar {
     public webdavClient: WebDAVSync;
     public qqFullCalendarEvents;
     public icsSubscription: ICSSubscription;
-
+    public calendarAV: IAVOperator;
 
     async init(settingdata) {
         this.plugin.addTab({
@@ -365,10 +367,15 @@ export class M_calendar {
         }
         //
         //dida
-        if(this_settingdata["cal-dida-enable"] && this_settingdata["cal-dida-token"]){
+        if (this_settingdata["cal-dida-enable"] && this_settingdata["cal-dida-token"]) {
             DidaService = new Dida365Service(this_settingdata["cal-dida-token"], this.plugin);
         }
         //dida
+        const avManager = new AVManager();
+        console.log("avManager", avManager);
+        console.log("avidMMMM", settingdata["cal-db-id"]);
+        this.calendarAV = avManager.withAV(settingdata["cal-db-id"]);
+        console.log("avidMMMM22", settingdata["cal-av-id"]);
         //配置实现只在某一端上传ics
         const selectToPics = this_settingdata["SelectTOPics"];
         if (!selectToPics || selectToPics === frontEnd) {
@@ -429,7 +436,7 @@ export class M_calendar {
                 }
                 console.log("cursorElement", cursorElementId);
                 const blockId = cursorElementId
-                if(!blockId) {
+                if (!blockId) {
                     showMessage("请先选中一个块", 3000, "error");
                     return;
                 }
@@ -487,6 +494,29 @@ export class M_calendar {
                 } else {
                     await this.openRiChengView("kanban");
                 }
+            }
+        });
+        menu.addItem({
+            icon: "iconSTcal",
+            label: "测试",
+            click: async () => {
+                console.log("测试avmanager");
+                // this.calendarAV.addKey({ keyName: "测试" ,keyType:"checkbox"});
+                // this.calendarAV.addKey({ keyName: "测试2" ,keyType:"created"});
+                // this.calendarAV.addKey({ keyName: "测试3" ,keyType:"date"});
+                // this.calendarAV.addKey({ keyName: "测试4" ,keyType:"select"});
+                // this.calendarAV.addKey({ keyName: "测试5" ,keyType:"text"});
+                // this.calendarAV.addKey({ keyName: "测试6" ,keyType:"number"});
+                // this.calendarAV.addKey({ keyName: "测试7" ,keyType:"mSelect"});
+                this.calendarAV.addKey({ keyName: "测试8" ,keyType:"relation"});
+                this.calendarAV.addBlocks(
+                    [{ id: "20250113212408-akkvj6a" },
+                    { id: this.calendarAV.manager.generateId(), content: '任务2', markdown: '# 任务2' }],
+                    {
+                        blockID: "20250113200532-ygf6abu",
+                    })
+                const keys = await this.calendarAV.getKeys();
+                console.log("keys", keys);
             }
         });
         if (front == "browser-mobile" || front == "mobile") {
@@ -841,8 +871,8 @@ export class M_calendar {
             name: item.content?.split(' ')[0] || 'N/A'
         })).filter(item => item.id !== null);
 
-        steveTools.outlog(avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
-        steveTools.outlog("avIds", avIds);
+        console.log("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+
         return avIds;
     }
 
