@@ -527,7 +527,7 @@ export async function currentTime(): Promise<number> {
 
 // **************************************** User ****************************************
 export async function refresh() {
-    location.reload()
+    fetch('/api/system/reloadUI', { method: 'POST' })
 }
 
 export async function sync() {
