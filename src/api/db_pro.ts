@@ -1,5 +1,6 @@
 // ============== AVManager 类实现 ==============
 
+import { showMessage } from "siyuan";
 import {
     AttributeViewKey,
     AttributeViewValue,
@@ -126,9 +127,11 @@ export class AVManager {
     private async findKeyByName(avID: string, keyName: string): Promise<AttributeViewKey> {
         const keys = await this.getAttributeViewKeysWithCache(avID);
         const key = keys.find(k => k.name === keyName);
-        console.log("kEEY");
-        if (!key) throw new Error(`未找到名称为 ${keyName} 的属性键`);
-        console.log("sadasda1111111111111122cessd",key)
+        // console.log("kEEY", key);
+        if (!key) {
+            showMessage(`未找到名称为 ${keyName} 的属性键`, -1, "error");
+            console.error(`未找到名称为 ${keyName} 的属性键`);
+        }
         return key;
     }
 
@@ -520,13 +523,10 @@ export class AVManager {
      * @returns 设置结果
      */
     async setBlockAttribute(avID: string, keyName: string, rowID: string, value: setAttributeViewValue): Promise<SetAttributeViewBlockAttrResponse> {
-        console.log("sadasda1111111111111441")
         if (!avID || !keyName || !rowID) {
             throw new Error('avID、keyName和rowID不能为空');
         }
-        console.log("sadasda1111111111111122cessd")
         const key = await this.findKeyByName(avID, keyName);
-        console.log("sadasda1111111111111133")
         return await this.request('setAttributeViewBlockAttr', { avID, keyID: key.id, rowID, value });
     }
 
@@ -744,7 +744,6 @@ export class AVManager {
         const results = [];
         for (const update of updates) {
             try {
-                console.log("sadasda22222222222222")
                 const result = await this.setBlockAttribute(avID, update.keyName, update.rowID, update.value);
                 results.push({ success: true, result });
             } catch (error) {
@@ -801,84 +800,117 @@ export class AVManager {
      * @param avID - 属性视图ID
      * @returns 链式操作对象
      */
-    withAV(avID: string): IAVOperator {
-        if (!avID) throw new Error('avID不能为空');
-
-        return {
-            avID,
-            manager: this,
-            async render(options = {}) {
-                return await this.manager.renderAttributeView(this.avID, options);
-            },
-
-            async addKey(options = {}) {
-                return await this.manager.addAttributeViewKey(this.avID, options);
-            },
-
-            async removeKey(keyName, removeRelationDest = false) {
-                return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
-            },
-
-            async removeKeyByName(keyName, removeRelationDest = false) {
-                return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
-            },
-
-            async addBlocksMore(blocksValues: AttributeViewValue[][]) {
-                return await this.manager.appendDetachedBlocksWithValues(this.avID, blocksValues);
-            },
-
-            async addBlocks(sources: BlockSource[], options: {
-                blockID?: string;
-                previousID?: string;
-                ignoreFillFilter?: boolean;
-            } = {}) {
-                return await this.manager.addAttributeViewBlocks(this.avID, sources, options);
-            },
-
-            async removeBlocks(srcIDs) {
-                return await this.manager.removeAttributeViewBlocks(this.avID, srcIDs);
-            },
-
-            async setCell(keyName, rowID, value) {
-                return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value);
-            },
-
-            async setCells(updates: Array<{
-                keyName: string;
-                rowID: string;
-                value: setAttributeViewValue;
-            }>) {
-                console.log("sadasda11111111111111")
-                return await this.manager.batchUpdateCells(this.avID, updates);
-            },
-
-            async getKeys() {
-                return await this.manager.getAttributeViewKeysByAvID(this.avID);
-            },
-
-            async getPrimaryKeys(options = {}) {
-                return await this.manager.getPrimaryKeyValues(this.avID, options);
-            },
-
-            async duplicate() {
-                return await this.manager.duplicateAttributeView(this.avID);
-            },
-
-            async getFilterSort(blockID) {
-                return await this.manager.getFilterSort(this.avID, blockID);
-            },
-
-            async getMirrorBlocks() {
-                return await this.manager.getMirrorDatabaseBlocks(this.avID);
-            },
-
-            async getCurrentImages(options = {}) {
-                return await this.manager.getCurrentImages(this.avID, options);
-            }
-        };
+    createOperator(avID: string): AVOperator {
+        return new AVOperator(avID, this);
     }
 }
 
+// AVOperator 类应在 AVManager 外部定义
+class AVOperator implements IAVOperator {
+    avID: string;
+    manager: AVManager;
+
+    constructor(avID: string, manager: AVManager) {
+        this.avID = avID;
+        this.manager = manager;
+    }
+
+    async render(options: {
+        viewID?: string;
+        page?: number;
+        pageSize?: number;
+        query?: string;
+    } = {}): Promise<RenderAttributeViewResponse> {
+        return await this.manager.renderAttributeView(this.avID, options);
+    }
+
+    async addKey(options: {
+        keyID?: string;
+        keyName?: string;
+        keyType?: KeyType;
+        keyIcon?: string;
+        previousKeyID?: string;
+        previousKeyName?: string;
+    } = {}): Promise<void> {
+        return await this.manager.addAttributeViewKey(this.avID, options);
+    }
+
+    async removeKey(keyName: string, removeRelationDest: boolean = false): Promise<void> {
+        return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
+    }
+
+    async removeKeyByName(keyName: string, removeRelationDest: boolean = false): Promise<void> {
+        return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
+    }
+
+    async addBlocksMore(blocksValues: AttributeViewValue[][]): Promise<void> {
+        return await this.manager.appendDetachedBlocksWithValues(this.avID, blocksValues);
+    }
+
+    async addBlocks(
+        sources: BlockSource[],
+        options: {
+            blockID?: string;
+            previousID?: string;
+            ignoreFillFilter?: boolean;
+        } = {}
+    ): Promise<void> {
+        return await this.manager.addAttributeViewBlocks(this.avID, sources, options);
+    }
+
+    async removeBlocks(srcIDs: string[]): Promise<void> {
+        return await this.manager.removeAttributeViewBlocks(this.avID, srcIDs);
+    }
+
+    async setCell(
+        keyName: string,
+        rowID: string,
+        value: setAttributeViewValue
+    ): Promise<SetAttributeViewBlockAttrResponse> {
+        return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value);
+    }
+
+    async setCells(
+        updates: Array<{
+            keyName: string;
+            rowID: string;
+            value: setAttributeViewValue;
+        }>
+    ): Promise<any> {
+        return await this.manager.batchUpdateCells(this.avID, updates);
+    }
+
+    async getKeys(): Promise<AttributeViewKey[]> {
+        return await this.manager.getAttributeViewKeysByAvID(this.avID);
+    }
+
+    async getPrimaryKeys(options: {
+        page?: number;
+        pageSize?: number;
+        keyword?: string;
+    } = {}): Promise<GetAttributeViewPrimaryKeyValuesResponse> {
+        return await this.manager.getPrimaryKeyValues(this.avID, options);
+    }
+
+    async duplicate(): Promise<DuplicateAttributeViewBlockResponse> {
+        return await this.manager.duplicateAttributeView(this.avID);
+    }
+
+    async getFilterSort(blockID: string): Promise<GetAttributeViewFilterSortResponse> {
+        return await this.manager.getFilterSort(this.avID, blockID);
+    }
+
+    async getMirrorBlocks(): Promise<GetMirrorDatabaseBlocksResponse> {
+        return await this.manager.getMirrorDatabaseBlocks(this.avID);
+    }
+
+    async getCurrentImages(options: {
+        viewID?: string;
+        query?: string;
+    } = {}): Promise<string[]> {
+        return await this.manager.getCurrentImages(this.avID, options);
+    }
+}
 
 // 导出类
 // export default AVManager;

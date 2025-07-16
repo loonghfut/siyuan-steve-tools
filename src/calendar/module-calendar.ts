@@ -372,10 +372,10 @@ export class M_calendar {
         }
         //dida
         const avManager = new AVManager();
-        console.log("avManager", avManager);
-        console.log("avidMMMM", settingdata["cal-db-id"]);
-        this.calendarAV = avManager.withAV(settingdata["cal-db-id"]);
-        console.log("avidMMMM22", settingdata["cal-av-id"]);
+        // console.log("avManager", avManager);
+        // console.log("avidMMMM", settingdata["cal-db-id"]);
+        this.calendarAV = avManager.createOperator(settingdata["cal-db-id"]);
+        // console.log("avidMMMM22", settingdata["cal-av-id"]);
         //配置实现只在某一端上传ics
         const selectToPics = this_settingdata["SelectTOPics"];
         if (!selectToPics || selectToPics === frontEnd) {
@@ -514,20 +514,11 @@ export class M_calendar {
                 // this.calendarAV.addBlocks([{
                 //     id: "20250113211737-28ema3u", isDetached: false
                 // }]);
-                for (let i = 0; i < 100; i++) {
-                    await this.calendarAV.setCells([
-                        { keyName: "分类", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作23" }] } },
-                        { keyName: "状态", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作21" }] } },
-                    ]);
-                    // 可选：延时50毫秒，防止接口压力过大
-                    await new Promise(res => setTimeout(res, 50));
-                    await this.calendarAV.setCells([
-                        { keyName: "分类", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工" }] } },
-                        { keyName: "状态", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工21" }] } },
-                    ]);
-                    await new Promise(res => setTimeout(res, 50));
-                }
 
+                await this.calendarAV.setCells([
+                    { keyName: "分类1", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作666" }] } },
+                    { keyName: "状态2", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作66666" }] } },
+                ]);
 
                 // this.calendarAV.addBlocksMore([[{ keyName: "事件", block: {id:"20250113211737-fg3sar2", blockID: "20250113211737-fg3sar2", isDetached: false } }]])
 

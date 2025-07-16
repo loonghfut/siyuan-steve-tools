@@ -417,11 +417,12 @@ export interface IAVOperator {
     removeBlocks(srcIDs: string[]): Promise<void>;
 
     setCell(keyName: string, rowID: string, value: setAttributeViewValue): Promise<SetAttributeViewBlockAttrResponse>;
+    
     setCells(updates: Array<{
         keyName: string;
         rowID: string;
         value: setAttributeViewValue;
-    }>): Promise<void>;
+    }>);
     getKeys(): Promise<AttributeViewKey[]>;
 
     getPrimaryKeys(options?: {
