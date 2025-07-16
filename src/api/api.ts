@@ -35,7 +35,7 @@ const addBlockQueue: Array<{
 
 let isProcessingQueue = false;
 let isProcessingAddBlockQueue = false;
-const QUEUE_PROCESS_DELAY = settingdata["transaction-delay"]; // 1秒间隔处理队列中的请求
+// const QUEUE_PROCESS_DELAY = 500; // 1秒间隔处理队列中的请求
 const ADD_BLOCK_QUEUE_DELAY = 200; // 500ms间隔处理添加块队列中的请求
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
@@ -876,8 +876,8 @@ async function processQueue() {
         }
         
         // 每个请求处理完后都添加延迟
-        console.log(`Cell update processed, waiting ${QUEUE_PROCESS_DELAY}ms before next...`);
-        await new Promise(resolve => setTimeout(resolve, QUEUE_PROCESS_DELAY));
+        console.log(`Cell update processed, waiting ${settingdata["transaction-delay"]}ms before next...`);
+        await new Promise(resolve => setTimeout(resolve, settingdata["transaction-delay"]));
         console.log("Delay completed, ready for next cell update");
     }
     

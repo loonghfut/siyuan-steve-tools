@@ -62,9 +62,9 @@ export interface AttributeViewValue {
     // 主键类型（block类型）
     block?: {
         content?: string;
-        blockID: string;
+        blockID?: string;
         id?: string;
-        isDetached: boolean;
+        isDetached?: boolean;
     };
     // 文字类型
     text?: {
