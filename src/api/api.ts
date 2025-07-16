@@ -7,10 +7,36 @@
  */
 
 import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
-import { IOperation, Protyle } from "siyuan";
 import { ISelectOption } from "@/calendar/interface";
 import { settingdata } from "..";
+import { AVManager } from "./db_pro";
+// 创建 AVManager 实例 - 可以根据需要进行配置
+const avManager = new AVManager();
 
+// 请求队列，确保所有请求都按顺序执行
+const cellUpdateQueue: Array<{
+    id: string;
+    avID: string;
+    keyID: string;
+    value: any;
+    type: string;
+    endtime?: string;
+    resolve: (value: any) => void;
+    reject: (reason: any) => void;
+}> = [];
+
+// 添加块到数据库的队列
+const addBlockQueue: Array<{
+    id: string;
+    avID: string;
+    resolve: (value: any) => void;
+    reject: (reason: any) => void;
+}> = [];
+
+let isProcessingQueue = false;
+let isProcessingAddBlockQueue = false;
+const QUEUE_PROCESS_DELAY = settingdata["transaction-delay"]; // 1秒间隔处理队列中的请求
+const ADD_BLOCK_QUEUE_DELAY = 200; // 500ms间隔处理添加块队列中的请求
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
     let res = response.code === 0 ? response.data : `${url}error`;
@@ -684,36 +710,69 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
 }
 
 
-export async function addBlockToDatabase_pro(id: string, avID: string, protyle?: Protyle) {
-    let doOperations: IOperation[] = [];
-    let undoOperations: IOperation[] = [];
-    doOperations.push(
-        {
-            action: "insertAttrViewBlock",
-            avID: avID,
-            ignoreFillFilter: true,
-            srcs: [{
-                id: id,
-                isDetached: false
-            }],
-            // blockID: avID //TODO:这里的blockID是数据库块的id
-        },
-    );
-    doOperations.push(
-        {
-            action: "doUpdateUpdated",
+export async function addBlockToDatabase_pro(id: string, avID: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+        // 将所有请求添加到队列中，确保按顺序执行
+        addBlockQueue.push({
+            id,
+            avID,
+            resolve,
+            reject
+        });
+        
+        // 开始处理队列
+        processAddBlockQueue();
+    });
+}
+
+// 处理添加块队列函数
+async function processAddBlockQueue() {
+    if (isProcessingAddBlockQueue || addBlockQueue.length === 0) {
+        return;
+    }
+    
+    isProcessingAddBlockQueue = true;
+    
+    while (addBlockQueue.length > 0) {
+        const addBlockData = addBlockQueue.shift();
+        if (!addBlockData) continue;
+        
+        try {
+            console.log(`Processing add block: ${addBlockData.id} for avID: ${addBlockData.avID}`);
+            const result = await processAddBlock(addBlockData.id, addBlockData.avID);
+            addBlockData.resolve(result);
+        } catch (error) {
+            addBlockData.reject(error);
+        }
+        
+        // 每个请求处理完后都添加延迟
+        console.log(`Add block processed, waiting ${ADD_BLOCK_QUEUE_DELAY}ms before next...`);
+        await new Promise(resolve => setTimeout(resolve, ADD_BLOCK_QUEUE_DELAY));
+        console.log("Delay completed, ready for next add block");
+    }
+    
+    isProcessingAddBlockQueue = false;
+    console.log("Add block queue processing completed");
+}
+
+// 实际的添加块处理函数
+async function processAddBlock(id: string, avID: string): Promise<any> {
+    try {
+        // 使用 AVManager 的 addAttributeViewBlocks 方法添加块到数据库
+        const sources = [{
             id: id,
-            data: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/[:\-]|(\.\d{3})|T/g, "").slice(0, 14)
-        }
-    );
-    undoOperations.push(
-        {
-            action: "removeAttrViewBlock",
-            srcIDs: [id],
-            avID: avID
-        }
-    );
-    Protyle.prototype.transaction(doOperations, undoOperations);
+            isDetached: false
+        }];
+        
+        const result = await avManager.addAttributeViewBlocks(avID, sources, {
+            ignoreFillFilter: true
+        });
+        
+        return result;
+    } catch (error) {
+        console.error("Error adding block to database:", error);
+        throw error;
+    }
 }
 
 interface UpdateMainKeyParams {
@@ -752,8 +811,7 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
 }
 
 
-let queuedDoOperations: IOperation[] = [];
-let transactionTimer: ReturnType<typeof setTimeout> | null = null;
+
 
 export async function updateAttrViewCell_pro(
     id: string,
@@ -770,131 +828,180 @@ export async function updateAttrViewCell_pro(
     },
     type: 'date' | 'select' | 'relation' | 'checkbox' | 'text' | 'mSelect',
     endtime?: string
-) {
-    const doOperations: IOperation[] = [];
-    const newId = await generateSiyuanID() as string;
-    let cellData: any;
+): Promise<any> {
+    return new Promise((resolve, reject) => {
+        // 将所有请求添加到队列中，确保按顺序执行
+        cellUpdateQueue.push({
+            id,
+            avID,
+            keyID,
+            value,
+            type,
+            endtime,
+            resolve,
+            reject
+        });
+        
+        // 开始处理队列
+        processQueue();
+    });
+}
 
-    switch (type) {
-        case 'date':
-            const { start, end } = await getDateTimestamps(value as string);
-            cellData = {
-                type: "date",
-                date: {
-                    content: start,
-                    isNotEmpty: true,
-                    content2: endtime ? (await getDateTimestamps(endtime)).start : end,
-                    isNotEmpty2: true,
-                    hasEndDate: true,
-                    isNotTime: false
-                },
-                id: newId
-            };
-            break;
-
-        case 'select':
-            cellData = {
-                type: "select",
-                id: newId,
-                mSelect: value as ISelectOption[]
-            };
-            break;
-
-        case 'mSelect':
-            cellData = {
-                type: "mSelect",
-                id: newId,
-                mSelect: value as ISelectOption[]
-            };
-            break;
-
-        case 'checkbox':
-            cellData = {
-                type: "checkbox",
-                id: newId,
-                checkbox: {
-                    checked: value as boolean
-                },
-            }
-            break;
-
-        case 'relation':
-            const { blockID, content, oldrelation, action } = value as {
-                blockID: string,
-                content: string,
-                oldrelation: {
-                    ids: string[],
-                    contents: string[]
-                },
-                action: string
-            };
-            const readyContents = transformBlockData(oldrelation.contents);
-            if (action === 'add') {
-                if (oldrelation.ids.includes(blockID)) return;
-                oldrelation.ids.push(blockID);
-                readyContents.push({
-                    block: { content: content, id: blockID },
-                    isDetached: false,
-                    type: "block"
-                });
-            } else if (action === 'remove') {
-                const index = oldrelation.ids.indexOf(blockID);
-                if (index === -1) return;
-                oldrelation.ids.splice(index, 1);
-                readyContents.splice(index, 1);
-            } else {
-                console.error("action error");
-                return
-            }
-            cellData = {
-                type: "relation",
-                id: newId,
-                relation: {
-                    blockIDs: oldrelation.ids,
-                    contents: readyContents
-                }
-            };
-            break;
-
-        case 'text':
-            cellData = {
-                type: "text",
-                id: newId,
-                text: {
-                    content: value as string
-                }
-            }
-            break;
+// 处理队列函数
+async function processQueue() {
+    if (isProcessingQueue || cellUpdateQueue.length === 0) {
+        return;
     }
+    
+    isProcessingQueue = true;
+    console.log(`Starting to process cell update queue with ${cellUpdateQueue.length} items`);
+    
+    while (cellUpdateQueue.length > 0) {
+        const updateData = cellUpdateQueue.shift();
+        if (!updateData) continue;
+        
+        try {
+            console.log(`Processing cell update: ${updateData.id} for avID: ${updateData.avID}, keyID: ${updateData.keyID}`);
+            const result = await processCellUpdate(
+                updateData.id,
+                updateData.avID,
+                updateData.keyID,
+                updateData.value,
+                updateData.type,
+                updateData.endtime
+            );
+            updateData.resolve(result);
+        } catch (error) {
+            updateData.reject(error);
+        }
+        
+        // 每个请求处理完后都添加延迟
+        console.log(`Cell update processed, waiting ${QUEUE_PROCESS_DELAY}ms before next...`);
+        await new Promise(resolve => setTimeout(resolve, QUEUE_PROCESS_DELAY));
+        console.log("Delay completed, ready for next cell update");
+    }
+    
+    isProcessingQueue = false;
+    console.log("Cell update queue processing completed");
+}
 
-    doOperations.push({
-        action: "updateAttrViewCell",
-        id: newId,
-        avID,
-        keyID,
-        rowID: id,
-        data: cellData
-    });
+// 实际的处理函数
+async function processCellUpdate(
+    id: string,
+    avID: string,
+    keyID: string,
+    value: any,
+    type: string,
+    endtime?: string
+): Promise<any> {
+    try {
+        let processedValue: any;
 
-    doOperations.push({
-        action: "doUpdateUpdated",
-        id: newId,
-        data: new Date(Date.now() + 8 * 60 * 60 * 1000)
-            .toISOString()
-            .replace(/[:\-]|(\.\d{3})|T/g, "")
-            .slice(0, 14)
-    });
+        switch (type) {
+            case 'date':
+                const { start, end } = await getDateTimestamps(value as string);
+                processedValue = {
+                    type: "date",
+                    date: {
+                        content: start,
+                        isNotEmpty: true,
+                        content2: endtime ? (await getDateTimestamps(endtime)).start : end,
+                        isNotEmpty2: true,
+                        hasEndDate: true,
+                        isNotTime: false
+                    }
+                };
+                break;
 
-    queuedDoOperations.push(...doOperations);
+            case 'select':
+                processedValue = {
+                    type: "select",
+                    mSelect: value as ISelectOption[]
+                };
+                break;
 
-    if (!transactionTimer) {
-        transactionTimer = setTimeout(() => {
-            if (queuedDoOperations.length > 0) {
-                Protyle.prototype.transaction(queuedDoOperations, []);
-                queuedDoOperations = []; // 清空队列
-            }
-            transactionTimer = null; // 重置计时器
-        }, settingdata['transaction-delay'] || 1000); // 使用设置中的延迟时间，默认1000毫秒
+            case 'mSelect':
+                processedValue = {
+                    type: "mSelect",
+                    mSelect: value as ISelectOption[]
+                };
+                break;
+
+            case 'checkbox':
+                processedValue = {
+                    type: "checkbox",
+                    checkbox: {
+                        checked: value as boolean
+                    }
+                };
+                break;
+
+            case 'relation':
+                const { blockID, content, oldrelation, action } = value as {
+                    blockID: string,
+                    content: string,
+                    oldrelation: {
+                        ids: string[],
+                        contents: string[]
+                    },
+                    action: string
+                };
+                const readyContents = transformBlockData(oldrelation.contents);
+                if (action === 'add') {
+                    if (oldrelation.ids.includes(blockID)) return;
+                    oldrelation.ids.push(blockID);
+                    readyContents.push({
+                        block: { content: content, id: blockID },
+                        isDetached: false,
+                        type: "block"
+                    });
+                } else if (action === 'remove') {
+                    const index = oldrelation.ids.indexOf(blockID);
+                    if (index === -1) return;
+                    oldrelation.ids.splice(index, 1);
+                    readyContents.splice(index, 1);
+                } else {
+                    console.error("action error");
+                    return;
+                }
+                processedValue = {
+                    type: "relation",
+                    relation: {
+                        blockIDs: oldrelation.ids,
+                        contents: readyContents
+                    }
+                };
+                break;
+
+            case 'text':
+                processedValue = {
+                    type: "text",
+                    text: {
+                        content: value as string
+                    }
+                };
+                break;
+
+            default:
+                console.error("Unsupported type:", type);
+                return;
+        }
+
+        // 首先需要获取键名，因为 AVManager 的 setBlockAttribute 方法需要键名
+        const keys = await avManager.getAttributeViewKeysByAvID(avID);
+        const key = keys.find(k => k.id === keyID);
+        if (!key) {
+            console.error("Key not found:", keyID);
+            return;
+        }
+
+        // 使用 AVManager 的 setBlockAttribute 方法设置属性
+        const result = await avManager.setBlockAttribute(avID, key.name, id, processedValue);
+
+        return result;
+    } catch (error) {
+        console.error("Error updating attribute view cell:", error);
+        throw error;
     }
 }
 

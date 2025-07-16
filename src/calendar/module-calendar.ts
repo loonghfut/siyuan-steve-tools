@@ -371,11 +371,11 @@ export class M_calendar {
             DidaService = new Dida365Service(this_settingdata["cal-dida-token"], this.plugin);
         }
         //dida
-        const avManager = new AVManager();
-        // console.log("avManager", avManager);
-        // console.log("avidMMMM", settingdata["cal-db-id"]);
-        this.calendarAV = avManager.createOperator(settingdata["cal-db-id"]);
-        // console.log("avidMMMM22", settingdata["cal-av-id"]);
+        // const avManager = new AVManager();
+        // // console.log("avManager", avManager);
+        // // console.log("avidMMMM", settingdata["cal-db-id"]);
+        // this.calendarAV = avManager.createOperator(settingdata["cal-db-id"]);
+        // // console.log("avidMMMM22", settingdata["cal-av-id"]);
         //配置实现只在某一端上传ics
         const selectToPics = this_settingdata["SelectTOPics"];
         if (!selectToPics || selectToPics === frontEnd) {
@@ -496,36 +496,14 @@ export class M_calendar {
                 }
             }
         });
-        menu.addItem({
-            icon: "iconSTcal",
-            label: "测试",
-            click: async () => {
-                console.log("测试avmanager");
-                // this.calendarAV.addKey({ keyName: "测试" ,keyType:"checkbox"});
-                // this.calendarAV.addKey({ keyName: "测试2" ,keyType:"created"});
-                // this.calendarAV.addKey({ keyName: "测试3" ,keyType:"date"});
-                // this.calendarAV.addKey({ keyName: "测试4" ,keyType:"select"});
-                // this.calendarAV.addKey({ keyName: "测试5" ,keyType:"text"});
-                // this.calendarAV.addKey({ keyName: "测试8", keyType: "number" });
-                // this.calendarAV.addKey({ keyName: "测试7", keyType: "mSelect" });
-                // this.calendarAV.removeKey("测试8");
-
-                // 使用正确的数据格式
-                // this.calendarAV.addBlocks([{
-                //     id: "20250113211737-28ema3u", isDetached: false
-                // }]);
-
-                await this.calendarAV.setCells([
-                    { keyName: "分类1", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作666" }] } },
-                    { keyName: "状态2", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作66666" }] } },
-                ]);
-
-                // this.calendarAV.addBlocksMore([[{ keyName: "事件", block: {id:"20250113211737-fg3sar2", blockID: "20250113211737-fg3sar2", isDetached: false } }]])
-
-                // const keys = await this.calendarAV.getKeys();
-                console.log("keys");
-            }
-        });
+        // menu.addItem({
+        //     icon: "iconSTcal",
+        //     label: "测试",
+        //     click: async () => {
+        //         console.log("测试avmanager");
+        //         console.log("keys");
+        //     }
+        // });
         if (front == "browser-mobile" || front == "mobile") {
             menu.fullscreen();
         } else {

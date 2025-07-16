@@ -916,14 +916,10 @@ class AVOperator implements IAVOperator {
 // export default AVManager;
 
 // // 兼容性导出
-// declare global {
-//     interface Window {
-//         AVManager: typeof AVManager;
-//     }
-// }
+declare global {
+    interface Window {
+        AVManager: typeof AVManager;
+    }
+}
 
-// if (typeof module !== 'undefined' && module.exports) {
-//     module.exports = AVManager;
-// } else if (typeof window !== 'undefined') {
-//     window.AVManager = AVManager;
-// }
+window.AVManager = AVManager;
