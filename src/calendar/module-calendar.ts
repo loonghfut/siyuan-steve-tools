@@ -511,23 +511,28 @@ export class M_calendar {
                 // this.calendarAV.removeKey("测试8");
 
                 // 使用正确的数据格式
-                this.calendarAV.addBlocks([[{
-                    keyName: "事件",
-                    name: "事件",
-                    block: {
-                        content: "大苏打",
-                        blockID: "20250113212408-akkvj6a"
-                    }
-                }, {
-                    keyName: "描述",
-                    name: "描述",
-                    text: {
-                        content: "这是一个测试事件"
-                    }
-                },]]);
+                // this.calendarAV.addBlocks([{
+                //     id: "20250113211737-28ema3u", isDetached: false
+                // }]);
+                for (let i = 0; i < 100; i++) {
+                    await this.calendarAV.setCells([
+                        { keyName: "分类", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作23" }] } },
+                        { keyName: "状态", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工作21" }] } },
+                    ]);
+                    // 可选：延时50毫秒，防止接口压力过大
+                    await new Promise(res => setTimeout(res, 50));
+                    await this.calendarAV.setCells([
+                        { keyName: "分类", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工" }] } },
+                        { keyName: "状态", rowID: "20250113211737-28ema3u", value: { mSelect: [{ content: "工21" }] } },
+                    ]);
+                    await new Promise(res => setTimeout(res, 50));
+                }
 
-                const keys = await this.calendarAV.getKeys();
-                console.log("keys", keys);
+
+                // this.calendarAV.addBlocksMore([[{ keyName: "事件", block: {id:"20250113211737-fg3sar2", blockID: "20250113211737-fg3sar2", isDetached: false } }]])
+
+                // const keys = await this.calendarAV.getKeys();
+                console.log("keys");
             }
         });
         if (front == "browser-mobile" || front == "mobile") {

@@ -59,11 +59,12 @@ export interface KeyOption {
 export interface AttributeViewValue {
     keyID?: string;
     keyName?: string;
-    name: string;
     // 主键类型（block类型）
     block?: {
-        content: string;
-        blockID?: string;
+        content?: string;
+        blockID: string;
+        id?: string;
+        isDetached: boolean;
     };
     // 文字类型
     text?: {
@@ -221,10 +222,10 @@ export interface AddAttributeViewBlocksRequest {
 }
 
 export interface BlockSource {
-    id?: string;
-    content?: string;
-    markdown?: string;
-    [key: string]: any;
+    id: string;
+    isDetached: boolean,              // 游离块
+    content?: string,
+    // [key: string]: any;
 }
 
 export interface RemoveAttributeViewBlocksRequest {
@@ -366,6 +367,20 @@ export interface RenderAttributeViewResponse {
     isMirror: boolean;
 }
 
+export type setAttributeViewValue =
+    | { text: { content: string } }
+    | { number: { content: number } }
+    | { date: { content: number; isNotTime?: boolean; hasEndDate?: boolean; content2?: number } }
+    | { mSelect: Array<{ content: string; color?: string }> }
+    | { checkbox: { checked: boolean } }
+    | { url: { content: string } }
+    | { email: { content: string } }
+    | { phone: { content: string } }
+    | { mAsset: Array<{ type: "file" | "image"; name: string; content: string }> }
+    | { relation: { blockIDs: string[] } }
+    | { block: { id: string; icon?: string; content: string; created?: number; updated?: number } };
+
+
 export interface SetAttributeViewBlockAttrResponse {
     value: any;
 }
@@ -393,12 +408,20 @@ export interface IAVOperator {
 
     removeKey(keyName: string, removeRelationDest?: boolean): Promise<void>;
     removeKeyByName(keyName: string, removeRelationDest?: boolean): Promise<void>;
-    addBlocks(blocksValues: AttributeViewValue[][]): Promise<void>;
-
+    addBlocksMore(blocksValues: AttributeViewValue[][]): Promise<void>;
+    addBlocks(sources: BlockSource[], options?: {
+        blockID?: string;
+        previousID?: string;
+        ignoreFillFilter?: boolean;
+    }): Promise<void>;
     removeBlocks(srcIDs: string[]): Promise<void>;
 
-    setCell(keyName: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse>;
-
+    setCell(keyName: string, rowID: string, value: setAttributeViewValue): Promise<SetAttributeViewBlockAttrResponse>;
+    setCells(updates: Array<{
+        keyName: string;
+        rowID: string;
+        value: setAttributeViewValue;
+    }>): Promise<void>;
     getKeys(): Promise<AttributeViewKey[]>;
 
     getPrimaryKeys(options?: {

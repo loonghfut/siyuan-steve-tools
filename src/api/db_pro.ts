@@ -18,6 +18,7 @@ import {
     SearchAttributeViewRelationKeyResponse,
     SearchAttributeViewResponse,
     SetAttributeViewBlockAttrResponse,
+    setAttributeViewValue,
     ViewGroup,
 } from "./db_interface";
 
@@ -125,7 +126,9 @@ export class AVManager {
     private async findKeyByName(avID: string, keyName: string): Promise<AttributeViewKey> {
         const keys = await this.getAttributeViewKeysWithCache(avID);
         const key = keys.find(k => k.name === keyName);
+        console.log("kEEY");
         if (!key) throw new Error(`未找到名称为 ${keyName} 的属性键`);
+        console.log("sadasda1111111111111122cessd",key)
         return key;
     }
 
@@ -470,9 +473,9 @@ export class AVManager {
             })
         );
 
-        return await this.request('appendAttributeViewDetachedBlocksWithValues', { 
-            avID, 
-            blocksValues: processedBlocksValues 
+        return await this.request('appendAttributeViewDetachedBlocksWithValues', {
+            avID,
+            blocksValues: processedBlocksValues
         });
     }
 
@@ -516,11 +519,14 @@ export class AVManager {
      * @param value - 值
      * @returns 设置结果
      */
-    async setBlockAttribute(avID: string, keyName: string, rowID: string, value: any): Promise<SetAttributeViewBlockAttrResponse> {
+    async setBlockAttribute(avID: string, keyName: string, rowID: string, value: setAttributeViewValue): Promise<SetAttributeViewBlockAttrResponse> {
+        console.log("sadasda1111111111111441")
         if (!avID || !keyName || !rowID) {
             throw new Error('avID、keyName和rowID不能为空');
         }
+        console.log("sadasda1111111111111122cessd")
         const key = await this.findKeyByName(avID, keyName);
+        console.log("sadasda1111111111111133")
         return await this.request('setAttributeViewBlockAttr', { avID, keyID: key.id, rowID, value });
     }
 
@@ -690,12 +696,12 @@ export class AVManager {
      * @param avID - 属性视图ID
      * @param blocks - 块数组
      * @param options - 选项
+     * ok
      */
     async batchAddBlocks(avID: string, blocks: Array<{
-        id?: string;
+        id: string;
         content?: string;
-        markdown?: string;
-        [key: string]: any;
+        isDetached: boolean;
     }>, options: {
         blockID?: string;
         previousID?: string;
@@ -705,8 +711,8 @@ export class AVManager {
 
         const sources = blocks.map(block => ({
             id: block.id || this.generateId(),
+            isDetached: block.isDetached !== undefined ? block.isDetached : false,
             content: block.content || '',
-            markdown: block.markdown || '',
             ...block
         }));
 
@@ -731,13 +737,14 @@ export class AVManager {
     async batchUpdateCells(avID: string, updates: Array<{
         keyName: string;
         rowID: string;
-        value: any;
+        value: setAttributeViewValue;
     }>): Promise<Array<{ success: boolean; result?: any; error?: string }>> {
         if (!Array.isArray(updates)) throw new Error('updates必须是数组');
 
         const results = [];
         for (const update of updates) {
             try {
+                console.log("sadasda22222222222222")
                 const result = await this.setBlockAttribute(avID, update.keyName, update.rowID, update.value);
                 results.push({ success: true, result });
             } catch (error) {
@@ -816,8 +823,16 @@ export class AVManager {
                 return await this.manager.removeAttributeViewKeyByName(this.avID, keyName, removeRelationDest);
             },
 
-            async addBlocks(blocksValues: AttributeViewValue[][]) {
+            async addBlocksMore(blocksValues: AttributeViewValue[][]) {
                 return await this.manager.appendDetachedBlocksWithValues(this.avID, blocksValues);
+            },
+
+            async addBlocks(sources: BlockSource[], options: {
+                blockID?: string;
+                previousID?: string;
+                ignoreFillFilter?: boolean;
+            } = {}) {
+                return await this.manager.addAttributeViewBlocks(this.avID, sources, options);
             },
 
             async removeBlocks(srcIDs) {
@@ -828,6 +843,14 @@ export class AVManager {
                 return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value);
             },
 
+            async setCells(updates: Array<{
+                keyName: string;
+                rowID: string;
+                value: setAttributeViewValue;
+            }>) {
+                console.log("sadasda11111111111111")
+                return await this.manager.batchUpdateCells(this.avID, updates);
+            },
 
             async getKeys() {
                 return await this.manager.getAttributeViewKeysByAvID(this.avID);
@@ -854,73 +877,8 @@ export class AVManager {
             }
         };
     }
-
-    // ============== 使用示例 ==============
-    
-    /**
-     * 使用示例：添加数据块及其值
-     * @param avID - 属性视图ID
-     * @returns 使用示例
-     */
-    async addBlocksExample(avID: string): Promise<void> {
-        // 示例：添加一个包含不同类型数据的块
-        const blocksValues = [[
-            // 主键类型（block类型）
-            {
-                keyName: "事件",
-                name: "事件",
-                block: {
-                    content: "新建事件标题"
-                }
-            },
-            // 文字类型
-            {
-                keyName: "描述",
-                name: "描述",
-                text: {
-                    content: "这是一个测试事件"
-                }
-            },
-            // 数字类型
-            {
-                keyName: "优先级",
-                name: "优先级",
-                number: {
-                    content: 1
-                }
-            },
-            // 日期类型
-            {
-                keyName: "开始时间",
-                name: "开始时间",
-                date: {
-                    content: Date.now(),
-                    hasEndDate: true,
-                    isNotTime: false
-                }
-            },
-            // 复选框类型
-            {
-                keyName: "已完成",
-                name: "已完成",
-                checkbox: {
-                    checked: false
-                }
-            },
-            // 单选类型
-            {
-                keyName: "状态",
-                name: "状态",
-                select: {
-                    content: "进行中",
-                    color: "var(--b3-card-info-color)"
-                }
-            }
-        ]];
-
-        await this.appendDetachedBlocksWithValues(avID, blocksValues);
-    }
 }
+
 
 // 导出类
 // export default AVManager;
