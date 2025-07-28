@@ -35,8 +35,8 @@ const addBlockQueue: Map<string, Array<{
 }>> = new Map();
 
 let isProcessingQueue = false;
-const BATCH_DELAY = 600; // 批量处理延迟（毫秒）
-const QUEUE_ACCUMULATION_DELAY = 200; // 增加积累延迟到200ms，让更多请求积累
+const getBatchDelay = () => settingdata['transaction-delay'] || 1000; // 使用配置的事务延迟时间
+const getQueueDelay = () => Math.min(settingdata['transaction-delay'] / 5, 200) || 200; // 队列延迟为事务延迟的1/5，最大200ms
 const MAX_WAIT_TIME = 5000; // 最大等待时间，防止单个请求等待太久
 
 // 队列处理定时器 - 按 avID 分别管理
@@ -738,7 +738,7 @@ export async function addBlockToDatabase_pro(id: string, avID: string): Promise<
         const timer = setTimeout(() => {
             processAddBlockQueueForAvID(avID);
             addBlockQueueTimers.delete(avID);
-        }, QUEUE_ACCUMULATION_DELAY);
+        }, getQueueDelay());
         
         addBlockQueueTimers.set(avID, timer);
     });
@@ -790,6 +790,7 @@ interface UpdateMainKeyParams {
 // Modify the function to accept an object parameter
 export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
     return new Promise((resolve, reject) => {
+        const delay = settingdata['transaction-delay'] || 1000;
         setTimeout(async () => {
             try {
                 const { avID, keyID, content, blockID } = params; // Destructure the parameters
@@ -811,7 +812,7 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
             } catch (error) {
                 reject(error);
             }
-        }, 2000); // Delay execution by 2000 milliseconds (2 seconds)
+        }, delay); // 使用配置的延迟时间
     });
 }
 
@@ -863,7 +864,7 @@ export async function updateAttrViewCell_pro(
         const queueAge = Date.now() - cellUpdateQueueStartTime;
         const currentQueueSize = cellUpdateQueue.length;
         
-        let waitTime = QUEUE_ACCUMULATION_DELAY;
+        let waitTime = getQueueDelay();
         
         // 如果队列已经等待太久或队列很大，立即处理
         if (queueAge >= MAX_WAIT_TIME || currentQueueSize >= 50) {
@@ -967,8 +968,9 @@ async function processQueue() {
         
         // 每个avID处理完后添加延迟
         if (groupedUpdates.size > 1) {
-            console.log(`⏱️ [批量处理] avID ${avID} 处理完成，等待 ${BATCH_DELAY}ms 后处理下一个avID...`);
-            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+            const batchDelay = getBatchDelay();
+            console.log(`⏱️ [批量处理] avID ${avID} 处理完成，等待 ${batchDelay}ms 后处理下一个avID...`);
+            await new Promise(resolve => setTimeout(resolve, batchDelay));
         }
     }
     
