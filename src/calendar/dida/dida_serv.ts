@@ -394,25 +394,28 @@ ${taskData.描述?.content || "描述：暂无"}
             const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', this.avId);
             const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
 
+            // 批量更新：收集所有需要更新的字段
+            const updatePromises: Promise<any>[] = [];
+
             // 更新 didaID (通常只在创建时写入)
             if (didaIdKeyID && taskData.didaID?.content && !existingTask?.didaID?.content) {
-                await updateAttrViewCell_pro(
+                updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
                     didaIdKeyID,
                     taskData.didaID.content,
                     "text"
-                );
+                ));
             }
 
-            // 更新事件标题
+            // 更新事件标题（需要单独处理，因为使用不同的API）
             if (eventKeyID && taskData.事件?.content && taskData.事件.content !== existingTask?.事件?.content) {
-                await updatemainkey({
+                updatePromises.push(updatemainkey({
                     avID: this.avId,
                     blockID: blockId,
                     keyID: eventKeyID,
                     content: taskData.事件.content,
-                });
+                }));
             }
 
             // 更新开始时间
@@ -426,39 +429,38 @@ ${taskData.描述?.content || "描述：暂无"}
             if (timeKeyID && (newStart !== oldStart || newEnd !== oldEnd)) {
                 const startTime = newTime?.start ? formatLocalDate(newTime.start) : undefined;
                 const endTime = newTime?.end && newTime?.hasEndDate ? formatLocalDate(newTime.end) : undefined;
-
-                await updateAttrViewCell_pro(
+                updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
                     timeKeyID,
                     startTime,
                     "date",
                     endTime
-                );
+                ));
             }
 
             // 更新优先级
             if (priorityKeyID && taskData.优先级?.content && taskData.优先级.content !== existingTask?.优先级?.content) {
                 const priorityData = [{ content: taskData.优先级.content }];
-                await updateAttrViewCell_pro(
+                updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
                     priorityKeyID,
                     priorityData,
                     "select"
-                );
+                ));
             }
 
             // 更新状态
             if (statusKeyID && taskData.状态?.content && taskData.状态.content !== existingTask?.状态?.content) {
                 const statusData = [{ content: taskData.状态.content }];
-                await updateAttrViewCell_pro(
+                updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
                     statusKeyID,
                     statusData,
                     "select"
-                );
+                ));
             }
 
             // 更新标签
@@ -466,25 +468,28 @@ ${taskData.描述?.content || "描述：暂无"}
             const oldTags = (existingTask?.标签?.content || []).sort().join(',');
             if (tagKeyID && taskData.标签?.content && newTags !== oldTags) {
                 console.log("更新标签：", taskData.标签.content);
-                await updateAttrViewCell_pro(
+                updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
                     tagKeyID,
                     taskData.标签.content,
                     "mSelect"
-                );
+                ));
             }
 
             // 更新描述
             if (descKeyID && taskData.描述?.content && taskData.描述.content !== existingTask?.描述?.content) {
-                await updateAttrViewCell_pro(
+                updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
                     descKeyID,
                     taskData.描述.content,
                     "text"
-                );
+                ));
             }
+
+            // 等待所有更新完成
+            await Promise.all(updatePromises);
 
         } catch (error) {
             console.error("更新任务字段失败:", error);

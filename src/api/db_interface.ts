@@ -320,6 +320,15 @@ export interface SetAttributeViewBlockAttrRequest {
     value: any;
 }
 
+export interface BatchSetAttributeViewBlockAttrsRequest {
+    avID: string;
+    values: Array<{
+        keyID: string;
+        rowID: string;
+        value: setAttributeViewValue;
+    }>;
+}
+
 // 响应数据类型
 export interface DuplicateAttributeViewBlockResponse {
     avID: string;

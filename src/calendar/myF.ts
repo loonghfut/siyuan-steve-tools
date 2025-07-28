@@ -594,20 +594,27 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 content: title,
             });
         }
+        // 批量更新：不使用 await，让请求积累到队列中
+        const updatePromises: Promise<any>[] = [];
+        
         if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
-            await api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select");
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select"));
         }
         if (noteKeyID && note) {
-            await api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, note, "text");
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, note, "text"));
         }
-        const datata = await api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date");
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date"));
+        
         const selectdata: ISelectOption[] = [{ content: status }];
         // console.log("selectdata", selectdata);
         // 2025/7/5新增默认添加优先级
-        await api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, [{ content: "无" }], "select");
-        await api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select");
-        await api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, ismain, "checkbox");
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, [{ content: "无" }], "select"));
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select"));
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, ismain, "checkbox"));
+        
+        // 等待所有更新完成
+        await Promise.all(updatePromises);
         sy.showMessage('已添加事件', 2000, "info", "1");
         return true;
     }
@@ -750,28 +757,35 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             if (ce) {
                 dateStr = ce;
             }
-            ////块时间处理
-            await api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date");
+            ////块时间处理 - 批量更新优化
+            const updatePromises2: Promise<any>[] = [];
+            
+            updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date"));
+            
             const selectdata: ISelectOption[] = [{ content: status }];
             const priorityData: ISelectOption[] = [{ content: priority }];
             const categoryData: ISelectOption[] = [{ content: category }];
             console.log("selectdata", selectdata);
+            
             ///////////更新属性////////////////////
             if (noteKeyID && note) {
-                await api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, note, "text");
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, note, "text"));
             }
             if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
-                await api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, categoryData, "select");
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, categoryData, "select"));
             }
             if (priority && priorityKeyID && priorityData) {
-                await api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, priorityData, "select");
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, priorityData, "select"));
             }
             if (status && statusKeyID && selectdata) {
-                await api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select");
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, selectdata, "select"));
             }
             if (checkboxKeyID) {
-                await api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox");
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox"));
             }
+            
+            // 等待所有更新完成
+            await Promise.all(updatePromises2);
             //////////////////
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {

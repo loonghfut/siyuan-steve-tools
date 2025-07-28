@@ -911,10 +911,13 @@ ${renderedContent}
         try {
             console.log(`更新数据库属性ICSICS`, event);
 
+            // 批量更新：收集所有需要更新的字段
+            const updatePromises: Promise<any>[] = [];
+
             // 更新标题
             const titleKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', databaseId);
             if (titleKeyID && event.title) {
-                await api.updateAttrViewCell_pro(blockId, databaseId, titleKeyID, event.title, "text");
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, titleKeyID, event.title, "text"));
             }
 
             // 更新开始时间和结束时间
@@ -922,28 +925,31 @@ ${renderedContent}
             if (timeKeyID && event.startTime) {
                 const dateStr = event.startTime instanceof Date ? event.startTime.toISOString() : event.startTime;
                 const endStr = event.endTime instanceof Date ? event.endTime.toISOString() : event.endTime;
-                await api.updateAttrViewCell_pro(blockId, databaseId, timeKeyID, dateStr, "date", endStr);
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, timeKeyID, dateStr, "date", endStr));
             }
 
             // 更新分类为"ICS导入"
             const categoryKeyID = await this.getKeyIDfromViewValue(viewValue, '分类', databaseId);
             if (categoryKeyID) {
                 const categoryData = [{ content: "ICS导入" }];
-                await api.updateAttrViewCell_pro(blockId, databaseId, categoryKeyID, categoryData, "select");
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, categoryKeyID, categoryData, "select"));
             }
 
-            // 跟新标签
+            // 更新标签
             const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', databaseId);
             if (tagKeyID && event.tags && event.tags.length > 0) {
                 const tagData = event.tags.map(tag => ({ content: tag }));
-                await api.updateAttrViewCell_pro(blockId, databaseId, tagKeyID, tagData, "mSelect");
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, tagKeyID, tagData, "mSelect"));
             }
 
             // 更新描述
             const noteKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', databaseId);
             if (noteKeyID && event.description) {
-                await api.updateAttrViewCell_pro(blockId, databaseId, noteKeyID, event.description, "text");
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, noteKeyID, event.description, "text"));
             }
+
+            // 等待所有更新完成
+            await Promise.all(updatePromises);
 
         } catch (error) {
             console.error('更新数据库属性失败:', error);

@@ -729,12 +729,50 @@ export class AVManager {
     }
 
     /**
-     * 批量更新单元格
+     * 批量更新单元格（使用原生批量API）
      * @param avID - 属性视图ID
      * @param updates - 更新数组
      * @returns 更新结果
      */
     async batchUpdateCells(avID: string, updates: Array<{
+        keyName: string;
+        rowID: string;
+        value: setAttributeViewValue;
+    }>): Promise<any> {
+        if (!avID) throw new Error('avID不能为空');
+        if (!Array.isArray(updates)) throw new Error('updates必须是数组');
+        if (updates.length === 0) return { success: true, message: '没有需要更新的数据' };
+
+        // 转换keyName为keyID
+        const processedValues = await Promise.all(
+            updates.map(async (update) => {
+                if (!update.keyName || !update.rowID) {
+                    throw new Error('每个更新项必须包含keyName和rowID');
+                }
+                
+                const key = await this.findKeyByName(avID, update.keyName);
+                return {
+                    keyID: key.id,
+                    rowID: update.rowID,
+                    value: update.value
+                };
+            })
+        );
+
+        return await this.request('batchSetAttributeViewBlockAttrs', {
+            avID,
+            values: processedValues
+        });
+    }
+
+    /**
+     * 批量更新单元格（兼容旧版本，逐个更新）
+     * @param avID - 属性视图ID
+     * @param updates - 更新数组
+     * @returns 更新结果
+     * @deprecated 建议使用 batchUpdateCells 方法，性能更好
+     */
+    async batchUpdateCellsLegacy(avID: string, updates: Array<{
         keyName: string;
         rowID: string;
         value: setAttributeViewValue;

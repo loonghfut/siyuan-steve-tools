@@ -13,11 +13,12 @@ import { AVManager } from "./db_pro";
 // 创建 AVManager 实例 - 可以根据需要进行配置
 const avManager = new AVManager();
 
-// 请求队列，确保所有请求都按顺序执行
+// 请求队列，使用批量处理优化性能
 const cellUpdateQueue: Array<{
     id: string;
     avID: string;
     keyID: string;
+    keyName?: string;
     value: any;
     type: string;
     endtime?: string;
@@ -25,18 +26,23 @@ const cellUpdateQueue: Array<{
     reject: (reason: any) => void;
 }> = [];
 
-// 添加块到数据库的队列
-const addBlockQueue: Array<{
+// 添加块到数据库的队列 - 按 avID 分组
+const addBlockQueue: Map<string, Array<{
     id: string;
     avID: string;
     resolve: (value: any) => void;
     reject: (reason: any) => void;
-}> = [];
+}>> = new Map();
 
 let isProcessingQueue = false;
-let isProcessingAddBlockQueue = false;
-// const QUEUE_PROCESS_DELAY = 500; // 1秒间隔处理队列中的请求
-const ADD_BLOCK_QUEUE_DELAY = 200; // 500ms间隔处理添加块队列中的请求
+const BATCH_DELAY = 600; // 批量处理延迟（毫秒）
+const QUEUE_ACCUMULATION_DELAY = 200; // 增加积累延迟到200ms，让更多请求积累
+const MAX_WAIT_TIME = 5000; // 最大等待时间，防止单个请求等待太久
+
+// 队列处理定时器 - 按 avID 分别管理
+const addBlockQueueTimers: Map<string, NodeJS.Timeout> = new Map();
+let cellUpdateQueueTimer: NodeJS.Timeout | null = null;
+let cellUpdateQueueStartTime: number | null = null; // 记录队列开始时间
 export async function request(url: string, data: any) {
     let response: IWebSocketData = await fetchSyncPost(url, data);
     let res = response.code === 0 ? response.data : `${url}error`;
@@ -712,67 +718,66 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
 
 export async function addBlockToDatabase_pro(id: string, avID: string): Promise<any> {
     return new Promise((resolve, reject) => {
-        // 将所有请求添加到队列中，确保按顺序执行
-        addBlockQueue.push({
+        // 按 avID 分组添加到队列中
+        if (!addBlockQueue.has(avID)) {
+            addBlockQueue.set(avID, []);
+        }
+        
+        addBlockQueue.get(avID)!.push({
             id,
             avID,
             resolve,
             reject
         });
         
-        // 开始处理队列
-        processAddBlockQueue();
+        // 为每个 avID 单独管理定时器
+        if (addBlockQueueTimers.has(avID)) {
+            clearTimeout(addBlockQueueTimers.get(avID)!);
+        }
+        
+        const timer = setTimeout(() => {
+            processAddBlockQueueForAvID(avID);
+            addBlockQueueTimers.delete(avID);
+        }, QUEUE_ACCUMULATION_DELAY);
+        
+        addBlockQueueTimers.set(avID, timer);
     });
 }
 
-// 处理添加块队列函数
-async function processAddBlockQueue() {
-    if (isProcessingAddBlockQueue || addBlockQueue.length === 0) {
+// 处理特定 avID 的添加块队列
+async function processAddBlockQueueForAvID(avID: string) {
+    const blocks = addBlockQueue.get(avID);
+    if (!blocks || blocks.length === 0) {
         return;
     }
     
-    isProcessingAddBlockQueue = true;
-    
-    while (addBlockQueue.length > 0) {
-        const addBlockData = addBlockQueue.shift();
-        if (!addBlockData) continue;
-        
-        try {
-            console.log(`Processing add block: ${addBlockData.id} for avID: ${addBlockData.avID}`);
-            const result = await processAddBlock(addBlockData.id, addBlockData.avID);
-            addBlockData.resolve(result);
-        } catch (error) {
-            addBlockData.reject(error);
-        }
-        
-        // 每个请求处理完后都添加延迟
-        console.log(`Add block processed, waiting ${ADD_BLOCK_QUEUE_DELAY}ms before next...`);
-        await new Promise(resolve => setTimeout(resolve, ADD_BLOCK_QUEUE_DELAY));
-        console.log("Delay completed, ready for next add block");
-    }
-    
-    isProcessingAddBlockQueue = false;
-    console.log("Add block queue processing completed");
-}
-
-// 实际的添加块处理函数
-async function processAddBlock(id: string, avID: string): Promise<any> {
     try {
-        // 使用 AVManager 的 addAttributeViewBlocks 方法添加块到数据库
-        const sources = [{
-            id: id,
-            isDetached: false
-        }];
+        console.log(`🚀 [批量添加块] 开始处理 ${blocks.length} 个块，avID: ${avID}`);
         
+        // 构建批量添加的数据
+        const sources = blocks.map(block => ({
+            id: block.id,
+            isDetached: false
+        }));
+        
+        // 使用批量API添加所有块
         const result = await avManager.addAttributeViewBlocks(avID, sources, {
             ignoreFillFilter: true
         });
         
-        return result;
+        // 成功后解析所有Promise
+        blocks.forEach(block => block.resolve(result));
+        
+        console.log(`✅ [批量添加块] 成功添加 ${blocks.length} 个块到 avID: ${avID}`);
+        
     } catch (error) {
-        console.error("Error adding block to database:", error);
-        throw error;
+        console.error(`❌ [批量添加块] 添加块失败，avID ${avID}:`, error);
+        // 错误时拒绝所有Promise
+        blocks.forEach(block => block.reject(error));
     }
+    
+    // 清除已处理的队列
+    addBlockQueue.delete(avID);
 }
 
 interface UpdateMainKeyParams {
@@ -830,7 +835,7 @@ export async function updateAttrViewCell_pro(
     endtime?: string
 ): Promise<any> {
     return new Promise((resolve, reject) => {
-        // 将所有请求添加到队列中，确保按顺序执行
+        // 将所有请求添加到队列中
         cellUpdateQueue.push({
             id,
             avID,
@@ -842,167 +847,230 @@ export async function updateAttrViewCell_pro(
             reject
         });
         
-        // 开始处理队列
-        processQueue();
+        console.log(`📝 [队列] 添加单元格更新请求，队列当前长度: ${cellUpdateQueue.length}, avID: ${avID}`);
+        
+        // 记录队列开始时间
+        if (!cellUpdateQueueStartTime) {
+            cellUpdateQueueStartTime = Date.now();
+        }
+        
+        // 智能定时器策略
+        if (cellUpdateQueueTimer) {
+            clearTimeout(cellUpdateQueueTimer);
+        }
+        
+        // 动态调整等待时间
+        const queueAge = Date.now() - cellUpdateQueueStartTime;
+        const currentQueueSize = cellUpdateQueue.length;
+        
+        let waitTime = QUEUE_ACCUMULATION_DELAY;
+        
+        // 如果队列已经等待太久或队列很大，立即处理
+        if (queueAge >= MAX_WAIT_TIME || currentQueueSize >= 50) {
+            waitTime = 150; // 几乎立即处理
+            console.log(`⚡ [队列] 触发立即处理 - 队列大小: ${currentQueueSize}, 等待时间: ${queueAge}ms`);
+        } else if (currentQueueSize >= 4) {
+            waitTime = 500; // 减少等待时间
+        }
+        
+        cellUpdateQueueTimer = setTimeout(() => {
+            processQueue();
+            cellUpdateQueueTimer = null;
+            cellUpdateQueueStartTime = null;
+        }, waitTime);
     });
 }
 
-// 处理队列函数
+// 处理队列函数 - 使用批量API优化
 async function processQueue() {
     if (isProcessingQueue || cellUpdateQueue.length === 0) {
+        console.log(`⏸️ [队列处理] 跳过处理 - 正在处理: ${isProcessingQueue}, 队列长度: ${cellUpdateQueue.length}`);
         return;
     }
     
     isProcessingQueue = true;
-    console.log(`Starting to process cell update queue with ${cellUpdateQueue.length} items`);
+    const totalItems = cellUpdateQueue.length;
+    console.log(`🚀 [队列处理] 开始处理单元格更新队列，共 ${totalItems} 个项目`);
     
+    // 按 avID 分组处理
+    const groupedUpdates = new Map<string, Array<typeof cellUpdateQueue[0]>>();
+    
+    // 取出所有待处理的更新
+    const allUpdates: Array<typeof cellUpdateQueue[0]> = [];
     while (cellUpdateQueue.length > 0) {
-        const updateData = cellUpdateQueue.shift();
-        if (!updateData) continue;
+        const update = cellUpdateQueue.shift();
+        if (!update) continue;
+        allUpdates.push(update);
         
+        if (!groupedUpdates.has(update.avID)) {
+            groupedUpdates.set(update.avID, []);
+        }
+        groupedUpdates.get(update.avID)!.push(update);
+    }
+    
+    console.log(`📊 [队列处理] 分组结果: ${groupedUpdates.size} 个avID，总共 ${allUpdates.length} 个更新`);
+    
+    // 按 avID 分组批量处理
+    for (const [avID, updates] of groupedUpdates.entries()) {
         try {
-            console.log(`Processing cell update: ${updateData.id} for avID: ${updateData.avID}, keyID: ${updateData.keyID}`);
-            const result = await processCellUpdate(
-                updateData.id,
-                updateData.avID,
-                updateData.keyID,
-                updateData.value,
-                updateData.type,
-                updateData.endtime
+            console.log(`🔄 [批量更新单元格] 开始处理 ${updates.length} 个单元格更新，avID: ${avID}`);
+            
+            // 预处理所有值并获取键信息
+            const processedUpdates = await Promise.all(
+                updates.map(async (update) => {
+                    const processedValue = await processCellValue(update.value, update.type, update.endtime);
+                    
+                    // 如果没有keyName，需要根据keyID获取
+                    let keyName = update.keyName;
+                    if (!keyName && update.keyID) {
+                        const keys = await avManager.getAttributeViewKeysByAvID(avID);
+                        const key = keys.find(k => k.id === update.keyID);
+                        keyName = key?.name;
+                    }
+                    
+                    return {
+                        ...update,
+                        keyName,
+                        processedValue
+                    };
+                })
             );
-            updateData.resolve(result);
+            
+            // 构建批量更新数据
+            const batchUpdates = processedUpdates
+                .filter(update => update.keyName) // 只处理有效的键名
+                .map(update => ({
+                    keyName: update.keyName!,
+                    rowID: update.id,
+                    value: update.processedValue
+                }));
+            
+            if (batchUpdates.length > 0) {
+                // 使用批量API更新单元格
+                const result = await avManager.batchUpdateCells(avID, batchUpdates);
+                
+                // 成功后解析所有Promise
+                updates.forEach(update => update.resolve(result));
+                
+                console.log(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
+            } else {
+                // 如果没有有效更新，拒绝所有Promise
+                updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
+                console.warn(`⚠️  [批量更新单元格] 没有有效的键名，avID: ${avID}`);
+            }
+            
         } catch (error) {
-            updateData.reject(error);
+            console.error(`❌ [批量更新单元格] 更新失败，avID ${avID}:`, error);
+            // 错误时拒绝所有Promise
+            updates.forEach(update => update.reject(error));
         }
         
-        // 每个请求处理完后都添加延迟
-        console.log(`Cell update processed, waiting ${settingdata["transaction-delay"]}ms before next...`);
-        await new Promise(resolve => setTimeout(resolve, settingdata["transaction-delay"]));
-        console.log("Delay completed, ready for next cell update");
+        // 每个avID处理完后添加延迟
+        if (groupedUpdates.size > 1) {
+            console.log(`⏱️ [批量处理] avID ${avID} 处理完成，等待 ${BATCH_DELAY}ms 后处理下一个avID...`);
+            await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+        }
     }
     
     isProcessingQueue = false;
-    console.log("Cell update queue processing completed");
+    console.log(`✅ [队列处理] 队列处理完成，共处理了 ${totalItems} 个单元格更新`);
 }
 
-// 实际的处理函数
-async function processCellUpdate(
-    id: string,
-    avID: string,
-    keyID: string,
-    value: any,
-    type: string,
-    endtime?: string
-): Promise<any> {
-    try {
-        let processedValue: any;
+// 处理单元格值的函数（从原来的processCellUpdate中提取）
+async function processCellValue(value: any, type: string, endtime?: string): Promise<any> {
+    let processedValue: any;
 
-        switch (type) {
-            case 'date':
-                const { start, end } = await getDateTimestamps(value as string);
-                processedValue = {
-                    type: "date",
-                    date: {
-                        content: start,
-                        isNotEmpty: true,
-                        content2: endtime ? (await getDateTimestamps(endtime)).start : end,
-                        isNotEmpty2: true,
-                        hasEndDate: true,
-                        isNotTime: false
-                    }
-                };
-                break;
+    switch (type) {
+        case 'date':
+            const { start, end } = await getDateTimestamps(value as string);
+            processedValue = {
+                date: {
+                    content: start,
+                    isNotEmpty: true,
+                    content2: endtime ? (await getDateTimestamps(endtime)).start : end,
+                    isNotEmpty2: true,
+                    hasEndDate: true,
+                    isNotTime: false
+                }
+            };
+            break;
 
-            case 'select':
-                processedValue = {
-                    type: "select",
-                    mSelect: value as ISelectOption[]
-                };
-                break;
+        case 'select':
+            processedValue = {
+                select: {
+                    content: (value as ISelectOption[])[0]?.content || '',
+                    color: (value as ISelectOption[])[0]?.color || ''
+                }
+            };
+            break;
 
-            case 'mSelect':
-                processedValue = {
-                    type: "mSelect",
-                    mSelect: value as ISelectOption[]
-                };
-                break;
+        case 'mSelect':
+            processedValue = {
+                mSelect: (value as ISelectOption[]).map(option => ({
+                    content: option.content,
+                    color: option.color
+                }))
+            };
+            break;
 
-            case 'checkbox':
-                processedValue = {
-                    type: "checkbox",
-                    checkbox: {
-                        checked: value as boolean
-                    }
-                };
-                break;
+        case 'checkbox':
+            processedValue = {
+                checkbox: {
+                    checked: value as boolean
+                }
+            };
+            break;
 
-            case 'relation':
-                const { blockID, content, oldrelation, action } = value as {
-                    blockID: string,
-                    content: string,
-                    oldrelation: {
-                        ids: string[],
-                        contents: string[]
-                    },
-                    action: string
-                };
-                const readyContents = transformBlockData(oldrelation.contents);
-                if (action === 'add') {
-                    if (oldrelation.ids.includes(blockID)) return;
+        case 'relation':
+            const { blockID, content, oldrelation, action } = value as {
+                blockID: string,
+                content: string,
+                oldrelation: {
+                    ids: string[],
+                    contents: string[]
+                },
+                action: string
+            };
+            const readyContents = transformBlockData(oldrelation.contents);
+            if (action === 'add') {
+                if (!oldrelation.ids.includes(blockID)) {
                     oldrelation.ids.push(blockID);
                     readyContents.push({
                         block: { content: content, id: blockID },
                         isDetached: false,
                         type: "block"
                     });
-                } else if (action === 'remove') {
-                    const index = oldrelation.ids.indexOf(blockID);
-                    if (index === -1) return;
+                }
+            } else if (action === 'remove') {
+                const index = oldrelation.ids.indexOf(blockID);
+                if (index !== -1) {
                     oldrelation.ids.splice(index, 1);
                     readyContents.splice(index, 1);
-                } else {
-                    console.error("action error");
-                    return;
                 }
-                processedValue = {
-                    type: "relation",
-                    relation: {
-                        blockIDs: oldrelation.ids,
-                        contents: readyContents
-                    }
-                };
-                break;
+            } else {
+                throw new Error("Invalid relation action");
+            }
+            processedValue = {
+                relation: oldrelation.ids.map(id => ({
+                    blockID: id,
+                    content: readyContents.find(c => c.block.id === id)?.block.content || ''
+                }))
+            };
+            break;
 
-            case 'text':
-                processedValue = {
-                    type: "text",
-                    text: {
-                        content: value as string
-                    }
-                };
-                break;
+        case 'text':
+            processedValue = {
+                text: {
+                    content: value as string
+                }
+            };
+            break;
 
-            default:
-                console.error("Unsupported type:", type);
-                return;
-        }
-
-        // 首先需要获取键名，因为 AVManager 的 setBlockAttribute 方法需要键名
-        const keys = await avManager.getAttributeViewKeysByAvID(avID);
-        const key = keys.find(k => k.id === keyID);
-        if (!key) {
-            console.error("Key not found:", keyID);
-            return;
-        }
-
-        // 使用 AVManager 的 setBlockAttribute 方法设置属性
-        const result = await avManager.setBlockAttribute(avID, key.name, id, processedValue);
-
-        return result;
-    } catch (error) {
-        console.error("Error updating attribute view cell:", error);
-        throw error;
+        default:
+            throw new Error(`Unsupported cell value type: ${type}`);
     }
+
+    return processedValue;
 }
 
 function transformBlockData(input: any[]): any[] {
@@ -1015,9 +1083,6 @@ function transformBlockData(input: any[]): any[] {
         isDetached: false
     }));
 }
-
-
-
 
 export async function generateSiyuanID(more = false) {
     // 生成时间戳部分
