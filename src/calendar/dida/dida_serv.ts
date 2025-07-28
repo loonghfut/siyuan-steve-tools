@@ -118,9 +118,11 @@ export class Dida365Service {
                 if (!didaTask.id) continue;
 
                 const existingTask = existingTasksMap.get(didaTask.id);
-                const taskData = this.buildTaskData(didaTask, existingTask);
-
+                
                 if (existingTask) {
+                    // 更新现有任务
+                    const taskData = this.buildTaskData(didaTask, existingTask);
+                    
                     // 比较任务数据，仅在有变化时更新
                     if (this.isTaskChanged(taskData, existingTask)) {
                         await this.updateSiyuanTask(existingTask, taskData);
@@ -128,6 +130,7 @@ export class Dida365Service {
                     }
                 } else {
                     // 创建新任务
+                    const taskData = this.buildTaskData(didaTask, existingTask);
                     await this.createSiyuanTask(taskData);
                     syncCount++;
                 }
@@ -199,6 +202,16 @@ export class Dida365Service {
     }
 
     /**
+     * 从标题中移除所有链接（D 链接和 S 链接），只保留原始标题
+     */
+    private removeLinksFromTitle(title: string): string {
+        // 移除 [D](https://dida365.com/webapp/#q/all/tasks/xxx) 和 [S](siyuan://blocks/xxx) 链接
+        return title.replace(/\s*\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/g, '')
+                   .replace(/\s*\[S\]\(siyuan:\/\/blocks\/[^)]+\)/g, '')
+                   .trim();
+    }
+
+    /**
      * 构建任务数据
      */
     private buildTaskData(didaTask: Task, existingTask?: any) {
@@ -233,6 +246,21 @@ export class Dida365Service {
             return task.tags.filter(tag => !statusTags.includes(tag));
         };
 
+        // 构建带超链接的标题
+        const buildTitleWithLinks = (title: string, didaId: string) => {
+            // 移除所有现有链接，获取原始标题
+            const originalTitle = this.removeLinksFromTitle(title);
+            
+            // 检查标题是否包含 S 链接，如果有则说明是从思源创建的任务
+            if (title.includes('[S](siyuan://blocks/')) {
+                // 如果有 S 链接，替换为 D 链接（思源端只能有 D 链接）
+                return `${originalTitle} [D](https://dida365.com/webapp/#q/all/tasks/${didaId})`;
+            }
+            
+            // 否则添加 D 链接（思源端链接到滴答清单）
+            return `${originalTitle} [D](https://dida365.com/webapp/#q/all/tasks/${didaId})`;
+        };
+
 
         // 转换时间
         const getTimeRange = (dueDate?: string, startDate?: string) => {
@@ -251,13 +279,17 @@ export class Dida365Service {
 
         const timeRange = getTimeRange(didaTask.dueDate, didaTask.startDate);
 
+        // 构建带超链接的标题
+        const originalTitle = didaTask.title || "";
+        const titleWithLinks = buildTitleWithLinks(originalTitle, didaTask.id || "");
+
         return {
             didaID: {
                 content: didaTask.id || "",
                 keyID: existingTask?.didaID?.keyID
             },
             事件: {
-                content: didaTask.title || "",
+                content: titleWithLinks,
                 keyID: existingTask?.事件?.keyID
             },
             开始时间: timeRange.start || timeRange.end ? {
@@ -315,13 +347,21 @@ export class Dida365Service {
 
             // 创建块内容
             const statusCustomAttr = taskData.状态?.content === "完成" ? "done" : "todo";
+            // 提取D链接
+            const titleWithoutLinks = this.removeLinksFromTitle(taskData.事件?.content || "新建任务");
+            const dLinkMatch = (taskData.事件?.content || "").match(/\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/);
+            const dLink = dLinkMatch ? dLinkMatch[0] : "";
+            
             await appendBlock(
                 "markdown",
                 `{{{row
-${"#### " + taskData.事件?.content || "新建任务"}
+${"#### " + titleWithoutLinks}
 
 {: id="${await generateSiyuanID() as string}"}
 ${taskData.描述?.content || "描述：暂无"}
+
+{: id="${await generateSiyuanID() as string}"}
+${dLink ? `链接：${dLink}` : "链接：无"}
 
 {: id="${await generateSiyuanID() as string}"}
 }}}
@@ -338,6 +378,33 @@ ${taskData.描述?.content || "描述：暂无"}
 
             // 更新各个字段
             await this.updateTaskFields(blockId, taskData, viewValue);
+
+            // 同步更新滴答清单任务，为其添加 S 链接
+            if (taskData.didaID?.content) {
+                try {
+                    const didaTaskId = taskData.didaID.content;
+                    const cachedTask = this.taskCache.get(didaTaskId);
+                    if (cachedTask) {
+                        // 获取原始标题（移除可能已存在的链接）
+                        const originalTitle = this.removeLinksFromTitle(cachedTask.title || "");
+                        const titleWithSLink = `${originalTitle} [S](siyuan://blocks/${blockId})`;
+                        
+                        // 更新滴答清单任务，添加 S 链接
+                        await this.apiClient.updateTask(didaTaskId, {
+                            id: didaTaskId,
+                            projectId: cachedTask.projectId,
+                            title: titleWithSLink
+                        });
+                        
+                        // 更新缓存中的任务标题
+                        cachedTask.title = titleWithSLink;
+                        
+                        console.log(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
+                    }
+                } catch (error) {
+                    console.warn("更新滴答任务 S 链接失败:", error);
+                }
+            }
 
             console.log("成功创建新任务:", taskData.事件?.content);
 
@@ -371,6 +438,35 @@ ${taskData.描述?.content || "描述：暂无"}
             await setBlockAttrs(blockId, {
                 "custom-st-event": statusCustomAttr
             });
+
+            // 同步更新滴答清单任务，确保其有正确的 S 链接
+            if (newTaskData.didaID?.content) {
+                try {
+                    const didaTaskId = newTaskData.didaID.content;
+                    const cachedTask = this.taskCache.get(didaTaskId);
+                    if (cachedTask) {
+                        // 获取原始标题（移除可能已存在的链接）
+                        const originalTitle = this.removeLinksFromTitle(newTaskData.事件?.content || "");
+                        const titleWithSLink = `${originalTitle} [S](siyuan://blocks/${blockId})`;
+                        
+                        // 检查滴答任务标题是否需要更新
+                        if (cachedTask.title !== titleWithSLink) {
+                            await this.apiClient.updateTask(didaTaskId, {
+                                id: didaTaskId,
+                                projectId: cachedTask.projectId,
+                                title: titleWithSLink
+                            });
+                            
+                            // 更新缓存中的任务标题
+                            cachedTask.title = titleWithSLink;
+                            
+                            console.log(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
+                        }
+                    }
+                } catch (error) {
+                    console.warn("更新滴答任务 S 链接失败:", error);
+                }
+            }
 
             console.log("成功更新任务:", newTaskData.事件?.content);
 
@@ -598,7 +694,11 @@ ${taskData.描述?.content || "描述：暂无"}
                 // 转换思源数据到滴答格式
                 // 默认值
                 updatePayload.status = 0;
-                if (siyuanTask.事件?.content) updatePayload.title = siyuanTask.事件.content;
+                if (siyuanTask.事件?.content) {
+                    // 移除标题中的 D 链接，并添加 S 链接指向思源
+                    const originalTitle = this.removeLinksFromTitle(siyuanTask.事件.content);
+                    updatePayload.title = `${originalTitle} [S](siyuan://blocks/${blockId})`;
+                }
                 if (siyuanTask.描述?.content) updatePayload.content = siyuanTask.描述.content;
                 if (siyuanTask.优先级?.content) {
                     const priorityMap: { [key: string]: 0 | 1 | 3 | 5 } = { "无": 0, "低": 1, "中": 3, "高": 5 };
@@ -676,7 +776,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
                     const createTaskPayload: Omit<Task, 'id' | 'status' | 'completedTime'> & { projectId: string } = {
                         projectId: targetProjectId,
-                        title: siyuanTask.事件.content,
+                        title: `${this.removeLinksFromTitle(siyuanTask.事件.content)} [S](siyuan://blocks/${blockId})`,
                         content: siyuanTask.描述?.content || undefined,
                         priority: siyuanTask.优先级?.content ? { "无": 0, "低": 1, "中": 3, "高": 5 }[siyuanTask.优先级.content] : 0,
                         startDate: siyuanTask.开始时间?.start ? formatDateToISO(siyuanTask.开始时间.start) : undefined,
