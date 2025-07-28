@@ -30,7 +30,8 @@ win端s3同步后，docker端感知s3同步。
 #### 目前主要是我自己使用，实在没精力和动力去制作详细教程（简单的使用方式会在社区发）。要是您希望我能制作详细教程，请[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)或者给项目点 [star](https://github.com/loonghfut/siyuan-steve-tools) ，若长期没有打赏和star，后续的功能交互提示可能会很潦草，还请见谅。
 
 #### 更新日志:
-详见代码[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
+
+更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
 
 #### 感谢：
 - [wilsons](https://ld246.com/member/wilsons)：开发`生成日历文件ics功能`指导
