@@ -509,7 +509,7 @@ ${renderedContent}
                 // 更换图标为历史图标，表示有新内容
                 this.updateTopBarIcon("iconHistory");
 
-                showMessage(`检测到 ${newEventCount} 个新的ICS日程。请点击顶栏按钮手动导入。`, 7000, 'info');
+                api.showStatusMessage(`检测到 ${newEventCount} 个新的ICS日程。请点击顶栏按钮手动导入。`, 7000, 'info');
 
             } else {
                 console.log('未检测到新的ICS日程。');
