@@ -85,7 +85,8 @@
                                 !moduleInstances["M_calendar"].av_ids
                             ) {
                                 console.warn(
-                                    "Calendar module or av_ids not initialized",moduleInstances["M_calendar"]
+                                    "Calendar module or av_ids not initialized",
+                                    moduleInstances["M_calendar"],
                                 );
                                 return { "": "无可用数据库" };
                             }
@@ -606,7 +607,7 @@
                 {
                     type: "textinput",
                     title: "滴答清单token",
-                    description: "滴答清单的API token",
+                    description: `滴答清单的API token。<a href="https://dida365.com/webapp/#q/all/tasks?modalType=settings" target="_blank">获取</a>API口令 `,
                     key: "cal-dida-token",
                     value: settings["cal-dida-token"],
                 },
