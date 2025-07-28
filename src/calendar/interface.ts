@@ -36,6 +36,7 @@ export interface KBCalendarEvent {
         rootid: string;
         description: string;
         descriptionid: string;
+        allDayId?: string;
         hasCircularRef: boolean;
         sub?: {
             ids: [];

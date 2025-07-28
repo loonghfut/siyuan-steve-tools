@@ -224,6 +224,15 @@ function extractDataFromTable(data: any, isZQ = false) {
                     };
                 }
 
+                //提取是否全天事件
+                const allDayCell = getCell('全天');
+                if (allDayCell) {
+                    rowData['全天'] = {
+                        content: allDayCell.checkbox?.checked || false,
+                        keyID: allDayCell.keyID || ''
+                    };
+                }
+
                 // 提取状态或周期性事件的字段
                 if (isZQ) {
                     const ruleCell = getCell('重复规则');
@@ -324,9 +333,10 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     const startDate = new Date(parseInt(item['开始时间'].start));
                     const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
 
-                    const isAllDay =
-                        // !endDate ||
-                        (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
+                    // 优先使用数据库中的全天设置，如果没有则按原逻辑判断
+                    const isAllDay = item['全天']?.content !== undefined 
+                        ? item['全天'].content 
+                        : (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0)));
 
                     let kramdown = "";
@@ -356,6 +366,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             categoryid: item['分类']?.keyID || '',
                             subid: item['子级']?.keyID || '',
                             descriptionid: item['描述']?.keyID || '',
+                            allDayId: item['全天']?.keyID || '',
                             Kstart: startDate,
                             Kend: endDate,
                         }
@@ -454,7 +465,7 @@ export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMor
         return;
     }
     if (!seemore) {
-        const tab = await sy.openTab({
+        await sy.openTab({
             app: window.siyuan.ws.app,
             doc: {
                 id: blockID,
@@ -481,7 +492,7 @@ export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMor
             // disableClose: true,
         });
         const eventPanel = document.getElementById('eventPanel-show');
-        const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+        new sy.Protyle(window.siyuan.ws.app, eventPanel, {
             blockId: blockID,
             rootId: blockID,
             render: {
@@ -581,6 +592,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
         const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
         const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
+        const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', to_db_id);
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
         const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
         const titleKeyID = await getKeyIDfromViewValue(viewValue, '事件', to_db_id);
@@ -612,6 +624,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, [{ content: "无" }], "select"));
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, selectdata, "select"));
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, ismain, "checkbox"));
+        // 默认设置为非全天事件
+        if (allDayKeyID) {
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, allDayKeyID, false, "checkbox"));
+        }
         
         // 等待所有更新完成
         await Promise.all(updatePromises);
@@ -661,12 +677,16 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                                     style="padding: 4px; font-size: 12px; width: 130px;"
                                     value="${formatDateWithTime(dateStr)}"/>
                                 </div>
+                                <label style="display: flex; align-items: center; gap: 2px; font-size: 12px;">
+                                    <input type="checkbox" id="st-all-day" style="margin: 0;">
+                                    全天
+                                </label>
                                 <button class="b3-button b3-button--text" style="padding: 4px 8px; font-size: 12px;">提交</button>
                                 <button class="b3-button b3-button--cancel" style="padding: 4px 8px; font-size: 12px;">取消</button>
                             </div>
                            </div>`,
         content: '<div id="eventPanel"></div>',
-        width: '500px',
+        width: '700px',
         height: 'auto',
         destroyCallback: async () => {
             if (!isok) {
@@ -686,6 +706,18 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     // 加载优先级选项
     const prioritySelect = dialog.element.querySelector('#st-priority') as HTMLSelectElement;
     await loadPriorityOptions(to_db_id, prioritySelect);
+    
+    // 添加全天选项的交互逻辑
+    const allDayCheckbox = dialog.element.querySelector('#st-all-day') as HTMLInputElement;
+    const startTimeInput = dialog.element.querySelector('#st-start-time') as HTMLInputElement;
+    
+    allDayCheckbox.addEventListener('change', () => {
+        if (allDayCheckbox.checked) {
+            // 全天事件：设置为当天00:00
+            const currentDate = startTimeInput.value.split('T')[0];
+            startTimeInput.value = `${currentDate}T00:00`;
+        }
+    });
     ///////
     let ok = false;//防崩溃
     const eventPanel = document.getElementById('eventPanel');
@@ -732,12 +764,14 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
             const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
             const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
+            const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', to_db_id);
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
             const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
             //// 新：用户自定义改动开始时间,优先级,分类
             const category2 = (document.getElementById('st-category') as HTMLSelectElement).value;
             const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
             const priority = (document.getElementById('st-priority') as HTMLSelectElement).value;
+            const isAllDay = (document.getElementById('st-all-day') as HTMLInputElement).checked;
             if (newdateStr) {
                 dateStr = newdateStr;
             }
@@ -782,6 +816,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
             if (checkboxKeyID) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, ismain, "checkbox"));
+            }
+            if (allDayKeyID) {
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, allDayKeyID, isAllDay, "checkbox"));
             }
             
             // 等待所有更新完成
@@ -887,11 +924,39 @@ export async function updateEventInDatabase(
         endDate.setDate(endDate.getDate() - 1);
         newEndDate = endDate.toISOString();
     }
-    steveTools.outlog("dateChange:::", newStartDate, newEndDate);
+    // steveTools.outlog("dateChange:::", newStartDate, newEndDate);
     const rootid = info.event._def.extendedProps.rootid;
+    
+    // 检测是否拖拽到全天区域或从全天区域拖拽出来
+    const isAllDay = info.event.allDay;
+    const wasAllDay = info.oldEvent ? info.oldEvent.allDay : false;
+    
+    // steveTools.outlog(`全天状态检测: 原状态=${wasAllDay}, 新状态=${isAllDay}`);
+    
+    // 准备批量更新的promise数组
+    const updatePromises: Promise<any>[] = [];
+    
+    // 更新时间
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', rootid);
+    updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate));
+    
+    // 如果全天状态发生变化，更新全天属性
+    if (isAllDay !== wasAllDay) {
+        const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', rootid);
+        if (allDayKeyID) {
+            updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, allDayKeyID, isAllDay, "checkbox"));
+            // steveTools.outlog(`更新全天属性: ${wasAllDay} -> ${isAllDay}`);
+            // sy.showMessage(`事件已${isAllDay ? '设置为' : '取消'}全天`, 2000, "info");
+        } else {
+            // steveTools.outlog("未找到全天字段，无法更新全天属性");
+            sy.showMessage("未找到全天字段，无法更新全天属性", 2000, "error");
+        }
+    }
+    
+    // 等待所有更新完成
+    await Promise.all(updatePromises);
+    
     steveTools.outlog("rootid:::", rootid);
-    const datata = await api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate);//TODOsettingdata["cal-db-id"]
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {
@@ -1076,6 +1141,12 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
                             <input type="datetime-local" id="qq-event-end" class="b3-text-field" value="${formatDateForInput(endTime)}">
                         </div>
                         <div class="form-item">
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                <input type="checkbox" id="qq-event-allday">
+                                全天事件
+                            </label>
+                        </div>
+                        <div class="form-item">
                             <label>描述</label>
                             <textarea id="qq-event-desc" class="b3-text-field" rows="3" placeholder="事件描述(可选)"></textarea>
                         </div>
@@ -1103,7 +1174,7 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
                 const start = new Date((document.getElementById('qq-event-start') as HTMLInputElement).value);
                 const end = new Date((document.getElementById('qq-event-end') as HTMLInputElement).value);
                 const description = (document.getElementById('qq-event-desc') as HTMLTextAreaElement).value;
-                // const allDay = (document.getElementById('qq-event-allday') as HTMLInputElement).checked;
+                const allDay = (document.getElementById('qq-event-allday') as HTMLInputElement).checked;
 
                 if (!title) {
                     sy.showMessage('请输入事件标题', -1, 'error');
@@ -1118,6 +1189,7 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
                         start: start,
                         end: end,
                         description: description,
+                        allDay: allDay,
                     });
                     await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
                     refreshKanban();
@@ -1188,7 +1260,7 @@ export function updataqqcalendar(info) {
         const start = new Date((document.getElementById('qq-edit-start') as HTMLInputElement).value);
         const end = new Date((document.getElementById('qq-edit-end') as HTMLInputElement).value);
         const description = (document.getElementById('qq-edit-desc') as HTMLTextAreaElement).value;
-        // const allDay = (document.getElementById('qq-edit-allday') as HTMLInputElement).checked;
+        const allDay = (document.getElementById('qq-edit-allday') as HTMLInputElement).checked;
 
         if (!title) {
             sy.showMessage('请输入事件标题', -1, 'error');
@@ -1206,6 +1278,7 @@ export function updataqqcalendar(info) {
                     start: start,
                     end: end,
                     description: description,
+                    isAllDay: allDay,
                 }
             );
 
