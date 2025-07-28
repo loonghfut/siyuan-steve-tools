@@ -32,9 +32,12 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.10.11 (2025年07月28日)
-- 测试自动更新日志流程 (loonghfut)
-- 更新版本号至0.10.11 (loonghfut)
+### v0.10.12 (2025年07月28日)
+- docs: 更新 v0.10.11 版本的更新日志 (loonghfut)
+- 优化刷新功能的API路径，更新为'/api/ui/reloadUI' (loonghfut)
+- feat: 添加全天事件支持，更新相关逻辑和界面交互 Fixes #79 (loonghfut)
+- 更新滴答清单token描述，添加获取链接 (loonghfut)
+- 更新版本号至0.10.12 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
