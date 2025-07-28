@@ -448,7 +448,7 @@ ${renderedContent}
             const sqlStr = `
                 SELECT ial FROM blocks 
                 WHERE ial LIKE '%custom-ics-event="true"%' 
-                  AND ial LIKE '%custom-ics-id=%'
+                  AND ial LIKE '%custom-ics-id=%' limit 9999999
             `;
             const results: { ial: string }[] = await api.sql(sqlStr);
 
