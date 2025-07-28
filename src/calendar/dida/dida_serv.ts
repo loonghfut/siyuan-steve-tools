@@ -151,9 +151,11 @@ export class Dida365Service {
      * 比较新旧任务数据是否有变化
      */
     private isTaskChanged(newTaskData: any, oldSiyuanTask: any): boolean {
-        // 比较事件标题
-        if (newTaskData.事件.content !== oldSiyuanTask.事件?.content) {
-            console.log("事件标题变化", newTaskData.事件.content, oldSiyuanTask.事件?.content);
+        // 比较事件标题（忽略链接，只比较原始标题）
+        const newEventTitle = this.removeLinksFromTitle(newTaskData.事件.content);
+        const oldEventTitle = oldSiyuanTask.事件?.content ? this.removeLinksFromTitle(oldSiyuanTask.事件.content) : '';
+        if (newEventTitle !== oldEventTitle) {
+            console.log("事件标题变化", newEventTitle, oldEventTitle);
             return true;
         }
         // 比较优先级
@@ -348,20 +350,17 @@ export class Dida365Service {
             // 创建块内容
             const statusCustomAttr = taskData.状态?.content === "完成" ? "done" : "todo";
             // 提取D链接
-            const titleWithoutLinks = this.removeLinksFromTitle(taskData.事件?.content || "新建任务");
-            const dLinkMatch = (taskData.事件?.content || "").match(/\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/);
-            const dLink = dLinkMatch ? dLinkMatch[0] : "";
+            // const titleWithoutLinks = this.removeLinksFromTitle(taskData.事件?.content || "新建任务");
+            // const dLinkMatch = (taskData.事件?.content || "").match(/\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/);
+            // const dLink = dLinkMatch ? dLinkMatch[0] : "";
             
             await appendBlock(
                 "markdown",
                 `{{{row
-${"#### " + titleWithoutLinks}
+${"#### " + taskData.事件?.content}
 
 {: id="${await generateSiyuanID() as string}"}
 ${taskData.描述?.content || "描述：暂无"}
-
-{: id="${await generateSiyuanID() as string}"}
-${dLink ? `链接：${dLink}` : "链接：无"}
 
 {: id="${await generateSiyuanID() as string}"}
 }}}
@@ -505,12 +504,14 @@ ${dLink ? `链接：${dLink}` : "链接：无"}
             }
 
             // 更新事件标题（需要单独处理，因为使用不同的API）
-            if (eventKeyID && taskData.事件?.content && taskData.事件.content !== existingTask?.事件?.content) {
+            if (eventKeyID && taskData.事件?.content) {
+                // 移除事件标题中的D链接，只保留原始标题
+                const newEventTitle = this.removeLinksFromTitle(taskData.事件.content);
                 updatePromises.push(updatemainkey({
                     avID: this.avId,
                     blockID: blockId,
                     keyID: eventKeyID,
-                    content: taskData.事件.content,
+                    content: newEventTitle, // 存储不含链接的标题
                 }));
             }
 
