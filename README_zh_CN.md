@@ -31,6 +31,12 @@ win端s3同步后，docker端感知s3同步。
 
 #### 更新日志:
 
+
+### v0.10.11 (2025年07月28日)
+- 测试自动更新日志流程 (loonghfut)
+- 更新版本号至0.10.11 (loonghfut)
+
+
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
 
 #### 感谢：
