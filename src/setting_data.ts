@@ -104,7 +104,7 @@ export const defaultSettings = {
     'SyncDelete': false, // 是否同步删除
     //插件通用配置
     "PluginUsageStatistics": true, // 是否开启插件使用统计
-    "transaction-delay": 1000, // 事务延迟时间（毫秒）
+    "transaction-delay": 800, // 事务延迟时间（毫秒）
 };
 
 export function getSettings() {

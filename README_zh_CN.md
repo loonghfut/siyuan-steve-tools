@@ -11,13 +11,13 @@ STEVETOOLS
 （注：由于是自用工具插件，可能会有一些不完善的地方，甚至出现数据遗失！！（因为使用了思源数据操作相关的api），请自行测试无问题的情况下再使用，同时本插件完全开源）   
  若介意请勿使用。
 ### 若发现BUG或者有好的建议，欢迎提issue或者PR。
-### [问题反馈处](https://www.yuque.com/forms/share/360faa58-b547-4d6c-bdbc-681216e80895) <-> [问题处理进展](https://www.yuque.com/steve-q8wfj/lfcbak/zft8g46por990bsi?singleDoc)  
-（请优先在GitHub上反馈，实在访问不了再用上面的链接）
+### [问题反馈请在社区发帖](https://ld246.com/post?type=5)  
+（请优先在GitHub上反馈，实在访问不了再用社区发帖）
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
-和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等。   
+和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持与滴答清单的初步联动     
 2. docker同步感知：    
-win端s3同步后，docker端感知s3同步.目前只支持docker端感知。   
+win端s3同步后，docker端感知s3同步。 
 3. ai网页侧边栏：    
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
@@ -27,7 +27,7 @@ win端s3同步后，docker端感知s3同步.目前只支持docker端感知。
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。
 
-#### 目前主要是我自己使用，实在没精力和动力去制作详细教程（简单的使用方式会在滴链发）。要是您希望我能制作教程，不妨通过[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)或者给项目点个 [star](https://github.com/loonghfut/siyuan-steve-tools) 来鼓励鼓励，这对我来说会是很大的动力，若长期没有打赏和star，后续的功能交互提示可能会很潦草，还请见谅。
+#### 目前主要是我自己使用，实在没精力和动力去制作详细教程（简单的使用方式会在社区发）。要是您希望我能制作详细教程，请[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png)或者给项目点 [star](https://github.com/loonghfut/siyuan-steve-tools) ，若长期没有打赏和star，后续的功能交互提示可能会很潦草，还请见谅。
 
 #### 更新日志:
 详见代码[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
