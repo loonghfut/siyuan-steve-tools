@@ -84,88 +84,492 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 
 // 视图选择菜单
+//视图选择界面
 .view-filter-menu {
     position: absolute;
-    // z-index: 1;
+    z-index: 1000;
     background-color: $background-color;
-    border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     color: $text-color;
     border: 1px solid $border-color;
-    display: flex;
-    flex-direction: column;
-    width: 156px;
-    max-height: 40vh; // 限制最大高度
+    min-width: 320px;
+    max-width: 450px;
+    max-height: 60vh;
+    overflow: hidden;
 }
 
-// 菜单头部（全部视图选项）
 .view-filter-header {
+    padding: 12px 16px;
     border-bottom: 1px solid $border-color;
-    padding: 8px 0;
-}
-
-// 可滚动的视图列表
-.view-filter-content {
-    overflow-y: auto;
-    max-height: 50vh; // 视图列表最大高度
-    padding: 8px 0;
-}
-
-// 底部按钮容器
-.view-filter-footer {
-    padding: 8px;
-    border-top: 1px solid $border-color;
+    background-color: var(--b3-theme-surface);
     display: flex;
-    justify-content: center; // Changed from flex-end to center
-    background-color: $background-color;
-    position: sticky;
-    bottom: 0;
-    // z-index: 1;
+    gap: 8px;
+    flex-wrap: wrap;
+    
+    .view-filter-select-all,
+    .view-filter-clear-all,
+    .view-filter-manage-groups {
+        padding: 4px 12px;
+        font-size: 0.9em;
+        border-radius: 4px;
+        flex: 1;
+        min-width: 80px;
+        
+        &:hover {
+            background-color: $hover-background-color;
+        }
+    }
+    
+    .view-filter-manage-groups {
+        background-color: var(--b3-card-info-background);
+        color: var(--b3-card-info-color);
+        border-color: var(--b3-card-info-color);
+    }
 }
 
-// 各部分的样式
-.view-filter-item {
-    padding: 8px 12px;
+.view-filter-content {
+    max-height: 450px;
+    overflow-y: auto;
+}
+
+.view-filter-group {
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+        border-bottom: none;
+    }
+}
+
+.view-filter-group-header {
+    padding: 12px 16px;
+    background-color: var(--b3-theme-surface);
+    font-weight: 600;
+    font-size: 0.95em;
     cursor: pointer;
-    transition: background-color 0.2s ease;
     display: flex;
     align-items: center;
-
+    justify-content: space-between;
+    transition: background-color 0.2s ease;
+    
     &:hover {
         background-color: $hover-background-color;
     }
 }
 
-.view-filter-all {
-    font-weight: bold;
+.view-filter-group-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    
+    .view-filter-group-select-btn,
+    .view-filter-group-deselect-btn {
+        padding: 2px 8px;
+        font-size: 0.8em;
+        border-radius: 3px;
+        
+        &:hover {
+            background-color: $hover-background-color;
+        }
+    }
+    
+    .view-filter-group-select-btn {
+        background-color: var(--b3-card-success-background);
+        color: var(--b3-card-success-color);
+        border-color: var(--b3-card-success-color);
+    }
+    
+    .view-filter-group-deselect-btn {
+        background-color: var(--b3-card-warning-background);
+        color: var(--b3-card-warning-color);
+        border-color: var(--b3-card-warning-color);
+    }
+    
+    .view-filter-toggle-icon {
+        font-size: 0.8em;
+        transition: transform 0.2s ease;
+        color: var(--b3-theme-on-surface-light);
+        margin-left: 8px;
+    }
+}
+
+.view-filter-group-items {
+    background-color: $background-color;
+}
+
+.view-filter-subgroup {
+    margin-left: 8px;
+    border-left: 2px solid var(--b3-border-color);
+}
+
+.view-filter-subgroup-header {
+    padding: 8px 16px;
+    background-color: rgba(128, 128, 128, 0.05);
+    font-weight: 500;
+    font-size: 0.9em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    
+    &:hover {
+        background-color: $hover-background-color;
+    }
+    
+    .view-filter-toggle-icon {
+        font-size: 0.7em;
+    }
+}
+
+.view-filter-subgroup-items {
+    background-color: $background-color;
+}
+
+.view-filter-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    
+    &:hover {
+        background-color: $hover-background-color;
+    }
+    
+    &.view-filter-subitem {
+        padding-left: 32px;
+        font-size: 0.9em;
+    }
 }
 
 .view-filter-checkbox {
-    margin-right: 8px;
+    margin: 0;
+    cursor: pointer;
 }
 
 .view-filter-label {
+    cursor: pointer;
     flex: 1;
-    white-space: nowrap;
+    user-select: none;
+}
+
+.view-filter-footer {
+    // padding: 12px 16px;
+    border-top: 1px solid $border-color;
+    background-color: var(--b3-theme-surface);
+    display: flex;
+    justify-content: flex-end;
+    
+    .b3-button {
+        padding: 6px 16px;
+        flex: 1;
+        text-align: center; // 文本居中
+    }
+}
+
+// 分组管理对话框
+.group-management-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.group-management-content {
+    background-color: $background-color;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    min-width: 500px;
+    max-width: 700px;
+    max-height: 80vh;
     overflow: hidden;
-    text-overflow: ellipsis;
+    display: flex;
+    flex-direction: column;
 }
 
-.view-filter-footer .b3-button {
-    padding: 6px 16px;
+.group-management-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid $border-color;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--b3-theme-surface);
+    
+    h3 {
+        margin: 0;
+        color: $text-color;
+    }
+    
+    .group-management-close {
+        padding: 4px 8px;
+        font-size: 1.2em;
+        border: none;
+        background: none;
+        cursor: pointer;
+        
+        &:hover {
+            background-color: $hover-background-color;
+        }
+    }
 }
 
-
-
-.form-item {
-    margin-bottom: 12px;
+.group-management-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
 }
-.form-item label {
-    display: block;
-    margin-bottom: 4px;
-    font-weight: 500;
+
+.create-group-form {
+    margin-bottom: 30px;
+    padding: 16px;
+    border: 1px solid $border-color;
+    border-radius: 6px;
+    background-color: var(--b3-theme-surface);
+    
+    h4 {
+        margin: 0 0 12px 0;
+        color: $text-color;
+    }
+    
+    .form-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        
+        input {
+            padding: 6px 10px;
+            border: 1px solid $border-color;
+            border-radius: 4px;
+            background-color: $background-color;
+            color: $text-color;
+            
+            &.group-name-input {
+                flex: 1;
+            }
+            
+            &.group-icon-input {
+                width: 60px;
+                text-align: center;
+            }
+        }
+        
+        .create-group-btn {
+            padding: 6px 16px;
+            background-color: var(--b3-card-success-background);
+            color: var(--b3-card-success-color);
+            border-color: var(--b3-card-success-color);
+        }
+    }
 }
-.form-item input, .form-item textarea {
-    width: 100%;
-    padding: 6px 8px;
+
+.groups-list {
+    h4 {
+        margin: 0 0 16px 0;
+        color: $text-color;
+    }
+}
+
+.group-management-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid $border-color;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background-color: var(--b3-theme-surface);
+    
+    &:hover {
+        background-color: $hover-background-color;
+    }
+}
+
+.group-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    
+    .group-icon {
+        font-size: 1.2em;
+    }
+    
+    .group-name {
+        font-weight: 500;
+        color: $text-color;
+    }
+    
+    .group-count {
+        font-size: 0.9em;
+        color: var(--b3-theme-on-surface-light);
+    }
+}
+
+.group-actions {
+    display: flex;
+    gap: 8px;
+    
+    .group-edit-btn,
+    .group-delete-btn {
+        padding: 4px 12px;
+        font-size: 0.9em;
+        border-radius: 4px;
+    }
+    
+    .group-edit-btn {
+        background-color: var(--b3-card-info-background);
+        color: var(--b3-card-info-color);
+        border-color: var(--b3-card-info-color);
+    }
+    
+    .group-delete-btn {
+        background-color: var(--b3-card-error-background);
+        color: var(--b3-card-error-color);
+        border-color: var(--b3-card-error-color);
+    }
+}
+
+// 分组编辑对话框
+.group-edit-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.group-edit-content {
+    background-color: $background-color;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    min-width: 600px;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.group-edit-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid $border-color;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--b3-theme-surface);
+    
+    h3 {
+        margin: 0;
+        color: $text-color;
+    }
+}
+
+.group-edit-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    
+    .form-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+        
+        label {
+            min-width: 80px;
+            font-weight: 500;
+            color: $text-color;
+        }
+        
+        input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid $border-color;
+            border-radius: 4px;
+            background-color: $background-color;
+            color: $text-color;
+        }
+    }
+    
+    .group-views-section,
+    .available-views-section {
+        margin-bottom: 20px;
+        
+        h4 {
+            margin: 0 0 12px 0;
+            color: $text-color;
+            padding-bottom: 8px;
+            border-bottom: 1px solid $border-color;
+        }
+    }
+    
+    .group-views-list,
+    .available-views-list {
+        border: 1px solid $border-color;
+        border-radius: 6px;
+        max-height: 150px;
+        overflow-y: auto;
+        background-color: var(--b3-theme-surface);
+    }
+    
+    .group-edit-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        padding-top: 16px;
+        border-top: 1px solid $border-color;
+        
+        .save-group-btn {
+            background-color: var(--b3-card-success-background);
+            color: var(--b3-card-success-color);
+            border-color: var(--b3-card-success-color);
+        }
+        
+        .cancel-group-btn {
+            background-color: var(--b3-card-warning-background);
+            color: var(--b3-card-warning-color);
+            border-color: var(--b3-card-warning-color);
+        }
+    }
+}
+
+.edit-view-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid $border-color;
+    
+    &:last-child {
+        border-bottom: none;
+    }
+    
+    &:hover {
+        background-color: $hover-background-color;
+    }
+    
+    span {
+        color: $text-color;
+    }
+    
+    button {
+        padding: 4px 8px;
+        font-size: 0.8em;
+        border-radius: 3px;
+        
+        &:hover {
+            opacity: 0.8;
+        }
+    }
 }
