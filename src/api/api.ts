@@ -1053,10 +1053,10 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
                 throw new Error("Invalid relation action");
             }
             processedValue = {
-                relation: oldrelation.ids.map(id => ({
-                    blockID: id,
-                    content: readyContents.find(c => c.block.id === id)?.block.content || ''
-                }))
+                relation: {
+                    blockIDs: oldrelation.ids,
+                    contents: readyContents
+                }
             };
             break;
 
