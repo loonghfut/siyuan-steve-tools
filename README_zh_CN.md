@@ -32,10 +32,18 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.10.13 (2025年07月28日)
-- docs: 更新 v0.10.12 版本的更新日志 (loonghfut)
-- 更新 .gitignore，添加 scripts/test_update_readme.js (loonghfut)
-- 测试自动更新日志脚本 (loonghfut)
+### v0.10.14 (2025年07月29日)
+- feat: 滴答思源同步时自动互链 (loonghfut)
+- 滴答：优化标题更新逻辑 (loonghfut)
+- feat: 添加对单元格更新请求的URL类型支持 (loonghfut)
+- feat: 提取任务链接信息并添加到数据库中 (loonghfut)
+- fix:修复单选字段api修改失败问题 (loonghfut)
+- feat: 添加链接字段变化比较逻辑并调整延迟时间 (loonghfut)
+- fix: 移除调试日志以清理代码 (loonghfut)
+- fix:修复关联字段api修改问题 (loonghfut)
+- feat: 添加批量更新后续处理逻辑（改用api的善后），优化视图刷新和滴答清单事件处理 (loonghfut)
+- fix: ics导入，修改事件插入逻辑，使用appendBlock替代prependBlock以确保内容正确追加 #76 (loonghfut)
+- 更新插件版本号至0.10.14 总结 修复#83 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
