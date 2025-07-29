@@ -200,6 +200,14 @@ export class Dida365Service {
             return true;
         }
 
+        // 比较链接字段
+        const newLink = newTaskData.链接?.content || "";
+        const oldLink = oldSiyuanTask.链接?.content || "";
+        if (newLink !== oldLink) {
+            console.log("链接变化", newLink, oldLink);
+            return true;
+        }
+
         return false;
     }
 
@@ -589,10 +597,10 @@ ${taskData.描述?.content || "描述：暂无"}
                     "text"
                 ));
             }
-            console.log("更新链接BBBBBBBBBBBBB：", taskData.链接.content, urlKeyID);
+            // console.log("更新链接BBBBBBBBBBBBB：", taskData.链接.content, urlKeyID);
             if (urlKeyID && taskData.链接?.content) {
                 // 更新链接
-                console.log("更新链接!!!!!!!!!!!!!!!!!!!：", taskData.链接.content);
+                // console.log("更新链接!!!!!!!!!!!!!!!!!!!：", taskData.链接.content);
                 updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -662,7 +670,7 @@ ${taskData.描述?.content || "描述：暂无"}
     private async handleSiyuanUpdate_dalay(e) {
         setTimeout(() => {
             this.handleSiyuanUpdate(e);
-        }, 3000); // 延迟3秒
+        }, 2000); // 延迟2秒
     }
 
     /**
