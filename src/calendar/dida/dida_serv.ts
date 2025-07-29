@@ -175,7 +175,7 @@ export class Dida365Service {
         // 将标签转换为字符串数组以便比较
         const newTagContents = newTags.map((tag: any) => tag.content).sort();
         const oldTagContents = oldTags.map((tag: any) => tag).sort();
-        console.log("比较标签", newTagContents, oldTagContents);
+        // console.log("比较标签", newTagContents, oldTagContents);
         if (newTagContents.join(",") !== oldTagContents.join(",")) {
             console.log("标签变化", newTagContents, oldTagContents);
             return true;
@@ -634,7 +634,7 @@ ${taskData.描述?.content || "描述：暂无"}
             if (!viewData.data || !Array.isArray(viewData.data) || viewData.data.length === 0) {
                 return null;
             }
-            console.log("获取字段 keyID：", fieldName, viewData.data);
+            // console.log("获取字段 keyID：", fieldName, viewData.data);
             // 从第一条数据中获取字段的 keyID
             const firstRecord = viewData.data[0];
             if (firstRecord[fieldName] && firstRecord[fieldName].keyID) {
@@ -676,7 +676,8 @@ ${taskData.描述?.content || "描述：暂无"}
     /**
      * 处理来自思源 WebSocket 的消息，判断是否需要更新滴答任务。
      */
-    private handleSiyuanUpdate = async (e: any) => {
+    handleSiyuanUpdate = async (e: any) => {
+
         const msg = e.detail;
         if (msg.cmd !== "transactions") return;
         const operation = msg.data?.[0]?.doOperations?.[0];
@@ -691,7 +692,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
         const blockId = operation.rowID;
         if (!blockId) return;
-
+        // console.log("处理思源更新：", e);
         try {
             // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
             console.log(`处理思源更新：块ID ${blockId}`);
