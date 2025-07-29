@@ -722,24 +722,24 @@ export async function addBlockToDatabase_pro(id: string, avID: string): Promise<
         if (!addBlockQueue.has(avID)) {
             addBlockQueue.set(avID, []);
         }
-        
+
         addBlockQueue.get(avID)!.push({
             id,
             avID,
             resolve,
             reject
         });
-        
+
         // 为每个 avID 单独管理定时器
         if (addBlockQueueTimers.has(avID)) {
             clearTimeout(addBlockQueueTimers.get(avID)!);
         }
-        
+
         const timer = setTimeout(() => {
             processAddBlockQueueForAvID(avID);
             addBlockQueueTimers.delete(avID);
         }, getQueueDelay());
-        
+
         addBlockQueueTimers.set(avID, timer);
     });
 }
@@ -750,32 +750,32 @@ async function processAddBlockQueueForAvID(avID: string) {
     if (!blocks || blocks.length === 0) {
         return;
     }
-    
+
     try {
         console.log(`🚀 [批量添加块] 开始处理 ${blocks.length} 个块，avID: ${avID}`);
-        
+
         // 构建批量添加的数据
         const sources = blocks.map(block => ({
             id: block.id,
             isDetached: false
         }));
-        
+
         // 使用批量API添加所有块
         const result = await avManager.addAttributeViewBlocks(avID, sources, {
             ignoreFillFilter: true
         });
-        
+
         // 成功后解析所有Promise
         blocks.forEach(block => block.resolve(result));
-        
+
         console.log(`✅ [批量添加块] 成功添加 ${blocks.length} 个块到 avID: ${avID}`);
-        
+
     } catch (error) {
         console.error(`❌ [批量添加块] 添加块失败，avID ${avID}:`, error);
         // 错误时拒绝所有Promise
         blocks.forEach(block => block.reject(error));
     }
-    
+
     // 清除已处理的队列
     addBlockQueue.delete(avID);
 }
@@ -832,7 +832,7 @@ export async function updateAttrViewCell_pro(
         },
         action: string
     },
-    type: 'date' | 'select' | 'relation' | 'checkbox' | 'text' | 'mSelect',
+    type: 'date' | 'select' | 'relation' | 'checkbox' | 'text' | 'mSelect' | 'url',
     endtime?: string
 ): Promise<any> {
     return new Promise((resolve, reject) => {
@@ -847,25 +847,25 @@ export async function updateAttrViewCell_pro(
             resolve,
             reject
         });
-        
+
         console.log(`📝 [队列] 添加单元格更新请求，队列当前长度: ${cellUpdateQueue.length}, avID: ${avID}`);
-        
+
         // 记录队列开始时间
         if (!cellUpdateQueueStartTime) {
             cellUpdateQueueStartTime = Date.now();
         }
-        
+
         // 智能定时器策略
         if (cellUpdateQueueTimer) {
             clearTimeout(cellUpdateQueueTimer);
         }
-        
+
         // 动态调整等待时间
         const queueAge = Date.now() - cellUpdateQueueStartTime;
         const currentQueueSize = cellUpdateQueue.length;
-        
+
         let waitTime = getQueueDelay();
-        
+
         // 如果队列已经等待太久或队列很大，立即处理
         if (queueAge >= MAX_WAIT_TIME || currentQueueSize >= 50) {
             waitTime = 150; // 几乎立即处理
@@ -873,7 +873,7 @@ export async function updateAttrViewCell_pro(
         } else if (currentQueueSize >= 4) {
             waitTime = 500; // 减少等待时间
         }
-        
+
         cellUpdateQueueTimer = setTimeout(() => {
             processQueue();
             cellUpdateQueueTimer = null;
@@ -888,39 +888,39 @@ async function processQueue() {
         console.log(`⏸️ [队列处理] 跳过处理 - 正在处理: ${isProcessingQueue}, 队列长度: ${cellUpdateQueue.length}`);
         return;
     }
-    
+
     isProcessingQueue = true;
     const totalItems = cellUpdateQueue.length;
     console.log(`🚀 [队列处理] 开始处理单元格更新队列，共 ${totalItems} 个项目`);
-    
+
     // 按 avID 分组处理
     const groupedUpdates = new Map<string, Array<typeof cellUpdateQueue[0]>>();
-    
+
     // 取出所有待处理的更新
     const allUpdates: Array<typeof cellUpdateQueue[0]> = [];
     while (cellUpdateQueue.length > 0) {
         const update = cellUpdateQueue.shift();
         if (!update) continue;
         allUpdates.push(update);
-        
+
         if (!groupedUpdates.has(update.avID)) {
             groupedUpdates.set(update.avID, []);
         }
         groupedUpdates.get(update.avID)!.push(update);
     }
-    
+
     console.log(`📊 [队列处理] 分组结果: ${groupedUpdates.size} 个avID，总共 ${allUpdates.length} 个更新`);
-    
+
     // 按 avID 分组批量处理
     for (const [avID, updates] of groupedUpdates.entries()) {
         try {
             console.log(`🔄 [批量更新单元格] 开始处理 ${updates.length} 个单元格更新，avID: ${avID}`);
-            
+
             // 预处理所有值并获取键信息
             const processedUpdates = await Promise.all(
                 updates.map(async (update) => {
                     const processedValue = await processCellValue(update.value, update.type, update.endtime);
-                    
+
                     // 如果没有keyName，需要根据keyID获取
                     let keyName = update.keyName;
                     if (!keyName && update.keyID) {
@@ -928,7 +928,7 @@ async function processQueue() {
                         const key = keys.find(k => k.id === update.keyID);
                         keyName = key?.name;
                     }
-                    
+
                     return {
                         ...update,
                         keyName,
@@ -936,7 +936,7 @@ async function processQueue() {
                     };
                 })
             );
-            
+
             // 构建批量更新数据
             const batchUpdates = processedUpdates
                 .filter(update => update.keyName) // 只处理有效的键名
@@ -945,27 +945,27 @@ async function processQueue() {
                     rowID: update.id,
                     value: update.processedValue
                 }));
-            
+
             if (batchUpdates.length > 0) {
                 // 使用批量API更新单元格
                 const result = await avManager.batchUpdateCells(avID, batchUpdates);
-                
+
                 // 成功后解析所有Promise
                 updates.forEach(update => update.resolve(result));
-                
+
                 console.log(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
             } else {
                 // 如果没有有效更新，拒绝所有Promise
                 updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
                 console.warn(`⚠️  [批量更新单元格] 没有有效的键名，avID: ${avID}`);
             }
-            
+
         } catch (error) {
             console.error(`❌ [批量更新单元格] 更新失败，avID ${avID}:`, error);
             // 错误时拒绝所有Promise
             updates.forEach(update => update.reject(error));
         }
-        
+
         // 每个avID处理完后添加延迟
         if (groupedUpdates.size > 1) {
             const batchDelay = getBatchDelay();
@@ -973,7 +973,7 @@ async function processQueue() {
             await new Promise(resolve => setTimeout(resolve, batchDelay));
         }
     }
-    
+
     isProcessingQueue = false;
     console.log(`✅ [队列处理] 队列处理完成，共处理了 ${totalItems} 个单元格更新`);
 }
@@ -1063,6 +1063,14 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
         case 'text':
             processedValue = {
                 text: {
+                    content: value as string
+                }
+            };
+            break;
+
+        case 'url':
+            processedValue = {
+                url: {
                     content: value as string
                 }
             };
