@@ -201,12 +201,12 @@ export class ICSImporter {
             if (!a.startTime) return 1;
             if (!b.startTime) return -1;
 
-            // 按开始时间降序排序（最新的在前）
+            // 按开始时间升序排序（最早的在前）
             const timeA = a.startTime.getTime();
             const timeB = b.startTime.getTime();
             
-            if (timeA > timeB) return -1;
-            if (timeA < timeB) return 1;
+            if (timeA < timeB) return -1;
+            if (timeA > timeB) return 1;
             
             // 如果开始时间相同，按标题排序保证稳定性
             return a.title.localeCompare(b.title);
