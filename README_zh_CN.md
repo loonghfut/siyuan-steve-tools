@@ -32,11 +32,10 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.10.16 (2025年07月29日)
-- 增加视图分组 #77 (loonghfut)
-- 优化分组样式#77 (loonghfut)
-- 调整数据库操作延迟时间建议值至1100，并更新滑块最小值至500 (loonghfut)
-- 更新插件版本号至0.10.16 (loonghfut)
+### v0.10.17 (2025年07月29日)
+- 重构筛选菜单代码，修复视图分组，侧边栏显示有问题 Fix #85 (loonghfut)
+- 新增分组管理功能，支持隐藏/显示分组及未分组视图，优化相关样式 #85 (loonghfut)
+- 更新插件版本号至0.10.17 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
