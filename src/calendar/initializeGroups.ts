@@ -8,23 +8,28 @@ export interface ViewGroup {
     icon?: string;
     viewIds: string[];
     isExpanded?: boolean;
+    isHidden?: boolean;
 }
 // 默认分组配置
 export let userGroups: ViewGroup[] = [];
+// 未分组的隐藏状态
+let isUngroupedHidden = false;
 const defaultGroups: ViewGroup[] = [
     {
         id: 'external',
         name: '外部日历',
         icon: '📅',
         viewIds: ['qqcalendar', 'icsSubscription'],
-        isExpanded: true
+        isExpanded: true,
+        isHidden: false
     },
     {
         id: 'special',
         name: '特殊功能',
         icon: '⚡',
         viewIds: ['lifelog'],
-        isExpanded: true
+        isExpanded: true,
+        isHidden: false
     }
 ];
 
@@ -54,6 +59,8 @@ export function initializeGroups() {
         userGroups = [...defaultGroups];
         saveUserGroups(userGroups);
     }
+    // 加载未分组的隐藏状态
+    isUngroupedHidden = loadUngroupedVisibility();
 }
 export function createNewGroup(name: string, icon: string = '📁'): ViewGroup {
     const newGroup: ViewGroup = {
@@ -61,7 +68,8 @@ export function createNewGroup(name: string, icon: string = '📁'): ViewGroup {
         name,
         icon,
         viewIds: [],
-        isExpanded: true
+        isExpanded: true,
+        isHidden: false
     };
     return newGroup;
 }
@@ -83,9 +91,41 @@ export function deleteGroup(groupId: string) {
     userGroups = userGroups.filter(g => g.id !== groupId);
     saveUserGroups(userGroups);
 }
+export function toggleGroupVisibility(groupId: string) {
+    const group = userGroups.find(g => g.id === groupId);
+    if (group) {
+        group.isHidden = !group.isHidden;
+        saveUserGroups(userGroups);
+    }
+}
+export function toggleUngroupedVisibility() {
+    isUngroupedHidden = !isUngroupedHidden;
+    saveUngroupedVisibility();
+}
+export function isUngroupedVisible(): boolean {
+    return !isUngroupedHidden;
+}
+function loadUngroupedVisibility(): boolean {
+    try {
+        const saved = moduleInstances['M_calendar'].calConfig.get("isUngroupedHidden");
+        return saved === 'true';
+    } catch (error) {
+        console.error('加载未分组隐藏状态失败:', error);
+        return false;
+    }
+}
+function saveUngroupedVisibility() {
+    try {
+        moduleInstances['M_calendar'].calConfig.set("isUngroupedHidden", isUngroupedHidden.toString());
+        moduleInstances['M_calendar'].calConfig.save();
+    } catch (error) {
+        console.error('保存未分组隐藏状态失败:', error);
+    }
+}
 export function getUngroupedViews(allViewIds: string[]): string[] {
     const groupedViewIds = new Set();
     userGroups.forEach(group => {
+        // 包含所有分组中的视图（无论是否隐藏）
         group.viewIds.forEach(id => groupedViewIds.add(id));
     });
     return allViewIds.filter(id => !groupedViewIds.has(id));
@@ -167,14 +207,16 @@ export async function createViewFilterMenu(
     const allSiyuanViewIds = viewIDs.map(v => v.viewId);
     const allViewIds = [...allSpecialViewIds, ...allSiyuanViewIds];
 
-    // 渲染分组
+    // 渲染分组（只显示非隐藏的分组）
     userGroups.forEach(group => {
-        createGroupSection(group, menuContent, viewIDs, allViewIds, filterViewId, setFilterViewId, calendar, lastSavedLifelogSlotDuration);
+        if (!group.isHidden) {
+            createGroupSection(group, menuContent, viewIDs, allViewIds, filterViewId, setFilterViewId, calendar, lastSavedLifelogSlotDuration);
+        }
     });
 
-    // 渲染未分组的视图
+    // 渲染未分组的视图（只在未分组可见时显示）
     const ungroupedViewIds = getUngroupedViews(allViewIds);
-    if (ungroupedViewIds.length > 0) {
+    if (ungroupedViewIds.length > 0 && isUngroupedVisible()) {
         const ungroupedItems = [];
         ungroupedViewIds.forEach(viewId => {
             const item = createViewItemElement(viewId, viewIDs, filterViewId, setFilterViewId, calendar, lastSavedLifelogSlotDuration);
@@ -521,12 +563,14 @@ export async function createViewFilterMenu(
         // 现有分组列表
         const groupsList = document.createElement('div');
         groupsList.className = 'groups-list';
-        groupsList.innerHTML = '<h4>现有分组</h4>';
+        const hiddenGroupsCount = userGroups.filter(g => g.isHidden).length;
+        const hiddenInfo = hiddenGroupsCount > 0 ? ` (${hiddenGroupsCount}个已隐藏)` : '';
+        groupsList.innerHTML = `<h4>现有分组${hiddenInfo}</h4>`;
         
         // 渲染现有分组
         userGroups.forEach(group => {
             const groupItem = document.createElement('div');
-            groupItem.className = 'group-management-item';
+            groupItem.className = `group-management-item ${group.isHidden ? 'hidden-group' : ''}`;
             
             const groupInfo = document.createElement('div');
             groupInfo.className = 'group-info';
@@ -534,10 +578,22 @@ export async function createViewFilterMenu(
                 <span class="group-icon">${group.icon || '📁'}</span>
                 <span class="group-name">${group.name}</span>
                 <span class="group-count">(${group.viewIds.length}个视图)</span>
+                ${group.isHidden ? '<span class="group-hidden-indicator">（已隐藏）</span>' : ''}
             `;
             
             const groupActions = document.createElement('div');
             groupActions.className = 'group-actions';
+            
+            // 添加隐藏/显示按钮（所有分组都可以隐藏）
+            const toggleVisibilityBtn = document.createElement('button');
+            toggleVisibilityBtn.className = 'b3-button group-toggle-visibility-btn';
+            toggleVisibilityBtn.textContent = group.isHidden ? '显示' : '隐藏';
+            toggleVisibilityBtn.title = group.isHidden ? '显示此分组' : '隐藏此分组';
+            toggleVisibilityBtn.onclick = () => {
+                toggleGroupVisibility(group.id);
+                renderGroupsList();
+            };
+            groupActions.appendChild(toggleVisibilityBtn);
             
             if (!['external', 'special'].includes(group.id)) { // 不允许删除默认分组
                 const editBtn = document.createElement('button');
@@ -573,11 +629,13 @@ export async function createViewFilterMenu(
             
             const newGroupsList = document.createElement('div');
             newGroupsList.className = 'groups-list';
-            newGroupsList.innerHTML = '<h4>现有分组</h4>';
+            const hiddenGroupsCount = userGroups.filter(g => g.isHidden).length;
+            const hiddenInfo = hiddenGroupsCount > 0 ? ` (${hiddenGroupsCount}个已隐藏)` : '';
+            newGroupsList.innerHTML = `<h4>现有分组${hiddenInfo}</h4>`;
             
             userGroups.forEach(group => {
                 const groupItem = document.createElement('div');
-                groupItem.className = 'group-management-item';
+                groupItem.className = `group-management-item ${group.isHidden ? 'hidden-group' : ''}`;
                 
                 const groupInfo = document.createElement('div');
                 groupInfo.className = 'group-info';
@@ -585,10 +643,22 @@ export async function createViewFilterMenu(
                     <span class="group-icon">${group.icon || '📁'}</span>
                     <span class="group-name">${group.name}</span>
                     <span class="group-count">(${group.viewIds.length}个视图)</span>
+                    ${group.isHidden ? '<span class="group-hidden-indicator">（已隐藏）</span>' : ''}
                 `;
                 
                 const groupActions = document.createElement('div');
                 groupActions.className = 'group-actions';
+                
+                // 添加隐藏/显示按钮（所有分组都可以隐藏）
+                const toggleVisibilityBtn = document.createElement('button');
+                toggleVisibilityBtn.className = 'b3-button group-toggle-visibility-btn';
+                toggleVisibilityBtn.textContent = group.isHidden ? '显示' : '隐藏';
+                toggleVisibilityBtn.title = group.isHidden ? '显示此分组' : '隐藏此分组';
+                toggleVisibilityBtn.onclick = () => {
+                    toggleGroupVisibility(group.id);
+                    renderGroupsList();
+                };
+                groupActions.appendChild(toggleVisibilityBtn);
                 
                 if (!['external', 'special'].includes(group.id)) {
                     const editBtn = document.createElement('button');
@@ -616,6 +686,14 @@ export async function createViewFilterMenu(
             });
             
             body.appendChild(newGroupsList);
+            
+            // 重新添加未分组管理
+            const existingUngroupedSection = body.querySelector('.ungrouped-management-section');
+            if (existingUngroupedSection) {
+                existingUngroupedSection.remove();
+            }
+            const newUngroupedSection = createUngroupedManagementSection(viewIDs);
+            body.appendChild(newUngroupedSection);
         }
         
         function editGroup(group: ViewGroup) {
@@ -623,8 +701,65 @@ export async function createViewFilterMenu(
             showGroupEditDialog(group, renderGroupsList, viewIDs);
         }
         
+        function createUngroupedManagementSection(viewIDs: any[]): HTMLElement {
+            const ungroupedSection = document.createElement('div');
+            ungroupedSection.className = 'ungrouped-management-section';
+            
+            // 获取未分组的视图数量
+            const allViewIds = ['qqcalendar', 'icsSubscription', 'lifelog', ...viewIDs.map(v => v.viewId)];
+            const ungroupedViewIds = getUngroupedViews(allViewIds);
+            const ungroupedCount = ungroupedViewIds.length;
+            
+            const ungroupedHeader = document.createElement('h4');
+            ungroupedHeader.textContent = `未分组 (${ungroupedCount}个视图)`;
+            
+            const ungroupedItem = document.createElement('div');
+            ungroupedItem.className = `group-management-item ${isUngroupedHidden ? 'hidden-group' : ''}`;
+            
+            const ungroupedInfo = document.createElement('div');
+            ungroupedInfo.className = 'group-info';
+            ungroupedInfo.innerHTML = `
+                <span class="group-icon">📁</span>
+                <span class="group-name">未分组</span>
+                <span class="group-count">(${ungroupedCount}个视图)</span>
+                ${isUngroupedHidden ? '<span class="group-hidden-indicator">（已隐藏）</span>' : ''}
+            `;
+            
+            const ungroupedActions = document.createElement('div');
+            ungroupedActions.className = 'group-actions';
+            
+            // 添加隐藏/显示按钮
+            const toggleVisibilityBtn = document.createElement('button');
+            toggleVisibilityBtn.className = 'b3-button group-toggle-visibility-btn';
+            toggleVisibilityBtn.textContent = isUngroupedHidden ? '显示' : '隐藏';
+            toggleVisibilityBtn.title = isUngroupedHidden ? '显示未分组' : '隐藏未分组';
+            toggleVisibilityBtn.onclick = () => {
+                toggleUngroupedVisibility();
+                // 重新渲染未分组管理区域
+                const existingUngroupedSection = body.querySelector('.ungrouped-management-section');
+                if (existingUngroupedSection) {
+                    existingUngroupedSection.remove();
+                }
+                const newUngroupedSection = createUngroupedManagementSection(viewIDs);
+                body.appendChild(newUngroupedSection);
+            };
+            ungroupedActions.appendChild(toggleVisibilityBtn);
+            
+            ungroupedItem.appendChild(ungroupedInfo);
+            ungroupedItem.appendChild(ungroupedActions);
+            
+            ungroupedSection.appendChild(ungroupedHeader);
+            ungroupedSection.appendChild(ungroupedItem);
+            
+            return ungroupedSection;
+        }
+        
         body.appendChild(createGroupForm);
         body.appendChild(groupsList);
+        
+        // 添加未分组管理
+        const ungroupedSection = createUngroupedManagementSection(viewIDs);
+        body.appendChild(ungroupedSection);
         
         dialogContent.appendChild(header);
         dialogContent.appendChild(body);

@@ -573,3 +573,51 @@ $priority-color-high-background: var(--b3-card-error-background);
         }
     }
 }
+
+// 隐藏分组相关样式
+.group-hidden-indicator {
+    color: var(--b3-theme-on-surface-light);
+    font-size: 0.85em;
+    font-style: italic;
+    margin-left: 8px;
+}
+
+.group-toggle-visibility-btn {
+    background-color: var(--b3-card-info-background);
+    color: var(--b3-card-info-color);
+    border-color: var(--b3-card-info-color);
+    
+    &:hover {
+        background-color: var(--b3-card-info-color);
+        color: var(--b3-card-info-background);
+    }
+}
+
+.group-management-item {
+    .group-info {
+        .group-hidden-indicator {
+            opacity: 0.7;
+        }
+    }
+    
+    &.hidden-group {
+        opacity: 0.6;
+        
+        .group-info {
+            text-decoration: line-through;
+        }
+    }
+}
+
+// 未分组管理区域样式
+.ungrouped-management-section {
+    margin-top: 20px;
+    border-top: 1px solid $border-color;
+    padding-top: 15px;
+    
+    h4 {
+        margin-bottom: 10px;
+        color: $text-color;
+        font-weight: 600;
+    }
+}
