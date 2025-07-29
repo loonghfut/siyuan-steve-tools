@@ -224,6 +224,15 @@ function extractDataFromTable(data: any, isZQ = false) {
                     };
                 }
 
+                //提取链接
+                const linkCell = getCell('链接');
+                if (linkCell) {
+                    rowData['链接'] = {
+                        content: linkCell.url?.content || '',
+                        keyID: linkCell.keyID || ''
+                    };
+                }
+
                 //提取是否全天事件
                 const allDayCell = getCell('全天');
                 if (allDayCell) {

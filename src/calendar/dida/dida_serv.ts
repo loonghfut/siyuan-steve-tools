@@ -118,11 +118,11 @@ export class Dida365Service {
                 if (!didaTask.id) continue;
 
                 const existingTask = existingTasksMap.get(didaTask.id);
-                
+
                 if (existingTask) {
                     // 更新现有任务
                     const taskData = this.buildTaskData(didaTask, existingTask);
-                    
+
                     // 比较任务数据，仅在有变化时更新
                     if (this.isTaskChanged(taskData, existingTask)) {
                         await this.updateSiyuanTask(existingTask, taskData);
@@ -209,8 +209,8 @@ export class Dida365Service {
     private removeLinksFromTitle(title: string): string {
         // 移除 [D](https://dida365.com/webapp/#q/all/tasks/xxx) 和 [S](siyuan://blocks/xxx) 链接
         return title.replace(/\s*\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/g, '')
-                   .replace(/\s*\[S\]\(siyuan:\/\/blocks\/[^)]+\)/g, '')
-                   .trim();
+            .replace(/\s*\[S\]\(siyuan:\/\/blocks\/[^)]+\)/g, '')
+            .trim();
     }
 
     /**
@@ -252,13 +252,13 @@ export class Dida365Service {
         const buildTitleWithLinks = (title: string, didaId: string) => {
             // 移除所有现有链接，获取原始标题
             const originalTitle = this.removeLinksFromTitle(title);
-            
+
             // 检查标题是否包含 S 链接，如果有则说明是从思源创建的任务
             if (title.includes('[S](siyuan://blocks/')) {
                 // 如果有 S 链接，替换为 D 链接（思源端只能有 D 链接）
                 return `${originalTitle} [D](https://dida365.com/webapp/#q/all/tasks/${didaId})`;
             }
-            
+
             // 否则添加 D 链接（思源端链接到滴答清单）
             return `${originalTitle} [D](https://dida365.com/webapp/#q/all/tasks/${didaId})`;
         };
@@ -303,6 +303,10 @@ export class Dida365Service {
             优先级: {
                 content: getPriority(didaTask.priority || 0),
                 keyID: existingTask?.优先级?.keyID
+            },
+            链接: {
+                content: didaTask.id ? `https://dida365.com/webapp/#q/all/tasks/${didaTask.id}` : "",
+                keyID: existingTask?.链接?.keyID
             },
             状态: {
                 content: getStatus(didaTask),
@@ -353,7 +357,7 @@ export class Dida365Service {
             // const titleWithoutLinks = this.removeLinksFromTitle(taskData.事件?.content || "新建任务");
             // const dLinkMatch = (taskData.事件?.content || "").match(/\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/);
             // const dLink = dLinkMatch ? dLinkMatch[0] : "";
-            
+
             await appendBlock(
                 "markdown",
                 `{{{row
@@ -387,17 +391,17 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 获取原始标题（移除可能已存在的链接）
                         const originalTitle = this.removeLinksFromTitle(cachedTask.title || "");
                         const titleWithSLink = `${originalTitle} [S](siyuan://blocks/${blockId})`;
-                        
+
                         // 更新滴答清单任务，添加 S 链接
                         await this.apiClient.updateTask(didaTaskId, {
                             id: didaTaskId,
                             projectId: cachedTask.projectId,
                             title: titleWithSLink
                         });
-                        
+
                         // 更新缓存中的任务标题
                         cachedTask.title = titleWithSLink;
-                        
+
                         console.log(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
                     }
                 } catch (error) {
@@ -447,7 +451,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 获取原始标题（移除可能已存在的链接）
                         const originalTitle = this.removeLinksFromTitle(newTaskData.事件?.content || "");
                         const titleWithSLink = `${originalTitle} [S](siyuan://blocks/${blockId})`;
-                        
+
                         // 检查滴答任务标题是否需要更新
                         if (cachedTask.title !== titleWithSLink) {
                             await this.apiClient.updateTask(didaTaskId, {
@@ -455,10 +459,10 @@ ${taskData.描述?.content || "描述：暂无"}
                                 projectId: cachedTask.projectId,
                                 title: titleWithSLink
                             });
-                            
+
                             // 更新缓存中的任务标题
                             cachedTask.title = titleWithSLink;
-                            
+
                             console.log(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
                         }
                     }
@@ -485,6 +489,7 @@ ${taskData.描述?.content || "描述：暂无"}
             const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', this.avId);
             const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间', this.avId);
             const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级', this.avId);
+            const urlKeyID = await this.getKeyIDfromViewValue(viewValue, '链接', this.avId);
             const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态', this.avId);
             const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', this.avId);
             const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
@@ -584,6 +589,19 @@ ${taskData.描述?.content || "描述：暂无"}
                     "text"
                 ));
             }
+            console.log("更新链接BBBBBBBBBBBBB：", taskData.链接.content, urlKeyID);
+            if (urlKeyID && taskData.链接?.content) {
+                // 更新链接
+                console.log("更新链接!!!!!!!!!!!!!!!!!!!：", taskData.链接.content);
+                updatePromises.push(updateAttrViewCell_pro(
+                    blockId,
+                    this.avId,
+                    urlKeyID,
+                    taskData.链接.content,
+                    "url"
+                ));
+            }
+
 
             // 等待所有更新完成
             await Promise.all(updatePromises);
@@ -608,7 +626,7 @@ ${taskData.描述?.content || "描述：暂无"}
             if (!viewData.data || !Array.isArray(viewData.data) || viewData.data.length === 0) {
                 return null;
             }
-
+            console.log("获取字段 keyID：", fieldName, viewData.data);
             // 从第一条数据中获取字段的 keyID
             const firstRecord = viewData.data[0];
             if (firstRecord[fieldName] && firstRecord[fieldName].keyID) {
