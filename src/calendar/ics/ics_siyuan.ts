@@ -644,8 +644,8 @@ ${renderedContent}
 
                 const blockContent = this.generateEventBlock(event);
                 try {
-                    console.log(`将事件fankui`,blockContent);
-                    const result = await api.prependBlock("markdown", blockContent, dailyNoteId);
+                    console.log(`将事件反馈`, blockContent);
+                    const result = await api.appendBlock("markdown", blockContent, dailyNoteId);
 
                     // 如果插入成功且启用了数据库功能，添加到数据库
                     if (result && this.settings['cal-ics-add-to-database']) {
@@ -744,7 +744,7 @@ ${renderedContent}
                 const blockContent = this.generateEventBlock(event);
                 
                 // 插入到文档
-                const result = await api.prependBlock("markdown", blockContent, documentId);
+                const result = await api.appendBlock("markdown", blockContent, documentId);
 // console.log(`生成超级块内容: ${blockContent}`,result);
                 // 如果插入成功且启用了数据库功能，添加到数据库
                 if (result && this.settings['cal-ics-add-to-database']) {
