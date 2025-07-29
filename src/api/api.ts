@@ -999,10 +999,10 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
 
         case 'select':
             processedValue = {
-                select: {
-                    content: (value as ISelectOption[])[0]?.content || '',
-                    color: (value as ISelectOption[])[0]?.color || ''
-                }
+                mSelect: (value as ISelectOption[]).map(option => ({
+                    content: option.content,
+                    color: option.color
+                }))
             };
             break;
 
