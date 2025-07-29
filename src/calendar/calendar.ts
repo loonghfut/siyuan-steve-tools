@@ -275,13 +275,7 @@ export async function run(
                 console.error('农历显示错误:', error);
             }
         },
-
-
         // 事件拖放处理
-
-
-
-
         eventDrop: async function (info) {
             // 检查是否是QQ日历事件
             if (info.event.extendedProps.source === 'qqcalendar') {
@@ -969,21 +963,8 @@ export async function run(
     update_thisCalendars();
     thisCalendars.push(calendar);
     console.log("thisCalendars", thisCalendars);
-    // Calendars_pro.push({Calendar:calendar,id:id});
     OUTcalendar = calendar;
     calendar.render();
-    // // 手动重新获取视图数据 - 只添加一次事件监听器
-    // const titleClickHandler = (e: MouseEvent) => {
-    //     const target = e.target as HTMLElement;
-    //     if (target.classList.contains('fc-toolbar-title')) {
-    //         refreshKanban();
-    //         console.log('refetchEvents：：AAA');
-    //     }
-    // };
-    // if (ishandrefetchEvents) {
-    //     document.addEventListener('click', titleClickHandler);
-    //     ishandrefetchEvents = false;
-    // }
     return calendar;
 }
 

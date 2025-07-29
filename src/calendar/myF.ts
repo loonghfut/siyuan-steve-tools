@@ -923,9 +923,7 @@ export async function updateEventInDatabase(
     is_more_one_day: boolean = false
 ) {
     // 更新思源数据库中的时间
-    steveTools.outlog("事件拖放", info);
     const blockId = info.event._def.extendedProps.blockId
-    steveTools.outlog("blockId:::", blockId);
     const newStartDate = info.event.startStr;
     let newEndDate = info.event.endStr;
     if (is_more_one_day && /^\d{4}-\d{2}-\d{2}$/.test(info.event.endStr)) {
@@ -933,14 +931,10 @@ export async function updateEventInDatabase(
         endDate.setDate(endDate.getDate() - 1);
         newEndDate = endDate.toISOString();
     }
-    // steveTools.outlog("dateChange:::", newStartDate, newEndDate);
     const rootid = info.event._def.extendedProps.rootid;
-    
     // 检测是否拖拽到全天区域或从全天区域拖拽出来
     const isAllDay = info.event.allDay;
     const wasAllDay = info.oldEvent ? info.oldEvent.allDay : false;
-    
-    // steveTools.outlog(`全天状态检测: 原状态=${wasAllDay}, 新状态=${isAllDay}`);
     
     // 准备批量更新的promise数组
     const updatePromises: Promise<any>[] = [];
@@ -954,10 +948,7 @@ export async function updateEventInDatabase(
         const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', rootid);
         if (allDayKeyID) {
             updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, allDayKeyID, isAllDay, "checkbox"));
-            // steveTools.outlog(`更新全天属性: ${wasAllDay} -> ${isAllDay}`);
-            // sy.showMessage(`事件已${isAllDay ? '设置为' : '取消'}全天`, 2000, "info");
         } else {
-            // steveTools.outlog("未找到全天字段，无法更新全天属性");
             sy.showMessage("未找到全天字段，无法更新全天属性", 2000, "error");
         }
     }
@@ -965,7 +956,6 @@ export async function updateEventInDatabase(
     // 等待所有更新完成
     await Promise.all(updatePromises);
     
-    steveTools.outlog("rootid:::", rootid);
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {
@@ -974,7 +964,7 @@ export async function updateEventInDatabase(
 }
 
 
-
+//TODO：急急优化
 async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string): Promise<string | undefined> {
     // First try to get keyID from existing viewValue
     const findKeyID = (data: any[]): string | undefined => {
@@ -995,7 +985,6 @@ async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string
 
     // If not found, fetch fresh data
     try {
-        steveTools.outlog('Fetching fresh view data...');
         sy.showMessage('添加事件中，请稍等...', -1, "info", "1");
         await new Promise(resolve => setTimeout(resolve, 1000));
         const Mcalendar = moduleInstances['M_calendar'];

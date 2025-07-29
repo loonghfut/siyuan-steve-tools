@@ -648,7 +648,7 @@ const _refreshKanban = async () => {
     // 重新初始化拖拽
     await initializeSortableKanban();
 };
-export const refreshKanban = debounce(_refreshKanban, 300);
+export const refreshKanban = debounce(_refreshKanban, 500);
 
 const logDebug = (message: string, ...args: any[]) => {
     console.log(`[Kanban] ${message}`, ...args);

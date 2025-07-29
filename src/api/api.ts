@@ -954,6 +954,9 @@ async function processQueue() {
                 updates.forEach(update => update.resolve(result));
 
                 console.log(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
+                const blockId = updates[0].id;
+                // 批量更新完成后的后续处理
+                await handlePostBatchUpdateActions(avID, updates, blockId);
             } else {
                 // 如果没有有效更新，拒绝所有Promise
                 updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
@@ -976,6 +979,45 @@ async function processQueue() {
 
     isProcessingQueue = false;
     console.log(`✅ [队列处理] 队列处理完成，共处理了 ${totalItems} 个单元格更新`);
+}
+
+// 处理批量更新完成后的后续操作
+async function handlePostBatchUpdateActions(avID: string, updates: Array<any>, blockId: string) {
+    try {
+        // 1. 触发视图刷新
+        await refreshAttributeView(avID);
+
+        // 2. 判断是否为滴答清单事件并处理
+        await handleDidaListEvent(avID, updates, blockId);
+
+    } catch (error) {
+        console.warn(`⚠️ [后续处理] 批量更新后续处理出错，avID: ${avID}`, error);
+    }
+}
+
+// 刷新属性视图
+async function refreshAttributeView(avID: string) {
+    try {
+        refreshKanban();
+        console.log(`🔄 [视图刷新] 成功刷新视图，avID: ${avID}`);
+    } catch (error) {
+        console.warn(`⚠️ [视图刷新] 刷新视图失败，avID: ${avID}`, error);
+    }
+}
+
+// 处理滴答清单事件
+async function handleDidaListEvent(avID: string, updates: Array<any>, blockId: string) {
+    try {
+        // 检查是否为滴答清单数据库
+        const didaDbId = settingdata['cal-dida-db-id'];
+        if (!didaDbId || avID !== didaDbId) {
+            return; // 不是滴答清单数据库，无需处理
+        }
+        (window as any).Dida365Service?.handleSiyuanUpdate("force", blockId);
+
+    } catch (error) {
+        console.warn(`⚠️ [滴答清单] 处理滴答清单事件失败`, error);
+    }
 }
 
 // 处理单元格值的函数（从原来的processCellUpdate中提取）
@@ -1153,6 +1195,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
 }
 
 import { PluginConfig } from "../savedata";
+import { refreshKanban } from "@/calendar/kanban";
 
 // 传入 PluginConfig 实例
 export async function getFromApi2(

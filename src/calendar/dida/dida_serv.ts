@@ -29,6 +29,11 @@ export class Dida365Service {
         this.isTokenValid();
         console.log("Dida365Service initialized", this.todoListId);
         this.init();
+
+        // 将实例导出到 window 对象
+        if (typeof window !== 'undefined' && !(window as any).Dida365Service) {
+            (window as any).Dida365Service = this;
+        }
     }
 
     /**
@@ -675,22 +680,24 @@ ${taskData.描述?.content || "描述：暂无"}
 
     /**
      * 处理来自思源 WebSocket 的消息，判断是否需要更新滴答任务。
+     * 增加强制刷新逻辑
      */
-    handleSiyuanUpdate = async (e: any) => {
-
-        const msg = e.detail;
-        if (msg.cmd !== "transactions") return;
-        const operation = msg.data?.[0]?.doOperations?.[0];
-        if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs")) {
-            return;
+    handleSiyuanUpdate = async (e: any, blockId = '') => {
+        if (e == 'force' && blockId) {
+            console.log("强制刷新思源更新监听");
+        } else {
+            const msg = e.detail;
+            if (msg.cmd !== "transactions") return;
+            const operation = msg.data?.[0]?.doOperations?.[0];
+            if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs")) {
+                return;
+            }
+            // 检查是否是我们正在监听的数据库
+            if (operation.avID !== this.avId) {
+                return;
+            }
+            blockId = operation.rowID;
         }
-
-        // 检查是否是我们正在监听的数据库
-        if (operation.avID !== this.avId) {
-            return;
-        }
-
-        const blockId = operation.rowID;
         if (!blockId) return;
         // console.log("处理思源更新：", e);
         try {
