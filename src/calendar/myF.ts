@@ -956,6 +956,8 @@ export async function updateEventInDatabase(
     // 等待所有更新完成
     await Promise.all(updatePromises);
     
+    api.handleDidaListEvent(rootid, blockId);
+
     setTimeout(() => calendar.refetchEvents(), 1000);
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {

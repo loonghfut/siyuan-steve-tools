@@ -987,8 +987,9 @@ async function handlePostBatchUpdateActions(avID: string, updates: Array<any>, b
         // 1. 触发视图刷新
         await refreshAttributeView(avID);
 
-        // 2. 判断是否为滴答清单事件并处理
-        await handleDidaListEvent(avID, updates, blockId);
+        //有BUG会漏事件和重复事件
+        // // 2. 判断是否为滴答清单事件并处理
+        // await handleDidaListEvent(avID, updates, blockId);
 
     } catch (error) {
         console.warn(`⚠️ [后续处理] 批量更新后续处理出错，avID: ${avID}`, error);
@@ -1006,7 +1007,7 @@ async function refreshAttributeView(avID: string) {
 }
 
 // 处理滴答清单事件
-async function handleDidaListEvent(avID: string, updates: Array<any>, blockId: string) {
+export async function handleDidaListEvent(avID: string,blockId: string) {
     try {
         // 检查是否为滴答清单数据库
         const didaDbId = settingdata['cal-dida-db-id'];

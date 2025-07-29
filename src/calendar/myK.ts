@@ -64,6 +64,8 @@ export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatu
         Fr_event.extendedProps.statusid,
         newstatus,
         "select");
+        
+    api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId);
     console.log("done-updateAttrViewCell_pro-select");
     return true;
 }

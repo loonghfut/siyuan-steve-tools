@@ -62,8 +62,6 @@ export async function run(
     elementca?: any,
 ) {
     filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
-
-
     let calendarEl: HTMLElement;
     if (id === "1") {
         // 创建悬浮容器
@@ -138,6 +136,7 @@ export async function run(
             minute: '2-digit',
             hour12: false
         },
+
         // selectable: true,
         // eventDurationEditable: true,
         eventDragStart: function (info) {
@@ -282,7 +281,6 @@ export async function run(
             // 检查是否是QQ日历事件
             if (info.event.extendedProps.source === 'qqcalendar') {
                 showDropTimeIndicator(info);
-
                 try {
                     const calendarId = settingdata['cal-qq-calendar-url'];
                     const success = await moduleInstances['M_calendar'].QQCalDAVClient.updateEvent(
@@ -434,7 +432,7 @@ export async function run(
                 click: async function () {
                     // 初始化分组
                     initializeGroups();
-                    
+
                     // 调用新的视图筛选菜单函数
                     await createViewFilterMenu(
                         calendarEl,
@@ -1101,5 +1099,5 @@ declare global {
         calendar: typeof waytocal;
     }
 }
-window.calendar=waytocal;
+window.calendar = waytocal;
 
