@@ -32,8 +32,10 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.10.14 (2025年07月29日)
+### v0.10.15 (2025年07月29日)
 - fix: 修改事件排序逻辑，按开始时间升序排列 #76 (loonghfut)
+- docs: 更新 v0.10.14 版本的更新日志 (loonghfut)
+- 更新插件版本号至0.10.15 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
