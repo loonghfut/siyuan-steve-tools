@@ -34,6 +34,8 @@ win端s3同步后，docker端感知s3同步。
 
 ### v0.10.18 (2025年07月29日)
 - 优化视图操作时滴答同步逻辑 (loonghfut)
+- docs: 更新 v0.10.18 版本的更新日志 (loonghfut)
+- 更新插件版本号至0.10.18 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
