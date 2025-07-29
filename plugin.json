@@ -2,7 +2,7 @@
   "name": "siyuan-steve-tools",
   "author": "steve",
   "url": "https://github.com/loonghfut/siyuan-steve-tools",
-  "version": "0.10.14", 
+  "version": "0.10.15", 
   "minAppVersion": "3.2.1",
   "backends": [
     "all"
