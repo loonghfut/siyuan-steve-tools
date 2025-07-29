@@ -22,6 +22,7 @@ import { updateAttrViewCell_pro } from '@/api/api';
 //审查ok
 import { getCategoryColor, lifelogColors } from '../lifelog/styles/colors';
 import { LifelogView } from './lifelog-view';
+import { initializeGroups, userGroups, getUngroupedViews, ViewGroup, saveUserGroups, deleteGroup, createNewGroup, removeViewFromGroup, addViewToGroup } from './initializeGroups';
 //审查ok
 
 export let isFilter = true;
@@ -41,12 +42,13 @@ let lastSavedLifelogSlotDuration: string;
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
 }
-
 export async function init_viewValue(data: { viewId: string, viewName: string }) {
     viewId = data.viewId;
     viewName = data.viewName;
     // 将逗号分隔的视图ID解析为数组
     filterViewId = data.viewId ? data.viewId.split(',') : [];
+    // 初始化分组配置
+    initializeGroups();
 }
 
 
@@ -430,189 +432,98 @@ export async function run(
             viewFilter: {
                 text: '视图选择',
                 click: async function () {
+                    // 初始化分组
+                    initializeGroups();
+                    
                     const viewIDs = await myF.getViewId(av_ids)
                     const button = calendarEl.querySelector('.fc-viewFilter-button');
                     if (!button) return;
 
                     // 创建下拉菜单
-                    // 修改创建菜单的代码
                     const menu = document.createElement('div');
                     menu.className = 'view-filter-menu';
 
-                    // 创建菜单头部（包含"全部视图"选项）
+                    // 创建菜单头部
                     const menuHeader = document.createElement('div');
                     menuHeader.className = 'view-filter-header';
 
-                    // 添加全选/全不选选项
+                    // 添加全选/清空按钮
+                    const selectAllBtn = document.createElement('button');
+                    selectAllBtn.className = 'b3-button view-filter-select-all';
+                    selectAllBtn.textContent = '全选';
+                    selectAllBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        // 选择所有视图
+                        filterViewId = ['qqcalendar', 'icsSubscription', 'lifelog'];
+                        viewIDs.forEach(view => {
+                            if (!filterViewId.includes(view.viewId)) {
+                                filterViewId.push(view.viewId);
+                            }
+                        });
+                        updateAllCheckboxes(menu, true);
+                        saveFilterConfig();
+                        refreshFiltersDisplay();
+                    };
+
+                    const clearAllBtn = document.createElement('button');
+                    clearAllBtn.className = 'b3-button view-filter-clear-all';
+                    clearAllBtn.textContent = '清空';
+                    clearAllBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        filterViewId = [];
+                        updateAllCheckboxes(menu, false);
+                        saveFilterConfig();
+                        refreshFiltersDisplay();
+                    };
+
+                    // 添加分组管理按钮
+                    const manageGroupsBtn = document.createElement('button');
+                    manageGroupsBtn.className = 'b3-button view-filter-manage-groups';
+                    manageGroupsBtn.textContent = '分组管理';
+                    manageGroupsBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        showGroupManagementDialog();
+                    };
+
+                    menuHeader.appendChild(selectAllBtn);
+                    menuHeader.appendChild(clearAllBtn);
+                    menuHeader.appendChild(manageGroupsBtn);
                     menu.appendChild(menuHeader);
 
                     // 创建可滚动的视图列表容器
                     const menuContent = document.createElement('div');
                     menuContent.className = 'view-filter-content';
 
-                    // 添加QQ日历选项
-                    if (1) {
-                        const qqItem = document.createElement('div');
-                        qqItem.className = 'view-filter-item';
+                    // 获取所有视图ID（包括特殊视图）
+                    const allSpecialViewIds = ['qqcalendar', 'icsSubscription', 'lifelog'];
+                    const allSiyuanViewIds = viewIDs.map(v => v.viewId);
+                    const allViewIds = [...allSpecialViewIds, ...allSiyuanViewIds];
 
-                        // 创建复选框
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = filterViewId.includes('qqcalendar');
-                        checkbox.className = 'view-filter-checkbox';
-
-                        // 创建标签
-                        const label = document.createElement('span');
-                        label.textContent = 'QQ邮箱日历';
-                        label.className = 'view-filter-label';
-
-                        qqItem.appendChild(checkbox);
-                        qqItem.appendChild(label);
-
-                        qqItem.onclick = (e) => {
-                            e.stopPropagation();
-                            if (filterViewId.includes('qqcalendar')) {
-                                filterViewId = filterViewId.filter(id => id !== 'qqcalendar');
-                            } else {
-                                filterViewId.push('qqcalendar');
-                            }
-                            checkbox.checked = filterViewId.includes('qqcalendar');
-
-                            // 保存配置
-                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
-                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
-                            moduleInstances['M_calendar'].calConfig.save();
-                            refreshFiltersDisplay();
-                        };
-
-                        menuContent.appendChild(qqItem);
-                    }
-                    // 添加ICS订阅选项
-                    if (1) {
-                        const icsItem = document.createElement('div');
-                        icsItem.className = 'view-filter-item';
-
-                        // 创建复选框
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = filterViewId.includes('icsSubscription');
-                        checkbox.className = 'view-filter-checkbox';
-
-                        // 创建标签
-                        const label = document.createElement('span');
-                        label.textContent = 'ICS订阅日历';
-                        label.className = 'view-filter-label';
-
-                        icsItem.appendChild(checkbox);
-                        icsItem.appendChild(label);
-
-                        icsItem.onclick = (e) => {
-                            e.stopPropagation();
-                            if (filterViewId.includes('icsSubscription')) {
-                                filterViewId = filterViewId.filter(id => id !== 'icsSubscription');
-                            } else {
-                                filterViewId.push('icsSubscription');
-                            }
-                            checkbox.checked = filterViewId.includes('icsSubscription');
-
-                            // 保存配置
-                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
-                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
-                            moduleInstances['M_calendar'].calConfig.save();
-                            refreshFiltersDisplay();
-                        };
-
-                        menuContent.appendChild(icsItem);
-                    }
-                    if (1) {
-                        const lifelogItem = document.createElement('div');
-                        lifelogItem.className = 'view-filter-item';
-
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        // 根据 filterViewId 动态设置选中状态
-                        checkbox.checked = filterViewId.includes('lifelog');
-                        checkbox.className = 'view-filter-checkbox';
-
-                        const label = document.createElement('span');
-                        label.textContent = 'Lifelog 记录';
-                        label.className = 'view-filter-label';
-
-                        lifelogItem.appendChild(checkbox);
-                        lifelogItem.appendChild(label);
-
-                        lifelogItem.onclick = (e) => {
-                            e.stopPropagation();
-                            if (filterViewId.includes('lifelog')) {
-                                filterViewId = filterViewId.filter(id => id !== 'lifelog');
-                                calendar.setOption('slotDuration', lastSavedLifelogSlotDuration);
-                            } else {
-                                filterViewId.push('lifelog');
-                                calendar.setOption('slotDuration', '00:10:00');
-                            }
-                            checkbox.checked = filterViewId.includes('lifelog');
-
-                            // 保存配置
-                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
-                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
-                            moduleInstances['M_calendar'].calConfig.save();
-                            refreshFiltersDisplay();
-                            calendar.refetchEvents();
-                        };
-
-
-                        menuContent.appendChild(lifelogItem);
-                    }
-
-                    // 添加视图选项
-                    viewIDs.forEach(view => {
-                        const item = document.createElement('div');
-                        item.className = 'view-filter-item';
-
-                        // 创建复选框
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = filterViewId.includes(view.viewId);
-                        checkbox.className = 'view-filter-checkbox';
-
-                        // 创建标签
-                        const label = document.createElement('span');
-                        label.textContent = view.name;
-                        label.className = 'view-filter-label';
-
-                        item.appendChild(checkbox);
-                        item.appendChild(label);
-
-                        item.onclick = (e) => {
-                            // 防止冒泡到菜单外
-                            e.stopPropagation();
-
-                            // 切换当前视图的选中状态
-                            if (filterViewId.includes(view.viewId)) {
-                                filterViewId = filterViewId.filter(id => id !== view.viewId);
-                            } else {
-                                filterViewId.push(view.viewId);
-                            }
-
-                            // 更新复选框状态
-                            checkbox.checked = filterViewId.includes(view.viewId);
-
-                            // 保存配置并刷新
-                            moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
-                            moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
-                            moduleInstances['M_calendar'].calConfig.save();
-                            refreshFiltersDisplay()
-                            // 不关闭菜单，允许多选
-                        };
-                        menuContent.appendChild(item);
+                    // 渲染分组
+                    userGroups.forEach(group => {
+                        createGroupSection(group, menuContent, viewIDs, allViewIds);
                     });
+
+                    // 渲染未分组的视图
+                    const ungroupedViewIds = getUngroupedViews(allViewIds);
+                    if (ungroupedViewIds.length > 0) {
+                        const ungroupedItems = [];
+                        ungroupedViewIds.forEach(viewId => {
+                            const item = createViewItemElement(viewId, viewIDs);
+                            if (item) ungroupedItems.push(item);
+                        });
+                        
+                        if (ungroupedItems.length > 0) {
+                            createViewGroup('📁 未分组', ungroupedItems, menuContent);
+                        }
+                    }
+
                     menu.appendChild(menuContent);
 
-                    // 创建固定在底部的按钮容器
+                    // 创建底部按钮容器
                     const menuFooter = document.createElement('div');
                     menuFooter.className = 'view-filter-footer';
 
-                    // 添加确定按钮
                     const confirmBtn = document.createElement('button');
                     confirmBtn.className = 'b3-button';
                     confirmBtn.textContent = '确定';
@@ -638,7 +549,231 @@ export async function run(
                         }
                     });
 
-                    // 辅助函数：更新筛选显示
+                    // 辅助函数
+                    function createGroupSection(group: ViewGroup, container: HTMLElement, viewIDs: any[], _allViewIds: string[]) {
+                        const groupContainer = document.createElement('div');
+                        groupContainer.className = 'view-filter-group';
+                        groupContainer.dataset.groupId = group.id;
+
+                        const groupHeader = document.createElement('div');
+                        groupHeader.className = 'view-filter-group-header';
+                        
+                        const headerText = document.createElement('span');
+                        headerText.textContent = `${group.icon || '📁'} ${group.name}`;
+                        groupHeader.appendChild(headerText);
+
+                        // 添加分组操作按钮
+                        const groupActions = document.createElement('div');
+                        groupActions.className = 'view-filter-group-actions';
+
+                        // 全选分组按钮
+                        const selectGroupBtn = document.createElement('button');
+                        selectGroupBtn.className = 'view-filter-group-select-btn';
+                        selectGroupBtn.textContent = '全选';
+                        selectGroupBtn.title = '选择此分组的所有视图';
+                        selectGroupBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            group.viewIds.forEach(viewId => {
+                                if (!filterViewId.includes(viewId)) {
+                                    filterViewId.push(viewId);
+                                }
+                            });
+                            updateGroupCheckboxes(groupContainer, true);
+                            saveFilterConfig();
+                            refreshFiltersDisplay();
+                        };
+
+                        // 取消分组按钮
+                        const deselectGroupBtn = document.createElement('button');
+                        deselectGroupBtn.className = 'view-filter-group-deselect-btn';
+                        deselectGroupBtn.textContent = '取消';
+                        deselectGroupBtn.title = '取消选择此分组的所有视图';
+                        deselectGroupBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            group.viewIds.forEach(viewId => {
+                                filterViewId = filterViewId.filter(id => id !== viewId);
+                            });
+                            updateGroupCheckboxes(groupContainer, false);
+                            saveFilterConfig();
+                            refreshFiltersDisplay();
+                        };
+
+                        // 展开/折叠按钮
+                        const toggleIcon = document.createElement('span');
+                        toggleIcon.className = 'view-filter-toggle-icon';
+                        toggleIcon.textContent = group.isExpanded !== false ? '▼' : '▶';
+
+                        groupActions.appendChild(selectGroupBtn);
+                        groupActions.appendChild(deselectGroupBtn);
+                        groupActions.appendChild(toggleIcon);
+                        groupHeader.appendChild(groupActions);
+
+                        groupContainer.appendChild(groupHeader);
+
+                        const groupItems = document.createElement('div');
+                        groupItems.className = 'view-filter-group-items';
+                        groupItems.style.display = group.isExpanded !== false ? 'block' : 'none';
+
+                        // 添加分组中的视图项
+                        group.viewIds.forEach(viewId => {
+                            const item = createViewItemElement(viewId, viewIDs);
+                            if (item) {
+                                groupItems.appendChild(item);
+                            }
+                        });
+
+                        groupContainer.appendChild(groupItems);
+
+                        // 点击展开/折叠
+                        groupHeader.onclick = (e) => {
+                            if ((e.target as Element).closest('.view-filter-group-actions')) {
+                                return; // 如果点击的是操作按钮，不处理展开/折叠
+                            }
+                            e.stopPropagation();
+                            const isExpanded = groupItems.style.display !== 'none';
+                            groupItems.style.display = isExpanded ? 'none' : 'block';
+                            toggleIcon.textContent = isExpanded ? '▶' : '▼';
+                            
+                            // 保存展开状态
+                            group.isExpanded = !isExpanded;
+                            saveUserGroups(userGroups);
+                        };
+
+                        container.appendChild(groupContainer);
+                    }
+
+                    function createViewGroup(groupTitle: string, items: HTMLElement[], container: HTMLElement) {
+                        if (items.length === 0) return;
+
+                        const groupContainer = document.createElement('div');
+                        groupContainer.className = 'view-filter-group';
+
+                        const groupHeader = document.createElement('div');
+                        groupHeader.className = 'view-filter-group-header';
+                        groupHeader.textContent = groupTitle;
+
+                        const toggleIcon = document.createElement('span');
+                        toggleIcon.className = 'view-filter-toggle-icon';
+                        toggleIcon.textContent = '▼';
+                        groupHeader.appendChild(toggleIcon);
+
+                        groupContainer.appendChild(groupHeader);
+
+                        const groupItems = document.createElement('div');
+                        groupItems.className = 'view-filter-group-items';
+
+                        items.forEach(item => {
+                            groupItems.appendChild(item);
+                        });
+
+                        groupContainer.appendChild(groupItems);
+
+                        // 点击展开/折叠
+                        groupHeader.onclick = (e) => {
+                            e.stopPropagation();
+                            const isExpanded = groupItems.style.display !== 'none';
+                            groupItems.style.display = isExpanded ? 'none' : 'block';
+                            toggleIcon.textContent = isExpanded ? '▶' : '▼';
+                        };
+
+                        container.appendChild(groupContainer);
+                    }
+
+                    function createViewItemElement(viewId: string, viewIDs: any[]): HTMLElement | null {
+                        let label = '';
+                        let isSpecial = false;
+
+                        // 判断是否为特殊视图
+                        switch (viewId) {
+                            case 'qqcalendar':
+                                label = 'QQ邮箱日历';
+                                isSpecial = true;
+                                break;
+                            case 'icsSubscription':
+                                label = 'ICS订阅日历';
+                                isSpecial = true;
+                                break;
+                            case 'lifelog':
+                                label = 'Lifelog 记录';
+                                isSpecial = true;
+                                break;
+                            default:
+                                const view = viewIDs.find(v => v.viewId === viewId);
+                                if (view) {
+                                    label = view.name;
+                                } else {
+                                    return null; // 视图不存在
+                                }
+                        }
+
+                        const item = document.createElement('div');
+                        item.className = 'view-filter-item';
+                        item.dataset.viewId = viewId;
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = filterViewId.includes(viewId);
+                        checkbox.className = 'view-filter-checkbox';
+
+                        const labelElement = document.createElement('span');
+                        labelElement.textContent = label;
+                        labelElement.className = 'view-filter-label';
+
+                        item.appendChild(checkbox);
+                        item.appendChild(labelElement);
+
+                        item.onclick = (e) => {
+                            e.stopPropagation();
+                            if (isSpecial && viewId === 'lifelog') {
+                                // 特殊处理 lifelog
+                                if (filterViewId.includes('lifelog')) {
+                                    filterViewId = filterViewId.filter(id => id !== 'lifelog');
+                                    calendar.setOption('slotDuration', lastSavedLifelogSlotDuration);
+                                } else {
+                                    filterViewId.push('lifelog');
+                                    calendar.setOption('slotDuration', '00:10:00');
+                                }
+                                checkbox.checked = filterViewId.includes('lifelog');
+                                saveFilterConfig();
+                                refreshFiltersDisplay();
+                                calendar.refetchEvents();
+                            } else {
+                                toggleViewSelection(viewId, checkbox);
+                            }
+                        };
+
+                        return item;
+                    }
+
+                    function updateAllCheckboxes(container: HTMLElement, checked: boolean) {
+                        container.querySelectorAll('.view-filter-checkbox').forEach((checkbox: HTMLInputElement) => {
+                            checkbox.checked = checked;
+                        });
+                    }
+
+                    function updateGroupCheckboxes(groupContainer: HTMLElement, checked: boolean) {
+                        groupContainer.querySelectorAll('.view-filter-checkbox').forEach((checkbox: HTMLInputElement) => {
+                            checkbox.checked = checked;
+                        });
+                    }
+
+                    function toggleViewSelection(viewId: string, checkbox: HTMLInputElement) {
+                        if (filterViewId.includes(viewId)) {
+                            filterViewId = filterViewId.filter(id => id !== viewId);
+                        } else {
+                            filterViewId.push(viewId);
+                        }
+                        checkbox.checked = filterViewId.includes(viewId);
+                        saveFilterConfig();
+                        refreshFiltersDisplay();
+                    }
+
+                    function saveFilterConfig() {
+                        moduleInstances['M_calendar'].calConfig.set("viewId", filterViewId.join(','));
+                        moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+                        moduleInstances['M_calendar'].calConfig.save();
+                    }
+
                     function refreshFiltersDisplay() {
                         if (filterViewId.length === 0) {
                             viewName = '全部视图';
@@ -646,12 +781,358 @@ export async function run(
                             const selectedView = viewIDs.find(v => v.viewId === filterViewId[0]);
                             if (selectedView) {
                                 viewName = selectedView.name;
+                            } else {
+                                // 检查特殊视图
+                                switch (filterViewId[0]) {
+                                    case 'qqcalendar':
+                                        viewName = 'QQ邮箱日历';
+                                        break;
+                                    case 'icsSubscription':
+                                        viewName = 'ICS订阅日历';
+                                        break;
+                                    case 'lifelog':
+                                        viewName = 'Lifelog 记录';
+                                        break;
+                                    default:
+                                        viewName = '未知视图';
+                                }
                             }
                         } else {
                             viewName = `已选择 ${filterViewId.length} 个视图`;
                         }
-
                         viewId = filterViewId.join(',');
+                    }
+
+                    // 分组管理对话框
+                    function showGroupManagementDialog() {
+                        menu.remove(); // 关闭筛选菜单
+                        
+                        // 创建分组管理对话框
+                        const dialog = document.createElement('div');
+                        dialog.className = 'group-management-dialog';
+                        
+                        const dialogContent = document.createElement('div');
+                        dialogContent.className = 'group-management-content';
+                        
+                        const header = document.createElement('div');
+                        header.className = 'group-management-header';
+                        header.innerHTML = `
+                            <h3>分组管理</h3>
+                            <button class="b3-button group-management-close">×</button>
+                        `;
+                        
+                        const body = document.createElement('div');
+                        body.className = 'group-management-body';
+                        
+                        // 创建新分组表单
+                        const createGroupForm = document.createElement('div');
+                        createGroupForm.className = 'create-group-form';
+                        createGroupForm.innerHTML = `
+                            <h4>创建新分组</h4>
+                            <div class="form-row">
+                                <input type="text" class="group-name-input" placeholder="分组名称" />
+                                <input type="text" class="group-icon-input" placeholder="图标 (如: 📁)" maxlength="2" />
+                                <button class="b3-button create-group-btn">创建</button>
+                            </div>
+                        `;
+                        
+                        // 现有分组列表
+                        const groupsList = document.createElement('div');
+                        groupsList.className = 'groups-list';
+                        groupsList.innerHTML = '<h4>现有分组</h4>';
+                        
+                        // 渲染现有分组
+                        userGroups.forEach(group => {
+                            const groupItem = document.createElement('div');
+                            groupItem.className = 'group-management-item';
+                            
+                            const groupInfo = document.createElement('div');
+                            groupInfo.className = 'group-info';
+                            groupInfo.innerHTML = `
+                                <span class="group-icon">${group.icon || '📁'}</span>
+                                <span class="group-name">${group.name}</span>
+                                <span class="group-count">(${group.viewIds.length}个视图)</span>
+                            `;
+                            
+                            const groupActions = document.createElement('div');
+                            groupActions.className = 'group-actions';
+                            
+                            if (!['external', 'special'].includes(group.id)) { // 不允许删除默认分组
+                                const editBtn = document.createElement('button');
+                                editBtn.className = 'b3-button group-edit-btn';
+                                editBtn.textContent = '编辑';
+                                editBtn.onclick = () => editGroup(group);
+                                
+                                const deleteBtn = document.createElement('button');
+                                deleteBtn.className = 'b3-button group-delete-btn';
+                                deleteBtn.textContent = '删除';
+                                deleteBtn.onclick = () => {
+                                    if (confirm(`确定删除分组 "${group.name}" 吗？`)) {
+                                        deleteGroup(group.id);
+                                        renderGroupsList();
+                                    }
+                                };
+                                
+                                groupActions.appendChild(editBtn);
+                                groupActions.appendChild(deleteBtn);
+                            }
+                            
+                            groupItem.appendChild(groupInfo);
+                            groupItem.appendChild(groupActions);
+                            groupsList.appendChild(groupItem);
+                        });
+                        
+                        function renderGroupsList() {
+                            // 重新渲染分组列表
+                            const existingGroupsList = body.querySelector('.groups-list');
+                            if (existingGroupsList) {
+                                existingGroupsList.remove();
+                            }
+                            
+                            const newGroupsList = document.createElement('div');
+                            newGroupsList.className = 'groups-list';
+                            newGroupsList.innerHTML = '<h4>现有分组</h4>';
+                            
+                            userGroups.forEach(group => {
+                                const groupItem = document.createElement('div');
+                                groupItem.className = 'group-management-item';
+                                
+                                const groupInfo = document.createElement('div');
+                                groupInfo.className = 'group-info';
+                                groupInfo.innerHTML = `
+                                    <span class="group-icon">${group.icon || '📁'}</span>
+                                    <span class="group-name">${group.name}</span>
+                                    <span class="group-count">(${group.viewIds.length}个视图)</span>
+                                `;
+                                
+                                const groupActions = document.createElement('div');
+                                groupActions.className = 'group-actions';
+                                
+                                if (!['external', 'special'].includes(group.id)) {
+                                    const editBtn = document.createElement('button');
+                                    editBtn.className = 'b3-button group-edit-btn';
+                                    editBtn.textContent = '编辑';
+                                    editBtn.onclick = () => editGroup(group);
+                                    
+                                    const deleteBtn = document.createElement('button');
+                                    deleteBtn.className = 'b3-button group-delete-btn';
+                                    deleteBtn.textContent = '删除';
+                                    deleteBtn.onclick = () => {
+                                        if (confirm(`确定删除分组 "${group.name}" 吗？`)) {
+                                            deleteGroup(group.id);
+                                            renderGroupsList();
+                                        }
+                                    };
+                                    
+                                    groupActions.appendChild(editBtn);
+                                    groupActions.appendChild(deleteBtn);
+                                }
+                                
+                                groupItem.appendChild(groupInfo);
+                                groupItem.appendChild(groupActions);
+                                newGroupsList.appendChild(groupItem);
+                            });
+                            
+                            body.appendChild(newGroupsList);
+                        }
+                        
+                        function editGroup(group: ViewGroup) {
+                            // 创建编辑分组的界面
+                            showGroupEditDialog(group, renderGroupsList);
+                        }
+                        
+                        body.appendChild(createGroupForm);
+                        body.appendChild(groupsList);
+                        
+                        dialogContent.appendChild(header);
+                        dialogContent.appendChild(body);
+                        dialog.appendChild(dialogContent);
+                        
+                        // 事件绑定
+                        const closeBtn = header.querySelector('.group-management-close') as HTMLButtonElement;
+                        closeBtn.onclick = () => dialog.remove();
+                        
+                        const createBtn = createGroupForm.querySelector('.create-group-btn') as HTMLButtonElement;
+                        const nameInput = createGroupForm.querySelector('.group-name-input') as HTMLInputElement;
+                        const iconInput = createGroupForm.querySelector('.group-icon-input') as HTMLInputElement;
+                        
+                        createBtn.onclick = () => {
+                            const name = nameInput.value.trim();
+                            const icon = iconInput.value.trim() || '📁';
+                            
+                            if (name) {
+                                const newGroup = createNewGroup(name, icon);
+                                userGroups.push(newGroup);
+                                saveUserGroups(userGroups);
+                                
+                                nameInput.value = '';
+                                iconInput.value = '';
+                                renderGroupsList();
+                            }
+                        };
+                        
+                        // 显示对话框
+                        document.body.appendChild(dialog);
+                        
+                        // 点击外部关闭
+                        dialog.onclick = (e) => {
+                            if (e.target === dialog) {
+                                dialog.remove();
+                            }
+                        };
+                    }
+
+                    function showGroupEditDialog(group: ViewGroup, onComplete: () => void) {
+                        const editDialog = document.createElement('div');
+                        editDialog.className = 'group-edit-dialog';
+                        
+                        const editContent = document.createElement('div');
+                        editContent.className = 'group-edit-content';
+                        
+                        editContent.innerHTML = `
+                            <div class="group-edit-header">
+                                <h3>编辑分组: ${group.name}</h3>
+                                <button class="b3-button group-edit-close">×</button>
+                            </div>
+                            <div class="group-edit-body">
+                                <div class="form-row">
+                                    <label>分组名称:</label>
+                                    <input type="text" class="edit-group-name" value="${group.name}" />
+                                </div>
+                                <div class="form-row">
+                                    <label>图标:</label>
+                                    <input type="text" class="edit-group-icon" value="${group.icon || '📁'}" maxlength="2" />
+                                </div>
+                                <div class="group-views-section">
+                                    <h4>分组中的视图</h4>
+                                    <div class="group-views-list"></div>
+                                </div>
+                                <div class="available-views-section">
+                                    <h4>可添加的视图</h4>
+                                    <div class="available-views-list"></div>
+                                </div>
+                                <div class="group-edit-actions">
+                                    <button class="b3-button save-group-btn">保存</button>
+                                    <button class="b3-button cancel-group-btn">取消</button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        editDialog.appendChild(editContent);
+                        
+                        // 渲染分组中的视图
+                        const groupViewsList = editContent.querySelector('.group-views-list') as HTMLElement;
+                        group.viewIds.forEach(viewId => {
+                            const viewItem = createEditViewItem(viewId, viewIDs, () => {
+                                removeViewFromGroup(group.id, viewId);
+                                renderEditDialog();
+                            });
+                            if (viewItem) groupViewsList.appendChild(viewItem);
+                        });
+                        
+                        // 渲染可添加的视图
+                        const availableViewsList = editContent.querySelector('.available-views-list') as HTMLElement;
+                        const allViewIds = ['qqcalendar', 'icsSubscription', 'lifelog', ...viewIDs.map(v => v.viewId)];
+                        const availableViewIds = allViewIds.filter(id => !group.viewIds.includes(id));
+                        
+                        availableViewIds.forEach(viewId => {
+                            const viewItem = createEditViewItem(viewId, viewIDs, () => {
+                                addViewToGroup(group.id, viewId);
+                                renderEditDialog();
+                            }, true);
+                            if (viewItem) availableViewsList.appendChild(viewItem);
+                        });
+                        
+                        function renderEditDialog() {
+                            // 重新渲染对话框内容
+                            groupViewsList.innerHTML = '';
+                            availableViewsList.innerHTML = '';
+                            
+                            group.viewIds.forEach(viewId => {
+                                const viewItem = createEditViewItem(viewId, viewIDs, () => {
+                                    removeViewFromGroup(group.id, viewId);
+                                    renderEditDialog();
+                                });
+                                if (viewItem) groupViewsList.appendChild(viewItem);
+                            });
+                            
+                            const updatedAvailableViewIds = allViewIds.filter(id => !group.viewIds.includes(id));
+                            updatedAvailableViewIds.forEach(viewId => {
+                                const viewItem = createEditViewItem(viewId, viewIDs, () => {
+                                    addViewToGroup(group.id, viewId);
+                                    renderEditDialog();
+                                }, true);
+                                if (viewItem) availableViewsList.appendChild(viewItem);
+                            });
+                        }
+                        
+                        function createEditViewItem(viewId: string, viewIDs: any[], onAction: () => void, isAdd: boolean = false): HTMLElement | null {
+                            let label = '';
+                            switch (viewId) {
+                                case 'qqcalendar':
+                                    label = 'QQ邮箱日历';
+                                    break;
+                                case 'icsSubscription':
+                                    label = 'ICS订阅日历';
+                                    break;
+                                case 'lifelog':
+                                    label = 'Lifelog 记录';
+                                    break;
+                                default:
+                                    const view = viewIDs.find(v => v.viewId === viewId);
+                                    if (view) {
+                                        label = view.name;
+                                    } else {
+                                        return null;
+                                    }
+                            }
+                            
+                            const item = document.createElement('div');
+                            item.className = 'edit-view-item';
+                            
+                            const labelElement = document.createElement('span');
+                            labelElement.textContent = label;
+                            
+                            const actionBtn = document.createElement('button');
+                            actionBtn.className = 'b3-button';
+                            actionBtn.textContent = isAdd ? '添加' : '移除';
+                            actionBtn.onclick = onAction;
+                            
+                            item.appendChild(labelElement);
+                            item.appendChild(actionBtn);
+                            
+                            return item;
+                        }
+                        
+                        // 事件绑定
+                        const closeBtn = editContent.querySelector('.group-edit-close') as HTMLButtonElement;
+                        const saveBtn = editContent.querySelector('.save-group-btn') as HTMLButtonElement;
+                        const cancelBtn = editContent.querySelector('.cancel-group-btn') as HTMLButtonElement;
+                        const nameInput = editContent.querySelector('.edit-group-name') as HTMLInputElement;
+                        const iconInput = editContent.querySelector('.edit-group-icon') as HTMLInputElement;
+                        
+                        closeBtn.onclick = cancelBtn.onclick = () => editDialog.remove();
+                        
+                        saveBtn.onclick = () => {
+                            const newName = nameInput.value.trim();
+                            const newIcon = iconInput.value.trim();
+                            
+                            if (newName) {
+                                group.name = newName;
+                                group.icon = newIcon || '📁';
+                                saveUserGroups(userGroups);
+                                editDialog.remove();
+                                onComplete();
+                            }
+                        };
+                        
+                        document.body.appendChild(editDialog);
+                        
+                        editDialog.onclick = (e) => {
+                            if (e.target === editDialog) {
+                                editDialog.remove();
+                            }
+                        };
                     }
                 },
             },
