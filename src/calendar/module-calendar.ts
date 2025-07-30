@@ -44,7 +44,7 @@ export class M_calendar {
     }
     private isUpdating: boolean = false;
     private isSettingAttrs: boolean = false;  // 添加属性声明
-    public av_ids: any;
+    public av_ids: any = [];
     public calConfig: M_caldata;
     public alistPlugin: ics_alist;
     public s3Client: ics_s3;
@@ -314,7 +314,8 @@ export class M_calendar {
                         const statusValue = operationDetails.data.mSelect[0].content;
 
                         //判断是否为事件（判断是否是日程数据库的事件）
-                        if (this.av_ids.map(item => item.id).includes(avID)) {
+                        if (this.av_ids && this.av_ids.map(item => item.id).includes(avID)) {
+                            console.log("更新了日程信息");
                             try {
                                 // 获取属性视图的列信息
                                 const avDetails = await api.getAttributeViewKeys(blockID);

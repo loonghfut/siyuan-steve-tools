@@ -419,7 +419,7 @@ export class DidaLinkInterceptor {
             // 更新dock中的URL
             if (this.dock.updateUrl) {
                 this.dock.updateUrl(url);
-                this.showMessage("已在侧边栏打开滴答清单", 2000, "info");
+                // this.showMessage("已在侧边栏打开滴答清单", 2000, "info");
             } else {
                 // 备用方案：直接更新iframe的src
                 const iframe = this.dock.element?.querySelector('iframe');
