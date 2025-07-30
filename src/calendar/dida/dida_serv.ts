@@ -143,6 +143,10 @@ export class Dida365Service {
 
             let syncCount = 0;
             let updateCount = 0;
+            let archiveCount = 0;
+
+            // 创建滴答清单任务ID的集合，用于后续检查归档
+            const didaTaskIds = new Set(didaTasks.map(task => task.id).filter(Boolean));
 
             // 处理每个滴答清单任务
             for (const didaTask of didaTasks) {
@@ -167,7 +171,23 @@ export class Dida365Service {
                 }
             }
 
-            showStatusMessage(`同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`, 3000, "dida-sync");
+            // 检查思源中存在但滴答清单中不存在的任务，将其状态设置为"归档"
+            const tasksToArchive = [];
+            for (const [didaId, existingTask] of existingTasksMap) {
+                if (!didaTaskIds.has(didaId) && existingTask.状态?.content !== "归档") {
+                    tasksToArchive.push(existingTask);
+                }
+            }
+
+            if (tasksToArchive.length > 0) {
+                archiveCount = await this.archiveSiyuanTasksBatch(tasksToArchive);
+                console.log(`批量归档了 ${archiveCount} 个任务`);
+            }
+
+            const statusMessage = archiveCount > 0 
+                ? `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务，归档 ${archiveCount} 个任务`
+                : `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`;
+            showStatusMessage(statusMessage, 3000, "dida-sync");
 
         } catch (error) {
             console.error("同步滴答清单任务失败:", error);
@@ -280,7 +300,7 @@ export class Dida365Service {
         };
         // 提取标签，排除状态标签
         const getTags = (task: Task) => {
-            const statusTags = ["完成", "进行中", "未完成"];
+            const statusTags = ["完成", "进行中", "未完成", "归档"];
             if (!task.tags) {
                 return [];
             }
@@ -519,19 +539,100 @@ ${taskData.描述?.content || "描述：暂无"}
     }
 
     /**
+     * 批量将思源任务设置为归档状态
+     */
+    private async archiveSiyuanTasksBatch(tasksToArchive: any[]): Promise<number> {
+        if (tasksToArchive.length === 0) {
+            return 0;
+        }
+
+        try {
+            if (!this.avId) {
+                console.error("数据库ID未设置，无法批量归档任务");
+                return 0;
+            }
+
+            // 获取 viewValue 用于获取 keyID
+            const data = await getViewId([this.avId]);
+            const viewValue = await getViewValue(data);
+
+            // 获取状态字段的 keyID
+            const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态');
+
+            if (!statusKeyID) {
+                console.error("无法找到状态字段的 keyID，无法批量归档任务");
+                return 0;
+            }
+
+            // 批量更新：收集所有需要更新的任务
+            const updatePromises: Promise<any>[] = [];
+            const blockAttrPromises: Promise<any>[] = [];
+            let successCount = 0;
+
+            for (const task of tasksToArchive) {
+                if (!task.事件?.id) {
+                    console.warn(`任务缺少事件ID，跳过归档: ${task.事件?.content}`);
+                    continue;
+                }
+
+                const blockId = task.事件.id;
+
+                // 更新状态为"归档"
+                const statusData = [{ content: "归档" }];
+                updatePromises.push(
+                    updateAttrViewCell_pro(
+                        blockId,
+                        this.avId,
+                        statusKeyID,
+                        statusData,
+                        "select"
+                    ).then(() => {
+                        successCount++;
+                        console.log(`任务 [${task.事件?.content}] 已设置为归档状态`);
+                    }).catch(error => {
+                        console.error(`更新任务 [${task.事件?.content}] 状态失败:`, error);
+                    })
+                );
+
+                // 更新块的自定义属性（状态）
+                blockAttrPromises.push(
+                    setBlockAttrs(blockId, {
+                        "custom-st-event": "archived"
+                    }).catch(error => {
+                        console.error(`更新任务 [${task.事件?.content}] 自定义属性失败:`, error);
+                    })
+                );
+            }
+
+            // 等待所有数据库状态更新完成
+            await Promise.all(updatePromises);
+
+            // 等待所有块属性更新完成
+            await Promise.all(blockAttrPromises);
+
+            console.log(`批量归档完成：成功归档 ${successCount} 个任务`);
+            return successCount;
+
+        } catch (error) {
+            console.error("批量归档思源任务失败:", error);
+            return 0;
+        }
+    }
+
+    /**
      * 更新任务字段的通用方法
      */
     private async updateTaskFields(blockId: string, taskData: any, viewValue: any, existingTask?: any): Promise<void> {
         try {
             // 获取各字段的 keyID
-            const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID', this.avId);
-            const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', this.avId);
-            const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间', this.avId);
-            const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级', this.avId);
-            const urlKeyID = await this.getKeyIDfromViewValue(viewValue, '链接', this.avId);
-            const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态', this.avId);
-            const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', this.avId);
-            const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', this.avId);
+            const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID');
+            const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件');
+            const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间');
+            const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级');
+            const urlKeyID = await this.getKeyIDfromViewValue(viewValue, '链接');
+            const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态');
+            const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签');
+            const descKeyID = await this.getKeyIDfromViewValue(viewValue, '描述');
 
             // 批量更新：收集所有需要更新的字段
             const updatePromises: Promise<any>[] = [];
@@ -655,7 +756,7 @@ ${taskData.描述?.content || "描述：暂无"}
     /**
      * 获取字段的 keyID（从 viewValue 中）
      */
-    private async getKeyIDfromViewValue(viewValue: any, fieldName: string, dbId: string): Promise<string | null> {
+    private async getKeyIDfromViewValue(viewValue: any, fieldName: string): Promise<string | null> {
         try {
             if (!viewValue || !Array.isArray(viewValue) || viewValue.length === 0) {
                 return null;
@@ -853,8 +954,8 @@ ${taskData.描述?.content || "描述：暂无"}
 
                     if (newDidaTask && newDidaTask.id) {
                         // 将新生成的 didaID 和链接字段写回思源数据库
-                        const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID', this.avId);
-                        const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接', this.avId);
+                        const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID');
+                        const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接');
 
                         const updatePromises: Promise<any>[] = [];
 
