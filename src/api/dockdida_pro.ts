@@ -428,7 +428,7 @@ export class DidaLinkInterceptor {
                     this.showMessage("已在侧边栏打开滴答清单", 2000, "info");
                 }
             }
-            
+        //TODO：判断是否模拟点击
         } catch (error) {
             console.error("更新滴答清单dock失败:", error);
             this.showMessage("打开滴答清单失败", 3000, "error");

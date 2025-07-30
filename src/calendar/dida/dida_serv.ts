@@ -246,8 +246,8 @@ export class Dida365Service {
      * 从标题中移除所有链接（D 链接和 S 链接），只保留原始标题
      */
     private removeLinksFromTitle(title: string): string {
-        // 移除 [D](https://dida365.com/webapp/#q/all/tasks/xxx) 和 [S](siyuan://blocks/xxx) 链接
-        return title.replace(/\s*\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/g, '')
+        // 移除 [D](https://dida365.com/webapp/#p/{projectid}/tasks/xxx) 和 [S](siyuan://blocks/xxx) 链接
+        return title.replace(/\s*\[D\]\(https:\/\/dida365\.com\/webapp\/#p\/[^\/]+\/tasks\/[^)]+\)/g, '')
             .replace(/\s*\[S\]\(siyuan:\/\/blocks\/[^)]+\)/g, '')
             .trim();
     }
@@ -288,18 +288,18 @@ export class Dida365Service {
         };
 
         // 构建带超链接的标题
-        const buildTitleWithLinks = (title: string, didaId: string) => {
+        const buildTitleWithLinks = (title: string, didaId: string, projectId: string) => {
             // 移除所有现有链接，获取原始标题
             const originalTitle = this.removeLinksFromTitle(title);
 
             // 检查标题是否包含 S 链接，如果有则说明是从思源创建的任务
             if (title.includes('[S](siyuan://blocks/')) {
                 // 如果有 S 链接，替换为 D 链接（思源端只能有 D 链接）
-                return `${originalTitle} [D](https://dida365.com/webapp/#q/all/tasks/${didaId})`;
+                return `${originalTitle} [D](https://dida365.com/webapp/#p/${projectId}/tasks/${didaId})`;
             }
 
             // 否则添加 D 链接（思源端链接到滴答清单）
-            return `${originalTitle} [D](https://dida365.com/webapp/#q/all/tasks/${didaId})`;
+            return `${originalTitle} [D](https://dida365.com/webapp/#p/${projectId}/tasks/${didaId})`;
         };
 
 
@@ -322,7 +322,7 @@ export class Dida365Service {
 
         // 构建带超链接的标题
         const originalTitle = didaTask.title || "";
-        const titleWithLinks = buildTitleWithLinks(originalTitle, didaTask.id || "");
+        const titleWithLinks = buildTitleWithLinks(originalTitle, didaTask.id || "", didaTask.projectId || "");
 
         return {
             didaID: {
@@ -344,7 +344,7 @@ export class Dida365Service {
                 keyID: existingTask?.优先级?.keyID
             },
             链接: {
-                content: didaTask.id ? `https://dida365.com/webapp/#q/all/tasks/${didaTask.id}` : "",
+                content: didaTask.id ? `https://dida365.com/webapp/#p/${didaTask.projectId}/tasks/${didaTask.id}` : "",
                 keyID: existingTask?.链接?.keyID
             },
             状态: {
@@ -867,7 +867,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
                         // 回写链接字段
                         if (linkKeyID) {
-                            const didaLink = `https://dida365.com/webapp/#q/all/tasks/${newDidaTask.id}`;
+                            const didaLink = `https://dida365.com/webapp/#p/${targetProjectId}/tasks/${newDidaTask.id}`;
                             updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, linkKeyID, didaLink, "url"));
                         } else {
                             console.error("无法找到 '链接' 字段的 KeyID，无法写回滴答任务链接。");
