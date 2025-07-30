@@ -46,6 +46,7 @@ win端s3同步后，docker端感知s3同步。
 - 滴答：增加同步检测，优化体验 (loonghfut)
 - feat: 更新版本号至0.10.19，优化插件描述信息 (loonghfut)
 - 优化部分提示 (loonghfut)
+- docs: 更新 v0.10.19 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
