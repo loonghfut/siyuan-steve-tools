@@ -138,7 +138,8 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false) {
     // 如果有缺失的字段，创建它们
     if (missingFields.length > 0) {
         console.log(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
-        
+        sy.showMessage(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
+        sy.showMessage(`数据库字段创建后，请不要删除，无用字段请自行隐藏`, -1, "error");
         try {
             for (const fieldName of missingFields) {
                 const fieldType = requiredFields[fieldName];
