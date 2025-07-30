@@ -684,22 +684,26 @@ ${taskData.描述?.content || "描述：暂无"}
      */
     handleSiyuanUpdate = async (e: any, blockId = '') => {
         if (e == 'force' && blockId) {
-            console.log("强制刷新思源更新监听");
+            console.log("fore滴答更新");
         } else {
             const msg = e.detail;
             if (msg.cmd !== "transactions") return;
             const operation = msg.data?.[0]?.doOperations?.[0];
-            if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs")) {
+            if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs" && operation.action !== "insertAttrViewBlock")) {
                 return;
             }
             // 检查是否是我们正在监听的数据库
+            // console.log("处理思源更新DDD：avID", operation.avID, this.avId);
             if (operation.avID !== this.avId) {
                 return;
             }
-            blockId = operation.rowID;
+            if( operation.action === "insertAttrViewBlock") {//TODO: 暂不支持批量添加情况
+                blockId = operation.srcs[0].id;
+            }else{
+                blockId = operation.rowID;
+            }
         }
         if (!blockId) return;
-        // console.log("处理思源更新：", e);
         try {
             // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
             console.log(`处理思源更新：块ID ${blockId}`);
