@@ -64,12 +64,12 @@ export function createDock(options: DockOptions) {
      */
     const setupResizeObserver = (targetElement: Element) => {
         if (!enableSmoothResize) return;
-        
+
         // 清理之前的观察器
         if (resizeObserver) {
             resizeObserver.disconnect();
         }
-        
+
         resizeObserver = new ResizeObserver(() => {
             (targetElement as HTMLElement).style.pointerEvents = 'none';
 
@@ -99,7 +99,7 @@ export function createDock(options: DockOptions) {
         config,
         data: null,
         type,
-        
+
         resize() {
             if (this.element.clientWidth == 0) {
                 isExpanded = false;
@@ -112,49 +112,49 @@ export function createDock(options: DockOptions) {
                 onResize(this);
             }
         },
-        
+
         update() {
             this.element.innerHTML = getUpdateHtml();
             const targetElement = this.element.querySelector(iframeSelector);
             if (targetElement) {
                 setupResizeObserver(targetElement);
             }
-            
+
             // 调用外部传入的 update 回调
             if (onUpdate) {
                 onUpdate(this);
             }
         },
-        
+
         init: (dock: any) => {
             // 验证 URL（如果提供）
             if (validateUrl && validateUrl === "") {
                 showMessage("请先配置服务地址...", -1, "error");
             }
             dock.element.innerHTML = getInitialHtml();
-            
+
             // 设置平滑拖拽
             const targetElement = dock.element.querySelector(iframeSelector);
             if (targetElement) {
                 setupResizeObserver(targetElement);
             }
-            
+
             // 调用外部传入的 dock 创建回调
             if (onDockCreated) {
                 onDockCreated(dock);
             }
         },
-        
+
         destroy() {
             console.log("destroy dock:", type);
             cleanup();
-            
+
             // 调用外部传入的 destroy 回调
             if (onDestroy) {
                 onDestroy();
             }
         },
-        
+
         // 提供访问内部状态的方法
         getState(): DockState {
             return {
@@ -273,7 +273,7 @@ export function createDidaDock(options: {
 }) {
     const {
         title = "滴答清单",
-        icon = "iconMp", 
+        icon = "iconMp",
         type = "dida-dock",
         position = "RightTop",
         size = { width: 350, height: 0 },
@@ -318,7 +318,7 @@ export function createDidaDock(options: {
             if (onDockCreated) {
                 onDockCreated(dock);
             }
-            
+
             // 向dock实例添加更新URL的方法
             dock.updateUrl = (newUrl: string) => {
                 currentUrl = newUrl;
@@ -327,6 +327,7 @@ export function createDidaDock(options: {
         },
         iframeSelector: `#${iframeId} iframe`
     });
+
 
     return dockInstance;
 }
@@ -337,7 +338,7 @@ export function createDidaDock(options: {
 export class DidaLinkInterceptor {
     private dock: any = null;
     private showMessage: (msg: string, timeout?: number, type?: string) => void;
-    
+
     constructor(showMessage: (msg: string, timeout?: number, type?: string) => void) {
         this.showMessage = showMessage;
     }
@@ -348,6 +349,11 @@ export class DidaLinkInterceptor {
     setDock(dock: any) {
         this.dock = dock;
         this.setupLinkInterceptor();
+    }
+
+    private dock_more: any = null;
+    setDock_more(dockInstance: any) {
+        this.dock_more = dockInstance;
     }
 
     /**
@@ -369,18 +375,23 @@ export class DidaLinkInterceptor {
      * 处理点击事件
      */
     private handleClick(event: MouseEvent) {
+        // 只处理左键单击（button为0），且不带Ctrl键
+        if (event.button !== 0 || event.ctrlKey) {
+            return;
+        }
+
         const target = event.target as HTMLElement;
-        
+
         // 检查是否是链接点击
         if (target.tagName === 'A' || target.closest('a')) {
             const linkElement = target.tagName === 'A' ? target as HTMLAnchorElement : target.closest('a') as HTMLAnchorElement;
             const href = linkElement?.href;
-            
+
             if (href && this.isDidaLink(href)) {
                 // 拦截滴答清单链接
                 event.preventDefault();
                 event.stopPropagation();
-                
+
                 this.openInDock(href);
                 return;
             }
@@ -390,7 +401,7 @@ export class DidaLinkInterceptor {
         if (target.dataset && target.dataset.href && this.isDidaLink(target.dataset.href)) {
             event.preventDefault();
             event.stopPropagation();
-            
+
             this.openInDock(target.dataset.href);
             return;
         }
@@ -400,7 +411,7 @@ export class DidaLinkInterceptor {
         if (parentWithHref && parentWithHref.dataset.href && this.isDidaLink(parentWithHref.dataset.href)) {
             event.preventDefault();
             event.stopPropagation();
-            
+
             this.openInDock(parentWithHref.dataset.href);
             return;
         }
@@ -428,7 +439,25 @@ export class DidaLinkInterceptor {
                     this.showMessage("已在侧边栏打开滴答清单", 2000, "info");
                 }
             }
-        //TODO：判断是否模拟点击
+            //TODO：判断是否模拟点击
+            if (!this.dock_more) {
+                this.showMessage("滴答清单dock_more未初始化", 3000, "error");
+                return;
+            }
+            const isExpanded = this.dock_more.getState().isExpanded;
+            console.log("当前dock状态:", isExpanded);
+            if (!isExpanded) {
+                // 模拟点击dock元素来展开
+                const dockElement = document.querySelector('[data-type="siyuan-steve-toolsdida-dock"]') as HTMLElement;
+                if (dockElement) {
+                    console.log("找到dock元素，模拟点击展开");
+                    dockElement.click();
+                    // this.showMessage("已展开滴答清单侧边栏", 2000, "info");
+                } else {
+                    console.warn("未找到dock元素");
+                    this.showMessage("无法展开滴答清单侧边栏", 3000, "warning");
+                }
+            }
         } catch (error) {
             console.error("更新滴答清单dock失败:", error);
             this.showMessage("打开滴答清单失败", 3000, "error");

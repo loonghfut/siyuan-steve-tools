@@ -103,7 +103,7 @@ export class Dida365Service {
             iframeId: "dida-dock",
             containerClass: "dida-dock-container"
         });
-
+        this.linkInterceptor.setDock_more(dockConfig);
         // 添加dock到插件
         this.plugin.addDock(dockConfig);
     }
