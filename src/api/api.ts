@@ -1304,3 +1304,29 @@ export async function showStatusMessage(message: string, timeout: number = 3000,
         }, timeout);
     }
 }
+
+// **************************************** AVManager Export ****************************************
+/**
+ * 导出 AVManager 实例供其他模块使用
+ */
+export { avManager };
+
+/**
+ * 添加属性视图键的便捷函数
+ * @param avID - 属性视图ID
+ * @param keyName - 键名称
+ * @param keyType - 键类型
+ * @param previousKeyName - 前一个键名称
+ */
+export async function addAttributeViewKey(
+    avID: string, 
+    keyName: string, 
+    keyType: string = 'text', 
+    previousKeyName: string = ''
+): Promise<void> {
+    return await avManager.addAttributeViewKey(avID, {
+        keyName,
+        keyType: keyType as any,
+        previousKeyName
+    });
+}

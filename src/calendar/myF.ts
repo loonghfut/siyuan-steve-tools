@@ -82,7 +82,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
             // console.log("viewValue_CHUSHI:::", viewValue);
-            const data = extractDataFromTable(viewValue.view, isZQ);
+            const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ);
             viewValue_Data.push({
                 from: viewId_Data,
                 data: data,
@@ -102,13 +102,38 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
 
 
 
-function extractDataFromTable(data: any, isZQ = false) {
+async function extractDataFromTable(data: any, avID: string, isZQ = false) {
     const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
     const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
 
     if (!isGalleryView && !isTableView) {
         console.warn('Invalid or unrecognized data structure received:', data);
         return [];
+    }
+
+    // 定义需要的字段及其类型
+    const requiredFields = {
+        '事件': 'block',
+        '开始时间': 'date',
+        '优先级': 'mSelect',
+        '分类': 'select',
+        '标签': 'mSelect',
+        '关联': 'relation',
+        '主事件': 'checkbox',
+        '链接': 'url',
+        '全天': 'checkbox',
+        '状态': 'select',
+        '描述': 'text',
+        'didaID': 'text'
+    };
+
+    // 如果是周期性事件，添加额外字段
+    if (isZQ) {
+        requiredFields['重复规则'] = 'text';
+        requiredFields['持续时间'] = 'number';
+        requiredFields['完成日期'] = 'text';
+        // 移除状态字段
+        delete requiredFields['状态'];
     }
 
     // 1. 创建字段映射
@@ -123,7 +148,50 @@ function extractDataFromTable(data: any, isZQ = false) {
         }
     });
 
-    // 2. 提取数据
+    // 2. 检查缺失的字段并创建
+    const missingFields: string[] = [];
+    for (const [fieldName, _fieldType] of Object.entries(requiredFields)) {
+        if (!fieldMap.has(fieldName)) {
+            missingFields.push(fieldName);
+        }
+    }
+
+    // 如果有缺失的字段，创建它们
+    if (missingFields.length > 0) {
+        console.log(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
+        
+        try {
+            for (const fieldName of missingFields) {
+                const fieldType = requiredFields[fieldName];
+                await api.addAttributeViewKey(avID, fieldName, fieldType);
+                console.log(`成功创建字段: ${fieldName} (类型: ${fieldType})`);
+            }
+            
+            // 重新获取视图数据以包含新创建的字段
+            const updatedViewValue = await api.renderAttributeView(avID);
+            const updatedData = updatedViewValue.view;
+            
+            // 更新字段映射
+            fieldMap.clear();
+            const updatedFields = isGalleryView ? updatedData.fields : updatedData.columns;
+            updatedFields.forEach((field: any, index: number) => {
+                if (field && field.name) {
+                    fieldMap.set(field.name, {
+                        id: field.id,
+                        index: index
+                    });
+                }
+            });
+            
+            // 使用更新后的数据
+            data = updatedData;
+        } catch (error) {
+            console.error('创建字段时出错:', error);
+            // 即使创建字段失败，也继续处理现有数据
+        }
+    }
+
+    // 3. 提取数据
     const items = isGalleryView ? data.cards : data.rows;
     if (!items || !Array.isArray(items)) {
         return [];

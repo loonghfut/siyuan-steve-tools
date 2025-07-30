@@ -343,7 +343,7 @@ export class M_calendar {
                     }
                     // }
                 }
-                //【】同步更新看板 //TODO优化请求频率
+                //【】同步更新看板 //TODO：优化请求频率
                 if (msg.data[0].doOperations[0].action === "update") {
                     const data = msg.data[0].doOperations[0].data;
                     if (data.startsWith('<div data-marker')) {
