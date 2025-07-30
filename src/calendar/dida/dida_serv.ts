@@ -826,17 +826,36 @@ ${taskData.描述?.content || "描述：暂无"}
                     const newDidaTask = await this.apiClient.createTask(createTaskPayload);
 
                     if (newDidaTask && newDidaTask.id) {
-                        // 将新生成的 didaID 写回思源数据库
+                        // 将新生成的 didaID 和链接字段写回思源数据库
                         const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID', this.avId);
+                        const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接', this.avId);
+                        
+                        const updatePromises: Promise<any>[] = [];
+                        
+                        // 回写 didaID
                         if (didaIdKeyID) {
-                            await updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, newDidaTask.id, "text");
-                            // 更新缓存
-                            this.taskCache.set(newDidaTask.id, newDidaTask);
-                            console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]`);
-                            showStatusMessage("新任务已同步到滴答清单", 2000);
+                            updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, newDidaTask.id, "text"));
                         } else {
                             console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
-                            showMessage("无法写回滴答任务ID，请检查数据库是否有名为 'didaID' 的列", -1, "error");
+                        }
+                        
+                        // 回写链接字段
+                        if (linkKeyID) {
+                            const didaLink = `https://dida365.com/webapp/#q/all/tasks/${newDidaTask.id}`;
+                            updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, linkKeyID, didaLink, "url"));
+                        } else {
+                            console.error("无法找到 '链接' 字段的 KeyID，无法写回滴答任务链接。");
+                        }
+                        
+                        // 等待所有更新完成
+                        if (updatePromises.length > 0) {
+                            await Promise.all(updatePromises);
+                            // 更新缓存
+                            this.taskCache.set(newDidaTask.id, newDidaTask);
+                            console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
+                            showStatusMessage("新任务已同步到滴答清单", 2000);
+                        } else {
+                            showMessage("无法写回滴答任务信息，请检查数据库是否有名为 'didaID' 和 '链接' 的列", -1, "error");
                         }
                     }
                 } finally {
