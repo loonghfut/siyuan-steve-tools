@@ -5,6 +5,7 @@ import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateToISO, formatLocalDate } from "./siyuan_api";
+import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
@@ -52,6 +53,7 @@ export class Dida365Service {
                 }
             });
         };
+        this.createDock();
         if (settingdata["cal-dida-sync-mode"] === "auto" || settingdata["cal-dida-sync-mode"] === "all") {
             // 自动同步模式，设置定时器
             setTimeout(async () => {
@@ -80,6 +82,30 @@ export class Dida365Service {
         const viewValue = await getViewValue(data);
         console.log("获取到的 avId 对应的值:", viewValue);
 
+    }
+    private didaDock: any = null;
+    private linkInterceptor: DidaLinkInterceptor;
+    private createDock() {
+        this.linkInterceptor = new DidaLinkInterceptor(showMessage);
+        const dockConfig = createDidaDock({
+            title: "滴答清单",
+            icon: "iconMp",
+            type: "dida-dock",
+            position: "RightTop",
+            size: { width: 350, height: 0 },
+            showMessage,
+            onDockCreated: (dock) => {
+                this.didaDock = dock;
+                // 设置链接拦截器
+                this.linkInterceptor.setDock(dock);
+                console.log("滴答清单dock创建成功", dock);
+            },
+            iframeId: "dida-dock",
+            containerClass: "dida-dock-container"
+        });
+
+        // 添加dock到插件
+        this.plugin.addDock(dockConfig);
     }
 
 
@@ -697,9 +723,9 @@ ${taskData.描述?.content || "描述：暂无"}
             if (operation.avID !== this.avId) {
                 return;
             }
-            if( operation.action === "insertAttrViewBlock") {//TODO: 暂不支持批量添加情况
+            if (operation.action === "insertAttrViewBlock") {//TODO: 暂不支持批量添加情况
                 blockId = operation.srcs[0].id;
-            }else{
+            } else {
                 blockId = operation.rowID;
             }
         }
@@ -829,16 +855,16 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 将新生成的 didaID 和链接字段写回思源数据库
                         const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID', this.avId);
                         const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接', this.avId);
-                        
+
                         const updatePromises: Promise<any>[] = [];
-                        
+
                         // 回写 didaID
                         if (didaIdKeyID) {
                             updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, newDidaTask.id, "text"));
                         } else {
                             console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
                         }
-                        
+
                         // 回写链接字段
                         if (linkKeyID) {
                             const didaLink = `https://dida365.com/webapp/#q/all/tasks/${newDidaTask.id}`;
@@ -846,7 +872,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         } else {
                             console.error("无法找到 '链接' 字段的 KeyID，无法写回滴答任务链接。");
                         }
-                        
+
                         // 等待所有更新完成
                         if (updatePromises.length > 0) {
                             await Promise.all(updatePromises);
