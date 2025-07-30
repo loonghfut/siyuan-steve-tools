@@ -11,6 +11,7 @@ import { refreshKanban } from './kanban';
 import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_time, runblockdata_for_title } from './quickadd';
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
+import { getRequiredFields } from './fieldConfig';
 
 export const statusMap = new Proxy({
     // 保留原有的映射关系作为已知状态
@@ -112,29 +113,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false) {
     }
 
     // 定义需要的字段及其类型
-    const requiredFields = {
-        '事件': 'block',
-        '开始时间': 'date',
-        '优先级': 'mSelect',
-        '分类': 'select',
-        '标签': 'mSelect',
-        '关联': 'relation',
-        '主事件': 'checkbox',
-        '链接': 'url',
-        '全天': 'checkbox',
-        '状态': 'select',
-        '描述': 'text',
-        'didaID': 'text'
-    };
-
-    // 如果是周期性事件，添加额外字段
-    if (isZQ) {
-        requiredFields['重复规则'] = 'text';
-        requiredFields['持续时间'] = 'number';
-        requiredFields['完成日期'] = 'text';
-        // 移除状态字段
-        delete requiredFields['状态'];
-    }
+    const requiredFields = getRequiredFields(isZQ);
 
     // 1. 创建字段映射
     const fieldMap = new Map();
