@@ -16,6 +16,7 @@ export class Dida365Service {
     private taskCache: Map<string, Task> = new Map(); // 新增：用于缓存滴答任务
     private isSyncing = false; // 新增同步锁
     private creatingDidaIds: Set<string> = new Set();
+    private syncDebounceTimer: NodeJS.Timeout | null = null; // 防抖计时器
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -108,6 +109,30 @@ export class Dida365Service {
         this.plugin.addDock(dockConfig);
     }
 
+    /**
+     * 防抖同步方法：等待10秒，如果期间有新的调用则重新计时
+     */
+    private debouncedSyncTasksToSiyuan(): void {
+        // 清除之前的计时器
+        if (this.syncDebounceTimer) {
+            clearTimeout(this.syncDebounceTimer);
+            console.log("取消之前的同步计时器，重新开始等待");
+        }
+
+        // 设置新的计时器
+        this.syncDebounceTimer = setTimeout(async () => {
+            try {
+                console.log("防抖等待完成，开始执行同步任务到思源");
+                await this.syncTasksToSiyuan();
+                this.syncDebounceTimer = null; // 清空计时器引用
+            } catch (error) {
+                console.error("防抖同步执行失败:", error);
+                this.syncDebounceTimer = null; // 清空计时器引用
+            }
+        }, 10000); // 10秒延迟
+
+        console.log("设置防抖同步计时器，将在10秒后执行（如无新的调用）");
+    }
 
     async syncTasksToSiyuan(): Promise<void> {
         this.isSyncing = true; // 开始同步，锁定
@@ -184,7 +209,7 @@ export class Dida365Service {
                 console.log(`批量归档了 ${archiveCount} 个任务`);
             }
 
-            const statusMessage = archiveCount > 0 
+            const statusMessage = archiveCount > 0
                 ? `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务，归档 ${archiveCount} 个任务`
                 : `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`;
             showStatusMessage(statusMessage, 3000, "dida-sync");
@@ -991,8 +1016,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     }, 2000);
                 }
             }
-
-
+            this.debouncedSyncTasksToSiyuan(); // 防抖同步检测：等待10秒，期间如有新调用则重新计时
         } catch (error) {
             console.error("从思源同步到滴答失败:", error);
         }
