@@ -18,6 +18,7 @@ export const defaultSettings = {
     "cal-show-ref-event": true,//是否展示被引用的事件
     "cal-show-float-view": false,//是否展示悬浮窗
     "cal-auto-update-status": false,//根据块内子事件完成情况自动更新事件状态
+    "cal-auto-create-fields": true,//是否自动创建缺失的数据库字段
     "cal-week-start": "monday",
     "cal-show-right-click": false,
     "cal-drag-change": false,//是否允许拖拽改变事件时间

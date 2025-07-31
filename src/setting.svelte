@@ -218,6 +218,14 @@
                 },
                 {
                     type: "checkbox",
+                    title: "自动创建缺失的数据库字段",
+                    description:
+                        "启用后会自动创建日程管理所需的数据库字段，禁用后需要手动创建字段",
+                    key: "cal-auto-create-fields",
+                    value: settings["cal-auto-create-fields"],
+                },
+                {
+                    type: "checkbox",
                     title: "日历视图拖拽归档",
                     description: "启用后在日历视图中拖拽事件到视图上方即可归档",
                     key: "cal-drag-change",
@@ -1030,7 +1038,7 @@
     const subGroupItemCounts = {
         日程管理: {
             基础设置: 7,
-            高级设置: 8,
+            高级设置: 9,
             ics设置: 7,
             ics分享: 9,
             qq邮箱日历: 4,
