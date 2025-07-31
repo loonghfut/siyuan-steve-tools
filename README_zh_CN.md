@@ -33,8 +33,7 @@ win端s3同步后，docker端感知s3同步。
 
 
 ### v0.11.0 (2025年07月31日)
-- 重构快捷键添加日程实现,兼容滴答数据库 (loonghfut)
-- feat: 更新版本号至 0.11.0 (loonghfut)
+
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
