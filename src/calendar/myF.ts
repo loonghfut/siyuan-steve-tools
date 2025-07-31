@@ -921,6 +921,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         render: {
             breadcrumb: false,
         },
+        click: {
+            preventInsetEmptyBlock: true,
+        },
         action: ["cb-get-focus"],
         mode: "wysiwyg",
         // action: ["cb-get-focus"],
