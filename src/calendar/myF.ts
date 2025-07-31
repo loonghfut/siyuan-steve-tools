@@ -76,14 +76,14 @@ export async function getViewId(va_ids: string[]): ViewData {
 }
 
 //获取视图值
-export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
+export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type = "normal"){
     const viewValue_Data = [];
 
     for (const viewId_Data of viewIds_Data) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
             // console.log("viewValue_CHUSHI:::", viewValue);
-            const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ);
+            const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type);
             viewValue_Data.push({
                 from: viewId_Data,
                 data: data,
@@ -103,7 +103,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false) {
 
 
 
-async function extractDataFromTable(data: any, avID: string, isZQ = false) {
+async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal") {
     const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
     const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
 
@@ -113,7 +113,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false) {
     }
 
     // 定义需要的字段及其类型
-    const requiredFields = getRequiredFields(isZQ);
+    const requiredFields = getRequiredFields(isZQ, type);
 
     // 1. 创建字段映射
     const fieldMap = new Map();
@@ -147,11 +147,11 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false) {
                     await api.addAttributeViewKey(avID, fieldName, fieldType);
                     console.log(`成功创建字段: ${fieldName} (类型: ${fieldType})`);
                 }
-                
+
                 // 重新获取视图数据以包含新创建的字段
                 const updatedViewValue = await api.renderAttributeView(avID);
                 const updatedData = updatedViewValue.view;
-                
+
                 // 更新字段映射
                 fieldMap.clear();
                 const updatedFields = isGalleryView ? updatedData.fields : updatedData.columns;
@@ -163,7 +163,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false) {
                         });
                     }
                 });
-                
+
                 // 使用更新后的数据
                 data = updatedData;
             } catch (error) {
@@ -393,8 +393,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     const endDate = item['开始时间'].end ? new Date(parseInt(item['开始时间'].end)) : null;
 
                     // 优先使用数据库中的全天设置，如果没有则按原逻辑判断
-                    const isAllDay = item['全天']?.content !== undefined 
-                        ? item['全天'].content 
+                    const isAllDay = item['全天']?.content !== undefined
+                        ? item['全天'].content
                         : (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0)));
 
@@ -667,7 +667,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         }
         // 批量更新：不使用 await，让请求积累到队列中
         const updatePromises: Promise<any>[] = [];
-        
+
         if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
             updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select"));
@@ -676,7 +676,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, note, "text"));
         }
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, dateStr, "date"));
-        
+
         const selectdata: ISelectOption[] = [{ content: status }];
         // console.log("selectdata", selectdata);
         // 2025/7/5新增默认添加优先级
@@ -687,7 +687,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         if (allDayKeyID) {
             updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, allDayKeyID, false, "checkbox"));
         }
-        
+
         // 等待所有更新完成
         await Promise.all(updatePromises);
         sy.showMessage('已添加事件', 2000, "info", "1");
@@ -765,11 +765,11 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     // 加载优先级选项
     const prioritySelect = dialog.element.querySelector('#st-priority') as HTMLSelectElement;
     await loadPriorityOptions(to_db_id, prioritySelect);
-    
+
     // 添加全天选项的交互逻辑
     const allDayCheckbox = dialog.element.querySelector('#st-all-day') as HTMLInputElement;
     const startTimeInput = dialog.element.querySelector('#st-start-time') as HTMLInputElement;
-    
+
     allDayCheckbox.addEventListener('change', () => {
         if (allDayCheckbox.checked) {
             // 全天事件：设置为当天00:00
@@ -852,14 +852,14 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
             ////块时间处理 - 批量更新优化
             const updatePromises2: Promise<any>[] = [];
-            
+
             updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, dateStr, "date"));
-            
+
             const selectdata: ISelectOption[] = [{ content: status }];
             const priorityData: ISelectOption[] = [{ content: priority }];
             const categoryData: ISelectOption[] = [{ content: category }];
             console.log("selectdata", selectdata);
-            
+
             ///////////更新属性////////////////////
             if (noteKeyID && note) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, note, "text"));
@@ -879,7 +879,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             if (allDayKeyID) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, allDayKeyID, isAllDay, "checkbox"));
             }
-            
+
             // 等待所有更新完成
             await Promise.all(updatePromises2);
             //////////////////
@@ -985,14 +985,14 @@ export async function updateEventInDatabase(
     // 检测是否拖拽到全天区域或从全天区域拖拽出来
     const isAllDay = info.event.allDay;
     const wasAllDay = info.oldEvent ? info.oldEvent.allDay : false;
-    
+
     // 准备批量更新的promise数组
     const updatePromises: Promise<any>[] = [];
-    
+
     // 更新时间
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', rootid);
     updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, newStartDate, "date", newEndDate));
-    
+
     // 如果全天状态发生变化，更新全天属性
     if (isAllDay !== wasAllDay) {
         const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', rootid);
@@ -1002,10 +1002,10 @@ export async function updateEventInDatabase(
             sy.showMessage("未找到全天字段，无法更新全天属性", 2000, "error");
         }
     }
-    
+
     // 等待所有更新完成
     await Promise.all(updatePromises);
-    
+
     api.handleDidaListEvent(rootid, blockId);
 
     setTimeout(() => calendar.refetchEvents(), 1000);

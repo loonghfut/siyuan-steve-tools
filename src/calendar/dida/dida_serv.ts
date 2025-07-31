@@ -72,17 +72,42 @@ export class Dida365Service {
         await this.getAllTasks(); // 初始化时加载滴答任务缓存
         this.setupSiyuanUpdateListener(); // 2025/7/5新增：设置思源更新监听器
     }
+    /**
+     * 获取数据库视图数据的封装方法
+     * @param logMessage 可选的日志消息前缀
+     * @returns Promise<any> 返回视图数据
+     */
+    private async getAvViewData(logMessage?: string): Promise<any> {
+        if (!this.avId || this.avId.trim() === "") {
+            throw new Error("avId 未设置或为空");
+        }
+
+        const data = await getViewId([this.avId]);
+        if (logMessage) {
+            console.log(`${logMessage} - 获取到的 avId 数据:`, data);
+        }
+
+        const viewValue = await getViewValue(data, false, "dida");
+        if (logMessage) {
+            console.log(`${logMessage} - 获取到的 avId 对应的值:`, viewValue);
+        }
+
+        return viewValue;
+    }
+
     private async init_av() {
         this.avId = settingdata["cal-dida-db-id"]
         if (!this.avId || this.avId.trim() === "") {
             showMessage("Dida365Service: avId is not set or is empty.");
             return;
         }
-        const data = await getViewId([this.avId]);
-        console.log("获取到的 avId 数据:", data);
-        const viewValue = await getViewValue(data);
-        console.log("获取到的 avId 对应的值:", viewValue);
 
+        try {
+            await this.getAvViewData("初始化数据库视图");
+        } catch (error) {
+            console.error("初始化数据库视图失败:", error);
+            showMessage("初始化数据库视图失败: " + (error instanceof Error ? error.message : String(error)));
+        }
     }
     private didaDock: any = null;
     private linkInterceptor: DidaLinkInterceptor;
@@ -147,8 +172,7 @@ export class Dida365Service {
                 return;
             }
 
-            const data = await getViewId([this.avId]);
-            const viewValue = await getViewValue(data);
+            const viewValue = await this.getAvViewData("同步任务到思源");
 
             if (!viewValue || !Array.isArray(viewValue) || viewValue.length === 0) {
                 showMessage("无法获取数据库视图数据", -1, "error");
@@ -460,8 +484,7 @@ ${taskData.描述?.content || "描述：暂无"}
             await addBlockToDatabase_pro(blockId, this.avId);
 
             // 获取 viewValue 用于获取 keyID
-            const data = await getViewId([this.avId]);
-            const viewValue = await getViewValue(data);
+            const viewValue = await this.getAvViewData("创建思源任务");
 
             // 更新各个字段
             await this.updateTaskFields(blockId, taskData, viewValue);
@@ -514,8 +537,7 @@ ${taskData.描述?.content || "描述：暂无"}
             const blockId = existingTask.事件.id;
 
             // 获取 viewValue 用于获取 keyID
-            const data = await getViewId([this.avId]);
-            const viewValue = await getViewValue(data);
+            const viewValue = await this.getAvViewData("更新思源任务");
 
             // 更新各个字段
             await this.updateTaskFields(blockId, newTaskData, viewValue, existingTask);
@@ -578,8 +600,7 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             // 获取 viewValue 用于获取 keyID
-            const data = await getViewId([this.avId]);
-            const viewValue = await getViewValue(data);
+            const viewValue = await this.getAvViewData("批量归档任务");
 
             // 获取状态字段的 keyID
             const statusKeyID = await this.getKeyIDfromViewValue(viewValue, '状态');
@@ -859,7 +880,7 @@ ${taskData.描述?.content || "描述：暂无"}
         try {
             // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
             console.log(`处理思源更新：块ID ${blockId}`);
-            const viewData = await getViewValue([{ rootid: this.avId, viewId: '', name: '' }]);
+            const viewData = await this.getAvViewData("处理思源更新");
             const allTasks = viewData.flatMap(view => view.data || []);
             const siyuanTask = allTasks.find((task: any) => task.事件?.id === blockId);
 
