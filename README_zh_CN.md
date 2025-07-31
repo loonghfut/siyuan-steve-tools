@@ -32,22 +32,10 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.10.19 (2025年07月30日)
-- 优化滴答更新处理逻辑，支持插入属性视图块的情况 (loonghfut)
-- 更新同步逻辑，回写滴答任务ID和链接字段至思源数据库 (loonghfut)
-- feat: 增加自动添加缺失数据库列(添加属性视图键的便捷函数并优化数据提取逻辑) (loonghfut)
-- feat: 开发：添加字段配置模块，优化事件字段获取逻辑 (loonghfut)
-- ai：侧边实现重构，增加dock创建封装 (loonghfut)
-- 初步实现滴答链接拦截 (loonghfut)
-- feat: 更新滴答链接处理逻辑，支持项目ID并优化链接构建 (loonghfut)
-- 修复部分错误 (loonghfut)
-- feat: 优化滴答链接拦截体验 (loonghfut)
-- feat: 增加批量归档思源任务功能，优化任务同步逻辑 (loonghfut)
-- 滴答：增加同步检测，优化体验 (loonghfut)
-- feat: 更新版本号至0.10.19，优化插件描述信息 (loonghfut)
-- 优化部分提示 (loonghfut)
-- docs: 更新 v0.10.19 版本的更新日志 (loonghfut)
-- docs: 更新 v0.10.19 版本的更新日志 (loonghfut)
+### v0.10.20 (2025年07月31日)
+- feat: 添加自动创建缺失数据库字段的设置选项 增加设置项不自动添加数据库缺失列 Fixes #87 (loonghfut)
+- feat: 优化缺失字段自动创建功能，仅在启用时检查并创建缺失字段 增加设置项不自动添加数据库缺失列 Fixes #87 (loonghfut)
+- feat: 更新版本号至 0.10.20 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
