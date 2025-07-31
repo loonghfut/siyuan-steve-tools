@@ -36,6 +36,7 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加自动创建缺失数据库字段的设置选项 增加设置项不自动添加数据库缺失列 Fixes #87 (loonghfut)
 - feat: 优化缺失字段自动创建功能，仅在启用时检查并创建缺失字段 增加设置项不自动添加数据库缺失列 Fixes #87 (loonghfut)
 - feat: 更新版本号至 0.10.20 (loonghfut)
+- docs: 更新 v0.10.20 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
