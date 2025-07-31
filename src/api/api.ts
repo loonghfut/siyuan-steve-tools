@@ -6,7 +6,7 @@
  * API 文档见 [API_zh_CN.md](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
  */
 
-import { fetchPost, fetchSyncPost, IWebSocketData } from "siyuan";
+import { fetchPost, fetchSyncPost, IWebSocketData, showMessage } from "siyuan";
 import { ISelectOption } from "@/calendar/interface";
 import { settingdata } from "..";
 import { AVManager } from "./db_pro";
@@ -1007,7 +1007,7 @@ async function refreshAttributeView(avID: string) {
 }
 
 // 处理滴答清单事件
-export async function handleDidaListEvent(avID: string,blockId: string) {
+export async function handleDidaListEvent(avID: string, blockId: string) {
     try {
         // 检查是否为滴答清单数据库
         const didaDbId = settingdata['cal-dida-db-id'];
@@ -1319,11 +1319,15 @@ export { avManager };
  * @param previousKeyName - 前一个键名称
  */
 export async function addAttributeViewKey(
-    avID: string, 
-    keyName: string, 
-    keyType: string = 'text', 
+    avID: string,
+    keyName: string,
+    keyType: string = 'text',
     previousKeyName: string = ''
 ): Promise<void> {
+    if (keyType == 'block') {
+        showMessage('主键键不支持添加，请自行修改主键名称为：事件', -1, 'error');
+        return;
+    }
     return await avManager.addAttributeViewKey(avID, {
         keyName,
         keyType: keyType as any,
