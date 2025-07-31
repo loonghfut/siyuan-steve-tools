@@ -282,6 +282,20 @@ export async function handleAddButtonClick(status = "", direct = { isdirect: fal
     return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct, isrefresh);
 }
 
+export async function handleAddButtonClick_Independent(status = "", direct = { isdirect: false, directid: "" }, isrefresh = true) {
+    // console.log('添加事件按钮被点击');
+    const now = new Date()
+    // console.log('当前时间:', now);
+    const fnow = myK.formatDateTime(now);
+    // console.log('格式化时间:', fnow);
+
+    const viewIDs = await getViewId([settingdata["cal-db-id"]])
+    const viewValue = await getViewValue(viewIDs);
+    const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
+    return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct, isrefresh);
+}
+
+
 async function handleKanbanClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
     // console.log('点击事件:1');

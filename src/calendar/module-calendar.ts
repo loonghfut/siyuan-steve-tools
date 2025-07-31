@@ -12,7 +12,7 @@ let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export let linkToCalendar = '';
 import * as myF from "./myF";
-import { handleAddButtonClick, refreshKanban } from "./kanban";
+import { handleAddButtonClick, handleAddButtonClick_Independent, refreshKanban } from "./kanban";
 import { globalOpen2 } from "./myK";
 import { addquikaddButton, getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
@@ -421,7 +421,7 @@ export class M_calendar {
             langText: "创建日程（应用内弹窗）",
             hotkey: "",
             callback: async () => {
-                handleAddButtonClick();
+                handleAddButtonClick_Independent();
             },
         })
         this.plugin.addCommand({
@@ -443,7 +443,7 @@ export class M_calendar {
                 }
                 // console.log("pro", blockId);
                 // console.log("创建日程（光标所在块）", blockId);
-                handleAddButtonClick('', { isdirect: true, directid: blockId });
+                handleAddButtonClick_Independent('', { isdirect: true, directid: blockId });
             },
         })
         //注册斜杠

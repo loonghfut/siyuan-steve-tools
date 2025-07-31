@@ -76,7 +76,7 @@ export async function getViewId(va_ids: string[]): ViewData {
 }
 
 //获取视图值
-export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type = "normal"){
+export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type = "normal") {
     const viewValue_Data = [];
 
     for (const viewId_Data of viewIds_Data) {
@@ -691,6 +691,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         // 等待所有更新完成
         await Promise.all(updatePromises);
         sy.showMessage('已添加事件', 2000, "info", "1");
+        // 滴答更新
+        api.handleDidaListEvent(to_db_id, direct.directid);
         return true;
     }
 
@@ -882,10 +884,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
             // 等待所有更新完成
             await Promise.all(updatePromises2);
+            // 滴答更新
+            api.handleDidaListEvent(to_db_id, id);
             //////////////////
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
-                    steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
+                    // steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
                     if (!panel.isUploading()) {
                         clearInterval(checkUploading);
                         if (isrefresh) {
@@ -941,7 +945,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     // panel.focus();
 
-    steveTools.outlog("dasdsssssssssss::::::", panel);
+    // steveTools.outlog("dasdsssssssssss::::::", panel);
     // 2. 添加到文档并显示
 
     // 3. 等待用户提交
