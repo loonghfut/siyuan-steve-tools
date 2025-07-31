@@ -897,7 +897,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     console.warn(`任务 ${didaTaskId} 不在缓存中，无法反向同步。`);
                     //执行缓存
                     await this.getAllTasks();
-                    showMessage("请重试");
+                    showMessage("请重试，无法获取到滴答事件，重试无效说明事件已经归档");
                     return;
                 }
                 const currentProjectId = cachedTask.projectId;
