@@ -127,22 +127,17 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false) {
         }
     });
 
-    // 2. 检查缺失的字段并创建
-    const missingFields: string[] = [];
-    for (const [fieldName, _fieldType] of Object.entries(requiredFields)) {
-        if (!fieldMap.has(fieldName)) {
-            missingFields.push(fieldName);
+    // 2. 检查缺失的字段并创建（仅在启用自动创建功能时）
+    if (settingdata["cal-auto-create-fields"]) {
+        const missingFields: string[] = [];
+        for (const [fieldName, _fieldType] of Object.entries(requiredFields)) {
+            if (!fieldMap.has(fieldName)) {
+                missingFields.push(fieldName);
+            }
         }
-    }
 
-    // 如果有缺失的字段，创建它们
-    if (missingFields.length > 0) {
-        // 检查是否启用自动创建字段功能
-        if (!settingdata["cal-auto-create-fields"]) {
-            // console.warn(`检测到缺失的字段: ${missingFields.join(', ')}，但自动创建字段功能已禁用`);
-            // sy.showMessage(`检测到缺失的字段: ${missingFields.join(', ')}，请手动创建或在设置中启用自动创建字段功能`, 5000, "error");
-            // 继续处理现有数据，不创建缺失字段
-        } else {
+        // 如果有缺失的字段，创建它们
+        if (missingFields.length > 0) {
             console.log(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
             sy.showMessage(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
             sy.showMessage(`数据库字段创建后，请不要删除，无用字段请自行隐藏`, -1, "error");
