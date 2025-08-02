@@ -30,6 +30,7 @@ import { M_ai } from "./ai/ai";
 import { M_handwriting } from "./handwriting/module-handwriting";
 import { M_imageCompression } from "./ImageCompression/module-imageCompression";
 import { M_lifelog } from "./lifelog/module-lifelog";
+import { trackFeatureUsage } from "./stats/public-stats";
 
 // import * as api from "@/api"
 import SettingExample from "@/setting.svelte";
@@ -126,6 +127,40 @@ export default class steveTools extends Plugin {
         for (const moduleName in moduleInstances) {
             steveTools.outlog("onLayoutReady--" + moduleName);
             await moduleInstances[moduleName]?.onLayoutReady?.();
+        }
+        
+        if (settingdata["PluginUsageStatistics"]) {
+            await this.Stats();
+            console.log("❤️统计数据");
+        }
+    }
+
+    private async Stats() {
+        try {
+            const enabledFeatures = ["plugin_daily_usage"];
+            if (settingdata["cal-enable"]) {
+                enabledFeatures.push("calendar_module");
+            }
+            if (settingdata["handwriting-enable"]) {
+                enabledFeatures.push("handwriting_module");
+            }
+            if (settingdata["ai-enable"]) {
+                enabledFeatures.push("ai_module");
+            }
+            if (settingdata["sync-enable"]) {
+                enabledFeatures.push("sync_module");
+            }
+            if (settingdata["img-compress-enable"]) {
+                enabledFeatures.push("image_compression_module");
+            }
+            if (settingdata["lifelog-enable"]) {
+                enabledFeatures.push("lifelog_module");
+            }
+            const mergedFeatures = enabledFeatures.join("+");
+            console.log("❤️统计功能:", mergedFeatures);
+            await trackFeatureUsage(this.pluginConfig, mergedFeatures);
+        } catch (error) {
+            console.warn("统计失败:", error);
         }
     }
     async onunload() {

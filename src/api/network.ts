@@ -11,7 +11,8 @@ export class NetworkClient {
     constructor(
         private serverUrl: string,
         private proxyApiUrl: string = "/api/network/forwardProxy",
-        private defaultHeaders: Record<string, string> = {}
+        private defaultHeaders: Record<string, string> = {},
+        private useProxy: boolean = true // 新增参数
     ) {}
 
     private getStatusText(status: number, fallback?: string) {
@@ -39,6 +40,26 @@ export class NetworkClient {
         // 合并 headers
         const requestHeaders = { ...this.defaultHeaders, ...headers };
         if (contentType) requestHeaders["Content-Type"] = contentType;
+
+        if (!this.useProxy) {
+            // 不使用代理，直接请求
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: requestHeaders,
+                    body,
+                    signal: controller.signal,
+                });
+                clearTimeout(timer);
+                return response;
+            } catch (err) {
+                clearTimeout(timer);
+                throw err;
+            }
+        }
 
         // 转换为代理格式
         const proxyHeaders: Array<{ [key: string]: string }> = [];

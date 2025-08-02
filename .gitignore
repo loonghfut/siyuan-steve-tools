@@ -12,3 +12,4 @@ tmp
 my
 dida_serve
 scripts/test_update_readme.js
+src/stats/private-stats.ts
