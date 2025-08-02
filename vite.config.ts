@@ -7,6 +7,7 @@ import zipPack from "vite-plugin-zip-pack";
 import fg from 'fast-glob';
 
 import vitePluginYamlI18n from './yaml-plugin';
+import vitePrivateStatsPlugin from './scripts/vite-plugin-private-stats.js';
 
 const env = process.env;
 const isSrcmap = env.VITE_SOURCEMAP === 'inline';
@@ -26,6 +27,9 @@ export default defineConfig({
     },
 
     plugins: [
+
+        vitePrivateStatsPlugin(),
+        
         svelte(),
 
         vitePluginYamlI18n({

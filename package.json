@@ -8,14 +8,19 @@
   "author": "steve",
   "license": "MIT",
   "scripts": {
+    "predev": "node --no-warnings ./scripts/handle_private_stats.js",
+    "prebuild": "node --no-warnings ./scripts/handle_private_stats.js",
     "d": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline vite build --watch",
     "b": "cross-env NODE_ENV=production vite build",
+    "dev": "npm run d",
+    "build": "npm run b",
     "make-link": "node --no-warnings ./scripts/make_dev_link.js",
     "make-link-win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/elevate.ps1 -scriptPath ./scripts/make_dev_link.js",
     "make-install": "pnpm run build && node --no-warnings ./scripts/make_install.js",
     "update-version": "node --no-warnings ./scripts/update_version.js",
     "update-changelog": "node --no-warnings ./scripts/update_changelog.js",
-    "r": "bash ./my/release.sh"
+    "r": "bash ./my/release.sh",
+    "clean-stats": "node --no-warnings ./scripts/handle_private_stats.js --cleanup"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.0",

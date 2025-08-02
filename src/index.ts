@@ -131,7 +131,6 @@ export default class steveTools extends Plugin {
         
         if (settingdata["PluginUsageStatistics"]) {
             await this.Stats();
-            console.log("❤️统计数据");
         }
     }
 
@@ -157,7 +156,7 @@ export default class steveTools extends Plugin {
                 enabledFeatures.push("lifelog_module");
             }
             const mergedFeatures = enabledFeatures.join("+");
-            console.log("❤️统计功能:", mergedFeatures);
+            console.log("功能:", mergedFeatures);
             await trackFeatureUsage(this.pluginConfig, mergedFeatures);
         } catch (error) {
             console.warn("统计失败:", error);
