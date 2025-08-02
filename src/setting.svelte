@@ -853,11 +853,11 @@
             items: [
                 {
                     type: "checkbox",
-                    title: "允许匿名统计",
+                    title: "允许统计",
                     description:
-                        "是否允许插件匿名统计使用情况，仅仅为了统计插件的使用人数，以决策之后的开发方向（只发起了一个get请求[细节见插件源码]，不会发送任何隐私数据）",
+                        "是否允许插件统计使用情况，仅仅为了统计插件的使用人数和功能使用情况，以决策之后的开发方向（发起了一个get请求[细节见插件源码]，不会发送任何隐私数据）",
                     key: "PluginUsageStatistics",
-                    value: settings["PluginUsageStatistics"], // 默认为true
+                    value: settings["PluginUsageStatistics"],
                 },
                 {
                     type: "slider",
@@ -883,7 +883,7 @@
                         callback: async () => {
                             if (!settings["PluginUsageStatistics"]) {
                                 showMessage(
-                                    "请先允许匿名统计才能查看此插件的使用情况",
+                                    "请先允许统计才能查看此插件的使用情况",
                                 );
                                 return;
                             }
