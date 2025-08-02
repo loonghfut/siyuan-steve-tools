@@ -23,7 +23,9 @@ import { updateAttrViewCell_pro } from '@/api/api';
 import { getCategoryColor, lifelogColors } from '../lifelog/styles/colors';
 import { LifelogView } from './lifelog-view';
 import { createViewFilterMenu, initializeGroups } from './initializeGroups';
+import { calendarStatsManager } from './stats';
 //审查ok
+
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
@@ -56,7 +58,7 @@ export async function run(
     id: string,
     initialView = 'dayGridMonth',
     S_viewID = "",
-    cleft = 'prev,next today viewFilter',
+    cleft = 'prev,next today viewFilter,statsButton',
     cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
     ccenter = 'title',
     elementca?: any,
@@ -452,12 +454,33 @@ export async function run(
                     );
                 },
             },
+            // 统计功能按钮
+            statsButton: {
+                text: '统计',
+                click: async function () {
+                    try {
+                        // 动态导入统计模块，避免影响主要加载性能
+                        
+                        const events = calendar.getEvents();
+                        
+                        if (!events || events.length === 0) {
+                            showMessage('当前没有可统计的事件数据', 3000, 'info');
+                            return;
+                        }
+                        
+                        await calendarStatsManager.showStatsDialog(events);
+                    } catch (error) {
+                        console.error('加载统计模块失败:', error);
+                        showMessage('统计功能暂时不可用', 3000, 'error');
+                    }
+                }
+            },
         },
         // 将 lifelogToggle 按钮添加到工具栏
         headerToolbar: {
             left: cleft,
             center: ccenter,
-            right: cright
+            right: cright 
         },
 
         // 从思源数据转换事件
