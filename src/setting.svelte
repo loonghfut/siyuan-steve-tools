@@ -855,7 +855,7 @@
                     type: "checkbox",
                     title: "允许统计",
                     description:
-                        "是否允许插件统计使用情况，仅仅为了统计插件的使用人数和功能使用情况，以决策之后的开发方向（发起了一个get请求[细节见插件源码]，不会发送任何隐私数据）",
+                        "是否允许插件统计使用情况，仅仅为了统计此插件的使用人数和功能使用情况，以决策之后的开发方向（不会发送任何隐私数据,细节见插件源码）",
                     key: "PluginUsageStatistics",
                     value: settings["PluginUsageStatistics"],
                 },
