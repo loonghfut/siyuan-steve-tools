@@ -48,6 +48,8 @@ export class M_caldata extends PluginConfig {
     // 切换视图ID（如果存在则删除，不存在则添加）
     toggleViewId(id: string): string[] {
         const ids = this.getViewIds();
+        console.log("当前视图ID列表:", ids);
+        console.log("尝试切换视图ID:", id);
         if (ids.includes(id)) {
             return this.removeViewId(id);
         } else {

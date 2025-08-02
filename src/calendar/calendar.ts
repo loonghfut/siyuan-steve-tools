@@ -61,7 +61,14 @@ export async function run(
     ccenter = 'title',
     elementca?: any,
 ) {
-    filterViewId = S_viewID ? [S_viewID] : (viewId ? viewId.split(',') : []);
+    // 如果有指定的S_viewID则使用，否则从配置中获取
+    if (S_viewID) {
+        filterViewId = [S_viewID];
+    } else {
+        const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
+        filterViewId = configViewIds.length > 0 ? configViewIds : (viewId ? viewId.split(',') : []);
+    }
+    
     let calendarEl: HTMLElement;
     if (id === "1") {
         // 创建悬浮容器

@@ -144,6 +144,13 @@ export async function createViewFilterMenu(
     const button = calendarEl.querySelector('.fc-viewFilter-button');
     if (!button) return;
 
+    // 确保初始化时UI状态与配置保持一致
+    const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
+    if (JSON.stringify(configViewIds.sort()) !== JSON.stringify(filterViewId.sort())) {
+        setFilterViewId(configViewIds);
+        filterViewId = configViewIds; // 更新本地变量以确保后续逻辑正确
+    }
+
     const viewIDs = await myF.getViewId(av_ids);
 
     // 创建下拉菜单
@@ -456,7 +463,9 @@ export async function createViewFilterMenu(
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
-        checkbox.checked = filterViewId.includes(viewId);
+        // 从配置中获取真实的选中状态，而不是依赖传入的 filterViewId 参数
+        const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
+        checkbox.checked = configViewIds.includes(viewId);
         checkbox.className = 'view-filter-checkbox';
 
         const labelElement = document.createElement('span');
@@ -471,16 +480,20 @@ export async function createViewFilterMenu(
             if (isSpecial && viewId === 'lifelog') {
                 // 特殊处理 lifelog
                 let newFilterViewId;
-                if (filterViewId.includes('lifelog')) {
-                    newFilterViewId = filterViewId.filter(id => id !== 'lifelog');
+                if (configViewIds.includes('lifelog')) {
+                    newFilterViewId = configViewIds.filter(id => id !== 'lifelog');
                     calendar.setOption('slotDuration', lastSavedLifelogSlotDuration);
                 } else {
-                    newFilterViewId = [...filterViewId, 'lifelog'];
+                    newFilterViewId = [...configViewIds, 'lifelog'];
                     calendar.setOption('slotDuration', '00:10:00');
                 }
+                // 直接更新配置
+                moduleInstances['M_calendar'].calConfig.setViewIds(newFilterViewId);
+                moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+                moduleInstances['M_calendar'].calConfig.save();
+                // 更新UI状态
                 setFilterViewId(newFilterViewId);
                 checkbox.checked = newFilterViewId.includes('lifelog');
-                saveFilterConfig(newFilterViewId);
                 refreshFiltersDisplay(newFilterViewId, viewIDs);
                 calendar.refetchEvents();
             } else {
@@ -503,17 +516,23 @@ export async function createViewFilterMenu(
         });
     }
 
-    function toggleViewSelection(viewId: string, checkbox: HTMLInputElement, filterViewId: string[], setFilterViewId: (ids: string[]) => void, viewIDs: any[]) {
-        let newFilterViewId;
-        if (filterViewId.includes(viewId)) {
-            newFilterViewId = filterViewId.filter(id => id !== viewId);
-        } else {
-            newFilterViewId = [...filterViewId, viewId];
-        }
-        setFilterViewId(newFilterViewId);
-        checkbox.checked = newFilterViewId.includes(viewId);
-        saveFilterConfig(newFilterViewId);
-        refreshFiltersDisplay(newFilterViewId, viewIDs);
+    function toggleViewSelection(viewId: string, checkbox: HTMLInputElement, _filterViewId: string[], setFilterViewId: (ids: string[]) => void, viewIDs: any[]) {
+        // 使用 M_caldata 的 toggleViewId 方法切换视图ID
+        moduleInstances['M_calendar'].calConfig.toggleViewId(viewId);
+        
+        // 保存配置（先保存再更新UI，确保配置持久化）
+        moduleInstances['M_calendar'].calConfig.set("viewName", "多视图");
+        moduleInstances['M_calendar'].calConfig.save();
+        
+        // 从配置中重新获取最新的视图ID列表，确保与配置保持一致
+        const latestViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
+        
+        // 更新UI状态，确保checkbox状态与配置一致
+        setFilterViewId(latestViewIds);
+        checkbox.checked = latestViewIds.includes(viewId);
+        
+        // 刷新显示
+        refreshFiltersDisplay(latestViewIds, viewIDs);
     }
 
     function saveFilterConfig(filterViewId: string[]) {

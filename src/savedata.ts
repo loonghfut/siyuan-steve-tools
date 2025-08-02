@@ -42,6 +42,7 @@ export class PluginConfig {
             console.error("保存配置文件失败:", error);
             throw error;
         }
+        this.load(); // 重新加载配置
     }
 
     /**
