@@ -131,6 +131,14 @@ export function getUngroupedViews(allViewIds: string[]): string[] {
     return allViewIds.filter(id => !groupedViewIds.has(id));
 }
 
+// 工具函数：获取所有视图ID并去重
+function getAllViewIds(viewIDs: any[]): string[] {
+    const allSpecialViewIds = ['qqcalendar', 'icsSubscription', 'lifelog'];
+    const allSiyuanViewIds = viewIDs.map(v => v.viewId);
+    // 使用 Set 去重，避免特殊视图与思源视图ID重复
+    return [...new Set([...allSpecialViewIds, ...allSiyuanViewIds])];
+}
+
 // 创建视图筛选菜单
 export async function createViewFilterMenu(
     calendarEl: HTMLElement,
@@ -210,9 +218,7 @@ export async function createViewFilterMenu(
     menuContent.className = 'view-filter-content';
 
     // 获取所有视图ID（包括特殊视图）
-    const allSpecialViewIds = ['qqcalendar', 'icsSubscription', 'lifelog'];
-    const allSiyuanViewIds = viewIDs.map(v => v.viewId);
-    const allViewIds = [...allSpecialViewIds, ...allSiyuanViewIds];
+    const allViewIds = getAllViewIds(viewIDs);
 
     // 渲染分组（只显示非隐藏的分组）
     userGroups.forEach(group => {
@@ -725,7 +731,7 @@ export async function createViewFilterMenu(
             ungroupedSection.className = 'ungrouped-management-section';
             
             // 获取未分组的视图数量
-            const allViewIds = ['qqcalendar', 'icsSubscription', 'lifelog', ...viewIDs.map(v => v.viewId)];
+            const allViewIds = getAllViewIds(viewIDs);
             const ungroupedViewIds = getUngroupedViews(allViewIds);
             const ungroupedCount = ungroupedViewIds.length;
             
@@ -868,7 +874,7 @@ export async function createViewFilterMenu(
         
         // 渲染可添加的视图
         const availableViewsList = editContent.querySelector('.available-views-list') as HTMLElement;
-        const allViewIds = ['qqcalendar', 'icsSubscription', 'lifelog', ...viewIDs.map(v => v.viewId)];
+        const allViewIds = getAllViewIds(viewIDs);
         const availableViewIds = allViewIds.filter(id => !group.viewIds.includes(id));
         
         availableViewIds.forEach(viewId => {
@@ -892,7 +898,9 @@ export async function createViewFilterMenu(
                 if (viewItem) groupViewsList.appendChild(viewItem);
             });
             
-            const updatedAvailableViewIds = allViewIds.filter(id => !group.viewIds.includes(id));
+            // 重新计算可用视图，确保去重
+            const updatedAllViewIds = getAllViewIds(viewIDs);
+            const updatedAvailableViewIds = updatedAllViewIds.filter(id => !group.viewIds.includes(id));
             updatedAvailableViewIds.forEach(viewId => {
                 const viewItem = createEditViewItem(viewId, viewIDs, () => {
                     addViewToGroup(group.id, viewId);
