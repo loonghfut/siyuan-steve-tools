@@ -12,16 +12,16 @@ export class CalendarStatsManager {
     private static instance: CalendarStatsManager;
     private statsDialog: Dialog | null = null;
     private lastStatsData: CalendarStatsData | null = null;
-    
-    private constructor() {}
-    
+
+    private constructor() { }
+
     public static getInstance(): CalendarStatsManager {
         if (!CalendarStatsManager.instance) {
             CalendarStatsManager.instance = new CalendarStatsManager();
         }
         return CalendarStatsManager.instance;
     }
-    
+
     /**
      * 显示统计对话框
      * @param events 日历事件数组
@@ -32,36 +32,35 @@ export class CalendarStatsManager {
             // 生成统计数据
             const statsData = calendarStats.generateStats(events, config);
             this.lastStatsData = statsData;
-            
+
             // 创建对话框
             this.statsDialog = new Dialog({
-                title: "📊 日历数据统计",
+                title: null,
                 content: `<div id="calendar-stats-container" style="width: 900px; max-width: 90vw;"></div>`,
-                width: "960px",
-                height: "720px",
+                width: "auto",
+                height: "auto",
                 disableClose: false,
                 disableAnimation: false,
+                hideCloseIcon: false,
             });
-            
-            // 等待对话框渲染完成
-            setTimeout(() => {
-                try {
-                    calendarStatsVisualization.createStatsPanel(statsData, 'calendar-stats-container');
-                } catch (error) {
-                    console.error('创建统计面板失败:', error);
-                    showMessage('统计面板创建失败', -1, 'error');
-                }
-            }, 500);
-            
+
+            try {
+                calendarStatsVisualization.createStatsPanel(statsData, 'calendar-stats-container', this.statsDialog);
+            } catch (error) {
+                console.error('创建统计面板失败:', error);
+                showMessage('统计面板创建失败', -1, 'error');
+            }
+
+
             // 显示成功消息
             calendarStats.showStatsMessage(statsData);
-            
+
         } catch (error) {
             console.error('显示统计对话框失败:', error);
             showMessage('统计功能出现错误', -1, 'error');
         }
     }
-    
+
     /**
      * 快速统计（不显示对话框）
      * @param events 日历事件数组
@@ -74,7 +73,7 @@ export class CalendarStatsManager {
         calendarStats.showStatsMessage(statsData);
         return statsData;
     }
-    
+
     /**
      * 获取当前月份统计
      * @param events 日历事件数组
@@ -84,17 +83,17 @@ export class CalendarStatsManager {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        
+
         const config: Partial<CalendarStatsConfig> = {
             dateRange: {
                 start: startOfMonth,
                 end: endOfMonth
             }
         };
-        
+
         return this.quickStats(events, config);
     }
-    
+
     /**
      * 获取当前年份统计
      * @param events 日历事件数组
@@ -104,17 +103,17 @@ export class CalendarStatsManager {
         const now = new Date();
         const startOfYear = new Date(now.getFullYear(), 0, 1);
         const endOfYear = new Date(now.getFullYear(), 11, 31);
-        
+
         const config: Partial<CalendarStatsConfig> = {
             dateRange: {
                 start: startOfYear,
                 end: endOfYear
             }
         };
-        
+
         return this.quickStats(events, config);
     }
-    
+
     /**
      * 获取最近7天统计
      * @param events 日历事件数组
@@ -123,17 +122,17 @@ export class CalendarStatsManager {
     public getRecentWeekStats(events: any[]): CalendarStatsData {
         const now = new Date();
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        
+
         const config: Partial<CalendarStatsConfig> = {
             dateRange: {
                 start: weekAgo,
                 end: now
             }
         };
-        
+
         return this.quickStats(events, config);
     }
-    
+
     /**
      * 获取最近30天统计
      * @param events 日历事件数组
@@ -142,17 +141,17 @@ export class CalendarStatsManager {
     public getRecentMonthStats(events: any[]): CalendarStatsData {
         const now = new Date();
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        
+
         const config: Partial<CalendarStatsConfig> = {
             dateRange: {
                 start: monthAgo,
                 end: now
             }
         };
-        
+
         return this.quickStats(events, config);
     }
-    
+
     /**
      * 获取自定义时间范围统计
      * @param events 日历事件数组
@@ -162,9 +161,9 @@ export class CalendarStatsManager {
      * @returns 统计数据
      */
     public getCustomRangeStats(
-        events: any[], 
-        startDate: Date, 
-        endDate: Date, 
+        events: any[],
+        startDate: Date,
+        endDate: Date,
         includeSources?: string[]
     ): CalendarStatsData {
         const config: Partial<CalendarStatsConfig> = {
@@ -173,14 +172,14 @@ export class CalendarStatsManager {
                 end: endDate
             }
         };
-        
+
         if (includeSources) {
             config.includeSources = includeSources;
         }
-        
+
         return this.quickStats(events, config);
     }
-    
+
     /**
      * 显示统计摘要消息
      * @param events 日历事件数组
@@ -189,7 +188,7 @@ export class CalendarStatsManager {
     public showStatsSummary(events: any[], config?: Partial<CalendarStatsConfig>): void {
         const statsData = calendarStats.generateStats(events, config);
         const summary = calendarStats.getStatsSummary(statsData);
-        
+
         // 创建一个简单的摘要对话框
         new Dialog({
             title: "📊 统计摘要",
@@ -198,7 +197,7 @@ export class CalendarStatsManager {
             disableClose: false,
         });
     }
-    
+
     /**
      * 导出统计数据
      * @param events 日历事件数组
@@ -206,16 +205,16 @@ export class CalendarStatsManager {
      * @param config 统计配置
      */
     public exportStats(
-        events: any[], 
-        format: 'json' | 'csv' | 'summary' = 'json', 
+        events: any[],
+        format: 'json' | 'csv' | 'summary' = 'json',
         config?: Partial<CalendarStatsConfig>
     ): void {
         const statsData = calendarStats.generateStats(events, config);
-        
+
         let content: string;
         let filename: string;
         let mimeType: string;
-        
+
         switch (format) {
             case 'csv':
                 content = calendarStats.exportStatsAsCSV(statsData);
@@ -233,17 +232,17 @@ export class CalendarStatsManager {
                 mimeType = 'application/json';
                 break;
         }
-        
+
         this.downloadFile(content, filename, mimeType);
     }
-    
+
     /**
      * 获取最后一次统计数据
      */
     public getLastStatsData(): CalendarStatsData | null {
         return this.lastStatsData;
     }
-    
+
     /**
      * 创建统计快捷菜单
      * @param events 日历事件数组
@@ -255,7 +254,7 @@ export class CalendarStatsManager {
             position: relative;
             display: inline-block;
         `;
-        
+
         const button = document.createElement('button');
         button.textContent = '📊 统计';
         button.style.cssText = `
@@ -267,7 +266,7 @@ export class CalendarStatsManager {
             cursor: pointer;
             font-size: 12px;
         `;
-        
+
         const dropdown = document.createElement('div');
         dropdown.style.cssText = `
             position: absolute;
@@ -281,7 +280,7 @@ export class CalendarStatsManager {
             min-width: 150px;
             display: none;
         `;
-        
+
         const menuItems = [
             { text: '📊 详细统计', action: () => this.showStatsDialog(events) },
             { text: '📋 统计摘要', action: () => this.showStatsSummary(events) },
@@ -292,7 +291,7 @@ export class CalendarStatsManager {
             { text: '💾 导出JSON', action: () => this.exportStats(events, 'json') },
             { text: '📄 导出CSV', action: () => this.exportStats(events, 'csv') },
         ];
-        
+
         menuItems.forEach(item => {
             const menuItem = document.createElement('div');
             menuItem.textContent = item.text;
@@ -303,44 +302,44 @@ export class CalendarStatsManager {
                 transition: background 0.2s;
                 font-size: 12px;
             `;
-            
+
             menuItem.addEventListener('mouseenter', () => {
                 menuItem.style.background = 'var(--b3-theme-surface-variant)';
             });
-            
+
             menuItem.addEventListener('mouseleave', () => {
                 menuItem.style.background = 'transparent';
             });
-            
+
             menuItem.addEventListener('click', () => {
                 item.action();
                 dropdown.style.display = 'none';
             });
-            
+
             dropdown.appendChild(menuItem);
         });
-        
+
         // 删除最后一个分割线
         const lastChild = dropdown.lastElementChild as HTMLElement;
         if (lastChild) {
             lastChild.style.borderBottom = 'none';
         }
-        
+
         button.addEventListener('click', (e) => {
             e.stopPropagation();
             dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
         });
-        
+
         // 点击其他地方关闭菜单
         document.addEventListener('click', () => {
             dropdown.style.display = 'none';
         });
-        
+
         menu.appendChild(button);
         menu.appendChild(dropdown);
         container.appendChild(menu);
     }
-    
+
     /**
      * 下载文件
      */
@@ -356,7 +355,7 @@ export class CalendarStatsManager {
         URL.revokeObjectURL(url);
         showMessage(`已导出: ${filename}`, 3000);
     }
-    
+
     /**
      * 关闭统计对话框
      */
@@ -366,7 +365,7 @@ export class CalendarStatsManager {
             this.statsDialog = null;
         }
     }
-    
+
     /**
      * 检查是否有可用的统计数据
      * @param events 事件数组
@@ -375,7 +374,7 @@ export class CalendarStatsManager {
     public hasStatsData(events: any[]): boolean {
         return events && events.length > 0;
     }
-    
+
     /**
      * 获取统计数据预览
      * @param events 事件数组
@@ -385,11 +384,11 @@ export class CalendarStatsManager {
         if (!events || events.length === 0) {
             return { total: 0, completed: 0, pending: 0, completionRate: 0 };
         }
-        
+
         const completed = events.filter(e => e.extendedProps?.status === '完成').length;
         const pending = events.filter(e => e.extendedProps?.status !== '完成' && e.extendedProps?.status !== '归档').length;
         const completionRate = (completed + pending) > 0 ? (completed / (completed + pending)) * 100 : 0;
-        
+
         return {
             total: events.length,
             completed,

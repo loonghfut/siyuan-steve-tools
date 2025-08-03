@@ -3,6 +3,7 @@
  * 提供图表和数据展示功能
  */
 
+import { Dialog } from 'siyuan';
 import { CalendarStatsData, calendarStats } from './calendar-stats';
 
 export interface ChartOptions {
@@ -15,28 +16,28 @@ export interface ChartOptions {
 
 export class CalendarStatsVisualization {
     private static instance: CalendarStatsVisualization;
-    
-    private constructor() {}
-    
+
+    private constructor() { }
+
     public static getInstance(): CalendarStatsVisualization {
         if (!CalendarStatsVisualization.instance) {
             CalendarStatsVisualization.instance = new CalendarStatsVisualization();
         }
         return CalendarStatsVisualization.instance;
     }
-    
+
     /**
      * 创建统计数据展示面板
      */
-    public createStatsPanel(stats: CalendarStatsData, containerId: string): HTMLElement {
+    public createStatsPanel(stats: CalendarStatsData, containerId: string, dialog: Dialog): HTMLElement {
         const container = document.getElementById(containerId);
         if (!container) {
             throw new Error(`Container with id "${containerId}" not found`);
         }
-        
+
         // 清空容器
         container.innerHTML = '';
-        
+
         // 创建主面板
         const panel = document.createElement('div');
         panel.className = 'calendar-stats-panel';
@@ -45,10 +46,9 @@ export class CalendarStatsVisualization {
             background: var(--b3-theme-background);
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            max-height: 80vh;
             overflow-y: auto;
         `;
-        
+
         // 添加标题
         const title = document.createElement('h2');
         title.textContent = '📊 日历数据统计';
@@ -59,23 +59,23 @@ export class CalendarStatsVisualization {
             padding-bottom: 10px;
         `;
         panel.appendChild(title);
-        
+
         // 添加基础统计卡片
         panel.appendChild(this.createBasicStatsCards(stats));
-        
+
         // 添加图表区域
         panel.appendChild(this.createChartsSection(stats));
-        
+
         // 添加详细统计表格
         panel.appendChild(this.createDetailedStatsTable(stats));
-        
+
         // 添加导出功能
         panel.appendChild(this.createExportSection(stats));
-        
+
         container.appendChild(panel);
         return panel;
     }
-    
+
     /**
      * 创建基础统计卡片
      */
@@ -87,7 +87,7 @@ export class CalendarStatsVisualization {
             gap: 15px;
             margin-bottom: 25px;
         `;
-        
+
         const cards = [
             {
                 title: '总事件数',
@@ -126,7 +126,7 @@ export class CalendarStatsVisualization {
                 color: '#34495e'
             }
         ];
-        
+
         cards.forEach(card => {
             const cardElement = document.createElement('div');
             cardElement.style.cssText = `
@@ -137,15 +137,15 @@ export class CalendarStatsVisualization {
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 transition: transform 0.2s;
             `;
-            
+
             cardElement.addEventListener('mouseenter', () => {
                 cardElement.style.transform = 'translateY(-2px)';
             });
-            
+
             cardElement.addEventListener('mouseleave', () => {
                 cardElement.style.transform = 'translateY(0)';
             });
-            
+
             cardElement.innerHTML = `
                 <div style="display: flex; align-items: center; margin-bottom: 8px;">
                     <span style="font-size: 20px; margin-right: 8px;">${card.icon}</span>
@@ -153,20 +153,20 @@ export class CalendarStatsVisualization {
                 </div>
                 <div style="font-size: 24px; font-weight: bold; color: ${card.color};">${card.value}</div>
             `;
-            
+
             cardsContainer.appendChild(cardElement);
         });
-        
+
         return cardsContainer;
     }
-    
+
     /**
      * 创建图表区域
      */
     private createChartsSection(stats: CalendarStatsData): HTMLElement {
         const section = document.createElement('div');
         section.style.cssText = `margin-bottom: 25px;`;
-        
+
         // 添加图表标题
         const title = document.createElement('h3');
         title.textContent = '📊 可视化图表';
@@ -175,7 +175,7 @@ export class CalendarStatsVisualization {
             color: var(--b3-theme-on-background);
         `;
         section.appendChild(title);
-        
+
         // 图表容器
         const chartsContainer = document.createElement('div');
         chartsContainer.style.cssText = `
@@ -183,28 +183,28 @@ export class CalendarStatsVisualization {
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
         `;
-        
+
         // 饼图：状态分布
         chartsContainer.appendChild(this.createPieChart(
             '状态分布',
             stats.eventsByStatus,
             ['#27ae60', '#f39c12', '#e74c3c', '#95a5a6']
         ));
-        
+
         // 饼图：优先级分布
         chartsContainer.appendChild(this.createPieChart(
             '优先级分布',
             stats.eventsByPriority,
             ['#e74c3c', '#f39c12', '#3498db', '#95a5a6']
         ));
-        
+
         // 柱状图：小时分布
         chartsContainer.appendChild(this.createBarChart(
             '24小时事件分布',
             stats.eventsByHour.map((count, hour) => ({ label: `${hour}:00`, value: count })),
             '#3498db'
         ));
-        
+
         // 柱状图：星期分布
         const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         chartsContainer.appendChild(this.createBarChart(
@@ -212,11 +212,11 @@ export class CalendarStatsVisualization {
             stats.eventsByWeekday.map((count, index) => ({ label: weekdays[index], value: count })),
             '#9b59b6'
         ));
-        
+
         section.appendChild(chartsContainer);
         return section;
     }
-    
+
     /**
      * 创建饼图
      */
@@ -228,7 +228,7 @@ export class CalendarStatsVisualization {
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
-        
+
         const chartTitle = document.createElement('h4');
         chartTitle.textContent = title;
         chartTitle.style.cssText = `
@@ -237,7 +237,7 @@ export class CalendarStatsVisualization {
             color: var(--b3-theme-on-surface);
         `;
         container.appendChild(chartTitle);
-        
+
         // 简单的饼图实现（CSS版本）
         const chartContainer = document.createElement('div');
         chartContainer.style.cssText = `
@@ -245,9 +245,9 @@ export class CalendarStatsVisualization {
             flex-direction: column;
             align-items: center;
         `;
-        
+
         const total = Object.values(data).reduce((sum, val) => sum + val, 0);
-        
+
         if (total > 0) {
             const pieChart = document.createElement('div');
             pieChart.style.cssText = `
@@ -260,11 +260,11 @@ export class CalendarStatsVisualization {
             `;
             chartContainer.appendChild(pieChart);
         }
-        
+
         // 图例
         const legend = document.createElement('div');
         legend.style.cssText = `width: 100%;`;
-        
+
         Object.entries(data).forEach(([key, value], index) => {
             if (value > 0) {
                 const legendItem = document.createElement('div');
@@ -274,9 +274,9 @@ export class CalendarStatsVisualization {
                     margin-bottom: 5px;
                     font-size: 12px;
                 `;
-                
+
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
-                
+
                 legendItem.innerHTML = `
                     <div style="
                         width: 12px; 
@@ -290,16 +290,16 @@ export class CalendarStatsVisualization {
                 legend.appendChild(legendItem);
             }
         });
-        
+
         chartContainer.appendChild(legend);
         container.appendChild(chartContainer);
         return container;
     }
-    
+
     /**
      * 创建柱状图
      */
-    private createBarChart(title: string, data: Array<{label: string, value: number}>, color: string): HTMLElement {
+    private createBarChart(title: string, data: Array<{ label: string, value: number }>, color: string): HTMLElement {
         const container = document.createElement('div');
         container.style.cssText = `
             background: var(--b3-theme-surface);
@@ -307,7 +307,7 @@ export class CalendarStatsVisualization {
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
-        
+
         const chartTitle = document.createElement('h4');
         chartTitle.textContent = title;
         chartTitle.style.cssText = `
@@ -316,9 +316,9 @@ export class CalendarStatsVisualization {
             color: var(--b3-theme-on-surface);
         `;
         container.appendChild(chartTitle);
-        
+
         const maxValue = Math.max(...data.map(d => d.value));
-        
+
         if (maxValue > 0) {
             const chartContainer = document.createElement('div');
             chartContainer.style.cssText = `
@@ -330,7 +330,7 @@ export class CalendarStatsVisualization {
                 border-bottom: 1px solid var(--b3-theme-outline);
                 margin-bottom: 10px;
             `;
-            
+
             data.forEach(item => {
                 const barContainer = document.createElement('div');
                 barContainer.style.cssText = `
@@ -340,7 +340,7 @@ export class CalendarStatsVisualization {
                     flex: 1;
                     min-width: 0;
                 `;
-                
+
                 const bar = document.createElement('div');
                 const height = maxValue > 0 ? (item.value / maxValue) * 120 : 0;
                 bar.style.cssText = `
@@ -352,7 +352,7 @@ export class CalendarStatsVisualization {
                     position: relative;
                     transition: opacity 0.2s;
                 `;
-                
+
                 // 添加数值标签
                 if (item.value > 0) {
                     const label = document.createElement('div');
@@ -367,15 +367,15 @@ export class CalendarStatsVisualization {
                     `;
                     bar.appendChild(label);
                 }
-                
+
                 bar.addEventListener('mouseenter', () => {
                     bar.style.opacity = '0.8';
                 });
-                
+
                 bar.addEventListener('mouseleave', () => {
                     bar.style.opacity = '1';
                 });
-                
+
                 const barLabel = document.createElement('div');
                 barLabel.textContent = item.label.split(':')[0];
                 barLabel.style.cssText = `
@@ -387,12 +387,12 @@ export class CalendarStatsVisualization {
                     max-width: 100%;
                     text-overflow: ellipsis;
                 `;
-                
+
                 barContainer.appendChild(bar);
                 barContainer.appendChild(barLabel);
                 chartContainer.appendChild(barContainer);
             });
-            
+
             container.appendChild(chartContainer);
         } else {
             const noDataMessage = document.createElement('div');
@@ -404,17 +404,17 @@ export class CalendarStatsVisualization {
             `;
             container.appendChild(noDataMessage);
         }
-        
+
         return container;
     }
-    
+
     /**
      * 创建详细统计表格
      */
     private createDetailedStatsTable(stats: CalendarStatsData): HTMLElement {
         const section = document.createElement('div');
         section.style.cssText = `margin-bottom: 25px;`;
-        
+
         const title = document.createElement('h3');
         title.textContent = '📋 详细统计';
         title.style.cssText = `
@@ -422,7 +422,7 @@ export class CalendarStatsVisualization {
             color: var(--b3-theme-on-background);
         `;
         section.appendChild(title);
-        
+
         const table = document.createElement('table');
         table.style.cssText = `
             width: 100%;
@@ -432,7 +432,7 @@ export class CalendarStatsVisualization {
             overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
-        
+
         const tableData = [
             ['统计项目', '数值', '占比'],
             ['总事件数', stats.totalEvents.toString(), '100%'],
@@ -444,7 +444,7 @@ export class CalendarStatsVisualization {
             ['平均时长', this.formatDuration(stats.averageEventDuration), '-'],
             ['完成率', `${stats.completionRate.toFixed(1)}%`, '-'],
         ];
-        
+
         tableData.forEach((row, index) => {
             const tr = document.createElement('tr');
             tr.style.cssText = `
@@ -452,7 +452,7 @@ export class CalendarStatsVisualization {
                 ${index === 0 ? 'background: var(--b3-theme-primary-container);' : ''}
                 ${index % 2 === 1 && index !== 0 ? 'background: var(--b3-theme-surface-variant);' : ''}
             `;
-            
+
             row.forEach((cell, cellIndex) => {
                 const td = document.createElement(index === 0 ? 'th' : 'td');
                 td.textContent = cell;
@@ -464,14 +464,14 @@ export class CalendarStatsVisualization {
                 `;
                 tr.appendChild(td);
             });
-            
+
             table.appendChild(tr);
         });
-        
+
         section.appendChild(table);
         return section;
     }
-    
+
     /**
      * 创建导出功能区域
      */
@@ -483,7 +483,7 @@ export class CalendarStatsVisualization {
             justify-content: center;
             flex-wrap: wrap;
         `;
-        
+
         const buttons = [
             {
                 text: '📄 导出JSON',
@@ -498,7 +498,7 @@ export class CalendarStatsVisualization {
                 action: () => this.copyToClipboard(calendarStats.getStatsSummary(stats))
             }
         ];
-        
+
         buttons.forEach(button => {
             const btn = document.createElement('button');
             btn.textContent = button.text;
@@ -512,42 +512,42 @@ export class CalendarStatsVisualization {
                 font-size: 14px;
                 transition: background 0.2s;
             `;
-            
+
             btn.addEventListener('mouseenter', () => {
                 btn.style.background = 'var(--b3-theme-primary-hover)';
             });
-            
+
             btn.addEventListener('mouseleave', () => {
                 btn.style.background = 'var(--b3-theme-primary)';
             });
-            
+
             btn.addEventListener('click', button.action);
             section.appendChild(btn);
         });
-        
+
         return section;
     }
-    
+
     /**
      * 创建圆锥渐变字符串
      */
     private createConicGradient(data: { [key: string]: number }, colors: string[], total: number): string {
         let angle = 0;
         const gradientStops: string[] = [];
-        
+
         Object.entries(data).forEach(([_key, value], index) => {
             if (value > 0) {
                 const percentage = (value / total) * 100;
                 const endAngle = angle + (percentage * 3.6); // 3.6度 = 1%
-                
+
                 gradientStops.push(`${colors[index % colors.length]} ${angle}deg ${endAngle}deg`);
                 angle = endAngle;
             }
         });
-        
+
         return gradientStops.join(', ');
     }
-    
+
     /**
      * 格式化时长
      */
@@ -564,7 +564,7 @@ export class CalendarStatsVisualization {
             return `${days}天${hours}小时`;
         }
     }
-    
+
     /**
      * 下载文件
      */
@@ -579,7 +579,7 @@ export class CalendarStatsVisualization {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
-    
+
     /**
      * 复制到剪贴板
      */
@@ -599,7 +599,7 @@ export class CalendarStatsVisualization {
                 z-index: 10000;
                 animation: slideIn 0.3s ease-out;
             `;
-            
+
             // 添加动画样式
             if (!document.querySelector('#toast-styles')) {
                 const style = document.createElement('style');
@@ -612,7 +612,7 @@ export class CalendarStatsVisualization {
                 `;
                 document.head.appendChild(style);
             }
-            
+
             document.body.appendChild(toast);
             setTimeout(() => {
                 document.body.removeChild(toast);
