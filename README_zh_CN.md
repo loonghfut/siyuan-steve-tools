@@ -33,19 +33,15 @@ win端s3同步后，docker端感知s3同步。
 
 #### 更新日志:
 
-### v0.11.1 (2025年08月02日)
-- docs: 更新 v0.11.0 版本的更新日志 (loonghfut)
-- docs: 更新 v0.11.0 版本的更新日志 (loonghfut)
-- 滴答：优化用户提示 (loonghfut)
-- 优化Protyle配置 (loonghfut)
-- fix #89 (loonghfut)
-- feat: 添加工具函数以获取所有视图ID并去重 #89 (loonghfut)
-- feat: 添加 NetworkClient 类 (loonghfut)
-- 统计升级 (loonghfut)
-- 优化构建 (loonghfut)
-- 更新设置描述 (loonghfut)
-- 增加事件统计功能（视图筛选右侧） (loonghfut)
-- 更新版本号至 0.11.1 (loonghfut)
+
+### v0.11.3 (2025年08月03日)
+- 优化描述 (loonghfut)
+- 优化md (loonghfut)
+- 更新版本号至 0.11.2 (loonghfut)
+- 继续优化描述 (loonghfut)
+- 优化日程统计面板 (loonghfut)
+- 更改md (loonghfut)
+- 更新版本号至 0.11.3 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
