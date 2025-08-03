@@ -136,7 +136,7 @@ export default class steveTools extends Plugin {
 
     private async Stats() {
         try {
-            const enabledFeatures = ["plugin_daily_usage"];
+            const enabledFeatures = ["plugin"];
             if (settingdata["cal-enable"]) {
                 enabledFeatures.push("calendar");
             }
