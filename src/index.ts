@@ -138,22 +138,25 @@ export default class steveTools extends Plugin {
         try {
             const enabledFeatures = ["plugin_daily_usage"];
             if (settingdata["cal-enable"]) {
-                enabledFeatures.push("calendar_module");
+                enabledFeatures.push("calendar");
             }
             if (settingdata["handwriting-enable"]) {
-                enabledFeatures.push("handwriting_module");
+                enabledFeatures.push("handwriting");
             }
             if (settingdata["ai-enable"]) {
-                enabledFeatures.push("ai_module");
+                enabledFeatures.push("ai");
             }
             if (settingdata["sync-enable"]) {
-                enabledFeatures.push("sync_module");
+                enabledFeatures.push("sync");
             }
             if (settingdata["img-compress-enable"]) {
-                enabledFeatures.push("image_compression_module");
+                enabledFeatures.push("image_compression");
             }
             if (settingdata["lifelog-enable"]) {
-                enabledFeatures.push("lifelog_module");
+                enabledFeatures.push("lifelog");
+            }
+            if( settingdata["cal-dida-enable"]){
+                enabledFeatures.push("dida");
             }
             const mergedFeatures = enabledFeatures.join("+");
             console.log("功能:", mergedFeatures);
