@@ -5,7 +5,7 @@ import livereload from "rollup-plugin-livereload"
 import { svelte } from "@sveltejs/vite-plugin-svelte"
 import zipPack from "vite-plugin-zip-pack";
 import fg from 'fast-glob';
-
+import vitePluginJavascriptObfuscator from 'vite-plugin-javascript-obfuscator';
 import vitePluginYamlI18n from './yaml-plugin';
 import vitePrivateStatsPlugin from './scripts/vite-plugin-private-stats.js';
 
@@ -29,14 +29,29 @@ export default defineConfig({
     plugins: [
 
         vitePrivateStatsPlugin(),
-        
+
         svelte(),
 
         vitePluginYamlI18n({
             inDir: 'public/i18n',
             outDir: `${outputDir}/i18n`
         }),
+        // vitePluginJavascriptObfuscator({
+        //     options: {
+        //         stringArray: true,
+        //         rotateStringArray: true,
+        //         stringArrayEncoding: ['base64'], // 或 'rc4'
+        //         stringArrayThreshold: 0.75,
 
+        //         controlFlowFlattening: true,
+        //         controlFlowFlatteningThreshold: 0.75,
+        //         deadCodeInjection: true,
+        //         deadCodeInjectionThreshold: 0.4,
+        //         transformObjectKeys: true,
+        //         unicodeEscapeSequence: true
+        //     },
+        //     apply: 'build'
+        // }),
         viteStaticCopy({
             targets: [
                 { src: "./README*.md", dest: "./" },
