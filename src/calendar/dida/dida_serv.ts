@@ -147,9 +147,13 @@ export class Dida365Service {
         // 设置新的计时器
         this.syncDebounceTimer = setTimeout(async () => {
             try {
+                let isUpdate = false;
                 console.log("防抖等待完成，开始执行同步任务到思源");
-                await this.syncTasksToSiyuan();
+                isUpdate = await this.syncTasksToSiyuan();
                 this.syncDebounceTimer = null; // 清空计时器引用
+                if (isUpdate) {
+                    showMessage("滴答任务同步不一致", 2000, "info", "dida-sync");
+                }
             } catch (error) {
                 console.error("防抖同步执行失败:", error);
                 this.syncDebounceTimer = null; // 清空计时器引用
@@ -159,7 +163,7 @@ export class Dida365Service {
         console.log("设置防抖同步计时器，将在10秒后执行（如无新的调用）");
     }
 
-    async syncTasksToSiyuan(): Promise<void> {
+    async syncTasksToSiyuan(): Promise<boolean> {
         this.isSyncing = true; // 开始同步，锁定
         showStatusMessage("正在同步滴答清单任务，请稍候...", 10000, "dida-sync");
         try {
@@ -236,8 +240,14 @@ export class Dida365Service {
             const statusMessage = archiveCount > 0
                 ? `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务，归档 ${archiveCount} 个任务`
                 : `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`;
-            showStatusMessage(statusMessage, 3000, "dida-sync");
 
+            if (syncCount > 0 || updateCount > 0 || archiveCount > 0) {
+                showStatusMessage(statusMessage, 3000, "dida-sync");
+                return true;
+            } else {
+                showStatusMessage("没有需要同步的任务", -1, "dida-sync");
+                return false;
+            }
         } catch (error) {
             console.error("同步滴答清单任务失败:", error);
             showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error", "dida-sync");
