@@ -872,27 +872,6 @@
                         step: 100,
                     },
                 },
-                {
-                    type: "button",
-                    title: "今日本插件使用情况",
-                    description: "查看本插件的使用情况",
-                    key: "e",
-                    value: "查看",
-                    button: {
-                        label: "查看",
-                        callback: async () => {
-                            if (!settings["PluginUsageStatistics"]) {
-                                showMessage(
-                                    "请先允许统计才能查看此插件的使用情况",
-                                );
-                                return;
-                            }
-                            const data = await myapi.getFromApi2("/admin");
-                            // console.log(data);
-                            showMessage(`人数：${data.data}`);
-                        },
-                    },
-                },
             ],
         },
     ];
