@@ -966,7 +966,11 @@ ${taskData.描述?.content || "描述：暂无"}
                     statusTags.push('完成');
                 } else if (newStatus === '进行中') {
                     statusTags.push('进行中');
-                } else {
+                } else if (newStatus === '归档') {
+                    statusTags.push('归档');
+                }
+                // 如果没有状态标签，则默认为未完成 
+                else {
                     statusTags.push('未完成');
                 }
                 updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
