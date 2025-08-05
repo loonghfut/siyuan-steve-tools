@@ -1195,72 +1195,9 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
     }
 }
 
-import { PluginConfig } from "../savedata";
 import { refreshKanban } from "@/calendar/kanban";
 
-// 传入 PluginConfig 实例
-export async function getFromApi2(
-    path: string,
-    params: Record<string, string> = {},
-    headers: Record<string, string> = {},
-    pluginConfig?: PluginConfig // 
-): Promise<any> {
-    const baseUrl = 'http://api2.232397.xyz';
-    const today = new Date().toISOString().slice(0, 10);
-    const key = `getFromApi2_${path}`;
 
-    // 检查配置文件中的日期
-    if (pluginConfig) {
-        await pluginConfig.load();
-        const lastDate = pluginConfig.get<string>(key);
-        console.log(`api2ok`);
-        if (lastDate === today) {
-            // console.warn(`getFromApi2: 今日已请求，无需重复发送`);
-            return {
-                success: false,
-                error: '今日已请求，无需重复发送'
-            };
-        }
-    }
-
-    const safeParams = params ?? {};
-    const queryString = Object.keys(safeParams).length > 0
-        ? '?' + new URLSearchParams(safeParams).toString()
-        : '';
-
-    const url = `${baseUrl}${path}${queryString}`;
-    try {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                ...headers
-            }
-        });
-
-        if (!response.ok) {
-            console.warn(`api`);
-        }
-
-        const data = await response.text();
-
-        // 请求成功后记录日期到配置
-        if (pluginConfig) {
-            pluginConfig.set(key, today);
-            await pluginConfig.save();
-        }
-
-        return {
-            success: true,
-            data
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: `请求出错: ${error instanceof Error ? error.message : String(error)}`
-        };
-    }
-}
 
 // **************************************** Status Bar ****************************************
 export async function showStatusMessage(message: string, timeout: number = 3000, id?: string) {

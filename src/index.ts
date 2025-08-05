@@ -62,10 +62,6 @@ export default class steveTools extends Plugin {
         if (data["cal-enable"] == true) {
             this.loadModule(M_calendar, 'M_calendar');
             console.log("日历模块加载");
-            if (settingdata["PluginUsageStatistics"]) {
-                // console.log("统计");
-                api.getFromApi2("/STcal",null, null, this.pluginConfig);
-            }
         }
         if (data["sync-enable"] == true) {
             this.loadModule(M_sync, 'M_sync');
@@ -83,10 +79,6 @@ export default class steveTools extends Plugin {
         if (data["handwriting-enable"] == true) {
             this.loadModule(M_handwriting, 'M_handwriting');
             console.log("画板模块加载");
-            if (settingdata["PluginUsageStatistics"]) {
-                // console.log("统计");
-                api.getFromApi2("/SThandwriting", null, null, this.pluginConfig);
-            }
         }
 
         if (data["lifelog-enable"] == true) {
