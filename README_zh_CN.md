@@ -34,14 +34,15 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.11.3 (2025年08月03日)
-- 优化描述 (loonghfut)
-- 优化md (loonghfut)
-- 更新版本号至 0.11.2 (loonghfut)
-- 继续优化描述 (loonghfut)
-- 优化日程统计面板 (loonghfut)
-- 更改md (loonghfut)
-- 更新版本号至 0.11.3 (loonghfut)
+### v0.11.4 (2025年08月05日)
+- 移除部分统计代码 (loonghfut)
+- 优化打包 (loonghfut)
+- 优化默认设置 (loonghfut)
+- 优化滴答任务同步逻辑，增加同步状态返回值以判断是否有任务更新 (loonghfut)
+- 优化同步任务逻辑，增加网络状态检查和离线模式的错误判断 (loonghfut)
+- 滴答：修复思源端无法归档的BUG (loonghfut)
+- ? (loonghfut)
+- 更新版本号至0.11.4 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
