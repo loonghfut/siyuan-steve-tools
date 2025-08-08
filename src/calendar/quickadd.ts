@@ -637,12 +637,12 @@ export function runblockdata_for_time(content: string): string | null {
         "|(?:(\\d{1,2})[号日])" +
         "|((?:本周|下周|上周))(?:周|星期)?([一二三四五六日天])" +
         "|((?:周|星期))([一二三四五六日天])" +
-        // NEW: YYYYMMDD strictly bounded with valid MM and DD
-        "|\\b(\\d{4})((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b" +
-        // NEW: M-D or M/D with valid ranges, allow leading zero
-    "|\\b((?:0?[1-9]|1[0-2]))[/\\-]((?:0?[1-9]|[12]\\d|3[01]))\\b(?!\\s*(?:点|时|小时|分|am|pm|AM|PM|:|：))" +
-        // NEW: MMDD compact with valid ranges (e.g., 0809)
-        "|\\b((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b"
+        // NEW: YYYYMMDD strictly bounded with valid MM and DD, must be followed by colon
+        "|\\b(\\d{4})((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b(?=\\s*[:|：])" +
+        // NEW: M-D or M/D with valid ranges, allow leading zero, must be followed by colon
+    "|\\b((?:0?[1-9]|1[0-2]))[/\\-]((?:0?[1-9]|[12]\\d|3[01]))\\b(?=\\s*[:|：])(?!\\s*(?:点|时|小时|分|am|pm|AM|PM))" +
+        // NEW: MMDD compact with valid ranges (e.g., 0809), must be followed by colon
+        "|\\b((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b(?=\\s*[:|：])"
     );
 
     // Updated timePattern to support Chinese numerals and "半"
