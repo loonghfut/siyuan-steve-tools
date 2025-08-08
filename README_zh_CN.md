@@ -34,15 +34,15 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.11.4 (2025年08月05日)
-- 移除部分统计代码 (loonghfut)
-- 优化打包 (loonghfut)
-- 优化默认设置 (loonghfut)
-- 优化滴答任务同步逻辑，增加同步状态返回值以判断是否有任务更新 (loonghfut)
-- 优化同步任务逻辑，增加网络状态检查和离线模式的错误判断 (loonghfut)
-- 滴答：修复思源端无法归档的BUG (loonghfut)
-- ? (loonghfut)
-- 更新版本号至0.11.4 (loonghfut)
+### v0.11.5 (2025年08月09日)
+- fix:统计BUG (loonghfut)
+- refactor: 重构 NetworkClient 构造函数，使用选项对象传递参数 (loonghfut)
+- chore: 删除 kanban_way.ts 文件 (loonghfut)
+- feat: 增强日期解析功能，支持多种日期格式 “20250809: 开会” / “2025-08-09：开会” / “8/9: 面谈” / “0809：提醒” -> 可识别 (loonghfut)
+- 优化识别 (loonghfut)
+- 减小误识别概率 (loonghfut)
+- feat: 添加刷新日历看板的命令 (loonghfut)
+- feat: 更新插件版本至 0.11.5 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
