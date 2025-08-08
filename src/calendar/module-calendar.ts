@@ -417,6 +417,15 @@ export class M_calendar {
             },
         })
         this.plugin.addCommand({
+            langKey: "ST_calendar_reload",
+            langText: "刷新日历看板",
+            hotkey: "",
+            callback: async () => {
+                // 刷新日历的逻辑
+                refreshKanban();
+            }
+        })
+        this.plugin.addCommand({
             langKey: "ST_calendar_quick",
             langText: "创建日程（应用内弹窗）",
             hotkey: "",
