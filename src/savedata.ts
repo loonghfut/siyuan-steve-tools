@@ -1,6 +1,8 @@
 import { getFile, putFile } from "./api/api";
 
+
 export class PluginConfig {
+    //记得load一下
     private configPath: string;
     private config: { [key: string]: any };
 

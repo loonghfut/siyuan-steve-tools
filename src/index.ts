@@ -120,15 +120,16 @@ export default class steveTools extends Plugin {
             steveTools.outlog("onLayoutReady--" + moduleName);
             await moduleInstances[moduleName]?.onLayoutReady?.();
         }
-        
+
         if (settingdata["PluginUsageStatistics"]) {
+            await this.pluginConfig.load();
             await this.Stats();
         }
     }
 
     private async Stats() {
         try {
-            const enabledFeatures = ["plugin"];
+            const enabledFeatures = [""];
             if (settingdata["cal-enable"]) {
                 enabledFeatures.push("calendar");
             }
@@ -142,13 +143,19 @@ export default class steveTools extends Plugin {
                 enabledFeatures.push("sync");
             }
             if (settingdata["img-compress-enable"]) {
-                enabledFeatures.push("image_compression");
+                enabledFeatures.push("image");
             }
             if (settingdata["lifelog-enable"]) {
                 enabledFeatures.push("lifelog");
             }
-            if( settingdata["cal-dida-enable"]){
+            if (settingdata["cal-dida-enable"]) {
                 enabledFeatures.push("dida");
+            }
+            if (settingdata["cal-ics-enable-subscribe"]) {
+                enabledFeatures.push("ics");
+            }
+            if (settingdata["cal-qq-enable"]) {
+                enabledFeatures.push("qq");
             }
             const mergedFeatures = enabledFeatures.join("+");
             console.log("功能:", mergedFeatures);
