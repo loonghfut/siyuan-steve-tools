@@ -484,15 +484,6 @@ function parseDateFromString(dateMatch: RegExpMatchArray | null, initialDate: da
             targetDate = targetDate.month(month - 1).date(day);
         }
     }
-    // NEW Group 18,19,20: YYYY-MM-DD or YYYY/MM/DD
-    else if (dateMatch[18] && dateMatch[19] && dateMatch[20]) {
-        const year = parseInt(dateMatch[18], 10);
-        const month = parseInt(dateMatch[19], 10);
-        const day = parseInt(dateMatch[20], 10);
-        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-            targetDate = targetDate.year(year).month(month - 1).date(day);
-        }
-    }
 
     return targetDate;
 }
@@ -647,13 +638,11 @@ export function runblockdata_for_time(content: string): string | null {
         "|((?:本周|下周|上周))(?:周|星期)?([一二三四五六日天])" +
         "|((?:周|星期))([一二三四五六日天])" +
         // NEW: YYYYMMDD strictly bounded with valid MM and DD
-    "|\\b(\\d{4})((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b(?=[:：])" +
-    // NEW: YYYY-MM-DD or YYYY/MM/DD with optional leading zeros on MM/DD
-    "|\\b(\\d{4})[-\\/]((?:0?[1-9]|1[0-2]))[-\\/]((?:0?[1-9]|[12]\\d|3[01]))\\b(?=[:：])" +
+        "|\\b(\\d{4})((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b" +
         // NEW: M-D or M/D with valid ranges, allow leading zero
-    "|\\b((?:0?[1-9]|1[0-2]))[/\\-]((?:0?[1-9]|[12]\\d|3[01]))\\b(?=[:：])" +
+    "|\\b((?:0?[1-9]|1[0-2]))[/\\-]((?:0?[1-9]|[12]\\d|3[01]))\\b(?!\\s*(?:点|时|小时|分|am|pm|AM|PM|:|：))" +
         // NEW: MMDD compact with valid ranges (e.g., 0809)
-    "|\\b((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b(?=[:：])"
+        "|\\b((?:0[1-9]|1[0-2]))((?:0[1-9]|[12]\\d|3[01]))\\b"
     );
 
     // Updated timePattern to support Chinese numerals and "半"
