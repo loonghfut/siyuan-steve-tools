@@ -7,13 +7,32 @@ export interface NetworkRequestOptions {
     contentType?: string;
 }
 
+export interface NetworkClientOptions {
+    serverUrl: string;
+    proxyApiUrl?: string;
+    defaultHeaders?: Record<string, string>;
+    useProxy?: boolean;
+}
+
 export class NetworkClient {
-    constructor(
-        private serverUrl: string,
-        private proxyApiUrl: string = "/api/network/forwardProxy",
-        private defaultHeaders: Record<string, string> = {},
-        private useProxy: boolean = true // 新增参数
-    ) {}
+    private serverUrl: string;
+    private proxyApiUrl: string;
+    private defaultHeaders: Record<string, string>;
+    private useProxy: boolean;
+
+    constructor(options: NetworkClientOptions) {
+        const {
+            serverUrl,
+            proxyApiUrl = "/api/network/forwardProxy",
+            defaultHeaders = {},
+            useProxy = true,
+        } = options;
+
+        this.serverUrl = serverUrl;
+        this.proxyApiUrl = proxyApiUrl;
+        this.defaultHeaders = defaultHeaders;
+        this.useProxy = useProxy;
+    }
 
     private getStatusText(status: number, fallback?: string) {
         // 可根据需要完善
