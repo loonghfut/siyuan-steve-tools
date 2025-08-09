@@ -21,3 +21,9 @@ export async function sendStats(_data: StatsData): Promise<void> {
 
 export async function markStatsSent(_pluginConfig: PluginConfig, _feature: string): Promise<void> {
 }
+
+export async function superDoSomething(): Promise<void> {
+}
+
+export async function getAnalysisData() {
+}

@@ -678,7 +678,7 @@ export function runblockdata_for_time(content: string): string | null {
     if (!finalDateWithTime) {
         return null;
     }
-
+    showMessage(`识别到日程时间: ${finalDateWithTime.format('YYYY-MM-DDTHH:mm')}`);
     return finalDateWithTime.format('YYYY-MM-DDTHH:mm');
 }
 
