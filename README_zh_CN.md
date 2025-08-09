@@ -34,15 +34,10 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.11.5 (2025年08月09日)
-- fix:统计BUG (loonghfut)
-- refactor: 重构 NetworkClient 构造函数，使用选项对象传递参数 (loonghfut)
-- chore: 删除 kanban_way.ts 文件 (loonghfut)
-- feat: 增强日期解析功能，支持多种日期格式 “20250809: 开会” / “2025-08-09：开会” / “8/9: 面谈” / “0809：提醒” -> 可识别 (loonghfut)
-- 优化识别 (loonghfut)
-- 减小误识别概率 (loonghfut)
-- feat: 添加刷新日历看板的命令 (loonghfut)
-- feat: 更新插件版本至 0.11.5 (loonghfut)
+### v0.11.6 (2025年08月09日)
+- feat: 在 runblockdata_for_time 函数中添加识别到日程时间的提示信息； (loonghfut)
+- 更新md (loonghfut)
+- 更新md (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
