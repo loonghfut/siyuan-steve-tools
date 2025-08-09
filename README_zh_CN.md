@@ -11,7 +11,7 @@ STEVETOOLS
 （注：由于是自用工具插件，可能会有一些不完善的地方，甚至出现数据遗失！！（因为使用了思源数据操作相关的api），请自行测试无问题的情况下再使用，若在使用过程中出现问题，请及时反馈）   
 ### 若介意请勿使用。
 #### ~~若发现BUG或者有好的建议，欢迎提issue或者PR。~~
-_**由于最近几乎没有收益，因此功能的开发主要取决于我个人需求和相关功能使用情况，不再考虑开发和维护个人用不到且使用人数很少的功能，毕竟这本就是自用免费分享插件，现已无热情无偿开发额外功能。**_
+_**由于最近几乎没有收益，因此功能的开发主要取决于我<abbr class="tooltip" title="指开发者自身实际使用该插件时遇到的需求和想要实现的功能">个人需求</abbr>和<abbr class="tooltip" title="通过插件设置页面统计获得功能使用数据，可通过设置关闭统计">相关功能使用情况</abbr>，不再考虑开发和维护个人用不到且使用人数很少的功能，毕竟这本就是自用免费分享插件，现已无热情无偿开发额外功能。**_
 
 ### ~~[问题反馈请在社区发帖](https://ld246.com/post?type=5)~~  
 ~~（请优先在GitHub上反馈，实在访问不了再用社区发帖）~~
@@ -29,7 +29,7 @@ win端s3同步后，docker端感知s3同步。
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。
 
-#### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) +[star](https://github.com/loonghfut/siyuan-steve-tools) 
+#### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
 #### 更新日志:
 
