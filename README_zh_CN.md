@@ -38,6 +38,8 @@ win端s3同步后，docker端感知s3同步。
 - 滴答：修复代码格式问题并添加归档状态处理 (loonghfut)
 - feat: 添加标签处理功能并更新相关字段 (loonghfut)
 - 滴答：优化添加任务标签处理 (loonghfut)
+- docs: 更新 v0.12.1 版本的更新日志 (loonghfut)
+- 。 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
