@@ -120,12 +120,27 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
 }
 
 /**
- * 从内容中提取分类信息，支持 #分类名# 或 分类: 分类名
+ * 从内容中提取标签信息，支持 #标签名#
+ * 返回所有匹配的标签名字符串数组，未匹配返回空数组
+ */
+export function runblockdata_for_tags(content: string): string[] {
+    // 匹配 #标签名#
+    const tagPattern = /#([\u4e00-\u9fa5\w\-]+)#/g;
+    const matches = [];
+    let match;
+    while ((match = tagPattern.exec(content)) !== null) {
+        matches.push(match[1]);
+    }
+    return matches;
+}
+
+/**
+ * 从内容中提取分类信息，支持 #@分类名#
  * 返回第一个匹配的分类名字符串，未匹配返回空字符串
  */
 export function runblockdata_for_category(content: string): string {
-    // 匹配 #分类名#
-    const hashPattern = /#([\u4e00-\u9fa5\w\-]+)#/; // Changed pattern
+    // 匹配 #@分类名#
+    const hashPattern = /#@([\u4e00-\u9fa5\w\-]+)#/;
     const hashMatch = content.match(hashPattern);
     if (hashMatch) {
         return hashMatch[1];

@@ -8,7 +8,7 @@ import { moduleInstances } from '@/index';
 import { ISelectOption } from "@/calendar/interface";
 import steveTools from "@/index";
 import { refreshKanban } from './kanban';
-import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_time, runblockdata_for_title } from './quickadd';
+import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_tags, runblockdata_for_time, runblockdata_for_title } from './quickadd';
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
 import { getRequiredFields } from './fieldConfig';
@@ -643,6 +643,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const ce = runblockdata_for_time(blockdata?.kramdown);
         const minsub = runblockdata_for_sub(blockdata?.kramdown);
         const categorie = runblockdata_for_category(blockdata?.kramdown);
+        const tags= runblockdata_for_tags(blockdata?.kramdown);
         const note = runblockdata_for_note(blockdata?.kramdown);
         const title = runblockdata_for_title(blockdata?.kramdown);
         console.log("title:::", title);
@@ -663,6 +664,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
         const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', to_db_id);
         const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
+        const tagsKeyID = await getKeyIDfromViewValue(viewValue, '标签', to_db_id);
         const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
         const titleKeyID = await getKeyIDfromViewValue(viewValue, '事件', to_db_id);
         const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
@@ -681,6 +683,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
             updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, categoryData, "select"));
+        }
+        if (tagsKeyID && tags) {
+            const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, tagsKeyID, tagsData, "mSelect"));
         }
         if (noteKeyID && note) {
             updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, note, "text"));
@@ -830,9 +836,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             // 添加数据库属性
             //// 添加时间和状态属性
             const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
-            // console.log("viewValue:::", viewValue);
-            // console.log("timeKeyID:::", timeKeyID);
             const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
+            const tagsKeyID = await getKeyIDfromViewValue(viewValue, '标签', to_db_id);
             const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
             const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
             const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', to_db_id);
@@ -851,6 +856,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const ce = runblockdata_for_time(blockdata?.kramdown);
             const minsub = runblockdata_for_sub(blockdata?.kramdown);
             const category1 = runblockdata_for_category(blockdata?.kramdown);
+            const tags = runblockdata_for_tags(blockdata?.kramdown);
             const note = runblockdata_for_note(blockdata?.kramdown);
             // 手动输入分类优先
             const category = category1 || category2;
@@ -878,6 +884,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
             if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, categoryData, "select"));
+            }
+            if (tags && tags.length > 0) {
+                const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, tagsKeyID, tagsData, "mSelect"));
             }
             if (priority && priorityKeyID && priorityData) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, priorityData, "select"));

@@ -20,6 +20,7 @@ export const requiredFields: RequiredFields = {
     '全天': 'checkbox',
     '状态': 'select',
     '描述': 'text',
+    '标签': 'mSelect',
 };
 
 /**
