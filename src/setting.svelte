@@ -606,6 +606,13 @@
                     },
                 },
                 {
+                    type: "number",
+                    title: "四象限紧急阈值（天）",
+                    description: "用于判定‘紧急’的天数阈值（<=该值视为紧急）",
+                    key: "cal-quadrant-urgent-days",
+                    value: settings["cal-quadrant-urgent-days"],
+                },
+                {
                     type: "checkbox",
                     title: "启用滴答清单同步",
                     description: "启用后可以同步滴答清单的任务",
@@ -1022,7 +1029,7 @@
             ics分享: 9,
             qq邮箱日历: 4,
             订阅日历: 8,
-            视图设置: 8,
+            视图设置: 9,
             滴答清单: 6,
             // 不限制
         },

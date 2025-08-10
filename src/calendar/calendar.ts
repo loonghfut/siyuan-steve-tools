@@ -9,6 +9,7 @@ import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import steveTools from "@/index";
 import kanban, { refreshKanban, thisCalendars, update_thisCalendars } from './kanban';
+import priorityQuadrant from './priorityQuadrant';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -59,7 +60,7 @@ export async function run(
     initialView = 'dayGridMonth',
     S_viewID = "",
     cleft = 'prev,next today viewFilter,statsButton',
-    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban',
+    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant',
     ccenter = 'title',
     elementca?: any,
 ) {
@@ -126,6 +127,7 @@ export async function run(
             multiMonthPlugin,
             rrule,
             kanban,
+            priorityQuadrant,
         ],
         initialView: initialView,
         navLinks: true,
@@ -432,6 +434,11 @@ export async function run(
                 type: 'kanban',
                 buttonText: '周板',
                 duration: { weeks: 1 },
+            },
+            priorityQuadrant: {
+                type: 'priorityQuadrant',
+                buttonText: '四象限',
+                duration: { months: 1 },
             },
 
         },

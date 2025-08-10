@@ -79,6 +79,8 @@ export const defaultSettings = {
     "cal-event-color": true,
     "kanban-default-view": "kanban",
     "cal-default-view": "dayGridMonth",
+    // 四象限
+    "cal-quadrant-urgent-days": 2,
     // 同步模块
     "sync-enable": false,
     "sync-url": "http://localhost:8080",

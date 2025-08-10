@@ -318,3 +318,20 @@ export function filterRecurringEvents(events: KBCalendarEvent[],
 
     return filteredEvents;
 }
+
+export async function run_changepriority(Fr_event: NestedKBCalendarEvent, newPriority: string) {
+    if (!Fr_event.extendedProps.priorityid) {
+        showMessage("目标数据库未设置优先级列", -1, "error");
+        return false;
+    }
+    await api.updateAttrViewCell_pro(
+        Fr_event.publicId,
+        Fr_event.extendedProps.rootid,
+        Fr_event.extendedProps.priorityid,
+        [{ content: newPriority }],
+        "select"
+    );
+    api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId);
+    console.log("done-updateAttrViewCell_pro-select-priority");
+    return true;
+}

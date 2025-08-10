@@ -488,6 +488,83 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     border-radius: 15px;
 }
 
+.priority-quadrant-view {
+    .quadrant-board {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        background-color: $background-color;
+    height: calc(80vh);
+    overflow: hidden; // 外层不滚动
+        padding: 4px;
+        border-radius: 12px;
+        box-sizing: border-box;
+        position: relative;
+
+        // 田字中线
+        &::before,
+        &::after {
+            content: "";
+            position: absolute;
+            background: $border-color;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        &::before {
+            // 竖线
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 1px;
+            transform: translateX(-0.5px);
+        }
+        &::after {
+            // 横线
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 1px;
+            transform: translateY(-0.5px);
+        }
+    }
+
+    .kanban-column {
+        display: flex;
+        flex-direction: column;
+        background-color: $background-color;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        min-height: 0; // 允许内部滚动
+
+        .kanban-column-header {
+            position: sticky;
+            top: 0;
+            background: inherit;
+            z-index: 1;
+
+            h2 {
+                text-align: center;
+                margin: 0;
+            }
+        }
+
+        .kanban-cards {
+            flex: 1;
+            min-height: 0; // 允许滚动
+            overflow: auto; // 内部滚动
+            width: 100%;
+        }
+    }
+
+    // 四象限标题配色
+    .quadrant-q1-head h2 { color: $text-color-error; }
+    .quadrant-q2-head h2 { color: $text-color-info; }
+    .quadrant-q3-head h2 { color: $text-color-processing; }
+    .quadrant-q4-head h2 { color: $text-color-success; }
+}
+
 .kanban-column {
 
     &-未完成,
