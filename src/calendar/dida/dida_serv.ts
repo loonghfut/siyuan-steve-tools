@@ -170,7 +170,7 @@ export class Dida365Service {
             // 获取滴答清单的所有任务
             let didaTasks: Task[] = [];
             let isOnline = true;
-            
+
             try {
                 didaTasks = await this.getAllTasks();
                 console.log("❤️❤️❤️❤️❤️")
@@ -255,7 +255,7 @@ export class Dida365Service {
                 console.log("网络异常，跳过归档检查以避免误操作");
             }
 
-            const statusMessage = isOnline 
+            const statusMessage = isOnline
                 ? (archiveCount > 0
                     ? `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务，归档 ${archiveCount} 个任务`
                     : `同步完成：新建 ${syncCount} 个任务，更新 ${updateCount} 个任务`)
@@ -372,6 +372,8 @@ export class Dida365Service {
                 return "完成";
             } else if (task.tags?.includes("进行中")) {
                 return "进行中";
+            } else if (task.tags?.includes('归档')) {
+                return "归档";
             } else {
                 return "未完成"
             }
@@ -974,7 +976,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     statusTags.push('未完成');
                 }
                 updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
-
+                console.log("❤️❤️❤️❤️更新的任务内容：", updatePayload);
                 if (Object.keys(updatePayload).length > 0) {
                     await this.apiClient.updateTask(didaTaskId, {
                         ...updatePayload,
