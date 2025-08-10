@@ -34,17 +34,10 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.12.0 (2025年08月10日)
-- 支持事件可视化拖拽安排 (loonghfut)
-- 看板：默认显示所有类别 (loonghfut)
-- 增加：四象限视图 (loonghfut)
-- 优化四象限交互细节 (loonghfut)
-- 四象限里实现状态改变逻辑 (loonghfut)
-- BUG：当把事件拖拽后，但放置在原处，会导致事件消失，刷新后才会显示 (loonghfut)
-- 四象限：优化事件排序 (loonghfut)
-- (❁´◡`❁) (loonghfut)
-- docs: 更新 v0.12.0 版本的更新日志 (loonghfut)
-- 更新版本号至 0.12.0 (loonghfut)
+### v0.12.1 (2025年08月10日)
+- 滴答：修复代码格式问题并添加归档状态处理 (loonghfut)
+- feat: 添加标签处理功能并更新相关字段 (loonghfut)
+- 滴答：优化添加任务标签处理 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
