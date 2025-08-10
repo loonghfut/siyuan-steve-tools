@@ -82,6 +82,65 @@ $priority-color-high-background: var(--b3-card-error-background);
     max-height: 70vh;
 }
 
+// 日历事件样式优化
+.fc-event {
+    max-width: 100%;
+    
+    .fc-event-main {
+        .fc-event-main-frame {
+            .fc-event-title-container {
+                .fc-event-title {
+                    white-space: normal !important;
+                    word-wrap: break-word !important;
+                    word-break: break-all !important;
+                    overflow-wrap: break-word !important;
+                    line-height: 1.2 !important;
+                    max-width: 100% !important;
+                    display: block !important;
+                }
+            }
+        }
+    }
+}
+.fc .fc-more-popover, .fc-list, .fc-list-item{
+    max-width: 400px;
+}
+
+// 拖拽事件时临时隐藏更多弹窗，避免遮挡/干扰（最小改动，无额外实现）
+.fc-dragging .fc-more-popover {
+    display: none !important;
+}
+
+// 兼容不同挂载位置/类名：当存在拖拽或调整大小态时，强制隐藏更多弹窗
+
+.fc:has(.fc-event-dragging) .fc-more-popover {
+    /* 强制隐藏弹出框，使用最高优先级 */
+    // display: none !important;
+    
+    /* 平滑淡出效果，增强视觉体验 */
+    opacity: 0;
+    visibility: hidden; /* 确保元素不可见且不占据空间 */
+    transition: 
+        opacity 0.5s ease-in-out,
+        visibility 0.5s ease-in-out;
+}
+/* 
+ * 拖拽结束后平滑显示弹出框
+ * 提供流畅的视觉过渡效果
+ */
+// .fc:not(:has(.fc-event-dragging)) .fc-more-popover {
+//     /* 确保元素可以显示 */
+//     // display: block !important;
+    
+//     /* 平滑淡入效果 */
+//     opacity: 1;
+//     visibility: visible;
+//     transition: 
+//         opacity 0.5s ease-in-out,
+//         visibility 0.5s ease-in-out;
+// }
+
+
 
 // 视图选择菜单
 //视图选择界面
@@ -621,3 +680,35 @@ $priority-color-high-background: var(--b3-card-error-background);
         font-weight: 600;
     }
 }
+
+
+/* 主容器美化 */
+.fc-popover.fc-more-popover {
+  border-radius: 12px; /* 圆角边框 */
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); /* 柔和阴影 */
+  border: none; /* 去除默认边框 */
+  overflow: hidden; /* 内容不超出容器 */
+  background-color: var(--b3-theme-background); /* 白色背景 */
+//   min-width: 320px; /* 最小宽度 */
+}
+
+// /* 头部样式优化 */
+// .fc-popover-header {
+//   background-color: #9d8fef; /* 主题色背景 */
+// //   color: #ffffff; /* 白色文字 */
+//   padding: 14px 18px; /* 内边距 */
+//   border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* 浅色分隔线 */
+//   display: flex;
+//   justify-content: space-between;
+//   align-items: center;
+// }
+
+// /* 标题样式 */
+// .fc-popover-title {
+//   font-size: 16px;
+//   font-weight: 600;
+//   letter-spacing: 0.5px;
+// }
+
+
+
