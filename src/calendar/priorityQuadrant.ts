@@ -202,10 +202,11 @@ const QuadrantViewConfig = {
     const createCard = (event: NestedKBCalendarEvent) => {
       const childCards = event.children?.map(createCard).join('') || '';
       const endtime = event.range.end ? new Date(event.range.end).toLocaleString() : '';
+      const statusLabel = event.extendedProps.status || '未完成';
       const nowToEndTime = event.range.end
-        ? myK.getDaysFromNow(event.range.end, event.extendedProps.status)
-        : myK.getDaysFromNow(event.extendedProps.Kstart, event.extendedProps.status);
-      const isRecurring = event.extendedProps?.isRecurring;
+        ? myK.getDaysFromNow(event.range.end, statusLabel)
+        : myK.getDaysFromNow(event.extendedProps.Kstart, statusLabel);
+  const isRecurring = event.extendedProps?.isRecurring;
       return `
         <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" 
              data-id="${event.publicId}" 
@@ -221,7 +222,7 @@ const QuadrantViewConfig = {
             </h3>
             <div class="kanban-card-meta">
               <span class="kanban-nowToEndTime">${nowToEndTime}</span>
-              <span class="kanban-status-${event.extendedProps.status}">${event.extendedProps.status}</span>
+              <span class=\"kanban-status kanban-status-${statusLabel}\">${statusLabel}</span>
               ${event.extendedProps.category !== '无' ? `<span class="category">${event.extendedProps.category}</span>` : ''}
               ${event.extendedProps.priority && event.extendedProps.priority !== '无' ?
                 `<span class="badge priority-${(event.extendedProps.priority as string).toLowerCase()}">${event.extendedProps.priority}</span>`
@@ -314,6 +315,83 @@ const QuadrantViewConfig = {
               e.stopPropagation();
               await handleAddButtonClick('未完成');
             }
+          });
+          // 点击状态文本，原位替换为内联选择框
+          container.addEventListener('click', async (e: Event) => {
+            const t = e.target as HTMLElement;
+            const statusSpan = t.closest('.kanban-card-meta .kanban-status') as HTMLElement | null;
+            if (!statusSpan) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const card = statusSpan.closest('.kanban-card') as HTMLElement | null;
+            if (!card) return;
+            const blockId = card.getAttribute('data-block-id') || '';
+            const isRecurring = card.hasAttribute('data-recurring');
+            const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
+            if (!eventData) return;
+
+            // 避免重复创建
+            if (statusSpan.classList.contains('editing')) return;
+
+            // 构造下拉
+            const select = document.createElement('select');
+            select.className = 'status-inline-select b3-text-field';
+            const opts = isRecurring ? ['未完成', '完成'] : ['未完成', '进行中', '完成', '归档'];
+            opts.forEach(s => {
+              const op = document.createElement('option');
+              op.value = s; op.textContent = s; if (s === (eventData.extendedProps.status || '未完成')) op.selected = true;
+              select.appendChild(op);
+            });
+            // 原位显示下拉：隐藏原状态，插入下拉在其后
+            statusSpan.classList.add('editing');
+            const parent = statusSpan.parentElement as HTMLElement;
+            statusSpan.style.display = 'none';
+            parent?.insertBefore(select, statusSpan.nextSibling);
+            select.focus();
+
+            // 防止拖拽冲突
+            select.addEventListener('pointerdown', ev => ev.stopPropagation(), { capture: true });
+            select.addEventListener('mousedown', ev => ev.stopPropagation(), { capture: true });
+
+            const cleanup = () => {
+              try {
+                if (select && select.isConnected) {
+                  select.remove();
+                }
+                if (statusSpan) {
+                  statusSpan.style.display = '';
+                  statusSpan.classList.remove('editing');
+                }
+              } catch {}
+            };
+            const onBlur = () => { cleanup(); select.removeEventListener('blur', onBlur); };
+            select.addEventListener('blur', onBlur, { once: true });
+
+            select.addEventListener('keydown', (ke: KeyboardEvent) => {
+              if (ke.key === 'Escape') { ke.preventDefault(); cleanup(); }
+            });
+
+            select.addEventListener('change', async () => {
+              try {
+                if (isRecurring) {
+                  const cur = eventData.extendedProps.status || '未完成';
+                  const chosen = select.value;
+                  if (cur !== chosen) {
+                    const startDate = card.getAttribute('data-start-date') || '';
+                    changestatus_for_zq(eventData.extendedProps, startDate);
+                  }
+                } else {
+                  const newStatus = select.value;
+                  const payload = [{ content: newStatus }];
+                  await myK.run_changestatus(eventData, payload);
+                }
+                refreshQuadrant();
+              } catch (err) {
+                console.error('inline status change error:', err);
+              } finally {
+                cleanup();
+              }
+            });
           });
     // 启用四象限之间拖拽：仅根据目标象限更新优先级（不改日期）
           container.querySelectorAll('.kanban-cards').forEach((col: Element) => {

@@ -563,6 +563,51 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     .quadrant-q2-head h2 { color: $text-color-info; }
     .quadrant-q3-head h2 { color: $text-color-processing; }
     .quadrant-q4-head h2 { color: $text-color-success; }
+
+    // 卡片内状态选择框统一样式
+    .kanban-card-header h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .kanban-card-header .status-select {
+        height: 24px;
+        line-height: 24px;
+        padding: 0 6px;
+        border-radius: 6px;
+        border: 1px solid $border-color;
+        background-color: $background-color;
+        color: $text-color;
+        font-size: 12px;
+        max-width: 120px;
+    }
+    // .kanban-card-header .status-select:hover {
+    //     border-color: mix($border-color, $text-color, 40%);
+    // }
+    .kanban-card-header .status-select:focus {
+        outline: none;
+        border-color: $text-color-info;
+        box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+    }
+    // 内联状态下拉（点击状态文本出现）
+    .kanban-card-meta .status-inline-select {
+        height: 22px;
+        line-height: 22px;
+        padding: 0 6px;
+        margin-left: 6px;
+        border-radius: 6px;
+        border: 1px solid $border-color;
+        background-color: $background-color;
+        color: $text-color;
+        font-size: 12px;
+        max-width: 120px;
+    }
+    .kanban-card-meta .status-inline-select:focus {
+        outline: none;
+        border-color: $text-color-info;
+        box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+    }
 }
 
 .kanban-column {
