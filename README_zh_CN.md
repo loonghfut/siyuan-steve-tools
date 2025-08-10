@@ -43,6 +43,8 @@ win端s3同步后，docker端感知s3同步。
 - BUG：当把事件拖拽后，但放置在原处，会导致事件消失，刷新后才会显示 (loonghfut)
 - 四象限：优化事件排序 (loonghfut)
 - (❁´◡`❁) (loonghfut)
+- docs: 更新 v0.12.0 版本的更新日志 (loonghfut)
+- 更新版本号至 0.12.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
