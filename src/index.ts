@@ -30,7 +30,7 @@ import { M_ai } from "./ai/ai";
 import { M_handwriting } from "./handwriting/module-handwriting";
 import { M_imageCompression } from "./ImageCompression/module-imageCompression";
 import { M_lifelog } from "./lifelog/module-lifelog";
-import { trackFeatureUsage } from "./stats/public-stats";
+import { check, trackFeatureUsage } from "./stats/public-stats";
 
 // import * as api from "@/api"
 import SettingExample from "@/setting.svelte";
@@ -125,6 +125,8 @@ export default class steveTools extends Plugin {
             await this.pluginConfig.load();
             await this.Stats();
         }
+
+        check();
     }
 
     private async Stats() {
@@ -163,6 +165,7 @@ export default class steveTools extends Plugin {
         } catch (error) {
             console.warn("统计失败:", error);
         }
+
     }
     async onunload() {
         // 卸载模块
