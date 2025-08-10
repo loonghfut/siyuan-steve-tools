@@ -3,9 +3,14 @@ import { NestedKBCalendarEvent, KBCalendarEvent } from './interface';
 import * as myK from './myK';
 import { settingdata } from '@/index';
 import { changestatus_for_zq, showEvent } from './myF';
-import { handleAddButtonClick } from './kanban';
+import { handleAddButtonClick, thisCalendars } from './kanban';
 import Sortable from 'sortablejs';
 import { run_changepriority } from './myK';
+import { ScrollState } from './interface';
+
+// 全局滚动状态存储（按日历元素区分）
+type QuadrantScrollBundle = { board?: ScrollState; byQuadrant: Record<string, ScrollState> };
+const quadrantScrollStore = new WeakMap<HTMLElement, QuadrantScrollBundle>();
 
 // 计算紧急阈值（天）
 const getUrgentThresholdDays = () => {
@@ -15,6 +20,81 @@ const getUrgentThresholdDays = () => {
 };
 
 let dataArray: NestedKBCalendarEvent[] = [];
+
+// 简单防抖
+function debounce<T extends (...args: any[]) => any>(fn: T, wait = 500) {
+  let t: number | undefined;
+  return (...args: Parameters<T>) => {
+    if (t) window.clearTimeout(t);
+    t = window.setTimeout(() => fn(...args), wait);
+  };
+}
+
+// 刷新四象限视图并恢复滚动位置（参考看板的实现）
+const refreshQuadrant = debounce(async () => {
+  const calendars = (thisCalendars || []).filter((c: any) => document.body.contains(c.el));
+  if (!calendars.length) return;
+
+  // 记录滚动位置
+  calendars.forEach((calendar: any) => {
+    try {
+      // 总板滚动
+      const board = calendar.el.querySelector('.priority-quadrant-view .quadrant-board') as HTMLElement | null;
+      // 各象限列滚动
+      const cols = calendar.el.querySelectorAll('.priority-quadrant-view .kanban-cards[data-quadrant]');
+      const byQuadrant: Record<string, ScrollState> = {};
+      cols.forEach((el: Element) => {
+        const hel = el as HTMLElement;
+        const q = hel.getAttribute('data-quadrant') || '';
+        if (q) {
+          byQuadrant[q] = { top: hel.scrollTop, left: hel.scrollLeft };
+        }
+      });
+      // 保存到实例
+      calendar['_quadrantScrollState'] = {
+        board: board ? { top: board.scrollTop, left: board.scrollLeft } : { top: 0, left: 0 },
+        byQuadrant,
+      } as any;
+      // 同步保存到全局存储
+      quadrantScrollStore.set(calendar.el, {
+        board: board ? { top: board.scrollTop, left: board.scrollLeft } : { top: 0, left: 0 },
+        byQuadrant,
+      });
+    } catch (err) {
+      console.error('保存四象限滚动位置失败:', err);
+    }
+  });
+
+  // 顺序刷新并恢复滚动
+  for (const calendar of calendars) {
+    await new Promise<void>((resolve) => {
+      calendar.refetchEvents();
+    calendar.on('eventsSet', () => {
+        try {
+          const state = (calendar['_quadrantScrollState'] as any) || quadrantScrollStore.get(calendar.el);
+          // 恢复总板滚动
+          const board = calendar.el.querySelector('.priority-quadrant-view .quadrant-board') as HTMLElement | null;
+          if (board && state?.board) {
+            board.scrollTo({ top: state.board.top, left: state.board.left });
+          }
+          // 恢复各象限列滚动
+          const cols = calendar.el.querySelectorAll('.priority-quadrant-view .kanban-cards[data-quadrant]');
+          cols.forEach((el: Element) => {
+            const hel = el as HTMLElement;
+            const q = hel.getAttribute('data-quadrant') || '';
+            const s = state?.byQuadrant?.[q];
+            if (s) {
+              hel.scrollTo({ top: s.top, left: s.left });
+            }
+          });
+        } catch (err) {
+          console.error('恢复四象限滚动位置失败:', err);
+        }
+        resolve();
+      });
+    });
+  }
+});
 
 // 仅使用当前 events 构建嵌套，避免跨文件耦合
 function convertEventsToNestedLocal(events: KBCalendarEvent[]): NestedKBCalendarEvent[] {
@@ -189,6 +269,24 @@ const QuadrantViewConfig = {
       requestAnimationFrame(() => {
   const containers = document.querySelectorAll('.priority-quadrant-view .quadrant-board');
     containers.forEach(container => {
+          // 识别所属日历元素
+          let calendarEl: HTMLElement | null = null;
+          for (const cal of thisCalendars || []) {
+            if (cal?.el && cal.el.contains(container)) { calendarEl = cal.el; break; }
+          }
+          // 渲染后立即按存储恢复列滚动
+          if (calendarEl) {
+            const saved = quadrantScrollStore.get(calendarEl);
+            if (saved) {
+              // 恢复列
+              (container as HTMLElement).querySelectorAll('.kanban-cards[data-quadrant]').forEach((el: Element) => {
+                const hel = el as HTMLElement;
+                const q = hel.getAttribute('data-quadrant') || '';
+                const s = saved.byQuadrant?.[q];
+                if (s) hel.scrollTo({ top: s.top, left: s.left });
+              });
+            }
+          }
           container.addEventListener('click', async (e: Event) => {
             const target = e.target as HTMLElement;
             // st-ref
@@ -221,12 +319,26 @@ const QuadrantViewConfig = {
           container.querySelectorAll('.kanban-cards').forEach((col: Element) => {
             const el = col as HTMLElement;
             if (el.dataset.sortableInited === '1') return; // 防重复
+            // 绑定列滚动监听，实时更新存储
+            if (calendarEl && el.dataset.scrollBinded !== '1') {
+              el.addEventListener('scroll', () => {
+                const q = el.getAttribute('data-quadrant') || '';
+                const exist = quadrantScrollStore.get(calendarEl!) || { byQuadrant: {} } as QuadrantScrollBundle;
+                exist.byQuadrant = exist.byQuadrant || {} as any;
+                exist.byQuadrant[q] = { top: el.scrollTop, left: el.scrollLeft };
+                quadrantScrollStore.set(calendarEl!, exist);
+              }, { passive: true });
+              el.dataset.scrollBinded = '1';
+            }
             Sortable.create(el, {
               group: { name: 'quadrant', pull: 'clone', put: true },
               sort: false,
               animation: 150,
               fallbackOnBody: true,
               swapThreshold: 0.65,
+      scroll: true,
+      scrollSensitivity: 10,
+      scrollSpeed: 10,
               onEnd: async (evt) => {
                 try {
                   const itemEl = evt.item as HTMLElement;
@@ -241,6 +353,8 @@ const QuadrantViewConfig = {
       const newPriority = map[toQuadrant] || eventData.extendedProps.priority;
                   if (newPriority !== eventData.extendedProps.priority) {
                     await run_changepriority(eventData, newPriority);
+        // 刷新并恢复滚动
+        refreshQuadrant();
                   }
                   // 移除克隆元素，等待刷新
                   itemEl.remove();
