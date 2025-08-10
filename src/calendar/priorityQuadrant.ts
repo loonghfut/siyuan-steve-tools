@@ -417,25 +417,51 @@ const QuadrantViewConfig = {
       scroll: true,
       scrollSensitivity: 10,
       scrollSpeed: 10,
+              onClone: (evt) => {
+                try { (evt.clone as HTMLElement).dataset.isClone = '1'; } catch {}
+              },
               onEnd: async (evt) => {
                 try {
                   const itemEl = evt.item as HTMLElement;
-      if (itemEl.classList.contains('no-drag')) { itemEl.remove(); return; }
+                  const isClone = itemEl?.dataset?.isClone === '1';
+                  if (itemEl.classList.contains('no-drag')) {
+                    // 不允许拖拽：仅移除克隆，否则复位
+                    if (isClone) { itemEl.remove(); }
+                    else if (evt.from && evt.oldIndex != null) {
+                      const children = Array.from(evt.from.children);
+                      const ref = children[Math.min(evt.oldIndex, children.length)];
+                      evt.from.insertBefore(itemEl, ref || null);
+                    }
+                    return;
+                  }
                   const blockId = itemEl.getAttribute('data-block-id');
                   const toQuadrant = (evt.to as HTMLElement).getAttribute('data-quadrant');
+                  const fromQuadrant = (evt.from as HTMLElement).getAttribute('data-quadrant');
                   if (!blockId || !toQuadrant) return;
                   const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
                   if (!eventData) return;
       // 映射优先级：q1->高, q2->中, q3->低, q4->无
       const map: Record<string, string> = { q1: '高', q2: '中', q3: '低', q4: '无' };
       const newPriority = map[toQuadrant] || eventData.extendedProps.priority;
+                  const noChange = newPriority === eventData.extendedProps.priority && toQuadrant === fromQuadrant;
+                  if (noChange) {
+                    // 未发生变化：移除克隆或将原元素复位
+                    if (isClone) {
+                      itemEl.remove();
+                    } else if (evt.from && evt.oldIndex != null) {
+                      const children = Array.from(evt.from.children);
+                      const ref = children[Math.min(evt.oldIndex, children.length)];
+                      evt.from.insertBefore(itemEl, ref || null);
+                    }
+                    return;
+                  }
                   if (newPriority !== eventData.extendedProps.priority) {
                     await run_changepriority(eventData, newPriority);
         // 刷新并恢复滚动
         refreshQuadrant();
                   }
                   // 移除克隆元素，等待刷新
-                  itemEl.remove();
+                  if (isClone) itemEl.remove();
                 } catch (err) {
                   console.error('quadrant drag error', err);
                 }
