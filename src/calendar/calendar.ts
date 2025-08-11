@@ -700,7 +700,8 @@ export async function run(
 
             try {
                 if (info.event._def === undefined) return;
-                if (info && info.event && info.event.extendedProps && info.event.extendedProps.status === '完成') {
+                const statusVal = info?.event?.extendedProps?.status;
+                if (info && info.event && statusVal && (statusVal === '完成' || statusVal === '归档')) {
                     // 应用完成状态的样式
                     info.el.style.textDecoration = 'line-through';
                     if (settingdata["cal-event-color"]) {
@@ -756,6 +757,10 @@ export async function run(
             }
             // 添加提示框
             const isCompleted = info.el.classList.contains('event-completed');
+            const statusValForTip = info?.event?.extendedProps?.status;
+            const statusText = statusValForTip === '归档'
+                ? '归档'
+                : (isCompleted ? '完成' : (statusValForTip || '未设置'));
             tippy(info.el, {
                 content: `
                     <div class="event-tooltip">
@@ -768,7 +773,7 @@ export async function run(
                         <div class="event-tooltip__content">
                             <p><span class="event-tooltip__label">开始:</span> ${info.event.start?.toLocaleString()}</p>
                             <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "无"}</p>
-                            <p><span class="event-tooltip__label">状态:</span> ${isCompleted ? "完成" : (info.event.extendedProps.status || "未设置")}</p>
+                            <p><span class="event-tooltip__label">状态:</span> ${statusText}</p>
                             <p><span class="event-tooltip__label">优先级:</span> ${info.event.extendedProps.priority || "未设置"}</p>
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
