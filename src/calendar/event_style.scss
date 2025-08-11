@@ -42,7 +42,15 @@ $priority-color-high-background: var(--b3-card-error-background);
     }
 }
 
-
+/* 针对日历事件标题和内容，强制长单词换行 */
+.kanban-card-header,
+.fc-event-title,
+.fc-event-title-container,
+.fc-event,
+.event-tooltip__title {
+    word-break: break-all;   /* 强制在任意字符处换行 */
+    white-space: normal;     /* 允许自动换行 */
+}
 
 //事件块背景
 .sb,
