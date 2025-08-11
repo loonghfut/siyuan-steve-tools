@@ -34,12 +34,12 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.12.1 (2025年08月10日)
-- 滴答：修复代码格式问题并添加归档状态处理 (loonghfut)
-- feat: 添加标签处理功能并更新相关字段 (loonghfut)
-- 滴答：优化添加任务标签处理 (loonghfut)
-- docs: 更新 v0.12.1 版本的更新日志 (loonghfut)
-- 。 (loonghfut)
+### v0.12.2 (2025年08月11日)
+- 回退refresh()实现 (loonghfut)
+- 优化归档显示效果 (loonghfut)
+- 优化字段换行效果 (loonghfut)
+- 四象限视图中“完成”状态的事件标题会自动加删除线 (loonghfut)
+- 更新版本号至 0.12.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
