@@ -207,6 +207,7 @@ const QuadrantViewConfig = {
         ? myK.getDaysFromNow(event.range.end, statusLabel)
         : myK.getDaysFromNow(event.extendedProps.Kstart, statusLabel);
   const isRecurring = event.extendedProps?.isRecurring;
+    const titleStyle = statusLabel === '完成' ? 'text-decoration: line-through;' : '';
       return `
         <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" 
              data-id="${event.publicId}" 
@@ -216,7 +217,7 @@ const QuadrantViewConfig = {
           <div class="kanban-card-header">
             <h3>${isRecurring ?
               `<span>${event.title}</span>` :
-              `<span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
+             `<span class="st-ref" style="${titleStyle}" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
             }
             ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
             </h3>
