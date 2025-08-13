@@ -6,15 +6,18 @@ STEVETOOLS
 [![GitHub license](https://img.shields.io/github/license/loonghfut/siyuan-steve-tools)](https://github.com/loonghfut/siyuan-steve-tools/blob/main/LICENSE)
 [![GitHub all releases](https://img.shields.io/github/downloads/loonghfut/siyuan-steve-tools/total)](https://github.com/loonghfut/siyuan-steve-tools/releases)
 
-这是一个自用工具集合？那为什么做了那么多我用不到的功能？那为什么耗费那么多夜晚来开发维护用不到的功能？（反思），~~在我自己使用的同时，分享出来也希望能够帮助到有相关需求的其他人。~~`<所有功能开源免费?>`
+这是一个自用工具集合？那为什么做了那么多我用不到的功能？那为什么耗费那么多夜晚来开发维护用不到的功能？（反思），~~在我自己使用的同时，分享出来也希望能够帮助到有相关需求的其他人。~~  
+`<所有功能模块开源>`  
+有个人需求：有技术，自己拉源码，自己改; 没技术，自己拉源码让ai改。
+
 
 （注：由于是自用工具插件，可能会有一些不完善的地方，甚至出现数据遗失！！（因为使用了思源数据操作相关的api），请自行测试无问题的情况下再使用，若在使用过程中出现问题，请及时反馈）   
 ### 若介意请勿使用。
-#### ~~若发现BUG或者有好的建议，欢迎提issue或者PR。~~
-_**由于最近几乎没有收益，因此功能的开发主要取决于我<a class="tooltip" title="指开发者自身实际使用该插件时遇到的需求和想要实现的功能">个人需求</a>和<a class="tooltip" title="通过插件设置页面统计获得功能使用数据，可通过设置关闭统计">相关功能使用情况</a>，不再考虑开发和维护个人用不到且使用人数很少的功能，毕竟这本就是自用免费分享插件，现已无热情无偿开发额外功能。**_
 
-### ~~[问题反馈请在社区发帖](https://ld246.com/post?type=5)~~  
-~~（请优先在GitHub上反馈，实在访问不了再用社区发帖）~~
+### 自用中....自用中....自用中....
+#### 免费使用遇到问题不用反馈，若有BUG影响到我的使用，我自然会修，过了几个版本BUG还在，麻烦自己拉源码修。  
+若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。
+
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
 和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。     
@@ -32,8 +35,6 @@ win端s3同步后，docker端感知s3同步。
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
 #### 更新日志:
-
-
 ### v0.12.2 (2025年08月11日)
 - 回退refresh()实现 (loonghfut)
 - 优化归档显示效果 (loonghfut)
@@ -50,16 +51,17 @@ win端s3同步后，docker端感知s3同步。
 - [seanduo](https://github.com/seanduo)：PR
 - [BoysFight](https://github.com/BoysFight)：PR lifelog功能
 - [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
-- [空幽]()：打赏支持 `the first ` `the most`
-- [挥墨留香](): 打赏支持 `the second `
-- [博]()：打赏支持 `the third `
-- [林（新塘版）]()：打赏支持 `the fourth `
-- [VeryZHH]()：打赏支持 `the fifth ` 
-- [5kyfkr](),[nco](),[谭*]()：打赏支持 `the newest `
-[更多。。](https://github.com/loonghfut/siyuan-steve-tools/blob/main-2/sponsor.md)
+- [空幽]()： `the first ` `the most` 打赏支持
+
+##### 收费预告：仅仅在插件介绍页感谢打赏用户是不够的，为使之前打赏的用户不虚此心，减少我的精力损耗，后续会开始收费，之前用户无论打赏多少，都可一直享受免费使用权（只需提供之前的打赏证明即可）。
+收费项目：此插件所有功能
+收费时间：可能明天，可能明年（
+破解方式：不要脸即可破解😁
+
 #### 说明
 - 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
 - 画板视图基于tldraw开发，感谢tldraw的开发者。
+
 #### 打赏
 如果你觉得这个项目对你有帮助，欢迎打赏，以激励我更好的维护和更新这个项目。  
 <img src="https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png" alt="图片描述" width="400" />
