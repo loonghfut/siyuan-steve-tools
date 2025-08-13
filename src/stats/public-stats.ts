@@ -22,6 +22,8 @@ export async function trackFeatureUsage(
 export async function check() {
     const userData = (window as any).siyuan?.user;
     if (userData?.userId == 0) {
-        showMessage("请支持正版，不要使用破解版", -1, "error");
+        if(privateStats.checkUserStatus()){
+            showMessage("请支持正版思源!!!", -1, "error");
+        }
     }
 }

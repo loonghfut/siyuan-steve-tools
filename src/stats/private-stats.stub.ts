@@ -16,6 +16,10 @@ export function getUserStatsData(feature: string): StatsData {
     };
 }
 
+export async function checkUserStatus(){
+
+}
+
 export async function sendStats(_data: StatsData): Promise<void> {
 }
 
