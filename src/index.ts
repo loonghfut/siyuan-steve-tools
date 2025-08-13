@@ -104,7 +104,7 @@ export default class steveTools extends Plugin {
             title: "SteveTools",
             position: "left",
             callback: async () => {
-                await this.vip();
+                // await this.vip();
                 this.openDIYSetting();
             }
         });
