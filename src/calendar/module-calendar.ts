@@ -84,6 +84,34 @@ export class M_calendar {
             },
         })
         this.plugin.addTab({
+            type: "quadrants",
+            async init() {
+                const id = new Date().getTime().toString();
+                let calendar: Calendar
+                this.element.innerHTML = `
+                <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
+                calendar = await run(id, 'priorityQuadrant');
+                this.data.id = id;
+                calendarinstance.set(id, calendar);
+            },
+            async destroy() {
+                console.log("销毁日历选项卡", this.data.id);
+                const calendar = calendarinstance.get(this.data.id);
+                if (calendar) {
+                    calendar.destroy();
+                    calendarinstance.delete(this.data.id);
+                    console.log("销毁日历实例", this.data.id);
+                }
+            },
+            resize() {
+                console.log("resize", this.data.id);
+                const calendar = calendarinstance.get(this.data.id);
+                if (calendar) {
+                    calendar.updateSize();
+                }
+            },
+        })
+        this.plugin.addTab({
             type: "kanban",
             async init() {
                 const id = new Date().getTime().toString();
@@ -184,7 +212,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar = await run(id, 'kanban', '', 'title', 'today,viewFilter,prev,next', '');
+                    D_calendar = await run(id, 'kanban', '', 'title', 'viewFilter,refreshButton', '');
                     refreshKanban();
                 }, 100);
             },
@@ -209,7 +237,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'today,viewFilter,prev,next', '');
+                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'viewFilter,refreshButton', '');
                 }, 100);
             },
         });
@@ -506,14 +534,17 @@ export class M_calendar {
                 }
             }
         });
-        // menu.addItem({
-        //     icon: "iconSTcal",
-        //     label: "测试",
-        //     click: async () => {
-        //         console.log("测试avmanager");
-        //         console.log("keys");
-        //     }
-        // });
+        menu.addItem({
+            icon: "iconSTcalKanban",
+            label: "四象限",
+            click: async () => {
+                if (front == "browser-mobile" || front == "mobile") {
+                    await this.openRiChengViewDialog(true, "", "priorityQuadrant");
+                } else {
+                    await this.openRiChengView("priorityQuadrant");
+                }
+            }
+        });
         if (front == "browser-mobile" || front == "mobile") {
             menu.fullscreen();
         } else {
@@ -657,6 +688,20 @@ export class M_calendar {
                     icon: "iconSTcal",
                     title: `日程视图`,
                     id: this.plugin.name + 'calendar',
+                    data: {
+                        id: null
+                    },
+                },
+                // position: "right",
+                keepCursor: false
+            });
+        } else if (initialView == "priorityQuadrant") {
+            const tab = await openTab({
+                app: window.siyuan.ws.app,
+                custom: {
+                    icon: "iconSTcal",
+                    title: `四象限`,
+                    id: this.plugin.name + 'quadrants',
                     data: {
                         id: null
                     },

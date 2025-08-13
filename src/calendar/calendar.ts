@@ -59,7 +59,7 @@ export async function run(
     id: string,
     initialView = 'dayGridMonth',
     S_viewID = "",
-    cleft = 'prev,next today viewFilter,statsButton',
+    cleft = 'prev,next today viewFilter,statsButton,refreshButton',
     cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant',
     ccenter = 'title',
     elementca?: any,
@@ -460,6 +460,14 @@ export async function run(
                         lastSavedLifelogSlotDuration
                     );
                 },
+            },
+            // 刷新
+            refreshButton: {
+                text: '🔄️',
+                click: async function () {
+                    showMessage('正在刷新视图...', 3000);
+                    refreshKanban();
+                }
             },
             // 统计功能按钮
             statsButton: {
