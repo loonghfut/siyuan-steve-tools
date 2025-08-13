@@ -103,7 +103,8 @@ export default class steveTools extends Plugin {
             icon: "iconST",
             title: "SteveTools",
             position: "left",
-            callback: () => {
+            callback: async () => {
+                await this.vip();
                 this.openDIYSetting();
             }
         });
@@ -172,6 +173,12 @@ export default class steveTools extends Plugin {
         api.refresh();
         // this.modules.forEach(module => module.onunload());
     }
+
+    async vip() {
+        //椒盐会员模式
+    }
+
+
 
     openDIYSetting() {
         setdialog = new Dialog({
