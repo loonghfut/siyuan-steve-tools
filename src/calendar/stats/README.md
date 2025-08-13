@@ -9,13 +9,15 @@
 ### 📊 核心统计功能
 - **事件统计**: 总数、完成数、待处理数、归档数、周期事件数
 - **时间统计**: 总时长、平均时长、时间分布分析
-- **分类统计**: 按优先级、状态、来源分类统计
+- **分类统计**: 按优先级、状态、来源、分类、标签统计（标签为多选聚合）
 - **完成率分析**: 计算任务完成率和效率指标
 - **时间分布**: 24小时、星期、月份的事件分布
 
 ### 📈 可视化图表
 - **饼图**: 状态分布、优先级分布
+- **饼图**: 分类分布
 - **柱状图**: 时间分布、周/月趋势分析
+- **柱状图**: 标签 TopN（默认Top12）
 - **热力图**: 事件活跃度分析
 - **卡片式展示**: 关键指标概览
 
@@ -160,6 +162,8 @@ interface CalendarStatsData {
     eventsByPriority: { [key: string]: number };
     eventsByStatus: { [key: string]: number };
     eventsBySource: { [key: string]: number };
+    eventsByCategory: { [key: string]: number };
+    eventsByTag: { [key: string]: number };
     
     // 时间分布
     eventsByHour: number[];    // 24小时分布

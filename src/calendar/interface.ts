@@ -33,6 +33,7 @@ export interface KBCalendarEvent {
         priorityid: string;
         category: string;
         categoryid: string;
+    tags?: string[]; // 多标签
         rootid: string;
         description: string;
         descriptionid: string;

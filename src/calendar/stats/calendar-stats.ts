@@ -21,6 +21,18 @@ export interface CalendarStatsData {
     eventsByPriority: { [key: string]: number };
     eventsByStatus: { [key: string]: number };
     eventsBySource: { [key: string]: number };
+    eventsByCategory: { [key: string]: number };
+    eventsByTag: { [key: string]: number };
+
+    // 分类/标签-时长与完成率
+    durationByCategory: { [key: string]: number }; // 分钟
+    durationByTag: { [key: string]: number }; // 分钟
+    completedByCategory: { [key: string]: number };
+    archivedByCategory: { [key: string]: number };
+    completedByTag: { [key: string]: number };
+    archivedByTag: { [key: string]: number };
+    completionRateByCategory: { [key: string]: number }; // 百分比
+    completionRateByTag: { [key: string]: number }; // 百分比
     
     // 时间分布统计
     eventsByHour: number[]; // 24小时分布
@@ -103,6 +115,16 @@ export class CalendarDataStats {
             eventsByPriority: {},
             eventsByStatus: {},
             eventsBySource: {},
+            eventsByCategory: {},
+            eventsByTag: {},
+            durationByCategory: {},
+            durationByTag: {},
+            completedByCategory: {},
+            archivedByCategory: {},
+            completedByTag: {},
+            archivedByTag: {},
+            completionRateByCategory: {},
+            completionRateByTag: {},
             eventsByHour: new Array(24).fill(0),
             eventsByWeekday: new Array(7).fill(0),
             eventsByMonth: new Array(12).fill(0),
@@ -116,10 +138,11 @@ export class CalendarDataStats {
         
         // 统计各项数据
         this.calculateEventStats(filteredEvents, stats);
-        this.calculateTimeStats(filteredEvents, stats);
-        this.calculateCategoryStats(filteredEvents, stats);
+    this.calculateTimeStats(filteredEvents, stats);
+    this.calculateCategoryStats(filteredEvents, stats);
         this.calculateTimeDistribution(filteredEvents, stats);
         this.calculateCompletionRate(stats);
+    this.calculateCategoryTagCompletionRates(stats);
         
         return stats;
     }
@@ -192,6 +215,17 @@ export class CalendarDataStats {
                 const duration = (new Date(event.end).getTime() - new Date(event.start).getTime()) / (1000 * 60);
                 totalDuration += duration;
                 eventCount++;
+
+                // 分类/标签时长累计
+                const category = event.extendedProps?.category || '无';
+                stats.durationByCategory[category] = (stats.durationByCategory[category] || 0) + duration;
+
+                const tags: string[] = Array.isArray(event.extendedProps?.tags) ? event.extendedProps.tags : ['无标签'];
+                if (tags.length === 0) tags.push('无标签');
+                for (const tag of tags) {
+                    const name = tag || '无标签';
+                    stats.durationByTag[name] = (stats.durationByTag[name] || 0) + duration;
+                }
             }
         }
         
@@ -215,6 +249,62 @@ export class CalendarDataStats {
             // 来源统计
             const source = event.extendedProps?.source || 'siyuan';
             stats.eventsBySource[source] = (stats.eventsBySource[source] || 0) + 1;
+
+            // 分类统计
+            const category = event.extendedProps?.category || '无';
+            stats.eventsByCategory[category] = (stats.eventsByCategory[category] || 0) + 1;
+
+            // 分类完成/归档计数
+            if (status === '完成') {
+                stats.completedByCategory[category] = (stats.completedByCategory[category] || 0) + 1;
+            } else if (status === '归档') {
+                stats.archivedByCategory[category] = (stats.archivedByCategory[category] || 0) + 1;
+            }
+
+            // 标签统计（多选）
+            const tags: string[] = Array.isArray(event.extendedProps?.tags)
+                ? event.extendedProps.tags
+                : [];
+            if (tags.length === 0) {
+                // 没有标签的事件归到“无标签”
+                stats.eventsByTag['无标签'] = (stats.eventsByTag['无标签'] || 0) + 1;
+                if (status === '完成') {
+                    stats.completedByTag['无标签'] = (stats.completedByTag['无标签'] || 0) + 1;
+                } else if (status === '归档') {
+                    stats.archivedByTag['无标签'] = (stats.archivedByTag['无标签'] || 0) + 1;
+                }
+            } else {
+                for (const tag of tags) {
+                    const name = tag || '无标签';
+                    stats.eventsByTag[name] = (stats.eventsByTag[name] || 0) + 1;
+                    if (status === '完成') {
+                        stats.completedByTag[name] = (stats.completedByTag[name] || 0) + 1;
+                    } else if (status === '归档') {
+                        stats.archivedByTag[name] = (stats.archivedByTag[name] || 0) + 1;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 计算分类/标签完成率
+     */
+    private calculateCategoryTagCompletionRates(stats: CalendarStatsData): void {
+        // 分类
+        for (const [category, total] of Object.entries(stats.eventsByCategory)) {
+            const archived = stats.archivedByCategory[category] || 0;
+            const actionable = Math.max(0, total - archived);
+            const completed = stats.completedByCategory[category] || 0;
+            stats.completionRateByCategory[category] = actionable > 0 ? (completed / actionable) * 100 : 0;
+        }
+
+        // 标签
+        for (const [tag, total] of Object.entries(stats.eventsByTag)) {
+            const archived = stats.archivedByTag[tag] || 0;
+            const actionable = Math.max(0, total - archived);
+            const completed = stats.completedByTag[tag] || 0;
+            stats.completionRateByTag[tag] = actionable > 0 ? (completed / actionable) * 100 : 0;
         }
     }
     
@@ -279,6 +369,33 @@ export class CalendarDataStats {
             ``,
             `🔄 来源分布：`,
             ...Object.entries(stats.eventsBySource).map(([source, count]) => `  • ${this.getSourceDisplayName(source)}：${count}`),
+            ``,
+            `📦 分类分布：`,
+            ...Object.entries(stats.eventsByCategory).map(([category, count]) => `  • ${category}：${count}`),
+            ``,
+            `🏷️ 标签（Top 15）：`,
+            ...Object.entries(stats.eventsByTag)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15)
+                .map(([tag, count]) => `  • ${tag}：${count}`),
+            ``,
+            `⏱️ 分类总时长 Top 10：`,
+            ...Object.entries(stats.durationByCategory)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10)
+                .map(([category, minutes]) => `  • ${category}：${this.formatDuration(minutes)}`),
+            ``,
+            `⏱️ 标签总时长 Top 10：`,
+            ...Object.entries(stats.durationByTag)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10)
+                .map(([tag, minutes]) => `  • ${tag}：${this.formatDuration(minutes)}`),
+            ``,
+            `✅ 分类完成率（Top 10 按任务量）：`,
+            ...Object.entries(stats.eventsByCategory)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10)
+                .map(([category]) => `  • ${category}：${(stats.completionRateByCategory[category] || 0).toFixed(1)}%`),
         ];
         
         return summary.join('\n');
@@ -344,6 +461,24 @@ export class CalendarDataStats {
             '',
             '来源分布',
             ...Object.entries(stats.eventsBySource).map(([source, count]) => `${this.getSourceDisplayName(source)},${count}`),
+            '',
+            '分类分布',
+            ...Object.entries(stats.eventsByCategory).map(([category, count]) => `${category},${count}`),
+            '',
+            '标签分布',
+            ...Object.entries(stats.eventsByTag).map(([tag, count]) => `${tag},${count}`),
+            '',
+            '分类总时长（分钟）',
+            ...Object.entries(stats.durationByCategory).map(([category, minutes]) => `${category},${Math.round(minutes)}`),
+            '',
+            '标签总时长（分钟）',
+            ...Object.entries(stats.durationByTag).map(([tag, minutes]) => `${tag},${Math.round(minutes)}`),
+            '',
+            '分类完成率（%）',
+            ...Object.entries(stats.completionRateByCategory).map(([category, rate]) => `${category},${rate.toFixed(1)}`),
+            '',
+            '标签完成率（%）',
+            ...Object.entries(stats.completionRateByTag).map(([tag, rate]) => `${tag},${rate.toFixed(1)}`),
         ];
         
         return csvLines.join('\n');

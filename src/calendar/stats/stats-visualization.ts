@@ -29,7 +29,7 @@ export class CalendarStatsVisualization {
     /**
      * 创建统计数据展示面板
      */
-    public createStatsPanel(stats: CalendarStatsData, containerId: string, dialog: Dialog): HTMLElement {
+    public createStatsPanel(stats: CalendarStatsData, containerId: string, _dialog: Dialog): HTMLElement {
         const container = document.getElementById(containerId);
         if (!container) {
             throw new Error(`Container with id "${containerId}" not found`);
@@ -198,6 +198,13 @@ export class CalendarStatsVisualization {
             ['#e74c3c', '#f39c12', '#3498db', '#95a5a6']
         ));
 
+        // 饼图：分类分布
+        chartsContainer.appendChild(this.createPieChart(
+            '分类分布',
+            stats.eventsByCategory,
+            ['#1abc9c', '#2ecc71', '#9b59b6', '#e67e22', '#e74c3c', '#95a5a6']
+        ));
+
         // 柱状图：小时分布
         chartsContainer.appendChild(this.createBarChart(
             '24小时事件分布',
@@ -212,8 +219,53 @@ export class CalendarStatsVisualization {
             stats.eventsByWeekday.map((count, index) => ({ label: weekdays[index], value: count })),
             '#9b59b6'
         ));
+        
+        // 追加：标签Top榜（取前12）
+        const topTags = Object.entries(stats.eventsByTag)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 12)
+            .map(([tag, count]) => ({ label: tag, value: count }));
+        if (topTags.length) {
+            chartsContainer.appendChild(this.createBarChart('标签 Top12', topTags, '#16a085'));
+        }
 
+        // 追加：分类总时长Top10
+        const categoryDurTop = Object.entries(stats.durationByCategory)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([label, value]) => ({ label, value }));
+        if (categoryDurTop.length) {
+            chartsContainer.appendChild(this.createBarChart('分类总时长 Top10（分钟）', categoryDurTop, '#2ecc71'));
+        }
+
+        // 追加：标签总时长Top10
+        const tagDurTop = Object.entries(stats.durationByTag)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([label, value]) => ({ label, value }));
+        if (tagDurTop.length) {
+            chartsContainer.appendChild(this.createBarChart('标签总时长 Top10（分钟）', tagDurTop, '#8e44ad'));
+        }
+
+        // 追加：分类完成率Top10（按任务量排序）
+        const categoryRateTop = Object.entries(stats.eventsByCategory)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([label]) => ({ label, value: Number((stats.completionRateByCategory[label] || 0).toFixed(1)) }));
+        if (categoryRateTop.length) {
+            chartsContainer.appendChild(this.createBarChart('分类完成率 Top10（%）', categoryRateTop, '#e67e22'));
+        }
+        
+        // 追加：标签完成率Top10（按任务量排序）
+        const tagRateTop = Object.entries(stats.eventsByTag)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([label]) => ({ label, value: Number((stats.completionRateByTag[label] || 0).toFixed(1)) }));
+        if (tagRateTop.length) {
+            chartsContainer.appendChild(this.createBarChart('标签完成率 Top10（%）', tagRateTop, '#c0392b'));
+        }
         section.appendChild(chartsContainer);
+
         return section;
     }
 
