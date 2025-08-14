@@ -24,12 +24,7 @@ import "@/index.scss";
 import * as api from "@/api/api";
 // import { ModuleA } from "./libs/moduleA";
 import * as ic from "@/icon"
-import { M_calendar } from "./calendar/module-calendar";
-import { M_sync } from "./sync/module-sync";
-import { M_ai } from "./ai/ai";
-import { M_handwriting } from "./handwriting/module-handwriting";
-import { M_imageCompression } from "./ImageCompression/module-imageCompression";
-import { M_lifelog } from "./lifelog/module-lifelog";
+import { MODULE_CONFIG, ModuleClasses } from "./modules.config";
 import { check, trackFeatureUsage } from "./stats/public-stats";
 
 // import * as api from "@/api"
@@ -42,14 +37,7 @@ let islog = false;
 const myfile = "steveTools.json";
 export let settingdata: any = {};
 let setdialog: any;
-export let moduleInstances: {
-    M_calendar?: M_calendar;
-    M_sync?: M_sync;
-    M_ai?: M_ai;
-    M_handwriting?: M_handwriting;
-    M_imageCompression?: M_imageCompression;
-    M_lifelog?: M_lifelog;  // 添加新模块
-} = {};
+export let moduleInstances: ModuleClasses = {};
 
 export default class steveTools extends Plugin {
     private pluginConfig: PluginConfig;
@@ -59,33 +47,14 @@ export default class steveTools extends Plugin {
         moduleInstances[moduleName] = moduleInstance; // 同时存储到全局对象中
     }
     private runloadModule(data: any) {
-        if (data["cal-enable"] == true) {
-            this.loadModule(M_calendar, 'M_calendar');
-            console.log("日历模块加载");
-        }
-        if (data["sync-enable"] == true) {
-            this.loadModule(M_sync, 'M_sync');
-            console.log("同步模块加载");
-        }
-        if (data["ai-enable"] == true) {
-            this.loadModule(M_ai, 'M_ai');
-            console.log("ai模块加载");
-            //    initdock();
-        }
-        if (data["img-compress-enable"] == true) {
-            this.loadModule(M_imageCompression, 'M_imageCompression');
-            console.log("图片压缩模块加载");
-        }
-        if (data["handwriting-enable"] == true) {
-            this.loadModule(M_handwriting, 'M_handwriting');
-            console.log("画板模块加载");
-        }
-
-        if (data["lifelog-enable"] == true) {
-            this.loadModule(M_lifelog, 'M_lifelog');
-            console.log("LifeLog模块加载");
-        }
-
+        // 遍历模块配置，根据设置启用相应模块
+        Object.keys(MODULE_CONFIG).forEach(moduleKey => {
+            const moduleConfig = MODULE_CONFIG[moduleKey];
+            if (data[moduleConfig.settingKey] === true) {
+                this.loadModule(moduleConfig.class, moduleConfig.name);
+                console.log(moduleConfig.logMessage);
+            }
+        });
     }
 
     // private isMobile: boolean;
@@ -111,7 +80,6 @@ export default class steveTools extends Plugin {
         settingdata = await this.loadData(myfile);
         this.runloadModule(settingdata);
         for (const moduleName in moduleInstances) {
-            steveTools.outlog("init--" + moduleName);
             await moduleInstances[moduleName]?.init?.(settingdata);
         }
     }
