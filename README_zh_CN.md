@@ -54,6 +54,7 @@ win端s3同步后，docker端感知s3同步。
 - 优化代码 (loonghfut)
 - WPS 设置组，增加子组以优化设置结构 (loonghfut)
 - 更新版本号 (loonghfut)
+- docs: 更新 v0.12.3 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
