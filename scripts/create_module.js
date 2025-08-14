@@ -6,7 +6,10 @@
  *
  * 生成内容:
  * 1. src/<name>/module-<name>.ts 模板文件
- * 2. 自动修改 src/modules.config.ts:
+ * 2. src/settings/<name>.ts 创建默认设置+分组（可用 --no-settings 跳过）
+ * 3. 自动修改 src/settings/index.ts: 引入并插入 <name>Group
+ * 4. 自动修改 src/setting_data.ts: 引入并合并 <name>Defaults
+ * 5. 自动修改 src/modules.config.ts:
  *    - 添加 import { M_<Name> } from "./<name>/module-<name>";
  *    - 在 MODULE_CONFIG 中追加配置
  *    - 在 ModuleClasses 中追加类型声明
@@ -14,6 +17,10 @@
  * 注意:
  *  - <Name> 采用首字母大写驼峰, 类名/配置键为 M_<Name>
  *  - settingKey 默认: <name>-enable
+ *  - 可选参数:
+ *      --no-settings        不生成 settings 模块
+ *      --group-name 名称     设置分组显示名称 (默认=displayName)
+ *      --setting-default v   默认值 (true/false/数字/字符串)
  */
 import fs from 'fs';
 import path from 'node:path';
@@ -65,7 +72,12 @@ const className = `M_${camelName}`;
 
 const displayName = opts.displayName || camelName;
 const settingKey = opts['setting-key'] || `${dirName}-enable`;
+const groupName = opts['group-name'] || displayName;
+const settingDefaultRaw = opts['setting-default'];
+let settingDefault;
+if (settingDefaultRaw === undefined) settingDefault = false; else if (["true","false"].includes(settingDefaultRaw)) settingDefault = settingDefaultRaw === 'true'; else if (!isNaN(Number(settingDefaultRaw))) settingDefault = Number(settingDefaultRaw); else settingDefault = settingDefaultRaw;
 const logMessage = opts.log || `${displayName}模块加载`;
+const noSettings = !!opts['no-settings'];
 
 // 路径
 const root = process.cwd();
@@ -73,10 +85,16 @@ const srcDir = path.join(root, 'src');
 const moduleDir = path.join(srcDir, dirName);
 const moduleFile = path.join(moduleDir, `module-${dirName}.ts`);
 const modulesConfigFile = path.join(srcDir, 'modules.config.ts');
+const settingsDir = path.join(srcDir, 'settings');
+const settingsIndexFile = path.join(settingsDir, 'index.ts');
+const settingDataFile = path.join(srcDir, 'setting_data.ts');
+const moduleSettingsFile = path.join(settingsDir, `${dirName}.ts`);
 
 if (!fs.existsSync(srcDir)) exit('未找到 src 目录, 请在项目根目录执行。');
 if (!fs.existsSync(modulesConfigFile)) exit('未找到 src/modules.config.ts');
 if (fs.existsSync(moduleFile)) exit(`目标文件已存在: ${moduleFile}`);
+if (!fs.existsSync(settingsDir)) exit('未找到 src/settings 目录');
+if (!noSettings && fs.existsSync(moduleSettingsFile)) exit(`settings 已存在: ${moduleSettingsFile}`);
 
 // -------- 1. 创建目录与模板文件 --------
 fs.mkdirSync(moduleDir, { recursive: true });
@@ -109,6 +127,26 @@ export class ${className} {
 `;
 fs.writeFileSync(moduleFile, template, 'utf8');
 console.log(`已创建模块模板: ${moduleFile}`);
+
+// -------- 1.1 创建 settings/<name>.ts --------
+if (!noSettings) {
+  const settingsTemplate = `import type { SettingGroupDefinition, BuildContext } from "./types";
+
+// ${displayName} 设置默认值
+export const ${dirName}Defaults: Record<string, any> = {
+    "${settingKey}": ${JSON.stringify(settingDefault)},
+};
+
+export const ${dirName}Group = (ctx: BuildContext): SettingGroupDefinition => ({
+    name: "${groupName}",
+    items: [
+        { type: "checkbox", title: "启用${displayName}", description: "启用后再进行下面的设置", key: "${settingKey}", value: ctx.settings["${settingKey}"] },
+    ]
+});
+`;
+  fs.writeFileSync(moduleSettingsFile, settingsTemplate, 'utf8');
+  console.log(`已创建设置模板: ${moduleSettingsFile}`);
+}
 
 // -------- 2. 修改 modules.config.ts --------
 let content = fs.readFileSync(modulesConfigFile, 'utf8');
@@ -188,11 +226,75 @@ if (!content.includes(`${className}?: ${className};`)) {
 fs.writeFileSync(modulesConfigFile, content, 'utf8');
 console.log('已更新: src/modules.config.ts');
 
+// -------- 3. 更新 settings/index.ts --------
+if (!noSettings) {
+  if (!fs.existsSync(settingsIndexFile)) {
+    console.warn('跳过: 未找到 settings/index.ts');
+  } else {
+    let sIndex = fs.readFileSync(settingsIndexFile, 'utf8');
+    const groupImport = `import { ${dirName}Group } from "./${dirName}";`;
+    if (!sIndex.includes(groupImport)) {
+      // 插入 import 在最后一个 import 后
+      const importRegex2 = /^(import .*?;\s*)+/s;
+      const m2 = sIndex.match(importRegex2);
+      if (m2) sIndex = sIndex.replace(m2[0], m2[0] + groupImport + '\n'); else sIndex = groupImport + '\n' + sIndex;
+    }
+    // 插入 group 调用
+    const buildArrRegex = /buildSettingGroups\([^)]*\)\s*:\s*SettingGroupDefinition\[]\s*{\s*return\s*\[([\s\S]*?)\];/;
+    const arrMatch = sIndex.match(buildArrRegex);
+    if (arrMatch && !arrMatch[1].includes(`${dirName}Group(ctx)`)) {
+      if (arrMatch[1].includes('commonGroup(ctx)')) {
+        sIndex = sIndex.replace('commonGroup(ctx),', `${dirName}Group(ctx),\n    commonGroup(ctx),`);
+      } else {
+        sIndex = sIndex.replace(/return \[/, `return [\n    ${dirName}Group(ctx),`);
+      }
+    }
+    fs.writeFileSync(settingsIndexFile, sIndex, 'utf8');
+    console.log('已更新: src/settings/index.ts');
+  }
+}
+
+// -------- 4. 更新 setting_data.ts 合并 defaults --------
+if (!noSettings) {
+  if (!fs.existsSync(settingDataFile)) {
+    console.warn('跳过: 未找到 setting_data.ts');
+  } else {
+    let sd = fs.readFileSync(settingDataFile, 'utf8');
+    const defaultsImport = `import { ${dirName}Defaults } from "./settings/${dirName}";`;
+    if (!sd.includes(defaultsImport)) {
+      // 在其它 Defaults import 之后追加
+      const importBlockRegex = /(import .*Defaults.*;\s*)+/;
+      const allImportsRegex = /^(import .*?;\s*)+/s;
+      if (importBlockRegex.test(sd)) sd = sd.replace(importBlockRegex, m => m + defaultsImport + '\n');
+      else if (allImportsRegex.test(sd)) sd = sd.replace(allImportsRegex, m => m + defaultsImport + '\n');
+      else sd = defaultsImport + '\n' + sd;
+    }
+    if (!sd.includes(`...${dirName}Defaults`)) {
+      // 在 defaultSettings 展开末尾（commonDefaults 后）插入
+      const spreadTargetRegex = /export const defaultSettings:[^{]*{[\s\S]*?\.\.\.commonDefaults,?/;
+      if (spreadTargetRegex.test(sd)) {
+        sd = sd.replace(spreadTargetRegex, m => m + `\n    ...${dirName}Defaults,`);
+      } else {
+        // 退化策略: 在 defaultSettings { 后立即插入
+        sd = sd.replace(/export const defaultSettings:[^{]*{/, x => x + `\n    ...${dirName}Defaults,`);
+      }
+    }
+    fs.writeFileSync(settingDataFile, sd, 'utf8');
+    console.log('已更新: src/setting_data.ts');
+  }
+}
+
 console.log('\n创建完成!');
 console.log(`类名: ${className}`);
 console.log(`目录: src/${dirName}`);
 console.log(`settingKey: ${settingKey}`);
-console.log('\n下一步:');
-console.log('1. 在设置界面增加对应的开关项 (若需要)');
+if (noSettings) {
+  console.log('\n(已使用 --no-settings, 未生成 settings 相关文件及引用)');
+  console.log('\n下一步:');
+  console.log('1. 如需设置界面, 手动在 src/settings 下创建对应文件并在 index.ts 引入');
+} else {
+  console.log('\n下一步:');
+  console.log('1. 若需更多设置项, 修改: src/settings/${dirName}.ts');
+}
 console.log('2. 在插件初始化逻辑里根据 settingdata[settingKey] 条件调用模块 init');
 console.log('3. 编写模块功能代码');
