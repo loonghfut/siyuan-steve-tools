@@ -1,5 +1,12 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+export const aiDefaults: Record<string, any> = {
+    "ai-enable": false,
+    // 这里保存最终使用的 url 字段仍沿用旧 key (ai-url) 供模块内部引用，界面上通过 ai-url-type 选择
+    "ai-url": "https://www.doubao.com/chat/",
+    "ai-url-custom": "",
+};
+
 export const aiGroup = (ctx: BuildContext): SettingGroupDefinition => ({
     name: "ai侧边栏",
     items: [

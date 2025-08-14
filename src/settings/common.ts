@@ -1,5 +1,10 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+export const commonDefaults: Record<string, any> = {
+    "PluginUsageStatistics": true,
+    "transaction-delay": 1000,
+};
+
 export const commonGroup = (ctx: BuildContext): SettingGroupDefinition => ({
     name: "通用设置",
     items: [

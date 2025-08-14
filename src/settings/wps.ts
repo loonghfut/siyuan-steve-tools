@@ -1,5 +1,9 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+export const wpsDefaults: Record<string, any> = {
+    "wps-enable": false,
+};
+
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
     name: "🛠️Wps开发中",
     items: [

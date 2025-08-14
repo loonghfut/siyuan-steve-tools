@@ -1,5 +1,11 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+export const lifelogDefaults: Record<string, any> = {
+    "lifelog-enable": false,
+    "lifelog-debug": false,
+    // 旧字段 lifelog-paths 在默认配置里（如果模块未来需要可加入）
+};
+
 export const lifelogGroup = (ctx: BuildContext): SettingGroupDefinition => ({
     name: "LifeLog",
     items: [

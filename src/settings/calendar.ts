@@ -2,6 +2,90 @@ import { convertProjectsToRecord } from "@/calendar/dida/dida_interface";
 import { DidaService } from "@/calendar/module-calendar";
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+// 日程管理模块默认配置
+export const calendarDefaults: Record<string, any> = {
+    "cal-enable": false,
+    "cal-url": "calendar.ics",
+    "cal-get-url": "Click Button",
+    "cal-reset": "Click Button",
+    "cal-auto-update": true,
+    "cal-auto-syncing-update": false,
+    "cal-hand-update": true,
+    "cal-view-night": false,
+    "cal-hand": "ces",
+    "cal-ur": "calendar2.ics",
+    "cal-show-view": true,
+    "cal-create-pos": null,
+    "cal-db-id": null,
+    "cal-create-way": "0",
+    "cal-seemore": false,
+    "cal-show-ref-event": true,
+    "cal-show-float-view": false,
+    "cal-auto-update-status": false,
+    "cal-auto-create-fields": true,
+    "cal-week-start": "monday",
+    "cal-show-right-click": false,
+    "cal-drag-change": false,
+    "cal-time": 1,
+    "cal-create-for-date": true,
+    // ics 订阅
+    "cal-ics-enable-subscribe": false,
+    "cal-ics-subscribe-url": "",
+    "cal-ics-subscribe-import": false,
+    "cal-ics-subscribe-import-path": "",
+    "cal-ics-subscribe-import-note-id": null,
+    "cal-ics-import-mode": "single-document",
+    "cal-ics-add-to-database": false,
+    "cal-ics-database-id": null,
+    "cal-ics-custom-template": `### {{title}}
+
+开始时间： {{startTime}}
+结束时间： {{endTime}}
+地点： {{location}}
+状态： {{status}}
+标签： {{tags}}
+描述：{{description}}
+重复规则： {{recurrence}}`,
+    // qq 邮箱
+    "cal-qq-code": "",
+    "cal-qq-email": "",
+    "cal-share": "",
+    "cal-qq-calendar-url": "",
+    "cal-qq-enable": false,
+    // 滴答清单
+    "cal-dida-enable": false,
+    "cal-dida-token": "",
+    "cal-dida-unfinished-list": "",
+    "cal-dida-finished-list": "",
+    "cal-dida-db-id": "",
+    "cal-dida-sync-mode": "auto",
+    "cal-dida-sync-interval": 5,
+    // 分享 / 云
+    "cal-s3-bucket": "",
+    "cal-s3-accessKeyId": "",
+    "cal-s3-secretAccessKey": "",
+    "cal-webdav-url": "",
+    "cal-webdav-username": "",
+    "cal-webdav-password": "",
+    "cal-webdav-path": "",
+    // 其它
+    "cal-show-zq-done": false,
+    "cal-ics-filter-old": 1,
+    "cal-ics-filter-new": 1,
+    // 视图
+    "cal-slot-duration": "01:00:00",
+    "cal-slot-min-time": "00:00:00",
+    "cal-slot-max-time": "24:00:00",
+    "cal-snap-duration": "00:30:00",
+    "cal-event-color": true,
+    "kanban-default-view": "kanban",
+    "cal-default-view": "dayGridMonth",
+    // 四象限
+    "cal-quadrant-urgent-days": 2,
+    // 触发平台
+    "SelectTOPics": "",
+};
+
 function notebookOptions() {
     const nb = (window as any).siyuan?.notebooks;
     if (!Array.isArray(nb) || nb.length === 0) return { "": "无可用日记本" };

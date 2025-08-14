@@ -1,5 +1,9 @@
 import type { BuildContext, SettingGroupDefinition } from "./types";
 
+export const imageCompressionDefaults: Record<string, any> = {
+    "img-compress-enable": false,
+};
+
 // 资源压缩（图片/视频压缩）设置分组
 // 后续可扩展: 压缩质量、并发、格式白名单等
 export function imageCompressionGroup(ctx: BuildContext): SettingGroupDefinition {

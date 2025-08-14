@@ -1,5 +1,11 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+export const syncDefaults: Record<string, any> = {
+    "sync-enable": false,
+    "sync-url": "http://localhost:8080",
+    "sync-token": "token",
+};
+
 export const syncGroup = (ctx: BuildContext): SettingGroupDefinition => ({
     name: "docker同步感知",
     items: [

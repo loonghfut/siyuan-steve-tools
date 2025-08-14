@@ -1,5 +1,13 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
+export const handwritingDefaults: Record<string, any> = {
+    "handwriting-enable": false,
+    "tl-draw-create-note-id": null,
+    "isGridMode": false,
+    "copyLinkTitle": true,
+    "SyncDelete": false,
+};
+
 export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => ({
     name: "画板",
     subGroups: [
