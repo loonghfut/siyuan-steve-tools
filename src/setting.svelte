@@ -9,7 +9,8 @@
 
     export let plugin;
     export let myfile;
-    export const setdialog: any = undefined; // 外部保留占位
+    // 作为可由父组件传入的属性必须使用 `export let`，之前使用 `export const` 会导致父级传入 <Setting setdialog={...}> 报 unknown prop
+    export let setdialog: any; // 外部可传入 setdialog 属性
 
     // Add subGroups and activeSubGroup properties to the module's entry in the groups array.
     // Add an entry to the subGroupItemCounts object for the module, specifying the item counts for each of its sub-groups.
