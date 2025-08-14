@@ -35,12 +35,25 @@ win端s3同步后，docker端感知s3同步。
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
 #### 更新日志:
-### v0.12.2 (2025年08月11日)
-- 回退refresh()实现 (loonghfut)
-- 优化归档显示效果 (loonghfut)
-- 优化字段换行效果 (loonghfut)
-- 四象限视图中“完成”状态的事件标题会自动加删除线 (loonghfut)
-- 更新版本号至 0.12.2 (loonghfut)
+
+
+### v0.12.3 (2025年08月14日)
+- 唉 (loonghfut)
+- 唉。。 (loonghfut)
+- feat: 添加刷新按钮和四象限视图选项卡功能，简化部分按钮 (loonghfut)
+- 统计：增加更多维度 (loonghfut)
+- 尝试实现破解版思源用户检查，为后面收费做尝试 (loonghfut)
+- vip (loonghfut)
+- 算了，还是不收费了，没精力写vip判断逻辑 (loonghfut)
+- feat: 重构模块加载逻辑，使用配置文件管理模块，简化代码 (loonghfut)
+- feat: 添加 Wps 模块及相关配置，支持 Wps 集成功能（开发中） 增加自动添加模块脚本 (loonghfut)
+- 重构设置实现逻辑 (loonghfut)
+- 优化部分设置逻辑 (loonghfut)
+- 重构设置配置文件 (loonghfut)
+- 改进模块生成脚本 (loonghfut)
+- 优化代码 (loonghfut)
+- WPS 设置组，增加子组以优化设置结构 (loonghfut)
+- 更新版本号 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
