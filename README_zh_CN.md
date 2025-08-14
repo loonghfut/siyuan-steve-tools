@@ -40,6 +40,7 @@ win端s3同步后，docker端感知s3同步。
 ### v0.12.4 (2025年08月14日)
 - 更新 (loonghfut)
 - docs: 更新 v0.12.4 版本的更新日志 (loonghfut)
+- docs: 更新 v0.12.4 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
