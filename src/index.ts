@@ -72,7 +72,7 @@ export default class steveTools extends Plugin {
             icon: "iconST",
             title: "SteveTools",
             position: "left",
-            callback: async () => {
+            callback: () => {
                 // await this.vip();
                 this.openDIYSetting();
             }
