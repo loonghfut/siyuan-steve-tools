@@ -37,8 +37,8 @@
         isrefresh(detail.key);
     };
 
-    const refreshKeys = new Set(["cal-enable","sync-enable","ai-enable","handwriting-enable","img-compress-enable"]);
-    function isrefresh(setting) { if (refreshKeys.has(setting)) myapi.refresh(); }
+    import { needsRefresh } from "./settings/refresh";
+    function isrefresh(setting) { if (needsRefresh(setting)) myapi.refresh(); }
 
     async function saveSettings() {
         await plugin.saveData(myfile, settings);
