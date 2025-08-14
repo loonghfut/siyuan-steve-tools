@@ -105,6 +105,8 @@ export const defaultSettings = {
     "isGridMode": false, // 是否开启网格模式
     "copyLinkTitle": true, // 是否复制标题
     'SyncDelete': false, // 是否同步删除
+    //WPS配置
+    "wps-enable": false,
     //插件通用配置
     "PluginUsageStatistics": true, // 是否开启插件使用统计
     "transaction-delay": 1000, // 事务延迟时间（毫秒）

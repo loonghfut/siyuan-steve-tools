@@ -856,6 +856,18 @@
             ],
         },
         {
+            name: "🛠️Wps开发中",
+            items: [
+                {
+                    type: "checkbox",
+                    title: "启用 Wps集成",
+                    description: "启用后可以使用 Wps 功能",
+                    key: "wps-enable",
+                    value: settings["wps-enable"],
+                },
+            ],
+        },
+        {
             name: "通用设置",
             items: [
                 {
