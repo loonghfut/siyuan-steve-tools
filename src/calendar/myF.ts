@@ -66,7 +66,7 @@ export async function getViewId(va_ids: string[]): ViewData {
                 });
             });
 
-            // steveTools.outlog(viewIds_Data);
+            // // steveTools.outlog(viewIds_Data);
         } catch (error) {
             console.error(`Error processing view ${va_id}:`, error);
         }
@@ -88,8 +88,8 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
                 from: viewId_Data,
                 data: data,
             });
-            // steveTools.outlog(viewValue);
-            // steveTools.outlog("ceshi1", data);
+            // // steveTools.outlog(viewValue);
+            // // steveTools.outlog("ceshi1", data);
 
 
         } catch (error) {
@@ -458,7 +458,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         ? new Date(parseInt(item['开始时间'].start))
                         : new Date(new Date().setHours(0, 0, 0, 0));
                     const endDate = item['开始时间']?.end ? new Date(parseInt(item['开始时间'].end)) : null;
-                    steveTools.outlog("startDate:::", startDate, "endDate:::", endDate);
+                    // steveTools.outlog("startDate:::", startDate, "endDate:::", endDate);
                     // 对于周期事件，如果没有设置开始时间，默认为全天事件
                     const isAllDay = !hasStartTime;
                     // (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
@@ -615,7 +615,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     createEventInDatabase_QQ(to_db_id, dateStr);
     if (to_db_id === 'qqcalendar') return;
 
-    steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
+    // steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
     function formatDateWithTime(dateStr: string, hour: number = 8): string {
         // 如果日期字符串已经包含时间部分，直接返回原值
         if (dateStr.includes('T')) {
@@ -737,7 +737,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 {: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id)
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
-    // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
+    // // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
     // console.log("dateStr:::", dateStr, "databaseId:::", to_db_id);
     const dialog = new sy.Dialog({
         title: `   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -820,12 +820,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             //// 获取块内容
             const block = await api.getBlockByID(id);
             //// 如果块内容为空，则删除块
-            // steveTools.outlog("block:::", block.markdown);
+            // // steveTools.outlog("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
             // console.log(markdownContent);
             if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
                 await api.deleteBlock(id);
-                steveTools.outlog('删除空白块');
+                // steveTools.outlog('删除空白块');
                 dialog.destroy();
                 sy.showMessage('已取消添加事件');
                 return;
@@ -911,7 +911,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             //////////////////
             if (panel.isUploading()) {
                 const checkUploading = setInterval(() => {
-                    // steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
+                    // // steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
                     if (!panel.isUploading()) {
                         clearInterval(checkUploading);
                         if (isrefresh) {
@@ -964,13 +964,13 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     };
 
     window.siyuan.ws.ws.addEventListener('message', messageHandler);
-    // steveTools.outlog(msg);
+    // // steveTools.outlog(msg);
 
     const debouncedHandleKeydown = debounce(handleKeydown, 300);
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     // panel.focus();
 
-    // steveTools.outlog("dasdsssssssssss::::::", panel);
+    // // steveTools.outlog("dasdsssssssssss::::::", panel);
     // 2. 添加到文档并显示
 
     // 3. 等待用户提交

@@ -33,7 +33,7 @@ import { PluginConfig } from "./savedata";
 
 export let frontEnd;
 
-let islog = false;
+// let islog = false;
 const myfile = "steveTools.json";
 export let settingdata: any = {};
 let setdialog: any;
@@ -86,7 +86,7 @@ export default class steveTools extends Plugin {
 
     async onLayoutReady() {
         for (const moduleName in moduleInstances) {
-            steveTools.outlog("onLayoutReady--" + moduleName);
+            // steveTools.outlog("onLayoutReady--" + moduleName);
             await moduleInstances[moduleName]?.onLayoutReady?.();
         }
 
@@ -175,10 +175,7 @@ export default class steveTools extends Plugin {
             moduleInstances[moduleName]?.onunload?.();
         }
     }
-    static outlog(mag: any, mag2?: any, mag3?: any, mag4?: any, mag5?: any) {
-        // if (islog) {
-        //     console.log(mag, mag2, mag3, mag4, mag5);
-        //     console.trace(); // 输出堆栈跟踪
-        // }
-    }
+    // static outlog(mag: any, mag2?: any, mag3?: any, mag4?: any, mag5?: any) {
+
+    // }
 }

@@ -14,7 +14,7 @@ export class M_sync {
     }
 
     init = async (settingdata) => {
-        steveTools.outlog("同步模块初始化中...");
+        // steveTools.outlog("同步模块初始化中...");
         // this.settingdata = settingdata;
         url = settingdata["sync-url"];
         token = settingdata["sync-token"];
@@ -63,11 +63,11 @@ export class M_sync {
             // console.log(msg);
         });
 
-        steveTools.outlog("同步模块初始化完成");
+        // steveTools.outlog("同步模块初始化完成");
     }
 
     async testSync() {
-        steveTools.outlog("测试同步...");
+        // steveTools.outlog("测试同步...");
         let res: any = await api.testSync(url, token);
         console.log("res: ", res);
         if (res) {
