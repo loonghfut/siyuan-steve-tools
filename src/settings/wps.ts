@@ -4,7 +4,9 @@ export const wpsDefaults: Record<string, any> = {
     "wps-enable": false,
     "wps-file-enable": false,
     "wps-pic-enable": false,
-    "wps-data-enable": false
+    "wps-data-enable": false,
+    "wps-airscript-token": "",
+    "wps-pic-url": ""
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -14,6 +16,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: "WPS集成",
             items: [
                 { type: "checkbox", title: "启用 WPS集成", description: "启用后可使用 Wps 功能", key: "wps-enable", value: ctx.settings["wps-enable"] },
+                { type: "textinput", title: "AirScript-Token", description: "WPS AirScript-Token", key: "wps-airscript-token", value: ctx.settings["wps-airscript-token"] },
             ]
         },
         {
@@ -26,6 +29,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: 'WPS图片管理',
             items: [
                 { type: "checkbox", title: "启用 WPS图片管理", description: "图片管理", key: "wps-pic-enable", value: ctx.settings["wps-pic-enable"] },
+                { type: "textinput", title: "图片脚本链接", description: "处理图片逻辑的链接", key: "wps-pic-url", value: ctx.settings["wps-pic-url"] },
             ]
         },
         {
