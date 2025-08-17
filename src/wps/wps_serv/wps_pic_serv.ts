@@ -20,11 +20,11 @@ export class WpsPicServ {
         this.plugin.eventBus.on("switch-protyle", (e) => {
             this.protyle = e.detail.protyle;
         });
-        // 示例: 根据设置添加一个顶部按钮
+
         this.plugin.addTopBar({
             icon: "iconInfo",
-            title: "Wps",
-            position: "left",
+            title: "WPS图片处理",
+            position: "right",
             callback: async () => {
                 await this.selectImageAndSend();
             }
@@ -80,7 +80,7 @@ export class WpsPicServ {
         };
         input.click();
     }
-    
+
     private async compressImageToBase64(file: File, maxSize: number): Promise<string> {
         return new Promise<string>((resolve) => {
             const img = new Image();
