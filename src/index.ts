@@ -128,6 +128,9 @@ export default class steveTools extends Plugin {
             if (settingdata["cal-qq-enable"]) {
                 enabledFeatures.push("qq");
             }
+            if (settingdata["wps-pic-enable"]) {
+                enabledFeatures.push("wps-pic");
+            }
             const mergedFeatures = enabledFeatures.join("+");
             console.log("功能:", mergedFeatures);
             await trackFeatureUsage(this.pluginConfig, mergedFeatures);
