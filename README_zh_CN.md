@@ -37,11 +37,15 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.12.4 (2025年08月14日)
-- 更新 (loonghfut)
-- docs: 更新 v0.12.4 版本的更新日志 (loonghfut)
-- docs: 更新 v0.12.4 版本的更新日志 (loonghfut)
-- docs: 更新 v0.12.4 版本的更新日志 (loonghfut)
+### v0.12.5 (2025年08月17日)
+- 删除无用配置 (loonghfut)
+- 移除outlog (loonghfut)
+- 初步实现wps图片管理 (loonghfut)
+- feat: 创建 WPS 服务文件 (loonghfut)
+- feat: 实现 WpsPicServ 图片上传功能 (loonghfut)
+- feat: 更新 WPS 图片处理功能，添加复制脚本到剪切板的功能 (loonghfut)
+- 重新载入模块 (loonghfut)
+- feat: 更新插件版本至 0.12.5 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
