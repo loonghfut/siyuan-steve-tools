@@ -79,9 +79,9 @@ export function createIframeDock(options: IframeDockOptions) {
         type,
         update() {
             this.element.innerHTML = createIframeHTML(
-                containerClass, 
-                url, 
-                "height: 100% ; width: 100%;  pointer-events: auto;", 
+                containerClass,
+                url,
+                "height: 100% ; width: 100%;  pointer-events: auto;",
                 zoom
             );
             const targetElement = this.element.querySelector(`#${containerClass} iframe`);
@@ -126,6 +126,7 @@ export function createWebviewDock(options: IframeDockOptions) {
         pointerEventsDelay = 300,
         zoom = 1 // 新增缩放比例，默认1
     } = options;
+    // const mobileUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1";
 
     const createWebviewHTML = (containerClass: string, url: string, style: string, zoom: number) => {
         return `
@@ -162,9 +163,9 @@ export function createWebviewDock(options: IframeDockOptions) {
         type,
         update() {
             this.element.innerHTML = createWebviewHTML(
-                containerClass, 
-                url, 
-                "height: 100% ; width: 100%;  pointer-events: auto;", 
+                containerClass,
+                url,
+                "height: 100% ; width: 100%;  pointer-events: auto;",
                 zoom
             );
             const targetElement = this.element.querySelector(`#${containerClass} webview`);
