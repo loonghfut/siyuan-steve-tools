@@ -3,6 +3,7 @@ import steveTools from "@/index";
 // import { runWpsScriptSync } from "./wps_api";
 // import { appendBlock } from "@/api/api";
 import { WpsPicServ } from "./wps_serv/wps_pic_serv";
+import { WpsDataServ } from "./wps_serv/wps_data_serv";
 
 // Wps 模块
 export class M_Wps {
@@ -15,6 +16,12 @@ export class M_Wps {
         console.log("Wps 模块初始化");
         if(settingdata["wps-pic-enable"]) {
             new WpsPicServ(this.plugin).init(settingdata);
+        }
+        if(settingdata["wps-data-enable"]) {
+            new WpsDataServ(this.plugin).init(settingdata);
+        }
+        if(settingdata["wps-file-enable"]) {
+            // Initialize WpsFileServ
         }
     }
 
