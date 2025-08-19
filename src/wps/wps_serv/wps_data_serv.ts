@@ -3,6 +3,7 @@ import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
 import {createWebviewDock_for_wps, } from "@/api/api2";
+import { generateLinkCard } from "@/api/api3";
 
 
 export class WpsDataServ {
@@ -42,7 +43,8 @@ export class WpsDataServ {
             title: "WPS数据处理",
             position: "right",
             callback: async () => {
-
+                const cardHtml = await generateLinkCard(this.settingdata["wps-data-weburl"]);
+                appendBlock("markdown",cardHtml,"20250816200734-6ii2m03");
             }
         });
     }
