@@ -8,7 +8,8 @@ export const wpsDefaults: Record<string, any> = {
     "wps-pic-enable": false,
     "wps-data-enable": false,
     "wps-airscript-token": "",
-    "wps-pic-url": ""
+    "wps-pic-url": "",
+    "wps-data-weburl": "",
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -51,6 +52,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: "WPS数据导入",
             items: [
                 { type: "checkbox", title: "启用 WPS数据导入", description: "数据导入", key: "wps-data-enable", value: ctx.settings["wps-data-enable"] },
+                { type: "textinput", title: "数据收集表", description: "多维表中收集表的链接", key: "wps-data-weburl", value: ctx.settings["wps-data-weburl"] },
             ]
         }
     ]

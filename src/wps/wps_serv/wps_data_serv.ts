@@ -31,7 +31,7 @@ export class WpsDataServ {
                 title: "收集表",
             },
             type: "wps-data-dock",
-            url: "https://www.kdocs.cn/wo/sl/v11rBRdJ",
+            url: this.settingdata["wps-data-weburl"],
             emptyUrlMessage: "请先配置网址...",
             containerClass: "wps-data-dock-container",
             iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
