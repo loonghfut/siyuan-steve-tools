@@ -321,8 +321,14 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             scheduleHide();
         };
 
-        // 监听全局鼠标移动（判断是否到达顶部）和按钮 hover
-        window.addEventListener('mousemove', onWindowMove);
+        // 仅在 webview 上监听鼠标移动；若未找到 webview 则回退到全局监听（兼容）
+        const webviewEl = rootEl.querySelector('webview') as HTMLElement | null;
+        if (webviewEl) {
+            webviewEl.addEventListener('mousemove', onWindowMove);
+        } else {
+            window.addEventListener('mousemove', onWindowMove);
+        }
+        // 按钮本身仍需监听 hover 以防鼠标移入按钮区域
         btns.addEventListener('mouseenter', onBtnsEnter);
         btns.addEventListener('mouseleave', onBtnsLeave);
 
@@ -584,7 +590,7 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             this.element.innerHTML = createWebviewHTML(
                 containerClass,
                 url,
-                "height: 100% ; width: 100%;  pointer-events: auto;",
+                iframeStyle,
                 zoom
             );
             const targetElement = this.element.querySelector(`#${containerClass} webview`);
