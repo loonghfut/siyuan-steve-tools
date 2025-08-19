@@ -109,12 +109,44 @@ export function createIframeDock(options: IframeDockOptions) {
 }
 
 
-
+interface WebviewExtraOptions {
+    enableButtons?: boolean;               // 是否启用顶部悬浮按钮 (默认 true)
+    buttonTexts?: {                        // 按钮文字自定义
+        copy?: string;                     // 复制(插入)按钮文字
+        refresh?: string;                  // 刷新按钮文字
+        dev?: string;                      // 开发者工具按钮文字 (仅当 showDevButton=true 时显示)
+    };
+    showDevButton?: boolean;              // 是否显示打开 DevTools 按钮 (默认 false)
+    hoverThreshold?: number;               // 显示按钮时的顶部阈值 (默认 60)
+    hoverHideDelay?: number;               // 鼠标离开后隐藏延迟 (默认 500ms)
+    hideCSS?: string | string[];           // 需要默认注入用于隐藏的 CSS (默认 .open-wps-button 隐藏)
+    injectCSS?: string | string[];         // 额外注入的 CSS 片段
+    injectJS?: string | string[];          // 额外注入的 JS 片段 (字符串形式，会直接 executeJavaScript)
+    disableDefaultHideCSS?: boolean;       // 是否禁用默认 hideCSS (默认 false)
+    userAgent?: string;                    // 覆盖 userAgent (默认移动 UA)
+    onCopy?: (ctx: { webview: any; url: string }) => Promise<void> | void;       // 自定义复制逻辑
+    onRefresh?: (ctx: { webview: any }) => Promise<void> | void;                 // 自定义刷新逻辑
+    onDevTools?: (ctx: { webview: any }) => Promise<void> | void;                // 自定义打开 DevTools 逻辑
+    buttons?: WebviewButtonConfig[];       // 自定义按钮集合（完全自定义覆盖默认按钮）
+}
+interface WebviewButtonConfig {
+    id?: string;                           // 按钮 id，不含容器前缀；最终实际 id = `${containerClass}-btn-${id}`
+    text: string;                          // 按钮显示文本（可含 HTML，注意安全）
+    title?: string;                        // 鼠标悬浮标题
+    builtInAction?: 'copy' | 'refresh' | 'dev';  // 复用内置逻辑
+    onClick?: (ctx: { webview: any; getCurrentUrl: () => string }) => Promise<void> | void; // 自定义回调
+    style?: string;                        // 行内样式
+    className?: string;                    // 自定义类名
+    show?: boolean;                        // 是否显示 (默认 true)
+    order?: number;                        // 排序 (默认 0)
+}
 /**
  * 创建一个带有webview的dock
  * @param options dock配置选项
  */
-export function createWebviewDock(options: IframeDockOptions) {
+export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewExtraOptions) {
+    // 扩展可选参数接口：按钮 / 注入逻辑配置
+    // 合并 options 为扩展对象（保持向后兼容）
     const {
         plugin,
         config,
@@ -124,12 +156,66 @@ export function createWebviewDock(options: IframeDockOptions) {
         containerClass = "",
         iframeStyle = "height: 99vh ; width: 100%;  pointer-events: auto;",
         pointerEventsDelay = 300,
-        zoom = 1 // 新增缩放比例，默认1
-    } = options;
-    const mobileUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1";
+        zoom = 1, // 新增缩放比例，默认1
+        // 新增参数（全部可选）
+        enableButtons = true,
+        buttonTexts = {},
+        showDevButton = false,
+        hoverThreshold = 60,
+        hoverHideDelay = 500,
+        hideCSS,
+        injectCSS,
+        injectJS,
+        disableDefaultHideCSS = false,
+        userAgent,
+        onCopy,
+        onRefresh,
+        onDevTools,
+        buttons,
+    } = options as IframeDockOptions & WebviewExtraOptions;
+
+    const mobileUA = userAgent || "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1";
+
+    const finalButtonText = {
+        copy: buttonTexts.copy ?? "插入",
+        refresh: buttonTexts.refresh ?? "刷新",
+        dev: buttonTexts.dev ?? "调试",
+    };
 
     const createWebviewHTML = (containerClass: string, url: string, style: string, zoom: number) => {
-        // 容器相对定位，按钮组初始隐藏，通过 JS 在鼠标移到顶部时显示
+        if (!enableButtons) {
+            return `
+            <div id="${containerClass}" class="${containerClass}" style="position: relative; height: 100%; width: 100%; overflow: hidden;">
+                <webview 
+                    src="${url}" 
+                    style="${style}; zoom: ${zoom}; position: absolute; inset: 0; width: 100%; height: 100%;"
+                    allowpopups
+                    webpreferences="contextIsolation, nativeWindowOpen, javascript=yes"
+                    useragent="${mobileUA}"
+                ></webview>
+            </div>`;
+        }
+
+        // 若用户未提供自定义按钮，则生成兼容旧逻辑的默认按钮
+        let btnConfigs: WebviewButtonConfig[] = [];
+        if (Array.isArray(buttons) && buttons.length > 0) {
+            btnConfigs = buttons.filter(b => b.show !== false).slice();
+        } else {
+            btnConfigs.push({ id: 'copy', text: finalButtonText.copy, title: '复制当前页面链接', builtInAction: 'copy', order: 0 });
+            btnConfigs.push({ id: 'refresh', text: finalButtonText.refresh, title: '刷新页面', builtInAction: 'refresh', order: 1 });
+            if (showDevButton) {
+                btnConfigs.push({ id: 'dev', text: finalButtonText.dev, title: '打开开发者工具', builtInAction: 'dev', order: 2 });
+            }
+        }
+        btnConfigs.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        const buttonBaseStyle = `padding: 6px 10px; background: rgba(255,255,255,0.95); border: 1px solid rgba(0,0,0,0.12); border-radius: 6px; cursor: pointer; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.12);`;
+        const buttonsHTML = btnConfigs.map(cfg => {
+            const id = `${containerClass}-btn-${cfg.id || cfg.builtInAction || Math.random().toString(36).slice(2)}`;
+            const styleAttr = (cfg.style ? buttonBaseStyle + cfg.style : buttonBaseStyle).replace(/"/g, '&quot;');
+            return `<button id="${id}" data-built-in="${cfg.builtInAction || ''}" class="${cfg.className || ''}" title="${cfg.title || ''}" style="${styleAttr}">${cfg.text}</button>`;
+        }).join('\n');
+
         return `
         <div id="${containerClass}" class="${containerClass}" style="position: relative; height: 100%; width: 100%; overflow: hidden;">
             <webview 
@@ -138,50 +224,12 @@ export function createWebviewDock(options: IframeDockOptions) {
                 allowpopups
                 webpreferences="contextIsolation, nativeWindowOpen, javascript=yes"
                 useragent="${mobileUA}"
-            >
-            </webview>
-
+            ></webview>
             <div id="${containerClass}-btns" style="
-                position: absolute;
-                top: 8px;
-                left: 50%;
-                transform: translateX(-50%) translateY(-8px);
-                z-index: 9999;
-                display: flex;
-                gap: 8px;
-                align-items: center;
-                opacity: 0;
-                pointer-events: none;
-                transition: opacity 0.18s ease, transform 0.18s ease;
-            ">
-                <button id="${containerClass}-copy-btn" title="复制当前页面链接"
-                    style="
-                        padding: 6px 10px;
-                        background: rgba(255,255,255,0.95);
-                        border: 1px solid rgba(0,0,0,0.12);
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-                    ">
-                    插入
-                </button>
-
-                <button id="${containerClass}-refresh-btn" title="刷新页面"
-                    style="
-                        padding: 6px 10px;
-                        background: rgba(255,255,255,0.95);
-                        border: 1px solid rgba(0,0,0,0.12);
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
-                    ">
-                    刷新
-                </button>
+                position: absolute; top: 8px; left: 50%; transform: translateX(-50%) translateY(-8px); z-index: 9999; display: flex; gap: 8px; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease;">
+                ${buttonsHTML}
             </div>
-        </div>
-        `;
+        </div>`;
     };
 
     const cleanupRoot = (rootEl: HTMLElement | null) => {
@@ -221,7 +269,7 @@ export function createWebviewDock(options: IframeDockOptions) {
     };
 
     // 当鼠标移到窗口顶部一定高度内时显示按钮（否则延迟隐藏）
-    const bindHoverButtons = (rootEl: HTMLElement | null, containerClass: string, threshold = 60, hideDelay = 500) => {
+    const bindHoverButtons = (rootEl: HTMLElement | null, containerClass: string, threshold = hoverThreshold, hideDelay = hoverHideDelay) => {
         if (!rootEl) return;
         const btns = rootEl.querySelector(`#${containerClass}-btns`) as HTMLElement | null;
         if (!btns) return;
@@ -293,17 +341,85 @@ export function createWebviewDock(options: IframeDockOptions) {
     };
 
     const bindCopyButton = (rootEl: HTMLElement | null, containerClass: string) => {
+        if (!enableButtons) return; // 直接跳过按钮逻辑
         if (!rootEl) return;
         // 在绑定前先清理旧的按钮监听（如果存在）
         if ((rootEl as any).__btnCleanup) {
             try { (rootEl as any).__btnCleanup(); } catch (e) { /* ignore */ }
             try { delete (rootEl as any).__btnCleanup; } catch (e) { /* ignore */ }
         }
-
-        const btn = rootEl.querySelector(`#${containerClass}-copy-btn`) as HTMLButtonElement | null;
-        const refreshBtn = rootEl.querySelector(`#${containerClass}-refresh-btn`) as HTMLButtonElement | null;
         const webviewEl = rootEl.querySelector(`webview`) as any | null;
-        if (!btn && !refreshBtn) return;
+        const allBtnContainer = rootEl.querySelector(`#${containerClass}-btns`);
+        if (!allBtnContainer) return;
+        const allButtons = Array.from(allBtnContainer.querySelectorAll('button')) as HTMLButtonElement[];
+        if (!allButtons.length) return;
+
+        // 注入用的 CSS
+        const defaultHideCss = `.open-wps-button { display: none !important; }`;
+        const hideCssArray: string[] = [];
+        if (!disableDefaultHideCSS) hideCssArray.push(defaultHideCss);
+        if (hideCSS) hideCssArray.push(...(Array.isArray(hideCSS) ? hideCSS : [hideCSS]));
+        const extraCssArray: string[] = injectCSS ? (Array.isArray(injectCSS) ? injectCSS : [injectCSS]) : [];
+        const jsArray: string[] = injectJS ? (Array.isArray(injectJS) ? injectJS : [injectJS]) : [];
+
+        // 注入函数：优先使用 webview.insertCSS，退回到 executeJavaScript 插入 <style>
+        const performInjection = async () => {
+            try {
+                if (!webviewEl) return;
+                const injectCssSnippets = [...hideCssArray, ...extraCssArray];
+                for (const cssSnippet of injectCssSnippets) {
+                    try {
+                        if (typeof webviewEl.insertCSS === "function") {
+                            await webviewEl.insertCSS(cssSnippet);
+                        } else if (typeof webviewEl.executeJavaScript === "function") {
+                            const code = `(function(){try{const s=document.createElement('style');s.textContent=${JSON.stringify(cssSnippet)};document.head.appendChild(s);}catch(e){} })();`;
+                            await webviewEl.executeJavaScript(code);
+                        } else if (webviewEl.contentWindow && webviewEl.contentWindow.postMessage) {
+                            webviewEl.contentWindow.postMessage({ type: 'inject-css', css: cssSnippet }, '*');
+                        }
+                    } catch (cssErr) {
+                        console.error("inject css failed snippet:", cssSnippet, cssErr);
+                    }
+                }
+                for (const jsSnippet of jsArray) {
+                    try {
+                        if (typeof webviewEl.executeJavaScript === "function") {
+                            await webviewEl.executeJavaScript(jsSnippet);
+                        } else if (webviewEl.contentWindow && webviewEl.contentWindow.postMessage) {
+                            webviewEl.contentWindow.postMessage({ type: 'inject-js', code: jsSnippet }, '*');
+                        }
+                    } catch (jsErr) {
+                        console.error("inject js failed snippet:", jsSnippet, jsErr);
+                    }
+                }
+            } catch (err) {
+                console.error("performInjection failed:", err);
+            }
+        };
+
+        // 如果 webview 存在，绑定 dom-ready / did-finish-load 事件以确保注入发生在页面加载后
+        let onDomReady: (() => void) | null = null;
+        if (webviewEl) {
+            onDomReady = () => {
+                performInjection();
+            };
+            try {
+                // Electron webview 使用 addEventListener 或 on 方法都可能存在
+                if (typeof webviewEl.addEventListener === "function") {
+                    webviewEl.addEventListener("dom-ready", onDomReady);
+                    webviewEl.addEventListener("did-finish-load", onDomReady);
+                } else if (typeof webviewEl.on === "function") {
+                    webviewEl.on("dom-ready", onDomReady);
+                    webviewEl.on("did-finish-load", onDomReady);
+                } else {
+                    // 尝试直接注入（若已经就绪）
+                    performInjection();
+                }
+            } catch (e) {
+                // 忽略事件绑定错误，尝试直接注入
+                performInjection();
+            }
+        }
 
         const clickHandler = async (e: Event) => {
             e.stopPropagation();
@@ -322,27 +438,37 @@ export function createWebviewDock(options: IframeDockOptions) {
                     showMessage("无法获取当前链接", 2000, "error");
                     return;
                 }
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(currentUrl);
+                if (onCopy) {
+                    await onCopy({ webview: webviewEl, url: currentUrl });
                 } else {
-                    const ta = document.createElement("textarea");
-                    ta.value = currentUrl;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(ta);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(currentUrl);
+                    } else {
+                        const ta = document.createElement("textarea");
+                        ta.value = currentUrl;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand("copy");
+                        document.body.removeChild(ta);
+                    }
+                    showMessage("已复制链接", 2000, "info");
                 }
-                showMessage("已复制链接", 2000, "info");
             } catch (err) {
                 console.error("copy url failed:", err);
                 showMessage("复制失败", 2000, "error");
             }
         };
 
-        const refreshHandler = (e: Event) => {
+        const refreshHandler = async (e: Event) => {
             e.stopPropagation();
             try {
-                if (webviewEl) {
+                if (!webviewEl) {
+                    showMessage("未找到 webview", 2000, "error");
+                    return;
+                }
+                if (onRefresh) {
+                    await onRefresh({ webview: webviewEl });
+                } else {
                     if (typeof webviewEl.reload === "function") {
                         webviewEl.reload();
                     } else if (typeof webviewEl.reloadIgnoringCache === "function") {
@@ -352,8 +478,6 @@ export function createWebviewDock(options: IframeDockOptions) {
                         if (src) webviewEl.setAttribute('src', src);
                     }
                     showMessage("已刷新", 1000, "info");
-                } else {
-                    showMessage("未找到 webview", 2000, "error");
                 }
             } catch (err) {
                 console.error("refresh failed:", err);
@@ -361,20 +485,88 @@ export function createWebviewDock(options: IframeDockOptions) {
             }
         };
 
+        const devHandler = async (e: Event) => {
+            e.stopPropagation();
+            try {
+                if (!webviewEl) {
+                    showMessage("未找到 webview", 2000, "error");
+                    return;
+                }
+                if (onDevTools) {
+                    await onDevTools({ webview: webviewEl });
+                } else {
+                    // Electron webview 提供 openDevTools()
+                    if (typeof webviewEl.openDevTools === "function") {
+                        webviewEl.openDevTools();
+                    } else if (webviewEl.getWebContents && typeof webviewEl.getWebContents === "function") {
+                        try { webviewEl.getWebContents().openDevTools(); } catch (err) { throw err; }
+                    } else {
+                        showMessage("当前环境不支持直接打开开发者工具", 2000, "error");
+                    }
+                }
+            } catch (err) {
+                console.error("open devtools failed:", err);
+                showMessage("打开开发者工具失败", 2000, "error");
+            }
+        };
+
         // 使用 onclick 覆盖绑定，避免重复 addEventListener 导致累积
-        if (btn) {
-            btn.onclick = null;
-            btn.onclick = clickHandler;
-        }
-        if (refreshBtn) {
-            refreshBtn.onclick = null;
-            refreshBtn.onclick = refreshHandler;
+        // 工具函数：获取当前 url
+        const getCurrentUrl = (): string => {
+            try {
+                if (webviewEl) {
+                    if (typeof webviewEl.getURL === 'function') return webviewEl.getURL();
+                    if (webviewEl.getAttribute) return webviewEl.getAttribute('src') || '';
+                    return webviewEl.src || '';
+                }
+            } catch { /* ignore */ }
+            return '';
+        };
+
+        // 遍历按钮并根据内置动作或自定义回调绑定
+        for (const button of allButtons) {
+            const builtIn = button.getAttribute('data-built-in') as 'copy' | 'refresh' | 'dev' | '';
+            button.onclick = null;
+            if (builtIn === 'copy') {
+                button.onclick = clickHandler;
+            } else if (builtIn === 'refresh') {
+                button.onclick = refreshHandler;
+            } else if (builtIn === 'dev') {
+                button.onclick = devHandler;
+            } else {
+                // 自定义按钮匹配用户传入配置
+                const shortId = button.id.replace(`${containerClass}-btn-`, '');
+                const cfg = (buttons || []).find(b => (b.id || b.builtInAction) === shortId);
+                if (cfg && typeof cfg.onClick === 'function') {
+                    button.onclick = async (e: Event) => {
+                        e.stopPropagation();
+                        try {
+                            await cfg.onClick!({ webview: webviewEl, getCurrentUrl });
+                        } catch (err) {
+                            console.error('custom button click failed:', err);
+                            showMessage('操作失败', 2000, 'error');
+                        }
+                    };
+                }
+            }
         }
 
         // 注册清理函数到 root，供后续替换 DOM 时调用
         (rootEl as any).__btnCleanup = () => {
-            try { if (btn) btn.onclick = null; } catch (e) { /* ignore */ }
-            try { if (refreshBtn) refreshBtn.onclick = null; } catch (e) { /* ignore */ }
+            try { allButtons.forEach(b => (b.onclick = null)); } catch (e) { /* ignore */ }
+
+            // 移除 webview 事件监听
+            try {
+                if (webviewEl && onDomReady) {
+                    if (typeof webviewEl.removeEventListener === "function") {
+                        webviewEl.removeEventListener("dom-ready", onDomReady);
+                        webviewEl.removeEventListener("did-finish-load", onDomReady);
+                    } else if (typeof webviewEl.off === "function") {
+                        webviewEl.off("dom-ready", onDomReady);
+                        webviewEl.off("did-finish-load", onDomReady);
+                    }
+                }
+            } catch (e) { /* ignore */ }
         };
 
         // 绑定悬浮显示/隐藏逻辑（此函数会在 root 上放 __hoverCleanup）

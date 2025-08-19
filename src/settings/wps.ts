@@ -10,6 +10,7 @@ export const wpsDefaults: Record<string, any> = {
     "wps-airscript-token": "",
     "wps-pic-url": "",
     "wps-data-weburl": "",
+    "wps-file-weburl": "",
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -23,9 +24,10 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             ]
         },
         {
-            name: "WPS文件链接管理",
+            name: "WPS文件管理",
             items: [
-                { type: "checkbox", title: "启用 WPS文件链接管理", description: "文件链接管理", key: "wps-file-enable", value: ctx.settings["wps-file-enable"] },
+                { type: "checkbox", title: "启用 WPS文件管理", description: "文件管理", key: "wps-file-enable", value: ctx.settings["wps-file-enable"] },
+                { type: "textinput", title: "文件夹链接", description: "WPS文件夹链接", key: "wps-file-weburl", value: ctx.settings["wps-file-weburl"] },
             ]
         },
         {

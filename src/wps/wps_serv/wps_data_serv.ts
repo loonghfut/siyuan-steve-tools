@@ -2,9 +2,7 @@ import { appendBlock } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
-import { createIframeDock, createWebviewDock } from "@/api/api2";
-import { createWebAppDock } from "@/api/dockdida_pro";
-
+import {createWebviewDock_for_wps, } from "@/api/api2";
 
 
 export class WpsDataServ {
@@ -22,13 +20,13 @@ export class WpsDataServ {
         // this.plugin.eventBus.on("switch-protyle", (e) => {
         //     this.protyle = e.detail.protyle;
         // });
-        createWebviewDock({
+        createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
                 position: "RightTop",
                 size: { width: 500, height: 0 },
                 icon: "iconInfo",
-                title: "收集表",
+                title: "WPS",
             },
             type: "wps-data-dock",
             url: this.settingdata["wps-data-weburl"],

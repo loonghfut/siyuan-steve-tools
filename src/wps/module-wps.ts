@@ -4,6 +4,7 @@ import steveTools from "@/index";
 // import { appendBlock } from "@/api/api";
 import { WpsPicServ } from "./wps_serv/wps_pic_serv";
 import { WpsDataServ } from "./wps_serv/wps_data_serv";
+import { WpsFileServ } from "./wps_serv/wps_file_serv";
 
 // Wps 模块
 export class M_Wps {
@@ -21,7 +22,7 @@ export class M_Wps {
             new WpsDataServ(this.plugin).init(settingdata);
         }
         if(settingdata["wps-file-enable"]) {
-            // Initialize WpsFileServ
+            new WpsFileServ(this.plugin).init(settingdata);
         }
     }
 
