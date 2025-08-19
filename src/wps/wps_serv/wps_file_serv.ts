@@ -2,13 +2,16 @@ import { appendBlock } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
-import { createWebviewDock_for_wps, } from "@/api/api2";
+import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 
 
 export class WpsFileServ {
     private settingdata: any;
     private plugin: steveTools;
-    private protyle: IProtyle;
+    // private protyle: IProtyle;
+    private now_protyle: IProtyle;
+    private cursorID: string;
+    private cursorID_b: string;
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -20,6 +23,13 @@ export class WpsFileServ {
         // this.plugin.eventBus.on("switch-protyle", (e) => {
         //     this.protyle = e.detail.protyle;
         // });
+        const handleWpsFileInsert = (e: { webview: any; getCurrentUrl: () => string }) => {
+            // 后续在这里扩展插入逻辑，webview 可用于与 iframe 通信
+            const fileurl = e.getCurrentUrl();
+            appendBlock("markdown", `<iframe src="${fileurl}" width="600" height="400"></iframe>`, this.cursorID);
+            showMessage('插入完成', 1000, 'info');
+        };
+
         createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
@@ -31,8 +41,8 @@ export class WpsFileServ {
             buttons: [
                 { id: 'copy', text: '复制', builtInAction: 'copy', order: 0 },
                 { id: 'refresh', text: '刷新', builtInAction: 'refresh', order: 1 },
-                { id: 'dev', text: '调试', builtInAction: 'dev', order: 2, show: process.env.NODE_ENV !== 'production' },
-                { id: 'custom', text: '自定义', order: 3, onClick: ({ webview }) => showMessage('自定义完成', 1000, 'info') }
+                // { id: 'dev', text: '调试', builtInAction: 'dev', order: 2, show: process.env.NODE_ENV !== 'production' },
+                { id: 'custom', text: '插入', order: 3, onClick: handleWpsFileInsert }
             ],
             type: "wps-file-dock",
             url: this.settingdata["wps-file-weburl"],
@@ -43,15 +53,20 @@ export class WpsFileServ {
             zoom: 1,
         });
 
-        // this.plugin.addTopBar({
-        //     icon: "iconInfo",
-        //     title: "WPS数据处理",
-        //     position: "right",
-        //     callback: async () => {
-
-        //     }
-        // });
+        this.plugin.eventBus.on("click-editorcontent", this.handleSelectionChange.bind(this));
+        this.plugin.eventBus.on("switch-protyle", async (event) => {
+            this.now_protyle = event.detail.protyle;
+            this.cursorID_b = event.detail.protyle.block.id;
+            this.cursorID = this.cursorID_b;
+            console.log("switch-image-protyle");
+        });
     }
 
+    async handleSelectionChange() {
+        const blockId = getCursorBlockId();
+        if (blockId) {
+            this.cursorID = blockId;
+        }
+    }
 
 }

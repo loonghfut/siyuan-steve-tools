@@ -2,6 +2,7 @@ import steveTools from "@/index";
 import * as api from "@/api/api"
 import { IProtyle, showMessage } from "siyuan";
 import imageCompression from 'browser-image-compression';
+import { getCursorBlockId } from "@/api/api2";
 declare const siyuan: any;
 
 export class M_imageCompression {
@@ -362,29 +363,3 @@ export class M_imageCompression {
     }
 }
 
-export function getCursorBlockId() {
-    const selection = window.getSelection();
-    if (!selection || !selection.rangeCount) return null;
-
-    const range = selection.getRangeAt(0);
-    let container = range.startContainer;
-
-    // 如果 startContainer 是文本节点，则获取其父元素
-    if (container.nodeType === Node.TEXT_NODE) {
-        container = container.parentElement;
-    }
-
-    // 确保 container 是一个元素节点
-    if (!(container instanceof Element)) {
-        return null;
-    }
-
-    const blockElement = container.closest('.protyle-wysiwyg [data-node-id]');
-
-    if (blockElement) {
-        // console.log(blockElement.getAttribute('data-node-id'));
-        return blockElement.getAttribute('data-node-id');
-    } else {
-        return null;
-    }
-}

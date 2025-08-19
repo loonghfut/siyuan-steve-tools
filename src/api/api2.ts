@@ -177,7 +177,7 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
     const mobileUA = userAgent || "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1";
 
     const finalButtonText = {
-        copy: buttonTexts.copy ?? "插入",
+        copy: buttonTexts.copy ?? "复制",
         refresh: buttonTexts.refresh ?? "刷新",
         dev: buttonTexts.dev ?? "调试",
     };
@@ -619,4 +619,33 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             clearTimeout(resizeTimeout);
         }
     });
+}
+
+
+
+export function getCursorBlockId() {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return null;
+
+    const range = selection.getRangeAt(0);
+    let container = range.startContainer;
+
+    // 如果 startContainer 是文本节点，则获取其父元素
+    if (container.nodeType === Node.TEXT_NODE) {
+        container = container.parentElement;
+    }
+
+    // 确保 container 是一个元素节点
+    if (!(container instanceof Element)) {
+        return null;
+    }
+
+    const blockElement = container.closest('.protyle-wysiwyg [data-node-id]');
+
+    if (blockElement) {
+        // console.log(blockElement.getAttribute('data-node-id'));
+        return blockElement.getAttribute('data-node-id');
+    } else {
+        return null;
+    }
 }
