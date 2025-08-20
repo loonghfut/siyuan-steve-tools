@@ -1,10 +1,15 @@
-import { appendBlock } from "@/api/api";
+import { appendBlock, generateSiyuanID } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
-import { runWpsScriptSync } from "../wps_api";
+import { ChangeLinkStyle, runWpsScriptSync } from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
 
+declare global {
+    interface Window {
+        wps?: any;
+    }
+}
 
 export class WpsFileServ {
     private settingdata: any;
@@ -20,26 +25,24 @@ export class WpsFileServ {
 
     async init(settingdata: any) {
         this.settingdata = settingdata;
-        // console.log("WpsPicServ initialized with settings:", this.settingdata);
-        // this.plugin.eventBus.on("switch-protyle", (e) => {
-        //     this.protyle = e.detail.protyle;
-        // });
+        window.wps = {
+            ChangeLinkStyle,
+        };
+
         const handleWpsFileInsert = async (e: { webview: any; getCurrentUrl: () => string }) => {
             // 后续在这里扩展插入逻辑，webview 可用于与 iframe 通信
+            const blockId = await generateSiyuanID() as string;
             const fileurl = e.getCurrentUrl();
             const cardHtml = await generateLinkCard(fileurl, [{
-                id: 'fav',
-                title: '收藏',
+                id: 'change',
+                title: '转换',
                 text: '★',
-                onClick: "console.log('收藏', window);"
+                onClick: `window.wps.ChangeLinkStyle('${fileurl}', '${blockId}');`
             },
-            {
-                id: 'more',
-                title: '更多',
-                text: '⋯',
-                onClick: "console.log('更多');"
-            }]);
-            appendBlock("markdown", cardHtml, this.cursorID);
+            ]);
+            appendBlock("markdown",
+                `<div>${cardHtml}</div>`
+                , this.cursorID);
             // appendBlock("markdown", `<iframe src="${fileurl}" width="600" height="400"></iframe>`, this.cursorID);
             showMessage('插入完成', 1000, 'info');
         };

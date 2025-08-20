@@ -1,4 +1,21 @@
 import { NetworkClient } from "@/api/network";
+import { showMessage } from "siyuan";
+
+
+export async function ChangeLinkStyle(url?: string, blockId?: string) {
+    showMessage(`测试中: ${url}, ${blockId}`)
+}
+
+
+
+
+
+
+
+
+
+
+
 
 export interface RunWpsScriptSyncParams {
     url: string;
@@ -127,3 +144,6 @@ function main() {
   }
 }
 return main();`
+
+
+
