@@ -182,8 +182,14 @@ export async function ShowLinkContent(url: string) {
   // 创建一个带简单工具栏的对话框，内容区用于挂载 webview 或 iframe
   const dialog = new Dialog({
     title: null,
-    content: `<div style="width:100%;height:100%;display:flex;flex-direction:column;">
+    content: `<div class="siyuan-webview-wrapper" style="width:100%;height:100%;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--b3-theme-background);color:var(--b3-theme-on-background);">
       <style>
+        .siyuan-webview-wrapper{ /* 确保整个对话框内容区域圆角并隐藏溢出 */ 
+          border-radius:12px;
+          overflow:hidden;
+          background:var(--b3-theme-background);
+          color:var(--b3-theme-on-background);
+        }
         #siyuan-webview-toolbar{
           padding:8px 10px;
           display:flex;
@@ -194,21 +200,25 @@ export async function ShowLinkContent(url: string) {
           border-bottom:1px solid rgba(0,0,0,0.06);
           box-shadow:0 1px 0 rgba(0,0,0,0.02) inset;
         }
+        /* toolbar 顶部保留圆角视觉（实际圆角由 wrapper 控制） */
+        #siyuan-webview-toolbar{ border-top-left-radius:12px; border-top-right-radius:12px; }
         #siyuan-webview-toolbar button{
           min-width:36px;
           padding:6px 10px;
-          border-radius:6px;
-          border:1px solid transparent;
-          background:transparent;
-          color:inherit;
+          border-radius:8px;
+          border:1px solid rgba(0,0,0,0.06);
+          background:rgba(255,255,255,0.02);
+          color:var(--b3-theme-on-background);
           cursor:pointer;
-          font-weight:500;
-          transition:background .12s ease, transform .06s ease, border-color .12s;
+          font-weight:600;
+          transition:background .12s ease, transform .06s ease, border-color .12s, box-shadow .12s;
+          box-shadow: none;
         }
         #siyuan-webview-toolbar button:hover{
-          background:rgba(0,0,0,0.04);
-          border-color: rgba(0,0,0,0.06);
+          background:rgba(255,255,255,0.03);
+          border-color: rgba(0,0,0,0.08);
           transform:translateY(-1px);
+          box-shadow:0 2px 6px rgba(0,0,0,0.04);
         }
         #siyuan-webview-toolbar button:active{ transform:translateY(0); }
         #siyuan-webview-url{
@@ -228,10 +238,12 @@ export async function ShowLinkContent(url: string) {
           border:1px solid rgba(0,0,0,0.08);
           background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
         }
-        /* container 保持主题背景 */
+        /* container 保持主题背景并与 wrapper 圆角契合（底部圆角） */
         #siyuan-webview-container{
           background:var(--b3-theme-background);
           color:var(--b3-theme-on-background);
+          border-bottom-left-radius:12px;
+          border-bottom-right-radius:12px;
         }
       </style>
       <div id="siyuan-webview-toolbar">
@@ -239,7 +251,7 @@ export async function ShowLinkContent(url: string) {
         <button id="siyuan-webview-forward" title="前进">→</button>
         <button id="siyuan-webview-reload" title="刷新">⟳</button>
         <input id="siyuan-webview-url" style="flex:1;padding:4px" value="${url}" />
-        <button id="siyuan-webview-open" title="在新窗口打开">新窗口打开</button>
+        <button id="siyuan-webview-open" title="浏览器打开">浏览器打开</button>
       </div>
       <div id="siyuan-webview-container" style="flex:1;position:relative;min-height:200px;overflow:hidden;"></div>
     </div>`,
