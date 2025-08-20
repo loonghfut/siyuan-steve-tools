@@ -1,9 +1,30 @@
+import { updateBlock } from "@/api/api";
 import { NetworkClient } from "@/api/network";
 import { showMessage } from "siyuan";
 
 
 export async function ChangeLinkStyle(url?: string, blockId?: string) {
-    showMessage(`测试中: ${url}, ${blockId}`)
+  showMessage(`测试中: ${url}, ${blockId}`)
+  updateBlock("markdown", `<iframe src="${url}" width="600" height="400"></iframe>
+{: custom-st-wps="2"}`, blockId);
+}
+
+
+/**
+ * 提取一个 NodeIFrame 块中的 data-node-id 与 iframe url
+ * @param blockEl 传入的块元素（detail.blockElements[0]）
+ * @returns { id: string; url: string } | null
+ */
+export function extractIframeBlockInfo(blockEl: Element | null | undefined): { id: string; url: string } | null {
+  if (!blockEl) return null;
+  const id = (blockEl.getAttribute?.('data-node-id')) || '';
+  if (!id) return null;
+  // 兼容 data-src 情况
+  const iframe = blockEl.querySelector?.('iframe');
+  if (!iframe) return null;
+  const url = iframe.getAttribute('src') || iframe.getAttribute('data-src') || '';
+  if (!url) return null;
+  return { id, url };
 }
 
 
@@ -13,14 +34,10 @@ export async function ChangeLinkStyle(url?: string, blockId?: string) {
 
 
 
-
-
-
-
 export interface RunWpsScriptSyncParams {
-    url: string;
-    token: string;
-    context?: any;
+  url: string;
+  token: string;
+  context?: any;
 }
 /**
  * 同步执行 WPS 脚本
@@ -36,42 +53,42 @@ export interface RunWpsScriptSyncParams {
  * @returns Promise<{result: string, logs: any[], error: string, status: string}>
  */
 export async function runWpsScriptSync(
-    params: RunWpsScriptSyncParams
+  params: RunWpsScriptSyncParams
 ): Promise<{ result: string, logs: any[], error: string, status: string }> {
-    const { url, token, context = {} } = params;
-    if (!url || !token) {
-        throw new Error("URL 和 Token 不能为空");
-    }
-    const body = JSON.stringify({ Context: context });
+  const { url, token, context = {} } = params;
+  if (!url || !token) {
+    throw new Error("URL 和 Token 不能为空");
+  }
+  const body = JSON.stringify({ Context: context });
 
-    const networkClient = new NetworkClient({
-        serverUrl: "", // 留空或填写实际服务地址
-        useProxy: true,
-    });
+  const networkClient = new NetworkClient({
+    serverUrl: "", // 留空或填写实际服务地址
+    useProxy: true,
+  });
 
-    const res = await networkClient.request({
-        method: "POST",
-        path: url,
-        body,
-        headers: {
-            "Content-Type": "application/json",
-            "AirScript-Token": token,
-        },
-        timeout: 15000,
-        contentType: "application/json"
-    });
+  const res = await networkClient.request({
+    method: "POST",
+    path: url,
+    body,
+    headers: {
+      "Content-Type": "application/json",
+      "AirScript-Token": token,
+    },
+    timeout: 15000,
+    contentType: "application/json"
+  });
 
-    if (!res.ok) {
-        throw new Error(`请求失败: ${res.status} ${res.statusText}`);
-    }
+  if (!res.ok) {
+    throw new Error(`请求失败: ${res.status} ${res.statusText}`);
+  }
 
-    const json = await res.json();
-    return {
-        result: json.data?.result ?? "",
-        logs: json.data?.logs ?? [],
-        error: json.error ?? "",
-        status: json.status ?? ""
-    };
+  const json = await res.json();
+  return {
+    result: json.data?.result ?? "",
+    logs: json.data?.logs ?? [],
+    error: json.error ?? "",
+    status: json.status ?? ""
+  };
 }
 
 
