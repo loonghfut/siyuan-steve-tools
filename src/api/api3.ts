@@ -1,3 +1,5 @@
+import { showMessage } from "siyuan";
+
 export function escapeHtml(s: string) {
     return String(s || "")
         .replace(/&/g, "&amp;")
@@ -100,77 +102,3 @@ export async function generateLinkCard(url: string): Promise<string> {
     }
 }
 
-// 拦截链接卡片点击，避免直接跳转外部浏览器
-export interface LinkCardInterceptOptions {
-    root?: ParentNode;                 // 监听范围，默认 document
-    openExternally?: boolean;          // true 则仍然外部打开
-    preventDefault?: boolean;          // 默认 true：阻止默认跳转
-    onClick?: (url: string, e: MouseEvent, anchor: HTMLAnchorElement) => void; // 自定义处理
-    filter?: (url: string, anchor: HTMLAnchorElement) => boolean;             // 返回 false 可跳过拦截
-}
-
-/**
- * interceptLinkCardClicks({
- *   onClick: (url)=>{ /* 在这里用思源 API 打开 / 预览 *\/ }
- * });
- * 返回值为取消绑定函数。
- */
-export function interceptLinkCardClicks(options: LinkCardInterceptOptions = {}) {
-    if (typeof document === "undefined") return () => {};
-    const {
-        root = document,
-        openExternally = false,
-        preventDefault = true,
-        onClick,
-        filter
-    } = options;
-
-    const handler = (e: Event) => {
-        const target = (e.target as HTMLElement)?.closest?.("a.link-card") as HTMLAnchorElement | null;
-        if (!target) return;
-        const url = target.getAttribute("data-link") || target.href;
-        if (!url) return;
-
-        if (filter && filter(url, target) === false) return;
-
-        if (preventDefault) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        if (onClick) {
-            onClick(url, e as MouseEvent, target);
-            return;
-        }
-
-        if (openExternally) {
-            window.open(url, "_blank", "noopener");
-            return;
-        }
-
-        // 默认行为：尝试使用思源内部 API（若存在），否则不跳转（留给 onClick）
-        const w: any = window;
-        if (w?.siyuan?.ws) {
-            // 尝试调用思源 RPC（根据思源版本可能不同，以下为示例，可按实际 API 调整）
-            try {
-                // 假设存在统一 openURL 接口；若无请替换为当前版本合适的调用
-                w.siyuan?.ws?.send?.("api/system/openURL", { url });
-            } catch {
-                // 回退外部
-                window.open(url, "_blank", "noopener");
-            }
-        } else {
-            // 没有思源环境：回退外部
-            window.open(url, "_blank", "noopener");
-        }
-    };
-
-    root.addEventListener("click", handler, true); // 捕获阶段优先阻止
-    return () => root.removeEventListener("click", handler, true);
-}
-
-// 使用示例：
-// const dispose = interceptLinkCardClicks({
-//   onClick: (url)=>{ console.log("自定义处理:", url); },
-//   preventDefault: true
-// });

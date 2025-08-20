@@ -3,7 +3,7 @@ import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
 import {createWebviewDock_for_wps, } from "@/api/api2";
-import { generateLinkCard } from "@/api/api3";
+import { generateLinkCard, interceptLinkCardClicks } from "@/api/api3";
 
 
 export class WpsDataServ {
