@@ -2,7 +2,7 @@ import { appendBlock } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
-import {createWebviewDock_for_wps, } from "@/api/api2";
+import { createWebviewDock_for_wps, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
 
 
@@ -35,7 +35,7 @@ export class WpsDataServ {
             containerClass: "wps-data-dock-container",
             iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
             pointerEventsDelay: 300,
-            zoom: 1 ,
+            zoom: 1,
         });
 
         this.plugin.addTopBar({
@@ -43,8 +43,19 @@ export class WpsDataServ {
             title: "WPS数据处理",
             position: "right",
             callback: async () => {
-                const cardHtml = await generateLinkCard(this.settingdata["wps-data-weburl"]);
-                appendBlock("markdown",cardHtml,"20250816200734-6ii2m03");
+                const cardHtml = await generateLinkCard(this.settingdata["wps-data-weburl"], [{
+                    id: 'fav',
+                    title: '收藏',
+                    text: '★',
+                    onClick: "console.log('收藏', arguments);"
+                },
+                {
+                    id: 'more',
+                    title: '更多',
+                    text: '⋯',
+                    onClick: "console.log('更多');"
+                }]);
+                appendBlock("markdown", cardHtml, "20250816200734-6ii2m03");
             }
         });
     }
