@@ -10,7 +10,7 @@ export const wpsDefaults: Record<string, any> = {
     "wps-airscript-token": "",
     "wps-pic-url": "",
     "wps-data-weburl": "",
-    "wps-file-weburl": "",
+    "wps-file-weburl": "https://www.kdocs.cn/latest",
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
