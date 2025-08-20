@@ -105,7 +105,13 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
             : "";
 
         // 公共样式（会重复插入，多次插入浏览器会去重；如需只插入一次，可在外部自行抽取）
-        const styleBlock = actions.length ? `<style>\n.link-card-actions .btn{min-width:${btnWidth}px;height:32px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;color:var(--fc-button-text-color);background:var(--fc-button-bg-color);border:1px solid var(--fc-button-border-color);border-radius:8px;cursor:pointer;box-shadow:var(--b3-dialog-shadow);transition:background .15s,border-color .15s,transform .06s,box-shadow .15s;backdrop-filter:blur(4px);-webkit-tap-highlight-color:transparent;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:var(--fc-button-hover-bg-color);border-color:var(--fc-button-hover-border-color);outline:none;}\n.link-card-actions .btn:active{background:var(--fc-button-active-bg-color);border-color:var(--fc-button-active-border-color);transform:translateY(1px);}\n</style>` : "";
+        const styleBlock = actions.length ? `<style>\n.link-card-actions .btn{min-width:${btnWidth}px;height:32px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;
+        color:var(--fc-button-text-color);
+        background:var(--fc-button-bg-color);
+        border:1px solid var(--fc-button-border-color);
+        border-radius:8px;cursor:pointer;
+        box-shadow:var(--b3-dialog-shadow);
+        transition:background .15s,border-color .15s,transform .06s,box-shadow .15s;backdrop-filter:blur(4px);-webkit-tap-highlight-color:transparent;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:var(--fc-button-hover-bg-color);border-color:var(--fc-button-hover-border-color);outline:none;}\n.link-card-actions .btn:active{background:var(--fc-button-active-bg-color);border-color:var(--fc-button-active-border-color);transform:translateY(1px);}\n</style>` : "";
 
         const cardHtml = `
 <div class="link-card-wrapper" contenteditable="false" style="display:block;">

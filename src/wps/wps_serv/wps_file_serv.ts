@@ -3,6 +3,7 @@ import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
+import { generateLinkCard } from "@/api/api3";
 
 
 export class WpsFileServ {
@@ -23,10 +24,23 @@ export class WpsFileServ {
         // this.plugin.eventBus.on("switch-protyle", (e) => {
         //     this.protyle = e.detail.protyle;
         // });
-        const handleWpsFileInsert = (e: { webview: any; getCurrentUrl: () => string }) => {
+        const handleWpsFileInsert = async (e: { webview: any; getCurrentUrl: () => string }) => {
             // 后续在这里扩展插入逻辑，webview 可用于与 iframe 通信
             const fileurl = e.getCurrentUrl();
-            appendBlock("markdown", `<iframe src="${fileurl}" width="600" height="400"></iframe>`, this.cursorID);
+            const cardHtml = await generateLinkCard(fileurl, [{
+                id: 'fav',
+                title: '收藏',
+                text: '★',
+                onClick: "console.log('收藏', window);"
+            },
+            {
+                id: 'more',
+                title: '更多',
+                text: '⋯',
+                onClick: "console.log('更多');"
+            }]);
+            appendBlock("markdown", cardHtml, this.cursorID);
+            // appendBlock("markdown", `<iframe src="${fileurl}" width="600" height="400"></iframe>`, this.cursorID);
             showMessage('插入完成', 1000, 'info');
         };
 

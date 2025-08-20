@@ -47,7 +47,7 @@ export class WpsDataServ {
                     id: 'fav',
                     title: '收藏',
                     text: '★',
-                    onClick: "console.log('收藏', arguments);"
+                    onClick: "console.log('收藏', window);"
                 },
                 {
                     id: 'more',
