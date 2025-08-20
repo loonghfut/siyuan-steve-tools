@@ -22,7 +22,7 @@ export class WpsPicServ {
         });
 
         this.plugin.addTopBar({
-            icon: "iconInfo",
+            icon: "iconImage",
             title: "WPS图片处理",
             position: "right",
             callback: async () => {

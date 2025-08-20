@@ -94,7 +94,7 @@ export class WpsFileServ {
             this.now_protyle = event.detail.protyle;
             this.cursorID_b = event.detail.protyle.block.id;
             this.cursorID = this.cursorID_b;
-            console.log("switch-image-protyle");
+            // console.log("switch-image-protyle");
         });
     }
 
