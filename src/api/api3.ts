@@ -84,11 +84,10 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
             catch { return url; }
         })();
 
-        // 计算右侧 padding（避免文字被按钮覆盖）
+        // 计算按钮整体宽度（用于 hover 时再扩展 padding）
         const btnWidth = 36; // 与样式中的最小宽度保持一致
         const gap = 8;
-        const totalBtnWidth = actions.length > 0 ? (actions.length * btnWidth + (actions.length - 1) * gap) : 0;
-        const rightPadding = 12 + (totalBtnWidth ? (totalBtnWidth + 4) : 0); // 额外 +4 微调
+        const totalBtnWidth = actions.length > 0 ? (actions.length * btnWidth + (actions.length - 1) * gap) : 0; // 不含左右额外空间
 
         // 生成按钮 HTML
         const actionsHtml = actions.length
@@ -105,14 +104,14 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
             : "";
 
         // 公共样式（会重复插入，多次插入浏览器会去重；如需只插入一次，可在外部自行抽取）
-        const styleBlock = actions.length ? `<style>\n/* 按钮显示控制：默认隐藏，hover 或按钮获得焦点显示 */\n.link-card-wrapper .link-card-actions{opacity:0;pointer-events:none;transition:opacity .18s ease, filter .18s ease;filter:blur(2px);}\n.link-card-wrapper:hover .link-card-actions,\n.link-card-wrapper .link-card-actions:focus-within{opacity:1;pointer-events:auto;filter:blur(0);}\n/* 按钮样式 */\n.link-card-actions .btn{min-width:${btnWidth}px;height:30px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--fc-button-text-color,#fff);background:var(--fc-button-bg-color,#2563eb);border:1px solid var(--fc-button-border-color,#2563eb);border-radius:7px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s,border-color .15s,transform .08s,box-shadow .15s, color .15s;backdrop-filter:blur(6px) saturate(160%);-webkit-tap-highlight-color:transparent;user-select:none;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:var(--fc-button-hover-bg-color,#1d4ed8);border-color:var(--fc-button-hover-border-color,#1d4ed8);outline:none;}\n.link-card-actions .btn:active{background:var(--fc-button-active-bg-color,#1e40af);border-color:var(--fc-button-active-border-color,#1e40af);transform:translateY(1px);}\n.link-card-actions .btn:disabled{opacity:.55;cursor:not-allowed;transform:none;}\n</style>` : "";
+        const styleBlock = actions.length ? `<style>\n/* 按钮显示控制：默认隐藏，不占初始布局。hover 或内聚焦时显示并为按钮腾出空间 */\n.link-card-wrapper.with-actions{--_ac-pad-extra:calc(var(--_actions-width,0px) + 12px);}/* 12px = 右侧原始内边距 */\n.link-card-wrapper.with-actions .link-card-inner{padding-right:12px;transition:padding-right .18s ease;}\n.link-card-wrapper.with-actions:hover .link-card-inner,\n.link-card-wrapper.with-actions:focus-within .link-card-inner{padding-right:var(--_ac-pad-extra);}\n.link-card-wrapper.with-actions .link-card-actions{opacity:0;pointer-events:none;transition:opacity .18s ease, filter .18s ease;filter:blur(2px);}\n.link-card-wrapper.with-actions:hover .link-card-actions,\n.link-card-wrapper.with-actions .link-card-actions:focus-within,\n.link-card-wrapper.with-actions:focus-within .link-card-actions{opacity:1;pointer-events:auto;filter:blur(0);}\n/* 按钮容器定位 */\n.link-card-wrapper.with-actions .link-card-actions{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;gap:${gap}px;z-index:2;}\n/* 按钮样式 */\n.link-card-actions .btn{min-width:${btnWidth}px;height:30px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--fc-button-text-color,#fff);background:var(--fc-button-bg-color,#2563eb);border:1px solid var(--fc-button-border-color,#2563eb);border-radius:7px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s,border-color .15s,transform .08s,box-shadow .15s,color .15s,opacity .18s;backdrop-filter:blur(6px) saturate(160%);-webkit-tap-highlight-color:transparent;user-select:none;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:var(--fc-button-hover-bg-color,#1d4ed8);border-color:var(--fc-button-hover-border-color,#1d4ed8);outline:none;}\n.link-card-actions .btn:active{background:var(--fc-button-active-bg-color,#1e40af);border-color:var(--fc-button-active-border-color,#1e40af);transform:translateY(1px);}\n.link-card-actions .btn:disabled{opacity:.55;cursor:not-allowed;transform:none;}\n</style>` : "";
 
         const cardHtml = `
-<div class="link-card-wrapper" contenteditable="false" style="display:block;">
+<div class="link-card-wrapper${actions.length ? ' with-actions' : ''}" contenteditable="false" style="display:block;${actions.length ? `--_actions-width:${totalBtnWidth}px;` : ''}">
   <a class="link-card" data-link="${escapeHtml(url)}" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
      contenteditable="false"
      style="text-decoration:none;color:inherit;display:block;cursor:pointer;">
-    <div style="position:relative;display:flex;align-items:center;gap:12px;border:1px solid ${colors.border};padding:12px ${rightPadding}px 12px 12px;border-radius:10px;box-shadow:${colors.shadow};background:var(--b3-theme-background,${colors.bgFallback});transition:background .25s,border-color .25s,box-shadow .25s;">
+    <div class="link-card-inner" style="position:relative;display:flex;align-items:center;gap:12px;border:1px solid ${colors.border};padding:12px;border-radius:10px;box-shadow:${colors.shadow};background:var(--b3-theme-background,${colors.bgFallback});transition:background .25s,border-color .25s,box-shadow .25s;">
       <img src="${escapeHtml(icon)}" alt="${escapeHtml(domain)}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#fff0;" />
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--b3-theme-on-background,${colors.title});">${escapeHtml(title)}</div>
@@ -136,17 +135,14 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
             const onClick = `(function(e){e.stopPropagation();e.preventDefault();try{${onClickBody}}catch(err){console.error('linkCard action error',err);if(window.showMessage){window.showMessage('Action error: '+err,'error');}}})(event)`;
             return `<button type=\"button\" class=\"${cls}\" title=\"${titleAttr}\" aria-label=\"${titleAttr}\" onclick=\"${onClick}\">${inner}</button>`;
         }).join("")}</div>` : "";
-        const btnWidth = 36;
-        const gap = 8;
-        const totalBtnWidth = actions.length > 0 ? (actions.length * btnWidth + (actions.length - 1) * gap) : 0;
-        const rightPadding = 12 + (totalBtnWidth ? (totalBtnWidth + 4) : 0);
-        const styleBlock = actions.length ? `\n<style>\n.link-card-wrapper .link-card-actions{opacity:0;pointer-events:none;transition:opacity .18s ease, filter .18s ease;filter:blur(2px);}\n.link-card-wrapper:hover .link-card-actions,\n.link-card-wrapper .link-card-actions:focus-within{opacity:1;pointer-events:auto;filter:blur(0);}\n.link-card-actions .btn{min-width:${btnWidth}px;height:30px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:#fff;background:#6b7280;border:1px solid #6b7280;border-radius:7px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s,border-color .15s,transform .08s,box-shadow .15s;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:#4b5563;}\n.link-card-actions .btn:active{background:#374151;transform:translateY(1px);}\n</style>` : "";
+        const btnWidth = 36; const gap = 8; const totalBtnWidth = actions.length > 0 ? (actions.length * btnWidth + (actions.length - 1) * gap) : 0;
+        const styleBlock = actions.length ? `\n<style>\n.link-card-wrapper.with-actions{--_ac-pad-extra:calc(var(--_actions-width,0px) + 12px);}\n.link-card-wrapper.with-actions .link-card-inner{padding-right:12px;transition:padding-right .18s ease;}\n.link-card-wrapper.with-actions:hover .link-card-inner,\n.link-card-wrapper.with-actions:focus-within .link-card-inner{padding-right:var(--_ac-pad-extra);}\n.link-card-wrapper.with-actions .link-card-actions{opacity:0;pointer-events:none;transition:opacity .18s ease, filter .18s ease;filter:blur(2px);}\n.link-card-wrapper.with-actions:hover .link-card-actions,\n.link-card-wrapper.with-actions .link-card-actions:focus-within,\n.link-card-wrapper.with-actions:focus-within .link-card-actions{opacity:1;pointer-events:auto;filter:blur(0);}\n.link-card-wrapper.with-actions .link-card-actions{position:absolute;right:12px;top:50%;transform:translateY(-50%);display:flex;gap:${gap}px;z-index:2;}\n.link-card-actions .btn{min-width:${btnWidth}px;height:30px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:#fff;background:#6b7280;border:1px solid #6b7280;border-radius:7px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s,border-color .15s,transform .08s,box-shadow .15s;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:#4b5563;}\n.link-card-actions .btn:active{background:#374151;transform:translateY(1px);}\n</style>` : "";
         return `
-<div class="link-card-wrapper" contenteditable="false" style="display:block;">
+<div class="link-card-wrapper${actions.length ? ' with-actions' : ''}" contenteditable="false" style="display:block;${actions.length ? `--_actions-width:${totalBtnWidth}px;` : ''}">
   <a class="link-card" data-link="${escapeHtml(url)}" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
      contenteditable="false"
      style="text-decoration:none;color:inherit;display:block;cursor:pointer;">
-    <div style="position:relative;display:flex;align-items:center;gap:12px;border:1px solid ${colors.border};padding:12px ${rightPadding}px 12px 12px;border-radius:10px;background:var(--b3-theme-background,${colors.bgFallback});">
+  <div class="link-card-inner" style="position:relative;display:flex;align-items:center;gap:12px;border:1px solid ${colors.border};padding:12px;border-radius:10px;background:var(--b3-theme-background,${colors.bgFallback});transition:padding-right .18s ease;">
       <div style="width:48px;height:48px;border-radius:8px;background:${colors.letterBg};display:flex;align-items:center;justify-content:center;font-weight:600;color:var(--b3-theme-on-background,${colors.letterColor});font-size:18px;">
         ${escapeHtml((domain || "").charAt(0).toUpperCase())}
       </div>
