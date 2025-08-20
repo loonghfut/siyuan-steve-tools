@@ -1,7 +1,7 @@
 import { appendBlock, generateSiyuanID, updateBlock } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
-import { ChangeLinkStyle, extractIframeBlockInfo, runWpsScriptSync } from "../wps_api";
+import { ChangeLinkStyle, extractIframeBlockInfo} from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
 
