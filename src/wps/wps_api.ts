@@ -367,14 +367,25 @@ export async function ShowLinkContent(url: string) {
  */
 export function extractIframeBlockInfo(blockEl: Element | null | undefined): { id: string; url: string } | null {
   if (!blockEl) return null;
-  const id = (blockEl.getAttribute?.('data-node-id')) || '';
+  const id = blockEl.getAttribute?.('data-node-id') || '';
   if (!id) return null;
-  // 兼容 data-src 情况
+
+  // 优先尝试 iframe（包含 data-src）
   const iframe = blockEl.querySelector?.('iframe');
-  if (!iframe) return null;
-  const url = iframe.getAttribute('src') || iframe.getAttribute('data-src') || '';
-  if (!url) return null;
-  return { id, url };
+  const iframeUrl = iframe?.getAttribute('src') || iframe?.getAttribute('data-src') || '';
+  if (iframeUrl) return { id, url: iframeUrl };
+
+  // 尝试标准 <a href="...">
+  const aEl = blockEl.querySelector?.('a[href]');
+  const aUrl = aEl?.getAttribute('href') || '';
+  if (aUrl) return { id, url: aUrl };
+
+  // 尝试带 data-href 的元素（例如 <span data-type="a" data-href="...">）
+  const dataHrefEl = blockEl.querySelector?.('[data-href]');
+  const dataHrefUrl = dataHrefEl?.getAttribute('data-href') || '';
+  if (dataHrefUrl) return { id, url: dataHrefUrl };
+
+  return null;
 }
 
 

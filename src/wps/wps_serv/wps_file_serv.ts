@@ -91,6 +91,7 @@ export class WpsFileServ {
     }
 
     async blockIconEvent({ detail }: any) {
+        console.log("WPS File Block Icon Clicked:", detail);
         const info = extractIframeBlockInfo(detail.blockElements?.[0]);
         if (!info) {
             // showMessage('未识别到可转换的 iframe 块', 2000, 'error');
