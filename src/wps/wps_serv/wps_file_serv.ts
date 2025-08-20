@@ -41,7 +41,8 @@ export class WpsFileServ {
             },
             ]);
             appendBlock("markdown",
-                `<div>${cardHtml}</div>`
+                `<div>${cardHtml}</div>
+{: id="${blockId}"  custom-st-wps="1"}`
                 , this.cursorID);
             // appendBlock("markdown", `<iframe src="${fileurl}" width="600" height="400"></iframe>`, this.cursorID);
             showMessage('插入完成', 1000, 'info');
