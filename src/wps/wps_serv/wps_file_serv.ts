@@ -4,7 +4,7 @@ import { IProtyle, showMessage } from "siyuan";
 import { ChangeLinkStyle, extractIframeBlockInfo, ShowLinkContent } from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
-
+import * as ic from "@/icon"
 declare global {
     interface Window {
         wps?: any;
@@ -25,6 +25,14 @@ export class WpsFileServ {
 
     async init(settingdata: any) {
         this.settingdata = settingdata;
+
+        this.plugin.addIcons(`
+                <symbol id="iconSTwps" viewBox="0 0 32 32">
+                   ${ic.steveTools_wps}
+                </symbol>
+            `)
+
+
         // 初始化全局函数
         window.wps = {
             ChangeLinkStyle,
@@ -62,7 +70,7 @@ export class WpsFileServ {
             config: {
                 position: "RightTop",
                 size: { width: 500, height: 0 },
-                icon: "iconCloud",
+                icon: "iconSTwps",
                 title: "WPS文件",
             },
             buttons: [
