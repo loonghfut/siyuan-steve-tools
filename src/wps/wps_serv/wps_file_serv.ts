@@ -62,7 +62,7 @@ export class WpsFileServ {
             config: {
                 position: "RightTop",
                 size: { width: 500, height: 0 },
-                icon: "iconInfo",
+                icon: "iconCloud",
                 title: "WPS文件",
             },
             buttons: [
