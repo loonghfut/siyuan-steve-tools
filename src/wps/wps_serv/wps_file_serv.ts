@@ -1,7 +1,7 @@
 import { appendBlock, generateSiyuanID, updateBlock } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
-import { ChangeLinkStyle, extractIframeBlockInfo} from "../wps_api";
+import { ChangeLinkStyle, extractIframeBlockInfo, ShowLinkContent } from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
 
@@ -28,6 +28,7 @@ export class WpsFileServ {
         // 初始化全局函数
         window.wps = {
             ChangeLinkStyle,
+            ShowLinkContent,
         };
 
 
@@ -41,6 +42,12 @@ export class WpsFileServ {
                 text: '★',
                 onClick: `window.wps.ChangeLinkStyle('${fileurl}', '${blockId}');`
             },
+            {
+                id: 'show',
+                title: '预览',
+                text: '🔍',
+                onClick: `window.wps.ShowLinkContent('${fileurl}');`
+            }
             ]);
             appendBlock("markdown",
                 `<div>${cardHtml}</div>
@@ -101,6 +108,12 @@ export class WpsFileServ {
                     text: '★',
                     onClick: `window.wps.ChangeLinkStyle('${info.url}', '${info.id}');`
                 },
+                {
+                    id: 'show',
+                    title: '预览',
+                    text: '🔍',
+                    onClick: `window.wps.ShowLinkContent('${info.url}');`
+                }
                 ]);
                 updateBlock("markdown",
                     `<div>${cardHtml}</div>
