@@ -15,18 +15,18 @@ export function escapeHtml(s: string) {
  * - 若抓取失败则使用 favicon 服务或首字母占位图
  */
 export interface LinkCardAction {
-  /** 按钮唯一 id（用于生成 class） */
-  id?: string;
-  /** 按钮标题 / 提示 */
-  title?: string;
-  /** 按钮显示文本（若提供 html 则忽略）*/
-  text?: string;
-  /** 自定义按钮内部 html（不转义，需自行保证安全） */
-  html?: string;
-  /** onclick 回调主体代码（函数体部分，会自动包装 e.stopPropagation 等） */
-  onClick?: string;
-  /** 额外类名 */
-  className?: string;
+    /** 按钮唯一 id（用于生成 class） */
+    id?: string;
+    /** 按钮标题 / 提示 */
+    title?: string;
+    /** 按钮显示文本（若提供 html 则忽略）*/
+    text?: string;
+    /** 自定义按钮内部 html（不转义，需自行保证安全） */
+    html?: string;
+    /** onclick 回调主体代码（函数体部分，会自动包装 e.stopPropagation 等） */
+    onClick?: string;
+    /** 额外类名 */
+    className?: string;
 }
 
 /**
@@ -39,8 +39,8 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
     const isDark =
         (typeof document !== "undefined" &&
             (document.documentElement.classList.contains("dark")
-             || document.documentElement.classList.contains("theme-dark")
-             || document.body.classList.contains("b3-theme-dark"))) ||
+                || document.documentElement.classList.contains("theme-dark")
+                || document.body.classList.contains("b3-theme-dark"))) ||
         (typeof window !== "undefined" &&
             window.matchMedia &&
             window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -105,13 +105,7 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
             : "";
 
         // 公共样式（会重复插入，多次插入浏览器会去重；如需只插入一次，可在外部自行抽取）
-        const styleBlock = actions.length ? `<style>\n.link-card-actions .btn{min-width:${btnWidth}px;height:32px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;
-        color:var(--fc-button-text-color);
-        background:var(--fc-button-bg-color);
-        border:1px solid var(--fc-button-border-color);
-        border-radius:8px;cursor:pointer;
-        box-shadow:var(--b3-dialog-shadow);
-        transition:background .15s,border-color .15s,transform .06s,box-shadow .15s;backdrop-filter:blur(4px);-webkit-tap-highlight-color:transparent;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:var(--fc-button-hover-bg-color);border-color:var(--fc-button-hover-border-color);outline:none;}\n.link-card-actions .btn:active{background:var(--fc-button-active-bg-color);border-color:var(--fc-button-active-border-color);transform:translateY(1px);}\n</style>` : "";
+        const styleBlock = actions.length ? `<style>\n/* 按钮显示控制：默认隐藏，hover 或按钮获得焦点显示 */\n.link-card-wrapper .link-card-actions{opacity:0;pointer-events:none;transition:opacity .18s ease, filter .18s ease;filter:blur(2px);}\n.link-card-wrapper:hover .link-card-actions,\n.link-card-wrapper .link-card-actions:focus-within{opacity:1;pointer-events:auto;filter:blur(0);}\n/* 按钮样式 */\n.link-card-actions .btn{min-width:${btnWidth}px;height:30px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--fc-button-text-color,#fff);background:var(--fc-button-bg-color,#2563eb);border:1px solid var(--fc-button-border-color,#2563eb);border-radius:7px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s,border-color .15s,transform .08s,box-shadow .15s, color .15s;backdrop-filter:blur(6px) saturate(160%);-webkit-tap-highlight-color:transparent;user-select:none;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:var(--fc-button-hover-bg-color,#1d4ed8);border-color:var(--fc-button-hover-border-color,#1d4ed8);outline:none;}\n.link-card-actions .btn:active{background:var(--fc-button-active-bg-color,#1e40af);border-color:var(--fc-button-active-border-color,#1e40af);transform:translateY(1px);}\n.link-card-actions .btn:disabled{opacity:.55;cursor:not-allowed;transform:none;}\n</style>` : "";
 
         const cardHtml = `
 <div class="link-card-wrapper" contenteditable="false" style="display:block;">
@@ -146,7 +140,7 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
         const gap = 8;
         const totalBtnWidth = actions.length > 0 ? (actions.length * btnWidth + (actions.length - 1) * gap) : 0;
         const rightPadding = 12 + (totalBtnWidth ? (totalBtnWidth + 4) : 0);
-        const styleBlock = actions.length ? `\n<style>\n.link-card-actions .btn{min-width:${btnWidth}px;height:32px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;color:#fff;background:#6b7280;border:1px solid #6b7280;border-radius:8px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2);transition:background .15s,transform .06s;}\n.link-card-actions .btn:hover{background:#4b5563;}\n.link-card-actions .btn:active{background:#374151;transform:translateY(1px);}\n</style>` : "";
+        const styleBlock = actions.length ? `\n<style>\n.link-card-wrapper .link-card-actions{opacity:0;pointer-events:none;transition:opacity .18s ease, filter .18s ease;filter:blur(2px);}\n.link-card-wrapper:hover .link-card-actions,\n.link-card-wrapper .link-card-actions:focus-within{opacity:1;pointer-events:auto;filter:blur(0);}\n.link-card-actions .btn{min-width:${btnWidth}px;height:30px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:#fff;background:#6b7280;border:1px solid #6b7280;border-radius:7px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:background .15s,border-color .15s,transform .08s,box-shadow .15s;}\n.link-card-actions .btn:hover,.link-card-actions .btn:focus{background:#4b5563;}\n.link-card-actions .btn:active{background:#374151;transform:translateY(1px);}\n</style>` : "";
         return `
 <div class="link-card-wrapper" contenteditable="false" style="display:block;">
   <a class="link-card" data-link="${escapeHtml(url)}" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer"
