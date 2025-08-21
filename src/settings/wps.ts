@@ -1,4 +1,4 @@
-import { airscript_pic_code } from "@/wps/wps_api";
+import { airscript_data_code, airscript_pic_code } from "@/wps/wps_api";
 import type { SettingGroupDefinition, BuildContext } from "./types";
 import { showMessage } from "siyuan";
 
@@ -9,7 +9,7 @@ export const wpsDefaults: Record<string, any> = {
     "wps-data-enable": false,
     "wps-airscript-token": "",
     "wps-pic-url": "",
-    "wps-data-weburl": "",
+    "wps-data-url": "",
     "wps-file-weburl": "https://www.kdocs.cn/latest",
 };
 
@@ -33,7 +33,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
         {
             name: 'WPS图片管理',
             items: [
-                { type: "checkbox", title: "启用 WPS图片管理", description: "图片管理", key: "wps-pic-enable", value: ctx.settings["wps-pic-enable"] },
+                { type: "checkbox", title: "启用 WPS图片管理", description: "图片管理(限制：图片链接有效期不足1天）", key: "wps-pic-enable", value: ctx.settings["wps-pic-enable"] },
                 { type: "textinput", title: "图片脚本链接", description: "处理图片逻辑的链接", key: "wps-pic-url", value: ctx.settings["wps-pic-url"] },
                 {
                     type: "button",
@@ -54,7 +54,20 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: "WPS数据导入",
             items: [
                 { type: "checkbox", title: "启用 WPS数据导入", description: "数据导入", key: "wps-data-enable", value: ctx.settings["wps-data-enable"] },
-                { type: "textinput", title: "数据收集表", description: "多维表中收集表的链接", key: "wps-data-weburl", value: ctx.settings["wps-data-weburl"] },
+                { type: "textinput", title: "数据导入脚本链接", description: "多维表格数据导入链接", key: "wps-data-url", value: ctx.settings["wps-data-url"] },
+                {
+                    type: "button",
+                    title: "复制数据导入处理脚本到剪切板",
+                    description: "点击复制 AirScript 数据导入处理代码",
+                    key: "wps-data-copy-script",
+                    value: "",
+                    button: {
+                        label: "复制",
+                        callback: () => {
+                            copyDataScriptToClipboard();
+                        }
+                    }
+                },
             ]
         }
     ]
@@ -69,3 +82,10 @@ function copyImageScriptToClipboard() {
     });
 }
 
+function copyDataScriptToClipboard() {
+    navigator.clipboard.writeText(airscript_data_code).then(() => {
+        showMessage("数据导入处理脚本已复制到剪切板");
+    }).catch(err => {
+        showMessage("复制失败:" + err);
+    });
+}

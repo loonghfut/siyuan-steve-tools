@@ -523,5 +523,7 @@ function main() {
 }
 return main();`
 
+export const airscript_data_code =`
 
+`
 

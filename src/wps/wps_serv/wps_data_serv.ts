@@ -4,12 +4,13 @@ import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
 import { createWebviewDock_for_wps, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
-
+import * as ic from "@/icon"
 
 export class WpsDataServ {
     private settingdata: any;
     private plugin: steveTools;
     private protyle: IProtyle;
+    private topBarButton
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -17,48 +18,33 @@ export class WpsDataServ {
 
     async init(settingdata: any) {
         this.settingdata = settingdata;
-        // console.log("WpsPicServ initialized with settings:", this.settingdata);
-        // this.plugin.eventBus.on("switch-protyle", (e) => {
-        //     this.protyle = e.detail.protyle;
-        // });
-        createWebviewDock_for_wps({
-            plugin: this.plugin,
-            config: {
-                position: "RightTop",
-                size: { width: 500, height: 0 },
-                icon: "iconInfo",
-                title: "WPS",
-            },
-            type: "wps-data-dock",
-            url: this.settingdata["wps-data-weburl"],
-            emptyUrlMessage: "请先配置网址...",
-            containerClass: "wps-data-dock-container",
-            iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
-            pointerEventsDelay: 300,
-            zoom: 1,
-        });
-
-        this.plugin.addTopBar({
-            icon: "iconInfo",
-            title: "WPS数据处理",
+        this.plugin.addIcons(`
+            <symbol id="iconSTwps_data" viewBox="0 0 16 16">
+                ${ic.steveTools_wps_data}
+            </symbol>
+            <symbol id="iconSTwps_data2" viewBox="0 0 55 55">
+                ${ic.steveTools_wps_data2}
+            </symbol>
+            `);
+        this.topBarButton = this.plugin.addTopBar({
+            icon: "iconSTwps_data2",
+            title: "导入WPS数据", 
             position: "right",
             callback: async () => {
-                const cardHtml = await generateLinkCard(this.settingdata["wps-data-weburl"], [{
-                    id: 'fav',
-                    title: '收藏',
-                    text: '★',
-                    onClick: "console.log('收藏', window);"
-                },
-                {
-                    id: 'more',
-                    title: '更多',
-                    text: '⋯',
-                    onClick: "console.log('更多');"
-                }]);
-                appendBlock("markdown", cardHtml, "20250816200734-6ii2m03");
+                console.log("导入WPS数据");
+                this.updateTopBarIcon("iconSTwps_data");
             }
         });
+
     }
 
+    private updateTopBarIcon(iconName: string) {
+        if (this.topBarButton) {
+            const svgUse = this.topBarButton.querySelector('svg use');
+            if (svgUse) {
+                svgUse.setAttribute('xlink:href', `#${iconName}`);
+            }
+        }
+    }
 
 }
