@@ -17,7 +17,7 @@ STEVETOOLS
 ### 自用中....自用中....自用中....
 #### 免费使用遇到问题不用反馈，若有BUG影响到我的使用，我自然会修，过了几个版本BUG还在，麻烦自己拉源码修。  
 若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。
-为方便和打赏用户沟通，故临时建了反馈QQ群，加之前请填一下[申请表](https://www.kdocs.cn/wo/sl/v1lC0R0)
+为方便和打赏用户沟通，故临时建了反馈QQ群（随时可能解散），加之前请填一下[申请表](https://www.kdocs.cn/wo/sl/v1lC0R0)
 
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
