@@ -6,7 +6,7 @@ import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
-
+import * as ic from "@/icon"
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
@@ -32,6 +32,11 @@ export class Dida365Service {
         console.log("Dida365Service initialized", this.todoListId);
         this.init();
 
+        this.plugin.addIcons(`
+            <symbol id="iconSTdida" viewBox="0 0 48 48">
+                ${ic.steveTools_dida}
+            </symbol>
+            `)
         // 将实例导出到 window 对象
         if (typeof window !== 'undefined' && !(window as any).Dida365Service) {
             (window as any).Dida365Service = this;
@@ -44,7 +49,7 @@ export class Dida365Service {
     private async init() {
         if (settingdata["cal-dida-sync-mode"] === "all" || settingdata["cal-dida-sync-mode"] === "manual") {
             this.plugin.addTopBar({
-                icon: "iconMp",
+                icon: "iconSTdida",
                 title: "导入滴答清单数据", // 标题可以考虑根据模式动态变化或在设置中说明
                 position: "right",
                 callback: async () => {
@@ -115,7 +120,7 @@ export class Dida365Service {
         this.linkInterceptor = new DidaLinkInterceptor(showMessage);
         const dockConfig = createDidaDock({
             title: "滴答清单",
-            icon: "iconMp",
+            icon: "iconSTdida",
             type: "dida-dock",
             position: "RightTop",
             size: { width: 350, height: 0 },

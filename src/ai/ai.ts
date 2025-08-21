@@ -12,7 +12,7 @@ export class M_ai {
     public url = "";
     async init(settingdata: any) {
         this.plugin.addIcons(`
-            <symbol id="iconSTai" viewBox="0 0 900 900">
+            <symbol id="iconSTai" viewBox="0 0 48 48">
                ${ic.steveTools_ai}
             </symbol>  
                 `);
