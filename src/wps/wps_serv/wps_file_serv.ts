@@ -15,7 +15,6 @@ export class WpsFileServ {
     private settingdata: any;
     private plugin: steveTools;
     // private protyle: IProtyle;
-    private now_protyle: IProtyle;
     private cursorID: string;
     private cursorID_b: string;
 
@@ -91,7 +90,6 @@ export class WpsFileServ {
         this.plugin.eventBus.on("click-blockicon", this.blockIconEvent.bind(this));
         this.plugin.eventBus.on("click-editorcontent", this.handleSelectionChange.bind(this));
         this.plugin.eventBus.on("switch-protyle", async (event) => {
-            this.now_protyle = event.detail.protyle;
             this.cursorID_b = event.detail.protyle.block.id;
             this.cursorID = this.cursorID_b;
             // console.log("switch-image-protyle");
