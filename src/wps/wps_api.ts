@@ -524,6 +524,239 @@ function main() {
 return main();`
 
 export const airscript_data_code =`
+function main() {
+  // 1. 基础配置（基于指定文档，可调整）
+  const TARGET_SHEET_NAME = "思源"; // 目标表名（参考Sheet _ AirScript文档.docx）
+  const MAX_RECORDS_PER_PAGE = 100; // 单页最大记录数（参考Record _ AirScript文档.docx）
+  let targetSheetId = null;
+  let allFieldInfo = []; // 缓存字段信息（复用对象，参考最佳实践 _ AirScript文档.docx）
+  const allRawRecords = []; // 存储所有分页记录
 
+  // 2. 查找目标表ID（基于Sheet _ AirScript文档.docx的GetSheets方法）
+  const app = Application;
+  const allSheets = app.Sheet.GetSheets();
+  for (let i = 0; i < allSheets.length; i++) {
+    const sheet = allSheets[i];
+    if (sheet.name !== null && sheet.name !== undefined && sheet.name === TARGET_SHEET_NAME) {
+      targetSheetId = sheet.id;
+      break;
+    }
+  }
+  if (targetSheetId === null) {
+    throw new Error(\`目标表不存在：\${TARGET_SHEET_NAME}（参考Sheet文档：表名需完全匹配）\`);
+  }
+
+  // 3. 缓存字段信息（基于Field _ AirScript文档.docx的GetFields方法，仅请求1次）
+  const fieldsResult = app.Field.GetFields({ SheetId: targetSheetId });
+  if (fieldsResult !== null && fieldsResult !== undefined) {
+    allFieldInfo = fieldsResult;
+  }
+
+  // 4. 分页读取核心逻辑（严格遵循Record _ AirScript文档.docx的nextOffset规范）
+  let currentOffset = ""; // 初始值为空字符串（符合Record文档“空字符串从第一条开始”的定义）
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    try {
+      // 调用Record文档的GetRecords，传入筛选条件（基于附录 _ AirScript文档.docx）
+      const pageResult = app.Record.GetRecords({
+        SheetId: targetSheetId,
+        Offset: currentOffset,
+        MaxRecords: MAX_RECORDS_PER_PAGE,
+        Filter: {
+          mode: "AND",
+          criteria: [{ field: "同步", op: "NotEqu", values: ["已发送"] }] // 符合附录筛选规则
+        }
+      });
+
+      // 处理当前页记录（基于Record文档返回的records数组）
+      const currentPageRecords = pageResult.records || [];
+      if (currentPageRecords.length > 0) {
+        allRawRecords.push(...currentPageRecords);
+      }
+
+      // 判断下一页（基于Record文档的nextOffset存在性）
+      if (pageResult.nextOffset !== undefined && pageResult.nextOffset !== null) {
+        currentOffset = pageResult.nextOffset;
+      } else {
+        hasNextPage = false;
+      }
+
+    } catch (error) {
+      throw new Error(\`分页读取失败（Offset=\${currentOffset}）：\${error.message}\`);
+    }
+  }
+
+  // 5. 字段格式处理（新增附件字段专属逻辑，基于附录 _ AirScript文档.docx）
+  if (allRawRecords.length === 0) {
+    return "[]";
+  }
+  const formattedRecords = allRawRecords.map(record => {
+    const formattedFields = {};
+    for (const fieldName in record.fields) {
+      if (!record.fields.hasOwnProperty(fieldName)) continue;
+
+      const fieldValue = record.fields[fieldName];
+      const fieldType = getFieldTypeFromCache(allFieldInfo, fieldName); // 复用缓存的字段类型
+
+      // 基于附录文档的字段类型处理，新增Attachment（附件）分支
+      switch (fieldType) {
+        case "Date":
+          formattedFields[fieldName] = fieldValue || ""; // 日期：保留原格式（yyyy/mm/dd）
+          break;
+        case "Time":
+          formattedFields[fieldName] = fieldValue || ""; // 时间：保留原格式（hh:mm:ss）
+          break;
+        case "MultipleSelect":
+          formattedFields[fieldName] = Array.isArray(fieldValue) ? fieldValue : []; // 多选项：数组格式
+          break;
+        case "Number":
+        case "Currency":
+        case "Percentage":
+          formattedFields[fieldName] = fieldValue !== null ? Number(fieldValue) : 0; // 数值：转为Number
+          break;
+        case "Checkbox":
+          formattedFields[fieldName] = fieldValue === true || fieldValue === "true"; // 复选框：布尔值
+          break;
+        // -------------------------- 新增：附件字段处理 --------------------------
+        case "Attachment":
+          const attachments = Array.isArray(fieldValue) ? fieldValue : [];
+          const processedAttachments = [];
+
+          // 使用for循环遍历附件
+          for (let i = 0; i < attachments.length; i++) {
+            const attachment = attachments[i];
+
+            // 跳过非对象类型的元素
+            if (typeof attachment !== 'object' || attachment === null) {
+              console.warn(\`第\${i + 1}个元素不是有效的附件对象，已跳过\`);
+              continue;
+            }
+
+            // 提取基础信息并设置默认值
+            let fileName = attachment.fileName;
+            if (!fileName) {
+              fileName = '未知文件名';
+            }
+
+            let linkUrl = attachment.linkUrl || '';
+            const size = attachment.size || 0;
+            let source = attachment.source || 'unknown';
+            const type = attachment.type || '';
+            const uploadId = attachment.uploadId || '';
+
+            // 如果是ks3上传的附件，并且有uploadId，则获取完整URL
+            if (source === 'upload_ks3' && uploadId) {
+              try {
+                linkUrl = app.Record.GetAttachmentURL({
+                  UploadId: uploadId,
+                  Source: "upload_ks3"
+                });
+              } catch (error) {
+                console.error(\`获取附件"\${fileName}"的URL失败:\`, error);
+                // 保留原始linkUrl作为备用
+              }
+            }
+
+            // 将处理后的附件添加到结果数组
+            processedAttachments.push({
+              fileName,
+              url: linkUrl,
+              size,
+              source,
+              type,
+              uploadId
+            });
+          }
+
+          // 更新格式化字段
+          formattedFields[fieldName] = processedAttachments;
+
+          // 调试信息
+          // console.log(\`处理后的\${fieldName}附件: \`, processedAttachments);
+          // console.log(\`共处理\${processedAttachments.length}个附件\`);
+          break;
+        // ----------------------------------------------------------------------
+        default:
+          formattedFields[fieldName] = fieldValue || ""; // 其他类型（文本/单选等）：保留原值
+          break;
+      }
+    }
+    return {
+      recordId: record.id || "", // 记录唯一ID（参考Record文档返回结构）
+      fields: formattedFields
+    };
+  });
+
+  console.log(\`分页读取完成：总记录数=\${allRawRecords.length}，含附件字段记录已预处理\`);
+  return formattedRecords;
+}
+
+/**
+ * 辅助函数：从缓存获取字段类型（基于Field _ AirScript文档.docx，复用对象优化性能）
+ * @param {Array} allFieldInfo - Field.GetFields返回的缓存字段信息
+ * @param {string} fieldName - 字段名
+ * @returns {string} 字段类型（如Attachment、MultiLineText等，参考附录文档）
+ */
+function getFieldTypeFromCache(allFieldInfo, fieldName) {
+  for (let i = 0; i < allFieldInfo.length; i++) {
+    const field = allFieldInfo[i];
+    if (field.name === fieldName) {
+      return field.type;
+    }
+  }
+  return ""; // 未找到字段时返回空（符合Field文档逻辑）
+}
+
+function batchSetSingleSelect() {
+  // 1. 基础配置（需按实际修改）
+  const SHEET_NAME = "思源"; // 目标表名（Sheet文档）
+  const FIELD_NAME = "同步"; // 单选字段名（Field文档）
+  const SET_VALUE = "已发送"; // 单选值（附录文档：需匹配现有选项）
+  const BATCH_SIZE = 50; // 单次批量数（最佳实践文档）
+  let sheetId = null, allRecords = [];
+
+  // 2. 找表ID（Sheet文档）
+  const sheets = Application.Sheet.GetSheets();
+  for (let i = 0; i < sheets.length; i++) {
+    if (sheets[i].name === SHEET_NAME) {
+      sheetId = sheets[i].id;
+      break;
+    }
+  }
+  if (!sheetId) throw new Error("表不存在");
+
+  // 3. 分页取待更新记录（Record文档）
+  let offset = "", hasNext = true;
+  while (hasNext) {
+    const res = Application.Record.GetRecords({
+      SheetId: sheetId,
+      Offset: offset,
+      MaxRecords: BATCH_SIZE,
+      Filter: { mode: "AND", criteria: [{ field: FIELD_NAME, op: "NotEqu", values: [SET_VALUE] }] } // 附录文档筛选
+    });
+    allRecords = allRecords.concat(res.records || []);
+    hasNext = res.nextOffset !== undefined && res.nextOffset !== null;
+    offset = res.nextOffset || "";
+  }
+  if (allRecords.length === 0) return "无待更新记录";
+
+  // 4. 批量设值（Record文档）
+  let success = 0;
+  for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
+    const batch = allRecords.slice(i, i + BATCH_SIZE).map(r => ({
+      id: r.id,
+      fields: { [FIELD_NAME]: SET_VALUE } // 附录文档：单选值为字符串
+    }));
+    Application.Record.UpdateRecords({ SheetId: sheetId, Records: batch });
+    success += batch.length;
+  }
+  return \`成功更新\${success}/\${allRecords.length}条\`;
+}
+
+
+const data = main();//获取记录数据
+batchSetSingleSelect();//标记已发送
+return data;
 `
 
