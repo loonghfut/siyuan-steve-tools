@@ -1,4 +1,4 @@
-import { appendBlock } from "@/api/api";
+import { appendBlock, createDailyNote } from "@/api/api";
 import steveTools from "@/index";
 import { IProtyle, showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
@@ -48,6 +48,15 @@ export class WpsDataServ {
                     .filter(s => s.length > 0);
                 const extract_data = extractFields(data, fieldList);
                 console.log("提取的WPS数据", extract_data);
+                // 写入思源日记
+                try {
+                    await this.insertIntoDailyNote(fieldList, extract_data);
+                    showMessage?.("WPS数据已写入日记");
+                } catch (e:any) {
+                    console.error("写入日记失败", e);
+                    showMessage?.("写入日记失败:" + e.message);
+                }
+                
                 this.updateTopBarIcon("iconSTwps_data");
             }
         });
@@ -61,6 +70,66 @@ export class WpsDataServ {
                 svgUse.setAttribute('xlink:href', `#${iconName}`);
             }
         }
+    }
+
+    private async insertIntoDailyNote(fieldList: string[], records: Array<Record<string, any>>) {
+        if (!records.length) return;
+        const notebookId = this.settingdata['wps-data-notebook'];
+        if (!notebookId) throw new Error('未配置 wps-data-notebook');
+        const dailyNoteResp = await createDailyNote(window.siyuan.ws.app.appId, notebookId);
+        const dailyNoteId = dailyNoteResp.id;
+
+        const templateStr: string = this.settingdata['wps-data-template'] || '';
+        let content: string;
+        if (templateStr.trim()) {
+            content = this.renderTemplate(templateStr, fieldList, records);
+        } else {
+            content = this.buildMarkdownTable(fieldList, records);
+        }
+        await appendBlock('markdown', content, dailyNoteId);
+    }
+
+    private buildMarkdownTable(fieldList: string[], records: Array<Record<string, any>>): string {
+        const header = ['序号', ...fieldList].join(' | ');
+        const sep = new Array(fieldList.length + 1).fill('---').join(' | ');
+        const lines = records.map((rec, idx) => {
+            const cols = fieldList.map(fn => this.formatFieldValue(rec[fn]));
+            return [String(idx + 1), ...cols].join(' | ');
+        });
+        return ['### WPS数据导入', '', header, sep, ...lines, ''].join('\n');
+    }
+
+    private formatFieldValue(v: any): string {
+        if (v === null || v === undefined) return '';
+        if (Array.isArray(v)) {
+            // 附件数组 [{fileName,url}]
+            if (v.length && typeof v[0] === 'object' && ('url' in v[0])) {
+                return v.map((it: any) => `[${it.fileName || '附件'}](${it.url || ''})`).join('<br/>');
+            }
+            return v.join('<br/>');
+        }
+        if (typeof v === 'object') {
+            try { return '`' + JSON.stringify(v) + '`'; } catch { return String(v); }
+        }
+        return String(v).replace(/\n/g, '<br/>');
+    }
+
+    // 极简模板渲染：支持 {{#records}}...{{/records}} 循环，内部可用 {{序号}} 与字段名占位符；附件字段会转为 markdown 链接集合
+    private renderTemplate(tpl: string, fieldList: string[], records: Array<Record<string, any>>): string {
+        const loopReg = /{{#records}}([\s\S]*?){{\/records}}/g;
+        return tpl.replace(loopReg, (_m, inner) => {
+            return records.map((rec, idx) => {
+                let seg = inner;
+                seg = seg.replace(/{{序号}}/g, String(idx + 1));
+                for (const f of fieldList) {
+                    const raw = rec[f];
+                    const rep = this.formatFieldValue(raw);
+                    const fEsc = f.replace(/[.*+?^${}()|[\]\\]/g, r=>`\\${r}`);
+                    seg = seg.replace(new RegExp('{{'+fEsc+'}}','g'), rep);
+                }
+                return seg;
+            }).join('\n');
+        }).replace(/{{字段列表}}/g, fieldList.join(', '));
     }
 
 }

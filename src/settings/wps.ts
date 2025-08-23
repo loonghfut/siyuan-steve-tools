@@ -12,6 +12,10 @@ export const wpsDefaults: Record<string, any> = {
     "wps-data-url": "",
     // 需要提取的字段列表，逗号分隔；可包含 (A) 标记表示附件
     "wps-data-fields": "field1,field2",
+    // 数据插入目标日记所在笔记本ID（相当于 calendar 的 cal-create-pos）
+    "wps-data-notebook": "",
+    // 自定义模板：支持 {{#records}}...{{/records}} 循环与 {{字段名}} 占位符；附件字段输出为 markdown 链接集合
+    "wps-data-template": "",
     "wps-file-weburl": "https://www.kdocs.cn/latest",
 };
 
@@ -58,6 +62,8 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "启用 WPS数据导入", description: "数据导入", key: "wps-data-enable", value: ctx.settings["wps-data-enable"] },
                 { type: "textinput", title: "数据导入脚本链接", description: "多维表格数据导入链接", key: "wps-data-url", value: ctx.settings["wps-data-url"] },
                 { type: "textarea", title: "提取字段列表", description: "要提取的字段，使用英文逗号分隔；附件字段以 (A) 或 （A） 结尾", key: "wps-data-fields", value: ctx.settings["wps-data-fields"], direction: "row" },
+                { type: "select", title: "导入数据笔记本", description: "用于创建/定位当日日记的笔记本", key: "wps-data-notebook", value: ctx.settings["wps-data-notebook"], options: notebookOptions() },
+                { type: "textarea", title: "自定义模板", description: "可选：支持 {{#records}}...{{/records}} 与 {{字段名}}; 无模板则自动生成表格", key: "wps-data-template", value: ctx.settings["wps-data-template"], direction: "row" },
                 {
                     type: "button",
                     title: "复制数据导入处理脚本到剪切板",
@@ -91,4 +97,10 @@ function copyDataScriptToClipboard() {
     }).catch(err => {
         showMessage("复制失败:" + err);
     });
+}
+
+function notebookOptions() {
+    const nb = (window as any).siyuan?.notebooks;
+    if (!Array.isArray(nb) || nb.length === 0) return { "": "无可用日记本" };
+    return Object.fromEntries(nb.map((n: any) => [n.id, n.name]));
 }
