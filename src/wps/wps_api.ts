@@ -415,7 +415,7 @@ export interface RunWpsScriptSyncParams {
  */
 export async function runWpsScriptSync(
   params: RunWpsScriptSyncParams
-): Promise<{ result: string, logs: any[], error: string, status: string }> {
+): Promise<{ result: any, logs: any[], error: string, status: string }> {
   const { url, token, context = {} } = params;
   if (!url || !token) {
     throw new Error("URL 和 Token 不能为空");

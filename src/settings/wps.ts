@@ -10,6 +10,8 @@ export const wpsDefaults: Record<string, any> = {
     "wps-airscript-token": "",
     "wps-pic-url": "",
     "wps-data-url": "",
+    // 需要提取的字段列表，逗号分隔；可包含 (A) 标记表示附件
+    "wps-data-fields": "field1,field2",
     "wps-file-weburl": "https://www.kdocs.cn/latest",
 };
 
@@ -55,6 +57,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             items: [
                 { type: "checkbox", title: "启用 WPS数据导入", description: "数据导入", key: "wps-data-enable", value: ctx.settings["wps-data-enable"] },
                 { type: "textinput", title: "数据导入脚本链接", description: "多维表格数据导入链接", key: "wps-data-url", value: ctx.settings["wps-data-url"] },
+                { type: "textarea", title: "提取字段列表", description: "要提取的字段，使用英文逗号分隔；附件字段以 (A) 或 （A） 结尾", key: "wps-data-fields", value: ctx.settings["wps-data-fields"], direction: "row" },
                 {
                     type: "button",
                     title: "复制数据导入处理脚本到剪切板",
