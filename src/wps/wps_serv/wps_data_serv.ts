@@ -1,16 +1,16 @@
 import { appendBlock, createDailyNote } from "@/api/api";
+import { createDailynote } from "@frostime/siyuan-plugin-kits";
 import steveTools from "@/index";
-import { IProtyle, showMessage } from "siyuan";
+import { showMessage } from "siyuan";
 import { runWpsScriptSync } from "../wps_api";
-import { createWebviewDock_for_wps, } from "@/api/api2";
-import { generateLinkCard } from "@/api/api3";
+// import { createWebviewDock_for_wps, } from "@/api/api2";
+// import { generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
 
 export class WpsDataServ {
     private settingdata: any;
     private plugin: steveTools;
-    private protyle: IProtyle;
-    private topBarButton
+    private topBarButton: HTMLElement | null;
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -76,8 +76,8 @@ export class WpsDataServ {
         if (!records.length) return;
         const notebookId = this.settingdata['wps-data-notebook'];
         if (!notebookId) throw new Error('未配置 wps-data-notebook');
-        const dailyNoteResp = await createDailyNote(window.siyuan.ws.app.appId, notebookId);
-        const dailyNoteId = dailyNoteResp.id;
+        const dailyNoteResp = await createDailynote(notebookId);
+        const dailyNoteId = dailyNoteResp;
 
         const templateStr: string = this.settingdata['wps-data-template'] || '';
         let content: string;
