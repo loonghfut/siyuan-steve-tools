@@ -31,7 +31,8 @@ win端s3同步后，docker端感知s3同步。
 5. tldraw白板：  
 模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
-用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。
+用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
+7. WPS联动：方便在思源中使用WPS（office文件嵌入，预览、编辑、同步），多维表格数据导入，图片上传。
 
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
