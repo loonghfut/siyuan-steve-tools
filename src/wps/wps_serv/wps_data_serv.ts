@@ -1,4 +1,4 @@
-import { appendBlock, createDailyNote, putFile } from "@/api/api";
+import { appendBlock, putFile } from "@/api/api";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
@@ -31,36 +31,53 @@ export class WpsDataServ {
             title: "导入WPS数据",
             position: "right",
             callback: async () => {
-                const result = await runWpsScriptSync({
-                    url: this.settingdata['wps-data-url'],
-                    token: this.settingdata['wps-airscript-token'],
-                    context: {
-                        argv: "",//暂无
-                    }
-                });
-                const data = result.result as IWpsRecord[];
-                console.log("导入WPS数据", data);
-                // 从设置中读取需要提取的字段列表，按逗号/换行/分号分隔并去空白
-                const fieldSetting: string = this.settingdata['wps-data-fields'] || '';
-                const fieldList = fieldSetting
-                    .split(/[,;\n]/)
-                    .map(s => s.trim())
-                    .filter(s => s.length > 0);
-                const extract_data = extractFields(data, fieldList);
-                console.log("提取的WPS数据", extract_data);
-                // 写入思源日记
-                try {
-                    await this.insertIntoDailyNote(fieldList, extract_data);
-                    showMessage?.("WPS数据已写入日记");
-                } catch (e: any) {
-                    console.error("写入日记失败", e);
-                    showMessage?.("写入日记失败:" + e.message);
-                }
-
-                this.updateTopBarIcon("iconSTwps_data");
+                await this.importWpsData();
             }
         });
+        this.checkIsNewData();
+    }
 
+    private async checkIsNewData() {
+        const result = await runWpsScriptSync({
+            url: this.settingdata['wps-data-url'],
+            token: this.settingdata['wps-airscript-token'],
+            context: {
+                argv: { name: 'check' }, //暂无
+            }
+        });
+        if (result.result === false) {
+            this.updateTopBarIcon("iconSTwps_data");
+        }
+    }
+
+    private async importWpsData() {
+        const result = await runWpsScriptSync({
+            url: this.settingdata['wps-data-url'],
+            token: this.settingdata['wps-airscript-token'],
+            context: {
+                argv: "", //暂无
+            }
+        });
+        const data = result.result as IWpsRecord[];
+        // console.log("导入WPS数据", data);
+        // 从设置中读取需要提取的字段列表，按逗号/换行/分号分隔并去空白
+        const fieldSetting: string = this.settingdata['wps-data-fields'] || '';
+        const fieldList = fieldSetting
+            .split(/[,;\n]/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+        const extract_data = extractFields(data, fieldList);
+        // console.log("提取的WPS数据", extract_data);
+        // 写入思源日记
+        try {
+            await this.insertIntoDailyNote(fieldList, extract_data);
+            // showMessage?.("WPS数据已写入日记");
+        } catch (e: any) {
+            console.error("写入日记失败", e);
+            showMessage?.("写入日记失败:" + e.message);
+        }
+
+        this.updateTopBarIcon("iconSTwps_data");
     }
 
     private updateTopBarIcon(iconName: string) {
@@ -73,7 +90,7 @@ export class WpsDataServ {
     }
 
     private async insertIntoDailyNote(fieldList: string[], records: Array<Record<string, any>>) {
-        if (!records.length) return;
+        if (!records.length) { showMessage?.("无新数据"); return; }
         const notebookId = this.settingdata['wps-data-notebook'];
         if (!notebookId) throw new Error('未配置 wps-data-notebook');
         const now = new Date();
@@ -88,7 +105,13 @@ export class WpsDataServ {
         } else {
             content = await this.buildMarkdownTable(fieldList, records);
         }
-        await appendBlock('markdown', content, dailyNoteId);
+        if (content) {
+            await appendBlock('markdown', content, dailyNoteId);
+            showMessage?.("WPS数据已写入日记");
+        } else {
+            showMessage?.("无新数据");
+        }
+
     }
 
     private async buildMarkdownTable(fieldList: string[], records: Array<Record<string, any>>): Promise<string> {
@@ -123,7 +146,7 @@ export class WpsDataServ {
         const name = att.fileName || '附件';
         const url = att.url || '';
         if (!url) return name;
-        if (this.isImageUrl(url,name)) {
+        if (this.isImageUrl(url, name)) {
             const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
             return `![${name}](${assetPath})`;
         }
@@ -135,7 +158,7 @@ export class WpsDataServ {
         // 1. data URI
         if (/^data:image\//i.test(url)) return true;
         // 常见图片扩展
-        const exts = ['png','jpg','jpeg','gif','webp','svg','avif','apng','bmp','ico','tif','tiff'];
+        const exts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'apng', 'bmp', 'ico', 'tif', 'tiff'];
         const extReg = new RegExp(`\.(${exts.join('|')})(?:$|[?#])`, 'i');
         if (extReg.test(url)) return true;
         // 2. 文件名兜底

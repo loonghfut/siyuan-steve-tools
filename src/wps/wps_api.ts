@@ -589,7 +589,13 @@ function main() {
 
   // 5. 字段格式处理（新增附件字段专属逻辑，基于附录 _ AirScript文档.docx）
   if (allRawRecords.length === 0) {
+    if (Context.argv.name == "check") {
+      return false;
+    }
     return "[]";
+  }
+  if (Context.argv.name == "check") {
+    return true;
   }
   const formattedRecords = allRawRecords.map(record => {
     const formattedFields = {};
@@ -671,10 +677,6 @@ function main() {
 
           // 更新格式化字段
           formattedFields[fieldName] = processedAttachments;
-
-          // 调试信息
-          // console.log(\`处理后的\${fieldName}附件: \`, processedAttachments);
-          // console.log(\`共处理\${processedAttachments.length}个附件\`);
           break;
         // ----------------------------------------------------------------------
         default:
@@ -687,8 +689,6 @@ function main() {
       fields: formattedFields
     };
   });
-
-  console.log(\`分页读取完成：总记录数=\${allRawRecords.length}，含附件字段记录已预处理\`);
   return formattedRecords;
 }
 
@@ -753,8 +753,6 @@ function batchSetSingleSelect() {
   }
   return \`成功更新\${success}/\${allRecords.length}条\`;
 }
-
-
 const data = main();//获取记录数据
 batchSetSingleSelect();//标记已发送
 return data;
