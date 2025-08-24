@@ -195,7 +195,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: "滴答清单",
             items: [
                 { type: "checkbox", title: "启用滴答清单同步", description: "同步滴答清单任务", key: "cal-dida-enable", value: ctx.settings["cal-dida-enable"] },
-                { type: "textinput", title: "滴答清单token", description: "滴答清单 API token", key: "cal-dida-token", value: ctx.settings["cal-dida-token"] },
+                { type: "textinput", title: "滴答清单token", description: "<a href=\"https://dida365.com/webapp/#q/all/tasks?modalType=settings\" target=\"_blank\">获取</a>API口令", key: "cal-dida-token", value: ctx.settings["cal-dida-token"] },
                 { type: "select", title: "设置要同步的清单", description: "选择清单", key: "cal-dida-unfinished-list", value: ctx.settings["cal-dida-unfinished-list"], dynamicOptions: async () => { try { const ps = await DidaService.getAllProjects(); return convertProjectsToRecord(ps) || {"":"无"}; } catch { return {"":"加载失败"}; } } },
                 { type: "textinput", title: "滴答清单同步数据库id", description: "对应数据库 id", key: "cal-dida-db-id", value: ctx.settings["cal-dida-db-id"] },
                 { type: "select", title: "滴答清单同步模式", description: "同步触发模式", key: "cal-dida-sync-mode", value: ctx.settings["cal-dida-sync-mode"], options: { auto: "自动同步", manual: "手动同步", all: "自动+手动" } },
