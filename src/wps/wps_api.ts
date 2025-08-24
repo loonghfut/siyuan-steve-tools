@@ -520,6 +520,7 @@ function main() {
       fields: formattedFields
     };
   });
+  batchSetSingleSelect();//标记已发送
   return formattedRecords;
 }
 
@@ -585,7 +586,7 @@ function batchSetSingleSelect() {
   return \`成功更新\${success}/\${allRecords.length}条\`;
 }
 const data = main();//获取记录数据
-batchSetSingleSelect();//标记已发送
+
 return data;
 `
 
