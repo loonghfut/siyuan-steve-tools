@@ -1,4 +1,4 @@
-import { appendBlock, createDailyNote } from "@/api/api";
+import { appendBlock, createDailyNote, putFile } from "@/api/api";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
@@ -52,11 +52,11 @@ export class WpsDataServ {
                 try {
                     await this.insertIntoDailyNote(fieldList, extract_data);
                     showMessage?.("WPS数据已写入日记");
-                } catch (e:any) {
+                } catch (e: any) {
                     console.error("写入日记失败", e);
                     showMessage?.("写入日记失败:" + e.message);
                 }
-                
+
                 this.updateTopBarIcon("iconSTwps_data");
             }
         });
@@ -76,35 +76,37 @@ export class WpsDataServ {
         if (!records.length) return;
         const notebookId = this.settingdata['wps-data-notebook'];
         if (!notebookId) throw new Error('未配置 wps-data-notebook');
-        const dailyNoteResp = await createDailynote(notebookId);
+        const now = new Date();
+        // console.log("当前时间（东八区）:", now);
+        const dailyNoteResp = await createDailynote(notebookId, now);
         const dailyNoteId = dailyNoteResp;
 
         const templateStr: string = this.settingdata['wps-data-template'] || '';
         let content: string;
         if (templateStr.trim()) {
-            content = this.renderTemplate(templateStr, fieldList, records);
+            content = await this.renderTemplate(templateStr, fieldList, records);
         } else {
-            content = this.buildMarkdownTable(fieldList, records);
+            content = await this.buildMarkdownTable(fieldList, records);
         }
         await appendBlock('markdown', content, dailyNoteId);
     }
 
-    private buildMarkdownTable(fieldList: string[], records: Array<Record<string, any>>): string {
+    private async buildMarkdownTable(fieldList: string[], records: Array<Record<string, any>>): Promise<string> {
         const header = ['序号', ...fieldList].join(' | ');
         const sep = new Array(fieldList.length + 1).fill('---').join(' | ');
-        const lines = records.map((rec, idx) => {
-            const cols = fieldList.map(fn => this.formatFieldValue(rec[fn]));
+        const lines = await Promise.all(records.map(async (rec, idx) => {
+            const cols = await Promise.all(fieldList.map(fn => this.formatFieldValue(rec[fn])));
             return [String(idx + 1), ...cols].join(' | ');
-        });
+        }));
         return ['### WPS数据导入', '', header, sep, ...lines, ''].join('\n');
     }
 
-    private formatFieldValue(v: any): string {
+    private async formatFieldValue(v: any): Promise<string> {
         if (v === null || v === undefined) return '';
         if (Array.isArray(v)) {
             // 附件数组 [{fileName,url}]
             if (v.length && typeof v[0] === 'object' && ('url' in v[0])) {
-                return v.map((it: any) => `[${it.fileName || '附件'}](${it.url || ''})`).join('<br/>');
+                return (await Promise.all(v.map((it: any) => this.handleAttachmentItem(it)))).join('<br/>');
             }
             return v.join('<br/>');
         }
@@ -114,22 +116,66 @@ export class WpsDataServ {
         return String(v).replace(/\n/g, '<br/>');
     }
 
+    /**
+     * 处理单个附件：若为图片则尝试下载到 /data/assets/wps/ 当下日期目录并返回本地 markdown；否则返回原链接。
+     */
+    private async handleAttachmentItem(att: any) {
+        const name = att.fileName || '附件';
+        const url = att.url || '';
+        if (!url) return name;
+        if (this.isImageUrl(url)) {
+            const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
+            return `![${name}](${assetPath})`;
+        }
+        return `[${name}](${url})`;
+    }
+
+    private isImageUrl(url: string): boolean {
+        return /(\.png|\.jpe?g|\.gif|\.webp|\.svg)(\?|$)/i.test(url);
+    }
+
+    private async downloadAndStoreImage(url: string, fileName: string) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const ext = (fileName.split('.').pop() || 'png').toLowerCase();
+            const safeExt = ext.match(/^[a-z0-9]{1,5}$/) ? ext : 'png';
+            const dateFolder = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            const baseName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_') || 'image';
+            const finalName = baseName.endsWith('.' + safeExt) ? baseName : baseName + '.' + safeExt;
+            const assetPath = `/data/assets/wps/${dateFolder}/${finalName}`;
+            await putFile(assetPath, false, blob);
+            return `assets/wps/${dateFolder}/${finalName}`
+        } catch (e) {
+            console.warn('保存图片失败', url, e);
+        }
+    }
+
     // 极简模板渲染：支持 {{#records}}...{{/records}} 循环，内部可用 {{序号}} 与字段名占位符；附件字段会转为 markdown 链接集合
-    private renderTemplate(tpl: string, fieldList: string[], records: Array<Record<string, any>>): string {
+    private async renderTemplate(tpl: string, fieldList: string[], records: Array<Record<string, any>>): Promise<string> {
+        // 之前使用 String.replace 的同步回调，内部调用异步的 formatFieldValue 未 await，
+        // 导致模板中出现 [object Promise]。这里改为手动匹配循环块并逐块异步渲染。
         const loopReg = /{{#records}}([\s\S]*?){{\/records}}/g;
-        return tpl.replace(loopReg, (_m, inner) => {
-            return records.map((rec, idx) => {
-                let seg = inner;
-                seg = seg.replace(/{{序号}}/g, String(idx + 1));
+        let output = tpl;
+        const matches = [...tpl.matchAll(loopReg)];
+        for (const m of matches) {
+            const full = m[0];
+            const inner = m[1];
+            const renderedRecords = await Promise.all(records.map(async (rec, idx) => {
+                let seg = inner.replace(/{{序号}}/g, String(idx + 1));
                 for (const f of fieldList) {
                     const raw = rec[f];
-                    const rep = this.formatFieldValue(raw);
-                    const fEsc = f.replace(/[.*+?^${}()|[\]\\]/g, r=>`\\${r}`);
-                    seg = seg.replace(new RegExp('{{'+fEsc+'}}','g'), rep);
+                    const rep = await this.formatFieldValue(raw); // 关键：等待异步格式化
+                    const fEsc = f.replace(/[.*+?^${}()|[\]\\]/g, r => `\\${r}`);
+                    seg = seg.replace(new RegExp('{{' + fEsc + '}}', 'g'), rep);
                 }
                 return seg;
-            }).join('\n');
-        }).replace(/{{字段列表}}/g, fieldList.join(', '));
+            }));
+            output = output.replace(full, renderedRecords.join('\n'));
+        }
+        output = output.replace(/{{字段列表}}/g, fieldList.join(', '));
+        return output;
     }
 
 }
