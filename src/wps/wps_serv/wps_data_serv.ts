@@ -123,15 +123,33 @@ export class WpsDataServ {
         const name = att.fileName || '附件';
         const url = att.url || '';
         if (!url) return name;
-        if (this.isImageUrl(url)) {
+        if (this.isImageUrl(url,name)) {
             const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
             return `![${name}](${assetPath})`;
         }
         return `[${name}](${url})`;
     }
 
-    private isImageUrl(url: string): boolean {
-        return /(\.png|\.jpe?g|\.gif|\.webp|\.svg)(\?|$)/i.test(url);
+    private isImageUrl(url: string, name: string): boolean {
+        if (!url) return false;
+        // 1. data URI
+        if (/^data:image\//i.test(url)) return true;
+        // 常见图片扩展
+        const exts = ['png','jpg','jpeg','gif','webp','svg','avif','apng','bmp','ico','tif','tiff'];
+        const extReg = new RegExp(`\.(${exts.join('|')})(?:$|[?#])`, 'i');
+        if (extReg.test(url)) return true;
+        // 2. 文件名兜底
+        if (name && extReg.test(name)) return true;
+        // 3. 查询参数 format / type / ext 提示
+        try {
+            const u = new URL(url, typeof window !== 'undefined' ? window.location.href : 'http://localhost');
+            const qp = (k: string) => (u.searchParams.get(k) || '').toLowerCase();
+            const cand = [qp('format'), qp('type'), qp('ext')];
+            if (cand.some(c => exts.includes(c.replace('image/', '')))) return true;
+        } catch { /* ignore malformed url */ }
+        // 4. 一些对象存储处理样式（含 image/ 或 x-oss-process=image/）
+        if (/image\//i.test(url) || /x-oss-process=image\//i.test(url)) return true;
+        return false;
     }
 
     private async downloadAndStoreImage(url: string, fileName: string) {
