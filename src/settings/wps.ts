@@ -20,10 +20,10 @@ export const wpsDefaults: Record<string, any> = {
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
-    name: "🛠️Wps联动开发中...",
+    name: "WPS联动",
     subGroups: [
         {
-            name: "WPS集成",
+            name: "WPS联动",
             items: [
                 { type: "checkbox", title: "启用 WPS集成", description: "启用后可使用 WPS联动相关功能", key: "wps-enable", value: ctx.settings["wps-enable"] },
                 { type: "textinput", title: "AirScript-Token", description: "WPS AirScript-Token", key: "wps-airscript-token", value: ctx.settings["wps-airscript-token"] },
@@ -37,9 +37,9 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             ]
         },
         {
-            name: 'WPS图片管理',
+            name: '🛠️WPS图片管理🛠️',
             items: [
-                { type: "checkbox", title: "启用 WPS图片管理", description: "图片管理(限制：图片链接有效期不足1天）", key: "wps-pic-enable", value: ctx.settings["wps-pic-enable"] },
+                { type: "checkbox", title: "启用 WPS图片管理", description: "图片管理(限制：图片链接有效期不足1天,请及时转为本地文件）", key: "wps-pic-enable", value: ctx.settings["wps-pic-enable"] },
                 { type: "textinput", title: "图片脚本链接", description: "处理图片逻辑的链接", key: "wps-pic-url", value: ctx.settings["wps-pic-url"] },
                 {
                     type: "button",
