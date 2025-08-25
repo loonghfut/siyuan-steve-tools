@@ -270,16 +270,35 @@ const CustomViewConfig = {
 }
 
 export async function handleAddButtonClick(status = "", direct = { isdirect: false, directid: "" }, isrefresh = true) {
-    // console.log('添加事件按钮被点击');
-    const now = new Date()
-    // console.log('当前时间:', now);
-    const fnow = myK.formatDateTime(now);
-    // console.log('格式化时间:', fnow);
-
-    const viewIDs = await getViewId(av_ids)
-    const viewValue = await getViewValue(viewIDs);
-    const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
-    return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct, isrefresh);
+    // 防抖：短时间多次点击只触发一次创建
+    if (!((handleAddButtonClick as any)._state)) {
+        (handleAddButtonClick as any)._state = {
+            lastTime: 0,
+            inFlight: null as Promise<any> | null,
+            delay: 1000 // ms，可按需调整或做成设置项
+        };
+    }
+    const st = (handleAddButtonClick as any)._state as { lastTime: number; inFlight: Promise<any> | null; delay: number };
+    const nowTs = Date.now();
+    // 若已有进行中的创建且仍在防抖时间窗口内，复用同一个 Promise
+    if (st.inFlight && (nowTs - st.lastTime) < st.delay) {
+        showMessage('操作过快，已阻止重复创建', 2000, 'info');
+        return st.inFlight;
+    }
+    st.lastTime = nowTs;
+    const run = async () => {
+        const now = new Date();
+        const fnow = myK.formatDateTime(now);
+        const viewIDs = await getViewId(av_ids);
+        const viewValue = await getViewValue(viewIDs);
+        const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
+        return await createEventInDatabase(fnow, OUTcalendar, viewValue, rootid, status, direct, isrefresh);
+    };
+    st.inFlight = run().finally(() => {
+        // 释放引用，允许下一次创建
+        setTimeout(() => { st.inFlight = null; }, st.delay);
+    });
+    return st.inFlight;
 }
 
 export async function handleAddButtonClick_Independent(status = "", direct = { isdirect: false, directid: "" }, isrefresh = true) {
@@ -386,9 +405,8 @@ export async function initializeSortableKanban() {
 
                 return true;
             },
-            onStart: function (evt) {
+            onStart: function () {
                 isDragging = true; // 开始拖拽时设置标志
-                // console.log('onStart', evt);
             },
             onUnchoose: async function (evt) {
                 let clickTimeout: NodeJS.Timeout;
