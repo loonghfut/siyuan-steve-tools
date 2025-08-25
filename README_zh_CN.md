@@ -39,21 +39,9 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.13.1 (2025年08月24日)
-- 优化功能图标显示 (loonghfut)
-- 优化不必要变量 (loonghfut)
-- feat: 添加WPS数据导入功能准备及相关图标支持 (loonghfut)
-- feat: 完成wps云脚本 (loonghfut)
-- feat: 添加WPS数据导入字段提取功能及相关接口实现 (loonghfut)
-- feat: 添加WPS数据导入到日记功能及自定义模板支持 (loonghfut)
-- 优化导入日记细节 (loonghfut)
-- feat: 增强WPS数据导入功能 (loonghfut)
-- 优化图片处理 (loonghfut)
-- 增加检查wps数据更新功能 (loonghfut)
-- 优化细节 (loonghfut)
-- 优化细节 (loonghfut)
-- v0.13.0 (loonghfut)
-- docs: 更新 v0.13.0 版本的更新日志 (loonghfut)
+### v0.13.2 (2025年08月25日)
+- 0.13.1 (loonghfut)
+- docs: 更新 v0.13.1 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
