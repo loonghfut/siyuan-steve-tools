@@ -157,3 +157,15 @@ export async function generateLinkCard(url: string, actions: LinkCardAction[] = 
     }
 }
 
+
+export function F5() {
+    const event = new KeyboardEvent("keydown", {
+        key: "F5",
+        code: "F5",
+        keyCode: 116,
+        which: 116,
+        bubbles: true,
+        cancelable: true
+    });
+    document.dispatchEvent(event);
+}
