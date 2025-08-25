@@ -128,6 +128,8 @@ interface WebviewExtraOptions {
     onRefresh?: (ctx: { webview: any }) => Promise<void> | void;                 // 自定义刷新逻辑
     onDevTools?: (ctx: { webview: any }) => Promise<void> | void;                // 自定义打开 DevTools 逻辑
     buttons?: WebviewButtonConfig[];       // 自定义按钮集合（完全自定义覆盖默认按钮）
+    onRoamingIntercept?: (data: { kind: string; url: string; body: string }) => void; // 监听 /api/v3/roaming 拦截数据回调
+    roamingTransportMode?: 'console' | 'poll'; // webview 与宿主数据传输模式，默认 console
 }
 interface WebviewButtonConfig {
     id?: string;                           // 按钮 id，不含容器前缀；最终实际 id = `${containerClass}-btn-${id}`
@@ -172,6 +174,8 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
         onRefresh,
         onDevTools,
         buttons,
+        onRoamingIntercept,
+        roamingTransportMode = 'console',
     } = options as IframeDockOptions & WebviewExtraOptions;
 
     const mobileUA = userAgent || "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1";
@@ -389,14 +393,84 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                 }
                 for (const jsSnippet of jsArray) {
                     try {
+                        // 简单移除 TS 断言 (as any) / (window as any) / (this as any) 以避免在纯 JS 环境下语法错误
+                        let sanitized = jsSnippet;
+                        try {
+                            sanitized = sanitized
+                                .replace(/\(window\s+as\s+any\)/g, 'window')
+                                .replace(/\(this\s+as\s+any\)/g, 'this')
+                                .replace(/\bas\s+any\b/g, '')
+                                ;
+                        } catch { /* ignore sanitize errors */ }
                         if (typeof webviewEl.executeJavaScript === "function") {
-                            await webviewEl.executeJavaScript(jsSnippet);
+                            await webviewEl.executeJavaScript(sanitized);
                         } else if (webviewEl.contentWindow && webviewEl.contentWindow.postMessage) {
-                            webviewEl.contentWindow.postMessage({ type: 'inject-js', code: jsSnippet }, '*');
+                            webviewEl.contentWindow.postMessage({ type: 'inject-js', code: sanitized }, '*');
                         }
                     } catch (jsErr) {
                         console.error("inject js failed snippet:", jsSnippet, jsErr);
                     }
+                }
+                // 注入对包含 /api/v3/roaming 的请求响应监听，打印并通过 console 传递 JSON
+                const roamingMonitor = `
+(() => {
+    if (window.__roamingMonitorInstalled) return;
+    window.__roamingMonitorInstalled = true;
+    const TARGET_KEY = '/api/v3/roaming';
+    window.__WPS_RoamingQueue = window.__WPS_RoamingQueue || [];
+    window.__drainWpsRoaming = function() {
+        const q = window.__WPS_RoamingQueue.slice();
+        window.__WPS_RoamingQueue.length = 0;
+        return q;
+    };
+    const MODE = '${roamingTransportMode}';
+    const emit = (kind, url, body) => {
+        try {
+            if (!url || url.indexOf(TARGET_KEY) === -1) return;
+            const fullBody = typeof body === 'string' ? body : (body + '');
+            const obj = { kind, url, body: fullBody };
+            window.__WPS_RoamingQueue.push(obj);
+            if (MODE === 'console') {
+                console.log('[WPS_Roaming]' + JSON.stringify(obj));
+            }
+        } catch (e) { /* swallow */ }
+    };
+    if (window.fetch) {
+        const _fetch = window.fetch;
+        window.fetch = async function(...args) {
+            const res = await _fetch.apply(this, args);
+            try {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const clone = res.clone();
+                clone.text().then(t => emit('fetch', url, t));
+            } catch (e) { /* ignore */ }
+            return res;
+        };
+    }
+    try {
+        const open = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            this.__roaming_url = url;
+            return open.call(this, method, url, ...rest);
+        };
+        const send = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.send = function(body) {
+            this.addEventListener('load', function() {
+                try { emit('xhr', this.__roaming_url, this.responseText); } catch (e) { /* ignore */ }
+            });
+            return send.call(this, body);
+        };
+    } catch (e) { /* ignore */ }
+})();
+`.trim();
+                try {
+                    if (typeof webviewEl.executeJavaScript === "function") {
+                        await webviewEl.executeJavaScript(roamingMonitor);
+                    } else if (webviewEl.contentWindow && webviewEl.contentWindow.postMessage) {
+                        webviewEl.contentWindow.postMessage({ type: 'inject-js', code: roamingMonitor }, '*');
+                    }
+                } catch (e) {
+                    console.error('inject roaming monitor failed', e);
                 }
             } catch (err) {
                 console.error("performInjection failed:", err);
@@ -412,8 +486,44 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             try {
                 // Electron webview 使用 addEventListener 或 on 方法都可能存在
                 if (typeof webviewEl.addEventListener === "function") {
+                    //注入两次
                     webviewEl.addEventListener("dom-ready", onDomReady);
                     webviewEl.addEventListener("did-finish-load", onDomReady);
+                    if (roamingTransportMode === 'console') {
+                        const consoleHandler = (e: any) => {
+                            try {
+                                if (typeof e.message === 'string' && e.message.startsWith('[WPS_Roaming]')) {
+                                    const jsonStr = e.message.substring('[WPS_Roaming]'.length);
+                                    const obj = JSON.parse(jsonStr);
+                                    // const obj = jsonStr;
+                                    if (obj && obj.url) {
+                                        // 回调（可选）
+                                        // try { if (onRoamingIntercept) onRoamingIntercept(obj); } catch (cbErr) { /* ignore */ }
+                                        // 始终宿主打印
+                                        // try { console.log('[WPS_Roaming_Host]', obj.kind, obj.url, obj.body); } catch (logErr) { /* ignore */ }
+                                        // console.log('[WPS]', obj.body);
+                                        console.log('[WPS_Roaming_Host]', pickRoamingFields(obj.body));
+                                    }
+                                }
+                            } catch (err) { /* ignore */ }
+                        };
+                        webviewEl.addEventListener('console-message', consoleHandler);
+                        (webviewEl as any).__roamingConsoleHandler = consoleHandler;
+                    } else if (roamingTransportMode === 'poll') {
+                        const poll = async () => {
+                            try {
+                                const arr = await webviewEl.executeJavaScript('window.__drainWpsRoaming ? window.__drainWpsRoaming() : []');
+                                if (Array.isArray(arr) && arr.length) {
+                                    for (const obj of arr) {
+                                        try { if (onRoamingIntercept) onRoamingIntercept(obj); } catch (e) { }
+                                        try { console.log('[WPS_Roaming_Host]', obj.kind, obj.url, obj.body); } catch (e) { }
+                                    }
+                                }
+                            } catch (e) { /* ignore */ }
+                        };
+                        const timer = window.setInterval(poll, 1000);
+                        (webviewEl as any).__roamingPollTimer = timer;
+                    }
                 } else if (typeof webviewEl.on === "function") {
                     webviewEl.on("dom-ready", onDomReady);
                     webviewEl.on("did-finish-load", onDomReady);
@@ -567,6 +677,17 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                     if (typeof webviewEl.removeEventListener === "function") {
                         webviewEl.removeEventListener("dom-ready", onDomReady);
                         webviewEl.removeEventListener("did-finish-load", onDomReady);
+                        // 移除 roaming console 监听
+                        try {
+                            if ((webviewEl as any).__roamingConsoleHandler) {
+                                webviewEl.removeEventListener('console-message', (webviewEl as any).__roamingConsoleHandler);
+                                delete (webviewEl as any).__roamingConsoleHandler;
+                            }
+                            if ((webviewEl as any).__roamingPollTimer) {
+                                window.clearInterval((webviewEl as any).__roamingPollTimer);
+                                delete (webviewEl as any).__roamingPollTimer;
+                            }
+                        } catch (e) { /* ignore */ }
                     } else if (typeof webviewEl.off === "function") {
                         webviewEl.off("dom-ready", onDomReady);
                         webviewEl.off("did-finish-load", onDomReady);
@@ -654,4 +775,52 @@ export function getCursorBlockId() {
     } else {
         return null;
     }
+}
+
+
+
+
+interface RoamingItem {
+  link_id: string;
+  link_url: string;
+  name: string;
+  file_type: string;
+  file_src: string;
+}
+
+function normalizeToArray(input: any): any[] {
+  if (Array.isArray(input)) return input;
+
+  // 字符串：尝试 JSON 解析
+  if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input);
+      return normalizeToArray(parsed); // 递归再判
+    } catch {
+      return [];
+    }
+  }
+
+  if (input && typeof input === 'object') {
+    // 常见包裹字段
+    const possibleKeys = ['data', 'list', 'items', 'records', 'result'];
+    for (const k of possibleKeys) {
+      if (Array.isArray((input as any)[k])) return (input as any)[k];
+    }
+    // 单对象当作一个元素
+    return [input];
+  }
+
+  return [];
+}
+
+export function pickRoamingFields(raw: any): RoamingItem[] {
+  const arr = normalizeToArray(raw);
+  return arr.map(o => ({
+    link_id: o?.link_id ?? '',
+    link_url: o?.link_url ?? '',
+    name: o?.name ?? '',
+    file_type: o?.file_type ?? '',
+    file_src: o?.file_src ?? '',
+  }));
 }

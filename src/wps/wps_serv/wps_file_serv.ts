@@ -63,7 +63,7 @@ export class WpsFileServ {
             // appendBlock("markdown", `<iframe src="${fileurl}" width="600" height="400"></iframe>`, this.cursorID);
             showMessage('插入完成', 1000, 'info');
         };
-
+const roamingMonitorSnippet = `(()=>{try{if((window as any).__ROAMING_MONITOR_INSTALLED__)return;(window as any).__ROAMING_MONITOR_INSTALLED__=true;const TARGET='https://drive.kdocs.cn/api/v3/roaming';const log=(tag,url,body)=>{try{console.log('[RoamingAPI]',tag,url,body);}catch(_){} };const of=window.fetch; if(of){window.fetch=async (...args)=>{const r=await of(...args);try{const raw=args[0];const u=typeof raw==='string'?raw:(raw&&raw.url)||''; if(u.includes(TARGET)){r.clone().text().then(t=>log('fetch',u,t)).catch(()=>{});} }catch(_){} return r;};}const oOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,...rest){(this as any).__isRoaming= typeof u==='string' && u.includes(TARGET);return oOpen.call(this,m,u,...rest);};const oSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){if((this as any).__isRoaming){this.addEventListener('load',function(){try{log('xhr',this.responseURL,this.responseText);}catch(_){} });}return oSend.call(this,b);};}catch(e){console.error('roaming monitor inject failed',e);} })();`;
         createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
@@ -75,7 +75,7 @@ export class WpsFileServ {
             buttons: [
                 { id: 'copy', text: '复制', builtInAction: 'copy', order: 0 },
                 { id: 'refresh', text: '刷新', builtInAction: 'refresh', order: 1 },
-                // { id: 'dev', text: '调试', builtInAction: 'dev', order: 2, show: process.env.NODE_ENV !== 'production' },
+                { id: 'dev', text: '调试', builtInAction: 'dev', order: 2 },
                 { id: 'custom', text: '插入', order: 3, onClick: handleWpsFileInsert }
             ],
             type: "wps-file-dock",
@@ -85,6 +85,7 @@ export class WpsFileServ {
             iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
             pointerEventsDelay: 300,
             zoom: 1,
+            injectJS: ["console.log('WPS文件加载完成');"+roamingMonitorSnippet]
         });
 
         // this.plugin.eventBus.on("open-menu-link", this.blockIconEvent.bind(this));
