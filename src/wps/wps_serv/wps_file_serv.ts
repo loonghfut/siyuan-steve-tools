@@ -3,7 +3,7 @@ import steveTools from "@/index";
 import { showMessage } from "siyuan";
 import { ChangeLinkStyle, extractIframeBlockInfo, ShowLinkContent } from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
-import { generateLinkCard } from "@/api/api3";
+import { F5, generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
 import { api } from "@frostime/siyuan-plugin-kits";
 declare global {
@@ -53,7 +53,9 @@ export class WpsFileServ {
             // 单条插入：改为模板形式（保留旧卡片逻辑可选）
             const fileurl = e.getCurrentUrl();
             if (fileurl === "https://www.kdocs.cn/m/") {
-                showMessage("WPS最近 (主页不插入)", 1200, "info");
+                // showMessage("WPS最近 (主页不插入)", 1200, "info");
+                // this.handleInsertFilelist();
+                this.importAllCapturedToCurrent();
                 return;
             }
             // 构造临时记录对象
@@ -84,9 +86,9 @@ export class WpsFileServ {
             },
             buttons: [
                 { id: 'refresh', text: '刷新', builtInAction: 'refresh', order: 0 },
-                { id: 'single', text: '插入当前', order: 1, onClick: handleWpsFileInsert },
-                { id: 'batch', text: '批量导入', order: 2, onClick: () => this.importAllCapturedToCurrent() },
-                { id: 'list', text: '旧式列表', order: 3, onClick: () => this.handleInsertFilelist() }
+                { id: 'single', text: '插入', order: 1, onClick: handleWpsFileInsert },
+                // { id: 'batch', text: '批量导入', order: 2, onClick: () => this.importAllCapturedToCurrent() },
+                // { id: 'list', text: '旧式列表', order: 3, onClick: () => this.handleInsertFilelist() }
             ],
             type: "wps-file-dock",
             url: this.settingdata["wps-file-weburl"],
@@ -327,12 +329,13 @@ ${md}
                 try {
                     await appendBlock('markdown', blockContent, setlocationid);
                     imported++;
-                    await new Promise(r => setTimeout(r, 500));
+                    await new Promise(r => setTimeout(r, 600));
                 } catch (e) {
                     console.error('插入失败', rec, e);
                 }
             }
             showMessage(`批量导入完成 新增 ${imported} 条, 跳过 ${skipped} 条`, 3000, 'info',"wpsdoclist");
+            F5();
         } catch (e) {
             console.error('批量导入异常', e);
             showMessage('批量导入失败', 2000, 'error',"wpsdoclist");
