@@ -120,20 +120,38 @@ export function sortEvents(events: NestedKBCalendarEvent[]): NestedKBCalendarEve
 }
 
 export function getDaysFromNow(time: string | Date, status: string): string {
-    if (status === '完成') {
-        return '';
-    }
+    if (status === '完成' || !time) return '';
     const targetDate = new Date(time);
+    if (isNaN(targetDate.getTime())) return '';
     const now = new Date();
-    const diffTime = targetDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays > 0) {
-        return `<span style="color: green">还有${diffDays}天</span>`;
-    } else if (diffDays < 0) {
-        return `<span style="color: red">超期${Math.abs(diffDays)}天</span>`;
-    } else {
-        return '<span style="color: orange">今天</span>';
+    const msHour = 1000 * 60 * 60;
+    const msDay = msHour * 24;
+
+    // 基于日期（去掉时分秒）计算纯天数差，避免今天晚些时候被算成还剩1天
+    const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const dayDiff = Math.floor((startOf(targetDate) - startOf(now)) / msDay);
+    const diffTime = targetDate.getTime() - now.getTime();
+
+    if (dayDiff === 0) { // 同一天内，精确到小时
+        const hourDiffRaw = diffTime / msHour;
+        if (hourDiffRaw > 1) {
+            const hours = Math.ceil(hourDiffRaw); // 还有 x.x 小时向上取整
+            return `<span style="color: orange">只有${hours}小时</span>`;
+        } else if (hourDiffRaw > 0) {
+            return `<span style="color: orange">不足1小时</span>`;
+        } else if (hourDiffRaw > -1) { // 已经过期但不满1小时
+            return `<span style="color: red">超期不足1小时</span>`;
+        } else {
+            const overdueHours = Math.floor(Math.abs(hourDiffRaw));
+            return `<span style="color: red">超期${overdueHours}小时</span>`;
+        }
+    }
+
+    if (dayDiff > 0) {
+        return `<span style="color: green">还有${dayDiff}天</span>`;
+    } else { // dayDiff < 0
+        return `<span style="color: red">超期${Math.abs(dayDiff)}天</span>`;
     }
 }
 
