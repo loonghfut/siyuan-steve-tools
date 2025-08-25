@@ -502,7 +502,23 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                                         // 始终宿主打印
                                         // try { console.log('[WPS_Roaming_Host]', obj.kind, obj.url, obj.body); } catch (logErr) { /* ignore */ }
                                         // console.log('[WPS]', obj.body);
-                                        console.log('[WPS_Roaming_Host]', pickRoamingFields(obj.body));
+                                        // 累加到 window.wpsdoc 并基于 link_id 去重
+                                        try {
+                                            const newItems = pickRoamingFields(obj.body) || [];
+                                            const w: any = window as any;
+                                            if (!Array.isArray(w.wpsdoc)) w.wpsdoc = [];
+                                            if (newItems.length) {
+                                                const existingIds = new Set<string>(w.wpsdoc.map((d: any) => d && d.link_id).filter(Boolean));
+                                                for (const it of newItems) {
+                                                    if (it && it.link_id && !existingIds.has(it.link_id)) {
+                                                        w.wpsdoc.push(it);
+                                                        existingIds.add(it.link_id);
+                                                    }
+                                                }
+                                            }
+                                            console.log('[WPS_Roaming_Host]', newItems);
+                                        } catch(e) { /* ignore accumulate errors */ }
+                                        
                                     }
                                 }
                             } catch (err) { /* ignore */ }
