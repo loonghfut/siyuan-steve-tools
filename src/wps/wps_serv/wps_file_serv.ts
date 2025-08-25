@@ -1,6 +1,6 @@
 import { appendBlock, generateSiyuanID, updateBlock } from "@/api/api";
 import steveTools from "@/index";
-import { IProtyle, showMessage } from "siyuan";
+import { showMessage } from "siyuan";
 import { ChangeLinkStyle, extractIframeBlockInfo, ShowLinkContent } from "../wps_api";
 import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { generateLinkCard } from "@/api/api3";
@@ -87,6 +87,7 @@ export class WpsFileServ {
             zoom: 1,
         });
 
+        // this.plugin.eventBus.on("open-menu-link", this.blockIconEvent.bind(this));
         this.plugin.eventBus.on("click-blockicon", this.blockIconEvent.bind(this));
         this.plugin.eventBus.on("click-editorcontent", this.handleSelectionChange.bind(this));
         this.plugin.eventBus.on("switch-protyle", async (event) => {
@@ -96,18 +97,72 @@ export class WpsFileServ {
         });
     }
 
+    // async openMenuLink({ detail }: any) {
+    //     console.log("WPS File Menu Link Opened:", detail);
+    // }
+
     async blockIconEvent({ detail }: any) {
         console.log("WPS File Block Icon Clicked:", detail);
-        const info = extractIframeBlockInfo(detail.blockElements?.[0]);
+        const blockEl: HTMLElement | undefined = detail.blockElements?.[0];
+        console.log("WPS File Block Icon Clicked:", blockEl);
+        if (!blockEl) return;
+
+        // 若是已生成的自定义 WPS 链接卡片（html 块）=> 提供“转换为链接”
+        if (blockEl.getAttribute("custom-st-wps") === "1") {
+            detail.menu.addItem({
+                iconHTML: "",
+                label: "转换为链接",
+                click: async () => {
+                    try {
+                        // 解析 data-content 中的原始卡片 HTML，提取链接与标题
+                        const protyleHtml = blockEl.querySelector('protyle-html');
+                        const dataContent = protyleHtml?.getAttribute('data-content') || '';
+                        const decoded = dataContent
+                            .replace(/&lt;/g, '<')
+                            .replace(/&gt;/g, '>')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#39;/g, "'");
+                        const match = decoded.match(/<a[^>]+?(?:data-link|href)="([^"]+)"/i);
+                        const url = match?.[1];
+                        if (!url) {
+                            showMessage('未能解析链接', 2000, 'error');
+                            return;
+                        }
+                        // 尝试解析标题
+                        let title = '';
+                        try {
+                            const tmp = document.createElement('div');
+                            tmp.innerHTML = decoded;
+                            // flex 容器内的第一个 div 即标题（结构参考 generateLinkCard 输出）
+                            const titleEl = tmp.querySelector('.link-card-inner > div[style*="flex:1"] > div:first-child');
+                            title = titleEl?.textContent?.trim() || '';
+                        } catch { /* ignore */ }
+                        if (!title) title = url;
+                        // 转义 markdown 中的特殊字符
+                        const esc = (s: string) => s.replace(/([\\`*_{}\[\]()#+\-.!])/g, '\\$1');
+                        const md = `[${esc(title)}](${url.replace(/\)/g, '%29')})`;
+                        const id = blockEl.getAttribute('data-node-id') as string;
+                        await updateBlock("markdown", md, id);
+                        showMessage('已还原为链接', 1500, 'info');
+                    } catch (e) {
+                        console.error(e);
+                        showMessage('转换失败', 2000, 'error');
+                    }
+                }
+            });
+            return; // 不再继续处理 iframe -> 卡片 的逻辑
+        }
+
+        // 否则尝试识别 iframe 块并提供“转换为卡片”
+        const info = extractIframeBlockInfo(blockEl);
         if (!info) {
-            // showMessage('未识别到可转换的 iframe 块', 2000, 'error');
             return;
         }
         detail.menu.addItem({
             iconHTML: "",
             label: "转换为卡片",
             click: async () => {
-
                 console.log('WPS IFrame Block Info:', info);
                 const cardHtml = await generateLinkCard(info.url, [{
                     id: 'change',
