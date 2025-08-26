@@ -91,17 +91,16 @@ export const confirmDialog = (args: IConfirmDialogArgs) => {
         target.appendChild(content);
     }
 
-    const btnsElement = dialog.element.querySelectorAll(".b3-button");
-    btnsElement[0].addEventListener("click", () => {
-        if (cancel) {
-            cancel(target);
-        }
+    // 仅作用于底部 action 区域，避免内容区域其它 .b3-button 干扰
+    const actionButtons = dialog.element.querySelectorAll(".b3-dialog__action .b3-button");
+    const cancelBtn = actionButtons[0];
+    const confirmBtn = actionButtons[1];
+    cancelBtn?.addEventListener("click", () => {
+        if (cancel) cancel(target);
         dialog.destroy();
     });
-    btnsElement[1].addEventListener("click", () => {
-        if (confirm) {
-            confirm(target);
-        }
+    confirmBtn?.addEventListener("click", () => {
+        if (confirm) confirm(target);
         dialog.destroy();
     });
 };

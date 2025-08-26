@@ -6,6 +6,7 @@ import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { F5, generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
 import { api } from "@frostime/siyuan-plugin-kits";
+import { confirmDialog } from "@/libs/dialog";
 import { fetchWpsFiles } from "../wps_files_api";
 declare global {
     interface Window {
@@ -330,50 +331,213 @@ export class WpsFileServ {
 ${md}
 }}}
 {: custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-block="true"}
+`; 
+    }
 
-{: custom-wps-id="null" }`; // 第二个空超级块行保持与 ICS 结构类似，便于批量选择
+    // --- UI 构建：返回一个用于 confirmDialog 的元素与回调上下文 ---
+    private buildWpsImportDialog(list: WpsFileRecord[], exists: Set<string>) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'st-wps-import-wrapper';
+        wrapper.style.cssText = 'display:flex;flex-direction:column;gap:8px;width:100%;height:100%;';
+
+        // 顶部工具栏
+        const topBar = document.createElement('div');
+        topBar.className = 'st-wps-import-toolbar';
+        topBar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+                topBar.innerHTML = `
+                        <input type="text" placeholder="搜索 (名称/类型/来源/链接)" class="b3-text-field" style="flex:1;min-width:220px;" />
+                        <label style="display:flex;align-items:center;gap:4px;font-size:12px;opacity:.9;">
+                            <input type="checkbox" id="wps-skip-exist" />跳过已存在
+                        </label>
+            <button class="b3-button" data-act="select-all">全选</button>
+            <button class="b3-button" data-act="unselect-all">全不选</button>
+            <button class="b3-button" data-act="invert">反选</button>
+            <span style="margin-left:auto;font-size:12px;opacity:.7;" data-stat></span>
+            <div style="flex-basis:100%;height:0;"></div>
+        `;
+        wrapper.appendChild(topBar);
+        const searchInput = topBar.querySelector('input.b3-text-field') as HTMLInputElement;
+        const skipExistCheckbox = topBar.querySelector('#wps-skip-exist') as HTMLInputElement;
+        const statSpan = topBar.querySelector('[data-stat]') as HTMLSpanElement;
+
+        // 列表区域
+        const listBox = document.createElement('div');
+        listBox.className = 'st-wps-import-list';
+        listBox.style.cssText = 'flex:1;overflow:auto;border: var(--b3-border-color) 1px solid;padding:6px;display:flex;flex-direction:column;gap:4px;font-size:13px;';
+        wrapper.appendChild(listBox);
+
+        // 条目渲染
+        const itemElements: HTMLElement[] = [];
+        for (const rec of list) {
+            const item = document.createElement('label');
+            item.className = 'st-wps-import-item';
+            item.style.cssText = 'display:flex;gap:6px;align-items:flex-start;padding:4px 6px;border-radius:4px;cursor:pointer;border:1px solid transparent;';
+            item.dataset.id = rec.link_id;
+            const already = exists.has(rec.link_id);
+            // 初始 skip-exist=false，因此已存在可选但默认不勾选
+            item.innerHTML = `
+                <input type="checkbox" ${already ? '' : 'checked'} />
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:500;word-break:break-all;">${rec.name || rec.link_url}</div>
+                    <div style="color:var(--b3-theme-on-surface-light);word-break:break-all;">${rec.link_url}</div>
+                    <div style="margin-top:2px;font-size:12px;opacity:.8;">类型: ${rec.file_type || '-'} | 来源: ${rec.file_src || '-'}${already ? ' | <span style="color:var(--b3-protyle-inline-mark-bg);">已存在</span>' : ''}</div>
+                </div>`;
+            item.addEventListener('mouseenter', () => item.style.borderColor = 'var(--b3-theme-primary)');
+            item.addEventListener('mouseleave', () => item.style.borderColor = 'transparent');
+            listBox.appendChild(item);
+            itemElements.push(item);
+        }
+
+        const updateStat = () => {
+            const total = itemElements.length;
+            const selectable = itemElements.filter(el => !(el.querySelector('input') as HTMLInputElement).disabled).length;
+            const selected = itemElements.filter(el => { const cb = el.querySelector('input') as HTMLInputElement; return cb.checked && !cb.disabled; }).length;
+            statSpan.textContent = `共 ${total} 条，可导入 ${selectable} 条，已选 ${selected} 条`;
+        };
+        updateStat();
+
+        const applyFilter = () => {
+            const kw = searchInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+            for (const el of itemElements) {
+                const id = el.dataset.id;
+                const rec = list.find(r => r.link_id === id);
+                if (!rec) continue;
+                const text = `${rec.name}\n${rec.link_url}\n${rec.file_type}\n${rec.file_src}`.toLowerCase();
+                const show = !kw || text.includes(kw);
+                el.style.display = show ? '' : 'none';
+                if (show) visibleCount++;
+            }
+            statSpan.dataset.visible = String(visibleCount);
+        };
+        searchInput.addEventListener('input', applyFilter);
+
+        topBar.addEventListener('click', (ev) => {
+            const btn = (ev.target as HTMLElement).closest('button[data-act]') as HTMLButtonElement;
+            if (!btn) return;
+            const act = btn.dataset.act;
+            const visible = itemElements.filter(el => el.style.display !== 'none');
+            if (act === 'select-all') {
+                visible.forEach(el => { const cb = el.querySelector('input') as HTMLInputElement; if (!cb.disabled) cb.checked = true; });
+            } else if (act === 'unselect-all') {
+                visible.forEach(el => { const cb = el.querySelector('input') as HTMLInputElement; if (!cb.disabled) cb.checked = false; });
+            } else if (act === 'invert') {
+                visible.forEach(el => { const cb = el.querySelector('input') as HTMLInputElement; if (!cb.disabled) cb.checked = !cb.checked; });
+            }
+            updateStat();
+        });
+
+        skipExistCheckbox.addEventListener('change', () => {
+            const skip = skipExistCheckbox.checked;
+            itemElements.forEach(el => {
+                const cb = el.querySelector('input') as HTMLInputElement;
+                const id = el.dataset.id;
+                const already = exists.has(id);
+                if (already) {
+                    if (skip) { cb.disabled = true; cb.checked = false; }
+                    else { cb.disabled = false; /* 保持未选中 */ }
+                }
+            });
+            updateStat();
+        });
+
+        listBox.addEventListener('change', (e) => {
+            if ((e.target as HTMLElement).tagName === 'INPUT') updateStat();
+        });
+
+        return {
+            element: wrapper,
+            getSelection: () => {
+                const allowDuplicates = !skipExistCheckbox.checked;
+                const selected: { rec: WpsFileRecord; duplicate: boolean }[] = [];
+                for (const el of itemElements) {
+                    const cb = el.querySelector('input') as HTMLInputElement;
+                    if (cb.disabled || !cb.checked) continue;
+                    const rec = list.find(r => r.link_id === el.dataset.id);
+                    if (!rec) continue;
+                    const isDup = exists.has(rec.link_id);
+                    if (isDup && !allowDuplicates) continue; // 安全兜底
+                    selected.push({ rec, duplicate: isDup });
+                }
+                return { selected, allowDuplicates };
+            }
+        };
     }
 
     async importAllCapturedToCurrent() {
+        // 需求：弹出面板 -> 支持搜索筛选 -> 勾选要导入 -> 执行插入
         try {
-            showMessage('开始导入页面加载的WPS文件', -1, 'info', "wpsdoclist");
             const w: any = window as any;
-            const list: WpsFileRecord[] = Array.isArray(w.wpsdoc) ? w.wpsdoc : [];
-            if (!list.length) {
-                showMessage('没有捕获的 WPS 文件数据', 1600, 'info');
-                return;
-            }
-            if (!this.cursorID) {
-                showMessage('未获取到光标位置', 1600, 'error');
-                return;
-            }
-            // 去重（内部）
+            const rawList: WpsFileRecord[] = Array.isArray(w.wpsdoc) ? w.wpsdoc : [];
+            if (!rawList.length) { showMessage('没有捕获的 WPS 文件数据', 1600, 'info'); return; }
+            if (!this.cursorID) { showMessage('未获取到光标位置', 1600, 'error'); return; }
+
+            // 去重
             const map = new Map<string, WpsFileRecord>();
-            for (const r of list) {
-                if (r && r.link_id && r.link_url) {
-                    if (!map.has(r.link_id)) map.set(r.link_id, r);
-                }
-            }
-            let imported = 0;
-            let skipped = 0;
+            for (const r of rawList) { if (r && r.link_id && r.link_url && !map.has(r.link_id)) map.set(r.link_id, r); }
+            const list = Array.from(map.values());
+            if (!list.length) { showMessage('无有效 WPS 文件记录', 1600, 'info'); return; }
+
             const exists = await this.checkWpsBlockExists();
+            const ui = this.buildWpsImportDialog(list, exists);
+            confirmDialog({
+                title: '选择要导入的 WPS 文件',
+                content: ui.element,
+                width: '700px',
+                height: '560px',
+                confirm: async () => {
+                    const { selected, allowDuplicates } = ui.getSelection();
+                    if (!selected.length) { showMessage('未选择任何可导入项', 1600, 'info'); return; }
+                    await this.insertSelectedWpsRecords(selected.map(s => s.rec), exists, { allowDuplicates });
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            showMessage('打开选择面板失败', 2000, 'error');
+        }
+    }
+
+    private async insertSelectedWpsRecords(records: WpsFileRecord[], exists?: Set<string>, options?: { allowDuplicates?: boolean }) {
+        try {
+            if (!this.cursorID) { showMessage('未获取到光标位置', 1600, 'error'); return; }
             const setlocationid = this.cursorID;
-            for (const rec of map.values()) {
-                if (exists.has(rec.link_id)) { skipped++; continue; }
-                const blockContent = this.generateWpsBlock(rec);
+            const importedSet = exists || await this.checkWpsBlockExists();
+            let imported = 0; let skipped = 0; let failed = 0;
+            const allowDup = options?.allowDuplicates;
+            // 批量一次性插入（合并为一个 markdown 块）
+            const toInsert: WpsFileRecord[] = [];
+            for (const rec of records) {
+                if (!allowDup && importedSet.has(rec.link_id)) {
+                    skipped++;
+                    continue;
+                }
+                toInsert.push(rec);
+            }
+
+            if (toInsert.length === 0) {
+                showMessage('无可导入项', 1600, 'info');
+                // 已统计 skipped
+            } else {
+                const batchContent = toInsert.map(r => this.generateWpsBlock(r)).join('\n\n');
                 try {
-                    await appendBlock('markdown', blockContent, setlocationid);
-                    imported++;
-                    await new Promise(r => setTimeout(r, 600));
-                } catch (e) {
-                    console.error('插入失败', rec, e);
+                    await appendBlock('markdown', batchContent, setlocationid);
+                    // 标记已插入并统计
+                    for (const rec of toInsert) {
+                        importedSet.add(rec.link_id);
+                        imported++;
+                    }
+                } catch (err) {
+                    console.error('批量插入失败', err);
+                    failed = toInsert.length;
+                    showMessage('批量插入失败', 2000, 'error');
                 }
             }
-            showMessage(`批量导入完成 新增 ${imported} 条, 跳过 ${skipped} 条`, 3000, 'info', "wpsdoclist");
-            F5();
+            const dupNote = allowDup ? ' (允许重复)' : '';
+            showMessage(`导入完成${dupNote}: 新增 ${imported} 条, 跳过 ${skipped} 条, 失败 ${failed} 条`, 4000, 'info');
+            // if (imported) F5();
         } catch (e) {
-            console.error('批量导入异常', e);
-            showMessage('批量导入失败', 2000, 'error', "wpsdoclist");
+            console.error('选择导入异常', e);
+            showMessage('导入过程发生错误', 2000, 'error');
         }
     }
 }
