@@ -6,9 +6,18 @@ import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
 import { F5, generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
 import { api } from "@frostime/siyuan-plugin-kits";
+import { fetchWpsFiles } from "../wps_files_api";
 declare global {
     interface Window {
         wps?: any;
+        siyuanWPS?: {
+            version: string;
+            loaded: boolean;
+            groupId: string;
+            parentId: string;
+            cookie: string;
+            [key: string]: any;
+        }
     }
 }
 
@@ -27,6 +36,7 @@ export class WpsFileServ {
     // private protyle: IProtyle;
     private cursorID: string;
     private cursorID_b: string;
+    private WPSfile?: Window["siyuanWPS"];
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -38,6 +48,9 @@ export class WpsFileServ {
         this.plugin.addIcons(`
                 <symbol id="iconSTwps" viewBox="0 0 32 32">
                    ${ic.steveTools_wps}
+                </symbol>
+                <symbol id="iconSTwpsFile" viewBox="0 0 20 20">
+                   ${ic.steveTools_wps_file}
                 </symbol>
             `)
 
@@ -109,6 +122,28 @@ export class WpsFileServ {
             // console.log("switch-image-protyle");
         });
     }
+
+    async onLayoutReady() {
+        this.WPSfile = window.siyuanWPS;
+        // console.log(this.WPSfile);
+        if (this.WPSfile.loaded) {
+            this.plugin.addTopBar({
+                icon: "iconSTwpsFile",
+                title: "WPS文件拉取",
+                position: "right",
+                callback: async () => {
+                    const { data } = await fetchWpsFiles({
+                        groupId: this.WPSfile.groupId,
+                        parentId: this.WPSfile.parentId,
+                        headers: { cookie: this.WPSfile.cookie }
+                    });
+                    console.log(data);
+                }
+            });
+        }
+    }
+
+
 
     async blockIconEvent({ detail }: any) {
         const blockEl: HTMLElement | undefined = detail.blockElements?.[0];
@@ -301,7 +336,7 @@ ${md}
 
     async importAllCapturedToCurrent() {
         try {
-            showMessage('开始导入页面加载的WPS文件', -1, 'info',"wpsdoclist");
+            showMessage('开始导入页面加载的WPS文件', -1, 'info', "wpsdoclist");
             const w: any = window as any;
             const list: WpsFileRecord[] = Array.isArray(w.wpsdoc) ? w.wpsdoc : [];
             if (!list.length) {
@@ -334,11 +369,11 @@ ${md}
                     console.error('插入失败', rec, e);
                 }
             }
-            showMessage(`批量导入完成 新增 ${imported} 条, 跳过 ${skipped} 条`, 3000, 'info',"wpsdoclist");
+            showMessage(`批量导入完成 新增 ${imported} 条, 跳过 ${skipped} 条`, 3000, 'info', "wpsdoclist");
             F5();
         } catch (e) {
             console.error('批量导入异常', e);
-            showMessage('批量导入失败', 2000, 'error',"wpsdoclist");
+            showMessage('批量导入失败', 2000, 'error', "wpsdoclist");
         }
     }
 }
