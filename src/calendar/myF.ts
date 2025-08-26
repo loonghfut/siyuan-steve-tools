@@ -390,7 +390,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 
                 // 检查是否设置了开始时间
                 const hasStartTime = item['开始时间']?.start;
-                const startDate = hasStartTime 
+                const startDate = hasStartTime
                     ? new Date(parseInt(item['开始时间'].start))
                     : new Date(new Date().setHours(8, 0, 0, 0));
                 const endDate = item['开始时间']?.end ? new Date(parseInt(item['开始时间'].end)) : null;
@@ -399,7 +399,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                 // 1. 首先判断是否有开始时间，没有则直接为全天事件
                 // 2. 然后使用数据库中的全天设置
                 // 3. 最后按时间判断（0点为全天事件）
-                const isAllDay = !hasStartTime 
+                const isAllDay = !hasStartTime
                     ? true
                     : (item['全天']?.content !== undefined
                         ? item['全天'].content
@@ -454,7 +454,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 
                     // 检查是否设置了开始时间
                     const hasStartTime = item['开始时间']?.start;
-                    const startDate = hasStartTime 
+                    const startDate = hasStartTime
                         ? new Date(parseInt(item['开始时间'].start))
                         : new Date(new Date().setHours(0, 0, 0, 0));
                     const endDate = item['开始时间']?.end ? new Date(parseInt(item['开始时间'].end)) : null;
@@ -547,49 +547,58 @@ export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMor
         });
 
     } else {
-        const dialog = new sy.Dialog({
-            title: `事件详情`,
-            content: '<div id="eventPanel-show"></div>',
-            width: '500px',
-            height: 'auto',
-            destroyCallback: async (option) => {
-                // console.log("ishandle",option?.ishandle)
-                if (option?.ishandle) {
-                } else {
-                    await refreshKanban();
-                }
-            },
-            hideCloseIcon: true,
-            // disableClose: true,
-        });
-        const eventPanel = document.getElementById('eventPanel-show');
-        new sy.Protyle(window.siyuan.ws.app, eventPanel, {
-            blockId: blockID,
-            rootId: blockID,
-            render: {
-                breadcrumb: false,
-            },
-            action: ["cb-get-focus",],
-            mode: "wysiwyg",
-            // action: ["cb-get-focus"],
-            after: () => {
-                if (seemore) {
-                    // console.log(panel.protyle);
-                    const parentElement = document.getElementById('eventPanel-show');
-                    // console.log("parentElement", parentElement);
-                    if (parentElement) {
-                        const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                        // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
-                        // console.log("找到目标元素:", targetElement);
-                        if (targetElement) {
-                            (targetElement as HTMLElement).click();
-                            dialog.destroy({ ishandle: "1" });
-                        }
-                    }
-                }
-            }
+        // const dialog = new sy.Dialog({
+        //     title: `事件详情`,
+        //     content: '<div id="eventPanel-show"></div>',
+        //     width: '500px',
+        //     height: 'auto',
+        //     destroyCallback: async (option) => {
+        //         // console.log("ishandle",option?.ishandle)
+        //         if (option?.ishandle) {
+        //         } else {
+        //             await refreshKanban();
+        //         }
+        //     },
+        //     hideCloseIcon: true,
+        //     // disableClose: true,
+        // });
+        // const eventPanel = document.getElementById('eventPanel-show');
+        // new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+        //     blockId: blockID,
+        //     rootId: blockID,
+        //     render: {
+        //         breadcrumb: false,
+        //     },
+        //     action: ["cb-get-focus",],
+        //     mode: "wysiwyg",
+        //     // action: ["cb-get-focus"],
+        //     after: () => {
+        //         if (seemore) {
+        //             // console.log(panel.protyle);
+        //             const parentElement = document.getElementById('eventPanel-show');
+        //             // console.log("parentElement", parentElement);
+        //             if (parentElement) {
+        //                 const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
+        //                 // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
+        //                 // console.log("找到目标元素:", targetElement);
+        //                 if (targetElement) {
+        //                     (targetElement as HTMLElement).click();
+        //                     dialog.destroy({ ishandle: "1" });
+        //                 }
+        //             }
+        //         }
+        //     }
 
-        });
+        // });
+        const data = await api.getBlockAttrs(blockID);
+        sy.openAttributePanel({
+            data: data,
+            focusName: "av",
+            protyle: new sy.Protyle(window.siyuan.ws.app, document.createElement('div'), {
+                blockId: blockID,
+                rootId: blockID,
+            }).protyle,
+        })
     }
 }
 
@@ -645,7 +654,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const ce = runblockdata_for_time(blockdata?.kramdown);
         const minsub = runblockdata_for_sub(blockdata?.kramdown);
         const categorie = runblockdata_for_category(blockdata?.kramdown);
-        const tags= runblockdata_for_tags(blockdata?.kramdown);
+        const tags = runblockdata_for_tags(blockdata?.kramdown);
         const note = runblockdata_for_note(blockdata?.kramdown);
         const title = runblockdata_for_title(blockdata?.kramdown);
         console.log("title:::", title);

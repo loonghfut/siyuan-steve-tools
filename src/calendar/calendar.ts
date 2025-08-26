@@ -188,7 +188,7 @@ export async function run(
             } else if (clicks2 === 2) {
                 clearTimeout(clickTimeout);
                 clicks2 = 0;
-                console.log("双击事件", info.event);
+                // console.log("双击事件", info.event);
                 if (info.event._def.extendedProps.isRecurring) {
                     console.log("周期条件进入");
                     if (info.event._def.extendedProps.source === 'qqcalendar') {
