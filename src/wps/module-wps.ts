@@ -9,21 +9,44 @@ import { WpsFileServ } from "./wps_serv/wps_file_serv";
 // Wps 模块
 export class M_Wps {
     private plugin: steveTools;
+    private settingdata: any;
+    private wpsPicServ: WpsPicServ;
+    private wpsDataServ: WpsDataServ;
+    private wpsFileServ: WpsFileServ;
+
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
 
     async init(settingdata: any) {
+        this.settingdata = settingdata;
         console.log("Wps 模块初始化");
-        if(settingdata["wps-pic-enable"]) {
-            new WpsPicServ(this.plugin).init(settingdata);
+        if (this.settingdata["wps-pic-enable"]) {
+            this.wpsPicServ = new WpsPicServ(this.plugin);
+            this.wpsPicServ.init(settingdata);
         }
-        if(settingdata["wps-data-enable"]) {
-            new WpsDataServ(this.plugin).init(settingdata);
+        if (this.settingdata["wps-data-enable"]) {
+            this.wpsDataServ = new WpsDataServ(this.plugin);
+            this.wpsDataServ.init(settingdata);
         }
-        if(settingdata["wps-file-enable"]) {
-            new WpsFileServ(this.plugin).init(settingdata);
+        if (this.settingdata["wps-file-enable"]) {
+            this.wpsFileServ = new WpsFileServ(this.plugin);
+            this.wpsFileServ.init(settingdata);
         }
+    }
+
+    async onLayoutReady() {
+        // console.log("Wps onLayoutReady");
+        if (this.settingdata["wps-pic-enable"]) {
+            (this.wpsPicServ as any)?.onLayoutReady?.();
+        }
+        if (this.settingdata["wps-data-enable"]) {
+            (this.wpsDataServ as any)?.onLayoutReady?.();
+        }
+        if (this.settingdata["wps-file-enable"]) {
+            (this.wpsFileServ as any)?.onLayoutReady?.();
+        }
+
     }
 
     onunload() {
