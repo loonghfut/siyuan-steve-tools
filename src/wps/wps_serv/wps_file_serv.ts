@@ -264,13 +264,10 @@ export class WpsFileServ {
 
     private defaultWpsTemplate(): string {
         return `### {{name}}
-
+        
 链接： [{{name}}]({{url}})
-
 类型： {{file_type}}
-
 来源： {{file_src}}
-
 原始链接： {{url}}`;
     }
 
@@ -280,7 +277,7 @@ export class WpsFileServ {
             return (v === undefined || v === null) ? '' : String(v);
         });
         // 清理多余空行
-        out = out.replace(/^\s*[\r\n]/gm, '').replace(/\n{3,}/g, '\n\n');
+        // out = out.replace(/^\s*[\r\n]/gm, '').replace(/\n{3,}/g, '\n\n');
         return out;
     }
 
