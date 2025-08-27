@@ -330,7 +330,7 @@ export class WpsFileServ {
         return `{{{row
 ${md}
 }}}
-{: custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-block="true"}
+{: custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}
 `; 
     }
 
@@ -534,7 +534,16 @@ ${md}
             }
             const dupNote = allowDup ? ' (允许重复)' : '';
             showMessage(`导入完成${dupNote}: 新增 ${imported} 条, 跳过 ${skipped} 条, 失败 ${failed} 条`, 4000, 'info');
-            // if (imported) F5();
+            if (imported > 10) {
+                // 延时触发 F5，让 UI 有时间完成插入
+                setTimeout(() => {
+                    try {
+                        F5();
+                    } catch (err) {
+                        console.error('Delayed F5 failed', err);
+                    }
+                }, 1000);
+            }
         } catch (e) {
             console.error('选择导入异常', e);
             showMessage('导入过程发生错误', 2000, 'error');

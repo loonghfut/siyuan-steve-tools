@@ -17,6 +17,8 @@ export const wpsDefaults: Record<string, any> = {
     // 自定义模板：支持 {{#records}}...{{/records}} 循环与 {{字段名}} 占位符；附件字段输出为 markdown 链接集合
     "wps-data-template": "",
     "wps-file-weburl": "https://www.kdocs.cn/latest",
+    // WPS 文件块自定义模板；支持占位符 {{name}} {{url}} {{file_type}} {{file_src}}，留空则使用内置默认模板
+    "wps-file-block-template": "",
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -34,6 +36,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             items: [
                 { type: "checkbox", title: "启用 WPS文件管理", description: "文件管理", key: "wps-file-enable", value: ctx.settings["wps-file-enable"] },
                 { type: "textinput", title: "文件夹链接", description: "WPS文件夹链接", key: "wps-file-weburl", value: ctx.settings["wps-file-weburl"] },
+                { type: "textarea", title: "文件块模板", description: "自定义导入的文件块模板；支持占位符：{{name}} {{url}} {{file_type}} {{file_src}}。留空使用内置默认模板。", key: "wps-file-block-template", value: ctx.settings["wps-file-block-template"], direction: "row" },
             ]
         },
         {
