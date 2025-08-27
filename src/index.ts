@@ -3,7 +3,6 @@ import {
     // showMessage,
     // confirm,
     Dialog,
-    getFrontend,
     // Menu,
     // openTab,
     // adaptHotkey,
@@ -82,6 +81,8 @@ export default class steveTools extends Plugin {
         for (const moduleName in moduleInstances) {
             await moduleInstances[moduleName]?.init?.(settingdata);
         }
+    // 应用页面反色设置
+    this.applyPageInvert();
     }
 
     async onLayoutReady() {
@@ -143,6 +144,7 @@ export default class steveTools extends Plugin {
         // 卸载模块
         api.refresh();
         // this.modules.forEach(module => module.onunload());
+    document.body.classList.remove("st-invert-mode");
     }
 
     async vip() {
@@ -176,6 +178,13 @@ export default class steveTools extends Plugin {
         console.log("uninstall");
         for (const moduleName in moduleInstances) {
             moduleInstances[moduleName]?.onunload?.();
+        }
+    }
+    private applyPageInvert() {
+        if (settingdata && settingdata["invert-page-enable"]) {
+            document.body.classList.add("st-invert-mode");
+        } else {
+            document.body.classList.remove("st-invert-mode");
         }
     }
     // static outlog(mag: any, mag2?: any, mag3?: any, mag4?: any, mag5?: any) {

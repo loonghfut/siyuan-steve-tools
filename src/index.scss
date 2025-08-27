@@ -1078,3 +1078,28 @@ body[data-lifelog-enabled] {
         }
     }
 }
+
+/* 页面反色模式：通过在 body 上添加 st-invert-mode 类来反转除图片和图标外的整体色彩 */
+body.st-invert-mode {
+    filter: invert(1) hue-rotate(180deg);
+}
+
+/* 还原图片、视频、SVG 与常见图标元素的颜色 */
+body.st-invert-mode img,
+body.st-invert-mode video,
+body.st-invert-mode picture,
+body.st-invert-mode canvas,
+body.st-invert-mode svg,
+body.st-invert-mode .b3-list-item__icon,
+body.st-invert-mode .b3-button svg,
+body.st-invert-mode .protyle-toolbar__item svg,
+body.st-invert-mode .protyle-wysiwyg [data-type="NodeImage"] img,
+body.st-invert-mode .protyle-wysiwyg [data-type="NodeMath"],
+body.st-invert-mode .b3-icon,
+body.st-invert-mode [class*="icon"],
+body.st-invert-mode .emoji {
+    filter: invert(1) hue-rotate(180deg);
+}
+
+/* 避免在嵌套对话框等位置出现多重反转 */
+// （已移除空规则占位，避免编译器警告）

@@ -36,6 +36,9 @@
             saveSettings();
         }
         isrefresh(detail.key);
+        if (detail.key === "invert-page-enable") {
+            document.body.classList.toggle("st-invert-mode", detail.value === true);
+        }
     };
 
     import { needsRefresh } from "./settings/refresh";
@@ -78,6 +81,10 @@
         updateGroupItems();
         await saveSettings();
         focusGroup = groups[0]?.name || "";
+        // 初始应用页面反色
+        if (settings["invert-page-enable"]) {
+            document.body.classList.add("st-invert-mode");
+        }
     }
 
     async function resolveDynamicOptions(ctx: BuildContext) {
