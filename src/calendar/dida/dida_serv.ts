@@ -169,7 +169,7 @@ export class Dida365Service {
     }
 
     async syncTasksToSiyuan(): Promise<boolean> {
-        this.isSyncing = true; // 开始同步，锁定
+        // this.isSyncing = true; // 开始同步，锁定
         showStatusMessage("正在同步滴答清单任务，请稍候...", 10000, "dida-sync");
         try {
             // 获取滴答清单的所有任务
