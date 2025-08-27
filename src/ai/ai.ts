@@ -1,6 +1,6 @@
 import steveTools from "@/index";
 import * as ic from "@/icon";
-import { createIframeDock } from "@/api/api2";
+import { createWebviewDock_for_wps } from "@/api/api2";
 declare const siyuan: any;
 
 export class M_ai {
@@ -23,8 +23,8 @@ export class M_ai {
             this.url = settingdata["ai-url-custom"];
         }
         
-        // 使用封装的API创建dock
-        createIframeDock({
+        // 改用 webview dock（支持更多特性与注入能力）
+        createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
                 position: "RightTop",
@@ -37,7 +37,8 @@ export class M_ai {
             emptyUrlMessage: "请先配置ai网址...",
             containerClass: "ai-dock-container",
             iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
-            pointerEventsDelay: 300
+            pointerEventsDelay: 300,
+            enableButtons: false // AI 面板暂不需要顶部按钮
         });
 
         console.log("ai模块初始化完成");
