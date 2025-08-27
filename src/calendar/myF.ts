@@ -540,10 +540,11 @@ export async function showEvent(blockID, rootId?, isSeeMore = false, forceSeeMor
             app: window.siyuan.ws.app,
             doc: {
                 id: blockID,
-                action: ["cb-get-hl", "cb-get-all"],
+                action: ["cb-get-all","cb-get-focus"],
+                zoomIn: true
             },
             // position: "right",
-            keepCursor: false
+            // keepCursor: false
         });
 
     } else {
