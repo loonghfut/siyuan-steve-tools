@@ -40,7 +40,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.13.3 (2025年08月27日)
+### v0.13.4 (2025年08月28日)
 - 优化功能图标显示 (loonghfut)
 - 优化不必要变量 (loonghfut)
 - feat: 添加WPS数据导入功能准备及相关图标支持 (loonghfut)
@@ -79,6 +79,11 @@ win端s3同步后，docker端感知s3同步。
 - 优化wps插入块默认模板 (loonghfut)
 - feat: Ai侧边栏改用 webview dock 替代 iframe dock，支持更多特性与注入能力 (loonghfut)
 - chore: 更新版本号至 0.13.3 (loonghfut)
+- docs: 更新 v0.13.3 版本的更新日志 (loonghfut)
+- https://github.com/siyuan-note/siyuan/issues/15336 (loonghfut)
+- fix: 添加可选链以防止 WPS 文件未加载时的错误 (loonghfut)
+- fix: 更新README，添加思源3.3.0之后版本日程管理功能不兼容的提示 (loonghfut)
+- fix: 更新版本号至 0.13.4，并修改日程管理名称以增强可识别性 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
