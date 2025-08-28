@@ -127,7 +127,7 @@ export class WpsFileServ {
     async onLayoutReady() {
         this.WPSfile = window.siyuanWPS;
         // console.log(this.WPSfile);
-        if (this.WPSfile.loaded) {
+        if (this.WPSfile?.loaded) {
             this.plugin.addTopBar({
                 icon: "iconSTwpsFile",
                 title: "WPS文件拉取",
