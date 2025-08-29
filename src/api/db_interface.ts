@@ -225,7 +225,7 @@ export interface BlockSource {
     id: string;
     isDetached: boolean,              // 游离块
     content?: string,
-    // [key: string]: any;
+    itemID: string
 }
 
 export interface RemoveAttributeViewBlocksRequest {

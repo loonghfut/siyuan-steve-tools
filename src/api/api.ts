@@ -18,6 +18,7 @@ const cellUpdateQueue: Array<{
     id: string;
     avID: string;
     keyID: string;
+    itemID: string;
     keyName?: string;
     value: any;
     type: string;
@@ -30,6 +31,7 @@ const cellUpdateQueue: Array<{
 const addBlockQueue: Map<string, Array<{
     id: string;
     avID: string;
+    itemID: string;
     resolve: (value: any) => void;
     reject: (reason: any) => void;
 }>> = new Map();
@@ -717,7 +719,7 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
 }
 
 
-export async function addBlockToDatabase_pro(id: string, avID: string): Promise<any> {
+export async function addBlockToDatabase_pro(id: string, avID: string, itemID: string): Promise<any> {
     return new Promise((resolve, reject) => {
         // 按 avID 分组添加到队列中
         if (!addBlockQueue.has(avID)) {
@@ -727,6 +729,7 @@ export async function addBlockToDatabase_pro(id: string, avID: string): Promise<
         addBlockQueue.get(avID)!.push({
             id,
             avID,
+            itemID,
             resolve,
             reject
         });
@@ -758,7 +761,8 @@ async function processAddBlockQueueForAvID(avID: string) {
         // 构建批量添加的数据
         const sources = blocks.map(block => ({
             id: block.id,
-            isDetached: false
+            isDetached: false,
+            itemID: block.itemID || this.generateId()
         }));
 
         // 使用批量API添加所有块
@@ -786,6 +790,7 @@ interface UpdateMainKeyParams {
     keyID: string;
     content: string;
     blockID: string;
+    itemID: string;
 }
 
 // Modify the function to accept an object parameter
@@ -794,12 +799,12 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
         const delay = settingdata['transaction-delay'] || 1000;
         setTimeout(async () => {
             try {
-                const { avID, keyID, content, blockID } = params; // Destructure the parameters
+                const { avID, keyID, content, blockID, itemID } = params; // Destructure the parameters
                 const url = '/api/av/setAttributeViewBlockAttr';
                 const payload = {
                     avID: avID,
                     keyID: keyID,
-                    rowID: blockID,
+                    rowID: itemID,
                     value: {
                         block: {
                             content: content,
@@ -824,6 +829,7 @@ export async function updateAttrViewCell_pro(
     id: string,
     avID: string,
     keyID: string,
+    itemID: string,
     value: string | Date | ISelectOption[] | boolean | {
         blockID: string,
         content: string,
@@ -842,6 +848,7 @@ export async function updateAttrViewCell_pro(
             id,
             avID,
             keyID,
+            itemID,
             value,
             type,
             endtime,
@@ -943,7 +950,7 @@ async function processQueue() {
                 .filter(update => update.keyName) // 只处理有效的键名
                 .map(update => ({
                     keyName: update.keyName!,
-                    rowID: update.id,
+                    rowID: update.itemID,
                     value: update.processedValue
                 }));
 
@@ -1008,14 +1015,14 @@ async function refreshAttributeView(avID: string) {
 }
 
 // 处理滴答清单事件
-export async function handleDidaListEvent(avID: string, blockId: string) {
+export async function handleDidaListEvent(avID: string, blockId: string, itemID: string) {
     try {
         // 检查是否为滴答清单数据库
         const didaDbId = settingdata['cal-dida-db-id'];
         if (!didaDbId || avID !== didaDbId) {
             return; // 不是滴答清单数据库，无需处理
         }
-        (window as any).Dida365Service?.handleSiyuanUpdate("force", blockId);
+        (window as any).Dida365Service?.handleSiyuanUpdate("force", blockId, itemID);
 
     } catch (error) {
         console.warn(`⚠️ [滴答清单] 处理滴答清单事件失败`, error);
@@ -1197,6 +1204,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
 }
 
 import { refreshKanban } from "@/calendar/kanban";
+import { it } from "node:test";
 
 
 

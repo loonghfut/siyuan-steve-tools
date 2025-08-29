@@ -702,6 +702,7 @@ export class AVManager {
         id: string;
         content?: string;
         isDetached: boolean;
+        itemID: string;
     }>, options: {
         blockID?: string;
         previousID?: string;
@@ -713,6 +714,7 @@ export class AVManager {
             id: block.id || this.generateId(),
             isDetached: block.isDetached !== undefined ? block.isDetached : false,
             content: block.content || '',
+            itemID: block.itemID || this.generateId(),
             ...block
         }));
 

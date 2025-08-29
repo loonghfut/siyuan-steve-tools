@@ -478,7 +478,7 @@ export class Dida365Service {
 
             // 创建一个新的块
             const blockId = await generateSiyuanID() as string;
-
+            const itemID = await generateSiyuanID() as string;
             // 根据配置确定创建位置
             let targetId;
             if (settingdata["cal-create-for-date"]) {
@@ -517,13 +517,13 @@ ${taskData.描述?.content || "描述：暂无"}
             );
 
             // 添加到数据库
-            await addBlockToDatabase_pro(blockId, this.avId);
+            await addBlockToDatabase_pro(blockId, this.avId, itemID);
 
             // 获取 viewValue 用于获取 keyID
             const viewValue = await this.getAvViewData("创建思源任务");
 
             // 更新各个字段
-            await this.updateTaskFields(blockId, taskData, viewValue);
+            await this.updateTaskFields(blockId, taskData, viewValue, itemID);
 
             // 同步更新滴答清单任务，为其添加 S 链接
             if (taskData.didaID?.content) {
@@ -658,7 +658,7 @@ ${taskData.描述?.content || "描述：暂无"}
                 }
 
                 const blockId = task.事件.id;
-
+                const itemID = task.事件.itemID;
                 // 更新状态为"归档"
                 const statusData = [{ content: "归档" }];
                 updatePromises.push(
@@ -666,6 +666,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         blockId,
                         this.avId,
                         statusKeyID,
+                        itemID,
                         statusData,
                         "select"
                     ).then(() => {
@@ -704,7 +705,7 @@ ${taskData.描述?.content || "描述：暂无"}
     /**
      * 更新任务字段的通用方法
      */
-    private async updateTaskFields(blockId: string, taskData: any, viewValue: any, existingTask?: any): Promise<void> {
+    private async updateTaskFields(blockId: string, taskData: any, viewValue: any, itemID: string, existingTask?: any): Promise<void> {
         try {
             // 获取各字段的 keyID
             const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID');
@@ -725,6 +726,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     didaIdKeyID,
+                    itemID,
                     taskData.didaID.content,
                     "text"
                 ));
@@ -737,6 +739,7 @@ ${taskData.描述?.content || "描述：暂无"}
                 updatePromises.push(updatemainkey({
                     avID: this.avId,
                     blockID: blockId,
+                    itemID: itemID,
                     keyID: eventKeyID,
                     content: newEventTitle, // 存储不含链接的标题
                 }));
@@ -757,6 +760,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     timeKeyID,
+                    itemID,
                     startTime,
                     "date",
                     endTime
@@ -770,6 +774,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     priorityKeyID,
+                    itemID,
                     priorityData,
                     "select"
                 ));
@@ -782,6 +787,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     statusKeyID,
+                    itemID,
                     statusData,
                     "select"
                 ));
@@ -796,6 +802,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     tagKeyID,
+                    itemID,
                     taskData.标签.content,
                     "mSelect"
                 ));
@@ -807,6 +814,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     descKeyID,
+                    itemID,
                     taskData.描述.content,
                     "text"
                 ));
@@ -819,6 +827,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId,
                     this.avId,
                     urlKeyID,
+                    itemID,
                     taskData.链接.content,
                     "url"
                 ));
@@ -891,8 +900,9 @@ ${taskData.描述?.content || "描述：暂无"}
      * 处理来自思源 WebSocket 的消息，判断是否需要更新滴答任务。
      * 增加强制刷新逻辑
      */
-    handleSiyuanUpdate = async (e: any, blockId = '') => {
-        if (e == 'force' && blockId) {
+    handleSiyuanUpdate = async (e: any, blockId = '', itemID = '') => {
+
+        if (e == 'force' && blockId && itemID) {
             console.log("fore滴答更新");
         } else {
             const msg = e.detail;
@@ -908,8 +918,9 @@ ${taskData.描述?.content || "描述：暂无"}
             }
             if (operation.action === "insertAttrViewBlock") {//TODO: 暂不支持批量添加情况
                 blockId = operation.srcs[0].id;
+                itemID = operation.srcs[0].itemID;
             } else {
-                blockId = operation.rowID;
+                showMessage("ST💩更新任务字段失败：未找到块ID");
             }
         }
         if (!blockId) return;
@@ -1057,7 +1068,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
                         // 回写 didaID
                         if (didaIdKeyID) {
-                            updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, newDidaTask.id, "text"));
+                            updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, itemID, newDidaTask.id, "text"));
                         } else {
                             console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
                         }
@@ -1065,7 +1076,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 回写链接字段
                         if (linkKeyID) {
                             const didaLink = `https://dida365.com/webapp/#p/${targetProjectId}/tasks/${newDidaTask.id}`;
-                            updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, linkKeyID, didaLink, "url"));
+                            updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, linkKeyID, itemID, didaLink, "url"));
                         } else {
                             console.error("无法找到 '链接' 字段的 KeyID，无法写回滴答任务链接。");
                         }

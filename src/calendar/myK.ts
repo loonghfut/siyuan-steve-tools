@@ -16,6 +16,7 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
         To_event.publicId,
         To_event.extendedProps.rootid,
         To_event.extendedProps.subid,
+        To_event.extendedProps.itemID,
         {
             blockID: Fr_event.publicId,
             content: Fr_event.title,
@@ -39,6 +40,7 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
         To_event.publicId,
         To_event.extendedProps.rootid,
         To_event.extendedProps.subid,
+        To_event.extendedProps.itemID,
         {
             blockID: Fr_event.publicId,
             content: Fr_event.title,
@@ -62,10 +64,11 @@ export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatu
         Fr_event.publicId,
         Fr_event.extendedProps.rootid,
         Fr_event.extendedProps.statusid,
+        Fr_event.extendedProps.itemID,
         newstatus,
         "select");
-        
-    api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId);
+
+    api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId, Fr_event.extendedProps.itemID);
     console.log("done-updateAttrViewCell_pro-select");
     return true;
 }
@@ -347,10 +350,11 @@ export async function run_changepriority(Fr_event: NestedKBCalendarEvent, newPri
         Fr_event.publicId,
         Fr_event.extendedProps.rootid,
         Fr_event.extendedProps.priorityid,
+        Fr_event.extendedProps.itemID,
         [{ content: newPriority }],
         "select"
     );
-    api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId);
+    api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId, Fr_event.extendedProps.itemID);
     console.log("done-updateAttrViewCell_pro-select-priority");
     return true;
 }

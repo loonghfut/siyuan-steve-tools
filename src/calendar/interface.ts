@@ -26,6 +26,8 @@ export interface KBCalendarEvent {
     publicId?: string;
     extendedProps: {
         blockId: string;
+        // AttributeView 行 ID（用于属性写入，优先于 blockId）
+        itemID: string;
         kramdown: string;
         status: string;
         statusid: string;
@@ -33,7 +35,7 @@ export interface KBCalendarEvent {
         priorityid: string;
         category: string;
         categoryid: string;
-    tags?: string[]; // 多标签
+        tags?: string[]; // 多标签
         rootid: string;
         description: string;
         descriptionid: string;

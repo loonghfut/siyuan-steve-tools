@@ -2,10 +2,10 @@ import { Calendar, createPlugin, sliceEvents } from '@fullcalendar/core';
 import Sortable from 'sortablejs';
 import * as myK from './myK';
 import { NestedKBCalendarEvent, KBCalendarEvent, ISelectOption, ScrollState } from "./interface";
-import { av_ids, filterViewId, isEventCompleted, OUTcalendar, viewName } from './calendar';
+import { av_ids, filterViewId, OUTcalendar } from './calendar'; // 移除未使用 isEventCompleted, viewName
 import { showMessage } from 'siyuan';
 import { settingdata } from '..';
-import { changestatus_for_zq, createEventInDatabase, getViewId, getViewValue, showEvent } from './myF';
+import { changestatus_for_zq, createEventInDatabase, getViewId, getViewValue, showEvent } from './myF'; // resolveAttrTargetId 暂未直接使用
 import { runblockdata_for_sub } from './quickadd';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
@@ -95,7 +95,7 @@ const CustomViewConfig = {
         // 在createCard函数中添加环形进度统计
         const createCard = (event: NestedKBCalendarEvent) => {
             const childCards = event.children?.map(createCard).join('') || '';
-            const starttime = new Date(event.extendedProps.Kstart).toLocaleString();
+            // const starttime = new Date(event.extendedProps.Kstart).toLocaleString(); // 未使用，注释
             let endtime = '';
             let nowToEndTime;
             // console.log('event.extendedProps.priority:', event);
@@ -187,6 +187,7 @@ const CustomViewConfig = {
                 <div class="kanban-card ${isRecurring ? 'recurring-event no-drag' : ''}" 
                 data-id="${event.publicId}" 
                 data-block-id="${event.extendedProps.blockId}"
+                data-item-id="${event.extendedProps.itemID || ''}" 
                 data-start-date="${event.range.start instanceof Date ? event.range.start.toISOString().split('T')[0] : ''}"
                 ${isRecurring ? 'data-recurring="true"' : ''}>
                     <div class="kanban-card-header">
