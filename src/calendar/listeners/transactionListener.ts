@@ -10,6 +10,13 @@ interface WsMsg { cmd: string; data?: any[] }
 export function registerTransactionListener(plugin: steveTools, M_calendar: M_calendar) {
   plugin.eventBus.on('ws-main', async (e) => {
     const msg: WsMsg = e.detail;
+    // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
+    if (msg.cmd === 'syncing') {
+      if (M_calendar.isAutoSyncingUpdateEnabled() && M_calendar.isListening()) {
+        M_calendar.scheduleCalendarUpdate(2000);
+      }
+      return; // syncing 不再继续走后续 transactions 分支
+    }
     if (msg.cmd !== 'transactions') return;
     const op: WsOp | undefined = msg?.data?.[0]?.doOperations?.[0];
     if (!op) return;

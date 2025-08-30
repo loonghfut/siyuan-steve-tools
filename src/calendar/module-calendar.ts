@@ -45,6 +45,31 @@ export class M_calendar {
         this.plugin = plugin;
     }
     private isUpdating: boolean = false;
+    /**
+     * 对外提供的安全调度更新方法，带去抖。\n
+     * 如果当前已有更新计时器在等待，则忽略新的调度请求。\n
+     * @param delay 延迟毫秒，默认 2000
+     */
+    public scheduleCalendarUpdate(delay: number = 2000) {
+        if (this.isUpdating) return;
+        this.isUpdating = true;
+        setTimeout(async () => {
+            try {
+                await this.getEventsFromSiYuanDatabase();
+                console.log("更新日历文件<schedule>");
+            } finally {
+                this.isUpdating = false;
+            }
+        }, delay);
+    }
+
+    /** 是否开启同步完成后自动更新 */
+    public isAutoSyncingUpdateEnabled(): boolean {
+        return this_settingdata["cal-auto-syncing-update"] === true;
+    }
+
+    /** 是否仍在监听（给监听器访问） */
+    public isListening(): boolean { return islisten; }
     // private isSettingAttrs: boolean = false;  // 暂未使用，后续如需并发控制可启用
     public av_ids: any = [];
     public calConfig: M_caldata;
@@ -297,31 +322,11 @@ export class M_calendar {
             //     // steveTools.outlog("自动更新日历文件<1>");
             // }, 900000);
         }
-        if (this_settingdata["cal-auto-syncing-update"] == true) {
-            siyuan.ws.ws.addEventListener('message', async (e: { data: string; }) => {
-                if (!islisten) {
-                    return;
-                }
-                // if (1) { return; }
-                const msg = JSON.parse(e.data);
-                if (msg.cmd === "syncing") {
-                    // steveTools.outlog("更新了日程信息");
-                    //延时执行
-                    if (!this.isUpdating) {
-                        this.isUpdating = true;
-                        setTimeout(async () => {
-                            await this.getEventsFromSiYuanDatabase();
-                            console.log("更新日历文件<2>");
-                            this.isUpdating = false;
-                        }, 2000);
-                    }
-                }
-            });
-        }
+    // cal-auto-syncing-update 逻辑已迁移至 listeners/transactionListener.ts，通过 eventBus 'ws-main' 统一处理
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
         //实现看板实时更新
-    //2025-2-9更新为插件api方式监听（抽离至 listeners/transactionListener.ts）
-    registerTransactionListener(this.plugin, this);
+        //2025-2-9更新为插件api方式监听（抽离至 listeners/transactionListener.ts）
+        registerTransactionListener(this.plugin, this);
     }
 
     async onLayoutReady() {
@@ -422,29 +427,6 @@ export class M_calendar {
                 handleAddButtonClick_Independent('', { isdirect: true, directid: blockId });
             },
         })
-        //注册斜杠
-        // this.plugin.protyleSlash = [{
-        //     filter: ["kb", "看板"],
-        //     html: "插入看板",
-        //     id: "ST_calendar_slash_kanban",
-        //     callback: async (protyle) => {
-        //         console.log("添加日程", protyle);
-        //         const Hdata = await insertHtml();
-        //         // const ca = await run("", 'dayGridMonth')
-        //         protyle.insert(`${Hdata.html}`, true, true);
-        //         const MTHIS = await THIS(Hdata.blockIdData.id);
-        //         console.log("MTHIS", MTHIS);
-        //         await run("2", 'dayGridMonth', '', 'prev,next today','multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban','title',MTHIS.shadowRoot) 
-        //     }
-        // }, {
-        //     filter: ["rl", "日历"],
-        //     html: "插入日历",
-        //     id: "ST_calendar_slash_calendar",
-        //     callback: async (protyle) => {
-        //         console.log("添加日程", protyle);
-        //         // protyle.insert()
-        //     }
-        // }]
     }
 
     private addMenu(rect?: DOMRect) {
@@ -590,7 +572,6 @@ export class M_calendar {
     }
 
     async openRiChengViewDialog(isMobile: boolean = false, viewID = "", initialView = "dayGridMonth") {
-
         const id = new Date().getTime().toString();
         let calendar: any;
         new Dialog({
@@ -615,11 +596,6 @@ export class M_calendar {
     }
 
     async openRiChengView(initialView = "dayGridMonth") {
-
-        // // steveTools.outlog(viewValue);
-        //时间戳
-        // const id = new Date().getTime().toString();
-        // let calendar: Calendar;
         if (initialView == "dayGridMonth") {
             await openTab({
                 app: window.siyuan.ws.app,
@@ -663,29 +639,6 @@ export class M_calendar {
                 keepCursor: false
             });
         }
-
-        //     tab.panelElement.innerHTML = `
-        //   <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-        //     calendar = await run(id);
-        //     const calendarDiv = document.getElementById(`calendar-${id}`);
-        //     if (calendarDiv) {
-        //         const resizeObserver = new ResizeObserver(entries => {
-        //             for (const entry of entries) {
-        //                 const { width, height } = entry.contentRect;
-        //                 // // steveTools.outlog('Calendar container resized:', width, height);
-        //                 if (width == 0 || height == 0) {
-        //                     // resizeObserver.disconnect();
-        //                     // steveTools.outlog('ResizeObserver disconnected');
-        //                 }
-        //                 // 如果日历组件有 resize 方法，在这里调用
-        //                 calendar.updateSize();
-        //             }
-        //         });
-        //         //如果已存在resizeObserver则先断开
-        //         resizeObserver.disconnect();
-        //         resizeObserver.observe(calendarDiv);
-        //     }
-
     }
 
 
@@ -715,11 +668,6 @@ export class M_calendar {
             console.error('保存事件数据时出错：', error);
         }
     }
-
-
-    // ICS 生成逻辑已迁移到 IcsFileManager
-
-
     // 检查并创建events.json文件
     async checkAndCreateEventsFile(filePath: string) {
         try {

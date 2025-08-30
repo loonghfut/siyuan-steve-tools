@@ -1354,7 +1354,8 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
                         description: description,
                         allDay: allDay,
                     });
-                    await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
+                    const qqCalUrl = settingdata['cal-qq-calendar-url'];
+                    await moduleInstances['M_calendar']?.QQCalDAVClient?.updateEventsFromQQCalDAV(qqCalUrl);
                     refreshKanban();
                     // setTimeout(() => refreshKanban(), 1000);
                     sy.showMessage('已添加事件到QQ日历', 3000, 'info', 'addcal');
@@ -1447,7 +1448,8 @@ export function updataqqcalendar(info) {
 
             if (success) {
                 dialog.destroy();
-                await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
+                const qqCalUrl2 = settingdata['cal-qq-calendar-url'];
+                await moduleInstances['M_calendar']?.QQCalDAVClient?.updateEventsFromQQCalDAV(qqCalUrl2);
                 refreshKanban();
             }
         } catch (error) {
@@ -1473,7 +1475,8 @@ export function updataqqcalendar(info) {
 
                 if (success) {
                     dialog.destroy();
-                    await moduleInstances['M_calendar']?.updateEventsFromQQCalDAV();
+                    const qqCalUrl3 = settingdata['cal-qq-calendar-url'];
+                    await moduleInstances['M_calendar']?.QQCalDAVClient?.updateEventsFromQQCalDAV(qqCalUrl3);
                     refreshKanban();
                     sy.showMessage('QQ日历事件已删除', 3000);
                 }

@@ -29,6 +29,8 @@ export class CalDAVClient {
     private serverUrl: string;
     private credentials: { username: string; password: string };
     private headers: { [key: string]: string };
+    /** 缓存最近获取的 QQ 日历事件 */
+    private qqFullCalendarEvents: CalendarEvent[] = [];
 
     constructor(username: string, password: string) {
         // 修改为正确的QQ邮箱CalDAV服务器地址
@@ -390,6 +392,23 @@ export class CalDAVClient {
             showMessage('获取日历事件失败，请检查网络，QQ邮箱配置', -1, 'error');
             return [];
         }
+    }
+
+    /**
+     * （兼容迁移）获取缓存的 QQ 日历事件，相当于原 M_calendar.getEventsFromQQCalDAV
+     */
+    public getEventsFromQQCalDAV(): CalendarEvent[] {
+        return this.qqFullCalendarEvents;
+    }
+
+    /**
+     * （兼容迁移）刷新 QQ 日历事件缓存，相当于原 M_calendar.updateEventsFromQQCalDAV
+     * @param calendarUrl 配置中的 QQ 日历地址
+     */
+    public async updateEventsFromQQCalDAV(calendarUrl: string): Promise<CalendarEvent[]> {
+        this.qqFullCalendarEvents = await this.getEvents(calendarUrl);
+        console.log('QQevent', this.qqFullCalendarEvents);
+        return this.qqFullCalendarEvents;
     }
 
     private parseEventsFromXML(xmlText: string): CalendarEvent[] {
