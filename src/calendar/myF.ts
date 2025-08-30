@@ -24,11 +24,11 @@ interface EventFieldData {
 
 // FullCalendar extendedProps 结构
 export interface CalendarEventExtendedProps {
-    blockId: string;      // 块 id（界面 / 跳转）
+    blockId?: string;      // 块 id（界面 / 跳转）
     itemID?: string;      // AV 行 id（写入）
     kramdown?: string;
     iskramdown?: boolean;
-    rootid: string;
+    rootid?: string;
     status?: string;
     description?: string;
     isRecurring?: boolean;

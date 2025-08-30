@@ -896,20 +896,15 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                     const blockId = info.event.extendedProps.blockId;
                     const rootid = info.event.extendedProps.rootid;
                     const statusKeyID = info.event.extendedProps.statusid;
+                    const itemID = info.event.extendedProps.itemID;
 
                     if (blockId && rootid && statusKeyID) {
-                        // const api = window.siyuan?.ws?.api;
-                        // if (!api) {
-                        //     showMessage('无法访问思源API', 3000, 'error');
-                        //     return;
-                        // }
-
-                        // 更新事件状态为"完成"
                         const selectdata = [{ content: "归档" }];
                         updateAttrViewCell_pro(
                             blockId,
                             rootid,
                             statusKeyID,
+                            itemID,
                             selectdata,
                             "select"
                         ).then(() => {

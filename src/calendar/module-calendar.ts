@@ -1,8 +1,7 @@
 import steveTools, { frontEnd, settingdata } from "@/index";
-import { createEvents, EventAttributes } from 'ics';
-import { RRule } from 'rrule';
+import { EventAttributes } from 'ics';
 import * as api from "@/api/api"
-import { showMessage, openTab, Dialog, getFrontend, confirm, Menu } from "siyuan";
+import { showMessage, openTab, Dialog, getFrontend, Menu } from "siyuan";
 import * as ic from "@/icon"
 import "./event_style.scss";
 declare const siyuan: any;
@@ -12,7 +11,9 @@ let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export let linkToCalendar = '';
 import * as myF from "./myF";
-import { handleAddButtonClick, handleAddButtonClick_Independent, refreshKanban } from "./kanban";
+import { handleAddButtonClick_Independent, refreshKanban } from "./kanban";
+import { registerTransactionListener } from './listeners/transactionListener';
+import { icsFileManager, transformEvents } from './ics/IcsFileManager';
 import { globalOpen2 } from "./myK";
 import { addquikaddButton, getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
@@ -22,10 +23,10 @@ import { CalDAVClient } from "./share/qqcaldav";
 import { WebDAVSync } from "./share/webdav";
 import { ICSSubscription } from "./share/ics_discribe";
 import { Calendar } from "@fullcalendar/core";
-import { insertHtml, THIS } from "./insertHtml";
+// import { insertHtml, THIS } from "./insertHtml"; // 未使用，保留注释以供未来参考
 import { ICSImporter } from "./ics/ics_siyuan";
 import { Dida365Service } from "./dida/dida_serv";
-import { AVManager } from "@/api/db_pro";
+// import { AVManager } from "@/api/db_pro"; // 未使用
 import { IAVOperator } from "@/api/db_interface";
 
 
@@ -43,7 +44,7 @@ export class M_calendar {
         this.plugin = plugin;
     }
     private isUpdating: boolean = false;
-    private isSettingAttrs: boolean = false;  // 添加属性声明
+    // private isSettingAttrs: boolean = false;  // 暂未使用，后续如需并发控制可启用
     public av_ids: any = [];
     public calConfig: M_caldata;
     public alistPlugin: ics_alist;
@@ -54,7 +55,7 @@ export class M_calendar {
     public icsSubscription: ICSSubscription;
     public calendarAV: IAVOperator;
 
-    async init(settingdata) {
+    async init(settingdata: { [x: string]: any; }) {
         this.plugin.addTab({
             type: "calendar",
             async init() {
@@ -175,7 +176,7 @@ export class M_calendar {
             });
         }
         if (this_settingdata["cal-ics-subscribe-import"] == true) {
-            const icsImporter = new ICSImporter(this.plugin);
+            new ICSImporter(this.plugin);
         }
         if (this_settingdata["cal-show-view"] == true) {
             const topBarElement = this.plugin.addTopBar({
@@ -246,7 +247,7 @@ export class M_calendar {
         if (this_settingdata["cal-auto-update"] == true) {
             // // steveTools.outlog("自动更新日历文件");
             //监听
-            siyuan.ws.ws.addEventListener('message', async (e) => {
+            siyuan.ws.ws.addEventListener('message', async (e: { data: string; }) => {
                 if (!islisten) {
                     return;
                 }
@@ -296,7 +297,7 @@ export class M_calendar {
             // }, 900000);
         }
         if (this_settingdata["cal-auto-syncing-update"] == true) {
-            siyuan.ws.ws.addEventListener('message', async (e) => {
+            siyuan.ws.ws.addEventListener('message', async (e: { data: string; }) => {
                 if (!islisten) {
                     return;
                 }
@@ -318,72 +319,8 @@ export class M_calendar {
         }
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
         //实现看板实时更新
-        //2025-2-9更新为插件api方式监听
-        this.plugin.eventBus.on("ws-main", async (e) => {
-            const msg = e.detail;
-            if (msg.cmd === "transactions") {
-                // console.log("newway", msg);
-                // if (msg.data[0].doOperations[0].action === "updateAttrs" || msg.data[0].doOperations[0].action === "updateAttrViewCell") {
-                //     // console.log("updateAttrs");
-                //     this.avButton();
-                //     // if(msg.data[0].doOperations[0].action === "updateAttrViewCell"){
-                //     refreshKanban();
-                //     console.log('trans')
-                //     //更新背景色
-                //     if (msg?.data?.[0]?.doOperations?.[0]?.avID &&
-                //         msg?.data?.[0]?.doOperations?.[0]?.data?.mSelect?.[0]?.content &&
-                //         msg?.data?.[0]?.doOperations?.[0]?.rowID &&
-                //         msg?.data?.[0]?.doOperations?.[0]?.keyID) { // 检查 keyID 是否存在
-
-                //         const operationDetails = msg.data[0].doOperations[0];
-                //         const avID = operationDetails.avID;
-                //         const columnKeyID = operationDetails.keyID; // 变化的列ID
-                //         const itemID = operationDetails.rowID; // 行ID，
-                //         const blockID = operationDetails.id;
-                //         const statusValue = operationDetails.data.mSelect[0].content;
-                //             console.log("ss",operationDetails)
-                //         //判断是否为事件（判断是否是日程数据库的事件）
-                //         if (this.av_ids && this.av_ids.map(item => item.id).includes(avID)) {
-                //             console.log("更新了日程信息", { avID, blockID, itemID, columnKeyID, statusValue });
-                //             try {
-                //                 // 获取属性视图的列信息
-                //                 const avDetails = await api.getAttributeViewKeys(blockID);
-                //                 // console.log("avDetails", avDetails);
-                //                 // 查找名为“状态”的属性列 (key) 的定义
-                //                 let statusKeyDefinition;
-                //                 // console.log("avDetails.keyValues2121", avDetails[0].keyValues);
-                //                 if (avDetails && avDetails[0].keyValues) {
-                //                     // console.log("avDetails.keyValues", avDetails[0].keyValues);
-                //                     const statusKeyValue = avDetails[0].keyValues.find(kv => kv.key && kv.key.name === "状态");
-                //                     // console.log("statusKeyValue", statusKeyValue);
-                //                     if (statusKeyValue) {
-                //                         // console.log("statusKeyValue", statusKeyValue);
-                //                         statusKeyDefinition = statusKeyValue.key;
-                //                     }
-                //                 }
-                //                 // 如果找到了“状态”列，并且其ID与当前变化的列ID一致
-                //                 if (statusKeyDefinition && statusKeyDefinition.id === columnKeyID) {
-                //                     console.log(`'状态'列 (ID: ${columnKeyID}) 发生变化: ${statusValue}, BlockID: ${blockID}`);
-                //                     await api.setBlockAttrs(blockID, { "custom-st-event": myF.statusMap[statusValue] });//TODO优化，防止二次触发
-                //                 }
-                //             } catch (error) {
-                //                 console.error("处理'状态'列数据变化时出错:", error);
-                //             }
-                //         }
-                //     }
-                //     // }
-                // }
-                //【】同步更新看板 //TODO：优化请求频率
-                if (msg.data[0].doOperations[0].action === "update") {
-                    const data = msg.data[0].doOperations[0].data;
-                    if (data.startsWith('<div data-marker')) {
-                        // console.log('asd', data);
-                        refreshKanban();
-                        console.log("update");
-                    }
-                }
-            }
-        });
+    //2025-2-9更新为插件api方式监听（抽离至 listeners/transactionListener.ts）
+    registerTransactionListener(this.plugin, this);
     }
 
     async onLayoutReady() {
@@ -466,7 +403,7 @@ export class M_calendar {
             langKey: "ST_calendar_quick_pro",
             langText: "创建日程（光标所在块）",
             hotkey: "",
-            editorCallback: async (pro) => {
+            editorCallback: async () => {
                 let cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
                 let cursorElement = getCursorElement();
                 if (cursorElement?.closest('.li')) {
@@ -599,7 +536,7 @@ export class M_calendar {
         }
     }
 
-    private avButton() {
+    public avButton() {
         setTimeout(async () => {
             const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
                 .filter(span => span.closest('[name="日程"]'));
@@ -683,7 +620,7 @@ export class M_calendar {
         // const id = new Date().getTime().toString();
         // let calendar: Calendar;
         if (initialView == "dayGridMonth") {
-            const tab = await openTab({
+            await openTab({
                 app: window.siyuan.ws.app,
                 custom: {
                     icon: "iconSTcal",
@@ -697,7 +634,7 @@ export class M_calendar {
                 keepCursor: false
             });
         } else if (initialView == "priorityQuadrant") {
-            const tab = await openTab({
+            await openTab({
                 app: window.siyuan.ws.app,
                 custom: {
                     icon: "iconSTcal",
@@ -711,7 +648,7 @@ export class M_calendar {
                 keepCursor: false
             });
         } else {
-            const tab = await openTab({
+            await openTab({
                 app: window.siyuan.ws.app,
                 custom: {
                     icon: "iconSTcalKanban",
@@ -779,87 +716,7 @@ export class M_calendar {
     }
 
 
-    private convertEventFormat(eventData: any[]): EventAttributes[] {
-        const events: EventAttributes[] = [];
-
-        eventData.forEach((event: any) => {
-            // 检查事件是否为周期性事件
-            if (event.recurrenceRule) {
-                // 处理周期性事件
-                events.push({
-                    start: event.start,
-                    title: event.title,
-                    description: event.description,
-                    recurrenceRule: event.recurrenceRule,
-                    duration: event.duration,
-                    // 添加提醒配置
-                    alarms: [{
-                        action: 'display',
-                        summary: event.title,
-                        description: event.description,
-                        trigger: {
-                            before: true,
-                            minutes: 15,
-                        }
-                    }],
-                });
-            } else {
-                // 处理常规事件
-                events.push({
-                    start: event.start,
-                    end: event.end,
-                    title: event.title,
-                    description: event.description,
-                    status: event.status,
-                    // 根据状态决定是否添加提醒配置
-                    alarms: event.status === 'CONFIRMED' ? [] : [{
-                        action: 'display',
-                        summary: event.title,
-                        description: event.description,
-                        trigger: {
-                            before: true,
-                            minutes: 15,
-                        }
-                    }],
-                });
-            }
-        });
-
-        // console.log("events", events);
-        return events;
-    }
-
-    // 修改后的generateICSFromEventsFile函数
-    async generateICSFromEventsFile(jsonFilePath: string, icsFilePath: string) {
-        try {
-            const eventsBlob = await api.getFileBlob(jsonFilePath);
-            if (!eventsBlob) {
-                console.error('读取事件数据失败');
-                return;
-            }
-            const eventsJson = await eventsBlob.text();
-            const rawEvents = JSON.parse(eventsJson);
-
-            // 使用新的转换函数
-            const convertedEvents = this.convertEventFormat(rawEvents);
-
-            // 生成ICS内容
-            const { error, value: icsContent } = createEvents(convertedEvents, {
-                method: 'PUBLISH',
-                calName: 'ST思源日程',
-            });
-            if (error) {
-                console.error('生成ICS内容时出错：', error);
-                return;
-            }
-
-            const fileBlob = new Blob([icsContent], { type: 'text/calendar' });
-            await api.putFile(icsFilePath, false, fileBlob);
-            // steveTools.outlog('ICS文件已生成到' + icsFilePath);
-        } catch (error) {
-            console.error('生成ICS文件时出错：', error);
-        }
-    }
+    // ICS 生成逻辑已迁移到 IcsFileManager
 
 
     // 检查并创建events.json文件
@@ -950,7 +807,7 @@ export class M_calendar {
                 await this.addEventToGlobal(result_zq);
             }
             await this.uploadAllEventsToFile(eventsPath);
-            await this.generateICSFromEventsFile(eventsPath, calendarpath);
+            await icsFileManager.generateFromEventsJson(eventsPath, calendarpath);
 
             const selectToPics = this_settingdata["SelectTOPics"];
             if (!selectToPics || selectToPics === frontEnd) {
@@ -1040,148 +897,11 @@ export class M_calendar {
         console.log("QQevent", this.qqFullCalendarEvents);
         return this.qqFullCalendarEvents;
     }
-    // /**
-    //  * 将思源日程导出到QQ日历
-    //  */
-    // async exportToQQCalendar() {
-    //     try {
-    //         // 检查是否配置了QQ日历
-    //         if (!this.QQCalDAVClient || !this_settingdata["cal-qq-calendar-url"]) {
-    //             showMessage('请先在设置中配置QQ日历', -1, 'error');
-    //             return;
-    //         }
-
-    //         showMessage('开始同步到QQ日历...', 3000, 'info');
-
-    //         // 获取QQ日历中的现有事件
-    //         let existingEvents = [];
-    //         try {
-    //             existingEvents = await this.QQCalDAVClient.getEvents(this_settingdata["cal-qq-calendar-url"]);
-    //             console.log("QQ日历现有事件数:", existingEvents.length);
-    //         } catch (error) {
-    //             console.error('获取QQ日历现有事件失败:', error);
-    //             showMessage('获取QQ日历现有事件失败，将尝试直接添加', 3000);
-    //         }
-
-    //         // 创建现有事件的标识映射，用于去重
-    //         const existingEventMap = new Map();
-    //         existingEvents.forEach(event => {
-    //             // 使用标题+开始时间作为事件的唯一标识
-    //             const eventKey = `${event.title}-${event.start?.toISOString() || ''}`;
-    //             existingEventMap.set(eventKey, event);
-
-    //             // 记录事件来源为QQ日历
-    //             if (event.extendedProps?.source === 'qqcalendar') {
-    //                 event.extendedProps.fromQQ = true;
-    //             }
-    //         });
-
-    //         // 获取思源的日程事件数据
-    //         const avIds = await this.getAVreferenceid();
-    //         const viewIDs = await myF.getViewId(avIds);
-    //         const viewValue = await myF.getViewValue(viewIDs);
-
-    //         // 转换为QQ日历可接受的格式，同时过滤掉已存在的事件
-    //         const events = viewValue.flatMap(eventGroup => {
-    //             if (!eventGroup.data) return [];
-
-    //             return eventGroup.data.map(event => {
-    //                 // 跳过已完成的事件
-    //                 if (event?.状态?.content === "完成") return null;
-
-    //                 // 跳过重复规则不为空的周期事件
-    //                 if (event?.重复规则?.content) {
-    //                     console.log(`跳过周期事件: ${event?.事件?.content || '未命名事件'}`);
-    //                     return null;
-    //                 }
-
-    //                 const startTime = new Date(event?.开始时间?.start);
-    //                 const endTime = new Date(event?.开始时间?.end);
-
-    //                 // 检查日期是否有效
-    //                 if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-    //                     return null;
-    //                 }
-
-    //                 // 创建事件唯一标识
-    //                 const eventKey = `${event?.事件?.content || '未命名事件'}-${startTime.toISOString()}`;
-
-    //                 // 检查事件是否已存在于QQ日历中
-    //                 if (existingEventMap.has(eventKey)) {
-    //                     const existingEvent = existingEventMap.get(eventKey);
-
-    //                     // 如果是来自QQ日历的事件，跳过
-    //                     if (existingEvent.extendedProps?.fromQQ) {
-    //                         console.log(`跳过QQ日历原有事件: ${eventKey}`);
-    //                         return null;
-    //                     }
-
-    //                     console.log(`跳过已存在的事件: ${eventKey}`);
-    //                     return null;
-    //                 }
-
-    //                 return {
-    //                     title: event?.事件?.content || '未命名事件',
-    //                     description: event?.描述?.content || '',
-    //                     start: startTime,
-    //                     end: endTime,
-    //                     isAllDay: event?.全天事件?.content === "是", // 根据属性判断是否为全天事件
-    //                     extendedProps: {
-    //                         source: 'siyuan', // 标记来源为思源
-    //                     }
-    //                 };
-    //             }).filter(Boolean); // 过滤掉无效事件
-    //         });
-
-    //         // 同步到QQ日历
-    //         if (events.length > 0) {
-    //             await this.QQCalDAVClient.syncEvents(
-    //                 this_settingdata["cal-qq-calendar-url"],
-    //                 events
-    //             );
-    //             showMessage(`成功将${events.length}个事件同步到QQ日历`, 3000, "info");
-    //         } else {
-    //             showMessage('没有需要同步的新事件', 3000, 'info');
-    //         }
-    //     } catch (error) {
-    //         console.error('导出到QQ日历失败:', error);
-    //         showMessage('导出到QQ日历失败，请查看控制台错误', -1, 'error');
-    //     }
-    // }
-
-    // /**
-    //  * 清空QQ日历中的事件
-    //  * @param onlySiyuanEvents 是否只删除来自思源的事件
-    //  */
-    // async clearQQCalendar(onlySiyuanEvents: boolean = true) {
-    //     try {
-    //         // 检查是否配置了QQ日历
-    //         if (!this.QQCalDAVClient || !this_settingdata["cal-qq-calendar-url"]) {
-    //             showMessage('请先在设置中配置QQ日历', -1, 'error');
-    //             return;
-    //         }
-
-    //         // 调用CalDAVClient的清空方法
-    //         await this.QQCalDAVClient.clearCalendar(
-    //             this_settingdata["cal-qq-calendar-url"],
-    //             {
-    //                 onlyFromSource: onlySiyuanEvents ? 'siyuan' : undefined
-    //             }
-    //         );
-
-    //         // 刷新日历显示
-    //         refreshKanban();
-
-    //     } catch (error) {
-    //         console.error('清空QQ日历失败:', error);
-    //         showMessage('清空QQ日历失败，请查看控制台错误', -1, 'error');
-    //     }
-    // }
 }
 
 
-function getSTCalendarNotebookId(notebooks): string | null {
-    const stCalendarNotebook = notebooks.find(notebook => notebook.name === "ST日程管理");
+function getSTCalendarNotebookId(notebooks: any[]): string | null {
+    const stCalendarNotebook = notebooks.find((notebook: { name: string; }) => notebook.name === "ST日程管理");
     return stCalendarNotebook ? stCalendarNotebook.id : null;
 }
 
@@ -1192,111 +912,3 @@ function extractDataAvId(markdown: string): string | null {
 }
 
 
-// function convertTimestampToArray(timestamp: number): [number, number, number, number, number] {
-//     const date = new Date(timestamp);
-//     const offset = 8 * 60; // 东八区的偏移量，单位为分钟
-//     const localDate = new Date(date.getTime() + offset * 60 * 1000);
-//     return [
-//         localDate.getUTCFullYear(),
-//         localDate.getUTCMonth() + 1, // 月份从0开始，所以需要加1
-//         localDate.getUTCDate(),
-//         localDate.getUTCHours(),
-//         localDate.getUTCMinutes()
-//     ];
-// }
-
-// 转换思源数据库中的事件数据为 ICS 格式
-
-function transformEvents(inputEvents, isZQ: boolean = false) {
-    // console.log("inputEvents", inputEvents);
-    function timestampToArray(timestamp) {
-        const date = new Date(timestamp);
-        return [
-            date.getFullYear(),
-            date.getMonth() + 1,
-            date.getDate(),
-            date.getHours(),
-            date.getMinutes()
-        ];
-    }
-
-    const oldM = settingdata["cal-ics-filter-old"] || 1;
-    const newM = settingdata["cal-ics-filter-new"] || 1;
-    // 获取当前时间前后6个月的时间范围
-    const now = new Date();
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - oldM, now.getDate());
-    const sixMonthsLater = new Date(now.getFullYear(), now.getMonth() + newM, now.getDate());
-
-    // 用于检查事件是否在时间范围内
-    function isEventInTimeRange(eventTime) {
-        const eventDate = new Date(eventTime);
-        return eventDate >= sixMonthsAgo && eventDate <= sixMonthsLater;
-    }
-
-    // 用于存储已处理过的事件的唯一标识
-    const processedEvents = new Set();
-    const transformedEvents = [];
-
-    // 遍历所有输入的事件数组
-    inputEvents.forEach(eventGroup => {
-        if (!eventGroup.data) return;
-
-        eventGroup.data.forEach(event => {
-            // 创建事件的唯一标识
-            const eventKey = `${event?.事件?.id}`;
-
-            // 检查事件是否已经处理过
-            if (processedEvents.has(eventKey)) {
-                return; // 跳过重复的事件
-            }
-
-            // 对于非周期性事件，检查时间范围
-            if (!isZQ && !isEventInTimeRange(event?.开始时间?.start)) {
-                return; // 跳过不在时间范围内的事件
-            }
-
-            // 记录已处理的事件
-            processedEvents.add(eventKey);
-
-            // Base event object with common properties
-            const baseEvent = {
-                start: timestampToArray(event?.开始时间?.start),
-                title: event?.事件?.content,
-                description: event?.描述?.content,
-            };
-
-            // Add properties based on event type
-            if (isZQ) {
-                try {
-                    // 尝试解析重复规则
-                    const rruleString = event.重复规则.content;
-
-                    // 如果不是以"RRULE:"开头，添加前缀
-                    const formattedRrule = rruleString.startsWith("RRULE:") ?
-                        rruleString : `RRULE:${rruleString}`;
-
-                    // 尝试用 rrule.js 解析，验证格式是否正确
-                    const rule = RRule.fromString(formattedRrule);
-
-                    // 如果解析成功，将正确格式的规则添加到事件中
-                    transformedEvents.push({
-                        ...baseEvent,
-                        recurrenceRule: formattedRrule.replace("RRULE:", ""), // 去掉前缀
-                        duration: { hours: event.持续时间.content || 1 }
-                    });
-                } catch (error) {
-                    console.error('解析重复规则出错:', event.重复规则.content, error);
-                    showMessage('周期事件-解析重复规则出错,请重试' + event.重复规则.content, -1, 'error');
-                }
-            } else {
-                transformedEvents.push({
-                    ...baseEvent,
-                    end: timestampToArray(event.开始时间.end),
-                    status: event.状态?.content === "完成" ? "CONFIRMED" : "TENTATIVE"
-                });
-            }
-        });
-    });
-
-    return transformedEvents;
-}
