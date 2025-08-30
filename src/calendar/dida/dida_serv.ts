@@ -478,7 +478,7 @@ export class Dida365Service {
 
             // 创建一个新的块
             const blockId = await generateSiyuanID() as string;
-            const itemID = await generateSiyuanID() as string;
+            const itemID = blockId || await generateSiyuanID() as string;
             // 根据配置确定创建位置
             let targetId;
             if (settingdata["cal-create-for-date"]) {
@@ -920,7 +920,9 @@ ${taskData.描述?.content || "描述：暂无"}
                 blockId = operation.srcs[0].id;
                 itemID = operation.srcs[0].itemID;
             } else {
-                showMessage("ST💩更新任务字段失败：未找到块ID");
+                // console.log("🚧🚧:",operation);
+                blockId = operation.rowID;
+                itemID = operation.rowID;
             }
         }
         if (!blockId) return;
@@ -929,7 +931,7 @@ ${taskData.描述?.content || "描述：暂无"}
             console.log(`处理思源更新：块ID ${blockId}`);
             const viewData = await this.getAvViewData("处理思源更新");
             const allTasks = viewData.flatMap(view => view.data || []);
-            const siyuanTask = allTasks.find((task: any) => task.事件?.id === blockId);
+            const siyuanTask = allTasks.find((task: any) => task.事件?.itemID === itemID);
 
             if (!siyuanTask) {
                 return;

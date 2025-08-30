@@ -173,7 +173,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     const requiredFields = getRequiredFields(isZQ, type);
 
     // 1. 创建字段映射
-    console.log("DATA：", data);
+    // console.log("DATA：", data);
     const fieldMap = new Map();
     const fields = isGalleryView ? data.fields : data.columns;
     fields.forEach((field: any, index: number) => {
@@ -265,7 +265,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
             try {
                 // 提取事件
                 const eventCell = getCell('事件');
-                console.log("eventCell:", eventCell);
+                // console.log("eventCell:", eventCell);
                 if (eventCell) {
                     rowData['事件'] = {
                         content: eventCell.block?.content || '',
@@ -606,7 +606,7 @@ export async function showEvent(blockID, _rootId?, isSeeMore = false, forceSeeMo
             app: window.siyuan.ws.app,
             doc: {
                 id: blockID,
-                action: ["cb-get-all","cb-get-focus"],
+                action: ["cb-get-all", "cb-get-focus"],
                 zoomIn: true
             },
             // position: "right",
@@ -684,7 +684,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     direct = { isdirect: false, directid: "" },
     isrefresh = true
 ) {
-    const itemID = await api.generateSiyuanID() as string;
+
 
     let isok = false;
     status = status || "未完成";
@@ -713,6 +713,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     }
     if (direct.isdirect) {
         // console.log("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
+        const itemID = direct.directid;
         if (await checkBlockInEvent(direct.directid, to_db_id)) {
             console.log("目标数据库已存在此事件");
             return;
@@ -816,6 +817,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 {: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id)
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
+    const itemID = id; //新创建的块，itemID和块ID相同
     // // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
     // console.log("dateStr:::", dateStr, "databaseId:::", to_db_id);
     const dialog = new sy.Dialog({
