@@ -28,6 +28,7 @@ import { ICSImporter } from "./ics/ics_siyuan";
 import { Dida365Service } from "./dida/dida_serv";
 // import { AVManager } from "@/api/db_pro"; // 未使用
 import { IAVOperator } from "@/api/db_interface";
+import { extractDataAvId } from "@/api/api3";
 
 
 
@@ -868,28 +869,6 @@ export class M_calendar {
             console.error('上传事件到文件时出错：', error);
         }
     }
-
-    public getEventsFromQQCalDAV() {
-        return this.qqFullCalendarEvents;
-    }
-
-    public async updateEventsFromQQCalDAV() {
-        this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(this_settingdata["cal-qq-calendar-url"]);
-        console.log("QQevent", this.qqFullCalendarEvents);
-        return this.qqFullCalendarEvents;
-    }
-}
-
-
-function getSTCalendarNotebookId(notebooks: any[]): string | null {
-    const stCalendarNotebook = notebooks.find((notebook: { name: string; }) => notebook.name === "ST日程管理");
-    return stCalendarNotebook ? stCalendarNotebook.id : null;
-}
-
-function extractDataAvId(markdown: string): string | null {
-    const regex = /data-av-id="([^"]+)"/;
-    const match = markdown.match(regex);
-    return match ? match[1] : null;
 }
 
 

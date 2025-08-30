@@ -169,3 +169,8 @@ export function F5() {
     });
     document.dispatchEvent(event);
 }
+export function extractDataAvId(markdown: string): string | null {
+    const regex = /data-av-id="([^"]+)"/;
+    const match = markdown.match(regex);
+    return match ? match[1] : null;
+}
