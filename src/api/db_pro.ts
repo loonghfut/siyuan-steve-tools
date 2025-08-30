@@ -6,6 +6,7 @@ import {
     AttributeViewValue,
     AVManagerOptions,
     BlockSource,
+    BatchReplaceAttributeViewBlocksRequest,
     DuplicateAttributeViewBlockResponse,
     GetAttributeViewFilterSortResponse,
     GetAttributeViewPrimaryKeyValuesResponse,
@@ -731,6 +732,24 @@ export class AVManager {
     }
 
     /**
+     * 批量替换属性视图中的块 (内核 API: /api/av/batchReplaceAttributeViewBlocks)
+     * @param avID 属性视图 ID
+     * @param mappings 旧块 -> 新块 的映射，如 [{"oldID":"newID"}]
+     * @param isDetached 是否作为游离块（默认 false 与内核一致）
+     */
+    async batchReplaceBlocks(avID: string, mappings: Array<Record<string, string>>, isDetached: boolean = false): Promise<void> {
+        if (!avID) throw new Error('avID不能为空');
+        if (!Array.isArray(mappings) || mappings.length === 0) throw new Error('mappings 必须是非空数组');
+
+        const payload: BatchReplaceAttributeViewBlocksRequest = {
+            avID,
+            isDetached,
+            oldNew: mappings
+        };
+        return await this.request('batchReplaceAttributeViewBlocks', payload);
+    }
+
+    /**
      * 批量更新单元格（使用原生批量API）
      * @param avID - 属性视图ID
      * @param updates - 更新数组
@@ -918,6 +937,15 @@ class AVOperator implements IAVOperator {
         }>
     ): Promise<any> {
         return await this.manager.batchUpdateCells(this.avID, updates);
+    }
+
+    /**
+     * 批量替换块
+     * @param mappings 映射数组 [{oldID: newID}, ...]
+     * @param isDetached 是否游离
+     */
+    async replaceBlocks(mappings: Array<Record<string, string>>, isDetached: boolean = false): Promise<void> {
+        return await this.manager.batchReplaceBlocks(this.avID, mappings, isDetached);
     }
 
     async getKeys(): Promise<AttributeViewKey[]> {

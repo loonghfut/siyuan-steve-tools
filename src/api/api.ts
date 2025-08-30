@@ -61,6 +61,7 @@ export async function lsNotebooks(): Promise<IReslsNotebooks> {
 }
 
 
+
 export async function openNotebook(notebook: NotebookId) {
     let url = '/api/notebook/openNotebook';
     return request(url, { notebook: notebook });
@@ -964,9 +965,8 @@ async function processQueue() {
                 updates.forEach(update => update.resolve(result));
 
                 console.log(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
-                const blockId = updates[0].id;
                 // 批量更新完成后的后续处理
-                await handlePostBatchUpdateActions(avID, updates, blockId);
+                await handlePostBatchUpdateActions(avID);
             } else {
                 // 如果没有有效更新，拒绝所有Promise
                 updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
@@ -992,7 +992,7 @@ async function processQueue() {
 }
 
 // 处理批量更新完成后的后续操作
-async function handlePostBatchUpdateActions(avID: string, updates: Array<any>, blockId: string) {
+async function handlePostBatchUpdateActions(avID: string) {
     try {
         // 1. 触发视图刷新
         await refreshAttributeView(avID);
@@ -1206,7 +1206,6 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
 }
 
 import { refreshKanban } from "@/calendar/kanban";
-import { it } from "node:test";
 
 
 
@@ -1281,5 +1280,15 @@ export async function addAttributeViewKey(
         keyType: keyType as any,
         previousKeyName
     });
+}
+
+/**
+ * 批量替换属性视图中的块 (封装 /api/av/batchReplaceAttributeViewBlocks)
+ * @param avID 属性视图 ID
+ * @param mappings 旧块 -> 新块 映射数组，如 [{"oldID":"newID"}, {"oldID2":"newID2"}]
+ * @param isDetached 是否游离块 (默认 false)
+ */
+export async function batchReplaceAttributeViewBlocks(avID: string, mappings: Array<Record<string, string>>, isDetached: boolean = false): Promise<void> {
+    return avManager.batchReplaceBlocks(avID, mappings, isDetached);
 }
 

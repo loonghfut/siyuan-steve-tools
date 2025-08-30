@@ -329,6 +329,17 @@ export interface BatchSetAttributeViewBlockAttrsRequest {
     }>;
 }
 
+// 批量替换属性视图数据块请求
+export interface BatchReplaceAttributeViewBlocksRequest {
+    avID: string;
+    isDetached?: boolean;
+    /**
+     * 旧块 ID 与新块 ID 的映射数组；
+     * 例如: [{"oldBlockID1": "newBlockID1"}, {"oldBlockID2": "newBlockID2"}]
+     */
+    oldNew: Array<Record<string, string>>;
+}
+
 // 响应数据类型
 export interface DuplicateAttributeViewBlockResponse {
     avID: string;
