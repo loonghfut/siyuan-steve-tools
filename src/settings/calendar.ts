@@ -110,7 +110,6 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "全局日程视图", description: "启用后再左上角加一个日历视图的入口", key: "cal-show-view", value: ctx.settings["cal-show-view"] },
                 { type: "select", title: "日程创建位置", description: "选择日记本", key: "cal-create-pos", value: ctx.settings["cal-create-pos"], options: notebookOptions() },
                 { type: "select", title: "日程数据库选择", description: "选择默认添加事件的数据库", key: "cal-db-id", value: ctx.settings["cal-db-id"], dynamicOptions: calendarDbOptions },
-                { type: "button", title: "日程周期模板", description: "生成日程周期模板（注意：会创建一个笔记本）", key: "cal-rule", value: ctx.settings["cal-rule"], button: { label: "生成", callback: () => { try { ctx.moduleInstances["M_calendar"].importMoBan(); } catch (e:any) { console.error(e); } } } },
                 { type: "number", title: "默认持续时间(单位：小时)", description: "默认事件持续时间", key: "cal-time", value: ctx.settings["cal-time"] },
                 { type: "checkbox", title: "是否按事件时间创建日记", description: "启用后会按事件时间的日记创建日程", key: "cal-create-for-date", value: ctx.settings["cal-create-for-date"] },
             ]

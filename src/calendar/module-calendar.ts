@@ -869,25 +869,6 @@ export class M_calendar {
         }
     }
 
-    async importMoBan() {
-        let notebookId = getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
-        // steveTools.outlog("ceshi1", notebookId);
-        if (!notebookId) {
-            showMessage("已创建名为“ST日程管理”的笔记本", 3000, "info");
-            await api.createNotebook("ST日程管理");
-            notebookId = getSTCalendarNotebookId((await api.lsNotebooks()).notebooks);
-        }
-        //获取模板zip文件
-        try {
-            const file = await api.getFileBlob("/data/plugins/siyuan-steve-tools/asset/日程.sy.zip");
-            await api.importSY(notebookId, file);
-        } catch (e) {
-            // steveTools.outlog(e);
-        }
-        showMessage("已导入日程模板", 3000, "info");
-        api.refresh();
-    }
-
     public getEventsFromQQCalDAV() {
         return this.qqFullCalendarEvents;
     }
