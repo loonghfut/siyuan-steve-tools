@@ -946,6 +946,7 @@ async function processQueue() {
             );
 
             // 构建批量更新数据
+            
             const batchUpdates = processedUpdates
                 .filter(update => update.keyName) // 只处理有效的键名
                 .map(update => ({
@@ -956,6 +957,7 @@ async function processQueue() {
 
             if (batchUpdates.length > 0) {
                 // 使用批量API更新单元格
+                console.log(`🔄 [批量更新单元格] 发送批量更新请求，avID: ${avID}`, batchUpdates);
                 const result = await avManager.batchUpdateCells(avID, batchUpdates);
 
                 // 成功后解析所有Promise

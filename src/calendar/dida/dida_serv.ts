@@ -571,12 +571,12 @@ ${taskData.描述?.content || "描述：暂无"}
             }
 
             const blockId = existingTask.事件.id;
-
+            const itemID = existingTask.事件.itemID;
             // 获取 viewValue 用于获取 keyID
             const viewValue = await this.getAvViewData("更新思源任务");
 
             // 更新各个字段
-            await this.updateTaskFields(blockId, newTaskData, viewValue, existingTask);
+            await this.updateTaskFields(blockId, newTaskData, viewValue, itemID, existingTask);
 
             // 更新块的自定义属性（状态）
             const statusCustomAttr = newTaskData.状态?.content === "完成" ? "done" : "todo";
