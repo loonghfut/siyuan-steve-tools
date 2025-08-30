@@ -403,6 +403,34 @@ export class AVManager {
     // ============== 属性视图数据块操作 ==============
 
     /**
+     * 根据一组 itemID 获取其绑定的块 ID 映射
+     * /api/av/getAttributeViewBoundBlockIDsByItemIDs
+     * @param avID 属性视图 ID
+     * @param itemIDs 项目(行) ID 列表
+     * @returns 形如 { itemID: blockID | "" } 的映射 (空字符串表示未绑定块)
+     */
+    async getBoundBlockIDsByItemIDs(avID: string, itemIDs: string[]): Promise<Record<string, string>> {
+        if (!avID) throw new Error('avID不能为空');
+        if (!Array.isArray(itemIDs)) throw new Error('itemIDs 必须是数组');
+        if (itemIDs.length === 0) return {};
+        return await this.request('getAttributeViewBoundBlockIDsByItemIDs', { avID, itemIDs });
+    }
+
+    /**
+     * 根据一组绑定块 ID 获取对应的 itemID 映射
+     * /api/av/getAttributeViewItemIDsByBoundIDs
+     * @param avID 属性视图 ID
+     * @param blockIDs 绑定块 ID 列表
+     * @returns 形如 { blockID: itemID } 的映射
+     */
+    async getItemIDsByBoundIDs(avID: string, blockIDs: string[]): Promise<Record<string, string>> {
+        if (!avID) throw new Error('avID不能为空');
+        if (!Array.isArray(blockIDs)) throw new Error('blockIDs 必须是数组');
+        if (blockIDs.length === 0) return {};
+        return await this.request('getAttributeViewItemIDsByBoundIDs', { avID, blockIDs });
+    }
+
+    /**
      * 添加属性视图数据块
      * @param avID - 属性视图ID
      * @param sources - 数据源数组
@@ -523,9 +551,17 @@ export class AVManager {
      * @param value - 值
      * @returns 设置结果
      */
-    async setBlockAttribute(avID: string, keyName: string, rowID: string, value: setAttributeViewValue): Promise<SetAttributeViewBlockAttrResponse> {
-        if (!avID || !keyName || !rowID) {
-            throw new Error('avID、keyName和rowID不能为空');
+    async setBlockAttribute(avID: string, keyName: string, rowID: string | undefined, value: setAttributeViewValue, blockID?: string): Promise<SetAttributeViewBlockAttrResponse> {
+        if (!avID || !keyName) {
+            throw new Error('avID、keyName不能为空');
+        }
+        // 若未提供 rowID 但提供了 blockID，则映射获取 itemID(rowID)
+        if (!rowID && blockID) {
+            const map = await this.getItemIDsByBoundIDs(avID, [blockID]);
+            rowID = map[blockID];
+        }
+        if (!rowID) {
+            throw new Error('缺少 rowID，且无法通过 blockID 映射获得');
         }
         const key = await this.findKeyByName(avID, keyName);
         return await this.request('setAttributeViewBlockAttr', { avID, keyID: key.id, rowID, value });
@@ -757,24 +793,38 @@ export class AVManager {
      */
     async batchUpdateCells(avID: string, updates: Array<{
         keyName: string;
-        rowID: string;
+        rowID?: string; // itemID
+        blockID?: string; // 若提供且 rowID 缺失则自动映射
         value: setAttributeViewValue;
     }>): Promise<any> {
         if (!avID) throw new Error('avID不能为空');
         if (!Array.isArray(updates)) throw new Error('updates必须是数组');
         if (updates.length === 0) return { success: true, message: '没有需要更新的数据' };
 
+        // 收集需要通过 blockID 映射的项
+        const needMapBlockIDs = Array.from(new Set(
+            updates.filter(u => !u.rowID && u.blockID).map(u => u.blockID as string)
+        ));
+        let blockToItem: Record<string, string> = {};
+        if (needMapBlockIDs.length > 0) {
+            blockToItem = await this.getItemIDsByBoundIDs(avID, needMapBlockIDs);
+        }
+
         // 转换keyName为keyID
         const processedValues = await Promise.all(
             updates.map(async (update) => {
-                if (!update.keyName || !update.rowID) {
-                    throw new Error('每个更新项必须包含keyName和rowID');
+                let { rowID } = update;
+                if (!rowID && update.blockID) {
+                    rowID = blockToItem[update.blockID];
+                }
+                if (!update.keyName || !rowID) {
+                    throw new Error('每个更新项必须包含keyName且需提供 rowID 或 blockID');
                 }
                 
                 const key = await this.findKeyByName(avID, update.keyName);
                 return {
                     keyID: key.id,
-                    rowID: update.rowID,
+                    rowID: rowID,
                     value: update.value
                 };
             })
@@ -795,15 +845,29 @@ export class AVManager {
      */
     async batchUpdateCellsLegacy(avID: string, updates: Array<{
         keyName: string;
-        rowID: string;
+        rowID?: string;
+        blockID?: string;
         value: setAttributeViewValue;
     }>): Promise<Array<{ success: boolean; result?: any; error?: string }>> {
         if (!Array.isArray(updates)) throw new Error('updates必须是数组');
 
+        // 预映射
+        const needMapBlockIDs = Array.from(new Set(
+            updates.filter(u => !u.rowID && u.blockID).map(u => u.blockID as string)
+        ));
+        let blockToItem: Record<string, string> = {};
+        if (needMapBlockIDs.length > 0) {
+            blockToItem = await this.getItemIDsByBoundIDs(avID, needMapBlockIDs);
+        }
+
         const results = [];
         for (const update of updates) {
             try {
-                const result = await this.setBlockAttribute(avID, update.keyName, update.rowID, update.value);
+                let rowID = update.rowID;
+                if (!rowID && update.blockID) {
+                    rowID = blockToItem[update.blockID];
+                }
+                const result = await this.setBlockAttribute(avID, update.keyName, rowID, update.value, update.blockID);
                 results.push({ success: true, result });
             } catch (error) {
                 results.push({ success: false, error: error.message });
@@ -923,16 +987,18 @@ class AVOperator implements IAVOperator {
 
     async setCell(
         keyName: string,
-        rowID: string,
-        value: setAttributeViewValue
+        rowID: string | undefined,
+        value: setAttributeViewValue,
+        blockID?: string
     ): Promise<SetAttributeViewBlockAttrResponse> {
-        return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value);
+        return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value, blockID);
     }
 
     async setCells(
         updates: Array<{
             keyName: string;
-            rowID: string;
+            rowID?: string;
+            blockID?: string;
             value: setAttributeViewValue;
         }>
     ): Promise<any> {
@@ -977,6 +1043,20 @@ class AVOperator implements IAVOperator {
         query?: string;
     } = {}): Promise<string[]> {
         return await this.manager.getCurrentImages(this.avID, options);
+    }
+
+    /**
+     * 获取若干 itemID 对应绑定块ID 映射
+     */
+    async getBoundBlockIDs(itemIDs: string[]): Promise<Record<string, string>> {
+        return await this.manager.getBoundBlockIDsByItemIDs(this.avID, itemIDs);
+    }
+
+    /**
+     * 获取若干绑定块ID 对应 itemID 映射
+     */
+    async getItemIDsByBlocks(blockIDs: string[]): Promise<Record<string, string>> {
+        return await this.manager.getItemIDsByBoundIDs(this.avID, blockIDs);
     }
 }
 

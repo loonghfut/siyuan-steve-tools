@@ -341,6 +341,33 @@ export async function getAttributeViewKeysByAvID(avid: BlockId) {
     return request(url, data);
 }
 
+/**
+ * 获取指定属性视图中一组项目 (itemIDs) 绑定的块 ID 映射。
+ * 空字符串表示对应 item 尚未绑定块。
+ * 封装 /api/av/getAttributeViewBoundBlockIDsByItemIDs
+ * @param avID 属性视图 ID
+ * @param itemIDs 项目 ID 数组
+ * @returns 形如 { itemID: blockID | "" } 的映射对象
+ */
+export async function getAttributeViewBoundBlockIDsByItemIDs(avID: string, itemIDs: string[]): Promise<Record<string, string>> {
+    const data = { avID, itemIDs };
+    const url = '/api/av/getAttributeViewBoundBlockIDsByItemIDs';
+    return request(url, data);
+}
+
+/**
+ * 根据一组已绑定的块 ID 获取其对应的属性视图项目 itemID 映射。
+ * 封装 /api/av/getAttributeViewItemIDsByBoundIDs
+ * @param avID 属性视图 ID
+ * @param blockIDs 块 ID 数组
+ * @returns 形如 { blockID: itemID } 的映射对象
+ */
+export async function getAttributeViewItemIDsByBoundIDs(avID: string, blockIDs: string[]): Promise<Record<string, string>> {
+    const data = { avID, blockIDs };
+    const url = '/api/av/getAttributeViewItemIDsByBoundIDs';
+    return request(url, data);
+}
+
 export async function renderAttributeView(avid: BlockId, viewID?: string) {
     let data: any;
     if (viewID === undefined) {

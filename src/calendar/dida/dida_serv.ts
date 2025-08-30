@@ -3,7 +3,7 @@ import { Dida365ApiClient } from "./dida_api";
 import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
-import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getAttributeViewBoundBlockIDsByItemIDs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
@@ -478,7 +478,7 @@ export class Dida365Service {
 
             // 创建一个新的块
             const blockId = await generateSiyuanID() as string;
-            const itemID = blockId || await generateSiyuanID() as string;
+            const itemID = await generateSiyuanID() as string;
             // 根据配置确定创建位置
             let targetId;
             if (settingdata["cal-create-for-date"]) {
@@ -920,9 +920,10 @@ ${taskData.描述?.content || "描述：暂无"}
                 blockId = operation.srcs[0].id;
                 itemID = operation.srcs[0].itemID;
             } else {
-                // console.log("🚧🚧:",operation);
-                blockId = operation.rowID;
                 itemID = operation.rowID;
+                blockId = await getAttributeViewBoundBlockIDsByItemIDs(operation.avID, [operation.rowID]).then(data => data[operation.rowID]);
+                // console.log("🚧🚧: blockId", blockId);
+                // console.log("🚧🚧: itemID", itemID);
             }
         }
         if (!blockId) return;

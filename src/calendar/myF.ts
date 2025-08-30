@@ -713,7 +713,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     }
     if (direct.isdirect) {
         // console.log("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
-        const itemID = direct.directid;
+        const itemID = await api.generateSiyuanID() as string; //直接使用块ID作为itemID
         if (await checkBlockInEvent(direct.directid, to_db_id)) {
             console.log("目标数据库已存在此事件");
             return;
@@ -817,7 +817,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 {: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id)
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
-    const itemID = id; //新创建的块，itemID和块ID相同
+    const itemID = await api.generateSiyuanID() as string;
     // // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
     // console.log("dateStr:::", dateStr, "databaseId:::", to_db_id);
     const dialog = new sy.Dialog({
