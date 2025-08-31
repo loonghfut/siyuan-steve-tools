@@ -161,8 +161,14 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
 
 
 async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal") {
+    // console.log("🚧🚧🚧🚧🚧🚧", data);
     const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
     const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
+    // 兼容：含有 groups 的分组看板（看板分组后顶层 cards 为空，真实数据在 groups[i].cards 内）
+    const hasGroups = Array.isArray(data?.groups) && data.groups.length > 0;
+    const isGroupedGalleryView = isGalleryView && hasGroups && (!Array.isArray(data.cards) || data.cards.length === 0);
+    // 兼容：含有 groups 的分组表格（顶层 rows 为空，真实数据在 groups[i].rows 内）
+    const isGroupedTableView = isTableView && hasGroups && (!Array.isArray(data.rows) || data.rows.length === 0);
 
     if (!isGalleryView && !isTableView) {
         console.warn('Invalid or unrecognized data structure received:', data);
@@ -175,7 +181,17 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     // 1. 创建字段映射
     // console.log("DATA：", data);
     const fieldMap = new Map();
-    const fields = isGalleryView ? data.fields : data.columns;
+    // 分组看板优先使用顶层 fields，否则回退到第一个分组的 fields
+    let fields = isGalleryView ? data.fields : data.columns;
+    if (isGroupedGalleryView) {
+        if (!fields || fields.length === 0) {
+            fields = data.groups[0]?.fields || [];
+        }
+    } else if (isGroupedTableView) {
+        if (!fields || fields.length === 0) {
+            fields = data.groups[0]?.columns || [];
+        }
+    }
     fields.forEach((field: any, index: number) => {
         if (field && field.name) {
             fieldMap.set(field.name, {
@@ -232,7 +248,17 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     }
 
     // 3. 提取数据
-    const items = isGalleryView ? data.cards : data.rows;
+    // 如果是分组看板，聚合所有分组内的 cards
+    let items;
+    if (isGalleryView) {
+        items = isGroupedGalleryView
+            ? data.groups.flatMap((g: any) => (Array.isArray(g.cards) ? g.cards : []))
+            : data.cards;
+    } else { // table view
+        items = isGroupedTableView
+            ? data.groups.flatMap((g: any) => (Array.isArray(g.rows) ? g.rows : []))
+            : data.rows;
+    }
     if (!items || !Array.isArray(items)) {
         return [];
     }
@@ -405,7 +431,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 return {};
             }
         });
-
+        console.log("extractDataFromTable🛠️🛠️ result:::", result);
         return result;
     } catch (error) {
         console.error('Error in extractDataFromTable:', error);
