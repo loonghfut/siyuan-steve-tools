@@ -39,7 +39,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.13.5 (2025年08月30日)
+### v0.13.6 (2025年08月31日)
 - 优化功能图标显示 (loonghfut)
 - 优化不必要变量 (loonghfut)
 - feat: 添加WPS数据导入功能准备及相关图标支持 (loonghfut)
@@ -88,6 +88,17 @@ win端s3同步后，docker端感知s3同步。
 - fix: 尝试修复 (loonghfut)
 - 更新到思源3.3.0版本好像看板啥的不同拖拽更新状态了？ Fixes #94 更新到思源3.3.0以后，又更新到最新的插件版本，日程添加后，时间 分类信息都不见了 Fixes #95 (loonghfut)
 - fix: 更新版本号至 0.13.5，并将最低应用版本更新至 3.3.1 (loonghfut)
+- docs: 更新 v0.13.5 版本的更新日志 (loonghfut)
+- 重构日程模块ics生成部分 (loonghfut)
+- 取消模板生成 (loonghfut)
+- 删除部分无用代码 (loonghfut)
+- feat: 重构QQ日历事件更新逻辑，迁移至CalDAVClient并优化事件缓存 (loonghfut)
+- feat: 添加批量替换属性视图主键块的功能，更新AVManager和相关接口 (loonghfut)
+- feat: 添加获取属性视图绑定块ID映射的功能，优化AVManager和Dida365Service中的相关逻辑https://github.com/siyuan-note/siyuan/issues/15708 https://github.com/loonghfut/siyuan-steve-tools/issues/94 (loonghfut)
+- 滴答同步，支撑绑定块时触发 (loonghfut)
+- 优化绑定块时触发同步体验 (loonghfut)
+- feat: 优化数据提取逻辑，支持分组看板和表格视图的兼容处理 (loonghfut)
+- feat: 更新版本号至0.13.6，优化日程管理设置名称 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
