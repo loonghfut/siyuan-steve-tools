@@ -101,7 +101,7 @@ function calendarDbOptions(ctx: BuildContext) {
 }
 
 export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
-    name: "🛠️日程管理🚧",
+    name: "日程管理",
     subGroups: [
         {
             name: "基础设置",

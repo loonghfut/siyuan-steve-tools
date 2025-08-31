@@ -10,8 +10,6 @@ STEVETOOLS
 `<所有功能模块开源>`  
 有个人需求：有技术，自己拉源码，自己改; 没技术，自己拉源码让ai改。
 
-# 重要！！！：由于思源数据库的数据结构发生变化，日程管理功能暂时不兼容思源3.3.0之后的版本，若更新到3.3.0之后的版本，请关闭日程管理功能。
-
 （注：由于是自用工具插件，可能会有一些不完善的地方，甚至出现数据遗失！！（因为使用了思源数据操作相关的api），请自行测试无问题的情况下再使用，若在使用过程中出现问题，请及时反馈）   
 ### 若介意请勿使用。
 
@@ -33,7 +31,8 @@ win端s3同步后，docker端感知s3同步。
 模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
-7. WPS联动：方便在思源中使用WPS（office文件嵌入，预览、编辑、同步），多维表格数据导入，图片上传。
+7. WPS联动：
+方便在思源中使用WPS（office文件嵌入，预览、编辑、同步），多维表格数据导入，图片上传。
 
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
