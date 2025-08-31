@@ -143,7 +143,7 @@ export class Dida365Service {
     /**
      * 防抖同步方法：等待10秒，如果期间有新的调用则重新计时
      */
-    private debouncedSyncTasksToSiyuan(): void {
+    private debouncedSyncTasksToSiyuan(delay = 10000): void {
         // 清除之前的计时器
         if (this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
@@ -157,16 +157,18 @@ export class Dida365Service {
                 console.log("防抖等待完成，开始执行同步任务到思源");
                 isUpdate = await this.syncTasksToSiyuan();
                 this.syncDebounceTimer = null; // 清空计时器引用
-                if (isUpdate) {
+                if (isUpdate && delay === 10000) {
                     showMessage("滴答任务同步不一致", 2000, "info", "dida-sync");
+                }else if (isUpdate && delay === 3000) {
+                    showMessage("滴答同步完成", 2000, "info", "dida-sync");
                 }
             } catch (error) {
                 console.error("防抖同步执行失败:", error);
                 this.syncDebounceTimer = null; // 清空计时器引用
             }
-        }, 10000); // 10秒延迟
+        }, delay); // 10秒延迟
 
-        console.log("设置防抖同步计时器，将在10秒后执行（如无新的调用）");
+        console.log(`设置防抖同步计时器，将在${delay / 1000}秒后执行（如无新的调用）`);
     }
 
     async syncTasksToSiyuan(): Promise<boolean> {
@@ -937,9 +939,6 @@ ${taskData.描述?.content || "描述：暂无"}
                 }
                 console.log("🚧🚧: blockId", blockId);
                 console.log("🚧🚧: itemID", itemID);
-                if (operation?.data?.new?.["av-names"]) {//TODO: 绑定块时触发同步
-                    console.log("获取到新的 av-names:", operation.data.new["av-names"]);
-                }
             }
         }
         // return;
@@ -1114,7 +1113,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     }, 2000);
                 }
             }
-            this.debouncedSyncTasksToSiyuan(); // 防抖同步检测：等待10秒，期间如有新调用则重新计时
+            this.debouncedSyncTasksToSiyuan(3000); // 防抖同步检测
         } catch (error) {
             console.error("从思源同步到滴答失败:", error);
         }
