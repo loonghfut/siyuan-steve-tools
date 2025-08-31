@@ -3,10 +3,11 @@ import { Dida365ApiClient } from "./dida_api";
 import { Project, Task } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
-import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getAttributeViewBoundBlockIDsByItemIDs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getAttributeViewBoundBlockIDsByItemIDs, getAttributeViewItemIDsByBoundIDs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
+import { extractNewAvId } from "@/api/api3";
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
@@ -901,7 +902,7 @@ ${taskData.描述?.content || "描述：暂无"}
      * 增加强制刷新逻辑
      */
     handleSiyuanUpdate = async (e: any, blockId = '', itemID = '') => {
-
+        let isDetached: boolean;
         if (e == 'force' && blockId && itemID) {
             console.log("fore滴答更新");
         } else {
@@ -912,20 +913,37 @@ ${taskData.描述?.content || "描述：暂无"}
                 return;
             }
             // 检查是否是我们正在监听的数据库
-            // console.log("处理思源更新DDD：avID", operation.avID, this.avId);
-            if (operation.avID !== this.avId) {
+            console.log("处理思源更新DDD🚧🚧", operation);
+            // Calculate the newly added avID by comparing old and new custom-avs
+
+
+            const avID = operation.avID || extractNewAvId(operation?.data?.old?.['custom-avs'], operation?.data?.new?.['custom-avs']);
+            console.log("获取到的🚧🚧 avID:", avID);
+            if (avID !== this.avId) {
                 return;
             }
+
             if (operation.action === "insertAttrViewBlock") {//TODO: 暂不支持批量添加情况
                 blockId = operation.srcs[0].id;
+                isDetached = operation.srcs[0].isDetached;
                 itemID = operation.srcs[0].itemID;
             } else {
-                itemID = operation.rowID;
-                blockId = await getAttributeViewBoundBlockIDsByItemIDs(operation.avID, [operation.rowID]).then(data => data[operation.rowID]);
-                // console.log("🚧🚧: blockId", blockId);
-                // console.log("🚧🚧: itemID", itemID);
+                if (operation.rowID) {
+                    itemID = operation.rowID;
+                    blockId = await getAttributeViewBoundBlockIDsByItemIDs(avID, [operation.rowID]).then(data => data[operation.rowID]);
+                } else if (operation.id) {
+                    blockId = operation.id;
+                    itemID = await getAttributeViewItemIDsByBoundIDs(avID, [operation.id]).then(data => data[operation.id]);
+                }
+                console.log("🚧🚧: blockId", blockId);
+                console.log("🚧🚧: itemID", itemID);
+                if (operation?.data?.new?.["av-names"]) {//TODO: 绑定块时触发同步
+                    console.log("获取到新的 av-names:", operation.data.new["av-names"]);
+                }
             }
         }
+        // return;
+        if (isDetached) return;//游离块不支持添加到滴答,后续操作需要绑定块ID
         if (!blockId) return;
         try {
             // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
@@ -1028,12 +1046,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
                     // 确定目标清单，如果状态未定，则默认为未完成清单
                     // 2025/7/5 修改：根据状态标签来确定目标清单，不再设置多个清单了
-                    let targetProjectId = this.todoListId
-                    // if (!targetProjectId) {
-                    //     console.warn("无法根据状态确定目标清单，将默认使用未完成清单。");
-                    //     targetProjectId = this.todoListId;
-                    // }
-
+                    let targetProjectId = this.todoListId;
                     // 如果连默认的未完成清单ID都没有设置，则无法继续
                     if (!targetProjectId) {
                         showMessage("无法创建任务：未设置默认的未完成清单ID。", -1, "error");

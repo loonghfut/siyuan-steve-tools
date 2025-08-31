@@ -174,3 +174,13 @@ export function extractDataAvId(markdown: string): string | null {
     const match = markdown.match(regex);
     return match ? match[1] : null;
 }
+
+
+export const extractNewAvId = (oldAvs: string, newAvs: string): string | null => {
+    console.log("提取新的 avID:", oldAvs, newAvs);
+    if (!newAvs) return null;
+    const oldList = oldAvs ? oldAvs.split(',') : [];
+    const newList = newAvs.split(',');
+    const added = newList.find(id => !oldList.includes(id));
+    return added || null; // 如果有多个新增的 ID，只返回第一个
+};
