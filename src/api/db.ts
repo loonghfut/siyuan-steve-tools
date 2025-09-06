@@ -79,8 +79,8 @@ export class DbService {
      * @param keyId 字段ID
      * @param value 新值
      */
-    async updateField(rowId: string, keyId: string, value: any) {
-        return this.api('/api/av/setAttributeViewBlockAttr', { avID: this._avId, rowID: rowId, keyID: keyId, value });
+    async updateField(itemID: string, keyId: string, value: any) {
+        return this.api('/api/av/setAttributeViewBlockAttr', { avID: this._avId, itemID, keyID: keyId, value });
     }
 
     /**

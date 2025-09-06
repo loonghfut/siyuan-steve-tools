@@ -551,20 +551,20 @@ export class AVManager {
      * @param value - 值
      * @returns 设置结果
      */
-    async setBlockAttribute(avID: string, keyName: string, rowID: string | undefined, value: setAttributeViewValue, blockID?: string): Promise<SetAttributeViewBlockAttrResponse> {
+    async setBlockAttribute(avID: string, keyName: string, itemID: string | undefined, value: setAttributeViewValue, blockID?: string): Promise<SetAttributeViewBlockAttrResponse> {
         if (!avID || !keyName) {
             throw new Error('avID、keyName不能为空');
         }
-        // 若未提供 rowID 但提供了 blockID，则映射获取 itemID(rowID)
-        if (!rowID && blockID) {
+        // 若未提供 itemID 但提供了 blockID，则映射获取 itemID
+        if (!itemID && blockID) {
             const map = await this.getItemIDsByBoundIDs(avID, [blockID]);
-            rowID = map[blockID];
+            itemID = map[blockID];
         }
-        if (!rowID) {
-            throw new Error('缺少 rowID，且无法通过 blockID 映射获得');
+        if (!itemID) {
+            throw new Error('缺少 itemID，且无法通过 blockID 映射获得');
         }
         const key = await this.findKeyByName(avID, keyName);
-        return await this.request('setAttributeViewBlockAttr', { avID, keyID: key.id, rowID, value });
+        return await this.request('setAttributeViewBlockAttr', { avID, keyID: key.id, itemID, value });
     }
 
     // ============== 数据库视图操作 ==============
@@ -824,7 +824,7 @@ export class AVManager {
                 const key = await this.findKeyByName(avID, update.keyName);
                 return {
                     keyID: key.id,
-                    rowID: rowID,
+                    itemID: rowID,
                     value: update.value
                 };
             })
@@ -987,11 +987,11 @@ class AVOperator implements IAVOperator {
 
     async setCell(
         keyName: string,
-        rowID: string | undefined,
+        itemID: string | undefined,
         value: setAttributeViewValue,
         blockID?: string
     ): Promise<SetAttributeViewBlockAttrResponse> {
-        return await this.manager.setBlockAttribute(this.avID, keyName, rowID, value, blockID);
+        return await this.manager.setBlockAttribute(this.avID, keyName, itemID, value, blockID);
     }
 
     async setCells(

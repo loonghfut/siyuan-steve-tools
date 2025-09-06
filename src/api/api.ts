@@ -832,7 +832,7 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
                 const payload = {
                     avID: avID,
                     keyID: keyID,
-                    rowID: itemID,
+                    itemID: itemID,
                     value: {
                         block: {
                             content: content,

@@ -316,7 +316,7 @@ export interface GetAttributeViewKeysRequest {
 export interface SetAttributeViewBlockAttrRequest {
     avID: string;
     keyID: string;
-    rowID: string;
+    itemID: string;
     value: any;
 }
 
@@ -324,7 +324,7 @@ export interface BatchSetAttributeViewBlockAttrsRequest {
     avID: string;
     values: Array<{
         keyID: string;
-        rowID: string;
+        itemID: string;
         value: setAttributeViewValue;
     }>;
 }
