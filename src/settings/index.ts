@@ -8,6 +8,7 @@ import { wpsGroup } from "./wps";
 import { commonGroup } from "./common";
 import { imageCompressionGroup } from "./imageCompression";
 
+import { aggregateGroup } from "./aggregate";
 export * from "./types";
 
 export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] {
@@ -19,6 +20,7 @@ export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] 
     handwritingGroup(ctx),
     lifelogGroup(ctx),
     wpsGroup(ctx),
+    aggregateGroup(ctx),
     commonGroup(ctx),
     ];
 }

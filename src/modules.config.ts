@@ -6,6 +6,7 @@ import { M_imageCompression } from "./ImageCompression/module-imageCompression";
 import { M_lifelog } from "./lifelog/module-lifelog";
 
 import { M_Wps } from "./wps/module-wps";
+import { M_Aggregate } from "./aggregate/module-aggregate";
 // 模块配置接口
 export interface ModuleConfig {
     [key: string]: {
@@ -61,6 +62,13 @@ export const MODULE_CONFIG: ModuleConfig = {
         logMessage: 'Wps模块加载'
     },
 
+    M_Aggregate: {
+        class: M_Aggregate,
+        name: 'M_Aggregate',
+        settingKey: 'aggregate-enable',
+        logMessage: 'Aggregate模块加载'
+    },
+
 };
 
 // 导出所有模块类型
@@ -72,4 +80,5 @@ export type ModuleClasses = {
     M_imageCompression?: M_imageCompression;
     M_lifelog?: M_lifelog;
     M_Wps?: M_Wps;
+    M_Aggregate?: M_Aggregate;
 };

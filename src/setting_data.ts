@@ -7,6 +7,7 @@ import { lifelogDefaults } from "./settings/lifelog";
 import { wpsDefaults } from "./settings/wps";
 import { commonDefaults } from "./settings/common";
 
+import { aggregateDefaults } from "./settings/aggregate";
 // 聚合所有模块默认配置
 export const defaultSettings: Record<string, any> = {
     ...calendarDefaults,
@@ -17,6 +18,7 @@ export const defaultSettings: Record<string, any> = {
     ...lifelogDefaults,
     ...wpsDefaults,
     ...commonDefaults,
+    ...aggregateDefaults,
 };
 
 export function getSettings() { return { ...defaultSettings }; }
