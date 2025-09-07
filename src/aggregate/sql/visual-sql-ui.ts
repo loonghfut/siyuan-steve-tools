@@ -19,6 +19,8 @@ export class VisualSqlUI {
   private pathLikeInput!: HTMLInputElement;
   private contentLikeInput!: HTMLInputElement;
   private mdLikeInput!: HTMLInputElement;
+  private hpathLikeInput!: HTMLInputElement;
+  private ialLikeInput!: HTMLInputElement;
   private tagInput!: HTMLInputElement;
   private createdDaysInput!: HTMLInputElement;
   private updatedDaysInput!: HTMLInputElement;
@@ -52,7 +54,7 @@ export class VisualSqlUI {
         </div>
 
         <fieldset class="vsb-card">
-          <legend class="vsb-legend">基础条件</legend>
+          <legend class="vsb-legend">常用筛选</legend>
 
           <div class="vsb-chips" aria-label="类型">
             ${([
@@ -102,13 +104,21 @@ export class VisualSqlUI {
                 })()}
               </div>
             </div>
+            <label class="vsb-field">tag 包含<input class="vsb-input" data-tag type="text" placeholder="标签名（无 #）"/></label>
+            <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
+            <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
+            <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" placeholder="默认64（未指定）"/></label>
+          </div>
+        </fieldset>
+
+        <details class="vsb-card">
+          <summary class="vsb-legend">更多筛选</summary>
+          <div class="vsb-grid vsb-grid-4" style="margin-top:8px;">
             <label class="vsb-field">root_id（文档）<input class="vsb-input" data-root type="text" placeholder="文档块 ID"/></label>
             <label class="vsb-field">parent_id<input class="vsb-input" data-parent type="text" placeholder="父块 ID"/></label>
-
-            <label class="vsb-field">path like<input class="vsb-input" data-path type="text" placeholder="%/2020.../xxx.sy"/></label>
-            <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
-            <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
-            <label class="vsb-field">tag 包含<input class="vsb-input" data-tag type="text" placeholder="标签名（无 #）"/></label>
+            <label class="vsb-field">path<input class="vsb-input" data-path type="text" placeholder="%/2020.../xxx.sy"/></label>
+            <label class="vsb-field">hpath（人类可读路径）<input class="vsb-input" data-hpath type="text" placeholder="%/目录/子目录%"/></label>
+            <label class="vsb-field">ial自定义属性要带custom-前缀<input class="vsb-input" data-ial type="text" placeholder="%name=\"value\"%"/></label>
 
             <label class="vsb-field">created 近 N 天<input class="vsb-input" data-created-days type="number" min="0" value="0"/></label>
             <label class="vsb-field">updated 近 N 天<input class="vsb-input" data-updated-days type="number" min="0" value="0"/></label>
@@ -124,16 +134,12 @@ export class VisualSqlUI {
             </label>
             <label class="vsb-field">排序方向
               <select class="vsb-input" data-order-dir>
-                <option value="desc">desc</option>
-                <option value="asc">asc</option>
+                <option value="desc">降序</option>
+                <option value="asc">升序</option>
               </select>
             </label>
-
-            <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" placeholder=""/></label>
           </div>
-        </fieldset>
-
-        
+        </details>
 
         <div class="vsb-actions">
           <button class="vsb-btn vsb-primary" data-generate>生成 SQL</button>
@@ -153,7 +159,9 @@ export class VisualSqlUI {
     this.parentIdInput = this.container.querySelector('input[data-parent]') as HTMLInputElement;
     this.pathLikeInput = this.container.querySelector('input[data-path]') as HTMLInputElement;
     this.contentLikeInput = this.container.querySelector('input[data-content]') as HTMLInputElement;
-    this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
+  this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
+  this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
+  this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
     this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
     this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
     this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
@@ -189,10 +197,19 @@ export class VisualSqlUI {
     }
     this.builder.inDoc(this.rootIdInput.value.trim());
     this.builder.parentIs(this.parentIdInput.value.trim());
-    this.builder.pathLike(this.pathLikeInput.value.trim());
-    this.builder.contentLike(this.contentLikeInput.value.trim());
-    this.builder.markdownLike(this.mdLikeInput.value.trim());
-    this.builder.hasTag(this.tagInput.value.trim());
+  const pathLike = this.smartLike(this.pathLikeInput.value);
+  const contentLike = this.smartLike(this.contentLikeInput.value);
+  const mdLike = this.smartLike(this.mdLikeInput.value);
+  const hpathLike = this.smartLike(this.hpathLikeInput?.value);
+  const ialLike = this.smartLike(this.ialLikeInput?.value);
+  if (pathLike) this.builder.pathLike(pathLike);
+  if (contentLike) this.builder.contentLike(contentLike);
+  if (mdLike) this.builder.markdownLike(mdLike);
+  if (hpathLike) this.builder.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
+  if (ialLike) this.builder.addFilter({ field: 'ial', op: 'like', value: ialLike });
+  const tagRaw = (this.tagInput.value || '').trim();
+  const tag = tagRaw.replace(/^#+/, ''); // 去除开头的 #，避免重复
+  this.builder.hasTag(tag);
     this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
     this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
 
@@ -212,6 +229,17 @@ export class VisualSqlUI {
     const sql = this.builder.compile();
     this.outputPre.textContent = sql;
     this.opts.onSqlChange?.(sql);
+  }
+
+  // 智能添加 %：
+  // - 空值返回 undefined（不参与条件）
+  // - 若已包含 % 或 _（LIKE 通配符），则按用户输入原样使用
+  // - 否则自动包裹为 %值%
+  private smartLike(v: string | undefined | null): string | undefined {
+    const val = (v ?? '').trim();
+    if (!val) return undefined;
+    if (/[%_]/.test(val)) return val;
+    return `%${val}%`;
   }
 
   private async copySql() {
