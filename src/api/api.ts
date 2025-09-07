@@ -859,7 +859,7 @@ export async function updateAttrViewCell_pro(
     keyID: string,
     itemID: string,
     value: string | Date | ISelectOption[] | boolean | {
-        blockID: string,
+        itemID: string,
         content: string,
         oldrelation: {
             ids: string[],
@@ -1104,8 +1104,8 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
             break;
 
         case 'relation':
-            const { blockID, content, oldrelation, action } = value as {
-                blockID: string,
+            const { itemID, content, oldrelation, action } = value as {
+                itemID: string,
                 content: string,
                 oldrelation: {
                     ids: string[],
@@ -1115,16 +1115,16 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
             };
             const readyContents = transformBlockData(oldrelation.contents);
             if (action === 'add') {
-                if (!oldrelation.ids.includes(blockID)) {
-                    oldrelation.ids.push(blockID);
+                if (!oldrelation.ids.includes(itemID)) {
+                    oldrelation.ids.push(itemID);
                     readyContents.push({
-                        block: { content: content, id: blockID },
+                        block: { content: content, id: itemID },
                         isDetached: false,
                         type: "block"
                     });
                 }
             } else if (action === 'remove') {
-                const index = oldrelation.ids.indexOf(blockID);
+                const index = oldrelation.ids.indexOf(itemID);
                 if (index !== -1) {
                     oldrelation.ids.splice(index, 1);
                     readyContents.splice(index, 1);

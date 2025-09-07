@@ -18,7 +18,7 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
         To_event.extendedProps.subid,
         To_event.extendedProps.itemID,
         {
-            blockID: Fr_event.publicId,
+            itemID: Fr_event.extendedProps.itemID || await api.getAttributeViewItemIDsByBoundIDs(To_event.extendedProps.rootid, [Fr_event.publicId]).then(data => data[Fr_event.publicId]),
             content: Fr_event.title,
             oldrelation: {
                 ids: To_event.extendedProps?.sub?.ids || [],
@@ -42,7 +42,7 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
         To_event.extendedProps.subid,
         To_event.extendedProps.itemID,
         {
-            blockID: Fr_event.publicId,
+            itemID: Fr_event.extendedProps.itemID || await api.getAttributeViewItemIDsByBoundIDs(To_event.extendedProps.rootid, [Fr_event.publicId]).then(data => data[Fr_event.publicId]),
             content: Fr_event.title,
             oldrelation: {
                 ids: To_event.extendedProps?.sub?.ids || [],
