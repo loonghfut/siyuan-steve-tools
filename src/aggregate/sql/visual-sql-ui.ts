@@ -1,0 +1,319 @@
+// 可视化 SQL 生成器 UI：通过传入容器元素挂载渲染（仅 embedded 模式）
+import { VisualSqlBuilder, BlockType, OrderDir } from './visual-sql-builder';
+
+export interface VisualSqlUIOptions {
+  onSqlChange?: (sql: string) => void;
+}
+
+export class VisualSqlUI {
+  private container: HTMLElement;
+  private opts: VisualSqlUIOptions;
+  private builder: VisualSqlBuilder;
+
+  // 控件引用
+  private typeChecks!: NodeListOf<HTMLInputElement>;
+  private subtypeChecks!: NodeListOf<HTMLInputElement>;
+  private boxChecks!: NodeListOf<HTMLInputElement>;
+  private rootIdInput!: HTMLInputElement;
+  private parentIdInput!: HTMLInputElement;
+  private pathLikeInput!: HTMLInputElement;
+  private contentLikeInput!: HTMLInputElement;
+  private mdLikeInput!: HTMLInputElement;
+  private tagInput!: HTMLInputElement;
+  private createdDaysInput!: HTMLInputElement;
+  private updatedDaysInput!: HTMLInputElement;
+  private orderFieldSel!: HTMLSelectElement;
+  private orderDirSel!: HTMLSelectElement;
+  private limitInput!: HTMLInputElement;
+
+  private outputPre!: HTMLPreElement;
+  private copyBtn!: HTMLButtonElement;
+  private genBtn!: HTMLButtonElement;
+  private resetBtn!: HTMLButtonElement;
+
+  constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
+    this.container = container;
+    this.opts = options || {};
+  this.builder = new VisualSqlBuilder('embedded');
+    this.render();
+    this.rebuildSql();
+  }
+
+  private html(strings: TemplateStringsArray, ...values: any[]) {
+    return strings.reduce((acc, s, i) => acc + s + (values[i] ?? ''), '');
+  }
+
+  private render() {
+    this.injectStyles();
+    this.container.innerHTML = this.html`
+      <div class="vsb-wrap">
+        <div class="vsb-header">
+          <div class="vsb-title">可视化 SQL 生成器</div>
+        </div>
+
+        <fieldset class="vsb-card">
+          <legend class="vsb-legend">基础条件</legend>
+
+          <div class="vsb-chips" aria-label="类型">
+            ${([
+              {v:'d', n:'文档'},
+              {v:'h', n:'标题'},
+              {v:'m', n:'数学公式'},
+              {v:'c', n:'代码块'},
+              {v:'t', n:'表格块'},
+              {v:'l', n:'列表块'},
+              {v:'b', n:'引述块'},
+              {v:'s', n:'超级块'},
+              {v:'p', n:'段落块'},
+              {v:'av', n:'数据库'}
+            ] as Array<{v: BlockType; n: string}>).map(it =>
+              `<label class="vsb-chip"><input type="checkbox" data-type value="${it.v}"/><span>${it.n}</span></label>`
+            ).join('')}
+          </div>
+
+          <div class="vsb-grid vsb-grid-4">
+            <div class="vsb-field" style="grid-column: 1 / -1;">
+              <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">子类型（可多选）</div>
+              <div class="vsb-chips" aria-label="子类型">
+                ${([
+                  {v:'h1', n:'标题 H1'},
+                  {v:'h2', n:'标题 H2'},
+                  {v:'h3', n:'标题 H3'},
+                  {v:'h4', n:'标题 H4'},
+                  {v:'h5', n:'标题 H5'},
+                  {v:'h6', n:'标题 H6'},
+                  {v:'u', n:'无序列表'},
+                  {v:'t', n:'任务项'},
+                  {v:'o', n:'有序列表'}
+                ] as Array<{v: string; n: string}>).map(it =>
+                  `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
+                ).join('')}
+              </div>
+            </div>
+            <div class="vsb-field" style="grid-column: 1 / -1;">
+              <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">笔记本（可多选）</div>
+              <div class="vsb-chips" aria-label="笔记本">
+                ${(() => {
+                  const nbs = (window as any)?.siyuan?.notebooks;
+                  if (!Array.isArray(nbs) || !nbs.length) {
+                    return `<span style=\"color:#9ca3af\">无可用日记本</span>`;
+                  }
+                  return nbs.map((n: any) => `<label class=\"vsb-chip\"><input type=\"checkbox\" data-box-id value=\"${n.id}\"/><span>${n.name || n.id}</span></label>`).join('');
+                })()}
+              </div>
+            </div>
+            <label class="vsb-field">root_id（文档）<input class="vsb-input" data-root type="text" placeholder="文档块 ID"/></label>
+            <label class="vsb-field">parent_id<input class="vsb-input" data-parent type="text" placeholder="父块 ID"/></label>
+
+            <label class="vsb-field">path like<input class="vsb-input" data-path type="text" placeholder="%/2020.../xxx.sy"/></label>
+            <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
+            <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
+            <label class="vsb-field">tag 包含<input class="vsb-input" data-tag type="text" placeholder="标签名（无 #）"/></label>
+
+            <label class="vsb-field">created 近 N 天<input class="vsb-input" data-created-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">updated 近 N 天<input class="vsb-input" data-updated-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">排序字段
+              <select class="vsb-input" data-order-field>
+                <option value="">不排序</option>
+                <option value="updated">updated</option>
+                <option value="created">created</option>
+                <option value="sort">sort</option>
+                <option value="length">length</option>
+                <option value="random()">random()</option>
+              </select>
+            </label>
+            <label class="vsb-field">排序方向
+              <select class="vsb-input" data-order-dir>
+                <option value="desc">desc</option>
+                <option value="asc">asc</option>
+              </select>
+            </label>
+
+            <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" placeholder=""/></label>
+          </div>
+        </fieldset>
+
+        
+
+        <div class="vsb-actions">
+          <button class="vsb-btn vsb-primary" data-generate>生成 SQL</button>
+          <button class="vsb-btn" data-copy>复制 SQL</button>
+          <button class="vsb-btn vsb-ghost" data-reset>重置</button>
+        </div>
+
+        <pre class="vsb-output" data-output></pre>
+      </div>
+    `;
+
+    // 绑定控件
+    this.typeChecks = this.container.querySelectorAll('input[data-type]') as NodeListOf<HTMLInputElement>;
+  this.subtypeChecks = this.container.querySelectorAll('input[data-subtype]') as NodeListOf<HTMLInputElement>;
+  this.boxChecks = this.container.querySelectorAll('input[data-box-id]') as NodeListOf<HTMLInputElement>;
+    this.rootIdInput = this.container.querySelector('input[data-root]') as HTMLInputElement;
+    this.parentIdInput = this.container.querySelector('input[data-parent]') as HTMLInputElement;
+    this.pathLikeInput = this.container.querySelector('input[data-path]') as HTMLInputElement;
+    this.contentLikeInput = this.container.querySelector('input[data-content]') as HTMLInputElement;
+    this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
+    this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
+    this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
+    this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
+    this.orderFieldSel = this.container.querySelector('select[data-order-field]') as HTMLSelectElement;
+    this.orderDirSel = this.container.querySelector('select[data-order-dir]') as HTMLSelectElement;
+    this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
+
+    this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
+    this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
+    this.genBtn = this.container.querySelector('button[data-generate]') as HTMLButtonElement;
+    this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
+
+    // 事件
+    const changeInputs = this.container.querySelectorAll('input, select');
+    changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
+    this.genBtn.addEventListener('click', () => this.rebuildSql());
+    this.copyBtn.addEventListener('click', () => this.copySql());
+    this.resetBtn.addEventListener('click', () => this.resetForm());
+  }
+
+  private rebuildSql() {
+    // 重建 builder
+  this.builder = new VisualSqlBuilder('embedded');
+
+    // 基础条件
+  const types = Array.from(this.typeChecks).filter(c => c.checked).map(c => c.value as BlockType);
+  const subtypes = Array.from(this.subtypeChecks).filter(c => c.checked).map(c => c.value);
+
+    this.builder.byTypes(types).bySubtypes(subtypes);
+    const boxes = Array.from(this.boxChecks).filter(c => c.checked).map(c => c.value);
+    if (boxes.length) {
+      this.builder.addFilter({ field: 'box', op: 'in', value: boxes });
+    }
+    this.builder.inDoc(this.rootIdInput.value.trim());
+    this.builder.parentIs(this.parentIdInput.value.trim());
+    this.builder.pathLike(this.pathLikeInput.value.trim());
+    this.builder.contentLike(this.contentLikeInput.value.trim());
+    this.builder.markdownLike(this.mdLikeInput.value.trim());
+    this.builder.hasTag(this.tagInput.value.trim());
+    this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
+    this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
+
+    // 排序
+    const orderExpr = this.orderFieldSel.value;
+    const orderDir = this.orderDirSel.value as OrderDir;
+    if (orderExpr) {
+      // random() 不需要方向
+      if (orderExpr === 'random()') this.builder.addOrder('random()');
+      else this.builder.addOrder(orderExpr, orderDir);
+    }
+
+    // limit
+    const limit = this.limitInput.value ? Number(this.limitInput.value) : undefined;
+    this.builder.setLimit(limit);
+
+    const sql = this.builder.compile();
+    this.outputPre.textContent = sql;
+    this.opts.onSqlChange?.(sql);
+  }
+
+  private async copySql() {
+    const sql = this.outputPre.textContent || '';
+    try {
+      await navigator.clipboard.writeText(sql);
+      this.toast('已复制 SQL 到剪贴板');
+    } catch {
+      // 兼容不支持 clipboard 的环境
+      const ta = document.createElement('textarea');
+      ta.value = sql;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      this.toast('已复制 SQL（兼容模式）');
+    }
+  }
+
+  private resetForm() {
+    // 简单重置：清空所有 input/select 的值与勾选
+  const els = this.container.querySelectorAll('input, select');
+    els.forEach((el: any) => {
+      if (el.type === 'checkbox' || el.type === 'radio') {
+    el.checked = false;
+      } else if (el.tagName === 'SELECT') {
+        el.selectedIndex = 0;
+      } else {
+        el.value = '';
+      }
+    });
+    this.rebuildSql();
+  }
+
+  private toast(msg: string) {
+    const tip = document.createElement('div');
+    tip.textContent = msg;
+    tip.style.cssText = 'position:fixed; right:16px; bottom:16px; background:#323232; color:#fff; padding:8px 12px; border-radius:4px; z-index:9999; opacity:0; transition:opacity .2s';
+    document.body.appendChild(tip);
+    requestAnimationFrame(() => tip.style.opacity = '1');
+    setTimeout(() => {
+      tip.style.opacity = '0';
+      setTimeout(() => tip.remove(), 200);
+    }, 1200);
+  }
+
+  private injectStyles() {
+    const STYLE_ID = 'visual-sql-ui-style';
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      .vsb-wrap{font:13px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"; color: var(--vsb-fg, #1f2328)}
+      .vsb-header{display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px}
+      .vsb-title{font-weight:600; font-size:14px}
+      .vsb-card{border:1px solid var(--vsb-border,#e5e7eb); padding:12px; border-radius:10px; background: var(--vsb-surface,#ffffff); box-shadow: 0 1px 2px rgba(0,0,0,.04); margin-bottom:12px}
+      .vsb-legend{font-weight:600; color: var(--vsb-muted,#4b5563);}
+      .vsb-grid{display:grid; gap:10px}
+      .vsb-grid-4{grid-template-columns: repeat(4, minmax(180px,1fr))}
+      .vsb-grid-3{grid-template-columns: repeat(3, minmax(220px,1fr))}
+      .vsb-field{display:grid; gap:6px; font-size:12px; color: var(--vsb-muted,#4b5563)}
+      .vsb-input{appearance:none; border:1px solid var(--vsb-input-border,#d0d7de); background: var(--vsb-input-bg,#fff); color: var(--vsb-fg,#1f2328); border-radius:8px; padding:8px 10px; outline:none}
+      .vsb-input:focus{border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,.15)}
+      .vsb-input::placeholder{color:#9ca3af}
+      .vsb-seg{display:flex; gap:6px; background: var(--vsb-seg-bg,#f3f4f6); padding:4px; border-radius:10px; border:1px solid var(--vsb-border,#e5e7eb)}
+      .vsb-seg-item{position:relative}
+      .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
+      .vsb-seg-item span{display:inline-block; padding:6px 10px; border-radius:8px; cursor:pointer; color:#374151}
+      .vsb-seg-item input:checked + span{background:#111827; color:#fff}
+      .vsb-chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px}
+      .vsb-chip{position:relative}
+      .vsb-chip input{position:absolute; opacity:0; pointer-events:none}
+      .vsb-chip span{display:inline-block; padding:6px 10px; border-radius:999px; border:1px solid var(--vsb-border,#e5e7eb); color:#374151; background: var(--vsb-chip-bg,#fff); cursor:pointer; transition:.15s}
+      .vsb-chip input:checked + span{background:#111827; border-color:#111827; color:#fff}
+      .vsb-checkbox{align-items:center}
+      .vsb-actions{display:flex; gap:8px; align-items:center; margin: 8px 0 12px}
+      .vsb-btn{appearance:none; border:1px solid var(--vsb-border,#e5e7eb); background:#fff; color:#111827; padding:8px 14px; line-height:1; border-radius:8px; cursor:pointer; transition:.15s}
+      .vsb-btn:hover{background:#f9fafb}
+      .vsb-btn.vsb-primary{background:#111827; color:#fff; border-color:#111827}
+      .vsb-btn.vsb-primary:hover{filter:brightness(1.05)}
+      .vsb-btn.vsb-ghost{background:transparent}
+      .vsb-output{white-space:pre-wrap; background:#0b1021; color:#e8eaf6; padding:12px; border-radius:10px; overflow:auto; max-height:320px; border:1px solid #11182722; font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:12px}
+      details.vsb-card summary{cursor:pointer; list-style:none}
+      details.vsb-card summary::marker, details.vsb-card summary::-webkit-details-marker{display:none}
+      details.vsb-card[open]{box-shadow: 0 2px 6px rgba(0,0,0,.06)}
+      @media (prefers-color-scheme: dark){
+        .vsb-wrap{color:#e5e7eb}
+        .vsb-card{background:#161b22; border-color:#2d333b; box-shadow: none}
+        .vsb-legend{color:#9aa4b2}
+        .vsb-input{background:#0d1117; border-color:#30363d; color:#e5e7eb}
+        .vsb-input::placeholder{color:#6b7280}
+        .vsb-seg{background:#0d1117; border-color:#30363d}
+        .vsb-seg-item span{color:#cbd5e1}
+        .vsb-seg-item input:checked + span{background:#2563eb}
+        .vsb-chip span{background:#0d1117; border-color:#30363d; color:#cbd5e1}
+        .vsb-chip input:checked + span{background:#2563eb; border-color:#2563eb}
+        .vsb-btn{background:#0d1117; color:#e5e7eb; border-color:#30363d}
+        .vsb-btn:hover{background:#111827}
+        .vsb-btn.vsb-primary{background:#2563eb; border-color:#2563eb}
+        .vsb-output{background:#0b1021; border-color:#30363d}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
