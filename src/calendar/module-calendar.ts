@@ -117,7 +117,7 @@ export class M_calendar {
                 let calendar: Calendar
                 this.element.innerHTML = `
                 <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-                calendar = await run(id, 'priorityQuadrant');
+                calendar = await run(id, settingdata["quadrant-default-view"] || 'priorityQuadrant');
                 this.data.id = id;
                 calendarinstance.set(id, calendar);
             },
@@ -460,9 +460,9 @@ export class M_calendar {
             label: "四象限",
             click: async () => {
                 if (front == "browser-mobile" || front == "mobile") {
-                    await this.openRiChengViewDialog(true, "", "priorityQuadrant");
+                    await this.openRiChengViewDialog(true, "", settingdata["quadrant-default-view"] || "priorityQuadrant");
                 } else {
-                    await this.openRiChengView("priorityQuadrant");
+                    await this.openRiChengView(settingdata["quadrant-default-view"] || "priorityQuadrant");
                 }
             }
         });
@@ -596,49 +596,52 @@ export class M_calendar {
     }
 
     async openRiChengView(initialView = "dayGridMonth") {
-        if (initialView == "dayGridMonth") {
-            await openTab({
-                app: window.siyuan.ws.app,
-                custom: {
-                    icon: "iconSTcal",
-                    title: `日程视图`,
-                    id: this.plugin.name + 'calendar',
-                    data: {
-                        id: null
-                    },
-                },
-                // position: "right",
-                keepCursor: false
-            });
-        } else if (initialView == "priorityQuadrant") {
+        // 统一根据 initialView 决定打开哪个选项卡（calendar / quadrants / kanban）
+        const view = initialView || settingdata["cal-default-view"] || "dayGridMonth";
+
+    // 日历视图无需专门判断，落入默认分支即可
+        const kanbanViews = ["kanban", "weekkanban", "yearkanban"];
+        const quadrantViews = ["priorityQuadrant", "weekpriorityQuadrant", "yearpriorityQuadrant"];
+
+        if (quadrantViews.includes(view)) {
             await openTab({
                 app: window.siyuan.ws.app,
                 custom: {
                     icon: "iconSTcal",
                     title: `四象限`,
                     id: this.plugin.name + 'quadrants',
-                    data: {
-                        id: null
-                    },
+                    data: { id: null },
                 },
-                // position: "right",
                 keepCursor: false
             });
-        } else {
+            return;
+        }
+
+        if (kanbanViews.includes(view)) {
             await openTab({
                 app: window.siyuan.ws.app,
                 custom: {
                     icon: "iconSTcalKanban",
                     title: `看板视图`,
                     id: this.plugin.name + 'kanban',
-                    data: {
-                        id: null
-                    },
+                    data: { id: null },
                 },
-                // position: "right",
                 keepCursor: false
             });
+            return;
         }
+
+        // 其余一律视为日历视图
+        await openTab({
+            app: window.siyuan.ws.app,
+            custom: {
+                icon: "iconSTcal",
+                title: `日程视图`,
+                id: this.plugin.name + 'calendar',
+                data: { id: null },
+            },
+            keepCursor: false
+        });
     }
 
 

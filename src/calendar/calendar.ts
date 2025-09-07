@@ -7,7 +7,6 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
-import steveTools from "@/index";
 import kanban, { refreshKanban, thisCalendars, update_thisCalendars } from './kanban';
 import priorityQuadrant from './priorityQuadrant';
 import { settingdata } from '@/index';
@@ -64,6 +63,24 @@ export async function run(
     ccenter = 'title',
     elementca?: any,
 ) {
+    // 允许用户通过设置覆盖 initialView 与 cright（当使用的是内置默认或未传入时）
+    try {
+        const DEFAULT_INITIAL = 'dayGridMonth';
+        const DEFAULT_RIGHT = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant';
+
+        const configuredInitialView = settingdata?.["cal-default-view"]; // e.g., dayGridMonth
+        // 若未传入或仍为内置默认，采用设置值
+        if (((!initialView || !String(initialView).trim()) || initialView === DEFAULT_INITIAL) && configuredInitialView) {
+            initialView = configuredInitialView;
+        }
+
+        const configuredRight = settingdata?.["cal-toolbar-right"];
+        if (((!cright || !String(cright).trim()) || cright === DEFAULT_RIGHT) && configuredRight) {
+            cright = configuredRight;
+        }
+    } catch (e) {
+        console.warn('读取日历视图设置失败，使用默认值', e);
+    }
     // 如果有指定的S_viewID则使用，否则从配置中获取
     if (S_viewID) {
         filterViewId = [S_viewID];
@@ -205,7 +222,7 @@ export async function run(
                 }
             }
         },
-        select: function (info) {//TODO: 选择处理
+    select: function (_info) {//TODO: 选择处理
             // console.log('select', info);
         },
         // 日期点击处理
@@ -221,7 +238,7 @@ export async function run(
                 rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
             }
             if (settingdata["cal-create-way"] === "1") {
-                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
+                await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
                 return;
             }
             let clickTimeout: NodeJS.Timeout;
@@ -234,7 +251,7 @@ export async function run(
                 clearTimeout(clickTimeout);
                 clicks1 = 0;
                 // steveTools.outlog("创建事件", info);
-                const eventId = await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
+                await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
             }
         },
         // 农历显示
@@ -336,7 +353,7 @@ export async function run(
 
         },
 
-        eventResizeStart: function (info) {
+    eventResizeStart: function (_info) {
             // 创建半透明的时间指示器跟随鼠标
             const timeGhost = document.createElement('div');
             timeGhost.id = 'fc-time-ghost';
@@ -423,9 +440,6 @@ export async function run(
                 type: 'kanban',
                 buttonText: '月板',
                 duration: { months: 1 },
-                // customParams: {
-                //     calendarEl: calendarEl,
-                // },
             },
             yearkanban: {
                 type: 'kanban',
@@ -442,7 +456,16 @@ export async function run(
                 buttonText: '四象限',
                 duration: { months: 1 },
             },
-
+            yearpriorityQuadrant: {
+                type: 'priorityQuadrant',
+                buttonText: '年象限',
+                duration: { years: 1 },
+            },
+            weekpriorityQuadrant: {
+                type: 'priorityQuadrant',
+                buttonText: '周象限',
+                duration: { weeks: 1 },
+            },
         },
         customButtons: {
             viewFilter: {

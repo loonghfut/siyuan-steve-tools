@@ -76,6 +76,9 @@ export const calendarDefaults: Record<string, any> = {
     "cal-event-color": true,
     "kanban-default-view": "kanban",
     "cal-default-view": "dayGridMonth",
+    "quadrant-default-view": "priorityQuadrant",
+    // 工具栏
+    "cal-toolbar-right": "multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant",
     // 四象限
     "cal-quadrant-urgent-days": 2,
     // 触发平台
@@ -134,7 +137,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "日程文件名", description: "建议复杂且包含.ics后缀", key: "cal-url", value: ctx.settings["cal-url"] },
                 { type: "number", title: "(ics)事件范围前(月)", description: "向前多少个月的事件", key: "cal-ics-filter-old", value: ctx.settings["cal-ics-filter-old"] },
                 { type: "number", title: "(ics)事件范围后(月)", description: "向后多少个月的事件", key: "cal-ics-filter-new", value: ctx.settings["cal-ics-filter-new"] },
-                { type: "button", title: "获取订阅链接", description: "更改文件名后请重新获取", key: "cal-get-url", value: ctx.settings["cal-get-url"], button: { label: "获取", callback: () => { try { ctx.moduleInstances["M_calendar"].getCalUrl(); } catch (e:any) { console.error(e); } } } },
+                { type: "button", title: "获取订阅链接", description: "更改文件名后请重新获取", key: "cal-get-url", value: ctx.settings["cal-get-url"], button: { label: "获取", callback: () => { try { ctx.moduleInstances["M_calendar"].getCalUrl(); } catch (e: any) { console.error(e); } } } },
                 { type: "checkbox", title: "自动更新ics文件", description: "修改日程后自动更新", key: "cal-auto-update", value: ctx.settings["cal-auto-update"] },
                 { type: "checkbox", title: "同步更新ics文件", description: "同步完成后自动更新", key: "cal-auto-syncing-update", value: ctx.settings["cal-auto-syncing-update"] },
                 { type: "checkbox", title: "手动更新ics文件", description: "Topbar按钮手动更新", key: "cal-hand-update", value: ctx.settings["cal-hand-update"] },
@@ -160,7 +163,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "启用QQ邮箱日历(beta)", description: "展示QQ邮箱日历事件", key: "cal-qq-enable", value: ctx.settings["cal-qq-enable"] },
                 { type: "textinput", title: "QQ邮箱地址", description: "对接QQ邮箱填写", key: "cal-qq-email", value: ctx.settings["cal-qq-email"] },
                 { type: "textinput", title: "QQ邮箱授权码", description: "对接QQ邮箱填写", key: "cal-qq-code", value: ctx.settings["cal-qq-code"] },
-                { type: "select", title: "QQ日历选择", description: "选择需要同步的QQ日历", key: "cal-qq-calendar-url", value: ctx.settings["cal-qq-calendar-url"], dynamicOptions: async (c) => { try { const list = await c.moduleInstances?.M_calendar?.QQCalDAVClient?.getCalendars(); if (Array.isArray(list) && list.length) { const m:Record<string,string> = {"":"无"}; list.forEach((cal:any)=>{ m[cal.url] = `${cal.displayName}${cal.description?` (${cal.description})`:""}`; }); return m; } } catch(e){ console.error(e);} return {"":"请先配置QQ邮箱信息"}; } },
+                { type: "select", title: "QQ日历选择", description: "选择需要同步的QQ日历", key: "cal-qq-calendar-url", value: ctx.settings["cal-qq-calendar-url"], dynamicOptions: async (c) => { try { const list = await c.moduleInstances?.M_calendar?.QQCalDAVClient?.getCalendars(); if (Array.isArray(list) && list.length) { const m: Record<string, string> = { "": "无" }; list.forEach((cal: any) => { m[cal.url] = `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`; }); return m; } } catch (e) { console.error(e); } return { "": "请先配置QQ邮箱信息" }; } },
             ]
         },
         {
@@ -187,6 +190,8 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "事件颜色样式切换", description: "启用后使用另一套事件颜色", key: "cal-event-color", value: ctx.settings["cal-event-color"] },
                 { type: "select", title: "默认日历视图模式", description: "首次打开默认模式", key: "cal-default-view", value: ctx.settings["cal-default-view"], options: { multiMonthYear: "MultiMonthYear", dayGridMonth: "DayGridMonth", timeGridWeek: "TimeGridWeek", timeGridThreeDays: "TimeGridThreeDays", timeGridDay: "TimeGridDay" } },
                 { type: "select", title: "默认看板视图模式", description: "看板默认模式", key: "kanban-default-view", value: ctx.settings["kanban-default-view"], options: { weekkanban: "WeekKanban", kanban: "Kanban", yearkanban: "YearKanban" } },
+                { type: "select", title: "默认四象限视图模式", description: "四象限默认模式", key: "quadrant-default-view", value: ctx.settings["quadrant-default-view"], options: { weekpriorityQuadrant: "WeekQuadrant", priorityQuadrant: "Quadrant", yearpriorityQuadrant: "YearQuadrant" } },
+                { type: "textarea", title: "视图右侧按钮", description: "逗号分隔的视图按钮列表：\n\nmultiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,\n\nweekkanban,kanban,yearkanban,\n\npriorityQuadrant,yearpriorityQuadrant,weekpriorityQuadrant", key: "cal-toolbar-right", value: ctx.settings["cal-toolbar-right"], direction: "row" },
                 { type: "number", title: "四象限紧急阈值（天）", description: "<=阈值视为紧急", key: "cal-quadrant-urgent-days", value: ctx.settings["cal-quadrant-urgent-days"] },
             ]
         },
@@ -195,7 +200,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             items: [
                 { type: "checkbox", title: "启用滴答清单同步", description: "同步滴答清单任务", key: "cal-dida-enable", value: ctx.settings["cal-dida-enable"] },
                 { type: "textinput", title: "滴答清单token", description: "<a href=\"https://dida365.com/webapp/#q/all/tasks?modalType=settings\" target=\"_blank\">获取</a>API口令", key: "cal-dida-token", value: ctx.settings["cal-dida-token"] },
-                { type: "select", title: "设置要同步的清单", description: "选择清单", key: "cal-dida-unfinished-list", value: ctx.settings["cal-dida-unfinished-list"], dynamicOptions: async () => { try { const ps = await DidaService.getAllProjects(); return convertProjectsToRecord(ps) || {"":"无"}; } catch { return {"":"加载失败"}; } } },
+                { type: "select", title: "设置要同步的清单", description: "选择清单", key: "cal-dida-unfinished-list", value: ctx.settings["cal-dida-unfinished-list"], dynamicOptions: async () => { try { const ps = await DidaService.getAllProjects(); return convertProjectsToRecord(ps) || { "": "无" }; } catch { return { "": "加载失败" }; } } },
                 { type: "textinput", title: "滴答清单同步数据库id", description: "对应数据库 id", key: "cal-dida-db-id", value: ctx.settings["cal-dida-db-id"] },
                 { type: "select", title: "滴答清单同步模式", description: "同步触发模式", key: "cal-dida-sync-mode", value: ctx.settings["cal-dida-sync-mode"], options: { auto: "自动同步", manual: "手动同步", all: "自动+手动" } },
                 { type: "number", title: "自动同步间隔", description: "分钟", key: "cal-dida-sync-interval", value: ctx.settings["cal-dida-sync-interval"] },
