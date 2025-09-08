@@ -1,6 +1,7 @@
 import steveTools from "@/index";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
 import { Dialog } from "siyuan";
+import { insertBlock, updateBlock } from "@/api/api";
 
 // Aggregate 模块
 export class M_Aggregate {
@@ -13,29 +14,84 @@ export class M_Aggregate {
 
     async init(_settingdata: any) {
         console.log("Aggregate 模块初始化");
-        // 你可在外部把一个容器元素传进来，然后调用 mountUI(container)
-        // 或者在此处由插件自身创建挂载点并注入到面板中
-        this.plugin.addTopBar({
-            icon: "iconSTwps_data2",
-            title: "ces1",
-            position: "right",
-            callback: async () => {
-                new Dialog({
-                    title: "SQL 可视化生成器",
-                    content: `<div id="visual-sql-container" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
-                    width: '70%',
-                    height: 'auto',
-                    disableClose: false,
-                    hideCloseIcon: true,
-                    resizeCallback: () => {
-                        this._ui?.resize();
-                    },
-                });
-                this.mountUI(document.getElementById('visual-sql-container')!);
-                // 初次渲染后按当前视口计算布局
-                requestAnimationFrame(() => this._ui?.resize());
-            }
-        });
+
+        if (_settingdata["aggregate-enable-sql-visualizer"]) {
+            this.plugin.addTopBar({
+                icon: "iconSQL",
+                title: "SQL 可视化生成器",
+                position: "right",
+                callback: async () => {
+                    new Dialog({
+                        title: "SQL 可视化生成器",
+                        content: `<div id="visual-sql-container" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                        width: '70%',
+                        height: 'auto',
+                        disableClose: false,
+                        hideCloseIcon: true,
+                        resizeCallback: () => {
+                            this._ui?.resize();
+                        },
+                    });
+                    this.mountUI(document.getElementById('visual-sql-container')!);
+                    // 初次渲染后按当前视口计算布局
+                    requestAnimationFrame(() => this._ui?.resize());
+                }
+            });
+        }
+        this.plugin.protyleSlash = [
+            {
+                filter: ["SQL", "sql", "查询", "query"],
+                html: `<div class="b3-list-item__first"><span class="b3-list-item__text">SQL</span><span class="b3-list-item__meta"></span></div>`,
+                id: "insertCardLink",
+                callback: async (protyle,nodeElement) => {
+                    let openedSQL = '';
+                    // 打开 SQL 可视化生成器面板
+                    const dlg = new Dialog({
+                        title: "SQL 可视化生成器",
+                        content: `<div id="visual-sql-container-slash" style="width:100%;max-height:70vh;overflow:auto;"></div>`,
+                        width: '70%',
+                        height: 'auto',
+                        disableClose: false,
+                        hideCloseIcon: false,
+                        resizeCallback: () => {
+                            ui?.resize();
+                        },
+                        destroyCallback: () => {
+
+                        }
+                    });
+
+                    const container = document.getElementById('visual-sql-container-slash')!;
+                    // 在 Slash 面板中挂载 UI，并增加“插入代码块”按钮
+                    const ui = new VisualSqlUI(container, {
+                        buttons: [
+                            {
+                                label: '插入SQL',
+                                title: '插入生成的 SQL',
+                                variant: 'primary',
+                                onClick: async ({ getSQL }) => {
+                                    const sql = (getSQL() || '').trim();
+                                    if (!sql) {return;}
+                                    try {
+                                        console.log("nodeElement",nodeElement);
+                                        const blockID = nodeElement.getAttribute('data-node-id');
+                                        updateBlock("markdown",`{{${sql}}}`,blockID);
+                                    } finally {
+                                        dlg.destroy();
+                                    }
+                                }
+                            }
+                        ],
+                        onSqlChange: (_sql) => {
+                            openedSQL = _sql;
+                        },
+                        persistKey: "visual-sql-slash",
+                    });
+                    // 初次渲染后按当前视口计算布局
+                    requestAnimationFrame(() => ui?.resize());
+                },
+            },
+        ];
     }
 
 

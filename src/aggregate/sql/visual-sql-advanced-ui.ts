@@ -312,7 +312,7 @@ export class VisualSqlAdvancedUI {
                     const b = document.createElement('input');
                     b.type = 'datetime-local';
                     b.className = 'vsb-input';
-                    a.style.minWidth = '180px'; b.style.minWidth = '180px';
+                    a.style.width = '140px'; b.style.width = '140px';
                     // 还原初值（逗号分隔的两端）
                     if (valHidden.value) {
                         const [v1, v2] = valHidden.value.split(',');
@@ -325,15 +325,18 @@ export class VisualSqlAdvancedUI {
                         setHidden([v1, v2].filter(Boolean).join(','));
                     };
                     a.addEventListener('change', upd); b.addEventListener('change', upd);
-                    valueWrap.appendChild(a); valueWrap.appendChild(b);
+                    const rowA = document.createElement('div'); rowA.style.display = 'flex'; rowA.style.gap = '6px'; rowA.appendChild(a);
+                    const rowB = document.createElement('div'); rowB.style.display = 'flex'; rowB.style.gap = '6px'; rowB.appendChild(b);
+                    valueWrap.appendChild(rowA); valueWrap.appendChild(rowB);
                 } else {
                     const a = document.createElement('input');
                     a.type = 'datetime-local';
                     a.className = 'vsb-input';
-                    a.style.minWidth = '200px';
+                    a.style.width = '140px';
                     if (valHidden.value) a.value = this.tsToDatetimeLocal(valHidden.value);
                     a.addEventListener('change', () => setHidden(a.value ? toTS(a.value) : ''));
-                    valueWrap.appendChild(a);
+                    const row = document.createElement('div'); row.style.display = 'flex'; row.style.gap = '6px'; row.appendChild(a);
+                    valueWrap.appendChild(row);
                 }
                 return;
             }
@@ -474,8 +477,9 @@ export class VisualSqlAdvancedUI {
     private tsToDatetimeLocal(ts: string): string {
         const s = (ts || '').trim();
         if (!/^\d{14}$/.test(s)) return '';
-        const y = s.slice(0, 4), mo = s.slice(4, 6), d = s.slice(6, 8), h = s.slice(8, 10), mi = s.slice(10, 12), se = s.slice(12, 14);
-        return `${y}-${mo}-${d}T${h}:${mi}:${se}`;
+        const y = s.slice(0, 4), mo = s.slice(4, 6), d = s.slice(6, 8), h = s.slice(8, 10), mi = s.slice(10, 12);
+        // 去掉秒数，仅显示到分钟
+        return `${y}-${mo}-${d}T${h}:${mi}`;
     }
     private datetimeLocalToTS(v: string): string {
         const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
@@ -578,9 +582,23 @@ export class VisualSqlAdvancedUI {
   /* Tag 搜索输入（datalist 绑定）配色适配 */
   .vsb-adv-wrap input.vsb-input[list^="vsb-tags-"]{ background: var(--b3-theme-background); color: var(--b3-theme-on-background); caret-color: var(--b3-theme-primary); }
   .vsb-adv-wrap input.vsb-input[list^="vsb-tags-"]::placeholder{ color: var(--b3-theme-on-surface-light); }
+    /* 统一日期输入宽度，避免与其他控件互相干涉 */
+        .vsb-adv-wrap input[type="datetime-local"].vsb-input{ width:140px; }
+    /* 日期面板（按钮已移除，保留样式以备将来复用） */
+    .vsb-date-panel{ position:fixed; z-index:99999; background: var(--b3-theme-surface); color: var(--b3-theme-on-background); border:1px solid var(--b3-border-color); border-radius:8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); width: 248px; }
+    .vsb-date-panel header{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--b3-border-color) }
+    .vsb-date-panel header button{ border:none; background:transparent; color:inherit; cursor:pointer; padding:4px }
+    .vsb-date-panel .grid{ display:grid; grid-template-columns: repeat(7, 1fr); gap:2px; padding:6px }
+    .vsb-date-panel .cell{ text-align:center; padding:6px 0; border-radius:6px; cursor:pointer }
+    .vsb-date-panel .cell:hover{ background: var(--b3-list-hover) }
+    .vsb-date-panel .dow{ font-size:11px; color: var(--b3-theme-on-surface); cursor:default }
     `;
         document.head.appendChild(style);
     }
+
+    // openDatePanel 已移除（不再使用）
+
+    // parseInputDate 已移除（不再使用）
 
     private async getTags(): Promise<string[]> {
         if (this.tagsCache) return this.tagsCache;

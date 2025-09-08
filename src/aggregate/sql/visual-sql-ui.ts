@@ -180,9 +180,8 @@ export class VisualSqlUI {
                   <option value=">">></option>
                   <option value="<"><</option>
                 </select>
-                <input class="vsb-input" data-created-at type="datetime-local" style="min-width:200px;" />
+                <input class="vsb-input" data-created-at type="datetime-local" style="width:140px;" />
               </div>
-              <div style="font-size:11px; color:var(--vsb-muted)">若设置了具体时间，将优先生效（覆盖“近 N 天”）</div>
             </label>
             <label class="vsb-field">updated 时间比较
               <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px;">
@@ -190,9 +189,8 @@ export class VisualSqlUI {
                   <option value=">">></option>
                   <option value="<"><</option>
                 </select>
-                <input class="vsb-input" data-updated-at type="datetime-local" style="min-width:200px;" />
+                <input class="vsb-input" data-updated-at type="datetime-local" style="width:140px;" />
               </div>
-              <div style="font-size:11px; color:var(--vsb-muted)">若设置了具体时间，将优先生效（覆盖“近 N 天”）</div>
             </label>
             <label class="vsb-field">排序字段
               <select class="vsb-input" data-order-field>
