@@ -1319,3 +1319,24 @@ export async function batchReplaceAttributeViewBlocks(avID: string, mappings: Ar
     return avManager.batchReplaceBlocks(avID, mappings, isDetached);
 }
 
+
+// **************************************** Tag ****************************************
+export interface TagItem {
+    name: string;
+    label: string;
+    children: TagItem[] | null;
+    type: string; // "tag"
+    depth: number;
+    count: number;
+}
+
+/**
+ * 获取标签列表
+ * POST /api/tag/getTag
+ * 默认载荷 { sort: 0 }
+ */
+export async function getTag(sort: number = 0): Promise<TagItem[]> {
+    const url = '/api/tag/getTag';
+    return request(url, { sort });
+}
+

@@ -1,4 +1,5 @@
 // showMessage 若需要可在运行环境通过 window.showMessage 使用，这里不直接导入以避免未使用警告
+import { getTag, TagItem } from "./api";
 
 export function escapeHtml(s: string) {
     return String(s || "")
@@ -184,3 +185,29 @@ export const extractNewAvId = (oldAvs: string, newAvs: string): string | null =>
     const added = newList.find(id => !oldList.includes(id));
     return added || null; // 如果有多个新增的 ID，只返回第一个
 };
+
+
+
+/**
+ * 获取所有标签（扁平 name 列表）
+ * 依赖 /api/tag/getTag
+ */
+export async function getalltages(): Promise<string[]> {
+    try {
+        const tree = await getTag(window.siyuan.config.tag.sort);
+        const result: string[] = [];
+        const walk = (nodes: TagItem[] | null) => {
+            if (!nodes) return;
+            for (const n of nodes) {
+                if (n?.name) result.push(n.name);
+                if (n?.children && n.children.length) walk(n.children as TagItem[]);
+            }
+        };
+        walk(tree);
+        // 去重并去空
+        return Array.from(new Set(result.filter(Boolean)));
+    } catch (e) {
+        console.warn("getalltages failed:", e);
+        return [];
+    }
+}
