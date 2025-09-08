@@ -21,17 +21,19 @@ export class M_Aggregate {
             position: "right",
             callback: async () => {
                 new Dialog({
-                    title: null,
-                    content: `<div id="visual-sql-container" style="width:100%;height:100%;"></div>`,
+                    title: "SQL 可视化生成器",
+                    content: `<div id="visual-sql-container" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
                     width: '70%',
-                    height: '86.66%',
+                    height: 'auto',
                     disableClose: false,
                     hideCloseIcon: true,
-                    // resizeCallback: () => {
-                        
-                    // },
+                    resizeCallback: () => {
+                        this._ui?.resize();
+                    },
                 });
                 this.mountUI(document.getElementById('visual-sql-container')!);
+                // 初次渲染后按当前视口计算布局
+                requestAnimationFrame(() => this._ui?.resize());
             }
         });
     }
@@ -42,6 +44,7 @@ export class M_Aggregate {
         this._ui = new VisualSqlUI(container, {
             onSqlChange: (_sql) => {
                 // 可同步 SQL 或发起查询
+                console.log("生成的 SQL:", _sql);
             }
         });
     }
