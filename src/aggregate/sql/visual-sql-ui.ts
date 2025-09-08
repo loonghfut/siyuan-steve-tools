@@ -235,7 +235,7 @@ export class VisualSqlUI {
     this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
     this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
     this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
-  this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
+    this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
     this.tagsDatalist = this.container.querySelector('#vsb-tags-list') as HTMLDataListElement;
     this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
     this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
@@ -247,26 +247,26 @@ export class VisualSqlUI {
     this.orderDirSel = this.container.querySelector('select[data-order-dir]') as HTMLSelectElement;
     this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
 
-  this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
+    this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
-  this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
-  const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
+    this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
+    const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
 
 
     // 异步加载标签下拉
-  this.populateTags();
+    this.populateTags();
 
-  // 事件
+    // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
     changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
     this.tagInput.addEventListener('change', () => {
       const v = (this.tagInput.value || '').trim();
       if (v) this.pushRecentTags([v]);
     });
-  this.copyBtn.addEventListener('click', () => this.copySql());
-  this.resetBtn.addEventListener('click', () => this.resetForm());
-  advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
+    this.copyBtn.addEventListener('click', () => this.copySql());
+    this.resetBtn.addEventListener('click', () => this.resetForm());
+    advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
 
 
     // 渲染自定义按钮（如有）
@@ -317,7 +317,7 @@ export class VisualSqlUI {
     if (mdLike) this.builder.markdownLike(mdLike);
     if (hpathLike) this.builder.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
     if (ialLike) this.builder.addFilter({ field: 'ial', op: 'like', value: ialLike });
-  const tagRaw = (this.tagInput.value || '').trim();
+    const tagRaw = (this.tagInput.value || '').trim();
     const tag = tagRaw.replace(/^#+/, ''); // 去除开头的 #，避免重复
     this.builder.hasTag(tag);
     // 时间：若设置了具体时间比较，则优先使用；否则使用“近 N 天”
@@ -529,14 +529,14 @@ export class VisualSqlUI {
         tag: this.tagInput?.value ?? '',
         createdDays: this.createdDaysInput?.value ?? '',
         updatedDays: this.updatedDaysInput?.value ?? '',
-  createdOp: this.createdOpSel?.value ?? '>',
-  createdAt: this.createdAtInput?.value ?? '',
-  updatedOp: this.updatedOpSel?.value ?? '>',
-  updatedAt: this.updatedAtInput?.value ?? '',
+        createdOp: this.createdOpSel?.value ?? '>',
+        createdAt: this.createdAtInput?.value ?? '',
+        updatedOp: this.updatedOpSel?.value ?? '>',
+        updatedAt: this.updatedAtInput?.value ?? '',
         orderField: this.orderFieldSel?.value ?? '',
         orderDir: this.orderDirSel?.value ?? 'desc',
-  limit: this.limitInput?.value ?? '',
-  advSqlFragment: this.advSqlFragment || ''
+        limit: this.limitInput?.value ?? '',
+        advSqlFragment: this.advSqlFragment || ''
       };
       localStorage.setItem(this.storageKey, JSON.stringify(state));
     } catch (e) {
@@ -570,17 +570,17 @@ export class VisualSqlUI {
       if (this.mdLikeInput) this.mdLikeInput.value = s?.md ?? '';
       if (this.hpathLikeInput) this.hpathLikeInput.value = s?.hpath ?? '';
       if (this.ialLikeInput) this.ialLikeInput.value = s?.ial ?? '';
-  if (this.tagInput) this.tagInput.value = s?.tag ?? '';
+      if (this.tagInput) this.tagInput.value = s?.tag ?? '';
       if (this.createdDaysInput) this.createdDaysInput.value = String(s?.createdDays ?? '');
       if (this.updatedDaysInput) this.updatedDaysInput.value = String(s?.updatedDays ?? '');
-  if (this.createdOpSel) this.createdOpSel.value = s?.createdOp ?? '>';
-  if (this.createdAtInput) this.createdAtInput.value = s?.createdAt ?? '';
-  if (this.updatedOpSel) this.updatedOpSel.value = s?.updatedOp ?? '>';
-  if (this.updatedAtInput) this.updatedAtInput.value = s?.updatedAt ?? '';
+      if (this.createdOpSel) this.createdOpSel.value = s?.createdOp ?? '>';
+      if (this.createdAtInput) this.createdAtInput.value = s?.createdAt ?? '';
+      if (this.updatedOpSel) this.updatedOpSel.value = s?.updatedOp ?? '>';
+      if (this.updatedAtInput) this.updatedAtInput.value = s?.updatedAt ?? '';
       if (this.orderFieldSel) this.orderFieldSel.value = s?.orderField ?? '';
       if (this.orderDirSel) this.orderDirSel.value = s?.orderDir ?? 'desc';
-  if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
-  this.advSqlFragment = s?.advSqlFragment || '';
+      if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
+      this.advSqlFragment = s?.advSqlFragment || '';
 
     } catch (e) {
       console.debug('[VisualSqlUI] restoreState failed', e);

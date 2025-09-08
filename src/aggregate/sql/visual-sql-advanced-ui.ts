@@ -134,8 +134,8 @@ export class VisualSqlAdvancedUI {
 
         // 事件
         seg.querySelectorAll('input[type="radio"]').forEach(el => el.addEventListener('change', () => this.emitSql()));
-    btnAddRule.addEventListener('click', () => { this.addRule(children, undefined, true); this.emitSql(); });
-    btnAddGroup.addEventListener('click', () => { children.insertBefore(this.createGroup(false, 'AND'), children.firstChild); this.emitSql(); });
+        btnAddRule.addEventListener('click', () => { this.addRule(children, undefined, true); this.emitSql(); });
+        btnAddGroup.addEventListener('click', () => { children.insertBefore(this.createGroup(false, 'AND'), children.firstChild); this.emitSql(); });
         btnClear.addEventListener('click', () => { children.innerHTML = ''; this.emitSql(); });
         btnDel.addEventListener('click', () => { group.remove(); this.emitSql(); });
 
@@ -152,7 +152,7 @@ export class VisualSqlAdvancedUI {
     private addRule(parentChildrenEl: HTMLElement, init?: AdvRuleState, insertAtStart: boolean = false) {
         const row = document.createElement('div');
         row.className = 'vsb-adv-row';
-    row.style.cssText = 'display:grid; grid-template-columns: 1.2fr 1fr 1.8fr auto; gap:6px; align-items:center;';
+        row.style.cssText = 'display:grid; grid-template-columns: 1.2fr 1fr 1.8fr auto; gap:6px; align-items:center;';
 
         const fieldSel = document.createElement('select');
         fieldSel.className = 'vsb-input';
@@ -181,7 +181,7 @@ export class VisualSqlAdvancedUI {
         // 初始化
         if (init?.field) fieldSel.value = init.field;
         if (init?.op) opSel.value = init.op;
-    if (init?.value !== undefined) valHidden.value = init.value ?? '';
+        if (init?.value !== undefined) valHidden.value = init.value ?? '';
 
         // 字段/运算符联动
         const syncOpByField = () => {
@@ -396,10 +396,10 @@ export class VisualSqlAdvancedUI {
         row.appendChild(fieldSel);
         row.appendChild(opSel);
         row.appendChild(valueWrap);
-    row.appendChild(valHidden);
-    row.appendChild(delBtn);
-    if (insertAtStart && parentChildrenEl.firstChild) parentChildrenEl.insertBefore(row, parentChildrenEl.firstChild);
-    else parentChildrenEl.appendChild(row);
+        row.appendChild(valHidden);
+        row.appendChild(delBtn);
+        if (insertAtStart && parentChildrenEl.firstChild) parentChildrenEl.insertBefore(row, parentChildrenEl.firstChild);
+        else parentChildrenEl.appendChild(row);
 
         // 初始 value 恢复后，再渲染一次值控件以匹配
         if (init?.value) {
@@ -446,7 +446,7 @@ export class VisualSqlAdvancedUI {
         const field = (row.querySelector('[data-field]') as HTMLSelectElement)?.value?.trim();
         const op = (row.querySelector('[data-op]') as HTMLSelectElement)?.value?.trim().toLowerCase();
         const rawVal = (row.querySelector('[data-value]') as HTMLInputElement)?.value ?? '';
-    if (!field || !op) return '';
+        if (!field || !op) return '';
 
         let expr = '';
         if (op === 'is null' || op === 'is not null') {
@@ -466,8 +466,8 @@ export class VisualSqlAdvancedUI {
             if (rawVal !== '') expr = `${field} ${op.toUpperCase()} ${Q(rawVal)}`;
         }
 
-    if (!expr) return '';
-    return `(${expr})`;
+        if (!expr) return '';
+        return `(${expr})`;
     }
 
     // ===== 工具：时间戳与 datetime-local 互转 =====
