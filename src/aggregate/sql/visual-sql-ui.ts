@@ -21,45 +21,45 @@ export interface VisualSqlUIOptions {
 }
 
 export class VisualSqlUI {
-    private container: HTMLElement;
-    private opts: VisualSqlUIOptions;
-    private builder: VisualSqlBuilder;
+  private container: HTMLElement;
+  private opts: VisualSqlUIOptions;
+  private builder: VisualSqlBuilder;
   private resizeRaf?: number;
   private storageKey?: string;
 
-    // 控件引用
-    private typeChecks!: NodeListOf<HTMLInputElement>;
-    private subtypeChecks!: NodeListOf<HTMLInputElement>;
-    private boxChecks!: NodeListOf<HTMLInputElement>;
-    private rootIdInput!: HTMLInputElement;
-    private parentIdInput!: HTMLInputElement;
-    private pathLikeInput!: HTMLInputElement;
-    private contentLikeInput!: HTMLInputElement;
-    private mdLikeInput!: HTMLInputElement;
-    private hpathLikeInput!: HTMLInputElement;
-    private ialLikeInput!: HTMLInputElement;
-    private tagInput!: HTMLInputElement;
-    private createdDaysInput!: HTMLInputElement;
-    private updatedDaysInput!: HTMLInputElement;
-    private orderFieldSel!: HTMLSelectElement;
-    private orderDirSel!: HTMLSelectElement;
-    private limitInput!: HTMLInputElement;
+  // 控件引用
+  private typeChecks!: NodeListOf<HTMLInputElement>;
+  private subtypeChecks!: NodeListOf<HTMLInputElement>;
+  private boxChecks!: NodeListOf<HTMLInputElement>;
+  private rootIdInput!: HTMLInputElement;
+  private parentIdInput!: HTMLInputElement;
+  private pathLikeInput!: HTMLInputElement;
+  private contentLikeInput!: HTMLInputElement;
+  private mdLikeInput!: HTMLInputElement;
+  private hpathLikeInput!: HTMLInputElement;
+  private ialLikeInput!: HTMLInputElement;
+  private tagInput!: HTMLInputElement;
+  private createdDaysInput!: HTMLInputElement;
+  private updatedDaysInput!: HTMLInputElement;
+  private orderFieldSel!: HTMLSelectElement;
+  private orderDirSel!: HTMLSelectElement;
+  private limitInput!: HTMLInputElement;
 
   private outputPre!: HTMLPreElement;
   private copyBtn!: HTMLButtonElement;
   private resetBtn!: HTMLButtonElement;
   private actionsEl!: HTMLElement;
 
-    constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
-        this.container = container;
-        this.opts = options || {};
-        this.builder = new VisualSqlBuilder('embedded');
-  this.storageKey = this.opts.persistKey ?? 'siyuan-steve-tools:visual-sql-ui';
-        this.render();
-  // 恢复上次状态并生成 SQL
-  this.restoreState();
-  this.rebuildSql();
-    }
+  constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
+    this.container = container;
+    this.opts = options || {};
+    this.builder = new VisualSqlBuilder('embedded');
+    this.storageKey = this.opts.persistKey ?? 'siyuan-steve-tools:visual-sql-ui';
+    this.render();
+    // 恢复上次状态并生成 SQL
+    this.restoreState();
+    this.rebuildSql();
+  }
 
   /**
    * 当外部容器尺寸变化时调用，执行轻量布局刷新（防抖）。
@@ -85,32 +85,32 @@ export class VisualSqlUI {
     });
   }
 
-    private html(strings: TemplateStringsArray, ...values: any[]) {
-        return strings.reduce((acc, s, i) => acc + s + (values[i] ?? ''), '');
-    }
+  private html(strings: TemplateStringsArray, ...values: any[]) {
+    return strings.reduce((acc, s, i) => acc + s + (values[i] ?? ''), '');
+  }
 
-    private render() {
-        this.injectStyles();
-        this.container.innerHTML = this.html`
+  private render() {
+    this.injectStyles();
+    this.container.innerHTML = this.html`
       <div class="vsb-wrap">
         <fieldset class="vsb-card">
           <legend class="vsb-legend">常用筛选</legend>
 
           <div class="vsb-chips" aria-label="类型">
             ${([
-                { v: 'd', n: '文档' },
-                { v: 'h', n: '标题' },
-                { v: 'm', n: '数学公式' },
-                { v: 'c', n: '代码块' },
-                { v: 't', n: '表格块' },
-                { v: 'l', n: '列表块' },
-                { v: 'b', n: '引述块' },
-                { v: 's', n: '超级块' },
-                { v: 'p', n: '段落块' },
-                { v: 'av', n: '数据库' }
-            ] as Array<{ v: BlockType; n: string }>).map(it =>
-                `<label class="vsb-chip"><input type="checkbox" data-type value="${it.v}"/><span>${it.n}</span></label>`
-            ).join('')}
+        { v: 'd', n: '文档' },
+        { v: 'h', n: '标题' },
+        { v: 'm', n: '数学公式' },
+        { v: 'c', n: '代码块' },
+        { v: 't', n: '表格块' },
+        { v: 'l', n: '列表块' },
+        { v: 'b', n: '引述块' },
+        { v: 's', n: '超级块' },
+        { v: 'p', n: '段落块' },
+        { v: 'av', n: '数据库' }
+      ] as Array<{ v: BlockType; n: string }>).map(it =>
+        `<label class="vsb-chip"><input type="checkbox" data-type value="${it.v}"/><span>${it.n}</span></label>`
+      ).join('')}
           </div>
 
           <div class="vsb-grid vsb-grid-4">
@@ -118,30 +118,30 @@ export class VisualSqlUI {
               <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">子类型（可多选）</div>
               <div class="vsb-chips" aria-label="子类型">
                 ${([
-                { v: 'h1', n: '标题 H1' },
-                { v: 'h2', n: '标题 H2' },
-                { v: 'h3', n: '标题 H3' },
-                { v: 'h4', n: '标题 H4' },
-                { v: 'h5', n: '标题 H5' },
-                { v: 'h6', n: '标题 H6' },
-                { v: 'u', n: '无序列表' },
-                { v: 't', n: '任务项' },
-                { v: 'o', n: '有序列表' }
-            ] as Array<{ v: string; n: string }>).map(it =>
-                `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
-            ).join('')}
+        { v: 'h1', n: '标题 H1' },
+        { v: 'h2', n: '标题 H2' },
+        { v: 'h3', n: '标题 H3' },
+        { v: 'h4', n: '标题 H4' },
+        { v: 'h5', n: '标题 H5' },
+        { v: 'h6', n: '标题 H6' },
+        { v: 'u', n: '无序列表' },
+        { v: 't', n: '任务项' },
+        { v: 'o', n: '有序列表' }
+      ] as Array<{ v: string; n: string }>).map(it =>
+        `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
+      ).join('')}
               </div>
             </div>
             <div class="vsb-field" style="grid-column: 1 / -1;">
               <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">笔记本（可多选）</div>
               <div class="vsb-chips" aria-label="笔记本">
                 ${(() => {
-                const nbs = (window as any)?.siyuan?.notebooks;
-                if (!Array.isArray(nbs) || !nbs.length) {
-                    return `<span style=\"color:#9ca3af\">无可用日记本</span>`;
-                }
-                return nbs.map((n: any) => `<label class=\"vsb-chip\"><input type=\"checkbox\" data-box-id value=\"${n.id}\"/><span>${n.name || n.id}</span></label>`).join('');
-            })()}
+        const nbs = (window as any)?.siyuan?.notebooks;
+        if (!Array.isArray(nbs) || !nbs.length) {
+          return `<span style=\"color:#9ca3af\">无可用日记本</span>`;
+        }
+        return nbs.map((n: any) => `<label class=\"vsb-chip\"><input type=\"checkbox\" data-box-id value=\"${n.id}\"/><span>${n.name || n.id}</span></label>`).join('');
+      })()}
               </div>
             </div>
             <label class="vsb-field">tag 包含<input class="vsb-input" data-tag type="text" placeholder="标签名（无 #）"/></label>
@@ -190,32 +190,32 @@ export class VisualSqlUI {
       </div>
     `;
 
-        // 绑定控件
-        this.typeChecks = this.container.querySelectorAll('input[data-type]') as NodeListOf<HTMLInputElement>;
-        this.subtypeChecks = this.container.querySelectorAll('input[data-subtype]') as NodeListOf<HTMLInputElement>;
-        this.boxChecks = this.container.querySelectorAll('input[data-box-id]') as NodeListOf<HTMLInputElement>;
-        this.rootIdInput = this.container.querySelector('input[data-root]') as HTMLInputElement;
-        this.parentIdInput = this.container.querySelector('input[data-parent]') as HTMLInputElement;
-        this.pathLikeInput = this.container.querySelector('input[data-path]') as HTMLInputElement;
-        this.contentLikeInput = this.container.querySelector('input[data-content]') as HTMLInputElement;
-        this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
-        this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
-        this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
-        this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
-        this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
-        this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
-        this.orderFieldSel = this.container.querySelector('select[data-order-field]') as HTMLSelectElement;
-        this.orderDirSel = this.container.querySelector('select[data-order-dir]') as HTMLSelectElement;
-        this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
+    // 绑定控件
+    this.typeChecks = this.container.querySelectorAll('input[data-type]') as NodeListOf<HTMLInputElement>;
+    this.subtypeChecks = this.container.querySelectorAll('input[data-subtype]') as NodeListOf<HTMLInputElement>;
+    this.boxChecks = this.container.querySelectorAll('input[data-box-id]') as NodeListOf<HTMLInputElement>;
+    this.rootIdInput = this.container.querySelector('input[data-root]') as HTMLInputElement;
+    this.parentIdInput = this.container.querySelector('input[data-parent]') as HTMLInputElement;
+    this.pathLikeInput = this.container.querySelector('input[data-path]') as HTMLInputElement;
+    this.contentLikeInput = this.container.querySelector('input[data-content]') as HTMLInputElement;
+    this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
+    this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
+    this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
+    this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
+    this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
+    this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
+    this.orderFieldSel = this.container.querySelector('select[data-order-field]') as HTMLSelectElement;
+    this.orderDirSel = this.container.querySelector('select[data-order-dir]') as HTMLSelectElement;
+    this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
 
-  this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
-  this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
-  this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
-  this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
+    this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
+    this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
+    this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
+    this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
 
-        // 事件
-        const changeInputs = this.container.querySelectorAll('input, select');
-        changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
+    // 事件
+    const changeInputs = this.container.querySelectorAll('input, select');
+    changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
     this.copyBtn.addEventListener('click', () => this.copySql());
     this.resetBtn.addEventListener('click', () => this.resetForm());
 
@@ -240,149 +240,166 @@ export class VisualSqlUI {
         this.actionsEl.insertBefore(btn, insertBeforeEl);
       }
     }
+  }
+
+  private rebuildSql() {
+    // 重建 builder
+    this.builder = new VisualSqlBuilder('embedded');
+
+    // 基础条件
+    const types = Array.from(this.typeChecks).filter(c => c.checked).map(c => c.value as BlockType);
+    const subtypes = Array.from(this.subtypeChecks).filter(c => c.checked).map(c => c.value);
+
+    this.builder.byTypes(types).bySubtypes(subtypes);
+    const boxes = Array.from(this.boxChecks).filter(c => c.checked).map(c => c.value);
+    if (boxes.length) {
+      this.builder.addFilter({ field: 'box', op: 'in', value: boxes });
+    }
+    this.builder.inDoc(this.rootIdInput.value.trim());
+    this.builder.parentIs(this.parentIdInput.value.trim());
+    const pathLike = this.smartLike(this.pathLikeInput.value);
+    const contentLike = this.smartLike(this.contentLikeInput.value);
+    const mdLike = this.smartLike(this.mdLikeInput.value);
+    const hpathLike = this.smartLike(this.hpathLikeInput?.value);
+    const ialLike = this.smartLike(this.ialLikeInput?.value);
+    if (pathLike) this.builder.pathLike(pathLike);
+    if (contentLike) this.builder.contentLike(contentLike);
+    if (mdLike) this.builder.markdownLike(mdLike);
+    if (hpathLike) this.builder.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
+    if (ialLike) this.builder.addFilter({ field: 'ial', op: 'like', value: ialLike });
+    const tagRaw = (this.tagInput.value || '').trim();
+    const tag = tagRaw.replace(/^#+/, ''); // 去除开头的 #，避免重复
+    this.builder.hasTag(tag);
+    this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
+    this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
+
+    // 排序
+    const orderExpr = this.orderFieldSel.value;
+    const orderDir = this.orderDirSel.value as OrderDir;
+    if (orderExpr) {
+      // random() 不需要方向
+      if (orderExpr === 'random()') this.builder.addOrder('random()');
+      else this.builder.addOrder(orderExpr, orderDir);
     }
 
-    private rebuildSql() {
-        // 重建 builder
-        this.builder = new VisualSqlBuilder('embedded');
+    // limit
+    const limit = this.limitInput.value ? Number(this.limitInput.value) : undefined;
+    this.builder.setLimit(limit);
 
-        // 基础条件
-        const types = Array.from(this.typeChecks).filter(c => c.checked).map(c => c.value as BlockType);
-        const subtypes = Array.from(this.subtypeChecks).filter(c => c.checked).map(c => c.value);
+    const sql = this.builder.compile();
+    this.outputPre.textContent = sql;
+    this.opts.onSqlChange?.(sql);
+    this.saveState();
+  }
 
-        this.builder.byTypes(types).bySubtypes(subtypes);
-        const boxes = Array.from(this.boxChecks).filter(c => c.checked).map(c => c.value);
-        if (boxes.length) {
-            this.builder.addFilter({ field: 'box', op: 'in', value: boxes });
-        }
-        this.builder.inDoc(this.rootIdInput.value.trim());
-        this.builder.parentIs(this.parentIdInput.value.trim());
-        const pathLike = this.smartLike(this.pathLikeInput.value);
-        const contentLike = this.smartLike(this.contentLikeInput.value);
-        const mdLike = this.smartLike(this.mdLikeInput.value);
-        const hpathLike = this.smartLike(this.hpathLikeInput?.value);
-        const ialLike = this.smartLike(this.ialLikeInput?.value);
-        if (pathLike) this.builder.pathLike(pathLike);
-        if (contentLike) this.builder.contentLike(contentLike);
-        if (mdLike) this.builder.markdownLike(mdLike);
-        if (hpathLike) this.builder.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
-        if (ialLike) this.builder.addFilter({ field: 'ial', op: 'like', value: ialLike });
-        const tagRaw = (this.tagInput.value || '').trim();
-        const tag = tagRaw.replace(/^#+/, ''); // 去除开头的 #，避免重复
-        this.builder.hasTag(tag);
-        this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
-        this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
+  // 智能添加 %：
+  // - 空值返回 undefined（不参与条件）
+  // - 若已包含 % 或 _（LIKE 通配符），则按用户输入原样使用
+  // - 否则自动包裹为 %值%
+  private smartLike(v: string | undefined | null): string | undefined {
+    const val = (v ?? '').trim();
+    if (!val) return undefined;
+    if (/[%_]/.test(val)) return val;
+    return `%${val}%`;
+  }
 
-        // 排序
-        const orderExpr = this.orderFieldSel.value;
-        const orderDir = this.orderDirSel.value as OrderDir;
-        if (orderExpr) {
-            // random() 不需要方向
-            if (orderExpr === 'random()') this.builder.addOrder('random()');
-            else this.builder.addOrder(orderExpr, orderDir);
-        }
-
-        // limit
-        const limit = this.limitInput.value ? Number(this.limitInput.value) : undefined;
-        this.builder.setLimit(limit);
-
-        const sql = this.builder.compile();
-        this.outputPre.textContent = sql;
-        this.opts.onSqlChange?.(sql);
-  this.saveState();
+  private async copySql() {
+    const sql = this.outputPre.textContent || '';
+    try {
+      await navigator.clipboard.writeText(sql);
+      this.toast('已复制 SQL 到剪贴板');
+    } catch {
+      // 兼容不支持 clipboard 的环境
+      const ta = document.createElement('textarea');
+      ta.value = sql;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      this.toast('已复制 SQL（兼容模式）');
     }
+  }
 
-    // 智能添加 %：
-    // - 空值返回 undefined（不参与条件）
-    // - 若已包含 % 或 _（LIKE 通配符），则按用户输入原样使用
-    // - 否则自动包裹为 %值%
-    private smartLike(v: string | undefined | null): string | undefined {
-        const val = (v ?? '').trim();
-        if (!val) return undefined;
-        if (/[%_]/.test(val)) return val;
-        return `%${val}%`;
-    }
+  private resetForm() {
+    // 简单重置：清空所有 input/select 的值与勾选
+    const els = this.container.querySelectorAll('input, select');
+    els.forEach((el: any) => {
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        el.checked = false;
+      } else if (el.tagName === 'SELECT') {
+        el.selectedIndex = 0;
+      } else {
+        el.value = '';
+      }
+    });
+    this.rebuildSql();
+  }
 
-    private async copySql() {
-        const sql = this.outputPre.textContent || '';
-        try {
-            await navigator.clipboard.writeText(sql);
-            this.toast('已复制 SQL 到剪贴板');
-        } catch {
-            // 兼容不支持 clipboard 的环境
-            const ta = document.createElement('textarea');
-            ta.value = sql;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            this.toast('已复制 SQL（兼容模式）');
-        }
-    }
+  private toast(msg: string) {
+    const tip = document.createElement('div');
+    tip.textContent = msg;
+    tip.style.cssText = 'position:fixed; right:16px; bottom:16px; background:#323232; color:#fff; padding:8px 12px; border-radius:4px; z-index:9999; opacity:0; transition:opacity .2s';
+    document.body.appendChild(tip);
+    requestAnimationFrame(() => tip.style.opacity = '1');
+    setTimeout(() => {
+      tip.style.opacity = '0';
+      setTimeout(() => tip.remove(), 200);
+    }, 1200);
+  }
 
-    private resetForm() {
-        // 简单重置：清空所有 input/select 的值与勾选
-        const els = this.container.querySelectorAll('input, select');
-        els.forEach((el: any) => {
-            if (el.type === 'checkbox' || el.type === 'radio') {
-                el.checked = false;
-            } else if (el.tagName === 'SELECT') {
-                el.selectedIndex = 0;
-            } else {
-                el.value = '';
-            }
-        });
-        this.rebuildSql();
-    }
+  private injectStyles() {
+    const STYLE_ID = 'visual-sql-ui-style';
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      /* 将 VS UI 变量映射到思源主题变量 */
+      .vsb-wrap{
+        --vsb-fg: var(--b3-theme-on-background);
+        --vsb-muted: var(--b3-theme-on-surface);
+        --vsb-border: var(--b3-border-color);
+        --vsb-surface: var(--b3-theme-surface);
+        --vsb-input-bg: var(--b3-theme-background);
+        --vsb-input-border: var(--b3-border-color);
+        --vsb-seg-bg: var(--b3-theme-background-light);
+        --vsb-chip-bg: var(--b3-theme-background);
+        --vsb-primary: var(--b3-theme-primary);
+        --vsb-on-primary: var(--b3-theme-on-primary);
+        font-family: var(--b3-font-family);
+        font-size: var(--b3-font-size);
+        line-height: 1.5;
+        color: var(--vsb-fg);
+      }
 
-    private toast(msg: string) {
-        const tip = document.createElement('div');
-        tip.textContent = msg;
-        tip.style.cssText = 'position:fixed; right:16px; bottom:16px; background:#323232; color:#fff; padding:8px 12px; border-radius:4px; z-index:9999; opacity:0; transition:opacity .2s';
-        document.body.appendChild(tip);
-        requestAnimationFrame(() => tip.style.opacity = '1');
-        setTimeout(() => {
-            tip.style.opacity = '0';
-            setTimeout(() => tip.remove(), 200);
-        }, 1200);
-    }
-
-    private injectStyles() {
-        const STYLE_ID = 'visual-sql-ui-style';
-        if (document.getElementById(STYLE_ID)) return;
-        const style = document.createElement('style');
-        style.id = STYLE_ID;
-        style.textContent = `
-      .vsb-wrap{font:12.5px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"; color: var(--vsb-fg, #1f2328)}
       .vsb-header{display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:8px}
       .vsb-title{font-weight:600; font-size:13px}
-      .vsb-card{border:1px solid var(--vsb-border,#e5e7eb); padding:10px; border-radius:8px; background: var(--vsb-surface,#ffffff); box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom:10px}
-      .vsb-legend{font-weight:600; color: var(--vsb-muted,#4b5563);}
+      .vsb-card{border:1px solid var(--vsb-border); padding:10px; border-radius:8px; background: var(--vsb-surface); box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom:10px}
+      .vsb-legend{font-weight:600; color: var(--vsb-muted);}
       .vsb-grid{display:grid; gap:8px}
       .vsb-grid-4{grid-template-columns: repeat(4, minmax(160px,1fr))}
       .vsb-grid-3{grid-template-columns: repeat(3, minmax(200px,1fr))}
-      .vsb-field{display:grid; gap:4px; font-size:12px; color: var(--vsb-muted,#4b5563)}
-      .vsb-input{appearance:none; border:1px solid var(--vsb-input-border,#d0d7de); background: var(--vsb-input-bg,#fff); color: var(--vsb-fg,#1f2328); border-radius:6px; padding:6px 8px; outline:none}
-      .vsb-input:focus{border-color:#4f46e5; box-shadow:0 0 0 2px rgba(79,70,229,.15)}
-      .vsb-input::placeholder{color:#9ca3af}
-      .vsb-seg{display:flex; gap:6px; background: var(--vsb-seg-bg,#f3f4f6); padding:4px; border-radius:10px; border:1px solid var(--vsb-border,#e5e7eb)}
+      .vsb-field{display:grid; gap:4px; font-size:12px; color: var(--vsb-muted)}
+      .vsb-input{appearance:none; border:1px solid var(--vsb-input-border); background: var(--vsb-input-bg); color: var(--vsb-fg); border-radius:6px; padding:6px 8px; outline:none}
+      .vsb-input:focus{border-color: var(--vsb-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
+      .vsb-input::placeholder{color: var(--b3-theme-on-surface-light)}
+      .vsb-seg{display:flex; gap:6px; background: var(--vsb-seg-bg); padding:4px; border-radius:10px; border:1px solid var(--vsb-border)}
       .vsb-seg-item{position:relative}
       .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
-      .vsb-seg-item span{display:inline-block; padding:6px 10px; border-radius:8px; cursor:pointer; color:#374151}
-      .vsb-seg-item input:checked + span{background:#111827; color:#fff}
+      .vsb-seg-item span{display:inline-block; padding:6px 10px; border-radius:8px; cursor:pointer; color: var(--vsb-fg)}
+      .vsb-seg-item input:checked + span{background: var(--vsb-primary); color: var(--vsb-on-primary)}
       .vsb-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px}
       .vsb-chip{position:relative}
       .vsb-chip input{position:absolute; opacity:0; pointer-events:none}
-      .vsb-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--vsb-border,#e5e7eb); color:#374151; background: var(--vsb-chip-bg,#fff); cursor:pointer; transition:.15s}
-      .vsb-chip input:checked + span{background:#111827; border-color:#111827; color:#fff}
+      .vsb-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--vsb-border); color: var(--vsb-fg); background: var(--vsb-chip-bg); cursor:pointer; transition:.15s}
+      .vsb-chip input:checked + span{background: var(--vsb-primary); border-color: var(--vsb-primary); color: var(--vsb-on-primary)}
       .vsb-checkbox{align-items:center}
       .vsb-actions{display:flex; gap:8px; align-items:center; margin: 6px 0 10px}
-      .vsb-btn{appearance:none; border:1px solid var(--vsb-border,#e5e7eb); background:#fff; color:#111827; padding:6px 10px; line-height:1; border-radius:6px; cursor:pointer; transition:.15s}
-      .vsb-btn:hover{background:#f9fafb}
-      .vsb-btn.vsb-primary{background:#111827; color:#fff; border-color:#111827}
+      .vsb-btn{appearance:none; border:1px solid var(--vsb-border); background: var(--b3-theme-background); color: var(--vsb-fg); padding:6px 10px; line-height:1; border-radius:6px; cursor:pointer; transition:.15s}
+      .vsb-btn:hover{background: var(--b3-list-hover)}
+      .vsb-btn.vsb-primary{background: var(--vsb-primary); color: var(--vsb-on-primary); border-color: var(--vsb-primary)}
       .vsb-btn.vsb-primary:hover{filter:brightness(1.05)}
       .vsb-btn.vsb-ghost{background:transparent}
-      .vsb-output{white-space:pre-wrap; background:#0b1021; color:#e8eaf6; padding:10px; border-radius:8px; overflow:auto; max-height:260px; border:1px solid #11182722; font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size:11px}
+      .vsb-output{white-space:pre-wrap; background: var(--b3-protyle-code-background, var(--b3-theme-background)); color: var(--b3-theme-on-surface); padding:10px; border-radius:8px; overflow:auto; max-height:260px; border:1px solid var(--b3-border-color); font-family: var(--b3-font-family-code, ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace); font-size:11px}
       details.vsb-card summary{cursor:pointer; list-style:none}
       details.vsb-card summary::marker, details.vsb-card summary::-webkit-details-marker{display:none}
       details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
@@ -404,31 +421,15 @@ export class VisualSqlUI {
         .vsb-chips{gap:4px}
         .vsb-title{font-size:12px}
       }
-  /* 允许通过容器 class 手动触发紧凑布局（与媒体查询互补） */
-  .vsb-compact .vsb-grid-4, .vsb-compact .vsb-grid-3{grid-template-columns: 1fr}
-  .vsb-compact .vsb-header{flex-direction:column; align-items:flex-start; gap:6px}
-  .vsb-compact .vsb-actions .vsb-btn{flex:1; min-width:0}
-  .vsb-compact .vsb-chips{gap:4px}
-  .vsb-compact .vsb-title{font-size:12px}
-      @media (prefers-color-scheme: dark){
-        .vsb-wrap{color:#e5e7eb}
-        .vsb-card{background:#161b22; border-color:#2d333b; box-shadow: none}
-        .vsb-legend{color:#9aa4b2}
-        .vsb-input{background:#0d1117; border-color:#30363d; color:#e5e7eb}
-        .vsb-input::placeholder{color:#6b7280}
-        .vsb-seg{background:#0d1117; border-color:#30363d}
-        .vsb-seg-item span{color:#cbd5e1}
-        .vsb-seg-item input:checked + span{background:#2563eb}
-        .vsb-chip span{background:#0d1117; border-color:#30363d; color:#cbd5e1}
-        .vsb-chip input:checked + span{background:#2563eb; border-color:#2563eb}
-        .vsb-btn{background:#0d1117; color:#e5e7eb; border-color:#30363d}
-        .vsb-btn:hover{background:#111827}
-        .vsb-btn.vsb-primary{background:#2563eb; border-color:#2563eb}
-        .vsb-output{background:#0b1021; border-color:#30363d}
-      }
+      /* 允许通过容器 class 手动触发紧凑布局（与媒体查询互补） */
+      .vsb-compact .vsb-grid-4, .vsb-compact .vsb-grid-3{grid-template-columns: 1fr}
+      .vsb-compact .vsb-header{flex-direction:column; align-items:flex-start; gap:6px}
+      .vsb-compact .vsb-actions .vsb-btn{flex:1; min-width:0}
+      .vsb-compact .vsb-chips{gap:4px}
+      .vsb-compact .vsb-title{font-size:12px}
     `;
-        document.head.appendChild(style);
-    }
+    document.head.appendChild(style);
+  }
 
   // ========== 持久化 ==========
   private saveState() {
