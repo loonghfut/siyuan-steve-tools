@@ -1,5 +1,6 @@
 // 可视化 SQL 生成器 UI：通过传入容器元素挂载渲染（仅 embedded 模式）
 import { VisualSqlBuilder, BlockType, OrderDir } from './visual-sql-builder';
+import { VisualSqlAdvancedUI } from './visual-sql-advanced-ui';
 import { getalltages } from '@/api/api3';
 
 export interface VisualSqlUIButton {
@@ -39,9 +40,15 @@ export class VisualSqlUI {
   private mdLikeInput!: HTMLInputElement;
   private hpathLikeInput!: HTMLInputElement;
   private ialLikeInput!: HTMLInputElement;
-  private tagInput!: HTMLSelectElement;
+  private tagInput!: HTMLInputElement; // 使用带 datalist 的单一输入
+  private tagsDatalist!: HTMLDataListElement;
+  private recentTagsKey = 'siyuan-steve-tools:recent-tags';
   private createdDaysInput!: HTMLInputElement;
   private updatedDaysInput!: HTMLInputElement;
+  private createdOpSel!: HTMLSelectElement;
+  private createdAtInput!: HTMLInputElement;
+  private updatedOpSel!: HTMLSelectElement;
+  private updatedAtInput!: HTMLInputElement;
   private orderFieldSel!: HTMLSelectElement;
   private orderDirSel!: HTMLSelectElement;
   private limitInput!: HTMLInputElement;
@@ -50,6 +57,7 @@ export class VisualSqlUI {
   private copyBtn!: HTMLButtonElement;
   private resetBtn!: HTMLButtonElement;
   private actionsEl!: HTMLElement;
+  private advSqlFragment: string = '';
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
     this.container = container;
@@ -146,9 +154,8 @@ export class VisualSqlUI {
               </div>
             </div>
             <label class="vsb-field">tag 包含
-              <select class="vsb-input" data-tag>
-                <option value="">全部</option>
-              </select>
+              <input class="vsb-input" data-tag list="vsb-tags-list" placeholder="选择或搜索标签" />
+              <datalist id="vsb-tags-list"></datalist>
             </label>
             <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
             <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
@@ -167,6 +174,26 @@ export class VisualSqlUI {
 
             <label class="vsb-field">created 近 N 天<input class="vsb-input" data-created-days type="number" min="0" value="0"/></label>
             <label class="vsb-field">updated 近 N 天<input class="vsb-input" data-updated-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">created 时间比较
+              <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px;">
+                <select class="vsb-input" data-created-op style="width:84px;">
+                  <option value=">">></option>
+                  <option value="<"><</option>
+                </select>
+                <input class="vsb-input" data-created-at type="datetime-local" style="min-width:200px;" />
+              </div>
+              <div style="font-size:11px; color:var(--vsb-muted)">若设置了具体时间，将优先生效（覆盖“近 N 天”）</div>
+            </label>
+            <label class="vsb-field">updated 时间比较
+              <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px;">
+                <select class="vsb-input" data-updated-op style="width:84px;">
+                  <option value=">">></option>
+                  <option value="<"><</option>
+                </select>
+                <input class="vsb-input" data-updated-at type="datetime-local" style="min-width:200px;" />
+              </div>
+              <div style="font-size:11px; color:var(--vsb-muted)">若设置了具体时间，将优先生效（覆盖“近 N 天”）</div>
+            </label>
             <label class="vsb-field">排序字段
               <select class="vsb-input" data-order-field>
                 <option value="">不排序</option>
@@ -186,7 +213,9 @@ export class VisualSqlUI {
           </div>
         </details>
 
+
         <div class="vsb-actions">
+          <button class="vsb-btn" data-adv-open>高级筛选</button>
           <button class="vsb-btn" data-copy>复制 SQL</button>
           <button class="vsb-btn vsb-ghost" data-reset>重置</button>
         </div>
@@ -206,26 +235,39 @@ export class VisualSqlUI {
     this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
     this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
     this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
-  this.tagInput = this.container.querySelector('select[data-tag]') as HTMLSelectElement;
+  this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
+    this.tagsDatalist = this.container.querySelector('#vsb-tags-list') as HTMLDataListElement;
     this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
     this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
+    this.createdOpSel = this.container.querySelector('select[data-created-op]') as HTMLSelectElement;
+    this.createdAtInput = this.container.querySelector('input[data-created-at]') as HTMLInputElement;
+    this.updatedOpSel = this.container.querySelector('select[data-updated-op]') as HTMLSelectElement;
+    this.updatedAtInput = this.container.querySelector('input[data-updated-at]') as HTMLInputElement;
     this.orderFieldSel = this.container.querySelector('select[data-order-field]') as HTMLSelectElement;
     this.orderDirSel = this.container.querySelector('select[data-order-dir]') as HTMLSelectElement;
     this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
 
-    this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
+  this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
-    this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
+  this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
+  const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
 
-  // 异步加载标签下拉
+
+    // 异步加载标签下拉
   this.populateTags();
 
   // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
     changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
-    this.copyBtn.addEventListener('click', () => this.copySql());
-    this.resetBtn.addEventListener('click', () => this.resetForm());
+    this.tagInput.addEventListener('change', () => {
+      const v = (this.tagInput.value || '').trim();
+      if (v) this.pushRecentTags([v]);
+    });
+  this.copyBtn.addEventListener('click', () => this.copySql());
+  this.resetBtn.addEventListener('click', () => this.resetForm());
+  advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
+
 
     // 渲染自定义按钮（如有）
     if (Array.isArray(this.opts.buttons) && this.opts.buttons.length && this.actionsEl) {
@@ -278,8 +320,21 @@ export class VisualSqlUI {
   const tagRaw = (this.tagInput.value || '').trim();
     const tag = tagRaw.replace(/^#+/, ''); // 去除开头的 #，避免重复
     this.builder.hasTag(tag);
-    this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
-    this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
+    // 时间：若设置了具体时间比较，则优先使用；否则使用“近 N 天”
+    const createdAt = (this.createdAtInput?.value || '').trim();
+    if (createdAt) {
+      const ts = this.datetimeLocalToTS(createdAt);
+      if (ts) this.builder.addFilter({ field: 'created', op: this.createdOpSel?.value || '>', value: ts });
+    } else {
+      this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
+    }
+    const updatedAt = (this.updatedAtInput?.value || '').trim();
+    if (updatedAt) {
+      const ts = this.datetimeLocalToTS(updatedAt);
+      if (ts) this.builder.addFilter({ field: 'updated', op: this.updatedOpSel?.value || '>', value: ts });
+    } else {
+      this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
+    }
 
     // 排序
     const orderExpr = this.orderFieldSel.value;
@@ -293,6 +348,11 @@ export class VisualSqlUI {
     // limit
     const limit = this.limitInput.value ? Number(this.limitInput.value) : undefined;
     this.builder.setLimit(limit);
+
+    // 附加高级筛选片段（来自独立高级筛选页面/组件）
+    if (this.advSqlFragment && this.advSqlFragment.trim()) {
+      this.builder.addFilter({ rawSql: this.advSqlFragment.trim() });
+    }
 
     const sql = this.builder.compile();
     this.outputPre.textContent = sql;
@@ -309,6 +369,14 @@ export class VisualSqlUI {
     if (!val) return undefined;
     if (/[%_]/.test(val)) return val;
     return `%${val}%`;
+  }
+
+  // 将 datetime-local 值转换为 YYYYMMDDHHMMSS 字符串
+  private datetimeLocalToTS(v: string): string {
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return '';
+    const [_, y, mo, d, h, mi, se] = m;
+    return `${y}${mo}${d}${h}${mi}${se ?? '00'}`;
   }
 
   private async copySql() {
@@ -412,6 +480,10 @@ export class VisualSqlUI {
       details.vsb-card summary::marker, details.vsb-card summary::-webkit-details-marker{display:none}
       details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
 
+  /* Tag 搜索输入（datalist 绑定）配色适配 */
+  input.vsb-input[data-tag]{ background: var(--vsb-input-bg); color: var(--vsb-fg); caret-color: var(--vsb-primary); }
+  input.vsb-input[data-tag]::placeholder{ color: var(--b3-theme-on-surface-light); }
+
       /* 响应式布局 */
       @media (max-width: 1280px){
         .vsb-grid-4{grid-template-columns: repeat(3, minmax(160px,1fr))}
@@ -457,9 +529,14 @@ export class VisualSqlUI {
         tag: this.tagInput?.value ?? '',
         createdDays: this.createdDaysInput?.value ?? '',
         updatedDays: this.updatedDaysInput?.value ?? '',
+  createdOp: this.createdOpSel?.value ?? '>',
+  createdAt: this.createdAtInput?.value ?? '',
+  updatedOp: this.updatedOpSel?.value ?? '>',
+  updatedAt: this.updatedAtInput?.value ?? '',
         orderField: this.orderFieldSel?.value ?? '',
         orderDir: this.orderDirSel?.value ?? 'desc',
-        limit: this.limitInput?.value ?? ''
+  limit: this.limitInput?.value ?? '',
+  advSqlFragment: this.advSqlFragment || ''
       };
       localStorage.setItem(this.storageKey, JSON.stringify(state));
     } catch (e) {
@@ -496,43 +573,111 @@ export class VisualSqlUI {
   if (this.tagInput) this.tagInput.value = s?.tag ?? '';
       if (this.createdDaysInput) this.createdDaysInput.value = String(s?.createdDays ?? '');
       if (this.updatedDaysInput) this.updatedDaysInput.value = String(s?.updatedDays ?? '');
+  if (this.createdOpSel) this.createdOpSel.value = s?.createdOp ?? '>';
+  if (this.createdAtInput) this.createdAtInput.value = s?.createdAt ?? '';
+  if (this.updatedOpSel) this.updatedOpSel.value = s?.updatedOp ?? '>';
+  if (this.updatedAtInput) this.updatedAtInput.value = s?.updatedAt ?? '';
       if (this.orderFieldSel) this.orderFieldSel.value = s?.orderField ?? '';
       if (this.orderDirSel) this.orderDirSel.value = s?.orderDir ?? 'desc';
-      if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
+  if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
+  this.advSqlFragment = s?.advSqlFragment || '';
+
     } catch (e) {
       console.debug('[VisualSqlUI] restoreState failed', e);
     }
   }
 
+  //（高级模式已迁移至独立页面/组件）
+
   // 加载标签并填充到下拉框
   private async populateTags() {
     try {
       const tags = await getalltages();
-      if (!this.tagInput) return;
-  // 清空并恢复默认“全部”
-      this.tagInput.innerHTML = '';
-      const defaultOpt = document.createElement('option');
-      defaultOpt.value = '';
-      defaultOpt.textContent = '全部';
-      this.tagInput.appendChild(defaultOpt);
-
-      // 追加标签选项
-      for (const t of tags) {
+      if (!this.tagInput || !this.tagsDatalist) return;
+      const ordered = this.orderTagsWithRecents(tags);
+      this.tagsDatalist.innerHTML = '';
+      for (const t of ordered) {
         const opt = document.createElement('option');
         opt.value = t;
-        opt.textContent = t;
-        this.tagInput.appendChild(opt);
+        this.tagsDatalist.appendChild(opt);
       }
     } catch (e) {
-      // 失败时提供降级提示
-      if (this.tagInput) {
-        this.tagInput.innerHTML = '';
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = '无可用标签';
-        this.tagInput.appendChild(opt);
-      }
+      // 静默失败：保持 datalist 为空
       console.debug('[VisualSqlUI] populateTags failed', e);
     }
+  }
+
+  private getRecentTags(): string[] {
+    try {
+      const raw = localStorage.getItem(this.recentTagsKey);
+      const arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(x => typeof x === 'string') : [];
+    } catch { return []; }
+  }
+  private pushRecentTags(tags: string[]) {
+    if (!Array.isArray(tags) || !tags.length) return;
+    const cur = this.getRecentTags();
+    const set = new Set<string>();
+    const merged = [...tags, ...cur].filter(t => { if (set.has(t)) return false; set.add(t); return true; });
+    localStorage.setItem(this.recentTagsKey, JSON.stringify(merged.slice(0, 20)));
+  }
+  private orderTagsWithRecents(all: string[]): string[] {
+    const rec = this.getRecentTags();
+    const inAll = rec.filter(r => all.includes(r));
+    const rest = all.filter(a => !inAll.includes(a));
+    return [...inAll, ...rest];
+  }
+
+  // ===== 高级筛选弹窗 =====
+  private openAdvancedModal() {
+    // 注入一次简单样式
+    const STYLE_ID = 'visual-sql-adv-modal-style';
+    if (!document.getElementById(STYLE_ID)) {
+      const st = document.createElement('style');
+      st.id = STYLE_ID;
+      st.textContent = `
+        .vsb-modal-mask{position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:9999}
+        .vsb-modal{width:min(880px, 92vw); max-height:86vh; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); display:flex; flex-direction:column}
+        .vsb-modal-header{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--b3-border-color)}
+        .vsb-modal-title{font-weight:600}
+        .vsb-modal-body{padding:12px; overflow:auto}
+        .vsb-modal-footer{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid var(--b3-border-color)}
+      `;
+      document.head.appendChild(st);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'vsb-modal-mask';
+    const dialog = document.createElement('div');
+    dialog.className = 'vsb-modal';
+    dialog.innerHTML = `
+      <div class="vsb-modal-header">
+        <div class="vsb-modal-title">高级筛选</div>
+        <button class="vsb-btn vsb-ghost" data-close>×</button>
+      </div>
+      <div class="vsb-modal-body"><div data-adv-container></div></div>
+      <div class="vsb-modal-footer">
+        <button class="vsb-btn" data-apply>应用</button>
+        <button class="vsb-btn vsb-ghost" data-cancel>取消</button>
+      </div>
+    `;
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    const advContainer = dialog.querySelector('[data-adv-container]') as HTMLElement;
+    let frag = this.advSqlFragment;
+    new VisualSqlAdvancedUI(advContainer, {
+      persistKey: 'siyuan-steve-tools:visual-sql-advanced-ui',
+      onChangeSql: (f) => { frag = f; }
+    });
+
+    const close = () => overlay.remove();
+    (dialog.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', close);
+    (dialog.querySelector('[data-cancel]') as HTMLButtonElement).addEventListener('click', close);
+    (dialog.querySelector('[data-apply]') as HTMLButtonElement).addEventListener('click', () => {
+      this.advSqlFragment = frag || '';
+      this.rebuildSql();
+      close();
+    });
   }
 }
