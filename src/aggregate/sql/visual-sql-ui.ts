@@ -159,7 +159,7 @@ export class VisualSqlUI {
             </label>
             <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
             <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
-            <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" placeholder="默认64（未指定）"/></label>
+            <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" max="999" placeholder="默认64（未指定，最大999）"/></label>
           </div>
         </fieldset>
 
@@ -343,8 +343,15 @@ export class VisualSqlUI {
       else this.builder.addOrder(orderExpr, orderDir);
     }
 
-    // limit
-    const limit = this.limitInput.value ? Number(this.limitInput.value) : undefined;
+    // limit（最大 999）
+    let limit: number | undefined = this.limitInput.value ? Number(this.limitInput.value) : undefined;
+    if (limit !== undefined && !Number.isNaN(limit)) {
+      if (limit > 999) {
+        limit = 999;
+        // 反馈到 UI，避免与实际使用不一致
+        this.limitInput.value = '999';
+      }
+    }
     this.builder.setLimit(limit);
 
     // 附加高级筛选片段（来自独立高级筛选页面/组件）
