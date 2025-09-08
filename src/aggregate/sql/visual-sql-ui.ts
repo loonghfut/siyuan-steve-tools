@@ -1,5 +1,6 @@
 // 可视化 SQL 生成器 UI：通过传入容器元素挂载渲染（仅 embedded 模式）
 import { VisualSqlBuilder, BlockType, OrderDir } from './visual-sql-builder';
+import { getalltages } from '@/api/api3';
 
 export interface VisualSqlUIButton {
   label: string; // 按钮文本
@@ -38,7 +39,7 @@ export class VisualSqlUI {
   private mdLikeInput!: HTMLInputElement;
   private hpathLikeInput!: HTMLInputElement;
   private ialLikeInput!: HTMLInputElement;
-  private tagInput!: HTMLInputElement;
+  private tagInput!: HTMLSelectElement;
   private createdDaysInput!: HTMLInputElement;
   private updatedDaysInput!: HTMLInputElement;
   private orderFieldSel!: HTMLSelectElement;
@@ -144,7 +145,11 @@ export class VisualSqlUI {
       })()}
               </div>
             </div>
-            <label class="vsb-field">tag 包含<input class="vsb-input" data-tag type="text" placeholder="标签名（无 #）"/></label>
+            <label class="vsb-field">tag 包含
+              <select class="vsb-input" data-tag>
+                <option value="">全部</option>
+              </select>
+            </label>
             <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
             <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
             <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" placeholder="默认64（未指定）"/></label>
@@ -201,7 +206,7 @@ export class VisualSqlUI {
     this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
     this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
     this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
-    this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
+  this.tagInput = this.container.querySelector('select[data-tag]') as HTMLSelectElement;
     this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
     this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
     this.orderFieldSel = this.container.querySelector('select[data-order-field]') as HTMLSelectElement;
@@ -213,7 +218,10 @@ export class VisualSqlUI {
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
     this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
 
-    // 事件
+  // 异步加载标签下拉
+  this.populateTags();
+
+  // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
     changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
     this.copyBtn.addEventListener('click', () => this.copySql());
@@ -267,7 +275,7 @@ export class VisualSqlUI {
     if (mdLike) this.builder.markdownLike(mdLike);
     if (hpathLike) this.builder.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
     if (ialLike) this.builder.addFilter({ field: 'ial', op: 'like', value: ialLike });
-    const tagRaw = (this.tagInput.value || '').trim();
+  const tagRaw = (this.tagInput.value || '').trim();
     const tag = tagRaw.replace(/^#+/, ''); // 去除开头的 #，避免重复
     this.builder.hasTag(tag);
     this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
@@ -485,7 +493,7 @@ export class VisualSqlUI {
       if (this.mdLikeInput) this.mdLikeInput.value = s?.md ?? '';
       if (this.hpathLikeInput) this.hpathLikeInput.value = s?.hpath ?? '';
       if (this.ialLikeInput) this.ialLikeInput.value = s?.ial ?? '';
-      if (this.tagInput) this.tagInput.value = s?.tag ?? '';
+  if (this.tagInput) this.tagInput.value = s?.tag ?? '';
       if (this.createdDaysInput) this.createdDaysInput.value = String(s?.createdDays ?? '');
       if (this.updatedDaysInput) this.updatedDaysInput.value = String(s?.updatedDays ?? '');
       if (this.orderFieldSel) this.orderFieldSel.value = s?.orderField ?? '';
@@ -493,6 +501,38 @@ export class VisualSqlUI {
       if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
     } catch (e) {
       console.debug('[VisualSqlUI] restoreState failed', e);
+    }
+  }
+
+  // 加载标签并填充到下拉框
+  private async populateTags() {
+    try {
+      const tags = await getalltages();
+      if (!this.tagInput) return;
+  // 清空并恢复默认“全部”
+      this.tagInput.innerHTML = '';
+      const defaultOpt = document.createElement('option');
+      defaultOpt.value = '';
+      defaultOpt.textContent = '全部';
+      this.tagInput.appendChild(defaultOpt);
+
+      // 追加标签选项
+      for (const t of tags) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        this.tagInput.appendChild(opt);
+      }
+    } catch (e) {
+      // 失败时提供降级提示
+      if (this.tagInput) {
+        this.tagInput.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '无可用标签';
+        this.tagInput.appendChild(opt);
+      }
+      console.debug('[VisualSqlUI] populateTags failed', e);
     }
   }
 }
