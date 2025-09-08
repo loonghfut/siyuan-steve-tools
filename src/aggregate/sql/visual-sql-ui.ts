@@ -13,6 +13,11 @@ export interface VisualSqlUIButton {
 export interface VisualSqlUIOptions {
   onSqlChange?: (sql: string) => void;
   buttons?: VisualSqlUIButton[]; // 自定义按钮
+  /**
+   * 状态持久化键名。若未提供则使用默认键启用持久化。
+   * 如需隔离不同实例可传入自定义键名。
+   */
+  persistKey?: string;
 }
 
 export class VisualSqlUI {
@@ -20,6 +25,7 @@ export class VisualSqlUI {
     private opts: VisualSqlUIOptions;
     private builder: VisualSqlBuilder;
   private resizeRaf?: number;
+  private storageKey?: string;
 
     // 控件引用
     private typeChecks!: NodeListOf<HTMLInputElement>;
@@ -48,8 +54,11 @@ export class VisualSqlUI {
         this.container = container;
         this.opts = options || {};
         this.builder = new VisualSqlBuilder('embedded');
+  this.storageKey = this.opts.persistKey ?? 'siyuan-steve-tools:visual-sql-ui';
         this.render();
-        this.rebuildSql();
+  // 恢复上次状态并生成 SQL
+  this.restoreState();
+  this.rebuildSql();
     }
 
   /**
@@ -280,6 +289,7 @@ export class VisualSqlUI {
         const sql = this.builder.compile();
         this.outputPre.textContent = sql;
         this.opts.onSqlChange?.(sql);
+  this.saveState();
     }
 
     // 智能添加 %：
@@ -419,4 +429,69 @@ export class VisualSqlUI {
     `;
         document.head.appendChild(style);
     }
+
+  // ========== 持久化 ==========
+  private saveState() {
+    if (!this.storageKey) return;
+    try {
+      const state = {
+        types: Array.from(this.typeChecks || []).filter(c => c.checked).map(c => c.value),
+        subtypes: Array.from(this.subtypeChecks || []).filter(c => c.checked).map(c => c.value),
+        boxes: Array.from(this.boxChecks || []).filter(c => c.checked).map(c => c.value),
+        rootId: this.rootIdInput?.value ?? '',
+        parentId: this.parentIdInput?.value ?? '',
+        path: this.pathLikeInput?.value ?? '',
+        content: this.contentLikeInput?.value ?? '',
+        md: this.mdLikeInput?.value ?? '',
+        hpath: this.hpathLikeInput?.value ?? '',
+        ial: this.ialLikeInput?.value ?? '',
+        tag: this.tagInput?.value ?? '',
+        createdDays: this.createdDaysInput?.value ?? '',
+        updatedDays: this.updatedDaysInput?.value ?? '',
+        orderField: this.orderFieldSel?.value ?? '',
+        orderDir: this.orderDirSel?.value ?? 'desc',
+        limit: this.limitInput?.value ?? ''
+      };
+      localStorage.setItem(this.storageKey, JSON.stringify(state));
+    } catch (e) {
+      // 忽略可能的异常（如无痕模式或配额问题）
+      console.debug('[VisualSqlUI] saveState failed', e);
+    }
+  }
+
+  private restoreState() {
+    if (!this.storageKey) return;
+    try {
+      const raw = localStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const s = JSON.parse(raw) as any;
+      if (Array.isArray(s?.types) && this.typeChecks) {
+        const set = new Set<string>(s.types);
+        this.typeChecks.forEach(c => c.checked = set.has(c.value));
+      }
+      if (Array.isArray(s?.subtypes) && this.subtypeChecks) {
+        const set = new Set<string>(s.subtypes);
+        this.subtypeChecks.forEach(c => c.checked = set.has(c.value));
+      }
+      if (Array.isArray(s?.boxes) && this.boxChecks) {
+        const set = new Set<string>(s.boxes);
+        this.boxChecks.forEach(c => c.checked = set.has(c.value));
+      }
+      if (this.rootIdInput) this.rootIdInput.value = s?.rootId ?? '';
+      if (this.parentIdInput) this.parentIdInput.value = s?.parentId ?? '';
+      if (this.pathLikeInput) this.pathLikeInput.value = s?.path ?? '';
+      if (this.contentLikeInput) this.contentLikeInput.value = s?.content ?? '';
+      if (this.mdLikeInput) this.mdLikeInput.value = s?.md ?? '';
+      if (this.hpathLikeInput) this.hpathLikeInput.value = s?.hpath ?? '';
+      if (this.ialLikeInput) this.ialLikeInput.value = s?.ial ?? '';
+      if (this.tagInput) this.tagInput.value = s?.tag ?? '';
+      if (this.createdDaysInput) this.createdDaysInput.value = String(s?.createdDays ?? '');
+      if (this.updatedDaysInput) this.updatedDaysInput.value = String(s?.updatedDays ?? '');
+      if (this.orderFieldSel) this.orderFieldSel.value = s?.orderField ?? '';
+      if (this.orderDirSel) this.orderDirSel.value = s?.orderDir ?? 'desc';
+      if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
+    } catch (e) {
+      console.debug('[VisualSqlUI] restoreState failed', e);
+    }
+  }
 }
