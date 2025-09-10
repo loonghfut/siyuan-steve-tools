@@ -481,9 +481,10 @@ export class VisualSqlUI {
       .vsb-btn.vsb-primary:hover{filter:brightness(1.05)}
       .vsb-btn.vsb-ghost{background:transparent}
       .vsb-output{white-space:pre-wrap; background: var(--b3-protyle-code-background, var(--b3-theme-background)); color: var(--b3-theme-on-surface); padding:10px; border-radius:8px; overflow:auto; max-height:260px; border:1px solid var(--b3-border-color); font-family: var(--b3-font-family-code, ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace); font-size:11px}
+      details.vsb-card{overflow:hidden; transition:max-height .4s ease; max-height:3em}
       details.vsb-card summary{cursor:pointer; list-style:none}
       details.vsb-card summary::marker, details.vsb-card summary::-webkit-details-marker{display:none}
-      details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
+      details.vsb-card[open]{max-height:1000px; box-shadow: 0 2px 5px rgba(0,0,0,.05)}
 
   /* Tag 搜索输入（datalist 绑定）配色适配 */
   input.vsb-input[data-tag]{ background: var(--vsb-input-bg); color: var(--vsb-fg); caret-color: var(--vsb-primary); }
