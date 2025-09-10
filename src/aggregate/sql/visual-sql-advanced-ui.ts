@@ -10,7 +10,7 @@ export interface AdvRuleState {
     value?: string;
 }
 
-type SavedNode = { type: 'group'; op: AdvGroup; children: SavedNode[] } | { type: 'rule'; state: AdvRuleState };
+type SavedNode = { type: 'group'; op: AdvGroup; children: SavedNode[]; collapsed?: boolean } | { type: 'rule'; state: AdvRuleState };
 
 export interface VisualSqlAdvancedUIOptions {
     persistKey?: string;
@@ -103,7 +103,7 @@ export class VisualSqlAdvancedUI {
       <label class="vsb-seg-item"><input type="radio" name="${name}" value="OR" ${initOp === 'OR' ? 'checked' : ''}/><span>OR</span></label>
     `;
 
-        // 操作按钮：添加条件 / 添加分组 / 删除分组（根分组不显示删除）
+    // 操作按钮：添加条件 / 添加分组 / 删除分组（根分组不显示删除）/ 折叠
         const btnAddRule = document.createElement('button');
         btnAddRule.className = 'vsb-btn';
         btnAddRule.textContent = '添加条件';
@@ -118,11 +118,23 @@ export class VisualSqlAdvancedUI {
         btnDel.textContent = '删除分组';
         if (isRoot) btnDel.style.display = 'none';
 
+    const btnToggle = document.createElement('button');
+    btnToggle.className = 'vsb-btn vsb-ghost';
+    btnToggle.setAttribute('data-collapse-btn', '');
+    btnToggle.textContent = '折叠';
+
+    // 预览
+    const preview = document.createElement('div');
+    preview.className = 'vsb-preview';
+    preview.setAttribute('data-preview', '');
+    preview.style.display = 'none';
+
         header.appendChild(seg);
         header.appendChild(btnAddRule);
         header.appendChild(btnAddGroup);
         header.appendChild(btnClear);
         header.appendChild(btnDel);
+    header.appendChild(btnToggle);
 
         const children = document.createElement('div');
         children.className = 'vsb-adv-children';
@@ -139,8 +151,16 @@ export class VisualSqlAdvancedUI {
         btnClear.addEventListener('click', () => { children.innerHTML = ''; this.emitSql(); });
         btnDel.addEventListener('click', () => { group.remove(); this.emitSql(); });
 
-        group.appendChild(header);
-        group.appendChild(children);
+        // 折叠/展开
+        btnToggle.addEventListener('click', () => {
+            const collapsed = !group.classList.contains('vsb-collapsed');
+            this.setGroupCollapsed(group, collapsed);
+            this.emitSql(); // 触发预览刷新与持久化
+        });
+
+    group.appendChild(header);
+    group.appendChild(children);
+    group.appendChild(preview);
         return group;
     }
 
@@ -418,7 +438,8 @@ export class VisualSqlAdvancedUI {
 
     private compileGroup(groupEl: HTMLElement): string {
         const op = this.getGroupOp(groupEl);
-        const children = Array.from(groupEl.querySelector('[data-children]')!.children) as HTMLElement[];
+        const childrenWrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement | null;
+        const children = childrenWrap ? (Array.from(childrenWrap.children) as HTMLElement[]) : [];
         const pieces: string[] = [];
         for (const el of children) {
             if (el.matches('.vsb-adv-row')) {
@@ -491,6 +512,8 @@ export class VisualSqlAdvancedUI {
     private emitSql() {
         const frag = this.getSqlFragment();
         this.saveState();
+    // 刷新所有折叠组的预览
+    this.updateAllGroupPreviews();
         this.opts.onChangeSql?.(frag);
     }
 
@@ -519,7 +542,7 @@ export class VisualSqlAdvancedUI {
 
     private serializeGroup(groupEl: HTMLElement): SavedNode {
         const op = this.getGroupOp(groupEl);
-        const childrenWrap = groupEl.querySelector('[data-children]') as HTMLElement;
+        const childrenWrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement;
         const children: SavedNode[] = [];
         for (const el of Array.from(childrenWrap.children) as HTMLElement[]) {
             if (el.matches('.vsb-adv-row')) {
@@ -533,17 +556,18 @@ export class VisualSqlAdvancedUI {
                 children.push(this.serializeGroup(el));
             }
         }
-        return { type: 'group', op, children };
+        const collapsed = groupEl.classList.contains('vsb-collapsed');
+        return { type: 'group', op, children, collapsed };
     }
 
     private hydrateGroup(groupEl: HTMLElement, saved: SavedNode) {
         // 设置组操作符
         if (saved && saved.type === 'group') {
-            const seg = groupEl.querySelector('.vsb-seg') as HTMLElement;
+            const seg = groupEl.querySelector(':scope > .vsb-adv-header .vsb-seg') as HTMLElement;
             const opVal = (saved.op === 'OR' ? 'OR' : 'AND');
             const inputs = Array.from(seg.querySelectorAll('input[type="radio"]')) as HTMLInputElement[];
             inputs.forEach(i => i.checked = (i.value === opVal));
-            const childrenWrap = groupEl.querySelector('[data-children]') as HTMLElement;
+            const childrenWrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement;
             childrenWrap.innerHTML = '';
             for (const child of (saved.children || [])) {
                 if (child.type === 'rule') {
@@ -554,9 +578,51 @@ export class VisualSqlAdvancedUI {
                     this.hydrateGroup(sub, child);
                 }
             }
+            // 恢复折叠状态
+            if ((saved as any).collapsed) {
+                this.setGroupCollapsed(groupEl, true);
+            } else {
+                this.setGroupCollapsed(groupEl, false);
+            }
         } else if (saved && saved.type === 'rule') {
-            const wrap = groupEl.querySelector('[data-children]') as HTMLElement;
+            const wrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement;
             this.addRule(wrap, saved.state);
+        }
+    }
+
+    // ===== 折叠与预览 =====
+    private setGroupCollapsed(groupEl: HTMLElement, collapsed: boolean) {
+    const children = groupEl.querySelector(':scope > [data-children]') as HTMLElement | null;
+    const preview = groupEl.querySelector(':scope > [data-preview]') as HTMLElement | null;
+    const header = groupEl.querySelector(':scope > .vsb-adv-header') as HTMLElement | null;
+    const toggleBtn = header?.querySelector('[data-collapse-btn]') as HTMLButtonElement | null;
+        if (collapsed) {
+            groupEl.classList.add('vsb-collapsed');
+            if (children) children.style.display = 'none';
+            if (preview) {
+                preview.style.display = '';
+                preview.textContent = this.getGroupPreviewSql(groupEl);
+            }
+            if (toggleBtn) toggleBtn.textContent = '展开';
+        } else {
+            groupEl.classList.remove('vsb-collapsed');
+            if (children) children.style.display = 'grid';
+            if (preview) preview.style.display = 'none';
+            if (toggleBtn) toggleBtn.textContent = '折叠';
+        }
+    }
+
+    private getGroupPreviewSql(groupEl: HTMLElement): string {
+        const body = this.compileGroup(groupEl);
+        if (!body) return '(空)';
+        return `(${body})`;
+    }
+
+    private updateAllGroupPreviews() {
+        const groups = Array.from(this.container.querySelectorAll('.vsb-adv-group.vsb-collapsed')) as HTMLElement[];
+        for (const g of groups) {
+            const preview = g.querySelector('[data-preview]') as HTMLElement | null;
+            if (preview) preview.textContent = this.getGroupPreviewSql(g);
         }
     }
 
@@ -569,6 +635,8 @@ export class VisualSqlAdvancedUI {
       .vsb-adv-wrap{ color: var(--b3-theme-on-background); font-family: var(--b3-font-family); font-size: var(--b3-font-size); }
       .vsb-adv-group{ border:1px solid var(--b3-border-color); border-radius:8px; padding:8px; background: var(--b3-theme-surface); }
       .vsb-adv-group + .vsb-adv-group{ margin-top:8px; }
+    .vsb-adv-group.vsb-collapsed{ background: var(--b3-theme-surface); }
+    .vsb-adv-group .vsb-preview{ margin-top:6px; padding:6px 8px; border-radius:6px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-background); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; border:1px dashed var(--b3-border-color); white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
       .vsb-seg{display:flex; gap:6px; background: var(--b3-theme-background-light); padding:4px; border-radius:10px; border:1px solid var(--b3-border-color)}
       .vsb-seg-item{position:relative}
       .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
