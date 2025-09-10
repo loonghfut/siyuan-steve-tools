@@ -147,22 +147,26 @@ export class VisualSqlAdvancedUI {
         // 事件
         seg.querySelectorAll('input[type="radio"]').forEach(el => el.addEventListener('change', () => this.emitSql()));
         btnAddRule.addEventListener('click', () => {
-            // 添加条目时自动展开当前分组
-            this.setGroupCollapsed(group, false);
+            // 添加条目时自动展开当前分组（禁用动画，避免抖动）
+            this.setGroupCollapsed(group, false, false);
             // 在“规则区域”内的开头插入（保持分组在前、规则在后）
-            this.addRule(children, undefined, true);
+            const row = this.addRule(children, undefined, true);
             this.reorderChildren(children);
+            // 确保新增项可见
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             this.emitSql();
         });
         btnAddGroup.addEventListener('click', () => {
-            // 添加分组时自动展开当前分组
-            this.setGroupCollapsed(group, false);
+            // 添加分组时自动展开当前分组（禁用动画，避免抖动）
+            this.setGroupCollapsed(group, false, false);
             // 将新分组插入到规则区域之前（保持所有分组集中在一起）
             const newGroup = this.createGroup(false, 'AND');
             const firstRule = Array.from(children.children).find(el => el.classList.contains('vsb-adv-row')) as HTMLElement | undefined;
             if (firstRule) children.insertBefore(newGroup, firstRule);
             else children.appendChild(newGroup);
             this.reorderChildren(children);
+            // 确保新增分组可见
+            newGroup.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             this.emitSql();
         });
         btnClear.addEventListener('click', () => { children.innerHTML = ''; this.emitSql(); });
@@ -186,7 +190,7 @@ export class VisualSqlAdvancedUI {
         return (radio?.value === 'OR' ? 'OR' : 'AND');
     }
 
-    private addRule(parentChildrenEl: HTMLElement, init?: AdvRuleState, insertAtStart: boolean = false) {
+    private addRule(parentChildrenEl: HTMLElement, init?: AdvRuleState, insertAtStart: boolean = false): HTMLElement {
         const row = document.createElement('div');
         row.className = 'vsb-adv-row';
         row.style.cssText = 'display:grid; grid-template-columns: 1.2fr 1fr 1.8fr auto; gap:6px; align-items:center;';
@@ -457,6 +461,7 @@ export class VisualSqlAdvancedUI {
         if (init?.value) {
             rebuildValueControl();
         }
+        return row;
     }
 
     // 对外：获取 SQL 片段（仅 where 条件表达式，不带 WHERE）
@@ -611,9 +616,9 @@ export class VisualSqlAdvancedUI {
             this.reorderChildren(childrenWrap);
             // 恢复折叠状态
             if ((saved as any).collapsed) {
-                this.setGroupCollapsed(groupEl, true);
+                this.setGroupCollapsed(groupEl, true, false);
             } else {
-                this.setGroupCollapsed(groupEl, false);
+                this.setGroupCollapsed(groupEl, false, false);
             }
         } else if (saved && saved.type === 'rule') {
             const wrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement;
@@ -622,24 +627,100 @@ export class VisualSqlAdvancedUI {
     }
 
     // ===== 折叠与预览 =====
-    private setGroupCollapsed(groupEl: HTMLElement, collapsed: boolean) {
+    private setGroupCollapsed(groupEl: HTMLElement, collapsed: boolean, animate: boolean = true) {
     const children = groupEl.querySelector(':scope > [data-children]') as HTMLElement | null;
     const preview = groupEl.querySelector(':scope > [data-preview]') as HTMLElement | null;
     const header = groupEl.querySelector(':scope > .vsb-adv-header') as HTMLElement | null;
     const toggleBtn = header?.querySelector('[data-collapse-btn]') as HTMLButtonElement | null;
         if (collapsed) {
             groupEl.classList.add('vsb-collapsed');
-            if (children) children.style.display = 'none';
+            if (children) {
+                if (animate) this.animateHeight(children, false); else { children.style.display = 'none'; }
+            }
             if (preview) {
-                preview.style.display = '';
                 preview.textContent = this.getGroupPreviewSql(groupEl);
+                preview.style.display = '';
+                if (animate) this.animateFade(preview, true); else { preview.style.opacity = '1'; }
             }
             if (toggleBtn) toggleBtn.textContent = '展开';
         } else {
             groupEl.classList.remove('vsb-collapsed');
-            if (children) children.style.display = 'grid';
-            if (preview) preview.style.display = 'none';
+            if (children) {
+                // 先确保显示，再做动画，避免和上一状态的预览动画竞争
+                children.style.display = 'grid';
+                if (animate) this.animateHeight(children, true);
+            }
+            if (preview) {
+                // 立即隐藏预览，避免重入时误判
+                preview.style.display = 'none';
+                preview.style.opacity = '';
+            }
             if (toggleBtn) toggleBtn.textContent = '折叠';
+        }
+    }
+
+    private animateHeight(el: HTMLElement, show: boolean) {
+        const duration = 220; // ms
+        const transition = `height ${duration}ms ease`;
+        const clear = () => {
+            el.classList.remove('is-animating');
+            el.style.transition = '';
+            el.style.height = '';
+            el.style.overflow = '';
+        };
+        const onEnd = (ev: TransitionEvent) => {
+            if (ev.target !== el || ev.propertyName !== 'height') return;
+            el.removeEventListener('transitionend', onEnd);
+            if (!show) el.style.display = 'none';
+            clear();
+        };
+        el.removeEventListener('transitionend', onEnd);
+
+        el.classList.add('is-animating');
+        el.style.transition = transition;
+        el.style.overflow = 'hidden';
+        if (show) {
+            // 准备展开
+            el.style.display = 'grid';
+            el.style.height = '0px';
+            // 强制回流后设置到目标高度
+            const target = el.scrollHeight;
+            requestAnimationFrame(() => {
+                el.addEventListener('transitionend', onEnd);
+                el.style.height = `${target}px`;
+            });
+        } else {
+            // 准备收起
+            const start = el.scrollHeight;
+            el.style.height = `${start}px`;
+            requestAnimationFrame(() => {
+                el.addEventListener('transitionend', onEnd);
+                el.style.height = '0px';
+            });
+        }
+    }
+
+    private animateFade(el: HTMLElement, show: boolean) {
+        const duration = 180; // ms
+        const prop = 'opacity';
+        const onEnd = (ev: TransitionEvent) => {
+            if (ev.target !== el || ev.propertyName !== prop) return;
+            el.removeEventListener('transitionend', onEnd);
+            if (!show) {
+                el.style.display = 'none';
+                el.style.opacity = '';
+                el.style.transition = '';
+            }
+        };
+        el.removeEventListener('transitionend', onEnd);
+        el.addEventListener('transitionend', onEnd);
+        el.style.transition = `${prop} ${duration}ms ease`;
+        if (show) {
+            el.style.display = '';
+            el.style.opacity = '0';
+            requestAnimationFrame(() => { el.style.opacity = '1'; });
+        } else {
+            requestAnimationFrame(() => { el.style.opacity = '0'; });
         }
     }
 
@@ -667,17 +748,13 @@ export class VisualSqlAdvancedUI {
             else if (n.classList.contains('vsb-adv-row')) rules.push(n);
         }
         const desired = [...groups, ...rules];
-        // 若已经有序则不动
-        let changed = false;
+        // 稳定重排：逐位对齐，不清空容器，避免抖动
         for (let i = 0; i < desired.length; i++) {
-            if (childrenWrap.children[i] !== desired[i]) { changed = true; break; }
+            const want = desired[i];
+            if (childrenWrap.children[i] !== want) {
+                childrenWrap.insertBefore(want, childrenWrap.children[i] || null);
+            }
         }
-        if (!changed) return;
-        // 重排
-        const frag = document.createDocumentFragment();
-        for (const n of desired) frag.appendChild(n);
-        childrenWrap.innerHTML = '';
-        childrenWrap.appendChild(frag);
     }
 
     private injectStyles() {
@@ -687,10 +764,23 @@ export class VisualSqlAdvancedUI {
         style.id = STYLE_ID;
         style.textContent = `
       .vsb-adv-wrap{ color: var(--b3-theme-on-background); font-family: var(--b3-font-family); font-size: var(--b3-font-size); }
-      .vsb-adv-group{ border:1px solid var(--b3-border-color); border-radius:8px; padding:8px; background: var(--b3-theme-surface); }
-      .vsb-adv-group + .vsb-adv-group{ margin-top:8px; }
-    .vsb-adv-group.vsb-collapsed{ background: var(--b3-theme-surface); }
-    .vsb-adv-group .vsb-preview{ margin-top:6px; padding:6px 8px; border-radius:6px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-background); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; border:1px dashed var(--b3-border-color); white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+    .vsb-adv-group{ border:2px solid var(--b3-border-color); border-left-width:4px; border-left-color: var(--b3-theme-primary); border-radius:8px; padding:8px; background: var(--b3-theme-surface); }
+    .vsb-adv-group + .vsb-adv-group{ margin-top:8px; }
+    /* 折叠不改变背景色阶，保持层级可视性 */
+    .vsb-adv-group.vsb-collapsed{ background: inherit; }
+    /* 层级背景色阶（使用主题常见变量，按层级轻微变化） */
+    .vsb-adv-group{ background: var(--b3-theme-surface); }
+    .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background); }
+    .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background-light); }
+    .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-surface); }
+    .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background); }
+    /* 更多层级将循环上述色阶 */
+    .vsb-adv-group .vsb-preview{ margin-top:6px; padding:6px 8px; border-radius:6px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-background); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; border:1px dashed var(--b3-border-color); white-space: normal; overflow-wrap: anywhere; word-break: break-word; transition: opacity .18s ease; }
+    /* 动画时避免抖动 */
+    .vsb-adv-children.is-animating{ will-change: height; }
+    /* 嵌套层级左侧强调条微调（仅在嵌套的组中改变色调） */
+    .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-primary-lighter, var(--b3-theme-primary)); }
+    .vsb-adv-group .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-secondary, var(--b3-theme-primary)); }
       .vsb-seg{display:flex; gap:6px; background: var(--b3-theme-background-light); padding:4px; border-radius:10px; border:1px solid var(--b3-border-color)}
       .vsb-seg-item{position:relative}
       .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
