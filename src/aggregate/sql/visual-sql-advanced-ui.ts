@@ -146,8 +146,25 @@ export class VisualSqlAdvancedUI {
 
         // 事件
         seg.querySelectorAll('input[type="radio"]').forEach(el => el.addEventListener('change', () => this.emitSql()));
-        btnAddRule.addEventListener('click', () => { this.addRule(children, undefined, true); this.emitSql(); });
-        btnAddGroup.addEventListener('click', () => { children.insertBefore(this.createGroup(false, 'AND'), children.firstChild); this.emitSql(); });
+        btnAddRule.addEventListener('click', () => {
+            // 添加条目时自动展开当前分组
+            this.setGroupCollapsed(group, false);
+            // 在“规则区域”内的开头插入（保持分组在前、规则在后）
+            this.addRule(children, undefined, true);
+            this.reorderChildren(children);
+            this.emitSql();
+        });
+        btnAddGroup.addEventListener('click', () => {
+            // 添加分组时自动展开当前分组
+            this.setGroupCollapsed(group, false);
+            // 将新分组插入到规则区域之前（保持所有分组集中在一起）
+            const newGroup = this.createGroup(false, 'AND');
+            const firstRule = Array.from(children.children).find(el => el.classList.contains('vsb-adv-row')) as HTMLElement | undefined;
+            if (firstRule) children.insertBefore(newGroup, firstRule);
+            else children.appendChild(newGroup);
+            this.reorderChildren(children);
+            this.emitSql();
+        });
         btnClear.addEventListener('click', () => { children.innerHTML = ''; this.emitSql(); });
         btnDel.addEventListener('click', () => { group.remove(); this.emitSql(); });
 
@@ -421,8 +438,20 @@ export class VisualSqlAdvancedUI {
         row.appendChild(valueWrap);
         row.appendChild(valHidden);
         row.appendChild(delBtn);
-        if (insertAtStart && parentChildrenEl.firstChild) parentChildrenEl.insertBefore(row, parentChildrenEl.firstChild);
-        else parentChildrenEl.appendChild(row);
+        // 插入规则时：保持“分组在前、规则在后”的分区
+        const nodes = Array.from(parentChildrenEl.children) as HTMLElement[];
+        const ruleNodes = nodes.filter(n => n.classList.contains('vsb-adv-row'));
+        if (insertAtStart) {
+            // 插入到规则分区开头（即第一个规则之前；若没有规则，则追加到末尾）
+            const firstRule = ruleNodes[0];
+            if (firstRule) parentChildrenEl.insertBefore(row, firstRule);
+            else parentChildrenEl.appendChild(row);
+        } else {
+            // 插入到规则分区末尾（即最后一个规则之后；若没有规则，则追加到末尾）
+            const lastRule = ruleNodes[ruleNodes.length - 1];
+            if (lastRule && lastRule.nextSibling) parentChildrenEl.insertBefore(row, lastRule.nextSibling);
+            else parentChildrenEl.appendChild(row);
+        }
 
         // 初始 value 恢复后，再渲染一次值控件以匹配
         if (init?.value) {
@@ -578,6 +607,8 @@ export class VisualSqlAdvancedUI {
                     this.hydrateGroup(sub, child);
                 }
             }
+            // 恢复后做一次归并排序：分组在前、规则在后
+            this.reorderChildren(childrenWrap);
             // 恢复折叠状态
             if ((saved as any).collapsed) {
                 this.setGroupCollapsed(groupEl, true);
@@ -624,6 +655,29 @@ export class VisualSqlAdvancedUI {
             const preview = g.querySelector('[data-preview]') as HTMLElement | null;
             if (preview) preview.textContent = this.getGroupPreviewSql(g);
         }
+    }
+
+    // ===== 子项归并排序：分组在前、规则在后（稳定相对顺序）=====
+    private reorderChildren(childrenWrap: HTMLElement) {
+        const nodes = Array.from(childrenWrap.children) as HTMLElement[];
+        const groups: HTMLElement[] = [];
+        const rules: HTMLElement[] = [];
+        for (const n of nodes) {
+            if (n.classList.contains('vsb-adv-group')) groups.push(n);
+            else if (n.classList.contains('vsb-adv-row')) rules.push(n);
+        }
+        const desired = [...groups, ...rules];
+        // 若已经有序则不动
+        let changed = false;
+        for (let i = 0; i < desired.length; i++) {
+            if (childrenWrap.children[i] !== desired[i]) { changed = true; break; }
+        }
+        if (!changed) return;
+        // 重排
+        const frag = document.createDocumentFragment();
+        for (const n of desired) frag.appendChild(n);
+        childrenWrap.innerHTML = '';
+        childrenWrap.appendChild(frag);
     }
 
     private injectStyles() {
