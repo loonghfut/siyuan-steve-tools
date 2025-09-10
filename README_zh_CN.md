@@ -39,7 +39,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.14.0 (2025年09月08日)
+### v0.14.1 (2025年09月11日)
 - 兼容API变更https://github.com/siyuan-note/siyuan/issues/15727 (loonghfut)
 - feat: 添加聚合模块及其设置支持 (loonghfut)
 - https://github.com/loonghfut/siyuan-steve-tools/issues/98 (loonghfut)
@@ -56,6 +56,13 @@ win端s3同步后，docker端感知s3同步。
 - feat: 增加protyleSlash，优化 UI 组件及设置选项 (loonghfut)
 - feat: 更新可视化 SQL 生成器，调整 limit 输入最大值并优化 UI 反馈 (loonghfut)
 - feat: 更新插件版本至 0.14.0 (loonghfut)
+- docs: 更新 v0.14.0 版本的更新日志 (loonghfut)
+- feat: 增加折叠功能和预览更新，优化可视化 SQL 生成器的用户体验 (loonghfut)
+- feat: 优化规则和分组的插入顺序，确保分组在前、规则在后 (loonghfut)
+- 修复“折叠状态下添加后，展开看不到条目”的问题 (loonghfut)
+- feat: 增加折叠/展开按钮的无障碍属性和样式优化 (loonghfut)
+- 优化细节 (loonghfut)
+- feat: 优化折叠卡片的样式和过渡效果 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
