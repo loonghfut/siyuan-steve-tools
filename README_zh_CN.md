@@ -63,6 +63,8 @@ win端s3同步后，docker端感知s3同步。
 - feat: 增加折叠/展开按钮的无障碍属性和样式优化 (loonghfut)
 - 优化细节 (loonghfut)
 - feat: 优化折叠卡片的样式和过渡效果 (loonghfut)
+- docs: 更新 v0.14.1 版本的更新日志 (loonghfut)
+- feat: 更新插件版本至 0.14.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
