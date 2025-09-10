@@ -121,6 +121,7 @@ export class VisualSqlAdvancedUI {
     const btnToggle = document.createElement('button');
     btnToggle.className = 'vsb-btn vsb-ghost';
     btnToggle.setAttribute('data-collapse-btn', '');
+    btnToggle.setAttribute('aria-expanded', 'true');
     btnToggle.textContent = '折叠';
 
     // 预览
@@ -642,7 +643,7 @@ export class VisualSqlAdvancedUI {
                 preview.style.display = '';
                 if (animate) this.animateFade(preview, true); else { preview.style.opacity = '1'; }
             }
-            if (toggleBtn) toggleBtn.textContent = '展开';
+            if (toggleBtn) { toggleBtn.textContent = '展开'; toggleBtn.setAttribute('aria-expanded', 'false'); }
         } else {
             groupEl.classList.remove('vsb-collapsed');
             if (children) {
@@ -655,7 +656,7 @@ export class VisualSqlAdvancedUI {
                 preview.style.display = 'none';
                 preview.style.opacity = '';
             }
-            if (toggleBtn) toggleBtn.textContent = '折叠';
+            if (toggleBtn) { toggleBtn.textContent = '折叠'; toggleBtn.setAttribute('aria-expanded', 'true'); }
         }
     }
 
@@ -778,6 +779,16 @@ export class VisualSqlAdvancedUI {
     .vsb-adv-group .vsb-preview{ margin-top:6px; padding:6px 8px; border-radius:6px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-background); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; border:1px dashed var(--b3-border-color); white-space: normal; overflow-wrap: anywhere; word-break: break-word; transition: opacity .18s ease; }
     /* 动画时避免抖动 */
     .vsb-adv-children.is-animating{ will-change: height; }
+
+    /* ===== 子分组紧凑版样式 ===== */
+    .vsb-adv-group .vsb-adv-group{ padding:6px; border-radius:6px; border-width:1px; border-left-width:3px; }
+    .vsb-adv-group .vsb-adv-group + .vsb-adv-group{ margin-top:6px; }
+    .vsb-adv-group .vsb-adv-group > .vsb-adv-header{ gap:6px; margin:4px 0; }
+    .vsb-adv-group .vsb-adv-group > [data-children]{ gap:4px !important; padding-left:8px !important; border-left-style: dotted; }
+    .vsb-adv-group .vsb-adv-group .vsb-seg{ padding:2px 4px; gap:4px; }
+    .vsb-adv-group .vsb-adv-group .vsb-seg-item span{ padding:4px 8px; }
+    .vsb-adv-group .vsb-adv-group .vsb-btn{ padding:4px 8px; }
+    .vsb-adv-group .vsb-adv-group .vsb-preview{ margin-top:4px; padding:4px 6px; }
     /* 嵌套层级左侧强调条微调（仅在嵌套的组中改变色调） */
     .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-primary-lighter, var(--b3-theme-primary)); }
     .vsb-adv-group .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-secondary, var(--b3-theme-primary)); }
@@ -789,6 +800,9 @@ export class VisualSqlAdvancedUI {
       .vsb-btn{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); padding:6px 10px; line-height:1; border-radius:6px; cursor:pointer; transition:.15s}
       .vsb-btn:hover{background: var(--b3-list-hover)}
       .vsb-btn.vsb-ghost{background:transparent}
+    /* 折叠/展开按钮颜色标识 */
+    .vsb-adv-header [data-collapse-btn][aria-expanded="true"]{ color: var(--b3-theme-primary); border-color: var(--b3-theme-primary); }
+    .vsb-adv-header [data-collapse-btn][aria-expanded="false"]{ color: var(--b3-theme-on-background); background: var(--b3-theme-background-light); }
       .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none}
       .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
   /* Tag 搜索输入（datalist 绑定）配色适配 */
