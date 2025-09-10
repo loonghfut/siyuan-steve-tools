@@ -183,6 +183,8 @@ export class VisualSqlAdvancedUI {
     group.appendChild(header);
     group.appendChild(children);
     group.appendChild(preview);
+        // 初始化折叠按钮可见性（无子项时隐藏）
+        this.updateGroupToggleFor(group);
         return group;
     }
 
@@ -549,6 +551,8 @@ export class VisualSqlAdvancedUI {
         this.saveState();
     // 刷新所有折叠组的预览
     this.updateAllGroupPreviews();
+    // 刷新所有组的折叠按钮可见性
+    this.updateAllGroupToggleVisibility();
         this.opts.onChangeSql?.(frag);
     }
 
@@ -621,6 +625,8 @@ export class VisualSqlAdvancedUI {
             } else {
                 this.setGroupCollapsed(groupEl, false, false);
             }
+            // 根据是否有子项，刷新该组的折叠按钮可见性
+            this.updateGroupToggleFor(groupEl);
         } else if (saved && saved.type === 'rule') {
             const wrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement;
             this.addRule(wrap, saved.state);
@@ -737,6 +743,24 @@ export class VisualSqlAdvancedUI {
             const preview = g.querySelector('[data-preview]') as HTMLElement | null;
             if (preview) preview.textContent = this.getGroupPreviewSql(g);
         }
+    }
+
+    // ===== 折叠按钮可见性：无子项时隐藏 =====
+    private hasAnyChild(groupEl: HTMLElement): boolean {
+        const wrap = groupEl.querySelector(':scope > [data-children]') as HTMLElement | null;
+        if (!wrap) return false;
+        return Array.from(wrap.children).some(el => (el as HTMLElement).classList?.contains('vsb-adv-row') || (el as HTMLElement).classList?.contains('vsb-adv-group'));
+    }
+    private updateGroupToggleFor(groupEl: HTMLElement) {
+        const header = groupEl.querySelector(':scope > .vsb-adv-header') as HTMLElement | null;
+        const btn = header?.querySelector('[data-collapse-btn]') as HTMLButtonElement | null;
+        if (!btn) return;
+        const has = this.hasAnyChild(groupEl);
+        btn.style.display = has ? '' : 'none';
+    }
+    private updateAllGroupToggleVisibility() {
+        const groups = Array.from(this.container.querySelectorAll('.vsb-adv-group')) as HTMLElement[];
+        for (const g of groups) this.updateGroupToggleFor(g);
     }
 
     // ===== 子项归并排序：分组在前、规则在后（稳定相对顺序）=====
