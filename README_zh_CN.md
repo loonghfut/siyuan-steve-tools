@@ -39,7 +39,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.14.1 (2025年09月11日)
+### v0.14.2 (2025年09月20日)
 - 兼容API变更https://github.com/siyuan-note/siyuan/issues/15727 (loonghfut)
 - feat: 添加聚合模块及其设置支持 (loonghfut)
 - https://github.com/loonghfut/siyuan-steve-tools/issues/98 (loonghfut)
@@ -65,6 +65,9 @@ win端s3同步后，docker端感知s3同步。
 - feat: 优化折叠卡片的样式和过渡效果 (loonghfut)
 - docs: 更新 v0.14.1 版本的更新日志 (loonghfut)
 - feat: 更新插件版本至 0.14.1 (loonghfut)
+- docs: 更新 v0.14.1 版本的更新日志 (loonghfut)
+- fix: ics导入问题 #101 (loonghfut)
+- feat: 更新插件版本至 0.14.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
