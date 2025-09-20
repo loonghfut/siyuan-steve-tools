@@ -204,10 +204,10 @@ export class ICSImporter {
             // 按开始时间升序排序（最早的在前）
             const timeA = a.startTime.getTime();
             const timeB = b.startTime.getTime();
-            
+
             if (timeA < timeB) return -1;
             if (timeA > timeB) return 1;
-            
+
             // 如果开始时间相同，按标题排序保证稳定性
             return a.title.localeCompare(b.title);
         });
@@ -345,11 +345,11 @@ export class ICSImporter {
     private generateEventBlock(event: ICSEvent): string {
         // 获取自定义模板内容，如果没有则使用默认内容
         const contentTemplate = this.settings['cal-ics-custom-template'] || this.getDefaultContentTemplate();
-        
+
         // 准备模板数据
         const startTimeStr = event.startTime ? this.formatDateTime(event.startTime, event.isAllDay) : '';
         const endTimeStr = event.endTime ? this.formatDateTime(event.endTime, event.isAllDay) : '';
-        
+
         // 处理状态映射
         const statusMap = {
             'TENTATIVE': '待定',
@@ -357,7 +357,7 @@ export class ICSImporter {
             'CANCELLED': '已取消'
         };
         const statusText = event.status && statusMap[event.status] ? statusMap[event.status] : '';
-        
+
         // 处理描述中的URL链接
         let processedDescription = event.description || '';
         if (processedDescription) {
@@ -371,11 +371,11 @@ export class ICSImporter {
                 processedDescription = processedDescription.replace(url, `[${url}](${url})`);
             });
         }
-        
+
         // 处理标签
-        const tagsText = event.tags && event.tags.length > 0 ? 
+        const tagsText = event.tags && event.tags.length > 0 ?
             event.tags.map(tag => `#${tag}`).join(' ') : '';
-        
+
         const templateData = {
             title: event.title || '',
             startTime: startTimeStr,
@@ -386,10 +386,10 @@ export class ICSImporter {
             recurrence: event.recurrence || '',
             tags: tagsText
         };
-        
+
         // 渲染用户自定义的内容部分
         const renderedContent = this.renderTemplate(contentTemplate, templateData);
-        
+
         // 包装成超级块并添加必要的属性
         return `{{{row
 ${renderedContent}
@@ -742,10 +742,10 @@ ${renderedContent}
 
                 // 生成超级块内容
                 const blockContent = this.generateEventBlock(event);
-                
+
                 // 插入到文档
                 const result = await api.appendBlock("markdown", blockContent, documentId);
-// console.log(`生成超级块内容: ${blockContent}`,result);
+                // console.log(`生成超级块内容: ${blockContent}`,result);
                 // 如果插入成功且启用了数据库功能，添加到数据库
                 if (result && this.settings['cal-ics-add-to-database']) {
                     // 从返回结果中获取新创建的块ID
@@ -810,7 +810,7 @@ ${renderedContent}
 
         try {
             // 添加块到数据库
-            await api.addBlockToDatabase_pro(blockId, databaseId);
+            await api.addBlockToDatabase_pro(blockId, databaseId, blockId);
             console.log(`成功将块 ${blockId} 添加到数据库 ${databaseId}`);
 
             // 添加小延时确保块已添加到数据库
@@ -913,11 +913,16 @@ ${renderedContent}
 
             // 批量更新：收集所有需要更新的字段
             const updatePromises: Promise<any>[] = [];
+            const itemID = await api.getAttributeViewItemIDsByBoundIDs(databaseId, [blockId]).then(data => data[blockId]);
+            if (!itemID) {
+                console.warn(`无法获取块 ${blockId} 在数据库 ${databaseId} 中的 itemID，跳过属性更新`);
+                return;
+            }
 
             // 更新标题
             const titleKeyID = await this.getKeyIDfromViewValue(viewValue, '事件', databaseId);
             if (titleKeyID && event.title) {
-                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, titleKeyID, event.title, "text"));
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, titleKeyID, itemID, event.title, "text"));
             }
 
             // 更新开始时间和结束时间
@@ -925,27 +930,27 @@ ${renderedContent}
             if (timeKeyID && event.startTime) {
                 const dateStr = event.startTime instanceof Date ? event.startTime.toISOString() : event.startTime;
                 const endStr = event.endTime instanceof Date ? event.endTime.toISOString() : event.endTime;
-                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, timeKeyID, dateStr, "date", endStr));
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, timeKeyID, itemID, dateStr, "date", endStr));
             }
 
             // 更新分类为"ICS导入"
             const categoryKeyID = await this.getKeyIDfromViewValue(viewValue, '分类', databaseId);
             if (categoryKeyID) {
                 const categoryData = [{ content: "ICS导入" }];
-                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, categoryKeyID, categoryData, "select"));
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, categoryKeyID, itemID, categoryData, "select"));
             }
 
             // 更新标签
             const tagKeyID = await this.getKeyIDfromViewValue(viewValue, '标签', databaseId);
             if (tagKeyID && event.tags && event.tags.length > 0) {
                 const tagData = event.tags.map(tag => ({ content: tag }));
-                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, tagKeyID, tagData, "mSelect"));
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, tagKeyID, itemID, tagData, "mSelect"));
             }
 
             // 更新描述
             const noteKeyID = await this.getKeyIDfromViewValue(viewValue, '描述', databaseId);
             if (noteKeyID && event.description) {
-                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, noteKeyID, event.description, "text"));
+                updatePromises.push(api.updateAttrViewCell_pro(blockId, databaseId, noteKeyID, itemID, event.description, "text"));
             }
 
             // 等待所有更新完成
