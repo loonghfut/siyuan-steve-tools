@@ -62,6 +62,10 @@ export class VisualSqlUI {
   private resultsEl!: HTMLElement;
   private queryDelayTimer?: number;
   private lastQuerySeq = 0;
+  private tooltipEl?: HTMLElement;
+  private tipDocClick?: (e: MouseEvent) => void;
+  private tipKeydown?: (e: KeyboardEvent) => void;
+  private tipScroll?: () => void;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
     this.container = container;
@@ -92,13 +96,6 @@ export class VisualSqlUI {
         const maxH = Math.max(160, Math.min(420, Math.floor(vpH * 0.35)));
         this.outputPre.style.maxHeight = `${maxH}px`;
       }
-      // 结果区域主体高度
-      const resultBody = this.container.querySelector('.vsb-result__body') as HTMLElement | null;
-      if (resultBody) {
-        const vpH = Math.max(360, window.innerHeight || 0);
-        const maxH = Math.max(200, Math.min(520, Math.floor(vpH * 0.45)));
-        resultBody.style.maxHeight = `${maxH}px`;
-      }
 
       // 读取一次布局属性以确保浏览器完成重排（轻量“强制回流”）
       void this.container.offsetHeight;
@@ -113,8 +110,10 @@ export class VisualSqlUI {
     this.injectStyles();
     this.container.innerHTML = this.html`
       <div class="vsb-wrap">
-        <fieldset class="vsb-card">
-          <legend class="vsb-legend">常用筛选</legend>
+        <details class="vsb-card" open data-section="filters">
+          <summary class="vsb-legend">筛选与 SQL</summary>
+          <fieldset class="vsb-card" style="margin-top:8px;">
+            <legend class="vsb-legend">常用筛选</legend>
 
           <div class="vsb-chips" aria-label="类型">
             ${([
@@ -172,11 +171,11 @@ export class VisualSqlUI {
             <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
             <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" max="999" placeholder="默认64（未指定，最大999）"/></label>
           </div>
-        </fieldset>
+          </fieldset>
 
-        <details class="vsb-card">
-          <summary class="vsb-legend">更多筛选</summary>
-          <div class="vsb-grid vsb-grid-4" style="margin-top:8px;">
+          <details class="vsb-card">
+            <summary class="vsb-legend">更多筛选</summary>
+            <div class="vsb-grid vsb-grid-4" style="margin-top:8px;">
             <label class="vsb-field">root_id（文档）<input class="vsb-input" data-root type="text" placeholder="文档块 ID"/></label>
             <label class="vsb-field">parent_id<input class="vsb-input" data-parent type="text" placeholder="父块 ID"/></label>
             <label class="vsb-field">path<input class="vsb-input" data-path type="text" placeholder="%/2020.../xxx.sy"/></label>
@@ -219,20 +218,25 @@ export class VisualSqlUI {
                 <option value="asc">升序</option>
               </select>
             </label>
+            </div>
+          </details>
+
+
+          <div class="vsb-actions">
+            <button class="vsb-btn" data-adv-open>高级筛选</button>
+            <button class="vsb-btn" data-copy>复制 SQL</button>
+            <button class="vsb-btn vsb-ghost" data-reset>重置</button>
           </div>
+
+          <pre class="vsb-output" data-output></pre>
         </details>
 
-
-        <div class="vsb-actions">
-          <button class="vsb-btn" data-adv-open>高级筛选</button>
-          <button class="vsb-btn" data-copy>复制 SQL</button>
-          <button class="vsb-btn vsb-ghost" data-reset>重置</button>
-        </div>
-
-        <pre class="vsb-output" data-output></pre>
-        <div class="vsb-result" data-result>
-          <div class="vsb-result__placeholder">变更筛选后将实时显示查询结果</div>
-        </div>
+        <details class="vsb-card" open data-section="preview" style="margin-top:8px;">
+          <summary class="vsb-legend">结果预览</summary>
+          <div class="vsb-result" data-result>
+            <div class="vsb-result__placeholder">变更筛选后将实时显示查询结果</div>
+          </div>
+        </details>
       </div>
     `;
 
@@ -260,19 +264,21 @@ export class VisualSqlUI {
     this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
 
     this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
-  this.resultsEl = this.container.querySelector('div[data-result]') as HTMLElement;
+    this.resultsEl = this.container.querySelector('div[data-result]') as HTMLElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
     this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
     const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
+  const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
+  const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
 
 
     // 异步加载标签下拉
     this.populateTags();
 
     // 事件
-  const changeInputs = this.container.querySelectorAll('input, select');
-  changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
+    const changeInputs = this.container.querySelectorAll('input, select');
+    changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
     this.tagInput.addEventListener('change', () => {
       const v = (this.tagInput.value || '').trim();
       if (v) this.pushRecentTags([v]);
@@ -280,6 +286,9 @@ export class VisualSqlUI {
     this.copyBtn.addEventListener('click', () => this.copySql());
     this.resetBtn.addEventListener('click', () => this.resetForm());
     advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
+  // 折叠状态变更时持久化
+  filtersSection?.addEventListener('toggle', () => this.saveState());
+  previewSection?.addEventListener('toggle', () => this.saveState());
 
 
     // 渲染自定义按钮（如有）
@@ -391,7 +400,7 @@ export class VisualSqlUI {
     }
     // 轻微防抖，减少频繁请求
     this.queryDelayTimer = window.setTimeout(() => {
-      this.queryNow(token, sql).catch(() => {/* 已在内部兜底渲染错误 */});
+      this.queryNow(token, sql).catch(() => {/* 已在内部兜底渲染错误 */ });
     }, 300);
   }
 
@@ -422,6 +431,7 @@ export class VisualSqlUI {
   }
 
   private renderLoading(stmt: string) {
+    this.hideTooltip();
     this.resultsEl.innerHTML = `
       <div class="vsb-result__head">
         <div>正在查询…</div>
@@ -434,6 +444,7 @@ export class VisualSqlUI {
   }
 
   private renderError(msg: string) {
+    this.hideTooltip();
     this.resultsEl.innerHTML = `
       <div class="vsb-result__head">
         <div>查询出错</div>
@@ -476,6 +487,7 @@ export class VisualSqlUI {
     }).join('')}</tbody>`;
 
     // 先渲染基础结构
+    this.hideTooltip();
     this.resultsEl.innerHTML = `
       <div class="vsb-result__head">
         <div>${total} 条结果</div>
@@ -501,6 +513,8 @@ export class VisualSqlUI {
       // 添加 header 拖拽调宽
       const ths = Array.from(tbl.querySelectorAll('thead th')) as HTMLTableCellElement[];
       ths.forEach((th, idx) => this.attachColResizer(th, idx, tbl));
+      // 单元格点击预览
+      this.attachCellTooltip(tbl);
     }
   }
 
@@ -520,7 +534,7 @@ export class VisualSqlUI {
         const text = td.textContent || '';
         let w = text.length * 8 + padding;
         if (ctx) {
-          try { w = ctx.measureText(text).width + padding; } catch {}
+          try { w = ctx.measureText(text).width + padding; } catch { }
         }
         widths[i] = Math.min(maxW, Math.max(widths[i] || minW, Math.ceil(w)));
       });
@@ -558,6 +572,81 @@ export class VisualSqlUI {
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     });
+  }
+
+  private attachCellTooltip(tbl: HTMLTableElement) {
+    // 事件委托绑定到表上
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const td = target.closest('td') as HTMLTableCellElement | null;
+      if (!td) return;
+      const text = td.textContent || '';
+      if (!text) return;
+      const rect = td.getBoundingClientRect();
+      this.showTooltip(text, rect);
+      e.stopPropagation();
+    };
+    // 仅绑定表内单击，文档/滚动/键盘在 showTooltip 中注册与清理
+    tbl.addEventListener('click', onClick);
+  }
+
+  private showTooltip(text: string, anchorRect: DOMRect) {
+    this.hideTooltip();
+    const tip = document.createElement('div');
+    tip.className = 'vsb-tooltip';
+    tip.innerHTML = `<div class="vsb-tooltip__body"><pre></pre></div>`;
+    const pre = tip.querySelector('pre') as HTMLPreElement;
+    pre.textContent = text;
+    document.body.appendChild(tip);
+    // 先测量尺寸
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const maxW = Math.min(720, vw - 24);
+    const maxH = Math.min(0.6 * vh, vh - 24);
+    tip.style.maxWidth = `${Math.floor(maxW)}px`;
+    tip.style.maxHeight = `${Math.floor(maxH)}px`;
+    tip.style.visibility = 'hidden';
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    // 强制布局以获取尺寸
+    const th = tip.getBoundingClientRect();
+    // 计算定位：优先放在单元格下方，右侧对齐，越界时调整
+    let left = Math.min(anchorRect.left, vw - th.width - 8);
+    left = Math.max(8, left);
+    let top = anchorRect.bottom + 6;
+    if (top + th.height + 8 > vh) {
+      top = Math.max(8, anchorRect.top - th.height - 6);
+    }
+    tip.style.left = `${Math.floor(left)}px`;
+    tip.style.top = `${Math.floor(top)}px`;
+    tip.style.visibility = 'visible';
+    this.tooltipEl = tip;
+
+    // 外部点击 / ESC / 滚动关闭：在 tooltip 生命周期内注册，hide 时清理
+    this.tipDocClick = (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if (this.tooltipEl && !this.tooltipEl.contains(el)) this.hideTooltip();
+    };
+    this.tipKeydown = (e: KeyboardEvent) => { if (e.key === 'Escape') this.hideTooltip(); };
+    this.tipScroll = () => this.hideTooltip();
+    // 避免与触发展示的同一次点击冲突，延迟注册
+    setTimeout(() => {
+      document.addEventListener('click', this.tipDocClick!);
+    }, 0);
+    document.addEventListener('keydown', this.tipKeydown!);
+    const body = this.resultsEl.querySelector('.vsb-result__body');
+    if (body) body.addEventListener('scroll', this.tipScroll!);
+  }
+
+  private hideTooltip() {
+    if (this.tooltipEl) {
+      this.tooltipEl.remove();
+      this.tooltipEl = undefined;
+    }
+    if (this.tipDocClick) { document.removeEventListener('click', this.tipDocClick); this.tipDocClick = undefined; }
+    if (this.tipKeydown) { document.removeEventListener('keydown', this.tipKeydown); this.tipKeydown = undefined; }
+    const body = this.resultsEl?.querySelector?.('.vsb-result__body') as HTMLElement | undefined;
+    if (this.tipScroll && body) { body.removeEventListener('scroll', this.tipScroll); }
+    this.tipScroll = undefined;
   }
 
   private formatCell(v: any): string {
@@ -664,6 +753,9 @@ export class VisualSqlUI {
       .vsb-title{font-weight:600; font-size:13px}
       .vsb-card{border:1px solid var(--vsb-border); padding:10px; border-radius:8px; background: var(--vsb-surface); box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom:10px}
       .vsb-legend{font-weight:600; color: var(--vsb-muted);}
+  details.vsb-card > summary.vsb-legend{cursor:pointer; list-style:none}
+  details.vsb-card > summary.vsb-legend::marker, details.vsb-card > summary.vsb-legend::-webkit-details-marker{display:none}
+  details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
       .vsb-grid{display:grid; gap:8px}
       .vsb-grid-4{grid-template-columns: repeat(4, minmax(160px,1fr))}
       .vsb-grid-3{grid-template-columns: repeat(3, minmax(200px,1fr))}
@@ -692,10 +784,12 @@ export class VisualSqlUI {
   .vsb-result{margin-top:8px; border:1px solid var(--b3-border-color); border-radius:8px; overflow:hidden;}
   .vsb-result__placeholder{padding:10px; color: var(--vsb-muted); font-size:12px;}
   .vsb-result__head{display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background: var(--b3-theme-surface); border-bottom:1px solid var(--b3-border-color); font-size:12px; color: var(--vsb-muted)}
-  .vsb-result__body{max-height:320px; overflow:auto}
-  .vsb-table{width:100%; border-collapse:collapse; font-size:12px}
+  .vsb-result__body{height: var(--vsb-result-height, 360px); overflow:auto; position:relative}
+  .vsb-result__body .vsb-table{width: 100%}
+  .vsb-table{width:100%; border-collapse:separate; border-spacing:0; font-size:12px}
   .vsb-table th,.vsb-table td{padding:6px 8px; border-bottom:1px solid var(--b3-border-color); vertical-align:top}
-  .vsb-table th{position:sticky; top:0; background: var(--b3-theme-surface); text-align:left; color: var(--vsb-muted)}
+  .vsb-table thead{position: sticky; top: 0; z-index: 3; background: var(--b3-theme-surface)}
+  .vsb-table th{position:sticky; top:0; background: var(--b3-theme-surface); text-align:left; color: var(--vsb-muted); z-index:3; box-shadow: 0 1px 0 var(--b3-border-color)}
   /* 列自适应 + 拖拽调整支持 */
   .vsb-table{table-layout: fixed}
   .vsb-table th{position: sticky; top:0}
@@ -704,6 +798,13 @@ export class VisualSqlUI {
   .vsb-small{color: var(--vsb-muted); font-size:11px}
   .vsb-error{padding:10px; color:#b71c1c}
   .vsb-loading{padding:10px; color: var(--vsb-muted)}
+  /* tooltip 预览 */
+  .vsb-tooltip{position:fixed; z-index:99999; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); box-shadow:0 10px 30px rgba(0,0,0,.25); border-radius:8px; overflow:hidden}
+  .vsb-tooltip__head{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--b3-border-color)}
+  .vsb-tooltip__title{font-size:12px; font-weight:600}
+  .vsb-tooltip__actions{display:flex; gap:6px}
+  .vsb-tooltip__body{max-height:60vh; overflow:auto}
+  .vsb-tooltip__body pre{margin:0; padding:10px; white-space:pre-wrap; word-break:break-word; font-family: var(--b3-font-family-code, ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace); font-size:12px}
       details.vsb-card{overflow:hidden; transition:max-height .4s ease; max-height:3em}
       details.vsb-card summary{cursor:pointer; list-style:none}
       details.vsb-card summary::marker, details.vsb-card summary::-webkit-details-marker{display:none}
@@ -765,7 +866,10 @@ export class VisualSqlUI {
         orderField: this.orderFieldSel?.value ?? '',
         orderDir: this.orderDirSel?.value ?? 'desc',
         limit: this.limitInput?.value ?? '',
-        advSqlFragment: this.advSqlFragment || ''
+        advSqlFragment: this.advSqlFragment || '',
+        // 折叠状态
+        filtersOpen: (this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null)?.open ?? true,
+        previewOpen: (this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null)?.open ?? true,
       };
       localStorage.setItem(this.storageKey, JSON.stringify(state));
     } catch (e) {
@@ -810,6 +914,11 @@ export class VisualSqlUI {
       if (this.orderDirSel) this.orderDirSel.value = s?.orderDir ?? 'desc';
       if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
       this.advSqlFragment = s?.advSqlFragment || '';
+      // 恢复折叠状态
+      const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
+      const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
+      if (filtersSection) filtersSection.open = s?.filtersOpen !== false; // 默认展开
+      if (previewSection) previewSection.open = s?.previewOpen !== false; // 默认展开
 
     } catch (e) {
       console.debug('[VisualSqlUI] restoreState failed', e);
