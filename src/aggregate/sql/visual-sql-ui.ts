@@ -21,6 +21,11 @@ export interface VisualSqlUIOptions {
    * 如需隔离不同实例可传入自定义键名。
    */
   persistKey?: string;
+  /**
+   * 结果预览列（优先级高于自动推断）。
+   * 可以是用逗号/空格分隔的字符串，或列名数组。
+   */
+  previewColumns?: string | string[];
 }
 
 export class VisualSqlUI {
@@ -29,6 +34,7 @@ export class VisualSqlUI {
   private builder: VisualSqlBuilder;
   private resizeRaf?: number;
   private storageKey?: string;
+  private previewCols?: string[];
 
   // 控件引用
   private typeChecks!: NodeListOf<HTMLInputElement>;
@@ -72,6 +78,7 @@ export class VisualSqlUI {
     this.opts = options || {};
     this.builder = new VisualSqlBuilder('embedded');
     this.storageKey = this.opts.persistKey ?? 'siyuan-steve-tools:visual-sql-ui';
+    this.previewCols = this.normalizePreviewColumns(this.opts.previewColumns);
     this.render();
     // 恢复上次状态并生成 SQL
     this.restoreState();
@@ -470,15 +477,20 @@ export class VisualSqlUI {
       return;
     }
 
-    // 取并集列名，最多展示 12 列，避免过宽
-    const colSet = new Set<string>();
-    for (const r of rows) {
-      if (r && typeof r === 'object') {
-        Object.keys(r).forEach(k => colSet.add(k));
+    // 列选择：若用户指定了预览列则按之显示；否则自动推断（最多 12 列）
+    let cols: string[];
+    if (this.previewCols && this.previewCols.length) {
+      cols = this.previewCols;
+    } else {
+      const colSet = new Set<string>();
+      for (const r of rows) {
+        if (r && typeof r === 'object') {
+          Object.keys(r).forEach(k => colSet.add(k));
+        }
+        if (colSet.size > 24) break; // 粗略上限，稍后截断
       }
-      if (colSet.size > 24) break; // 粗略上限，稍后截断
+      cols = Array.from(colSet).slice(0, 12);
     }
-    const cols = Array.from(colSet).slice(0, 12);
 
     const thead = `<thead><tr>${cols.map(c => `<th>${this.escapeHtml(c)}</th>`).join('')}</tr></thead>`;
     const tbody = `<tbody>${rows.map(r => {
@@ -516,6 +528,19 @@ export class VisualSqlUI {
       // 单元格点击预览
       this.attachCellTooltip(tbl);
     }
+  }
+
+  // 解析设置中的列列表
+  private normalizePreviewColumns(v?: string | string[] | null): string[] | undefined {
+    if (!v) return undefined;
+    if (Array.isArray(v)) {
+      const arr = v.map(s => (s ?? '').toString().trim()).filter(Boolean);
+      return arr.length ? arr : undefined;
+    }
+    const s = (v || '').trim();
+    if (!s) return undefined;
+    const parts = s.split(/[\s,，]+/).map(x => x.trim()).filter(Boolean);
+    return parts.length ? parts : undefined;
   }
 
   private measureColumnWidths(tbl: HTMLTableElement): number[] {

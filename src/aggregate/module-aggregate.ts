@@ -1,7 +1,7 @@
 import steveTools from "@/index";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
 import { Dialog } from "siyuan";
-import { insertBlock, updateBlock } from "@/api/api";
+import { updateBlock } from "@/api/api";
 
 // Aggregate 模块
 export class M_Aggregate {
@@ -21,6 +21,7 @@ export class M_Aggregate {
                 title: "SQL 可视化生成器",
                 position: "right",
                 callback: async () => {
+                    const previewCols = (_settingdata["aggregate-sql-preview-columns"] || "").trim();
                     new Dialog({
                         title: "SQL 可视化生成器",
                         content: `<div id="visual-sql-container" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
@@ -32,7 +33,7 @@ export class M_Aggregate {
                             this._ui?.resize();
                         },
                     });
-                    this.mountUI(document.getElementById('visual-sql-container')!);
+                    this.mountUI(document.getElementById('visual-sql-container')!, previewCols);
                     // 初次渲染后按当前视口计算布局
                     requestAnimationFrame(() => this._ui?.resize());
                 }
@@ -43,8 +44,7 @@ export class M_Aggregate {
                 filter: ["SQL", "sql", "查询", "query"],
                 html: `<div class="b3-list-item__first"><span class="b3-list-item__text">SQL</span><span class="b3-list-item__meta"></span></div>`,
                 id: "insertCardLink",
-                callback: async (protyle,nodeElement) => {
-                    let openedSQL = '';
+                callback: async (_protyle,nodeElement) => {
                     // 打开 SQL 可视化生成器面板
                     const dlg = new Dialog({
                         title: "SQL 可视化生成器",
@@ -62,8 +62,10 @@ export class M_Aggregate {
                     });
 
                     const container = document.getElementById('visual-sql-container-slash')!;
+                    const previewCols = (_settingdata["aggregate-sql-preview-columns"] || "").trim();
                     // 在 Slash 面板中挂载 UI，并增加“插入代码块”按钮
                     const ui = new VisualSqlUI(container, {
+                        previewColumns: previewCols,
                         buttons: [
                             {
                                 label: '插入SQL',
@@ -83,7 +85,7 @@ export class M_Aggregate {
                             }
                         ],
                         onSqlChange: (_sql) => {
-                            openedSQL = _sql;
+                            /* noop: slash 模式无需回写 */
                         },
                         persistKey: "visual-sql-slash",
                     });
@@ -97,8 +99,9 @@ export class M_Aggregate {
 
 
 
-    mountUI(container: HTMLElement) {
+    mountUI(container: HTMLElement, previewColumns?: string) {
         this._ui = new VisualSqlUI(container, {
+            previewColumns,
             onSqlChange: (_sql) => {
                 // 可同步 SQL 或发起查询
                 console.log("生成的 SQL:", _sql);
