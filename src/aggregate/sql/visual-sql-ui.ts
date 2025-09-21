@@ -2,6 +2,7 @@
 import { VisualSqlBuilder, BlockType, OrderDir } from './visual-sql-builder';
 import { VisualSqlAdvancedUI } from './visual-sql-advanced-ui';
 import { getalltages } from '@/api/api3';
+import { sql as runSql } from '@/api/api';
 
 export interface VisualSqlUIButton {
   label: string; // 按钮文本
@@ -58,6 +59,9 @@ export class VisualSqlUI {
   private resetBtn!: HTMLButtonElement;
   private actionsEl!: HTMLElement;
   private advSqlFragment: string = '';
+  private resultsEl!: HTMLElement;
+  private queryDelayTimer?: number;
+  private lastQuerySeq = 0;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
     this.container = container;
@@ -87,6 +91,13 @@ export class VisualSqlUI {
         const vpH = Math.max(320, window.innerHeight || 0);
         const maxH = Math.max(160, Math.min(420, Math.floor(vpH * 0.35)));
         this.outputPre.style.maxHeight = `${maxH}px`;
+      }
+      // 结果区域主体高度
+      const resultBody = this.container.querySelector('.vsb-result__body') as HTMLElement | null;
+      if (resultBody) {
+        const vpH = Math.max(360, window.innerHeight || 0);
+        const maxH = Math.max(200, Math.min(520, Math.floor(vpH * 0.45)));
+        resultBody.style.maxHeight = `${maxH}px`;
       }
 
       // 读取一次布局属性以确保浏览器完成重排（轻量“强制回流”）
@@ -219,6 +230,9 @@ export class VisualSqlUI {
         </div>
 
         <pre class="vsb-output" data-output></pre>
+        <div class="vsb-result" data-result>
+          <div class="vsb-result__placeholder">变更筛选后将实时显示查询结果</div>
+        </div>
       </div>
     `;
 
@@ -246,6 +260,7 @@ export class VisualSqlUI {
     this.limitInput = this.container.querySelector('input[data-limit]') as HTMLInputElement;
 
     this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
+  this.resultsEl = this.container.querySelector('div[data-result]') as HTMLElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
     this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
@@ -256,8 +271,8 @@ export class VisualSqlUI {
     this.populateTags();
 
     // 事件
-    const changeInputs = this.container.querySelectorAll('input, select');
-    changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
+  const changeInputs = this.container.querySelectorAll('input, select');
+  changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
     this.tagInput.addEventListener('change', () => {
       const v = (this.tagInput.value || '').trim();
       if (v) this.pushRecentTags([v]);
@@ -363,6 +378,198 @@ export class VisualSqlUI {
     this.outputPre.textContent = sql;
     this.opts.onSqlChange?.(sql);
     this.saveState();
+    this.scheduleQuery(sql);
+  }
+
+  // ===== 实时查询 =====
+  private scheduleQuery(sql: string) {
+    // 记录本次查询序号，避免竞态导致旧结果覆盖新结果
+    const token = ++this.lastQuerySeq;
+    // 取消前一次防抖
+    if (this.queryDelayTimer) {
+      clearTimeout(this.queryDelayTimer);
+    }
+    // 轻微防抖，减少频繁请求
+    this.queryDelayTimer = window.setTimeout(() => {
+      this.queryNow(token, sql).catch(() => {/* 已在内部兜底渲染错误 */});
+    }, 300);
+  }
+
+  private async queryNow(token: number, sql: string) {
+    if (!this.resultsEl) return;
+    // 若用户未勾选任何类型等，依然允许查询，但有个默认 LIMIT
+    const stmt = this.ensureLimit(sql);
+    this.renderLoading(stmt);
+    const started = performance.now();
+    try {
+      const res = await runSql(stmt);
+      // 若期间又触发了新查询，丢弃旧结果
+      if (token !== this.lastQuerySeq) return;
+      const elapsed = Math.max(0, performance.now() - started);
+      if (!Array.isArray(res)) throw new Error('SQL 结果异常');
+      this.renderResultTable(res, stmt, elapsed);
+    } catch (e: any) {
+      if (token !== this.lastQuerySeq) return;
+      const msg = (e && e.message) ? e.message : '查询失败';
+      this.renderError(msg);
+    }
+  }
+
+  private ensureLimit(sql: string): string {
+    // 已设置 LIMIT 则尊重；否则默认限制 64 行，避免卡顿
+    if (/\blimit\b/i.test(sql)) return sql;
+    return sql + ' LIMIT 64';
+  }
+
+  private renderLoading(stmt: string) {
+    this.resultsEl.innerHTML = `
+      <div class="vsb-result__head">
+        <div>正在查询…</div>
+        <div class="vsb-small">${this.escapeHtml(stmt)}</div>
+      </div>
+      <div class="vsb-result__body">
+        <div class="vsb-loading">加载中…</div>
+      </div>
+    `;
+  }
+
+  private renderError(msg: string) {
+    this.resultsEl.innerHTML = `
+      <div class="vsb-result__head">
+        <div>查询出错</div>
+      </div>
+      <div class="vsb-result__body">
+        <div class="vsb-error">${this.escapeHtml(msg)}</div>
+      </div>
+    `;
+  }
+
+  private renderResultTable(rows: any[], stmt: string, elapsedMs: number) {
+    const total = rows.length;
+    if (!total) {
+      this.resultsEl.innerHTML = `
+        <div class="vsb-result__head">
+          <div>0 条结果</div>
+          <div class="vsb-small">${this.escapeHtml(stmt)} · ${Math.round(elapsedMs)}ms</div>
+        </div>
+        <div class="vsb-result__body">
+          <div class="vsb-result__placeholder">无结果</div>
+        </div>
+      `;
+      return;
+    }
+
+    // 取并集列名，最多展示 12 列，避免过宽
+    const colSet = new Set<string>();
+    for (const r of rows) {
+      if (r && typeof r === 'object') {
+        Object.keys(r).forEach(k => colSet.add(k));
+      }
+      if (colSet.size > 24) break; // 粗略上限，稍后截断
+    }
+    const cols = Array.from(colSet).slice(0, 12);
+
+    const thead = `<thead><tr>${cols.map(c => `<th>${this.escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r => {
+      if (!r || typeof r !== 'object') return `<tr><td colspan="${cols.length}">${this.escapeHtml(String(r))}</td></tr>`;
+      return `<tr>${cols.map(c => `<td>${this.escapeHtml(this.formatCell(r[c]))}</td>`).join('')}</tr>`;
+    }).join('')}</tbody>`;
+
+    // 先渲染基础结构
+    this.resultsEl.innerHTML = `
+      <div class="vsb-result__head">
+        <div>${total} 条结果</div>
+        <div class="vsb-small">${this.escapeHtml(stmt)} · ${Math.round(elapsedMs)}ms</div>
+      </div>
+      <div class="vsb-result__body">
+        <table class="vsb-table">${thead}${tbody}</table>
+      </div>
+    `;
+
+    // 列宽自适应：基于内容测量，设置 colgroup
+    const tbl = this.resultsEl.querySelector('table.vsb-table') as HTMLTableElement | null;
+    if (tbl) {
+      const widths = this.measureColumnWidths(tbl);
+      const cg = document.createElement('colgroup');
+      widths.forEach(w => {
+        const col = document.createElement('col');
+        col.style.width = w + 'px';
+        cg.appendChild(col);
+      });
+      tbl.insertBefore(cg, tbl.firstChild);
+
+      // 添加 header 拖拽调宽
+      const ths = Array.from(tbl.querySelectorAll('thead th')) as HTMLTableCellElement[];
+      ths.forEach((th, idx) => this.attachColResizer(th, idx, tbl));
+    }
+  }
+
+  private measureColumnWidths(tbl: HTMLTableElement): number[] {
+    const ths = Array.from(tbl.querySelectorAll('thead th')) as HTMLTableCellElement[];
+    const rows = Array.from(tbl.querySelectorAll('tbody tr')) as HTMLTableRowElement[];
+    const ctx = document.createElement('canvas').getContext('2d');
+    const style = window.getComputedStyle(tbl);
+    const font = `${style.getPropertyValue('font-weight')} ${style.getPropertyValue('font-size')} ${style.getPropertyValue('font-family')}`;
+    if (ctx) ctx.font = font;
+    const padding = 16; // 左右 padding 合计
+    const minW = 60, maxW = 480;
+    const widths = ths.map(th => Math.min(maxW, Math.max(minW, th.textContent ? (th.textContent.length * 8 + padding) : minW)));
+    rows.slice(0, 200).forEach(tr => {
+      const tds = Array.from(tr.cells) as HTMLTableCellElement[];
+      tds.forEach((td, i) => {
+        const text = td.textContent || '';
+        let w = text.length * 8 + padding;
+        if (ctx) {
+          try { w = ctx.measureText(text).width + padding; } catch {}
+        }
+        widths[i] = Math.min(maxW, Math.max(widths[i] || minW, Math.ceil(w)));
+      });
+    });
+    return widths;
+  }
+
+  private attachColResizer(th: HTMLTableCellElement, colIndex: number, tbl: HTMLTableElement) {
+    // 防止重复添加
+    if (th.querySelector('.vsb-col-resizer')) return;
+    th.style.position = 'relative';
+    const handle = document.createElement('div');
+    handle.className = 'vsb-col-resizer';
+    th.appendChild(handle);
+
+    let startX = 0;
+    let startW = 0;
+    const cg = tbl.querySelector('colgroup');
+    if (!cg) return;
+    const cols = Array.from(cg.children) as HTMLTableColElement[];
+    const onMove = (e: MouseEvent) => {
+      const dx = e.clientX - startX;
+      const newW = Math.max(40, startW + dx);
+      if (cols[colIndex]) cols[colIndex].style.width = newW + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      startX = e.clientX;
+      const cur = cols[colIndex];
+      startW = cur ? (parseInt(cur.style.width || '0') || th.getBoundingClientRect().width) : th.getBoundingClientRect().width;
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  private formatCell(v: any): string {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+      try { return JSON.stringify(v); } catch { return String(v); }
+    }
+    return String(v);
+  }
+
+  private escapeHtml(s: string): string {
+    return (s || '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[ch]);
   }
 
   // 智能添加 %：
@@ -451,6 +658,7 @@ export class VisualSqlUI {
         line-height: 1.5;
         color: var(--vsb-fg);
       }
+  /* 单列上下布局，去除双栏样式 */
 
       .vsb-header{display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:8px}
       .vsb-title{font-weight:600; font-size:13px}
@@ -481,6 +689,21 @@ export class VisualSqlUI {
       .vsb-btn.vsb-primary:hover{filter:brightness(1.05)}
       .vsb-btn.vsb-ghost{background:transparent}
       .vsb-output{white-space:pre-wrap; background: var(--b3-protyle-code-background, var(--b3-theme-background)); color: var(--b3-theme-on-surface); padding:10px; border-radius:8px; overflow:auto; max-height:260px; border:1px solid var(--b3-border-color); font-family: var(--b3-font-family-code, ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace); font-size:11px}
+  .vsb-result{margin-top:8px; border:1px solid var(--b3-border-color); border-radius:8px; overflow:hidden;}
+  .vsb-result__placeholder{padding:10px; color: var(--vsb-muted); font-size:12px;}
+  .vsb-result__head{display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background: var(--b3-theme-surface); border-bottom:1px solid var(--b3-border-color); font-size:12px; color: var(--vsb-muted)}
+  .vsb-result__body{max-height:320px; overflow:auto}
+  .vsb-table{width:100%; border-collapse:collapse; font-size:12px}
+  .vsb-table th,.vsb-table td{padding:6px 8px; border-bottom:1px solid var(--b3-border-color); vertical-align:top}
+  .vsb-table th{position:sticky; top:0; background: var(--b3-theme-surface); text-align:left; color: var(--vsb-muted)}
+  /* 列自适应 + 拖拽调整支持 */
+  .vsb-table{table-layout: fixed}
+  .vsb-table th{position: sticky; top:0}
+  .vsb-table th,.vsb-table td{white-space: nowrap; overflow:hidden; text-overflow: ellipsis}
+  .vsb-col-resizer{position:absolute; right:0; top:0; width:6px; height:100%; cursor:col-resize; user-select:none}
+  .vsb-small{color: var(--vsb-muted); font-size:11px}
+  .vsb-error{padding:10px; color:#b71c1c}
+  .vsb-loading{padding:10px; color: var(--vsb-muted)}
       details.vsb-card{overflow:hidden; transition:max-height .4s ease; max-height:3em}
       details.vsb-card summary{cursor:pointer; list-style:none}
       details.vsb-card summary::marker, details.vsb-card summary::-webkit-details-marker{display:none}
