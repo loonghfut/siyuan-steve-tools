@@ -1225,21 +1225,24 @@ export class VisualSqlUI {
         .vsb-modal-title{font-weight:600}
         .vsb-modal-body{padding:12px; overflow:auto}
         .vsb-modal-footer{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid var(--b3-border-color)}
-        .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none; width:100%}
-        .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
-        .vsb-field{display:grid; gap:6px}
-        .vsb-label{font-size:12px; color: var(--b3-theme-on-surface)}
-        /* Preset modal */
-        .vsb-preset .vsb-preset-head{display:flex; align-items:center; gap:8px; margin-bottom:10px}
-        .vsb-preset .vsb-search{max-width: 260px}
-        .vsb-preset .vsb-badge{display:inline-block; min-width:22px; padding:2px 6px; border-radius:999px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-surface); font-size:12px; text-align:center; border:1px solid var(--b3-border-color)}
-        .vsb-list{display:flex; flex-direction:column; gap:8px}
-        .vsb-item{display:flex; align-items:center; justify-content:space-between; border:1px solid var(--b3-border-color); border-radius:8px; padding:8px 10px; background: var(--b3-theme-background); transition: background .15s, border-color .15s}
-        .vsb-item:hover{background: var(--b3-list-hover)}
-        .vsb-item-name{font-size:13px; font-weight:500}
-        .vsb-item-actions{display:flex; gap:8px}
-        .vsb-btn--danger{background: #b71c1c; color:#fff; border-color:#b71c1c}
-        .vsb-btn--danger:hover{filter:brightness(1.05)}
+        .vsb-modal .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none; width:100%}
+        .vsb-modal .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
+        .vsb-modal .vsb-field{display:grid; gap:6px}
+        .vsb-modal .vsb-label{font-size:12px; color: var(--b3-theme-on-surface)}
+  /* Preset modal */
+  .vsb-modal .vsb-preset .vsb-preset-head,
+  .vsb-modal.vsb-preset .vsb-preset-head{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+  .vsb-modal .vsb-preset .vsb-search,
+  .vsb-modal.vsb-preset .vsb-search{max-width: 260px; width:auto}
+  .vsb-modal .vsb-preset .vsb-badge,
+  .vsb-modal.vsb-preset .vsb-badge{display:inline-block; min-width:22px; padding:2px 6px; border-radius:999px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-surface); font-size:12px; text-align:center; border:1px solid var(--b3-border-color)}
+        .vsb-modal .vsb-list{display:flex; flex-direction:column; gap:8px}
+        .vsb-modal .vsb-item{display:flex; align-items:center; justify-content:space-between; border:1px solid var(--b3-border-color); border-radius:8px; padding:8px 10px; background: var(--b3-theme-background); transition: background .15s, border-color .15s}
+        .vsb-modal .vsb-item:hover{background: var(--b3-list-hover)}
+        .vsb-modal .vsb-item-name{font-size:13px; font-weight:500}
+        .vsb-modal .vsb-item-actions{display:flex; gap:8px}
+        .vsb-modal .vsb-btn--danger{background: #b71c1c; color:#fff; border-color:#b71c1c}
+        .vsb-modal .vsb-btn--danger:hover{filter:brightness(1.05)}
       `;
       document.head.appendChild(st);
     }
