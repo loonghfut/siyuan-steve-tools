@@ -314,6 +314,7 @@ export class VisualSqlUI {
   const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
     this.currentPresetEl = this.container.querySelector('[data-current-preset]') as HTMLElement;
     this.updateCurrentPresetLabel();
+  this.currentPresetEl?.addEventListener('click', (e) => this.openPresetQuickMenu(e));
 
 
     // 异步加载标签下拉
@@ -387,6 +388,115 @@ export class VisualSqlUI {
     if (!this.currentPresetEl) return;
     const name = (this.currentPresetName || '').trim();
     this.currentPresetEl.textContent = name ? `预设：${name}` : '';
+  }
+
+  // ===== 预设快速切换 Popover =====
+  private presetPopoverEl?: HTMLElement;
+  private presetPopHandlers?: { onDocClick: (e: MouseEvent) => void; onKey: (e: KeyboardEvent) => void; onScroll: () => void };
+
+  private async openPresetQuickMenu(ev: Event) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (!this.currentPresetEl) return;
+    // 若已存在则切换为关闭
+    if (this.presetPopoverEl) { this.closePresetQuickMenu(); return; }
+    // 注入样式（一次）
+    this.ensurePopoverStyle();
+    // 拉取预设
+    const maybe = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+    const presets = maybe || {};
+    const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b,'zh-CN'));
+    // 构建 DOM
+    const pop = document.createElement('div');
+    pop.className = 'vsb-popover vsb-preset-popover';
+    if (!names.length) {
+      pop.innerHTML = `<div class="vsb-popover__empty">暂无预设</div>`;
+    } else {
+      pop.innerHTML = `
+        <div class="vsb-popover__list">
+          ${names.map(n => `<div class="vsb-popover__item" data-name="${this.escapeHtml(n)}">${this.escapeHtml(n)}</div>`).join('')}
+        </div>
+      `;
+    }
+    document.body.appendChild(pop);
+    // 定位到标签元素附近
+    const rect = this.currentPresetEl.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const maxW = Math.min(320, vw - 16);
+    pop.style.maxWidth = `${maxW}px`;
+    // 先置隐形测量
+    pop.style.visibility = 'hidden';
+    pop.style.left = '0px';
+    pop.style.top = '0px';
+    const ph = pop.getBoundingClientRect();
+    let left = Math.min(rect.left, vw - ph.width - 8);
+    left = Math.max(8, left);
+    let top = rect.bottom + 6;
+    if (top + ph.height + 8 > vh) top = Math.max(8, rect.top - ph.height - 6);
+    pop.style.left = `${Math.floor(left)}px`;
+    pop.style.top = `${Math.floor(top)}px`;
+    pop.style.visibility = 'visible';
+    this.presetPopoverEl = pop;
+    // 绑定事件：点击项应用、外点关闭、ESC 关闭、滚动关闭
+    if (names.length) {
+      pop.querySelectorAll('.vsb-popover__item').forEach(el => {
+        el.addEventListener('click', async () => {
+          const name = (el as HTMLElement).getAttribute('data-name') || '';
+          const p = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+          const s = p[name];
+          if (!s) return;
+          this.currentPresetName = name;
+          this.hydrateState(s, { applyCollapse: false });
+          this.rebuildSql();
+          this.toast('已应用预设');
+          this.closePresetQuickMenu();
+        });
+      });
+    }
+    const onDocClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (this.presetPopoverEl && !this.presetPopoverEl.contains(t) && !this.currentPresetEl!.contains(t)) {
+        this.closePresetQuickMenu();
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') this.closePresetQuickMenu(); };
+    const body = this.resultsEl?.querySelector?.('.vsb-result__body');
+    const onScroll = () => this.closePresetQuickMenu();
+    setTimeout(()=> document.addEventListener('click', onDocClick), 0);
+    document.addEventListener('keydown', onKey);
+    if (body) body.addEventListener('scroll', onScroll);
+    this.presetPopHandlers = { onDocClick, onKey, onScroll };
+  }
+
+  private closePresetQuickMenu() {
+    if (this.presetPopoverEl) {
+      this.presetPopoverEl.remove();
+      this.presetPopoverEl = undefined;
+    }
+    if (this.presetPopHandlers) {
+      document.removeEventListener('click', this.presetPopHandlers.onDocClick);
+      document.removeEventListener('keydown', this.presetPopHandlers.onKey);
+      const body = this.resultsEl?.querySelector?.('.vsb-result__body') as HTMLElement | undefined;
+      if (body) body.removeEventListener('scroll', this.presetPopHandlers.onScroll);
+      this.presetPopHandlers = undefined;
+    }
+  }
+
+  private ensurePopoverStyle() {
+    const ID = 'visual-sql-preset-popover-style';
+    if (document.getElementById(ID)) return;
+    const st = document.createElement('style');
+    st.id = ID;
+    st.textContent = `
+      .vsb-popover{position:fixed; z-index:99999; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.2); overflow:hidden; font-size:12px}
+      .vsb-preset-popover{min-width:160px}
+      .vsb-popover__list{max-height:40vh; overflow:auto}
+      .vsb-popover__item{padding:4px 8px; cursor:pointer; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; border-bottom:1px solid var(--b3-border-color); line-height:1.35}
+      .vsb-popover__item:last-child{border-bottom:none}
+      .vsb-popover__item:hover{background: var(--b3-list-hover)}
+      .vsb-popover__empty{padding:8px; color: var(--vsb-muted); font-size:12px}
+    `;
+    document.head.appendChild(st);
   }
 
   private rebuildSql() {
