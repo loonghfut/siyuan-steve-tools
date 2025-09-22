@@ -83,6 +83,7 @@ export class VisualSqlUI {
 
   private outputPre!: HTMLPreElement;
   private copyBtn!: HTMLButtonElement;
+  private copyEmbedBtn!: HTMLButtonElement;
   private resetBtn!: HTMLButtonElement;
   private actionsEl!: HTMLElement;
   private advSqlFragment: string = '';
@@ -257,6 +258,7 @@ export class VisualSqlUI {
           <div class="vsb-actions">
             <button class="vsb-btn" data-adv-open>高级筛选</button>
             <button class="vsb-btn" data-copy>复制 SQL</button>
+            <button class="vsb-btn" data-copy-embed>复制嵌入块</button>
             <button class="vsb-btn vsb-ghost" data-reset>重置</button>
           </div>
 
@@ -304,6 +306,7 @@ export class VisualSqlUI {
     this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
     this.resultsEl = this.container.querySelector('div[data-result]') as HTMLElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
+  this.copyEmbedBtn = this.container.querySelector('button[data-copy-embed]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
     this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
     const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
@@ -331,6 +334,7 @@ export class VisualSqlUI {
       if (v) this.pushRecentTags([v]);
     });
     this.copyBtn.addEventListener('click', () => this.copySql());
+    this.copyEmbedBtn.addEventListener('click', () => this.copyEmbedSql());
     this.resetBtn.addEventListener('click', () => this.resetForm());
     advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
   // 折叠状态变更时持久化
@@ -792,19 +796,27 @@ export class VisualSqlUI {
 
   private async copySql() {
     const sql = (this.outputPre.textContent || '').trim();
+    await this.copyText(sql, '已复制 SQL 到剪贴板');
+  }
+
+  private async copyEmbedSql() {
+    const sql = (this.outputPre.textContent || '').trim();
     const wrapped = sql ? `{{${sql}}}` : '';
+    await this.copyText(wrapped, '已复制嵌入块到剪贴板');
+  }
+
+  private async copyText(text: string, okMsg: string) {
     try {
-      await navigator.clipboard.writeText(wrapped);
-      this.toast('已复制 SQL 到剪贴板');
+      await navigator.clipboard.writeText(text);
+      this.toast(okMsg);
     } catch {
-      // 兼容不支持 clipboard 的环境
       const ta = document.createElement('textarea');
-      ta.value = wrapped;
+      ta.value = text;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      this.toast('已复制 SQL（兼容模式）');
+      this.toast(okMsg + '（兼容模式）');
     }
   }
 
@@ -1230,7 +1242,13 @@ export class VisualSqlUI {
           render();
         });
         del.addEventListener('click', async () => {
-          const ok = await this.openConfirmModal(`删除预设 “${name}”？`);
+          const ok = await this.openConfirmModal({
+            message: `删除预设 “${name}”？`,
+            title: '删除确认',
+            okText: '删除',
+            cancelText: '取消',
+            danger: true
+          });
           if (!ok) return;
           const p2 = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
           delete p2[name];
@@ -1255,7 +1273,7 @@ export class VisualSqlUI {
         .vsb-modal-title{font-weight:600}
         .vsb-modal-body{padding:12px; overflow:auto}
         .vsb-modal-footer{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid var(--b3-border-color)}
-        .vsb-modal .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none; width:100%}
+        .vsb-modal .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none;}
         .vsb-modal .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
         .vsb-modal .vsb-field{display:grid; gap:6px}
         .vsb-modal .vsb-label{font-size:12px; color: var(--b3-theme-on-surface)}
@@ -1273,6 +1291,20 @@ export class VisualSqlUI {
         .vsb-modal .vsb-item-actions{display:flex; gap:8px}
         .vsb-modal .vsb-btn--danger{background: #b71c1c; color:#fff; border-color:#b71c1c}
         .vsb-modal .vsb-btn--danger:hover{filter:brightness(1.05)}
+
+        /* Scoped tweaks for input modal only */
+        .vsb-modal.vsb-modal--input{width:min(520px, 92vw)}
+        .vsb-modal.vsb-modal--input .vsb-modal-footer{justify-content:flex-end}
+        .vsb-modal.vsb-modal--input .vsb-modal-footer .vsb-btn[data-cancel]{order:1}
+        .vsb-modal.vsb-modal--input .vsb-modal-footer .vsb-btn[data-ok]{order:2}
+
+        /* Scoped tweaks for confirm modal only */
+        .vsb-modal.vsb-modal--confirm{width:min(480px, 92vw)}
+        .vsb-modal.vsb-modal--confirm .vsb-modal-footer{justify-content:flex-end}
+        .vsb-modal.vsb-modal--confirm .vsb-modal-footer .vsb-btn[data-cancel]{order:1}
+        .vsb-modal.vsb-modal--confirm .vsb-modal-footer .vsb-btn[data-ok]{order:2}
+        .vsb-modal.vsb-modal--confirm.vsb-modal--danger .vsb-modal-footer .vsb-btn[data-ok]{background:#b71c1c; color:#fff; border-color:#b71c1c}
+        .vsb-modal.vsb-modal--confirm.vsb-modal--danger .vsb-modal-footer .vsb-btn[data-ok]:hover{filter:brightness(1.05)}
       `;
       document.head.appendChild(st);
     }
@@ -1284,7 +1316,7 @@ export class VisualSqlUI {
       const overlay = document.createElement('div');
       overlay.className = 'vsb-modal-mask';
       const dialog = document.createElement('div');
-      dialog.className = 'vsb-modal';
+      dialog.className = 'vsb-modal vsb-modal--input';
       dialog.innerHTML = `
         <div class="vsb-modal-header">
           <div class="vsb-modal-title">${this.escapeHtml(opts.title)}</div>
@@ -1321,24 +1353,31 @@ export class VisualSqlUI {
     });
   }
 
-  private openConfirmModal(msg: string): Promise<boolean> {
+  private openConfirmModal(opts: string | { message: string; title?: string; okText?: string; cancelText?: string; danger?: boolean; modalClass?: string; }): Promise<boolean> {
     this.ensureModalStyle();
     return new Promise(resolve => {
+      const o = typeof opts === 'string' ? { message: opts } : opts;
+      const title = (o.title || '确认');
+      const message = o.message || '';
+      const okText = (o.okText || '确定');
+      const cancelText = (o.cancelText || '取消');
+      const danger = !!o.danger;
+      const extraClass = o.modalClass ? ' ' + o.modalClass : '';
       const overlay = document.createElement('div');
       overlay.className = 'vsb-modal-mask';
       const dialog = document.createElement('div');
-      dialog.className = 'vsb-modal';
+      dialog.className = 'vsb-modal vsb-modal--confirm' + (danger ? ' vsb-modal--danger' : '') + extraClass;
       dialog.innerHTML = `
         <div class="vsb-modal-header">
-          <div class="vsb-modal-title">确认</div>
+          <div class="vsb-modal-title">${this.escapeHtml(title)}</div>
           <button class="vsb-btn vsb-ghost" data-close>×</button>
         </div>
         <div class="vsb-modal-body">
-          <div>${this.escapeHtml(msg)}</div>
+          <div>${this.escapeHtml(message)}</div>
         </div>
         <div class="vsb-modal-footer">
-          <button class="vsb-btn" data-ok>确定</button>
-          <button class="vsb-btn vsb-ghost" data-cancel>取消</button>
+          <button class="vsb-btn" data-ok>${this.escapeHtml(okText)}</button>
+          <button class="vsb-btn vsb-ghost" data-cancel>${this.escapeHtml(cancelText)}</button>
         </div>
       `;
       overlay.appendChild(dialog);
