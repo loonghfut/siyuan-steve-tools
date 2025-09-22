@@ -717,14 +717,15 @@ export class VisualSqlUI {
   }
 
   private async copySql() {
-    const sql = this.outputPre.textContent || '';
+    const sql = (this.outputPre.textContent || '').trim();
+    const wrapped = sql ? `{{${sql}}}` : '';
     try {
-      await navigator.clipboard.writeText(sql);
+      await navigator.clipboard.writeText(wrapped);
       this.toast('已复制 SQL 到剪贴板');
     } catch {
       // 兼容不支持 clipboard 的环境
       const ta = document.createElement('textarea');
-      ta.value = sql;
+      ta.value = wrapped;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
