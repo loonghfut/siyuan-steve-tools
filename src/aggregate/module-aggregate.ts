@@ -42,6 +42,7 @@ export class M_Aggregate {
                     await conf.load();
                     const ui = new VisualSqlUI(container, {
                         previewColumns: previewCols,
+                        previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                         noPreviewHeightLimit: true,
                         showPresetControls: true,
                         // 使用持久化配置替代 localStorage
@@ -104,6 +105,7 @@ export class M_Aggregate {
                     // 在 Slash 面板中挂载 UI，并增加“插入代码块”按钮
                     const ui = new VisualSqlUI(container, {
                         previewColumns: previewCols,
+                        previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                         buttons: [
                             {
                                 label: '插入SQL',
@@ -137,9 +139,10 @@ export class M_Aggregate {
 
 
 
-    mountUI(container: HTMLElement, previewColumns?: string) {
+    mountUI(container: HTMLElement, previewColumns?: string, settings?: any) {
         this._ui = new VisualSqlUI(container, {
             previewColumns,
+            previewColMaxWidth: Number(settings?.["aggregate-sql-preview-col-max-width"]) || 480,
             onSqlChange: (_sql) => {
                 // 可同步 SQL 或发起查询
                 console.log("生成的 SQL:", _sql);
@@ -191,7 +194,7 @@ export class M_Aggregate {
                         this._ui?.resize();
                     },
                 });
-                this.mountUI(document.getElementById('visual-sql-container')!, previewCols);
+                this.mountUI(document.getElementById('visual-sql-container')!, previewCols, _settingdata);
                 requestAnimationFrame(() => this._ui?.resize());
             }
         });

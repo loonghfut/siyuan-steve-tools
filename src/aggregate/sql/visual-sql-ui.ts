@@ -17,6 +17,11 @@ export interface VisualSqlUIOptions {
   onSqlChange?: (sql: string) => void;
   buttons?: VisualSqlUIButton[]; // 自定义按钮
   /**
+   * 结果预览中单列最大宽度（像素）。
+   * 若未提供则默认为 480。
+   */
+  previewColMaxWidth?: number;
+  /**
    * 状态持久化键名。若未提供则使用默认键启用持久化。
    * 如需隔离不同实例可传入自定义键名。
    */
@@ -820,8 +825,9 @@ export class VisualSqlUI {
     const style = window.getComputedStyle(tbl);
     const font = `${style.getPropertyValue('font-weight')} ${style.getPropertyValue('font-size')} ${style.getPropertyValue('font-family')}`;
     if (ctx) ctx.font = font;
-    const padding = 16; // 左右 padding 合计
-    const minW = 60, maxW = 480;
+  const padding = 16; // 左右 padding 合计
+  const minW = 60;
+  const maxW = this.getPreviewColMaxWidth();
     const widths = ths.map((th, idx) => {
       const base = th.textContent ? (th.textContent.length * 8 + padding) : minW;
       const colMin = idx === 0 ? 40 : minW; // 行号列更窄一些
@@ -857,7 +863,8 @@ export class VisualSqlUI {
     const cols = Array.from(cg.children) as HTMLTableColElement[];
     const onMove = (e: MouseEvent) => {
       const dx = e.clientX - startX;
-      const newW = Math.max(40, startW + dx);
+      const maxW = this.getPreviewColMaxWidth();
+      const newW = Math.min(maxW, Math.max(40, startW + dx));
       if (cols[colIndex]) cols[colIndex].style.width = newW + 'px';
     };
     const onUp = () => {
@@ -872,6 +879,14 @@ export class VisualSqlUI {
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     });
+  }
+
+  private getPreviewColMaxWidth(): number {
+    const v = Number(this.opts?.previewColMaxWidth);
+    const def = 480;
+    const n = Number.isFinite(v) && v > 0 ? v : def;
+    // 合理夹取，避免异常值
+    return Math.min(2000, Math.max(120, Math.floor(n)));
   }
 
   private attachCellTooltip(tbl: HTMLTableElement) {

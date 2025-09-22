@@ -6,6 +6,8 @@ export const aggregateDefaults: Record<string, any> = {
     "aggregate-enable-sql-visualizer": true,
     // SQL 结果预览列（逗号/空格分隔）。为空则自动推断列
     "aggregate-sql-preview-columns": "",
+    // SQL 结果预览列最大宽度（像素）
+    "aggregate-sql-preview-col-max-width": 480,
 };
 
 export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -20,6 +22,13 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             key: "aggregate-sql-preview-columns",
             value: ctx.settings["aggregate-sql-preview-columns"] ?? "",
             direction: "row",
+        },
+        {
+            type: "number",
+            title: "结果预览列最大宽度（px）",
+            description: "限制结果表格中每一列的最大宽度，避免列过宽影响阅读。建议范围 240~1200，默认 480。",
+            key: "aggregate-sql-preview-col-max-width",
+            value: ctx.settings["aggregate-sql-preview-col-max-width"] ?? 480,
         },
     ]
 });
