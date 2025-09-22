@@ -827,7 +827,7 @@ export class VisualSqlAdvancedUI {
     /* 折叠/展开按钮颜色标识 */
     .vsb-adv-header [data-collapse-btn][aria-expanded="true"]{ color: var(--b3-theme-primary); border-color: var(--b3-theme-primary); }
     .vsb-adv-header [data-collapse-btn][aria-expanded="false"]{ color: var(--b3-theme-on-background); background: var(--b3-theme-background-light); }
-      .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none}
+      .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 3px; outline:none}
       .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
   /* Tag 搜索输入（datalist 绑定）配色适配 */
   .vsb-adv-wrap input.vsb-input[list^="vsb-tags-"]{ background: var(--b3-theme-background); color: var(--b3-theme-on-background); caret-color: var(--b3-theme-primary); }

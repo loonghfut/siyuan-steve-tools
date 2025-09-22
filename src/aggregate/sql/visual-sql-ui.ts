@@ -216,7 +216,7 @@ export class VisualSqlUI {
             <label class="vsb-field">updated 近 N 天<input class="vsb-input" data-updated-days type="number" min="0" value="0"/></label>
             <label class="vsb-field">created 时间比较
               <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px;">
-                <select class="vsb-input" data-created-op style="width:84px;">
+                <select class="vsb-input" data-created-op style="width:26px;">
                   <option value=">">></option>
                   <option value="<"><</option>
                 </select>
@@ -225,7 +225,7 @@ export class VisualSqlUI {
             </label>
             <label class="vsb-field">updated 时间比较
               <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px;">
-                <select class="vsb-input" data-updated-op style="width:84px;">
+                <select class="vsb-input" data-updated-op style="width:26px;">
                   <option value=">">></option>
                   <option value="<"><</option>
                 </select>
@@ -486,15 +486,28 @@ export class VisualSqlUI {
 
   private renderLoading(stmt: string) {
     this.hideTooltip();
-    this.resultsEl.innerHTML = `
-      <div class="vsb-result__head">
-        <div>正在查询…</div>
-        <div class="vsb-small">${this.escapeHtml(stmt)}</div>
-      </div>
-      <div class="vsb-result__body">
-        <div class="vsb-loading">加载中…</div>
-      </div>
-    `;
+    // 优雅加载：保留当前内容，叠加骨架屏与淡化
+    const head = this.resultsEl.querySelector('.vsb-result__head');
+    const body = this.resultsEl.querySelector('.vsb-result__body') as HTMLElement | null;
+    if (head && body) {
+      head.innerHTML = `<div>正在查询…</div><div class="vsb-small">${this.escapeHtml(stmt)}</div>`;
+      this.resultsEl.classList.add('is-loading');
+      if (!body.querySelector('.vsb-skeleton')) {
+        body.appendChild(this.createSkeleton());
+      }
+    } else {
+      // 首次渲染或无内容时，构造基本结构 + 骨架屏
+      this.resultsEl.innerHTML = `
+        <div class="vsb-result__head">
+          <div>正在查询…</div>
+          <div class="vsb-small">${this.escapeHtml(stmt)}</div>
+        </div>
+        <div class="vsb-result__body"></div>
+      `;
+      const b = this.resultsEl.querySelector('.vsb-result__body') as HTMLElement;
+      b.appendChild(this.createSkeleton());
+      this.resultsEl.classList.add('is-loading');
+    }
   }
 
   private renderError(msg: string) {
@@ -507,6 +520,10 @@ export class VisualSqlUI {
         <div class="vsb-error">${this.escapeHtml(msg)}</div>
       </div>
     `;
+    this.resultsEl.classList.remove('is-loading');
+    // 淡入过渡
+    const body = this.resultsEl.querySelector('.vsb-result__body') as HTMLElement | null;
+    body?.classList.add('vsb-fade-in');
   }
 
   private renderResultTable(rows: any[], stmt: string, elapsedMs: number) {
@@ -556,6 +573,10 @@ export class VisualSqlUI {
         <table class="vsb-table">${thead}${tbody}</table>
       </div>
     `;
+    this.resultsEl.classList.remove('is-loading');
+    // 淡入过渡
+    const body = this.resultsEl.querySelector('.vsb-result__body') as HTMLElement | null;
+    body?.classList.add('vsb-fade-in');
 
     // 列宽自适应：基于内容测量，设置 colgroup
     const tbl = this.resultsEl.querySelector('table.vsb-table') as HTMLTableElement | null;
@@ -833,7 +854,7 @@ export class VisualSqlUI {
       .vsb-grid-4{grid-template-columns: repeat(4, minmax(160px,1fr))}
       .vsb-grid-3{grid-template-columns: repeat(3, minmax(200px,1fr))}
       .vsb-field{display:grid; gap:4px; font-size:12px; color: var(--vsb-muted)}
-      .vsb-input{appearance:none; border:1px solid var(--vsb-input-border); background: var(--vsb-input-bg); color: var(--vsb-fg); border-radius:6px; padding:6px 8px; outline:none}
+      .vsb-input{appearance:none; border:1px solid var(--vsb-input-border); background: var(--vsb-input-bg); color: var(--vsb-fg); border-radius:6px; padding:6px 3px; outline:none}
       .vsb-input:focus{border-color: var(--vsb-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
       .vsb-input::placeholder{color: var(--b3-theme-on-surface-light)}
       .vsb-seg{display:flex; gap:6px; background: var(--vsb-seg-bg); padding:4px; border-radius:10px; border:1px solid var(--vsb-border)}
@@ -861,6 +882,17 @@ export class VisualSqlUI {
   /* 在 Tab 模式可关闭固定高度，由外层容器负责滚动 */
   .vsb-wrap.vsb-no-limit-preview .vsb-result__body{height:auto; max-height:none; overflow-y:visible; overflow-x:auto}
   .vsb-result__body .vsb-table{width: 100%}
+  /* 加载态与骨架屏 */
+  .vsb-result.is-loading .vsb-result__body > *:not(.vsb-skeleton){
+    opacity:.45; filter: blur(.3px); transition: opacity .15s ease, filter .15s ease;
+  }
+  .vsb-skeleton{position:absolute; inset:0; padding:10px; overflow:hidden; pointer-events:none}
+  .vsb-skel-line{height:12px; border-radius:6px; background: var(--b3-theme-background-light); margin:10px 0; position:relative; overflow:hidden}
+  .vsb-skel-line::after{content:""; position:absolute; inset:0; width:40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent); transform: translateX(-100%); animation: vsbShimmer 1.2s infinite}
+  @keyframes vsbShimmer{0%{transform: translateX(-100%)}100%{transform: translateX(200%)}}
+  /* 淡入动画 */
+  .vsb-fade-in{animation: vsbFadeIn .18s ease}
+  @keyframes vsbFadeIn{from{opacity:0; transform: translateY(2px)} to{opacity:1; transform: translateY(0)}}
   .vsb-table{width:100%; border-collapse:separate; border-spacing:0; font-size:12px}
   .vsb-table th,.vsb-table td{padding:6px 8px; border-bottom:1px solid var(--b3-border-color); vertical-align:top}
   .vsb-table thead{position: sticky; top: 0; z-index: 3; background: var(--b3-theme-surface)}
@@ -914,6 +946,22 @@ export class VisualSqlUI {
       .vsb-compact .vsb-title{font-size:12px}
     `;
     document.head.appendChild(style);
+  }
+
+  private createSkeleton(): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'vsb-skeleton';
+    // 生成若干条骨架行
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const line = document.createElement('div');
+      line.className = 'vsb-skel-line';
+      // 行宽错落更自然
+      const w = 80 - (i % 4) * 10; // 80%,70%,60%,50% 循环
+      line.style.width = w + '%';
+      wrap.appendChild(line);
+    }
+    return wrap;
   }
 
   // ========== 持久化 ==========
