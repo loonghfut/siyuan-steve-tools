@@ -686,10 +686,15 @@ export class VisualSqlUI {
       cols = Array.from(colSet).slice(0, 12);
     }
 
-    const thead = `<thead><tr>${cols.map(c => `<th>${this.escapeHtml(c)}</th>`).join('')}</tr></thead>`;
-    const tbody = `<tbody>${rows.map(r => {
-      if (!r || typeof r !== 'object') return `<tr><td colspan="${cols.length}">${this.escapeHtml(String(r))}</td></tr>`;
-      return `<tr>${cols.map(c => `<td>${this.escapeHtml(this.formatCell(r[c]))}</td>`).join('')}</tr>`;
+    const thead = `<thead><tr><th class="vsb-th-rownumber">#</th>${cols.map(c => `<th>${this.escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${rows.map((r, idx) => {
+      const rowNo = `<td class="vsb-rownumber">${idx + 1}</td>`;
+      if (!r || typeof r !== 'object') {
+        const txt = this.escapeHtml(String(r));
+        return `<tr>${rowNo}<td colspan="${Math.max(1, cols.length)}">${txt}</td></tr>`;
+      }
+      const cells = cols.map(c => `<td>${this.escapeHtml(this.formatCell(r[c]))}</td>`).join('');
+      return `<tr>${rowNo}${cells}</tr>`;
     }).join('')}</tbody>`;
 
     // 先渲染基础结构
@@ -817,7 +822,11 @@ export class VisualSqlUI {
     if (ctx) ctx.font = font;
     const padding = 16; // 左右 padding 合计
     const minW = 60, maxW = 480;
-    const widths = ths.map(th => Math.min(maxW, Math.max(minW, th.textContent ? (th.textContent.length * 8 + padding) : minW)));
+    const widths = ths.map((th, idx) => {
+      const base = th.textContent ? (th.textContent.length * 8 + padding) : minW;
+      const colMin = idx === 0 ? 40 : minW; // 行号列更窄一些
+      return Math.min(maxW, Math.max(colMin, base));
+    });
     rows.slice(0, 200).forEach(tr => {
       const tds = Array.from(tr.cells) as HTMLTableCellElement[];
       tds.forEach((td, i) => {
@@ -826,7 +835,8 @@ export class VisualSqlUI {
         if (ctx) {
           try { w = ctx.measureText(text).width + padding; } catch { }
         }
-        widths[i] = Math.min(maxW, Math.max(widths[i] || minW, Math.ceil(w)));
+        const colMin = i === 0 ? 40 : minW;
+        widths[i] = Math.min(maxW, Math.max(widths[i] || colMin, Math.ceil(w)));
       });
     });
     return widths;
@@ -1109,6 +1119,8 @@ export class VisualSqlUI {
   .vsb-table th,.vsb-table td{padding:6px 8px; border-bottom:1px solid var(--b3-border-color); vertical-align:top}
   .vsb-table thead{position: sticky; top: 0; z-index: 3; background: var(--b3-theme-surface)}
   .vsb-table th{position:sticky; top:0; background: var(--b3-theme-surface); text-align:left; color: var(--vsb-muted); z-index:3; box-shadow: 0 1px 0 var(--b3-border-color)}
+  /* 行号列样式 */
+  .vsb-table th.vsb-th-rownumber, .vsb-table td.vsb-rownumber{color: var(--vsb-muted); text-align:right; width: 1%; white-space:nowrap}
   /* 列自适应 + 拖拽调整支持 */
   .vsb-table{table-layout: fixed}
   .vsb-table th{position: sticky; top:0}
