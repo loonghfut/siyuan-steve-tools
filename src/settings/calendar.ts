@@ -95,7 +95,7 @@ function calendarDbOptions(ctx: BuildContext) {
     try {
         const ids = ctx.moduleInstances["M_calendar"]?.av_ids;
         if (!Array.isArray(ids) || ids.length === 0) {
-            return { "": "无可用数据库请先导入日程周期模板" };
+            return { "": "未找到命名为‘日程’的数据库" };
         }
         return Object.fromEntries(ids.filter((d: any) => d?.id && d?.name).map((d: any) => [d.id, d.name]));
     } catch {
