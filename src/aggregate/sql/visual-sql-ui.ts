@@ -1091,7 +1091,8 @@ export class VisualSqlUI {
   .vsb-result__head{display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background: var(--b3-theme-surface); border-bottom:1px solid var(--b3-border-color); font-size:12px; color: var(--vsb-muted)}
   .vsb-result__body{height: var(--vsb-result-height, 360px); overflow:auto; position:relative}
   /* 在 Tab 模式可关闭固定高度，由外层容器负责滚动 */
-  .vsb-wrap.vsb-no-limit-preview .vsb-result__body{height:auto; max-height:none; overflow-y:visible; overflow-x:auto}
+  /* 在“无限高”模式下，仍保留一个合理的最大高度以允许局部滚动 */
+  .vsb-wrap.vsb-no-limit-preview .vsb-result__body{height:auto; max-height: var(--vsb-result-max-height, 80vh); overflow-y:auto; overflow-x:auto}
   .vsb-result__body .vsb-table{width: 100%}
   /* 加载态与骨架屏 */
   .vsb-result.is-loading .vsb-result__body > *:not(.vsb-skeleton){
