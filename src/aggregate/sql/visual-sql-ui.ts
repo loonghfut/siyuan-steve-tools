@@ -31,6 +31,22 @@ export interface VisualSqlUIOptions {
    * 为 true 时，结果预览区域随内容自增高，由外层滚动容器承载滚动。
    */
   noPreviewHeightLimit?: boolean;
+  /**
+   * 显示筛选预设（保存/应用）控制，仅 Tab 模式启用。
+   */
+  showPresetControls?: boolean;
+  /**
+   * 筛选预设存储键。不同项目可配置独立键。
+   */
+  presetsKey?: string;
+  /**
+   * 读取预设的回调；若提供则优先使用（可返回 Promise）。
+   */
+  loadPresets?: () => Promise<Record<string, any>> | Record<string, any>;
+  /**
+   * 保存预设的回调；若提供则优先使用（可返回 Promise）。
+   */
+  savePresets?: (obj: Record<string, any>) => Promise<void> | void;
 }
 
 export class VisualSqlUI {
@@ -77,12 +93,14 @@ export class VisualSqlUI {
   private tipDocClick?: (e: MouseEvent) => void;
   private tipKeydown?: (e: KeyboardEvent) => void;
   private tipScroll?: () => void;
+  private presetsKey?: string;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
     this.container = container;
     this.opts = options || {};
     this.builder = new VisualSqlBuilder('embedded');
     this.storageKey = this.opts.persistKey ?? 'siyuan-steve-tools:visual-sql-ui';
+    this.presetsKey = this.opts.presetsKey ?? 'siyuan-steve-tools:visual-sql-presets';
     this.previewCols = this.normalizePreviewColumns(this.opts.previewColumns);
     this.render();
     // 恢复上次状态并生成 SQL
@@ -329,6 +347,24 @@ export class VisualSqlUI {
         }
         this.actionsEl.insertBefore(btn, insertBeforeEl);
       }
+    }
+
+    // Tab 模式：筛选预设控制
+    if (this.opts.showPresetControls && this.actionsEl) {
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'vsb-btn';
+      saveBtn.textContent = '保存筛选';
+      saveBtn.title = '保存当前筛选为预设';
+      saveBtn.addEventListener('click', () => this.savePresetFlow());
+      const applyBtn = document.createElement('button');
+      applyBtn.className = 'vsb-btn';
+      applyBtn.textContent = '应用筛选';
+      applyBtn.title = '从预设中选择并应用';
+      applyBtn.addEventListener('click', () => this.openPresetModal());
+      // 插到最左侧
+      const insertBeforeEl = this.actionsEl.firstElementChild || null;
+      this.actionsEl.insertBefore(applyBtn, insertBeforeEl);
+      this.actionsEl.insertBefore(saveBtn, applyBtn);
     }
   }
 
@@ -884,37 +920,41 @@ export class VisualSqlUI {
   private saveState() {
     if (!this.storageKey) return;
     try {
-      const state = {
-        types: Array.from(this.typeChecks || []).filter(c => c.checked).map(c => c.value),
-        subtypes: Array.from(this.subtypeChecks || []).filter(c => c.checked).map(c => c.value),
-        boxes: Array.from(this.boxChecks || []).filter(c => c.checked).map(c => c.value),
-        rootId: this.rootIdInput?.value ?? '',
-        parentId: this.parentIdInput?.value ?? '',
-        path: this.pathLikeInput?.value ?? '',
-        content: this.contentLikeInput?.value ?? '',
-        md: this.mdLikeInput?.value ?? '',
-        hpath: this.hpathLikeInput?.value ?? '',
-        ial: this.ialLikeInput?.value ?? '',
-        tag: this.tagInput?.value ?? '',
-        createdDays: this.createdDaysInput?.value ?? '',
-        updatedDays: this.updatedDaysInput?.value ?? '',
-        createdOp: this.createdOpSel?.value ?? '>',
-        createdAt: this.createdAtInput?.value ?? '',
-        updatedOp: this.updatedOpSel?.value ?? '>',
-        updatedAt: this.updatedAtInput?.value ?? '',
-        orderField: this.orderFieldSel?.value ?? '',
-        orderDir: this.orderDirSel?.value ?? 'desc',
-        limit: this.limitInput?.value ?? '',
-        advSqlFragment: this.advSqlFragment || '',
-        // 折叠状态
-        filtersOpen: (this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null)?.open ?? true,
-        previewOpen: (this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null)?.open ?? true,
-      };
+      const state = this.getStateSnapshot();
       localStorage.setItem(this.storageKey, JSON.stringify(state));
     } catch (e) {
       // 忽略可能的异常（如无痕模式或配额问题）
       console.debug('[VisualSqlUI] saveState failed', e);
     }
+  }
+
+  private getStateSnapshot() {
+    return {
+      types: Array.from(this.typeChecks || []).filter(c => c.checked).map(c => c.value),
+      subtypes: Array.from(this.subtypeChecks || []).filter(c => c.checked).map(c => c.value),
+      boxes: Array.from(this.boxChecks || []).filter(c => c.checked).map(c => c.value),
+      rootId: this.rootIdInput?.value ?? '',
+      parentId: this.parentIdInput?.value ?? '',
+      path: this.pathLikeInput?.value ?? '',
+      content: this.contentLikeInput?.value ?? '',
+      md: this.mdLikeInput?.value ?? '',
+      hpath: this.hpathLikeInput?.value ?? '',
+      ial: this.ialLikeInput?.value ?? '',
+      tag: this.tagInput?.value ?? '',
+      createdDays: this.createdDaysInput?.value ?? '',
+      updatedDays: this.updatedDaysInput?.value ?? '',
+      createdOp: this.createdOpSel?.value ?? '>',
+      createdAt: this.createdAtInput?.value ?? '',
+      updatedOp: this.updatedOpSel?.value ?? '>',
+      updatedAt: this.updatedAtInput?.value ?? '',
+      orderField: this.orderFieldSel?.value ?? '',
+      orderDir: this.orderDirSel?.value ?? 'desc',
+      limit: this.limitInput?.value ?? '',
+      advSqlFragment: this.advSqlFragment || '',
+      // 折叠状态
+      filtersOpen: (this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null)?.open ?? true,
+      previewOpen: (this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null)?.open ?? true,
+    };
   }
 
   private restoreState() {
@@ -923,6 +963,15 @@ export class VisualSqlUI {
       const raw = localStorage.getItem(this.storageKey);
       if (!raw) return;
       const s = JSON.parse(raw) as any;
+      this.hydrateState(s, { applyCollapse: true });
+
+    } catch (e) {
+      console.debug('[VisualSqlUI] restoreState failed', e);
+    }
+  }
+
+  private hydrateState(s: any, opts?: { applyCollapse?: boolean }) {
+    try {
       if (Array.isArray(s?.types) && this.typeChecks) {
         const set = new Set<string>(s.types);
         this.typeChecks.forEach(c => c.checked = set.has(c.value));
@@ -953,15 +1002,277 @@ export class VisualSqlUI {
       if (this.orderDirSel) this.orderDirSel.value = s?.orderDir ?? 'desc';
       if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
       this.advSqlFragment = s?.advSqlFragment || '';
-      // 恢复折叠状态
-      const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
-      const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
-      if (filtersSection) filtersSection.open = s?.filtersOpen !== false; // 默认展开
-      if (previewSection) previewSection.open = s?.previewOpen !== false; // 默认展开
+      if (opts?.applyCollapse) {
+        const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
+        const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
+        if (filtersSection) filtersSection.open = s?.filtersOpen !== false;
+        if (previewSection) previewSection.open = s?.previewOpen !== false;
+      }
+    } catch {}
+  }
 
-    } catch (e) {
-      console.debug('[VisualSqlUI] restoreState failed', e);
+  private loadPresets(): Record<string, any> {
+    if (this.opts.loadPresets) {
+      try {
+        const res = (this.opts.loadPresets() as any);
+        // 支持同步或异步
+        if (res && typeof res.then === 'function') {
+          // 异步版本无法在同步 API 返回；暂缓存为空，调用方使用 openPresetModal 渲染时会再次获取
+          // 为简化处理，这里阻塞不合适，改为由 openPresetModal 内部再次调用 loadPresets（已如此实现）
+          console.debug('[VisualSqlUI] loadPresets called synchronously, async provider will be awaited at call sites');
+          return {};
+        }
+        return (res as Record<string, any>) || {};
+      } catch { return {}; }
     }
+    try {
+      const raw = localStorage.getItem(this.presetsKey!);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  }
+
+  private savePresets(obj: Record<string, any>) {
+    if (this.opts.savePresets) {
+      try { (this.opts.savePresets(obj) as any); } catch {}
+      return;
+    }
+    try { localStorage.setItem(this.presetsKey!, JSON.stringify(obj)); } catch {}
+  }
+
+  private async savePresetFlow() {
+    const nameRaw = await this.openInputModal({ title: '保存为预设', label: '名称', placeholder: '输入预设名称' });
+    const name = (nameRaw || '').trim();
+    if (!name) return;
+    const presets = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+    if (presets[name]) {
+      const ok = await this.openConfirmModal('同名预设已存在，是否覆盖？');
+      if (!ok) return;
+    }
+    const snap = this.getStateSnapshot();
+    presets[name] = snap;
+    await (this.opts.savePresets ? this.opts.savePresets(presets) : (async () => this.savePresets(presets))());
+    this.toast('已保存筛选预设');
+  }
+
+  private openPresetModal() {
+    // 统一样式注入
+    this.ensureModalStyle();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'vsb-modal-mask';
+    const dialog = document.createElement('div');
+    dialog.className = 'vsb-modal vsb-preset';
+    dialog.innerHTML = `
+      <div class="vsb-modal-header">
+        <div class="vsb-modal-title">筛选预设</div>
+        <button class="vsb-btn vsb-ghost" data-close>×</button>
+      </div>
+      <div class="vsb-modal-body">
+        <div class="vsb-preset-head">
+          <input class="vsb-input vsb-search" data-search placeholder="搜索预设..." />
+          <span class="vsb-badge" data-count>0</span>
+        </div>
+        <div class="vsb-list" data-list></div>
+      </div>
+      <div class="vsb-modal-footer">
+        <button class="vsb-btn" data-close2>关闭</button>
+      </div>
+    `;
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    (dialog.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', close);
+    (dialog.querySelector('[data-close2]') as HTMLButtonElement).addEventListener('click', close);
+
+    const listEl = dialog.querySelector('[data-list]') as HTMLElement;
+    const searchEl = dialog.querySelector('[data-search]') as HTMLInputElement;
+    const countEl = dialog.querySelector('[data-count]') as HTMLElement;
+    const render = async () => {
+      const maybe = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+      const presets = maybe || {};
+      const q = (searchEl?.value || '').trim().toLowerCase();
+      const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b,'zh-CN'))
+        .filter(n => !q || n.toLowerCase().includes(q));
+      if (!names.length) {
+        listEl.innerHTML = `<div class="vsb-item"><div class="vsb-item-name" style="color: var(--vsb-muted)">暂无预设</div></div>`;
+        if (countEl) countEl.textContent = '0';
+        return;
+      }
+      if (countEl) countEl.textContent = String(names.length);
+      listEl.innerHTML = names.map(n => `
+        <div class="vsb-item" data-name="${this.escapeHtml(n)}">
+          <div class="vsb-item-name">${this.escapeHtml(n)}</div>
+          <div class="vsb-item-actions">
+            <button class="vsb-btn" data-apply>应用</button>
+            <button class="vsb-btn" data-rename>重命名</button>
+            <button class="vsb-btn vsb-btn--danger" data-delete>删除</button>
+          </div>
+        </div>
+      `).join('');
+      // 绑定事件
+      listEl.querySelectorAll('.vsb-item').forEach(item => {
+        const name = (item as HTMLElement).getAttribute('data-name') || '';
+        const apply = item.querySelector('[data-apply]') as HTMLButtonElement;
+        const rename = item.querySelector('[data-rename]') as HTMLButtonElement;
+        const del = item.querySelector('[data-delete]') as HTMLButtonElement;
+        apply.addEventListener('click', async () => {
+          const p = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+          const s = p[name];
+          if (!s) return;
+          this.hydrateState(s, { applyCollapse: false });
+          this.rebuildSql();
+          this.toast('已应用预设');
+          close();
+        });
+        // 双击整行也可应用
+        (item as HTMLElement).addEventListener('dblclick', async () => {
+          const p = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+          const s = p[name];
+          if (!s) return;
+          this.hydrateState(s, { applyCollapse: false });
+          this.rebuildSql();
+          this.toast('已应用预设');
+          close();
+        });
+        rename.addEventListener('click', async () => {
+          const p = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+          const cur = p[name];
+          if (!cur) return;
+          const newNameRaw = await this.openInputModal({ title: '重命名预设', label: '新名称', defaultValue: name });
+          const newName = (newNameRaw || '').trim();
+          if (!newName || newName === name) return;
+          if (p[newName] && newName !== name) {
+            const ok = await this.openConfirmModal('同名预设已存在，是否覆盖？');
+            if (!ok) return;
+          }
+          p[newName] = cur;
+          if (newName !== name) delete p[name];
+          await (this.opts.savePresets ? this.opts.savePresets(p) : (async () => this.savePresets(p))());
+          render();
+        });
+        del.addEventListener('click', async () => {
+          const ok = await this.openConfirmModal(`删除预设 “${name}”？`);
+          if (!ok) return;
+          const p2 = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+          delete p2[name];
+          await (this.opts.savePresets ? this.opts.savePresets(p2) : (async () => this.savePresets(p2))());
+          render();
+        });
+      });
+    };
+    searchEl?.addEventListener('input', () => { render(); });
+    render();
+  }
+
+  private ensureModalStyle() {
+    const STYLE_ID = 'visual-sql-adv-modal-style';
+    if (!document.getElementById(STYLE_ID)) {
+      const st = document.createElement('style');
+      st.id = STYLE_ID;
+      st.textContent = `
+        .vsb-modal-mask{position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:9999}
+        .vsb-modal{width:min(720px, 92vw); max-height:86vh; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); display:flex; flex-direction:column}
+        .vsb-modal-header{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--b3-border-color)}
+        .vsb-modal-title{font-weight:600}
+        .vsb-modal-body{padding:12px; overflow:auto}
+        .vsb-modal-footer{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid var(--b3-border-color)}
+        .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none; width:100%}
+        .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
+        .vsb-field{display:grid; gap:6px}
+        .vsb-label{font-size:12px; color: var(--b3-theme-on-surface)}
+        /* Preset modal */
+        .vsb-preset .vsb-preset-head{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+        .vsb-preset .vsb-search{max-width: 260px}
+        .vsb-preset .vsb-badge{display:inline-block; min-width:22px; padding:2px 6px; border-radius:999px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-surface); font-size:12px; text-align:center; border:1px solid var(--b3-border-color)}
+        .vsb-list{display:flex; flex-direction:column; gap:8px}
+        .vsb-item{display:flex; align-items:center; justify-content:space-between; border:1px solid var(--b3-border-color); border-radius:8px; padding:8px 10px; background: var(--b3-theme-background); transition: background .15s, border-color .15s}
+        .vsb-item:hover{background: var(--b3-list-hover)}
+        .vsb-item-name{font-size:13px; font-weight:500}
+        .vsb-item-actions{display:flex; gap:8px}
+        .vsb-btn--danger{background: #b71c1c; color:#fff; border-color:#b71c1c}
+        .vsb-btn--danger:hover{filter:brightness(1.05)}
+      `;
+      document.head.appendChild(st);
+    }
+  }
+
+  private openInputModal(opts: { title: string; label?: string; defaultValue?: string; placeholder?: string; confirmText?: string; cancelText?: string; }): Promise<string | null> {
+    this.ensureModalStyle();
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'vsb-modal-mask';
+      const dialog = document.createElement('div');
+      dialog.className = 'vsb-modal';
+      dialog.innerHTML = `
+        <div class="vsb-modal-header">
+          <div class="vsb-modal-title">${this.escapeHtml(opts.title)}</div>
+          <button class="vsb-btn vsb-ghost" data-close>×</button>
+        </div>
+        <div class="vsb-modal-body">
+          <div class="vsb-field">
+            ${opts.label ? `<label class="vsb-label">${this.escapeHtml(opts.label)}</label>` : ''}
+            <input class="vsb-input" data-input placeholder="${this.escapeHtml(opts.placeholder || '')}" />
+          </div>
+        </div>
+        <div class="vsb-modal-footer">
+          <button class="vsb-btn" data-ok>${this.escapeHtml(opts.confirmText || '确定')}</button>
+          <button class="vsb-btn vsb-ghost" data-cancel>${this.escapeHtml(opts.cancelText || '取消')}</button>
+        </div>
+      `;
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      const input = dialog.querySelector('[data-input]') as HTMLInputElement;
+      const close = (val: string | null) => { overlay.remove(); resolve(val); };
+      (dialog.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', () => close(null));
+      (dialog.querySelector('[data-cancel]') as HTMLButtonElement).addEventListener('click', () => close(null));
+      (dialog.querySelector('[data-ok]') as HTMLButtonElement).addEventListener('click', () => close(input.value || ''));
+      input.value = opts.defaultValue || '';
+      input.focus();
+      input.select();
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') close(null);
+        if (e.key === 'Enter') close(input.value || '');
+      };
+      overlay.addEventListener('keydown', onKey);
+      // 允许点击遮罩关闭
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+    });
+  }
+
+  private openConfirmModal(msg: string): Promise<boolean> {
+    this.ensureModalStyle();
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'vsb-modal-mask';
+      const dialog = document.createElement('div');
+      dialog.className = 'vsb-modal';
+      dialog.innerHTML = `
+        <div class="vsb-modal-header">
+          <div class="vsb-modal-title">确认</div>
+          <button class="vsb-btn vsb-ghost" data-close>×</button>
+        </div>
+        <div class="vsb-modal-body">
+          <div>${this.escapeHtml(msg)}</div>
+        </div>
+        <div class="vsb-modal-footer">
+          <button class="vsb-btn" data-ok>确定</button>
+          <button class="vsb-btn vsb-ghost" data-cancel>取消</button>
+        </div>
+      `;
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      const close = (val: boolean) => { overlay.remove(); resolve(val); };
+      (dialog.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', () => close(false));
+      (dialog.querySelector('[data-cancel]') as HTMLButtonElement).addEventListener('click', () => close(false));
+      (dialog.querySelector('[data-ok]') as HTMLButtonElement).addEventListener('click', () => close(true));
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') close(false);
+        if (e.key === 'Enter') close(true);
+      };
+      overlay.addEventListener('keydown', onKey);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+    });
   }
 
   //（高级模式已迁移至独立页面/组件）

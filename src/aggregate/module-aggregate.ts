@@ -2,6 +2,7 @@ import steveTools from "@/index";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
 import { Dialog, Menu, openTab } from "siyuan";
 import { updateBlock } from "@/api/api";
+import { PluginConfig } from "@/savedata";
 
 // Aggregate 模块
 export class M_Aggregate {
@@ -36,9 +37,17 @@ export class M_Aggregate {
                     this.element.innerHTML = `<div id="visual-sql-tab-${id}" style="width:100%;height:100%;overflow:auto;"></div>`;
                     const container = document.getElementById(`visual-sql-tab-${id}`)! as HTMLElement;
                     const previewCols = (_settingdata["aggregate-sql-preview-columns"] || "").trim();
+                    // 使用插件级配置存储筛选预设
+                    const conf = new PluginConfig(aggregate.plugin.name, 'aggregate-sql');
+                    await conf.load();
                     const ui = new VisualSqlUI(container, {
                         previewColumns: previewCols,
                         noPreviewHeightLimit: true,
+                        showPresetControls: true,
+                        // 使用持久化配置替代 localStorage
+                        loadPresets: () => (conf.get('presets') || {}),
+                        savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                        presetsKey: 'siyuan-steve-tools:visual-sql-presets',
                         persistKey: `visual-sql-tab:${id}`,
                         onSqlChange: (_sql) => {
                             // 可在此触发查询/日志
