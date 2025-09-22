@@ -94,6 +94,8 @@ export class VisualSqlUI {
   private tipKeydown?: (e: KeyboardEvent) => void;
   private tipScroll?: () => void;
   private presetsKey?: string;
+  private currentPresetName?: string;
+  private currentPresetEl?: HTMLElement;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
     this.container = container;
@@ -141,7 +143,7 @@ export class VisualSqlUI {
     this.container.innerHTML = this.html`
       <div class="vsb-wrap">
         <details class="vsb-card" open data-section="filters">
-          <summary class="vsb-legend">筛选与 SQL</summary>
+          <summary class="vsb-legend">筛选与 SQL <span class="vsb-preset-tag" data-current-preset></span></summary>
           <fieldset class="vsb-card" style="margin-top:8px;">
             <legend class="vsb-legend">常用筛选</legend>
 
@@ -307,6 +309,8 @@ export class VisualSqlUI {
     const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
   const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
   const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
+    this.currentPresetEl = this.container.querySelector('[data-current-preset]') as HTMLElement;
+    this.updateCurrentPresetLabel();
 
 
     // 异步加载标签下拉
@@ -314,7 +318,14 @@ export class VisualSqlUI {
 
     // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
-    changeInputs.forEach(el => el.addEventListener('change', () => this.rebuildSql()));
+    const onUserChange = () => {
+      if (this.currentPresetName) {
+        this.currentPresetName = undefined;
+        this.updateCurrentPresetLabel();
+      }
+      this.rebuildSql();
+    };
+    changeInputs.forEach(el => el.addEventListener('change', onUserChange));
     this.tagInput.addEventListener('change', () => {
       const v = (this.tagInput.value || '').trim();
       if (v) this.pushRecentTags([v]);
@@ -366,6 +377,12 @@ export class VisualSqlUI {
       this.actionsEl.insertBefore(applyBtn, insertBeforeEl);
       this.actionsEl.insertBefore(saveBtn, applyBtn);
     }
+  }
+
+  private updateCurrentPresetLabel() {
+    if (!this.currentPresetEl) return;
+    const name = (this.currentPresetName || '').trim();
+    this.currentPresetEl.textContent = name ? `预设：${name}` : '';
   }
 
   private rebuildSql() {
@@ -803,6 +820,11 @@ export class VisualSqlUI {
         el.value = '';
       }
     });
+    // 清空当前预设显示
+    if (this.currentPresetName) {
+      this.currentPresetName = undefined;
+      this.updateCurrentPresetLabel();
+    }
     this.rebuildSql();
   }
 
@@ -847,6 +869,7 @@ export class VisualSqlUI {
       .vsb-title{font-weight:600; font-size:13px}
       .vsb-card{border:1px solid var(--vsb-border); padding:10px; border-radius:8px; background: var(--vsb-surface); box-shadow: 0 1px 2px rgba(0,0,0,.03); margin-bottom:10px}
       .vsb-legend{font-weight:600; color: var(--vsb-muted);}
+  .vsb-legend .vsb-preset-tag{margin-left:8px; font-weight:400; font-size:11px; color: var(--vsb-muted); background: var(--b3-theme-background-light); border:1px solid var(--b3-border-color); padding:2px 6px; border-radius:999px}
   details.vsb-card > summary.vsb-legend{cursor:pointer; list-style:none}
   details.vsb-card > summary.vsb-legend::marker, details.vsb-card > summary.vsb-legend::-webkit-details-marker{display:none}
   details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
@@ -999,6 +1022,7 @@ export class VisualSqlUI {
       orderDir: this.orderDirSel?.value ?? 'desc',
       limit: this.limitInput?.value ?? '',
       advSqlFragment: this.advSqlFragment || '',
+      currentPresetName: this.currentPresetName || '',
       // 折叠状态
       filtersOpen: (this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null)?.open ?? true,
       previewOpen: (this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null)?.open ?? true,
@@ -1050,6 +1074,10 @@ export class VisualSqlUI {
       if (this.orderDirSel) this.orderDirSel.value = s?.orderDir ?? 'desc';
       if (this.limitInput) this.limitInput.value = String(s?.limit ?? '');
       this.advSqlFragment = s?.advSqlFragment || '';
+      if (typeof s?.currentPresetName === 'string' && s.currentPresetName.trim()) {
+        this.currentPresetName = s.currentPresetName.trim();
+      }
+      this.updateCurrentPresetLabel();
       if (opts?.applyCollapse) {
         const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
         const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
@@ -1168,6 +1196,7 @@ export class VisualSqlUI {
           const p = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
           const s = p[name];
           if (!s) return;
+          this.currentPresetName = name;
           this.hydrateState(s, { applyCollapse: false });
           this.rebuildSql();
           this.toast('已应用预设');
@@ -1178,6 +1207,7 @@ export class VisualSqlUI {
           const p = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
           const s = p[name];
           if (!s) return;
+          this.currentPresetName = name;
           this.hydrateState(s, { applyCollapse: false });
           this.rebuildSql();
           this.toast('已应用预设');
