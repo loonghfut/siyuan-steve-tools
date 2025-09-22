@@ -263,7 +263,7 @@ export class VisualSqlUI {
           <div class="vsb-actions">
             <button class="vsb-btn" data-adv-open>高级筛选</button>
             <button class="vsb-btn" data-copy>复制 SQL</button>
-            <button class="vsb-btn" data-copy-embed>复制嵌入块</button>
+            <button class="vsb-btn" data-copy-embed>嵌入块</button>
             <button class="vsb-btn vsb-ghost" data-reset>重置</button>
           </div>
 
