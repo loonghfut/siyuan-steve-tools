@@ -1164,6 +1164,54 @@ export class VisualSqlUI {
     }
   }
 
+  // 生成用于预设去重比较的精简快照（不含折叠状态、当前预设名等 UI 元信息）
+  private getPresetComparableSnapshot(raw?: any) {
+    const s = raw ?? this.getStateSnapshot();
+    const pick = (k: string, d: any = '') => (s?.[k] ?? d);
+    const normStr = (v: any) => (v == null ? '' : String(v).trim());
+    const normArr = (v: any[]) => Array.isArray(v) ? Array.from(new Set(v.map(x => String(x)))).sort() : [] as string[];
+    return {
+      types: normArr(pick('types', [])),
+      subtypes: normArr(pick('subtypes', [])),
+      boxes: normArr(pick('boxes', [])),
+      rootId: normStr(pick('rootId')),
+      parentId: normStr(pick('parentId')),
+      path: normStr(pick('path')),
+      content: normStr(pick('content')),
+      md: normStr(pick('md')),
+      hpath: normStr(pick('hpath')),
+      ial: normStr(pick('ial')),
+      tag: normStr(pick('tag')),
+      createdDays: normStr(pick('createdDays')),
+      updatedDays: normStr(pick('updatedDays')),
+      createdOp: normStr(pick('createdOp', '>')),
+      createdAt: normStr(pick('createdAt')),
+      updatedOp: normStr(pick('updatedOp', '>')),
+      updatedAt: normStr(pick('updatedAt')),
+      orderField: normStr(pick('orderField')),
+      orderDir: normStr(pick('orderDir', 'desc')),
+      limit: normStr(pick('limit')),
+      advSqlFragment: normStr(pick('advSqlFragment')),
+    };
+  }
+
+  private isSamePreset(a: any, b: any): boolean {
+    try {
+      const ca = this.getPresetComparableSnapshot(a);
+      const cb = this.getPresetComparableSnapshot(b);
+      return JSON.stringify(ca) === JSON.stringify(cb);
+    } catch { return false; }
+  }
+
+  private findDuplicatePresetName(presets: Record<string, any>, snap: any): string | undefined {
+    try {
+      for (const [name, val] of Object.entries(presets || {})) {
+        if (this.isSamePreset(val, snap)) return name;
+      }
+    } catch {}
+    return undefined;
+  }
+
   private hydrateState(s: any, opts?: { applyCollapse?: boolean }) {
     try {
       if (Array.isArray(s?.types) && this.typeChecks) {
@@ -1238,15 +1286,22 @@ export class VisualSqlUI {
   }
 
   private async savePresetFlow() {
+    // 先做内容去重校验：若已存在相同筛选，则阻止保存
+    const presets = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+    const snap = this.getStateSnapshot();
+    const dup = this.findDuplicatePresetName(presets, snap);
+    if (dup) {
+      this.toast(`存在相同筛选（预设：${dup}），未保存`);
+      return;
+    }
+
     const nameRaw = await this.openInputModal({ title: '保存为预设', label: '名称', placeholder: '输入预设名称' });
     const name = (nameRaw || '').trim();
     if (!name) return;
-    const presets = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
     if (presets[name]) {
       const ok = await this.openConfirmModal('同名预设已存在，是否覆盖？');
       if (!ok) return;
     }
-    const snap = this.getStateSnapshot();
     presets[name] = snap;
     await (this.opts.savePresets ? this.opts.savePresets(presets) : (async () => this.savePresets(presets))());
     this.toast('已保存筛选预设');
