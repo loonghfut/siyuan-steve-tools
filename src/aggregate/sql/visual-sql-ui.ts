@@ -26,6 +26,11 @@ export interface VisualSqlUIOptions {
    * 可以是用逗号/空格分隔的字符串，或列名数组。
    */
   previewColumns?: string | string[];
+  /**
+   * 预览区不限制高度（用于 Tab 模式）。
+   * 为 true 时，结果预览区域随内容自增高，由外层滚动容器承载滚动。
+   */
+  noPreviewHeightLimit?: boolean;
 }
 
 export class VisualSqlUI {
@@ -246,6 +251,12 @@ export class VisualSqlUI {
         </details>
       </div>
     `;
+
+    // 根据选项切换预览区高度限制
+    if (this.opts.noPreviewHeightLimit) {
+      const wrap = this.container.querySelector('.vsb-wrap') as HTMLElement | null;
+      wrap?.classList.add('vsb-no-limit-preview');
+    }
 
     // 绑定控件
     this.typeChecks = this.container.querySelectorAll('input[data-type]') as NodeListOf<HTMLInputElement>;
@@ -810,6 +821,8 @@ export class VisualSqlUI {
   .vsb-result__placeholder{padding:10px; color: var(--vsb-muted); font-size:12px;}
   .vsb-result__head{display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background: var(--b3-theme-surface); border-bottom:1px solid var(--b3-border-color); font-size:12px; color: var(--vsb-muted)}
   .vsb-result__body{height: var(--vsb-result-height, 360px); overflow:auto; position:relative}
+  /* 在 Tab 模式可关闭固定高度，由外层容器负责滚动 */
+  .vsb-wrap.vsb-no-limit-preview .vsb-result__body{height:auto; max-height:none; overflow-y:visible; overflow-x:auto}
   .vsb-result__body .vsb-table{width: 100%}
   .vsb-table{width:100%; border-collapse:separate; border-spacing:0; font-size:12px}
   .vsb-table th,.vsb-table td{padding:6px 8px; border-bottom:1px solid var(--b3-border-color); vertical-align:top}
