@@ -323,10 +323,7 @@ export class VisualSqlUI {
     // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
     const onUserChange = () => {
-      if (this.currentPresetName) {
-        this.currentPresetName = undefined;
-        this.updateCurrentPresetLabel();
-      }
+      // 不在此处清空当前预设名，改为在 rebuild 后按内容自动判定
       this.rebuildSql();
     };
     changeInputs.forEach(el => el.addEventListener('change', onUserChange));
@@ -573,6 +570,8 @@ export class VisualSqlUI {
     this.opts.onSqlChange?.(sql);
     this.saveState();
     this.scheduleQuery(sql);
+    // 重建后根据当前筛选与已保存预设的内容一致性，自动更新“当前预设”标签
+    this.refreshCurrentPresetByContent().catch(() => {});
   }
 
   // ===== 实时查询 =====
@@ -727,6 +726,73 @@ export class VisualSqlUI {
       // 单元格点击预览
       this.attachCellTooltip(tbl);
     }
+  }
+
+  // 根据状态快照生成 SQL（仅用于展示/预览）
+  private compileSqlFromSnapshot(s: any): string {
+    const b = new VisualSqlBuilder('embedded');
+    const types = Array.isArray(s?.types) ? s.types : [];
+    const subtypes = Array.isArray(s?.subtypes) ? s.subtypes : [];
+    b.byTypes(types as BlockType[]).bySubtypes(subtypes as string[]);
+    if (Array.isArray(s?.boxes) && s.boxes.length) {
+      b.addFilter({ field: 'box', op: 'in', value: s.boxes });
+    }
+    const smartLike = (v: any) => {
+      const val = (v ?? '').toString().trim();
+      if (!val) return undefined;
+      if (/%|_/.test(val)) return val;
+      return `%${val}%`;
+    };
+    b.inDoc((s?.rootId || '').trim());
+    b.parentIs((s?.parentId || '').trim());
+    const pathLike = smartLike(s?.path);
+    const contentLike = smartLike(s?.content);
+    const mdLike = smartLike(s?.md);
+    const hpathLike = smartLike(s?.hpath);
+    const ialLike = smartLike(s?.ial);
+    if (pathLike) b.pathLike(pathLike);
+    if (contentLike) b.contentLike(contentLike);
+    if (mdLike) b.markdownLike(mdLike);
+    if (hpathLike) b.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
+    if (ialLike) b.addFilter({ field: 'ial', op: 'like', value: ialLike });
+    const tagRaw = (s?.tag || '').toString().trim();
+    const tag = tagRaw.replace(/^#+/, '');
+    b.hasTag(tag);
+    // 时间优先具体时间比较，否则使用近 N 天
+    const toTS = (v: string) => {
+      const m = (v || '').match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?$/);
+      if (m) return `${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}${m[6] ?? '00'}`;
+      return '';
+    };
+    if (s?.createdAt) {
+      const ts = toTS(s.createdAt);
+      if (ts) b.addFilter({ field: 'created', op: (s?.createdOp || '>') as any, value: ts });
+    } else if (s?.createdDays) {
+      b.createdSinceDays(Number(s.createdDays || 0));
+    }
+    if (s?.updatedAt) {
+      const ts = toTS(s.updatedAt);
+      if (ts) b.addFilter({ field: 'updated', op: (s?.updatedOp || '>') as any, value: ts });
+    } else if (s?.updatedDays) {
+      b.updatedSinceDays(Number(s.updatedDays || 0));
+    }
+    const orderExpr = (s?.orderField || '').toString();
+    const orderDir = (s?.orderDir || 'desc') as OrderDir;
+    if (orderExpr) {
+      if (orderExpr === 'random()') b.addOrder('random()');
+      else b.addOrder(orderExpr, orderDir);
+    }
+    const limit = s?.limit ? Number(s.limit) : undefined;
+    if (limit !== undefined && !Number.isNaN(limit)) {
+      b.setLimit(Math.min(999, Math.max(0, limit)));
+    }
+    const adv = (s?.advSqlFragment || '').toString().trim();
+    if (adv) b.addFilter({ rawSql: adv });
+    return b.compile();
+  }
+
+  private safeCompileSqlFromSnapshot(s: any): string {
+    try { return this.compileSqlFromSnapshot(s); } catch { return ''; }
   }
 
   // 解析设置中的列列表
@@ -1212,6 +1278,21 @@ export class VisualSqlUI {
     return undefined;
   }
 
+  // 根据当前筛选状态，自动匹配并展示对应的预设名
+  private async refreshCurrentPresetByContent() {
+    try {
+      const presets = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+      const snap = this.getStateSnapshot();
+      const matched = this.findDuplicatePresetName(presets, snap);
+      const prev = this.currentPresetName || '';
+      const next = matched || '';
+      if (prev !== next) {
+        this.currentPresetName = matched;
+        this.updateCurrentPresetLabel();
+      }
+    } catch {}
+  }
+
   private hydrateState(s: any, opts?: { applyCollapse?: boolean }) {
     try {
       if (Array.isArray(s?.types) && this.typeChecks) {
@@ -1353,16 +1434,21 @@ export class VisualSqlUI {
         return;
       }
       if (countEl) countEl.textContent = String(names.length);
-      listEl.innerHTML = names.map(n => `
+      listEl.innerHTML = names.map(n => {
+        const sql = this.escapeHtml(this.safeCompileSqlFromSnapshot(presets[n]));
+        return `
         <div class="vsb-item" data-name="${this.escapeHtml(n)}">
-          <div class="vsb-item-name">${this.escapeHtml(n)}</div>
+          <div class="vsb-item__main">
+            <div class="vsb-item-name">${this.escapeHtml(n)}</div>
+            <pre class="vsb-item-sql">${sql || '（无 SQL 或生成失败）'}</pre>
+          </div>
           <div class="vsb-item-actions">
             <button class="vsb-btn" data-apply>应用</button>
             <button class="vsb-btn" data-rename>重命名</button>
             <button class="vsb-btn vsb-btn--danger" data-delete>删除</button>
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
       // 绑定事件
       listEl.querySelectorAll('.vsb-item').forEach(item => {
         const name = (item as HTMLElement).getAttribute('data-name') || '';
@@ -1450,9 +1536,11 @@ export class VisualSqlUI {
   .vsb-modal .vsb-preset .vsb-badge,
   .vsb-modal.vsb-preset .vsb-badge{display:inline-block; min-width:22px; padding:2px 6px; border-radius:999px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-surface); font-size:12px; text-align:center; border:1px solid var(--b3-border-color)}
         .vsb-modal .vsb-list{display:flex; flex-direction:column; gap:8px}
-        .vsb-modal .vsb-item{display:flex; align-items:center; justify-content:space-between; border:1px solid var(--b3-border-color); border-radius:8px; padding:8px 10px; background: var(--b3-theme-background); transition: background .15s, border-color .15s}
+  .vsb-modal .vsb-item{display:flex; align-items:flex-start; justify-content:space-between; gap:10px; border:1px solid var(--b3-border-color); border-radius:8px; padding:8px 10px; background: var(--b3-theme-background); transition: background .15s, border-color .15s}
+  .vsb-modal .vsb-item__main{flex:1; min-width:0}
         .vsb-modal .vsb-item:hover{background: var(--b3-list-hover)}
         .vsb-modal .vsb-item-name{font-size:13px; font-weight:500}
+  .vsb-modal .vsb-item-sql{margin:6px 0 0; padding:6px 8px; border:1px solid var(--b3-border-color); border-radius:6px; background: var(--b3-protyle-code-background, var(--b3-theme-background)); color: var(--b3-theme-on-surface); max-height:120px; overflow:auto; white-space:pre-wrap; word-break:break-word; font-family: var(--b3-font-family-code, ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace); font-size:11px}
         .vsb-modal .vsb-item-actions{display:flex; gap:8px}
         .vsb-modal .vsb-btn--danger{background: #b71c1c; color:#fff; border-color:#b71c1c}
         .vsb-modal .vsb-btn--danger:hover{filter:brightness(1.05)}
