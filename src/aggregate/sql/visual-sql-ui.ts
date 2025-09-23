@@ -1132,7 +1132,35 @@ export class VisualSqlUI {
   private async copySegmentedEmbed() {
     const res = this.computeSegmentedEmbeds();
     if (!res) return;
-    await this.copyText(res.text, '已复制分段嵌入到剪贴板');
+    const segs = res.segments;
+    if (!segs.length) { this.toast('无可用分段'); return; }
+    // 并发探测每段是否有结果（强制 LIMIT 1），仅保留有结果的段
+    const include: boolean[] = new Array(segs.length).fill(false);
+    let cursor = 0;
+    const maxConc = Math.min(3, segs.length);
+    const runner = async () => {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= segs.length) return;
+        try {
+          const probe = this.forceLimit(segs[idx].sql, 1);
+          const rows = await runSql(probe);
+          if (Array.isArray(rows) && rows.length > 0) include[idx] = true;
+        } catch { /* 忽略探测异常，视为无结果 */ }
+      }
+    };
+    await Promise.all(new Array(maxConc).fill(0).map(() => runner()));
+    const parts = segs.map((seg, i) => include[i] ? `{{${seg.sql}}}` : '').filter(Boolean);
+    if (!parts.length) { this.toast('所有分段均无结果，未复制'); return; }
+    await this.copyText(parts.join('\n'), `已复制 ${parts.length} 段（已过滤空段）`);
+  }
+
+  // 将 SQL 的 LIMIT 强制为指定数值；若无 LIMIT 则追加
+  private forceLimit(sql: string, n: number): string {
+    const s = (sql || '').trim().replace(/;\s*$/,'');
+    const re = /limit\s+\d+(\s+offset\s+\d+)?/i;
+    if (re.test(s)) return s.replace(re, `LIMIT ${Math.max(0, Math.floor(n))}`);
+    return `${s} LIMIT ${Math.max(0, Math.floor(n))}`;
   }
 
   private openSegmentedEmbedPreview() {
