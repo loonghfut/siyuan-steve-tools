@@ -1141,7 +1141,7 @@ export class VisualSqlUI {
     if (!res || !this.resultsEl) return;
     const headerEl = document.createElement('div');
     headerEl.className = 'vsb-result__head';
-    headerEl.innerHTML = `<div>分段结果预览 · 共 ${res.segments.length} 段</div><div class="vsb-small">可见即加载（并发 2）</div>`;
+    headerEl.innerHTML = `<div>分段结果预览 · 共 ${res.segments.length} 段</div>`;
     const bodyWrap = document.createElement('div');
     bodyWrap.className = 'vsb-result__body';
     const list = document.createElement('div');
