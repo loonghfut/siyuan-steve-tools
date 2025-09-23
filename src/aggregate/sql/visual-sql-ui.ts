@@ -52,6 +52,14 @@ export interface VisualSqlUIOptions {
    * 保存预设的回调；若提供则优先使用（可返回 Promise）。
    */
   savePresets?: (obj: Record<string, any>) => Promise<void> | void;
+  /**
+   * 分段嵌入配置：基于 created 时间将查询拆分为多段，并复制多段嵌入块。
+   */
+  segmentEmbed?: {
+    start?: string; // YYYYMMDDHHmmss 或 "YYYY-MM-DD HH:mm"（秒缺省00）
+    end?: string;   // 同上
+    intervalDays?: number; // 间隔天数（>0）
+  };
 }
 
 export class VisualSqlUI {
@@ -61,6 +69,7 @@ export class VisualSqlUI {
   private resizeRaf?: number;
   private storageKey?: string;
   private previewCols?: string[];
+  private previewMode: 'normal' | 'segment' = 'normal';
 
   // 控件引用
   private typeChecks!: NodeListOf<HTMLInputElement>;
@@ -89,6 +98,7 @@ export class VisualSqlUI {
   private outputPre!: HTMLPreElement;
   private copyBtn!: HTMLButtonElement;
   private copyEmbedBtn!: HTMLButtonElement;
+  private copySegmentEmbedBtn!: HTMLButtonElement;
   private resetBtn!: HTMLButtonElement;
   private actionsEl!: HTMLElement;
   private advSqlFragment: string = '';
@@ -296,6 +306,7 @@ export class VisualSqlUI {
             <button class="vsb-btn" data-adv-open>高级筛选</button>
             <button class="vsb-btn" data-copy>复制 SQL</button>
             <button class="vsb-btn" data-copy-embed>嵌入块</button>
+            <button class="vsb-btn" data-copy-seg-embed title="按设置的 created 起止与间隔，生成分段嵌入">分段嵌入</button>
             <button class="vsb-btn vsb-ghost" data-reset>重置</button>
           </div>
 
@@ -304,6 +315,7 @@ export class VisualSqlUI {
 
         <details class="vsb-card" open data-section="preview" style="margin-top:8px;">
           <summary class="vsb-legend">结果预览
+            <button class="vsb-icon-btn" type="button" data-preview-seg-embed title="分段嵌入预览" aria-label="分段嵌入预览">▦</button>
             <button class="vsb-icon-btn" type="button" data-preview-refresh title="刷新预览" aria-label="刷新预览">⟳</button>
           </summary>
           <div class="vsb-result" data-result>
@@ -346,12 +358,14 @@ export class VisualSqlUI {
     this.resultsEl = this.container.querySelector('div[data-result]') as HTMLElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
   this.copyEmbedBtn = this.container.querySelector('button[data-copy-embed]') as HTMLButtonElement;
+  this.copySegmentEmbedBtn = this.container.querySelector('button[data-copy-seg-embed]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
     this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
     const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
   const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
   const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
   const previewRefreshBtn = this.container.querySelector('button[data-preview-refresh]') as HTMLButtonElement | null;
+  const previewSegEmbedBtn = this.container.querySelector('button[data-preview-seg-embed]') as HTMLButtonElement | null;
     this.currentPresetEl = this.container.querySelector('[data-current-preset]') as HTMLElement;
     this.updateCurrentPresetLabel();
   this.currentPresetEl?.addEventListener('click', (e) => this.openPresetQuickMenu(e));
@@ -375,19 +389,37 @@ export class VisualSqlUI {
     });
     this.copyBtn.addEventListener('click', () => this.copySql());
     this.copyEmbedBtn.addEventListener('click', () => this.copyEmbedSql());
+  this.copySegmentEmbedBtn.addEventListener('click', () => this.copySegmentedEmbed());
     this.resetBtn.addEventListener('click', () => this.resetForm());
     advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
-    // 结果预览刷新按钮：立即使用当前 SQL 触发查询
+    // 刷新按钮：刷新当前模式
     previewRefreshBtn?.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
       try {
-        const sql = this.outputPre?.textContent || this.builder.compile();
-        // bump 序号并直接查询，跳过防抖
-        const token = ++this.lastQuerySeq;
-        this.queryNow(token, this.ensureLimit(sql));
+        this.saveState();
+        if (this.previewMode === 'segment') {
+          this.openSegmentedEmbedPreview();
+        } else {
+          const sql = this.outputPre?.textContent || this.builder.compile();
+          const token = ++this.lastQuerySeq;
+          this.queryNow(token, this.ensureLimit(sql));
+        }
         this.toast('已刷新预览');
       } catch {}
+    });
+    // 分段按钮：切换模式（normal ↔ segment）并渲染
+    previewSegEmbedBtn?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.previewMode = this.previewMode === 'segment' ? 'normal' : 'segment';
+      this.saveState();
+      if (this.previewMode === 'segment') this.openSegmentedEmbedPreview();
+      else {
+        const sql = this.outputPre?.textContent || this.builder.compile();
+        const token = ++this.lastQuerySeq;
+        this.queryNow(token, this.ensureLimit(sql));
+      }
     });
   // 折叠状态变更时持久化
   filtersSection?.addEventListener('toggle', () => this.saveState());
@@ -623,7 +655,11 @@ export class VisualSqlUI {
     this.outputPre.textContent = sql;
     this.opts.onSqlChange?.(sql);
     this.saveState();
-    this.scheduleQuery(sql);
+    if (this.previewMode === 'segment') {
+      this.openSegmentedEmbedPreview();
+    } else {
+      this.scheduleQuery(sql);
+    }
     // 重建后根据当前筛选与已保存预设的内容一致性，自动更新“当前预设”标签
     this.refreshCurrentPresetByContent().catch(() => {});
   }
@@ -1006,53 +1042,235 @@ export class VisualSqlUI {
       this.tooltipEl.remove();
       this.tooltipEl = undefined;
     }
-    if (this.tipDocClick) { document.removeEventListener('click', this.tipDocClick); this.tipDocClick = undefined; }
-    if (this.tipKeydown) { document.removeEventListener('keydown', this.tipKeydown); this.tipKeydown = undefined; }
-    const body = this.resultsEl?.querySelector?.('.vsb-result__body') as HTMLElement | undefined;
-    if (this.tipScroll && body) { body.removeEventListener('scroll', this.tipScroll); }
-    this.tipScroll = undefined;
-  }
-
-  private formatCell(v: any): string {
-    if (v === null || v === undefined) return '';
-    if (typeof v === 'object') {
-      try { return JSON.stringify(v); } catch { return String(v); }
+    if (this.tipDocClick) {
+      document.removeEventListener('click', this.tipDocClick);
+      this.tipDocClick = undefined;
     }
-    return String(v);
+    if (this.tipKeydown) {
+      document.removeEventListener('keydown', this.tipKeydown);
+      this.tipKeydown = undefined;
+    }
+    if (this.tipScroll) {
+      const body = this.resultsEl?.querySelector?.('.vsb-result__body') as HTMLElement | undefined;
+      if (body) body.removeEventListener('scroll', this.tipScroll);
+      this.tipScroll = undefined;
+    }
   }
 
-  private escapeHtml(s: string): string {
-    return (s || '').replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[ch]);
-  }
-
-  // 智能添加 %：
-  // - 空值返回 undefined（不参与条件）
-  // - 若已包含 % 或 _（LIKE 通配符），则按用户输入原样使用
-  // - 否则自动包裹为 %值%
-  private smartLike(v: string | undefined | null): string | undefined {
-    const val = (v ?? '').trim();
-    if (!val) return undefined;
-    if (/[%_]/.test(val)) return val;
-    return `%${val}%`;
-  }
-
-  // 将 datetime-local 值转换为 YYYYMMDDHHMMSS 字符串
-  private datetimeLocalToTS(v: string): string {
-    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m) return '';
+  private tsToDate(ts: string): Date | null {
+    const m = ts.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+    if (!m) return null;
     const [_, y, mo, d, h, mi, se] = m;
-    return `${y}${mo}${d}${h}${mi}${se ?? '00'}`;
+    const dt = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(se));
+    return isNaN(dt.getTime()) ? null : dt;
   }
 
-  private async copySql() {
-    const sql = (this.outputPre.textContent || '').trim();
-    await this.copyText(sql, '已复制 SQL 到剪贴板');
+  private dateToTs(d: Date): string {
+    const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
   }
 
-  private async copyEmbedSql() {
-    const sql = (this.outputPre.textContent || '').trim();
-    const wrapped = sql ? `{{${sql}}}` : '';
-    await this.copyText(wrapped, '已复制嵌入块到剪贴板');
+  private addDays(d: Date, days: number): Date {
+    const nd = new Date(d.getTime());
+    nd.setDate(nd.getDate() + days);
+    return nd;
+  }
+
+  private buildWithCreatedCond(sqlBase: string, cond: string): string {
+    // 在原 SQL 的 WHERE 后追加 AND (cond)；若原本无 WHERE，则添加 WHERE (cond)
+    const hasWhere = /\bwhere\b/i.test(sqlBase);
+    const seg = `(${cond})`;
+    if (hasWhere) {
+      return sqlBase.replace(/\border\b|\blimit\b|$/i, (m) => ` AND ${seg} ${m}`);
+    }
+    return sqlBase.replace(/\border\b|\blimit\b|$/i, (m) => ` WHERE ${seg} ${m}`);
+  }
+
+  private computeSegmentedEmbeds(): { parts: string[]; text: string; segments: Array<{ sql: string; start: Date; end: Date; inclusiveEnd: boolean; label: string; }> } | null {
+    const opt = this.opts.segmentEmbed || {};
+    const intervalDays = Math.max(1, Math.floor(Number(opt.intervalDays || 0) || 7));
+    const startTs = this.parseAnyTs(opt.start);
+    const endTs = this.parseAnyTs(opt.end);
+    if (!startTs || !endTs) {
+      this.toast('请在设置中填写有效的分段开始/结束时间');
+      return null;
+    }
+    const start = this.tsToDate(startTs);
+    const end = this.tsToDate(endTs);
+    if (!start || !end || start.getTime() >= end.getTime()) {
+      this.toast('分段开始/结束时间不合法');
+      return null;
+    }
+    const baseSql = (this.outputPre.textContent || this.builder.compile()).trim();
+    if (!baseSql) { this.toast('当前无 SQL'); return null; }
+    const parts: string[] = [];
+    const segments: Array<{ sql: string; start: Date; end: Date; inclusiveEnd: boolean; label: string; }> = [];
+    let cur = new Date(start.getTime());
+    while (cur.getTime() < end.getTime()) {
+      const next = this.addDays(cur, intervalDays);
+      const segStartTs = this.dateToTs(cur);
+      const realNext = next.getTime() < end.getTime() ? next : end;
+      const segEndTs = this.dateToTs(realNext);
+      const cond = (realNext.getTime() < end.getTime())
+        ? `created >= '${segStartTs.replace(/'/g, "''")}' AND created < '${segEndTs.replace(/'/g, "''")}'`
+        : `created >= '${segStartTs.replace(/'/g, "''")}' AND created <= '${segEndTs.replace(/'/g, "''")}'`;
+      const segSql = this.buildWithCreatedCond(baseSql, cond);
+      parts.push(`{{${segSql}}}`);
+      const inclusiveEnd = !(realNext.getTime() < end.getTime());
+      segments.push({
+        sql: segSql,
+        start: new Date(cur.getTime()),
+        end: new Date(realNext.getTime()),
+        inclusiveEnd,
+        label: this.formatRangeLabel(cur, realNext, inclusiveEnd),
+      });
+      cur = next;
+    }
+    return { parts, text: parts.join('\n'), segments };
+  }
+
+  private async copySegmentedEmbed() {
+    const res = this.computeSegmentedEmbeds();
+    if (!res) return;
+    await this.copyText(res.text, '已复制分段嵌入到剪贴板');
+  }
+
+  private openSegmentedEmbedPreview() {
+    // 在结果预览区渲染分段列表；仅在滚动时懒加载可见项（并发 2）
+    const res = this.computeSegmentedEmbeds();
+    if (!res || !this.resultsEl) return;
+    const headerEl = document.createElement('div');
+    headerEl.className = 'vsb-result__head';
+    headerEl.innerHTML = `<div>分段结果预览 · 共 ${res.segments.length} 段</div><div class="vsb-small">可见即加载（并发 2）</div>`;
+    const bodyWrap = document.createElement('div');
+    bodyWrap.className = 'vsb-result__body';
+    const list = document.createElement('div');
+    list.className = 'vsb-segprev-list';
+    list.innerHTML = res.segments.map((seg, i) => `
+      <div class="vsb-segprev-item" data-idx="${i}">
+        <div class="vsb-segprev-head">
+          <div class="vsb-segprev-title">第 ${i + 1} 段：${this.escapeHtml(seg.label)}</div>
+        </div>
+        <div class="vsb-segprev-body"><div class="vsb-loading">等待加载…</div></div>
+      </div>
+    `).join('');
+    bodyWrap.appendChild(list);
+    this.resultsEl.innerHTML = '';
+    this.resultsEl.appendChild(headerEl);
+    this.resultsEl.appendChild(bodyWrap);
+
+    const rootEl = bodyWrap;
+    const maxConcurrency = 2;
+    let running = 0;
+    const queued = new Set<number>();
+    const loaded = new Set<number>();
+    const pending: Array<() => Promise<void>> = [];
+
+    const updateHeaderCount = () => {
+      const remain = list.querySelectorAll('.vsb-segprev-item').length;
+      const left = headerEl.querySelector('div:first-child');
+      if (left) left.textContent = `分段结果预览 · 共 ${remain} 段`;
+    };
+
+    const pump = () => {
+      if (!pending.length) return;
+      while (running < maxConcurrency && pending.length) {
+        const task = pending.shift()!;
+        running++;
+        task().finally(() => { running--; pump(); });
+      }
+    };
+
+    const enqueue = (idx: number, el: HTMLElement, sql: string) => {
+      if (loaded.has(idx) || queued.has(idx)) return;
+      queued.add(idx);
+      pending.push(async () => {
+        const body = el.querySelector('.vsb-segprev-body') as HTMLElement;
+        try {
+          const rows = await this.loadSegmentRows(sql);
+          if (!Array.isArray(rows) || rows.length === 0) {
+            el.remove();
+            updateHeaderCount();
+            return;
+          }
+          body.innerHTML = this.buildSegmentTableHtml(rows);
+          this.applyTableBehaviors(body);
+        } catch (e: any) {
+          body.innerHTML = `<div class=\"vsb-error\">${this.escapeHtml(e?.message || '加载失败')}</div>`;
+        } finally {
+          loaded.add(idx);
+        }
+      });
+      pump();
+    };
+
+    const items = Array.from(list.querySelectorAll('.vsb-segprev-item')) as HTMLElement[];
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((en) => {
+        if (en.isIntersecting) {
+          const el = en.target as HTMLElement;
+          const idx = Number(el.getAttribute('data-idx'));
+          const sql = res.segments[idx].sql;
+          enqueue(idx, el, sql);
+          io.unobserve(el);
+        }
+      });
+    }, { root: rootEl, threshold: 0.1 });
+    items.forEach(el => io.observe(el));
+  }
+
+
+  private buildSegmentTableHtml(rows: any[]): string {
+    const total = rows.length;
+    if (!total) return `<div class="vsb-result__placeholder">无结果</div>`;
+    // 列选择与主预览一致
+    let cols: string[];
+    if (this.previewCols && this.previewCols.length) {
+      cols = this.previewCols.slice(0, 12);
+    } else {
+      const colSet = new Set<string>();
+      for (const r of rows) {
+        if (r && typeof r === 'object') Object.keys(r).forEach(k => colSet.add(k));
+        if (colSet.size > 24) break;
+      }
+      cols = Array.from(colSet).slice(0, 12);
+    }
+    const thead = `<thead><tr><th class=\"vsb-th-rownumber\">#</th>${cols.map(c => `<th>${this.escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${rows.map((r, idx) => {
+      const rowNo = `<td class=\"vsb-rownumber\">${idx + 1}</td>`;
+      if (!r || typeof r !== 'object') return `<tr>${rowNo}<td colspan=\"${Math.max(1, cols.length)}\">${this.escapeHtml(String(r))}</td></tr>`;
+      const cells = cols.map(c => `<td>${this.escapeHtml(this.formatCell(r[c]))}</td>`).join('');
+      return `<tr>${rowNo}${cells}</tr>`;
+    }).join('')}</tbody>`;
+    return `<table class="vsb-table">${thead}${tbody}</table>`;
+  }
+
+  private applyTableBehaviors(scope: HTMLElement) {
+    const tbl = scope.querySelector('table.vsb-table') as HTMLTableElement | null;
+    if (!tbl) return;
+    const widths = this.measureColumnWidths(tbl);
+    const cg = document.createElement('colgroup');
+    widths.forEach(w => { const col = document.createElement('col'); col.style.width = w + 'px'; cg.appendChild(col); });
+    tbl.insertBefore(cg, tbl.firstChild);
+    const ths = Array.from(tbl.querySelectorAll('thead th')) as HTMLTableCellElement[];
+    ths.forEach((th, idx) => this.attachColResizer(th, idx, tbl));
+    this.attachCellTooltip(tbl);
+    const wrap = scope.closest('.vsb-result__body') as HTMLElement | null;
+    wrap?.classList.add('vsb-fade-in');
+  }
+
+  private async loadSegmentRows(sql: string) {
+    const stmt = this.ensureLimit(sql);
+    return await runSql(stmt);
+  }
+
+
+  private formatRangeLabel(start: Date, end: Date, inclusiveEnd: boolean): string {
+    const f = (d: Date) => {
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+    return inclusiveEnd ? `${f(start)} ~ ${f(end)}（闭）` : `${f(start)} ~ ${f(end)}（开）`;
   }
 
   private async copyText(text: string, okMsg: string) {
@@ -1068,6 +1286,63 @@ export class VisualSqlUI {
       document.body.removeChild(ta);
       this.toast(okMsg + '（兼容模式）');
     }
+  }
+
+  // ===== 辅助方法缺失修复 =====
+  private escapeHtml(s: any): string {
+    const str = (s == null ? '' : String(s));
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private smartLike(v: any): string | undefined {
+    const val = (v ?? '').toString().trim();
+    if (!val) return undefined;
+    if (/%|_/.test(val)) return val; // 已包含通配符
+    return `%${val}%`;
+  }
+
+  private datetimeLocalToTS(v: string): string {
+    const s = (v || '').trim();
+    if (!s) return '';
+    // 允许 "YYYY-MM-DDTHH:mm" / "YYYY-MM-DD HH:mm" / 可带秒
+    const digits = s.replace(/\D/g, '');
+    if (digits.length === 14) return digits;
+    if (digits.length === 12) return digits + '00';
+    if (digits.length === 8) return digits + '000000';
+    return '';
+  }
+
+  private parseAnyTs(v?: string): string {
+    const s = (v || '').trim();
+    if (!s) return '';
+    // 接受纯 14 位，或包含分隔符的日期时间
+    const digits = /^(\d{14})$/.test(s) ? s : s.replace(/\D/g, '');
+    if (digits.length === 14) return digits;
+    if (digits.length === 12) return digits + '00';
+    if (digits.length === 8) return digits + '000000';
+    return '';
+  }
+
+  private formatCell(v: any): string {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    try { return JSON.stringify(v); } catch { return String(v); }
+  }
+
+  private async copySql() {
+    const sql = (this.outputPre?.textContent || this.builder.compile());
+    await this.copyText(sql, '已复制 SQL');
+  }
+
+  private async copyEmbedSql() {
+    const sql = (this.outputPre?.textContent || this.builder.compile());
+    await this.copyText(`{{${sql}}}`, '已复制嵌入块');
   }
 
   private resetForm() {
@@ -1138,8 +1413,17 @@ export class VisualSqlUI {
   details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
       /* legend 右侧小图标按钮（仅用于 details > summary 处） */
       details.vsb-card > summary.vsb-legend{display:flex; align-items:center; justify-content:space-between; gap:6px}
-      details.vsb-card > summary.vsb-legend .vsb-icon-btn{margin-left:auto; appearance:none; border:1px solid var(--vsb-border); background: var(--b3-theme-background); color: var(--vsb-muted); width:22px; height:22px; line-height:20px; text-align:center; border-radius:6px; cursor:pointer; font-size:12px; padding:0}
+  details.vsb-card > summary.vsb-legend .vsb-icon-btn{margin-left:auto; appearance:none; border:1px solid var(--vsb-border); background: var(--b3-theme-background); color: var(--vsb-muted); width:22px; height:22px; line-height:20px; text-align:center; border-radius:6px; cursor:pointer; font-size:12px; padding:0}
       details.vsb-card > summary.vsb-legend .vsb-icon-btn:hover{background: var(--b3-list-hover)}
+  /* 保证多个图标按钮相邻展示 */
+  details.vsb-card > summary.vsb-legend .vsb-icon-btn + .vsb-icon-btn{margin-left:6px}
+      
+  /* 分段预览样式 */
+  .vsb-segprev-list{display:flex; flex-direction:column; gap:10px}
+  .vsb-segprev-item{border:1px solid var(--b3-border-color); border-radius:8px; overflow:hidden}
+  .vsb-segprev-head{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; background: var(--b3-theme-surface); border-bottom:1px solid var(--b3-border-color)}
+  .vsb-segprev-title{font-size:12px; color: var(--vsb-muted)}
+  .vsb-segprev-body{padding:8px; overflow:auto}
       .vsb-grid{display:grid; gap:8px}
       .vsb-grid-4{grid-template-columns: repeat(4, minmax(160px,1fr))}
       .vsb-grid-3{grid-template-columns: repeat(3, minmax(200px,1fr))}
@@ -1311,6 +1595,7 @@ export class VisualSqlUI {
       // 折叠状态
       filtersOpen: (this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null)?.open ?? true,
       previewOpen: (this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null)?.open ?? true,
+      previewMode: this.previewMode,
     };
   }
 
@@ -1433,6 +1718,8 @@ export class VisualSqlUI {
         if (filtersSection) filtersSection.open = s?.filtersOpen !== false;
         if (previewSection) previewSection.open = s?.previewOpen !== false;
       }
+      const pm = (s?.previewMode || '').toString();
+      this.previewMode = pm === 'segment' ? 'segment' : 'normal';
     } catch {}
   }
 

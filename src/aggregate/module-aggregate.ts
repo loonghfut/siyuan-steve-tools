@@ -45,6 +45,11 @@ export class M_Aggregate {
                         previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                         noPreviewHeightLimit: true,
                         showPresetControls: true,
+                        segmentEmbed: {
+                            start: String(_settingdata["aggregate-segment-embed-start"] || ""),
+                            end: String(_settingdata["aggregate-segment-embed-end"] || ""),
+                            intervalDays: Number(_settingdata["aggregate-segment-embed-interval-days"]) || 7,
+                        },
                         // 使用持久化配置替代 localStorage
                         loadPresets: () => (conf.get('presets') || {}),
                         savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
@@ -106,6 +111,11 @@ export class M_Aggregate {
                     const ui = new VisualSqlUI(container, {
                         previewColumns: previewCols,
                         previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                        segmentEmbed: {
+                            start: String(_settingdata["aggregate-segment-embed-start"] || ""),
+                            end: String(_settingdata["aggregate-segment-embed-end"] || ""),
+                            intervalDays: Number(_settingdata["aggregate-segment-embed-interval-days"]) || 7,
+                        },
                         buttons: [
                             {
                                 label: '插入SQL',
@@ -143,6 +153,11 @@ export class M_Aggregate {
         this._ui = new VisualSqlUI(container, {
             previewColumns,
             previewColMaxWidth: Number(settings?.["aggregate-sql-preview-col-max-width"]) || 480,
+            segmentEmbed: {
+                start: String(settings?.["aggregate-segment-embed-start"] || ""),
+                end: String(settings?.["aggregate-segment-embed-end"] || ""),
+                intervalDays: Number(settings?.["aggregate-segment-embed-interval-days"]) || 7,
+            },
             onSqlChange: (_sql) => {
                 // 可同步 SQL 或发起查询
                 console.log("生成的 SQL:", _sql);

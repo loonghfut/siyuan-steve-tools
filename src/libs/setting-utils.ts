@@ -27,6 +27,7 @@ const createDefaultGetter = (type: TSettingItemType) => {
         case 'slider':
         case 'textinput':
         case 'textarea':
+        case 'datetime-local':
             getter = (ele: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => {
                 return ele.value;
             };
@@ -62,6 +63,11 @@ const createDefaultSetter = (type: TSettingItemType) => {
         case 'textinput':
         case 'textarea':
         case 'number':
+            setter = (ele: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: any) => {
+                ele.value = value;
+            };
+            break;
+        case 'datetime-local':
             setter = (ele: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: any) => {
                 ele.value = value;
             };
@@ -354,6 +360,13 @@ export class SettingUtils {
                 numberElement.value = item.value;
                 itemElement = numberElement;
                 numberElement.addEventListener('keydown', preventEnterConfirm);
+                break;
+            case 'datetime-local':
+                const dtEl: HTMLInputElement = document.createElement('input');
+                dtEl.type = 'datetime-local';
+                dtEl.className = 'b3-text-field fn__flex-center fn__size200';
+                dtEl.value = item.value;
+                itemElement = dtEl;
                 break;
             case 'button':
                 let buttonElement: HTMLButtonElement = document.createElement('button');

@@ -71,6 +71,17 @@
         on:change={changed}
         style={style}
     />
+{:else if type === "datetime-local"}
+    <input
+        class:b3-text-field={true}
+        class:fn__flex-center={true}
+        class:fn__size200={fnSize}
+        id={key}
+        type="datetime-local"
+        bind:value={value}
+        on:change={changed}
+        style={style}
+    />
 {:else if type === "button"}
     <!-- Button Input -->
     <button
