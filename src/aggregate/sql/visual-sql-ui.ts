@@ -102,6 +102,7 @@ export class VisualSqlUI {
   private presetsKey?: string;
   private currentPresetName?: string;
   private currentPresetEl?: HTMLElement;
+  private multiOutsideCloser?: (e: MouseEvent) => void;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
     this.container = container;
@@ -152,55 +153,86 @@ export class VisualSqlUI {
           <summary class="vsb-legend">筛选与 SQL <span class="vsb-preset-tag" data-current-preset></span></summary>
           <fieldset class="vsb-card" style="margin-top:8px;">
             <legend class="vsb-legend">常用筛选</legend>
-
-          <div class="vsb-chips" aria-label="类型">
-            ${([
-        { v: 'd', n: '文档' },
-        { v: 'h', n: '标题' },
-        { v: 'm', n: '数学公式' },
-        { v: 'c', n: '代码块' },
-        { v: 't', n: '表格块' },
-        { v: 'l', n: '列表块' },
-        { v: 'b', n: '引述块' },
-        { v: 's', n: '超级块' },
-        { v: 'p', n: '段落块' },
-        { v: 'av', n: '数据库' }
-      ] as Array<{ v: BlockType; n: string }>).map(it =>
-        `<label class="vsb-chip"><input type="checkbox" data-type value="${it.v}"/><span>${it.n}</span></label>`
-      ).join('')}
-          </div>
-
-          <div class="vsb-grid vsb-grid-4">
-            <div class="vsb-field" style="grid-column: 1 / -1;">
-              <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">子类型（可多选）</div>
-              <div class="vsb-chips" aria-label="子类型">
-                ${([
-        { v: 'h1', n: '标题 H1' },
-        { v: 'h2', n: '标题 H2' },
-        { v: 'h3', n: '标题 H3' },
-        { v: 'h4', n: '标题 H4' },
-        { v: 'h5', n: '标题 H5' },
-        { v: 'h6', n: '标题 H6' },
-        { v: 'u', n: '无序列表' },
-        { v: 't', n: '任务项' },
-        { v: 'o', n: '有序列表' }
-      ] as Array<{ v: string; n: string }>).map(it =>
-        `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
-      ).join('')}
+          <div class="vsb-inline-group">
+            <div class="vsb-inline-item">
+              <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">类型（可多选）</div>
+              <div class="vsb-multi" data-multi="type">
+                <button type="button" class="vsb-input vsb-multi__btn" data-multi-btn aria-haspopup="listbox" aria-expanded="false">选择类型</button>
+                <div class="vsb-multi__panel" role="listbox" aria-multiselectable="true">
+                  <div class="vsb-chips" aria-label="类型">
+                    ${(([
+                      { v: 'd', n: '文档' },
+                      { v: 'h', n: '标题' },
+                      { v: 'm', n: '数学公式' },
+                      { v: 'c', n: '代码块' },
+                      { v: 't', n: '表格块' },
+                      { v: 'l', n: '列表块' },
+                      { v: 'b', n: '引述块' },
+                      { v: 's', n: '超级块' },
+                      { v: 'p', n: '段落块' },
+                      { v: 'av', n: '数据库' }
+                    ] as Array<{ v: BlockType; n: string }>).map(it =>
+                      `<label class=\"vsb-chip\"><input type=\"checkbox\" data-type value=\"${it.v}\"/><span>${it.n}</span></label>`
+                    ).join(''))}
+                  </div>
+                  <div class="vsb-multi__footer">
+                    <button class="vsb-btn vsb-ghost" type="button" data-multi-clear>清空</button>
+                    <button class="vsb-btn" type="button" data-multi-ok>完成</button>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="vsb-field" style="grid-column: 1 / -1;">
+            <div class="vsb-inline-item">
+              <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">子类型（可多选）</div>
+              <div class="vsb-multi" data-multi="subtype">
+                <button type="button" class="vsb-input vsb-multi__btn" data-multi-btn aria-haspopup="listbox" aria-expanded="false">选择子类型</button>
+                <div class="vsb-multi__panel" role="listbox" aria-multiselectable="true">
+                  <div class="vsb-chips" aria-label="子类型">
+                    ${(([ 
+                      { v: 'h1', n: '标题 H1' },
+                      { v: 'h2', n: '标题 H2' },
+                      { v: 'h3', n: '标题 H3' },
+                      { v: 'h4', n: '标题 H4' },
+                      { v: 'h5', n: '标题 H5' },
+                      { v: 'h6', n: '标题 H6' },
+                      { v: 'u', n: '无序列表' },
+                      { v: 't', n: '任务项' },
+                      { v: 'o', n: '有序列表' }
+                    ] as Array<{ v: string; n: string }>).map(it =>
+                      `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
+                    ).join(''))}
+                  </div>
+                  <div class="vsb-multi__footer">
+                    <button class="vsb-btn vsb-ghost" type="button" data-multi-clear>清空</button>
+                    <button class="vsb-btn" type="button" data-multi-ok>完成</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="vsb-inline-item">
               <div style="font-size:12px; color: var(--vsb-muted,#4b5563); margin-bottom:6px;">笔记本（可多选）</div>
-              <div class="vsb-chips" aria-label="笔记本">
-                ${(() => {
+              <div class="vsb-multi" data-multi="box">
+                <button type="button" class="vsb-input vsb-multi__btn" data-multi-btn aria-haspopup="listbox" aria-expanded="false">选择笔记本</button>
+                <div class="vsb-multi__panel" role="listbox" aria-multiselectable="true">
+                  <div class="vsb-chips" aria-label="笔记本">
+                    ${(() => {
         const nbs = (window as any)?.siyuan?.notebooks;
         if (!Array.isArray(nbs) || !nbs.length) {
           return `<span style=\"color:#9ca3af\">无可用日记本</span>`;
         }
         return nbs.map((n: any) => `<label class=\"vsb-chip\"><input type=\"checkbox\" data-box-id value=\"${n.id}\"/><span>${n.name || n.id}</span></label>`).join('');
       })()}
+                  </div>
+                  <div class="vsb-multi__footer">
+                    <button class="vsb-btn vsb-ghost" type="button" data-multi-clear>清空</button>
+                    <button class="vsb-btn" type="button" data-multi-ok>完成</button>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+
+          <div class="vsb-grid vsb-grid-4">
             <label class="vsb-field">tag 包含
               <input class="vsb-input" data-tag list="vsb-tags-list" placeholder="选择或搜索标签" />
               <datalist id="vsb-tags-list"></datalist>
@@ -325,8 +357,10 @@ export class VisualSqlUI {
   this.currentPresetEl?.addEventListener('click', (e) => this.openPresetQuickMenu(e));
 
 
-    // 异步加载标签下拉
-    this.populateTags();
+  // 异步加载标签下拉
+  this.populateTags();
+  // 初始化下拉多选交互
+  this.initMultiSelectDropdowns();
 
     // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
@@ -1053,6 +1087,7 @@ export class VisualSqlUI {
       this.currentPresetName = undefined;
       this.updateCurrentPresetLabel();
     }
+    this.updateAllMultiSummaries();
     this.rebuildSql();
   }
 
@@ -1117,12 +1152,27 @@ export class VisualSqlUI {
       .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
       .vsb-seg-item span{display:inline-block; padding:6px 10px; border-radius:8px; cursor:pointer; color: var(--vsb-fg)}
       .vsb-seg-item input:checked + span{background: var(--vsb-primary); color: var(--vsb-on-primary)}
-      .vsb-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px}
-      .vsb-chip{position:relative}
-      .vsb-chip input{position:absolute; opacity:0; pointer-events:none}
-      .vsb-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--vsb-border); color: var(--vsb-fg); background: var(--vsb-chip-bg); cursor:pointer; transition:.15s}
-      .vsb-chip input:checked + span{background: var(--vsb-primary); border-color: var(--vsb-primary); color: var(--vsb-on-primary)}
-      .vsb-checkbox{align-items:center}
+    .vsb-chips{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px}
+    .vsb-chip{position:relative}
+    .vsb-chip input{position:absolute; opacity:0; pointer-events:none}
+    .vsb-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--vsb-border); color: var(--vsb-fg); background: var(--vsb-chip-bg); cursor:pointer; transition:.15s}
+    .vsb-chip input:checked + span{background: var(--vsb-primary); border-color: var(--vsb-primary); color: var(--vsb-on-primary)}
+    .vsb-checkbox{align-items:center}
+  /* 横向分组，空间不够再换行（仅常用筛选区域内） */
+  .vsb-wrap details[data-section="filters"] .vsb-inline-group{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; margin-bottom:6px}
+  .vsb-wrap details[data-section="filters"] .vsb-inline-group .vsb-inline-item{min-width:260px; flex:1 1 260px}
+  /* 下拉多选样式（仅常用筛选区域内生效） */
+  .vsb-wrap details[data-section="filters"] .vsb-multi{position:relative; display:inline-block; min-width:220px}
+  .vsb-wrap details[data-section="filters"] .vsb-multi__btn{display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; font-size:12px}
+  .vsb-wrap details[data-section="filters"] .vsb-multi__btn::after{content:"▾"; font-size:10px; color: var(--vsb-muted)}
+  .vsb-wrap details[data-section="filters"] .vsb-multi__panel{position:absolute; top:calc(100% + 6px); left:0; min-width:280px; max-width:min(420px, 80vw); max-height:50vh; overflow:auto; z-index:9998; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); padding:10px; display:none}
+  .vsb-wrap details[data-section="filters"] .vsb-multi.is-open .vsb-multi__panel{display:block}
+  .vsb-wrap details[data-section="filters"] .vsb-multi__footer{display:flex; gap:8px; justify-content:flex-end; padding-top:8px; margin-top:8px; border-top:1px solid var(--b3-border-color)}
+  /* 下拉面板底部按钮更紧凑，仅筛选区域 */
+  .vsb-wrap details[data-section="filters"] .vsb-multi__panel .vsb-btn{padding:4px 8px; font-size:12px}
+  /* 更紧凑的下拉项：仅在筛选下拉面板内 */
+  .vsb-wrap details[data-section="filters"] .vsb-multi__panel .vsb-chips{gap:4px}
+  .vsb-wrap details[data-section="filters"] .vsb-multi__panel .vsb-chip span{padding:3px 6px; font-size:12px}
       .vsb-actions{display:flex; gap:8px; align-items:center; margin: 6px 0 10px}
       .vsb-btn{appearance:none; border:1px solid var(--vsb-border); background: var(--b3-theme-background); color: var(--vsb-fg); padding:6px 10px; line-height:1; border-radius:6px; cursor:pointer; transition:.15s}
       .vsb-btn:hover{background: var(--b3-list-hover)}
@@ -1376,6 +1426,7 @@ export class VisualSqlUI {
         this.currentPresetName = s.currentPresetName.trim();
       }
       this.updateCurrentPresetLabel();
+      this.updateAllMultiSummaries();
       if (opts?.applyCollapse) {
         const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
         const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
@@ -1696,6 +1747,81 @@ export class VisualSqlUI {
   }
 
   //（高级模式已迁移至独立页面/组件）
+
+  // ===== 下拉多选交互 =====
+  private initMultiSelectDropdowns() {
+    const wrappers = Array.from(this.container.querySelectorAll('.vsb-multi')) as HTMLElement[];
+    wrappers.forEach(w => this.setupOneMulti(w));
+    // 外部点击收起
+    this.multiOutsideCloser = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      const openList = Array.from(this.container.querySelectorAll('.vsb-multi.is-open')) as HTMLElement[];
+      openList.forEach(w => { if (!w.contains(t)) this.setMultiOpen(w, false); });
+    };
+    document.addEventListener('click', this.multiOutsideCloser);
+  }
+
+  private setupOneMulti(wrap: HTMLElement) {
+    const btn = wrap.querySelector('[data-multi-btn]') as HTMLButtonElement | null;
+    const panel = wrap.querySelector('.vsb-multi__panel') as HTMLElement | null;
+    if (!btn || !panel) return;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = !wrap.classList.contains('is-open');
+      this.setMultiOpen(wrap, open);
+    });
+    panel.addEventListener('click', (e) => e.stopPropagation());
+    // 清空
+    const clearBtn = panel.querySelector('[data-multi-clear]') as HTMLButtonElement | null;
+    clearBtn?.addEventListener('click', () => {
+      const inputs = Array.from(panel.querySelectorAll('input[type="checkbox"]')) as HTMLInputElement[];
+      let changed = false;
+      inputs.forEach(i => { if (i.checked) { i.checked = false; changed = true; i.dispatchEvent(new Event('change', { bubbles: true })); } });
+      this.updateMultiSummary(wrap);
+      if (changed) this.rebuildSql();
+    });
+    // 完成
+    const okBtn = panel.querySelector('[data-multi-ok]') as HTMLButtonElement | null;
+    okBtn?.addEventListener('click', () => this.setMultiOpen(wrap, false));
+    // 勾选变化更新文案
+    panel.querySelectorAll('input[type="checkbox"]').forEach(inp => {
+      inp.addEventListener('change', () => this.updateMultiSummary(wrap));
+    });
+    // 初始
+    this.updateMultiSummary(wrap);
+  }
+
+  private setMultiOpen(wrap: HTMLElement, open: boolean) {
+    const btn = wrap.querySelector('[data-multi-btn]') as HTMLButtonElement | null;
+    if (open) wrap.classList.add('is-open'); else wrap.classList.remove('is-open');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  private updateMultiSummary(wrap: HTMLElement) {
+    const btn = wrap.querySelector('[data-multi-btn]') as HTMLButtonElement | null;
+    if (!btn) return;
+    const checks = Array.from(wrap.querySelectorAll('.vsb-multi__panel input[type="checkbox"]')) as HTMLInputElement[];
+    const labels = checks.filter(i => i.checked).map(i => {
+      const lab = i.closest('label.vsb-chip');
+      const span = lab?.querySelector('span');
+      return (span?.textContent || '').trim();
+    }).filter(Boolean);
+    if (!labels.length) {
+      const kind = wrap.getAttribute('data-multi');
+      btn.textContent = kind === 'type' ? '选择类型' : kind === 'subtype' ? '选择子类型' : kind === 'box' ? '选择笔记本' : '请选择';
+      btn.title = '';
+      return;
+    }
+    const show = labels.slice(0, 3).join('、');
+    const more = labels.length > 3 ? ` 等${labels.length}项` : '';
+    btn.textContent = `${show}${more}`;
+    btn.title = labels.join('、');
+  }
+
+  private updateAllMultiSummaries() {
+    const wrappers = Array.from(this.container.querySelectorAll('.vsb-multi')) as HTMLElement[];
+    wrappers.forEach(w => this.updateMultiSummary(w));
+  }
 
   // 加载标签并填充到下拉框
   private async populateTags() {
