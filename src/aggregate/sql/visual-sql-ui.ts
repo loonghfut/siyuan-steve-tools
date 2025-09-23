@@ -271,7 +271,9 @@ export class VisualSqlUI {
         </details>
 
         <details class="vsb-card" open data-section="preview" style="margin-top:8px;">
-          <summary class="vsb-legend">结果预览</summary>
+          <summary class="vsb-legend">结果预览
+            <button class="vsb-icon-btn" type="button" data-preview-refresh title="刷新预览" aria-label="刷新预览">⟳</button>
+          </summary>
           <div class="vsb-result" data-result>
             <div class="vsb-result__placeholder">变更筛选后将实时显示查询结果</div>
           </div>
@@ -317,6 +319,7 @@ export class VisualSqlUI {
     const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
   const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
   const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
+  const previewRefreshBtn = this.container.querySelector('button[data-preview-refresh]') as HTMLButtonElement | null;
     this.currentPresetEl = this.container.querySelector('[data-current-preset]') as HTMLElement;
     this.updateCurrentPresetLabel();
   this.currentPresetEl?.addEventListener('click', (e) => this.openPresetQuickMenu(e));
@@ -340,6 +343,18 @@ export class VisualSqlUI {
     this.copyEmbedBtn.addEventListener('click', () => this.copyEmbedSql());
     this.resetBtn.addEventListener('click', () => this.resetForm());
     advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
+    // 结果预览刷新按钮：立即使用当前 SQL 触发查询
+    previewRefreshBtn?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      try {
+        const sql = this.outputPre?.textContent || this.builder.compile();
+        // bump 序号并直接查询，跳过防抖
+        const token = ++this.lastQuerySeq;
+        this.queryNow(token, this.ensureLimit(sql));
+        this.toast('已刷新预览');
+      } catch {}
+    });
   // 折叠状态变更时持久化
   filtersSection?.addEventListener('toggle', () => this.saveState());
   previewSection?.addEventListener('toggle', () => this.saveState());
@@ -1086,6 +1101,10 @@ export class VisualSqlUI {
   details.vsb-card > summary.vsb-legend{cursor:pointer; list-style:none}
   details.vsb-card > summary.vsb-legend::marker, details.vsb-card > summary.vsb-legend::-webkit-details-marker{display:none}
   details.vsb-card[open]{box-shadow: 0 2px 5px rgba(0,0,0,.05)}
+      /* legend 右侧小图标按钮（仅用于 details > summary 处） */
+      details.vsb-card > summary.vsb-legend{display:flex; align-items:center; justify-content:space-between; gap:6px}
+      details.vsb-card > summary.vsb-legend .vsb-icon-btn{margin-left:auto; appearance:none; border:1px solid var(--vsb-border); background: var(--b3-theme-background); color: var(--vsb-muted); width:22px; height:22px; line-height:20px; text-align:center; border-radius:6px; cursor:pointer; font-size:12px; padding:0}
+      details.vsb-card > summary.vsb-legend .vsb-icon-btn:hover{background: var(--b3-list-hover)}
       .vsb-grid{display:grid; gap:8px}
       .vsb-grid-4{grid-template-columns: repeat(4, minmax(160px,1fr))}
       .vsb-grid-3{grid-template-columns: repeat(3, minmax(200px,1fr))}
