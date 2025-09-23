@@ -507,6 +507,7 @@ export class VisualSqlAdvancedUI {
         const field = (row.querySelector('[data-field]') as HTMLSelectElement)?.value?.trim();
         const op = (row.querySelector('[data-op]') as HTMLSelectElement)?.value?.trim().toLowerCase();
         const rawVal = (row.querySelector('[data-value]') as HTMLInputElement)?.value ?? '';
+        const isNumericField = !!field && this.numericFields.has(field);
         if (!field || !op) return '';
 
         let expr = '';
@@ -514,17 +515,33 @@ export class VisualSqlAdvancedUI {
             expr = `${field} ${op.toUpperCase()}`;
         } else if (op === 'between') {
             const parts = (rawVal || '').split(',').map(s => s.trim()).filter(Boolean);
-            if (parts.length === 2) expr = `${field} BETWEEN ${Q(parts[0])} AND ${Q(parts[1])}`;
+            if (parts.length === 2) {
+                const a = isNumericField ? Number(parts[0]) : parts[0];
+                const b = isNumericField ? Number(parts[1]) : parts[1];
+                if (!isNumericField || (Number.isFinite(a as number) && Number.isFinite(b as number))) {
+                    expr = `${field} BETWEEN ${Q(a)} AND ${Q(b)}`;
+                }
+            }
         } else if (op === 'in' || op === 'not in') {
             let parts = (rawVal || '').split(',').map(s => s.trim()).filter(Boolean);
-            if (field === 'tag') parts = parts.map(x => x.startsWith('#') ? x : `#${x}`);
+            if (field === 'tag') {
+                parts = parts.map(x => x.startsWith('#') ? x : `#${x}`);
+            } else if (isNumericField) {
+                // 仅保留有效数字
+                parts = parts.map(v => Number(v)).filter(v => Number.isFinite(v)) as any[];
+            }
             if (parts.length) expr = `${field} ${op.toUpperCase()} (${parts.map(Q).join(', ')})`;
         } else if (op === 'like' || op === 'not like') {
             const v0 = smartLike(rawVal) ?? '';
             const v = (field === 'tag' && v0 && !v0.includes('#')) ? v0.replace('%', '%#') : v0;
             if (v) expr = `${field} ${op.toUpperCase()} ${Q(v)}`;
         } else {
-            if (rawVal !== '') expr = `${field} ${op.toUpperCase()} ${Q(rawVal)}`;
+            if (rawVal !== '') {
+                const v = isNumericField ? Number(rawVal) : rawVal;
+                if (!isNumericField || Number.isFinite(v as number)) {
+                    expr = `${field} ${op.toUpperCase()} ${Q(v)}`;
+                }
+            }
         }
 
         if (!expr) return '';
@@ -788,60 +805,60 @@ export class VisualSqlAdvancedUI {
         const style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = `
-      .vsb-adv-wrap{ color: var(--b3-theme-on-background); font-family: var(--b3-font-family); font-size: var(--b3-font-size); }
-    .vsb-adv-group{ border:2px solid var(--b3-border-color); border-left-width:4px; border-left-color: var(--b3-theme-primary); border-radius:8px; padding:8px; background: var(--b3-theme-surface); }
-    .vsb-adv-group + .vsb-adv-group{ margin-top:8px; }
+            .vsb-adv-wrap{ color: var(--b3-theme-on-background); font-family: var(--b3-font-family); font-size: var(--b3-font-size); }
+        .vsb-adv-wrap .vsb-adv-group{ border:2px solid var(--b3-border-color); border-left-width:4px; border-left-color: var(--b3-theme-primary); border-radius:8px; padding:8px; background: var(--b3-theme-surface); }
+        .vsb-adv-wrap .vsb-adv-group + .vsb-adv-group{ margin-top:8px; }
     /* 折叠不改变背景色阶，保持层级可视性 */
-    .vsb-adv-group.vsb-collapsed{ background: inherit; }
+        .vsb-adv-wrap .vsb-adv-group.vsb-collapsed{ background: inherit; }
     /* 层级背景色阶（使用主题常见变量，按层级轻微变化） */
-    .vsb-adv-group{ background: var(--b3-theme-surface); }
-    .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background); }
-    .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background-light); }
-    .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-surface); }
-    .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background); }
+        .vsb-adv-wrap .vsb-adv-group{ background: var(--b3-theme-surface); }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background); }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background-light); }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-surface); }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group .vsb-adv-group{ background: var(--b3-theme-background); }
     /* 更多层级将循环上述色阶 */
-    .vsb-adv-group .vsb-preview{ margin-top:6px; padding:6px 8px; border-radius:6px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-background); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; border:1px dashed var(--b3-border-color); white-space: normal; overflow-wrap: anywhere; word-break: break-word; transition: opacity .18s ease; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-preview{ margin-top:6px; padding:6px 8px; border-radius:6px; background: var(--b3-theme-background-light); color: var(--b3-theme-on-background); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; border:1px dashed var(--b3-border-color); white-space: normal; overflow-wrap: anywhere; word-break: break-word; transition: opacity .18s ease; }
     /* 动画时避免抖动 */
-    .vsb-adv-children.is-animating{ will-change: height; }
+        .vsb-adv-wrap .vsb-adv-children.is-animating{ will-change: height; }
 
     /* ===== 子分组紧凑版样式 ===== */
-    .vsb-adv-group .vsb-adv-group{ padding:6px; border-radius:6px; border-width:1px; border-left-width:3px; }
-    .vsb-adv-group .vsb-adv-group + .vsb-adv-group{ margin-top:6px; }
-    .vsb-adv-group .vsb-adv-group > .vsb-adv-header{ gap:6px; margin:4px 0; }
-    .vsb-adv-group .vsb-adv-group > [data-children]{ gap:4px !important; padding-left:8px !important; border-left-style: dotted; }
-    .vsb-adv-group .vsb-adv-group .vsb-seg{ padding:2px 4px; gap:4px; }
-    .vsb-adv-group .vsb-adv-group .vsb-seg-item span{ padding:4px 8px; }
-    .vsb-adv-group .vsb-adv-group .vsb-btn{ padding:4px 8px; }
-    .vsb-adv-group .vsb-adv-group .vsb-preview{ margin-top:4px; padding:4px 6px; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group{ padding:6px; border-radius:6px; border-width:1px; border-left-width:3px; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group + .vsb-adv-group{ margin-top:6px; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group > .vsb-adv-header{ gap:6px; margin:4px 0; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group > [data-children]{ gap:4px !important; padding-left:8px !important; border-left-style: dotted; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-seg{ padding:2px 4px; gap:4px; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-seg-item span{ padding:4px 8px; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-btn{ padding:4px 8px; }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-preview{ margin-top:4px; padding:4px 6px; }
     /* 嵌套层级左侧强调条微调（仅在嵌套的组中改变色调） */
-    .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-primary-lighter, var(--b3-theme-primary)); }
-    .vsb-adv-group .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-secondary, var(--b3-theme-primary)); }
-      .vsb-seg{display:flex; gap:6px; background: var(--b3-theme-background-light); padding:4px; border-radius:10px; border:1px solid var(--b3-border-color)}
-      .vsb-seg-item{position:relative}
-      .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
-      .vsb-seg-item span{display:inline-block; padding:6px 10px; border-radius:8px; cursor:pointer}
-      .vsb-seg-item input:checked + span{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary)}
-      .vsb-btn{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); padding:6px 10px; line-height:1; border-radius:6px; cursor:pointer; transition:.15s}
-      .vsb-btn:hover{background: var(--b3-list-hover)}
-      .vsb-btn.vsb-ghost{background:transparent}
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-primary-lighter, var(--b3-theme-primary)); }
+        .vsb-adv-wrap .vsb-adv-group .vsb-adv-group .vsb-adv-group{ border-left-color: var(--b3-theme-secondary, var(--b3-theme-primary)); }
+            .vsb-adv-wrap .vsb-seg{display:flex; gap:6px; background: var(--b3-theme-background-light); padding:4px; border-radius:10px; border:1px solid var(--b3-border-color)}
+            .vsb-adv-wrap .vsb-seg-item{position:relative}
+            .vsb-adv-wrap .vsb-seg-item input{position:absolute; opacity:0; pointer-events:none}
+            .vsb-adv-wrap .vsb-seg-item span{display:inline-block; padding:6px 10px; border-radius:8px; cursor:pointer}
+            .vsb-adv-wrap .vsb-seg-item input:checked + span{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary)}
+            .vsb-adv-wrap .vsb-btn{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); padding:6px 10px; line-height:1; border-radius:6px; cursor:pointer; transition:.15s}
+            .vsb-adv-wrap .vsb-btn:hover{background: var(--b3-list-hover)}
+            .vsb-adv-wrap .vsb-btn.vsb-ghost{background:transparent}
     /* 折叠/展开按钮颜色标识 */
-    .vsb-adv-header [data-collapse-btn][aria-expanded="true"]{ color: var(--b3-theme-primary); border-color: var(--b3-theme-primary); }
-    .vsb-adv-header [data-collapse-btn][aria-expanded="false"]{ color: var(--b3-theme-on-background); background: var(--b3-theme-background-light); }
-      .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 3px; outline:none}
-      .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
+        .vsb-adv-wrap .vsb-adv-header [data-collapse-btn][aria-expanded="true"]{ color: var(--b3-theme-primary); border-color: var(--b3-theme-primary); }
+        .vsb-adv-wrap .vsb-adv-header [data-collapse-btn][aria-expanded="false"]{ color: var(--b3-theme-on-background); background: var(--b3-theme-background-light); }
+            .vsb-adv-wrap .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 3px; outline:none}
+            .vsb-adv-wrap .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
   /* Tag 搜索输入（datalist 绑定）配色适配 */
   .vsb-adv-wrap input.vsb-input[list^="vsb-tags-"]{ background: var(--b3-theme-background); color: var(--b3-theme-on-background); caret-color: var(--b3-theme-primary); }
   .vsb-adv-wrap input.vsb-input[list^="vsb-tags-"]::placeholder{ color: var(--b3-theme-on-surface-light); }
     /* 统一日期输入宽度，避免与其他控件互相干涉 */
-        .vsb-adv-wrap input[type="datetime-local"].vsb-input{ width:140px; }
+                .vsb-adv-wrap input[type="datetime-local"].vsb-input{ width:140px; }
     /* 日期面板（按钮已移除，保留样式以备将来复用） */
-    .vsb-date-panel{ position:fixed; z-index:99999; background: var(--b3-theme-surface); color: var(--b3-theme-on-background); border:1px solid var(--b3-border-color); border-radius:8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); width: 248px; }
-    .vsb-date-panel header{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--b3-border-color) }
-    .vsb-date-panel header button{ border:none; background:transparent; color:inherit; cursor:pointer; padding:4px }
-    .vsb-date-panel .grid{ display:grid; grid-template-columns: repeat(7, 1fr); gap:2px; padding:6px }
-    .vsb-date-panel .cell{ text-align:center; padding:6px 0; border-radius:6px; cursor:pointer }
-    .vsb-date-panel .cell:hover{ background: var(--b3-list-hover) }
-    .vsb-date-panel .dow{ font-size:11px; color: var(--b3-theme-on-surface); cursor:default }
+        .vsb-adv-wrap .vsb-date-panel{ position:fixed; z-index:99999; background: var(--b3-theme-surface); color: var(--b3-theme-on-background); border:1px solid var(--b3-border-color); border-radius:8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); width: 248px; }
+        .vsb-adv-wrap .vsb-date-panel header{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--b3-border-color) }
+        .vsb-adv-wrap .vsb-date-panel header button{ border:none; background:transparent; color:inherit; cursor:pointer; padding:4px }
+        .vsb-adv-wrap .vsb-date-panel .grid{ display:grid; grid-template-columns: repeat(7, 1fr); gap:2px; padding:6px }
+        .vsb-adv-wrap .vsb-date-panel .cell{ text-align:center; padding:6px 0; border-radius:6px; cursor:pointer }
+        .vsb-adv-wrap .vsb-date-panel .cell:hover{ background: var(--b3-list-hover) }
+        .vsb-adv-wrap .vsb-date-panel .dow{ font-size:11px; color: var(--b3-theme-on-surface); cursor:default }
     `;
         document.head.appendChild(style);
     }
