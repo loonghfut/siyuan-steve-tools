@@ -359,7 +359,9 @@ export class M_calendar {
             this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
             await this.QQCalDAVClient.init();
             const qqCalendars_url = this_settingdata["cal-qq-calendar-url"];
-            this.qqFullCalendarEvents = await this.QQCalDAVClient.getEvents(qqCalendars_url);
+            // 确保首次进入面板即拉取并写入 QQ 事件缓存
+            await this.QQCalDAVClient.updateEventsFromQQCalDAV(qqCalendars_url);
+            this.qqFullCalendarEvents = this.QQCalDAVClient.getEventsFromQQCalDAV();
             refreshKanban();
             console.log("QQevent", this.qqFullCalendarEvents);
         }
