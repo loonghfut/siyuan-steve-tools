@@ -39,7 +39,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.15.0 (2025年09月22日)
+### v0.15.1 (2025年09月24日)
 - 增加实时预览查询 (loonghfut)
 - feat: 添加结果预览和工具提示功能，优化筛选区域的折叠状态持久化 (loonghfut)
 - feat: 添加 SQL 结果预览列设置，支持自定义列显示 (loonghfut)
@@ -59,6 +59,15 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加 SQL 结果预览列最大宽度设置，优化可视化表格显示 (loonghfut)
 - feat: 优化嵌入块按钮文本，提升用户界面友好性 (loonghfut)
 - feat: 更新插件版本号至 0.15.0 (loonghfut)
+- docs: 更新 v0.15.0 版本的更新日志 (loonghfut)
+- feat: 添加结果预览刷新按钮，支持实时查询更新 (loonghfut)
+- feat: 增强 SQL 规则表达式处理，支持数字字段的有效性检查 (loonghfut)
+- feat: 添加多选下拉交互，优化筛选功能的用户体验 (loonghfut)
+- feat: 添加分段嵌入功能，支持时间段的 SQL 查询与预览 (loonghfut)
+- 优化部分细节 (loonghfut)
+- feat: 优化分段嵌入复制功能，增加结果探测与空段过滤 (loonghfut)
+- fix: 更新 QQ 日历事件获取逻辑，确保首次进入面板时拉取并写入事件缓存 (loonghfut)
+- fix: 更新插件版本号至 0.15.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
