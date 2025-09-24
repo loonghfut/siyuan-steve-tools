@@ -16,7 +16,7 @@
   },
   "description": {
     "en_US": "schedule management, docker sync awareness, ai sidebar",
-    "zh_CN": "互联日程管理（基于数据库的看板视图和日历视图）支持ics，qq邮箱日期，滴答清单双向联动, docker同步感知, ai侧边栏, 资源压缩, 白板, WPS联动, SQL聚合"
+    "zh_CN": "互联日程管理（基于数据库的看板视图和日历视图）支持ics，qq邮箱日历，滴答清单双向联动, docker同步感知, ai侧边栏, 资源压缩, 白板, WPS联动, SQL聚合可视化"
   },
   "readme": {
     "en_US": "README.md",
