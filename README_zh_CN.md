@@ -22,17 +22,19 @@ STEVETOOLS
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
 和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。     
 2. docker同步感知：    
-win端s3同步后，docker端感知s3同步。 
+win端s3同步后，docker端感知s3同步。  
 3. ai网页侧边栏：    
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
 压缩媒体资源后再导入思源。  
 5. tldraw白板：  
-模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转
+模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转  
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
-7. WPS联动：
+7. WPS联动：  
 方便在思源中使用WPS（office文件嵌入，预览、编辑、同步），多维表格数据导入，图片上传。
+8. SQL聚合查询：  
+可视化生成SQL语句，查询思源数据库，支持多条件筛选，排序等功能，支持结果预览和嵌入块。
 
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
