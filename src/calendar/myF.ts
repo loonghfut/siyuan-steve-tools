@@ -6,7 +6,6 @@ import { Calendar } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/interface";
-import steveTools from "@/index";
 import { refreshKanban } from './kanban';
 import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_tags, runblockdata_for_time, runblockdata_for_title } from './quickadd';
 // import { isEventCompleted } from './calendar';
@@ -15,12 +14,6 @@ import { getRequiredFields } from './fieldConfig';
 
 // ================== 自定义类型补充（轻量，不破坏现有引用） ==================
 // 事件字段解析结果（行中的“事件”列）
-interface EventFieldData {
-    content: string;
-    id: string;      // 块 ID（用于打开 / 跳转）
-    itemID: string;  // AttributeView 行内部 ID（属性写入优先使用）
-    keyID: string;   // 列 keyID
-}
 
 // FullCalendar extendedProps 结构
 export interface CalendarEventExtendedProps {
@@ -451,7 +444,11 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
         filterKeys.includes(item.from.viewId)
     );
 
-    if (filteredViewValue.length === 0 && !filterKeys.includes('qqcalendar') && !filterKeys.includes('icsSubscription')) {
+    // 仅当用户选择了普通视图且没有匹配时才提示；
+    // 如果只选择了特殊视图（qqcalendar/icsSubscription/lifelog/recurring），不提示。
+    const specialKeys = new Set(['qqcalendar', 'icsSubscription', 'lifelog', 'recurring']);
+    const onlySpecialSelected = filterKeys.length > 0 && filterKeys.every(k => specialKeys.has(k));
+    if (filteredViewValue.length === 0 && !onlySpecialSelected) {
         sy.showMessage('未找到匹配的视图，请重新选择', -1, "error");
     }
 

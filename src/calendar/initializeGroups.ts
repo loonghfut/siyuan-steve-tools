@@ -27,7 +27,7 @@ const defaultGroups: ViewGroup[] = [
         id: 'special',
         name: '特殊功能',
         icon: '⚡',
-        viewIds: ['lifelog'],
+        viewIds: ['lifelog', 'recurring'],
         isExpanded: true,
         isHidden: false
     }
@@ -133,7 +133,7 @@ export function getUngroupedViews(allViewIds: string[]): string[] {
 
 // 工具函数：获取所有视图ID并去重
 function getAllViewIds(viewIDs: any[]): string[] {
-    const allSpecialViewIds = ['qqcalendar', 'icsSubscription', 'lifelog'];
+    const allSpecialViewIds = ['qqcalendar', 'icsSubscription', 'lifelog', 'recurring'];
     const allSiyuanViewIds = viewIDs.map(v => v.viewId);
     // 使用 Set 去重，避免特殊视图与思源视图ID重复
     return [...new Set([...allSpecialViewIds, ...allSiyuanViewIds])];
@@ -176,7 +176,7 @@ export async function createViewFilterMenu(
     selectAllBtn.onclick = (e) => {
         e.stopPropagation();
         // 选择所有视图
-        let newFilterViewId = ['qqcalendar', 'icsSubscription', 'lifelog'];
+        let newFilterViewId = ['qqcalendar', 'icsSubscription', 'lifelog', 'recurring'];
         viewIDs.forEach(view => {
             if (!newFilterViewId.includes(view.viewId)) {
                 newFilterViewId.push(view.viewId);
@@ -452,6 +452,10 @@ export async function createViewFilterMenu(
                 break;
             case 'lifelog':
                 label = 'Lifelog 记录';
+                isSpecial = true;
+                break;
+            case 'recurring':
+                label = '周期事件';
                 isSpecial = true;
                 break;
             default:
@@ -921,6 +925,9 @@ export async function createViewFilterMenu(
                     break;
                 case 'lifelog':
                     label = 'Lifelog 记录';
+                    break;
+                case 'recurring':
+                    label = '周期事件';
                     break;
                 default:
                     const view = viewIDs.find(v => v.viewId === viewId);

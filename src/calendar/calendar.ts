@@ -242,6 +242,11 @@ export async function run(
             } else {
                 rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
             }
+            // 若当前选择的均为只读或无有效视图，阻止创建
+            if (!rootid) {
+                showMessage('当前选择的视图不支持直接创建事件', 3000, 'info');
+                return;
+            }
             if (settingdata["cal-create-way"] === "1") {
                 await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
                 return;
@@ -622,29 +627,32 @@ export async function run(
                 }
 
                 /////////////////////思源////////////////////////
-                // 1. 获取引用ID
+                // 1. 获取引用ID（普通事件）
                 av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
-                const av_ids_zq = await moduleInstances['M_calendar'].getAVreferenceid("周期");
-                if (!av_ids?.length) {
-                    console.warn('No reference IDs found');
+                const showRecurring = filterViewId.includes('recurring');
+                // 仅当既没有普通视图引用、又未选择任何特殊来源（QQ/ICS/Lifelog/周期）时才早退
+                if (!av_ids?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription') && !showRecurring) {
+                    console.warn('No reference IDs found and no view selected');
                     successCallback([]);
                     return;
                 }
 
                 // 2. 获取视图ID
-                const viewIDs_zq = await myF.getViewId(av_ids_zq);
-                const viewIDs = await myF.getViewId(av_ids);
+                const viewIDs = av_ids?.length ? await myF.getViewId(av_ids) : [];
+                // 仅在需要显示周期事件时获取周期视图ID
+                const av_ids_zq = showRecurring ? await moduleInstances['M_calendar'].getAVreferenceid("周期") : [];
+                const viewIDs_zq = (showRecurring && av_ids_zq?.length) ? await myF.getViewId(av_ids_zq) : [];
 
                 // 修改视图ID检查逻辑
-                if (!viewIDs?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription')) {
+                if (!viewIDs?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription') && !showRecurring) {
                     console.warn('No view IDs found and no special views selected');
                     successCallback([]);
                     return;
                 }
 
                 // 3. 获取视图数据
-                viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
-                viewValue = await myF.getViewValue(viewIDs);
+                viewValue = viewIDs?.length ? await myF.getViewValue(viewIDs) : [];
+                viewValue_zq = (showRecurring && viewIDs_zq?.length) ? await myF.getViewValue(viewIDs_zq, true) : [];
                 // console.log("View data:", viewValue, "周期", viewValue_zq);
 
                 // 3.5 增加筛选函数
