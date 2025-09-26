@@ -10,6 +10,12 @@ export interface VisualSqlUIButton {
   className?: string; // 追加的 class，例如 "vsb-btn vsb-primary"
   variant?: 'default' | 'primary' | 'ghost'; // 便捷皮肤
   attrs?: Record<string, string>; // 透传属性，如 { 'data-action': 'run' }
+  /**
+   * 按钮插入位置：
+   * - 'start'（默认）：插入到操作区最左侧
+   * - 'before-reset'：插入到“重置”按钮左侧
+   */
+  placement?: 'start' | 'before-reset';
   onClick?: (ctx: { getSQL: () => string; builder: VisualSqlBuilder; container: HTMLElement; event: MouseEvent; }) => void;
 }
 
@@ -429,7 +435,6 @@ export class VisualSqlUI {
     // 渲染自定义按钮（如有）
     if (Array.isArray(this.opts.buttons) && this.opts.buttons.length && this.actionsEl) {
       const getSQL = () => this.builder.compile();
-      const insertBeforeEl = this.actionsEl.firstElementChild || null; // 放在最左侧
       for (const cfg of this.opts.buttons) {
         const btn = document.createElement('button');
         // 计算 class
@@ -444,7 +449,10 @@ export class VisualSqlUI {
         if (cfg.onClick) {
           btn.addEventListener('click', (event) => cfg.onClick!({ getSQL, builder: this.builder, container: this.container, event }));
         }
-        this.actionsEl.insertBefore(btn, insertBeforeEl);
+        const targetBefore = (cfg.placement === 'before-reset')
+          ? (this.resetBtn as HTMLElement | null)
+          : (this.actionsEl.firstElementChild as HTMLElement | null);
+        this.actionsEl.insertBefore(btn, targetBefore || null);
       }
     }
 

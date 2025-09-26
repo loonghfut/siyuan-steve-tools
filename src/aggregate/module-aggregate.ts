@@ -1,7 +1,8 @@
 import steveTools from "@/index";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
+import { VisualEchartsUI } from "./echarts/visual-echarts-ui";
 import { Dialog, Menu, openTab } from "siyuan";
-import { updateBlock } from "@/api/api";
+import { updateBlock, insertBlock } from "@/api/api";
 import { PluginConfig } from "@/savedata";
 
 // Aggregate 模块
@@ -50,6 +51,31 @@ export class M_Aggregate {
                             end: String(_settingdata["aggregate-segment-embed-end"] || ""),
                             intervalDays: Number(_settingdata["aggregate-segment-embed-interval-days"]) || 7,
                         },
+                        buttons: [
+                            {
+                                label: '转到 ECharts',
+                                title: '用当前 SQL 打开 ECharts 配置',
+                                placement: 'before-reset',
+                                onClick: async ({ getSQL }) => {
+                                    const sql = (getSQL() || '').trim();
+                                    new Dialog({
+                                        title: 'ECharts 可视化生成器',
+                                        content: `<div id="visual-echarts-from-sql-tab-${id}" style="width:100%;height:100%;max-height:80vh;overflow:auto;"></div>`,
+                                        width: '70%',
+                                        height: 'auto',
+                                        disableClose: false,
+                                        hideCloseIcon: true,
+                                    });
+                                    const c2 = document.getElementById(`visual-echarts-from-sql-tab-${id}`)! as HTMLElement;
+                                    const eui = new VisualEchartsUI(c2, {
+                                        persistKey: `visual-echarts-from-sql-tab:${id}`,
+                                        initialSQL: sql,
+                                        loadSqlPresets: () => (conf.get('presets') || {})
+                                    });
+                                    requestAnimationFrame(()=> eui.resize());
+                                }
+                            }
+                        ],
                         // 使用持久化配置替代 localStorage
                         loadPresets: () => (conf.get('presets') || {}),
                         savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
@@ -62,6 +88,7 @@ export class M_Aggregate {
                     });
                     this.data.id = id;
                     aggregate._tabInstances.set(id, ui);
+                    // 顶部 Tabbar 按钮已移除，统一在 actions 区提供“转到 ECharts”
                     // 初次渲染后按当前视口计算布局
                     requestAnimationFrame(() => ui?.resize());
                 },
@@ -85,8 +112,8 @@ export class M_Aggregate {
         }
         this.plugin.protyleSlash = [
             {
-                filter: ["SQL", "sql", "查询", "query"],
-                html: `<div class="b3-list-item__first"><span class="b3-list-item__text">SQL</span><span class="b3-list-item__meta"></span></div>`,
+                filter: ["SQL", "sql", "查询", "query","stsql"],
+                html: `<div class="b3-list-item__first"><span class="b3-list-item__text">ST_SQL</span><span class="b3-list-item__meta"></span></div>`,
                 id: "insertCardLink",
                 callback: async (_protyle,nodeElement) => {
                     // 打开 SQL 可视化生成器面板
@@ -132,6 +159,31 @@ export class M_Aggregate {
                                         dlg.destroy();
                                     }
                                 }
+                            },
+                            {
+                                label: '转到 ECharts',
+                                title: '用当前 SQL 打开 ECharts 配置',
+                                placement: 'before-reset',
+                                onClick: async ({ getSQL }) => {
+                                    const sql = (getSQL() || '').trim();
+                                    new Dialog({
+                                        title: 'ECharts 可视化生成器',
+                                        content: `<div id="visual-echarts-from-sql" style="width:100%;max-height:70vh;overflow:auto;"></div>`,
+                                        width: '70%',
+                                        height: 'auto',
+                                        disableClose: false,
+                                        hideCloseIcon: false,
+                                    });
+                                    const c2 = document.getElementById('visual-echarts-from-sql')! as HTMLElement;
+                                    const conf2 = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                                    await conf2.load();
+                                    const eui = new VisualEchartsUI(c2, {
+                                        persistKey: 'siyuan-steve-tools:visual-echarts-from-sql',
+                                        initialSQL: sql,
+                                        loadSqlPresets: () => (conf2.get('presets') || {})
+                                    });
+                                    requestAnimationFrame(()=> eui.resize());
+                                }
                             }
                         ],
                         onSqlChange: (_sql) => {
@@ -143,6 +195,47 @@ export class M_Aggregate {
                     requestAnimationFrame(() => ui?.resize());
                 },
             },
+            // ECharts 可视化代码生成器（Slash 入口）
+            {
+                filter: ["ECharts", "echarts", "图表", "chart","stcharts"],
+                html: `<div class="b3-list-item__first"><span class="b3-list-item__text">ST_Charts</span><span class="b3-list-item__meta"></span></div>`,
+                id: "insertEchartsCode",
+                callback: async (_protyle, nodeElement) => {
+                    const dlg = new Dialog({
+                        title: "ECharts 可视化生成器",
+                        content: `<div id="visual-echarts-container-slash" style="width:100%;max-height:70vh;overflow:auto;"></div>`,
+                        width: '70%',
+                        height: 'auto',
+                        disableClose: false,
+                        hideCloseIcon: false,
+                        resizeCallback: () => { ui?.resize(); },
+                    });
+                    const container = document.getElementById('visual-echarts-container-slash')!;
+                    const conf3 = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                    await conf3.load();
+                    const ui = new VisualEchartsUI(container, {
+                        persistKey: 'siyuan-steve-tools:visual-echarts-slash',
+                        loadSqlPresets: () => (conf3.get('presets') || {})
+                    });
+                    // 追加“插入代码块”按钮
+                    const bar = document.createElement('div');
+                    bar.style.cssText = 'display:flex; gap:8px; padding:6px 0;';
+                    const btn = document.createElement('button');
+                    btn.className = 'b3-button';
+                    btn.textContent = '插入ECharts IIFE';
+                    btn.addEventListener('click', async () => {
+                        const code = (container.querySelector('[data-output]') as HTMLElement)?.textContent || '';
+                        const curId = nodeElement.getAttribute('data-node-id');
+                        const fenced = '```echarts\n' + code + '\n```';
+                        // 在当前块后插入新的 ECharts 代码块，避免覆盖原块引起渲染器类型不一致
+                        await insertBlock('markdown', fenced, undefined, curId || undefined, undefined);
+                        dlg.destroy();
+                    });
+                    bar.appendChild(btn);
+                    container.parentElement?.insertBefore(bar, container);
+                    requestAnimationFrame(()=> ui?.resize());
+                }
+            }
         ];
         
     }
@@ -181,6 +274,7 @@ export class M_Aggregate {
     }
 
     private addMenu(rect: DOMRect, _settingdata: any) {
+        const self = this;
         const menu = new Menu("topBarSQL", () => {});
         menu.addItem({
             icon: "iconSQL",
@@ -209,10 +303,108 @@ export class M_Aggregate {
                         this._ui?.resize();
                     },
                 });
-                this.mountUI(document.getElementById('visual-sql-container')!, previewCols, _settingdata);
+                const container = document.getElementById('visual-sql-container')!;
+                const ui = new VisualSqlUI(container, {
+                    previewColumns: previewCols,
+                    previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                    segmentEmbed: {
+                        start: String(_settingdata["aggregate-segment-embed-start"] || ""),
+                        end: String(_settingdata["aggregate-segment-embed-end"] || ""),
+                        intervalDays: Number(_settingdata["aggregate-segment-embed-interval-days"]) || 7,
+                    },
+                    buttons: [
+                        {
+                            label: '转到 ECharts',
+                            title: '用当前 SQL 打开 ECharts 配置',
+                                placement: 'before-reset',
+                            onClick: async ({ getSQL }) => {
+                                const sql = (getSQL() || '').trim();
+                                new Dialog({
+                                    title: 'ECharts 可视化生成器',
+                                    content: `<div id="visual-echarts-from-sql-modal" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                                    width: '70%',
+                                    height: 'auto',
+                                    disableClose: false,
+                                    hideCloseIcon: true,
+                                });
+                                const c2 = document.getElementById('visual-echarts-from-sql-modal')! as HTMLElement;
+                                const conf = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                                await conf.load();
+                                const eui = new VisualEchartsUI(c2, {
+                                    persistKey: 'siyuan-steve-tools:visual-echarts-from-sql-modal',
+                                    initialSQL: sql,
+                                    loadSqlPresets: () => (conf.get('presets') || {})
+                                });
+                                requestAnimationFrame(()=> eui.resize());
+                            }
+                        }
+                    ]
+                });
+                this._ui = ui;
                 requestAnimationFrame(() => this._ui?.resize());
             }
         });
+        // 若启用图表功能，额外提供 ECharts 按钮与 Tab
+        if (_settingdata["chart-enable"]) {
+            menu.addSeparator();
+            menu.addItem({
+                icon: "iconChart", // 使用现有图标名或后续替换
+                label: "ECharts 页签",
+                click: async () => {
+                    this.plugin.addTab({
+                        type: "visual-echarts",
+                        async init() {
+                            const id = new Date().getTime().toString();
+                            this.element.innerHTML = `<div id="visual-echarts-tab-${id}" style="width:100%;height:100%;overflow:auto;"></div>`;
+                            const container = document.getElementById(`visual-echarts-tab-${id}`)! as HTMLElement;
+                            const conf = new PluginConfig(self.plugin.name, 'aggregate-sql');
+                            await conf.load();
+                            const ui = new VisualEchartsUI(container, {
+                                persistKey: `visual-echarts-tab:${id}`,
+                                loadSqlPresets: () => (conf.get('presets') || {})
+                            });
+                            (this as any).data = { id, ui };
+                            requestAnimationFrame(()=> ui.resize());
+                        },
+                        async destroy() {
+                            // 目前无显式销毁
+                        },
+                        resize() {
+                            const ui = (this as any).data?.ui as VisualEchartsUI | undefined;
+                            ui?.resize();
+                        },
+                    });
+                    await openTab({
+                        app: (window as any).siyuan.ws.app,
+                        custom: { icon: "iconChart", title: "ECharts 视图", id: this.plugin.name + "visual-echarts", data: { id: null } },
+                        keepCursor: false,
+                    });
+                }
+            });
+            menu.addItem({
+                icon: "iconChart",
+                label: "ECharts 弹窗",
+                click: async () => {
+                    new Dialog({
+                        title: "ECharts 可视化生成器",
+                        content: `<div id="visual-echarts-container" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                        width: '70%',
+                        height: 'auto',
+                        disableClose: false,
+                        hideCloseIcon: true,
+                        resizeCallback: () => {},
+                    });
+                    const container = document.getElementById('visual-echarts-container')!;
+                    const conf = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                    await conf.load();
+                    const ui = new VisualEchartsUI(container, {
+                        persistKey: 'siyuan-steve-tools:visual-echarts-modal',
+                        loadSqlPresets: () => (conf.get('presets') || {})
+                    });
+                    requestAnimationFrame(()=> ui.resize());
+                }
+            });
+        }
         menu.open({ x: rect.right, y: rect.bottom, isLeft: true });
     }
 }
