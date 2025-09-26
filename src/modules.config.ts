@@ -19,12 +19,12 @@ export interface ModuleConfig {
 
 // 所有可用模块的配置
 export const MODULE_CONFIG: ModuleConfig = {
-    // M_calendar: {
-    //     class: M_calendar,
-    //     name: 'M_calendar',
-    //     settingKey: 'cal-enable',
-    //     logMessage: '日历模块加载'
-    // },
+    M_calendar: {
+        class: M_calendar,
+        name: 'M_calendar',
+        settingKey: 'cal-enable',
+        logMessage: '日历模块加载'
+    },
     // M_sync: {
     //     class: M_sync,
     //     name: 'M_sync',

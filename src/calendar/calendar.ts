@@ -228,6 +228,11 @@ export async function run(
         // 日期点击处理
         //// 双击触发(可选)
         dateClick: async function (info) {
+            // 空筛选不允许创建事件
+            if (!filterViewId || filterViewId.length === 0) {
+                showMessage('未选择视图，无法创建事件。请先点击“视图选择”。', 3000, 'info');
+                return;
+            }
             // console.log('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
             let rootid;
@@ -529,15 +534,19 @@ export async function run(
             // const buttons = document.querySelectorAll('.fc-viewFilter-button');
             // buttons.forEach(btn => btn.textContent = viewName);
             try {
+                // 空筛选不显示任何事件
+                if (!filterViewId || filterViewId.length === 0) {
+                    successCallback([]);
+                    return;
+                }
                 let allEvents = [];
                 /////////////////////QQ日历////////////////////////
                 try {
                     if (moduleInstances['M_calendar']?.QQCalDAVClient) {
                         const qqEvents = moduleInstances["M_calendar"].QQCalDAVClient?.getEventsFromQQCalDAV();
                         if (qqEvents && Array.isArray(qqEvents)) {
-                            // 如果有筛选视图且不是要显示所有视图，检查是否应该显示QQ日历事件
-                            const showQQEvents = filterViewId.length === 0 ||
-                                filterViewId.includes('qqcalendar'); // 假设'qqcalendar'是QQ日历视图的ID
+                            // 检查是否应该显示QQ日历事件（仅当筛选包含该视图时）
+                            const showQQEvents = filterViewId.includes('qqcalendar');
 
                             if (showQQEvents) {
                                 allEvents = allEvents.concat(qqEvents);
@@ -553,9 +562,8 @@ export async function run(
                     if (moduleInstances['M_calendar']?.icsSubscription) {
                         const icsEvents = moduleInstances['M_calendar'].icsSubscription.getEvents();
                         if (icsEvents && Array.isArray(icsEvents)) {
-                            // 检查是否需要根据视图筛选
-                            const showIcsEvents = filterViewId.length === 0 ||
-                                filterViewId.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
+                            // 检查是否需要根据视图筛选（仅当筛选包含该视图时）
+                            const showIcsEvents = filterViewId.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
                             if (showIcsEvents) {
                                 console.log(`加载了 ${icsEvents.length} 个ICS订阅日历事件`);
                                 // 为每个ICS订阅事件添加不可拖拽属性和标识
