@@ -70,9 +70,25 @@ export class M_Aggregate {
                                     const eui = new VisualEchartsUI(c2, {
                                         persistKey: `visual-echarts-from-sql-tab:${id}`,
                                         initialSQL: sql,
-                                        loadSqlPresets: () => (conf.get('presets') || {})
+                                        loadSqlPresets: () => (conf.get('presets') || {}),
+                                        onGotoSQL: () => {
+                                            // 打开弹窗版 SQL 生成器（共享同一套 PluginConfig 预设）
+                                            new Dialog({
+                                                title: 'SQL 可视化生成器',
+                                                content: `<div id="visual-sql-from-echarts-tab-${id}" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                                                width: '70%', height: 'auto', disableClose: false, hideCloseIcon: true,
+                                            });
+                                            const cont = document.getElementById(`visual-sql-from-echarts-tab-${id}`)!;
+                                            new VisualSqlUI(cont, {
+                                                previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                                previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                                loadPresets: () => (conf.get('presets') || {}),
+                                                savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                                                showPresetControls: true,
+                                            });
+                                        }
                                     });
-                                    requestAnimationFrame(()=> eui.resize());
+                                    requestAnimationFrame(() => eui.resize());
                                 }
                             }
                         ],
@@ -109,13 +125,46 @@ export class M_Aggregate {
                     }
                 },
             });
+            this.plugin.addTab({
+                type: "visual-echarts",
+                async init() {
+                    const id = new Date().getTime().toString();
+                    this.element.innerHTML = `<div id="visual-echarts-tab-${id}" style="width:100%;height:100%;overflow:auto;"></div>`;
+                    const container = document.getElementById(`visual-echarts-tab-${id}`)! as HTMLElement;
+                    const conf = new PluginConfig(aggregate.plugin.name, 'aggregate-sql');
+                    await conf.load();
+                    const ui = new VisualEchartsUI(container, {
+                        persistKey: `visual-echarts-tab:${id}`,
+                        loadSqlPresets: () => (conf.get('presets') || {}),
+                        onGotoSQL: () => {
+                            // 打开弹窗版 SQL 生成器
+                            new Dialog({
+                                title: 'SQL 可视化生成器',
+                                content: `<div id="visual-sql-from-echarts-tab-open-${id}" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                                width: '70%', height: 'auto', disableClose: false, hideCloseIcon: true,
+                            });
+                            const cont = document.getElementById(`visual-sql-from-echarts-tab-open-${id}`)!;
+                            new VisualSqlUI(cont, {
+                                previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                loadPresets: () => (conf.get('presets') || {}),
+                                savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                                showPresetControls: true,
+                            });
+                        }
+                    });
+                },
+                async destroy() {
+                    // 目前无显式销毁
+                },
+            });
         }
         this.plugin.protyleSlash = [
             {
-                filter: ["SQL", "sql", "查询", "query","stsql"],
+                filter: ["SQL", "sql", "查询", "query", "stsql"],
                 html: `<div class="b3-list-item__first"><span class="b3-list-item__text">ST_SQL</span><span class="b3-list-item__meta"></span></div>`,
                 id: "insertCardLink",
-                callback: async (_protyle,nodeElement) => {
+                callback: async (_protyle, nodeElement) => {
                     // 打开 SQL 可视化生成器面板
                     const dlg = new Dialog({
                         title: "SQL 可视化生成器",
@@ -150,11 +199,11 @@ export class M_Aggregate {
                                 variant: 'primary',
                                 onClick: async ({ getSQL }) => {
                                     const sql = (getSQL() || '').trim();
-                                    if (!sql) {return;}
+                                    if (!sql) { return; }
                                     try {
-                                        console.log("nodeElement",nodeElement);
+                                        console.log("nodeElement", nodeElement);
                                         const blockID = nodeElement.getAttribute('data-node-id');
-                                        updateBlock("markdown",`{{${sql}}}`,blockID);
+                                        updateBlock("markdown", `{{${sql}}}`, blockID);
                                     } finally {
                                         dlg.destroy();
                                     }
@@ -180,9 +229,28 @@ export class M_Aggregate {
                                     const eui = new VisualEchartsUI(c2, {
                                         persistKey: 'siyuan-steve-tools:visual-echarts-from-sql',
                                         initialSQL: sql,
-                                        loadSqlPresets: () => (conf2.get('presets') || {})
+                                        loadSqlPresets: () => (conf2.get('presets') || {}),
+                                        onGotoSQL: () => {
+                                            // 在 Slash 场景下，直接弹 SQL 生成器
+                                            new Dialog({
+                                                title: 'SQL 可视化生成器',
+                                                content: `<div id="visual-sql-from-echarts" style="width:100%;max-height:70vh;overflow:auto;"></div>`,
+                                                width: '70%', height: 'auto', disableClose: false, hideCloseIcon: false,
+                                            });
+                                            const cont = document.getElementById('visual-sql-from-echarts')!;
+                                            const conf = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                                            conf.load().then(() => {
+                                                new VisualSqlUI(cont, {
+                                                    previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                                    previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                                    loadPresets: () => (conf.get('presets') || {}),
+                                                    savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                                                    showPresetControls: true,
+                                                });
+                                            });
+                                        }
                                     });
-                                    requestAnimationFrame(()=> eui.resize());
+                                    requestAnimationFrame(() => eui.resize());
                                 }
                             }
                         ],
@@ -197,7 +265,7 @@ export class M_Aggregate {
             },
             // ECharts 可视化代码生成器（Slash 入口）
             {
-                filter: ["ECharts", "echarts", "图表", "chart","stcharts"],
+                filter: ["ECharts", "echarts", "图表", "chart", "stcharts"],
                 html: `<div class="b3-list-item__first"><span class="b3-list-item__text">ST_Charts</span><span class="b3-list-item__meta"></span></div>`,
                 id: "insertEchartsCode",
                 callback: async (_protyle, nodeElement) => {
@@ -233,11 +301,11 @@ export class M_Aggregate {
                     });
                     bar.appendChild(btn);
                     container.parentElement?.insertBefore(bar, container);
-                    requestAnimationFrame(()=> ui?.resize());
+                    requestAnimationFrame(() => ui?.resize());
                 }
             }
         ];
-        
+
     }
 
 
@@ -274,8 +342,7 @@ export class M_Aggregate {
     }
 
     private addMenu(rect: DOMRect, _settingdata: any) {
-        const self = this;
-        const menu = new Menu("topBarSQL", () => {});
+        const menu = new Menu("topBarSQL", () => { });
         menu.addItem({
             icon: "iconSQL",
             label: "页签模式",
@@ -316,7 +383,7 @@ export class M_Aggregate {
                         {
                             label: '转到 ECharts',
                             title: '用当前 SQL 打开 ECharts 配置',
-                                placement: 'before-reset',
+                            placement: 'before-reset',
                             onClick: async ({ getSQL }) => {
                                 const sql = (getSQL() || '').trim();
                                 new Dialog({
@@ -333,9 +400,27 @@ export class M_Aggregate {
                                 const eui = new VisualEchartsUI(c2, {
                                     persistKey: 'siyuan-steve-tools:visual-echarts-from-sql-modal',
                                     initialSQL: sql,
-                                    loadSqlPresets: () => (conf.get('presets') || {})
+                                    loadSqlPresets: () => (conf.get('presets') || {}),
+                                    onGotoSQL: () => {
+                                        new Dialog({
+                                            title: 'SQL 可视化生成器',
+                                            content: `<div id="visual-sql-from-echarts-modal" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                                            width: '70%', height: 'auto', disableClose: false, hideCloseIcon: true,
+                                        });
+                                        const cont = document.getElementById('visual-sql-from-echarts-modal')!;
+                                        const conf4 = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                                        conf4.load().then(() => {
+                                            new VisualSqlUI(cont, {
+                                                previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                                previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                                loadPresets: () => (conf4.get('presets') || {}),
+                                                savePresets: async (obj) => { conf4.set('presets', obj); await conf4.save(); },
+                                                showPresetControls: true,
+                                            });
+                                        });
+                                    }
                                 });
-                                requestAnimationFrame(()=> eui.resize());
+                                requestAnimationFrame(() => eui.resize());
                             }
                         }
                     ]
@@ -351,29 +436,6 @@ export class M_Aggregate {
                 icon: "iconChart", // 使用现有图标名或后续替换
                 label: "ECharts 页签",
                 click: async () => {
-                    this.plugin.addTab({
-                        type: "visual-echarts",
-                        async init() {
-                            const id = new Date().getTime().toString();
-                            this.element.innerHTML = `<div id="visual-echarts-tab-${id}" style="width:100%;height:100%;overflow:auto;"></div>`;
-                            const container = document.getElementById(`visual-echarts-tab-${id}`)! as HTMLElement;
-                            const conf = new PluginConfig(self.plugin.name, 'aggregate-sql');
-                            await conf.load();
-                            const ui = new VisualEchartsUI(container, {
-                                persistKey: `visual-echarts-tab:${id}`,
-                                loadSqlPresets: () => (conf.get('presets') || {})
-                            });
-                            (this as any).data = { id, ui };
-                            requestAnimationFrame(()=> ui.resize());
-                        },
-                        async destroy() {
-                            // 目前无显式销毁
-                        },
-                        resize() {
-                            const ui = (this as any).data?.ui as VisualEchartsUI | undefined;
-                            ui?.resize();
-                        },
-                    });
                     await openTab({
                         app: (window as any).siyuan.ws.app,
                         custom: { icon: "iconChart", title: "ECharts 视图", id: this.plugin.name + "visual-echarts", data: { id: null } },
@@ -392,16 +454,34 @@ export class M_Aggregate {
                         height: 'auto',
                         disableClose: false,
                         hideCloseIcon: true,
-                        resizeCallback: () => {},
+                        resizeCallback: () => { },
                     });
                     const container = document.getElementById('visual-echarts-container')!;
                     const conf = new PluginConfig(this.plugin.name, 'aggregate-sql');
                     await conf.load();
                     const ui = new VisualEchartsUI(container, {
                         persistKey: 'siyuan-steve-tools:visual-echarts-modal',
-                        loadSqlPresets: () => (conf.get('presets') || {})
+                        loadSqlPresets: () => (conf.get('presets') || {}),
+                        onGotoSQL: () => {
+                            new Dialog({
+                                title: 'SQL 可视化生成器',
+                                content: `<div id="visual-sql-from-echarts-standalone" style="width:100%;max-height:80vh;overflow:auto;"></div>`,
+                                width: '70%', height: 'auto', disableClose: false, hideCloseIcon: true,
+                            });
+                            const cont = document.getElementById('visual-sql-from-echarts-standalone')!;
+                            const conf5 = new PluginConfig(this.plugin.name, 'aggregate-sql');
+                            conf5.load().then(() => {
+                                new VisualSqlUI(cont, {
+                                    previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                    previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                    loadPresets: () => (conf5.get('presets') || {}),
+                                    savePresets: async (obj) => { conf5.set('presets', obj); await conf5.save(); },
+                                    showPresetControls: true,
+                                });
+                            });
+                        }
                     });
-                    requestAnimationFrame(()=> ui.resize());
+                    requestAnimationFrame(() => ui.resize());
                 }
             });
         }

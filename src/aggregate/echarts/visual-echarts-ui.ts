@@ -9,6 +9,11 @@ export interface VisualEchartsOptions {
    * 若未提供则回退到 localStorage('siyuan-steve-tools:visual-sql-presets')。
    */
   loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
+  /**
+   * 转到 SQL 面板的回调（例如打开 SQL 生成器对话框或页签）。
+   * 若未提供，则隐藏“转到 SQL”按钮。
+   */
+  onGotoSQL?: () => void;
 }
 
 export class VisualEchartsUI {
@@ -39,12 +44,14 @@ export class VisualEchartsUI {
   private presetTitleInput?: HTMLInputElement;
   private presetColorsInput?: HTMLInputElement;
   private loadSqlPresetsProvider?: () => Promise<Record<string, any>> | Record<string, any>;
+  private opts?: VisualEchartsOptions;
 
   constructor(container: HTMLElement, options?: VisualEchartsOptions) {
     this.container = container;
     this.key = options?.persistKey || 'siyuan-steve-tools:visual-echarts-ui';
     this.ctx = defaultLineAreaTpl;
     this.loadSqlPresetsProvider = options?.loadSqlPresets;
+    this.opts = options;
     this.render();
     // 初始根据模式隐藏/显示区块
     this.toggleSections();
@@ -114,6 +121,7 @@ export class VisualEchartsUI {
             <span style="margin-left:8px; display:inline-flex; gap:6px; align-items:center;">
               <button class="ve-btn" data-mode="table">数据</button>
               <button class="ve-btn" data-mode="chart">图表</button>
+              <button class="ve-btn" data-goto-sql>转到 SQL</button>
             </span>
           </summary>
           <div class="ve-result" data-result><div class="ve-placeholder">请在下方添加对比的 SQL 预设后，切换到“图表”查看预览</div></div>
@@ -167,6 +175,12 @@ export class VisualEchartsUI {
     (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', () => this.refreshPreview());
   (this.container.querySelector('[data-mode="table"]') as HTMLButtonElement).addEventListener('click', () => { this.previewMode = 'table'; this.refreshPreview(); });
   (this.container.querySelector('[data-mode="chart"]') as HTMLButtonElement).addEventListener('click', () => { this.previewMode = 'chart'; this.refreshPreview(); });
+  const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement;
+  if (this.opts?.onGotoSQL) {
+    gotoSqlBtn.addEventListener('click', () => this.opts!.onGotoSQL!());
+  } else {
+    gotoSqlBtn.style.display = 'none';
+  }
 
     this.sqlInput.addEventListener('input', () => this.rebuildCode());
     this.xFieldSel.addEventListener('change', () => {
@@ -440,6 +454,8 @@ export class VisualEchartsUI {
       .ve-modal__body{padding:12px; overflow:auto}
       .ve-modal__foot{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid var(--border)}
       .ve-preset-chooser{display:flex; flex-wrap:wrap; gap:6px}
+      .ve-search{margin-bottom:8px}
+      .ve-empty{color: var(--muted); font-size:12px; padding:4px 0}
     `; document.head.appendChild(st);
   }
 
@@ -643,13 +659,36 @@ export class VisualEchartsUI {
     dlg.innerHTML = `
       <div class="ve-modal__head"><div>选择要加入对比的预设</div><button class="ve-btn ve-ghost" data-close>×</button></div>
       <div class="ve-modal__body">
+        <div class="ve-search"><input class="ve-input" type="search" data-filter placeholder="搜索预设名称…" /></div>
         <div class="ve-preset-chooser">${names.map(n=>`<label class="ve-chip"><input type="checkbox" value="${this.escape(n)}"/><span>${this.escape(n)}</span></label>`).join('')}</div>
+        <div class="ve-empty" data-empty style="display:none">无匹配结果</div>
       </div>
       <div class="ve-modal__foot"><button class="ve-btn" data-ok>加入</button><button class="ve-btn ve-ghost" data-close2>取消</button></div>`;
     overlay.appendChild(dlg); document.body.appendChild(overlay);
     const close = ()=> overlay.remove();
     (dlg.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', close);
     (dlg.querySelector('[data-close2]') as HTMLButtonElement).addEventListener('click', close);
+    // 过滤逻辑
+    const filterInput = dlg.querySelector('[data-filter]') as HTMLInputElement;
+    const chooser = dlg.querySelector('.ve-preset-chooser') as HTMLElement;
+    const empty = dlg.querySelector('[data-empty]') as HTMLElement;
+    const labels = Array.from(chooser.querySelectorAll('.ve-chip')) as HTMLElement[];
+    const applyFilter = () => {
+      const q = (filterInput.value || '').trim().toLowerCase();
+      let visibleCount = 0;
+      labels.forEach(lbl => {
+        const name = (lbl.querySelector('span')?.textContent || '').toLowerCase();
+        const show = !q || name.includes(q);
+        (lbl as HTMLElement).style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+      });
+      if (empty) empty.style.display = visibleCount ? 'none' : '';
+    };
+    if (filterInput) {
+      filterInput.addEventListener('input', applyFilter);
+      // 初始应用一次，避免空白边距抖动
+      applyFilter();
+    }
     (dlg.querySelector('[data-ok]') as HTMLButtonElement).addEventListener('click', () => {
       const checks = Array.from(dlg.querySelectorAll('.ve-preset-chooser input[type="checkbox"]')) as HTMLInputElement[];
       const picked = checks.filter(c=>c.checked).map(c=>c.value);
