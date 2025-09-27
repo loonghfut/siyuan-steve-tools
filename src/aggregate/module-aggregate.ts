@@ -96,7 +96,7 @@ export class M_Aggregate {
                         loadPresets: () => (conf.get('presets') || {}),
                         savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                         presetsKey: 'siyuan-steve-tools:visual-sql-presets',
-                        persistKey: `visual-sql-tab:${id}`,
+                        persistKey: `visual-sql-tab`,
                         onSqlChange: (_sql) => {
                             // 可在此触发查询/日志
                             // console.log("[Tab] 生成的 SQL:", _sql);
@@ -134,7 +134,7 @@ export class M_Aggregate {
                     const conf = new PluginConfig(aggregate.plugin.name, 'aggregate-sql');
                     await conf.load();
                     const ui = new VisualEchartsUI(container, {
-                        persistKey: `visual-echarts-tab:${id}`,
+                        persistKey: `visual-echarts-tab`,
                         loadSqlPresets: () => (conf.get('presets') || {}),
                         onGotoSQL: () => {
                             // 打开弹窗版 SQL 生成器
