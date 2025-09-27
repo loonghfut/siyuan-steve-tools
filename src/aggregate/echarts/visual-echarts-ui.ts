@@ -1,5 +1,4 @@
-import { defaultLineAreaTpl, EchartsTplCtx, barTpl, scatterTpl, stackedAreaTpl, mixedDualAxisTpl, buildPresetCountIIFE } from './option-templates';
-import { sql as runSql } from '@/api/api';
+import { buildPresetCountIIFE } from './option-templates';
 
 export interface VisualEchartsOptions {
   persistKey?: string;
@@ -19,43 +18,41 @@ export interface VisualEchartsOptions {
 export class VisualEchartsUI {
   private container: HTMLElement;
   private key: string;
-  private ctx: EchartsTplCtx;
   private outputPre!: HTMLPreElement;
-  private sqlInput!: HTMLTextAreaElement;
-  private xFieldSel!: HTMLSelectElement;
-  private seriesWrap!: HTMLElement;
   private previewBody!: HTMLElement;
-  private mode: 'normal' | 'presetCount' = 'presetCount';
   private chartDiv?: HTMLDivElement;
   private echartsInst?: any;
-  private lastRows: any[] = [];
-  private tplSel!: HTMLSelectElement;
-  private titleInput!: HTMLInputElement;
-  private smoothInput!: HTMLInputElement;
-  private areaInput!: HTMLInputElement;
-  private stackInput!: HTMLInputElement;
-  private boundaryGapInput!: HTMLInputElement;
-  private colorsInput!: HTMLInputElement;
+  // Debounced operations
+  private debouncedRebuildColorUpdate!: () => void;
   // 预设计数相关
   private presetListEl?: HTMLElement;
   private presetItems: Array<{ name: string; sql: string }> = [];
   private presetTypeSel?: HTMLSelectElement; // bar/line/pie
   private presetTitleInput?: HTMLInputElement;
   private presetColorsInput?: HTMLInputElement;
+  // 每种图的自定义设置（持久化）
+  private perTypeSettings: {
+    bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
+    line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
+    pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius'|'area'|false; label?: { show?: boolean; position?: string } };
+  } = {
+    bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
+    line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
+    pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
+  };
+  private currentSettingsEl?: HTMLElement;
   private loadSqlPresetsProvider?: () => Promise<Record<string, any>> | Record<string, any>;
   private opts?: VisualEchartsOptions;
 
   constructor(container: HTMLElement, options?: VisualEchartsOptions) {
     this.container = container;
     this.key = options?.persistKey || 'siyuan-steve-tools:visual-echarts-ui';
-    this.ctx = defaultLineAreaTpl;
     this.loadSqlPresetsProvider = options?.loadSqlPresets;
     this.opts = options;
+    // 初始化颜色相关的防抖重建
+    this.debouncedRebuildColorUpdate = this.debounce(() => this.rebuildPresetCode(), 160);
     this.render();
-    // 初始根据模式隐藏/显示区块
-    this.toggleSections();
     this.restore();
-    // 仅保留预设模式，忽略外部传入 SQL
     this.rebuildCode();
   }
 
@@ -63,58 +60,22 @@ export class VisualEchartsUI {
     return strings.reduce((acc, s, i) => acc + s + (values[i] ?? ''), '');
   }
 
+  // 简单的防抖工具：在 wait 毫秒内只触发最后一次
+  private debounce<T extends (...args: any[]) => void>(fn: T, wait = 200) {
+    let timer: number | undefined;
+    return ((...args: Parameters<T>) => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        fn(...args);
+      }, wait) as unknown as number;
+    }) as T;
+  }
+
   private render() {
     this.injectStyle();
     this.container.innerHTML = this.html`
       <div class="ve-wrap">
-  <details class="ve-card" data-section="normal" style="display:none">
-          <summary class="ve-legend">数据与映射</summary>
-          <div class="ve-row" style="margin-top:8px;">
-            <label class="ve-field">模板
-              <select class="ve-input" data-tpl></select>
-            </label>
-            <label class="ve-field">标题
-              <input class="ve-input" data-title placeholder="图表标题" />
-            </label>
-          </div>
-          <div class="ve-row">
-            <label class="ve-field"><input type="checkbox" data-smooth /> 平滑</label>
-            <label class="ve-field"><input type="checkbox" data-area /> 面积</label>
-            <label class="ve-field"><input type="checkbox" data-stack /> 堆叠</label>
-            <label class="ve-field"><input type="checkbox" data-boundarygap /> boundaryGap</label>
-            <label class="ve-field">颜色
-              <input class="ve-input" data-colors placeholder="#3b82f6,#ef4444,#10b981" />
-            </label>
-          </div>
-          <div class="ve-grid ve-grid-2" style="margin-top:8px;">
-            <label class="ve-field">SQL
-              <textarea class="ve-input" data-sql rows="5" placeholder="SELECT x, y1 FROM blocks ..."></textarea>
-            </label>
-            <div class="ve-field">
-              <div class="ve-label">字段映射</div>
-              <div class="ve-row">
-                <label class="ve-field">x 轴字段
-                  <select class="ve-input" data-x></select>
-                </label>
-              </div>
-              <div class="ve-row">
-                <div data-series></div>
-                <button class="ve-btn" data-add-series>添加序列</button>
-                <button class="ve-btn" data-add-series-num>从数值列批量添加序列</button>
-              </div>
-            </div>
-          </div>
-          <div class="ve-actions">
-            <button class="ve-btn" data-run>运行 SQL</button>
-            <button class="ve-btn" data-suggest>根据数据猜测映射</button>
-            <button class="ve-btn" data-copy>复制 JS(IIFE)</button>
-            <button class="ve-btn ve-ghost" data-reset>重置</button>
-          </div>
-          <details class="ve-sub">
-            <summary class="ve-legend">代码预览</summary>
-            <pre class="ve-output" data-output></pre>
-          </details>
-        </details>
         <details class="ve-card" open data-section="preview">
           <summary class="ve-legend">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></summary>
           <div class="ve-result" data-result><div class="ve-placeholder">请在下方添加对比的 SQL 预设后，将在此显示图表</div></div>
@@ -134,9 +95,16 @@ export class VisualEchartsUI {
             <label class="ve-field">标题
               <input class="ve-input" data-preset-title placeholder="图表标题" />
             </label>
-            <label class="ve-field">颜色
-              <input class="ve-input" data-preset-colors placeholder="#3b82f6,#ef4444,#10b981" />
-            </label>
+            <div class="ve-field">
+              <div class="ve-label">颜色</div>
+              <div class="ve-row ve-color-row">
+                <input class="ve-input" data-preset-colors placeholder="#3b82f6,#ef4444,#10b981" style="width:230px" />
+                <div class="ve-color-editor">
+                  <div class="ve-color-palette" data-color-palette></div>
+                  <button class="ve-btn ve-ghost ve-small" data-color-add type="button">添加颜色</button>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="ve-row" style="margin:6px 0;">
             <button class="ve-btn" data-preset-add>从 SQL 预设添加</button>
@@ -144,28 +112,24 @@ export class VisualEchartsUI {
             <button class="ve-btn" data-preset-clear>清空</button>
             <button class="ve-btn" data-preset-copy>复制 JS(IIFE)</button>
           </div>
+          <details class="ve-sub" data-type-settings>
+            <summary class="ve-legend">图表自定义设置</summary>
+            <div class="ve-collapse" data-collapse>
+              <div class="ve-type-settings" data-type-settings-body></div>
+            </div>
+          </details>
+          <details class="ve-sub">
+            <summary class="ve-legend">代码预览</summary>
+            <pre class="ve-output" data-output></pre>
+          </details>
           <div class="ve-preset-list" data-preset-list></div>
           <div class="ve-hint" style="color:var(--muted); font-size:12px; margin-top:6px;">说明：x 轴为各预设名称，y 为各自 SQL 查询结果的行数。</div>
         </details>
       </div>
     `;
     this.outputPre = this.container.querySelector('[data-output]') as HTMLPreElement;
-    this.sqlInput = this.container.querySelector('[data-sql]') as HTMLTextAreaElement;
-    this.xFieldSel = this.container.querySelector('[data-x]') as HTMLSelectElement;
-    this.seriesWrap = this.container.querySelector('[data-series]') as HTMLElement;
     this.previewBody = this.container.querySelector('[data-result]') as HTMLElement;
-  this.tplSel = this.container.querySelector('[data-tpl]') as HTMLSelectElement;
-  this.titleInput = this.container.querySelector('[data-title]') as HTMLInputElement;
-  this.smoothInput = this.container.querySelector('[data-smooth]') as HTMLInputElement;
-  this.areaInput = this.container.querySelector('[data-area]') as HTMLInputElement;
-  this.stackInput = this.container.querySelector('[data-stack]') as HTMLInputElement;
-  this.boundaryGapInput = this.container.querySelector('[data-boundarygap]') as HTMLInputElement;
-  this.colorsInput = this.container.querySelector('[data-colors]') as HTMLInputElement;
-
-    (this.container.querySelector('[data-run]') as HTMLButtonElement).addEventListener('click', () => this.query());
-    (this.container.querySelector('[data-suggest]') as HTMLButtonElement).addEventListener('click', () => this.suggestMappings());
-    (this.container.querySelector('[data-copy]') as HTMLButtonElement).addEventListener('click', () => this.copyCode());
-    (this.container.querySelector('[data-reset]') as HTMLButtonElement).addEventListener('click', () => this.reset());
+    // 预览刷新
     (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', () => this.refreshPreview());
     const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement | null;
     if (gotoSqlBtn) {
@@ -176,200 +140,119 @@ export class VisualEchartsUI {
       }
     }
 
-    this.sqlInput.addEventListener('input', () => this.rebuildCode());
-    this.xFieldSel.addEventListener('change', () => {
-      const field = this.xFieldSel.value || '';
-      if (field) this.ctx.xDataExpr = `rows.map(r=>String(r.${field}))`;
-      this.rebuildCode();
-    });
-
-    // 模板选项
-    const templates: Array<{key:string;name:string;tpl:EchartsTplCtx|undefined}> = [
-      { key:'lineArea', name:'折线(面积)', tpl: defaultLineAreaTpl },
-      { key:'bar', name:'柱状图', tpl: barTpl },
-      { key:'stackedArea', name:'堆叠面积', tpl: stackedAreaTpl },
-      { key:'scatter', name:'散点图', tpl: scatterTpl },
-      { key:'mixed', name:'混合双轴', tpl: mixedDualAxisTpl },
-      { key:'presetCount', name:'预设对比计数（柱/线/饼）', tpl: undefined },
-    ];
-    if (this.tplSel) {
-      this.tplSel.innerHTML = templates.map(t=>`<option value="${t.key}">${t.name}</option>`).join('');
-      this.tplSel.value = 'presetCount';
-      this.tplSel.addEventListener('change', () => {
-        // 强制预设模式
-        this.mode = 'presetCount';
-        this.toggleSections();
-        this.rebuildPresetListUI();
-        this.rebuildPresetCode();
-      });
-    }
-
-    // 全局输入
-    if (this.titleInput) this.titleInput.addEventListener('input', () => { this.ctx.title = this.titleInput.value || ''; this.rebuildCode(); });
-    if (this.smoothInput) this.smoothInput.addEventListener('change', () => { this.ctx.smooth = !!this.smoothInput.checked; this.rebuildCode(); });
-    if (this.areaInput) this.areaInput.addEventListener('change', () => { this.ctx.area = !!this.areaInput.checked; this.rebuildCode(); });
-    if (this.stackInput) this.stackInput.addEventListener('change', () => { this.ctx.stack = !!this.stackInput.checked; this.rebuildCode(); });
-    if (this.boundaryGapInput) this.boundaryGapInput.addEventListener('change', () => { this.ctx.boundaryGap = !!this.boundaryGapInput.checked; this.rebuildCode(); });
-    if (this.colorsInput) this.colorsInput.addEventListener('input', () => { this.ctx.colors = (this.colorsInput.value||'').split(',').map(s=>s.trim()).filter(Boolean); this.rebuildCode(); });
-
-    // 批量添加序列
-    const addNumBtn = this.container.querySelector('[data-add-series-num]') as HTMLButtonElement;
-    if (addNumBtn) addNumBtn.addEventListener('click', () => this.addNumericSeries());
-
     // 预设区控件
     this.presetListEl = this.container.querySelector('[data-preset-list]') as HTMLElement;
     this.presetTypeSel = this.container.querySelector('[data-preset-type]') as HTMLSelectElement;
     this.presetTitleInput = this.container.querySelector('[data-preset-title]') as HTMLInputElement;
     this.presetColorsInput = this.container.querySelector('[data-preset-colors]') as HTMLInputElement;
+    this.currentSettingsEl = this.container.querySelector('[data-type-settings-body]') as HTMLElement;
     (this.container.querySelector('[data-preset-add]') as HTMLButtonElement)?.addEventListener('click', () => this.addFromSqlPresets());
     (this.container.querySelector('[data-preset-clear]') as HTMLButtonElement)?.addEventListener('click', () => { this.presetItems = []; this.rebuildPresetListUI(); this.rebuildPresetCode(); });
     (this.container.querySelector('[data-preset-copy]') as HTMLButtonElement)?.addEventListener('click', () => this.copyPresetCode());
-    this.presetTypeSel?.addEventListener('change', () => this.rebuildPresetCode());
+    this.presetTypeSel?.addEventListener('change', () => { this.renderTypeSettingsUI(); this.rebuildPresetCode(); });
     this.presetTitleInput?.addEventListener('input', () => this.rebuildPresetCode());
-    this.presetColorsInput?.addEventListener('input', () => this.rebuildPresetCode());
-  }
-
-  private rebuildSeriesUI() {
-    this.seriesWrap.innerHTML = '';
-    const series = this.ctx.seriesExprs || [];
-    series.forEach((s, idx) => {
-      const row = document.createElement('div');
-      row.className = 've-series-row';
-      row.innerHTML = `
-        <div class="ve-row">
-          <label class="ve-field">名称
-            <input class="ve-input" data-name value="${this.escape(s.name)}" />
-          </label>
-          <label class="ve-field">类型
-            <select class="ve-input" data-type>
-              <option value="line" ${s.type==='line'?'selected':''}>line</option>
-              <option value="bar" ${s.type==='bar'?'selected':''}>bar</option>
-              <option value="scatter" ${s.type==='scatter'?'selected':''}>scatter</option>
-            </select>
-          </label>
-          <label class="ve-field">y 数据字段
-            <select class="ve-input" data-y></select>
-          </label>
-          <button class="ve-btn ve-ghost" data-del title="删除">删除</button>
+    this.presetColorsInput?.addEventListener('input', () => this.debouncedRebuildColorUpdate());
+    // 颜色编辑器交互
+    const paletteEl = this.container.querySelector('[data-color-palette]') as HTMLElement | null;
+    const addColorBtn = this.container.querySelector('[data-color-add]') as HTMLButtonElement | null;
+    const getColors = (): string[] => (this.presetColorsInput?.value || '').split(',').map(s=>s.trim()).filter(Boolean);
+    const setColors = (arr: string[]) => { if (this.presetColorsInput) this.presetColorsInput.value = arr.join(','); this.debouncedRebuildColorUpdate(); };
+    const renderPalette = () => {
+      if (!paletteEl) return;
+      const colors = getColors();
+      if (!colors.length) { paletteEl.innerHTML = '<div class="ve-color-empty">未设置颜色，使用内置默认配色</div>'; return; }
+      paletteEl.innerHTML = colors.map((c,i)=>`
+        <div class="ve-color-chip" data-idx="${i}">
+          <span class="ve-color-swatch" style="background:${c}"></span>
+          <button class="ve-color-del" title="删除" type="button">×</button>
+          <input type="color" value="${c}" />
         </div>
-      `;
-      const ySel = row.querySelector('[data-y]') as HTMLSelectElement;
-      this.fillFieldOptions(ySel, this.lastRows);
-      // 若 expr 是简单 rows.map(r=>r.xxx)，尽量还原选择
-      const m = (s.expr || '').match(/rows\.map\(r=>Number\(r\.(.+?)\)\|\|0\)\)/);
-      const field = m?.[1] || '';
-      if (field) ySel.value = field;
-      ySel.addEventListener('change', () => {
-        const f = ySel.value || '';
-        this.ctx.seriesExprs![idx].expr = `rows.map(r=>Number(r.${f})||0)`;
-        this.rebuildCode();
+      `).join('');
+      // 绑定变化
+      Array.from(paletteEl.querySelectorAll('.ve-color-chip')).forEach((chip) => {
+        const idx = Number((chip as HTMLElement).getAttribute('data-idx')||'0');
+        const picker = chip.querySelector('input[type="color"]') as HTMLInputElement | null;
+        const del = chip.querySelector('.ve-color-del') as HTMLButtonElement | null;
+        const swatch = chip.querySelector('.ve-color-swatch') as HTMLElement | null;
+        if (picker) picker.addEventListener('input', () => {
+          const cs = getColors();
+          cs[idx] = picker.value;
+          if (swatch) swatch.style.background = picker.value;
+          setColors(cs);
+        });
+        if (del) del.addEventListener('click', () => {
+          const cs = getColors();
+          cs.splice(idx, 1);
+          setColors(cs);
+          renderPalette();
+        });
       });
-      (row.querySelector('[data-name]') as HTMLInputElement).addEventListener('input', (e) => {
-        this.ctx.seriesExprs![idx].name = (e.target as HTMLInputElement).value;
-        this.rebuildCode();
-      });
-      (row.querySelector('[data-type]') as HTMLSelectElement).addEventListener('change', (e) => {
-        this.ctx.seriesExprs![idx].type = (e.target as HTMLSelectElement).value as any;
-        this.rebuildCode();
-      });
-      (row.querySelector('[data-del]') as HTMLButtonElement).addEventListener('click', () => {
-        this.ctx.seriesExprs!.splice(idx, 1);
-        this.rebuildSeriesUI();
-        this.rebuildCode();
-      });
-      this.seriesWrap.appendChild(row);
+    };
+    if (addColorBtn) addColorBtn.addEventListener('click', () => {
+      const cs = getColors();
+      cs.push('#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0'));
+      setColors(cs);
+      renderPalette();
     });
-  }
-
-  private async query() {
-    const sql = (this.sqlInput.value || '').trim();
-    if (!sql) { this.toast('请输入 SQL'); return; }
-    this.previewBody.innerHTML = '<div class="ve-loading">查询中…</div>';
-    try {
-      const rows = await runSql(sql);
-      if (!Array.isArray(rows)) throw new Error('结果异常');
-      this.lastRows = rows;
-      this.fillFieldOptions(this.xFieldSel, rows);
-      // 若当前没有配置，则尝试猜测映射
-      if (!(this.ctx.xDataExpr && (this.ctx.seriesExprs||[]).length)) {
-        this.suggestMappings();
+    // 初始化 palette
+    renderPalette();
+    this.presetColorsInput?.addEventListener('input', renderPalette);
+    // 初始化类型设置区（默认折叠）
+    this.renderTypeSettingsUI();
+    // 绑定折叠过渡动画
+    const typeDetails = this.container.querySelector('details[data-type-settings]') as HTMLDetailsElement | null;
+    const collapse = this.container.querySelector('[data-collapse]') as HTMLElement | null;
+    if (typeDetails && collapse) {
+      const syncHeight = () => {
+        if (!collapse) return;
+        if (typeDetails.open) {
+          // 先设为 auto 获取高度，再回退到像素值以触发过渡
+          collapse.style.height = 'auto';
+          const h = collapse.getBoundingClientRect().height;
+          collapse.style.height = '0px';
+          // 下一帧应用目标高度
+          requestAnimationFrame(() => { collapse.style.height = h + 'px'; });
+        } else {
+          const h = collapse.getBoundingClientRect().height;
+          collapse.style.height = h + 'px';
+          requestAnimationFrame(() => { collapse.style.height = '0px'; });
+        }
+      };
+      // 初始化：若 open 则同步到实际高度，否则为 0
+      if (typeDetails.open) {
+        collapse.style.height = 'auto';
+      } else {
+        collapse.style.height = '0px';
       }
-  await this.renderChartPreview(rows);
-    } catch (e:any) {
-      this.previewBody.innerHTML = `<div class="ve-error">${this.escape(e?.message||'查询失败')}</div>`;
+      typeDetails.addEventListener('toggle', syncHeight);
+      // 当内部内容变化（切换图类型或值变化导致高度变化）时，如果是展开状态，更新为 auto 再回流到像素值
+      const ro = new ResizeObserver(() => {
+        if (!typeDetails.open) return;
+        collapse.style.height = 'auto';
+        const h = collapse.getBoundingClientRect().height;
+        collapse.style.height = h + 'px';
+      });
+      ro.observe(collapse);
     }
   }
 
-  private suggestMappings() {
-    const rows = this.lastRows || [];
-    if (!rows.length) { this.toast('无数据可分析'); return; }
-    const keys = Object.keys(rows[0] || {});
-    if (!keys.length) return;
-    // 简单策略：优先匹配日期、时间或 name 的字段作为 x
-    const x = keys.find(k => /date|time|day|created|updated|name|title|x/i.test(k)) || keys[0];
-    const nums = keys.filter(k => k!==x).filter(k => typeof rows[0][k] === 'number' || /^\d+(\.\d+)?$/.test(String(rows[0][k])));
-    const ys = nums.slice(0, 3);
-    this.ctx.xDataExpr = `rows.map(r=>String(r.${x}))`;
-    this.ctx.seriesExprs = ys.length ? ys.map((k, i) => ({ name: `系列${i+1}`, expr: `rows.map(r=>Number(r.${k})||0)`, type: 'line' as const })) : [{ name: '系列1', expr: 'rows.map((_,i)=>i+1)', type: 'line' }];
-    this.ctx.legend = (this.ctx.seriesExprs||[]).map(s=>s.name);
-    // 同步 UI
-    this.fillFieldOptions(this.xFieldSel, rows);
-    this.xFieldSel.value = x;
-    this.syncGeneralInputs();
-    this.rebuildSeriesUI();
-    this.rebuildCode();
-  }
-
-  // 已移除表格预览，仅保留图表
-
-  private fillFieldOptions(sel: HTMLSelectElement, rows: any[]) {
-    const keys = rows.length ? Object.keys(rows[0]) : [];
-    sel.innerHTML = keys.map(k => `<option value="${this.escape(k)}">${this.escape(k)}</option>`).join('');
-    sel.dispatchEvent(new Event('change'));
-  }
-
   private rebuildCode() {
-    // 仅保留预设模式
-    this.mode = 'presetCount';
     this.rebuildPresetCode();
   }
 
   private async refreshPreview() {
-    // 仅保留预设模式，结果预览默认显示图表
-    await this.renderChartPreview(this.lastRows);
-  }
-
-  private reset() {
-    // 重置为预设模式初始状态
-    this.mode = 'presetCount';
-    this.toggleSections();
-    this.presetItems = [];
-    if (this.presetTypeSel) this.presetTypeSel.value = 'bar';
-    if (this.presetTitleInput) this.presetTitleInput.value = '';
-    if (this.presetColorsInput) this.presetColorsInput.value = '';
-    this.rebuildPresetListUI();
-    this.previewBody.innerHTML = '<div class="ve-placeholder">已重置，请添加 SQL 预设</div>';
-    this.rebuildCode();
-  }
-
-  private async copyCode() {
-    const txt = this.outputPre.textContent || '';
-    try { await navigator.clipboard.writeText(txt); this.toast('已复制'); }
-    catch {
-      const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制');
-    }
+    await this.renderChartPreview();
   }
 
   private save() {
     try {
       const data = {
-        ctx: this.ctx,
-        sql: this.sqlInput.value,
         preset: {
           items: this.presetItems,
           type: this.presetTypeSel?.value || 'bar',
           title: this.presetTitleInput?.value || '',
-          colors: this.presetColorsInput?.value || ''
+          colors: this.presetColorsInput?.value || '',
+          perTypeSettings: this.perTypeSettings
         }
       };
       localStorage.setItem(this.key, JSON.stringify(data));
@@ -379,17 +262,15 @@ export class VisualEchartsUI {
     try {
       const raw = localStorage.getItem(this.key); if (!raw) return;
       const obj = JSON.parse(raw);
-      if (obj?.ctx) this.ctx = obj.ctx;
-      if (obj?.sql) this.sqlInput.value = obj.sql;
       if (obj?.preset) {
         this.presetItems = Array.isArray(obj.preset.items) ? obj.preset.items : [];
         if (this.presetTypeSel && obj.preset.type) this.presetTypeSel.value = obj.preset.type;
         if (this.presetTitleInput) this.presetTitleInput.value = obj.preset.title || '';
         if (this.presetColorsInput) this.presetColorsInput.value = obj.preset.colors || '';
+        if (obj.preset.perTypeSettings) this.perTypeSettings = { ...this.perTypeSettings, ...obj.preset.perTypeSettings };
         this.rebuildPresetListUI();
+        this.renderTypeSettingsUI();
       }
-      this.rebuildSeriesUI();
-      this.syncGeneralInputs();
     } catch {}
   }
 
@@ -405,16 +286,27 @@ export class VisualEchartsUI {
     if (document.getElementById(ID)) return;
     const st = document.createElement('style'); st.id = ID; st.textContent = `
       .ve-wrap{--fg: var(--b3-theme-on-background); --muted: var(--b3-theme-on-surface); --border: var(--b3-border-color); --bg: var(--b3-theme-surface); font-family: var(--b3-font-family); font-size: var(--b3-font-size);}
-      .ve-card{border:1px solid var(--border); border-radius:8px; padding:10px; background: var(--bg); margin-bottom:10px}
+  .ve-card{border:1px solid var(--border); border-radius:10px; padding:12px; background: var(--bg); margin-bottom:12px; box-shadow: 0 6px 20px color-mix(in oklab, var(--b3-theme-on-background), transparent 92%)}
       .ve-legend{font-weight:600; color: var(--muted)}
       .ve-grid{display:grid; gap:8px}
       .ve-grid-2{grid-template-columns: 1fr 1fr}
-      .ve-field{display:grid; gap:6px; font-size:12px; color: var(--muted)}
+  .ve-field{display:grid; gap:6px; font-size:13.5px; color: var(--fg)}
       .ve-label{font-size:12px; color: var(--muted)}
+  .ve-legend{font-size:13.5px}
       .ve-input{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); border-radius:6px; padding:6px 8px; outline:none}
+  .ve-field input[type="checkbox"]{accent-color: var(--b3-theme-primary); transform: scale(1.05);}
+  .ve-inline{display:flex; align-items:center; gap:10px}
+  /* Switch style */
+  .ve-switch{position:relative; display:inline-flex; align-items:center}
+  .ve-switch input{position:absolute; opacity:0; width:0; height:0}
+  .ve-switch i{width:36px; height:20px; background: var(--b3-border-color); border-radius:999px; position:relative; transition:all .18s ease; box-shadow: inset 0 0 0 1px var(--b3-border-color)}
+  .ve-switch i:before{content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background: var(--b3-theme-on-surface); transition:transform .18s ease}
+  .ve-switch input:checked + i{background: var(--b3-theme-primary); box-shadow: inset 0 0 0 1px var(--b3-theme-primary)}
+  .ve-switch input:checked + i:before{background: var(--b3-theme-on-primary); transform: translateX(16px)}
       .ve-row{display:flex; gap:8px; flex-wrap:wrap}
       .ve-btn{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); padding:6px 10px; border-radius:6px; cursor:pointer}
       .ve-btn.ve-ghost{background:transparent}
+  .ve-btn.ve-small{padding:4px 8px; font-size:12px}
       .ve-actions{display:flex; gap:8px; margin:8px 0}
       .ve-output{white-space:pre-wrap; background: var(--b3-protyle-code-background, var(--b3-theme-background)); border:1px solid var(--border); border-radius:6px; padding:8px; font-family: var(--b3-font-family-code, ui-monospace,monospace); font-size:11px}
       .ve-result{border:1px solid var(--border); border-radius:8px; overflow:auto}
@@ -424,12 +316,38 @@ export class VisualEchartsUI {
       .ve-icon{border:1px solid var(--border); background: var(--b3-theme-background); color: var(--muted); width:22px; height:22px; padding:0; border-radius:6px; cursor:pointer; margin-left:6px}
       @media(max-width:980px){.ve-grid-2{grid-template-columns:1fr}}
       /* 预设模式样式 */
-      .ve-preset-list{display:flex; flex-direction:column; gap:8px}
+  .ve-preset-list{display:flex; flex-direction:column; gap:8px}
+  .ve-type-settings{display:grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px}
+  @media(max-width:980px){.ve-type-settings{grid-template-columns: 1fr}}
       .ve-preset-item{border:1px solid var(--border); border-radius:8px; padding:8px}
       .ve-chip{position:relative}
       .ve-chip input{position:absolute; opacity:0; pointer-events:none}
-      .ve-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color: var(--fg); background: var(--b3-theme-background); cursor:pointer}
-      .ve-chip input:checked + span{background: var(--b3-theme-primary); border-color: var(--b3-theme-primary); color: var(--b3-theme-on-primary)}
+    .ve-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color: var(--fg); background: var(--b3-theme-background); cursor:pointer; transition: all .15s ease}
+    .ve-chip input:checked + span{background: var(--b3-theme-primary); border-color: var(--b3-theme-primary); color: var(--b3-theme-on-primary)}
+    .ve-chip span:hover{border-color: var(--b3-theme-primary)}
+    .ve-chip input:focus-visible + span{outline:2px solid color-mix(in oklab, var(--b3-theme-primary), transparent 60%); outline-offset:2px}
+  .ve-chip-group{display:flex; gap:6px; flex-wrap:wrap}
+  .ve-range{width:220px}
+  .ve-range{appearance:none; height:4px; border-radius:999px; background: color-mix(in oklab, var(--b3-border-color), transparent 30%)}
+  .ve-range::-webkit-slider-thumb{appearance:none; width:14px; height:14px; border-radius:50%; background: var(--b3-theme-primary); border: 2px solid var(--b3-theme-on-primary); margin-top:-5px}
+  .ve-range::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background: var(--b3-theme-primary); border: 2px solid var(--b3-theme-on-primary)}
+  .ve-help{color: var(--muted); font-size: 12px}
+  .ve-justify-end{justify-content: flex-end}
+  /* collapse wrapper for smooth open/close */
+  .ve-collapse{overflow:hidden; transition: height .24s cubic-bezier(0.4, 0, 0.2, 1)}
+  /* color editor */
+  .ve-color-editor{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .ve-color-row{align-items:center}
+  .ve-color-palette{display:flex; gap:8px; flex-wrap:wrap}
+  .ve-color-chip{position:relative; width:28px; height:28px}
+  .ve-color-swatch{display:block; width:100%; height:100%; border-radius:6px; border:1px solid var(--border); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000, transparent 85%)}
+  .ve-color-del{position:absolute; right:-6px; top:-6px; width:18px; height:18px; border-radius:50%; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--muted); cursor:pointer; line-height:16px; font-size:12px; z-index:2}
+  .ve-color-chip input[type="color"]{position:absolute; inset:0; opacity:0; cursor:pointer; z-index:1}
+  .ve-color-empty{color: var(--muted); font-size:12px}
+  /* Grouped sections */
+  .ve-group{border:1px solid var(--border); border-radius:10px; padding:10px; background: color-mix(in oklab, var(--b3-theme-surface), var(--b3-theme-background) 30%)}
+  .ve-group__title{font-weight:600; color: var(--muted); margin-bottom:6px}
+  .ve-type-settings > .ve-group{grid-column: 1 / -1}
       .ve-modal-mask{position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:9999}
       .ve-modal{width:min(640px, 92vw); max-height:86vh; background: var(--b3-theme-surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); display:flex; flex-direction:column}
       .ve-modal__head{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--border)}
@@ -447,9 +365,6 @@ export class VisualEchartsUI {
 
   // 供外部设置 SQL 并可选择触发一次查询
   public setSQL(..._args: any[]) {
-    // 仅保留预设模式，忽略外部 SQL 设置
-    this.mode = 'presetCount';
-    this.toggleSections();
     this.rebuildCode();
   }
 
@@ -460,36 +375,6 @@ export class VisualEchartsUI {
     document.body.appendChild(tip);
     requestAnimationFrame(() => tip.style.opacity = '1');
     setTimeout(() => { tip.style.opacity = '0'; setTimeout(() => tip.remove(), 200); }, 1200);
-  }
-
-  private syncGeneralInputs() {
-    if (this.titleInput) this.titleInput.value = this.ctx.title || '';
-    if (this.smoothInput) this.smoothInput.checked = !!this.ctx.smooth;
-    if (this.areaInput) this.areaInput.checked = !!this.ctx.area;
-    if (this.stackInput) this.stackInput.checked = !!this.ctx.stack;
-    if (this.boundaryGapInput) this.boundaryGapInput.checked = !!this.ctx.boundaryGap;
-    if (this.colorsInput) this.colorsInput.value = (this.ctx.colors||[]).join(',');
-  }
-
-  private addNumericSeries() {
-    const rows = this.lastRows || [];
-    if (!rows.length) { this.toast('请先运行 SQL'); return; }
-    const sample = rows[0] || {};
-    const keys = Object.keys(sample);
-    const numeric = keys.filter(k => typeof sample[k] === 'number');
-    if (!numeric.length) { this.toast('未检测到数值列'); return; }
-    const names = new Set((this.ctx.seriesExprs||[]).map(s=>s.name));
-    numeric.forEach((k) => {
-      if (names.has(k)) return;
-      (this.ctx.seriesExprs ||= []).push({ name: k, expr: `rows.map(r=>Number(r.${k})||0)`, type: (this.ctx.seriesExprs && this.ctx.seriesExprs[0]?.type) || 'line' });
-    });
-    this.ctx.legend = (this.ctx.seriesExprs||[]).map(s=>s.name);
-    if (!this.ctx.xDataExpr) {
-      const nonNum = keys.find(k => typeof sample[k] !== 'number') || keys[0];
-      if (nonNum) this.ctx.xDataExpr = `rows.map(r=>String(r.${nonNum}))`;
-    }
-    this.rebuildSeriesUI();
-    this.rebuildCode();
   }
 
   // -------- 图表预览 --------
@@ -504,55 +389,207 @@ export class VisualEchartsUI {
     });
   }
 
-  private evalExpr<T = any>(expr: string, rows: any[]): T {
+  private buildOptionForPreview() {
+    // 仅保留预设模式，通过 IIFE 生成 option
     try {
+      const title = (this.presetTitleInput?.value ?? '') as string;
+      const colors = (this.presetColorsInput?.value ?? '') as string;
+      const settings = this.getCurrentTypeSettings();
+      const iife = buildPresetCountIIFE(
+        this.presetItems,
+        (this.presetTypeSel?.value as any) || 'bar',
+        title || '',
+        settings,
+        (colors||'').split(',').map(s=>s.trim()).filter(Boolean)
+      );
       // eslint-disable-next-line no-new-func
-      const fn = new Function('rows', `return (${expr});`);
-      return fn(rows);
-    } catch { return [] as any; }
+      const fn = new Function(`return ${iife};`);
+      return fn();
+    } catch { return {}; }
   }
 
-  private buildOptionForPreview(rows: any[]) {
-    if (this.mode === 'presetCount') {
-      // 预设模式的图表预览不依赖 lastRows，这里直接基于 presetItems 构造 option（同步计数）
-      try {
-        // 复用 IIFE 生成字符串后执行得到 option
-        const title = (this.presetTitleInput?.value ?? this.titleInput?.value ?? '') as string;
-        const colors = (this.presetColorsInput?.value ?? this.colorsInput?.value ?? '') as string;
-        const iife = buildPresetCountIIFE(this.presetItems, (this.presetTypeSel?.value as any) || 'bar', title || '', (colors||'').split(',').map(s=>s.trim()).filter(Boolean));
-        // eslint-disable-next-line no-new-func
-        const fn = new Function(`return ${iife};`);
-        return fn();
-      } catch { return {}; }
+  // ------- 类型设置渲染与读取 -------
+  private renderTypeSettingsUI() {
+    if (!this.currentSettingsEl) return;
+    const t = (this.presetTypeSel?.value as any) || 'bar';
+    let html = '';
+    if (t === 'bar') {
+      const s = this.perTypeSettings.bar;
+      html = `
+        <div class="ve-type-settings">
+          <div class="ve-group">
+            <div class="ve-group__title">基础</div>
+            <label class="ve-field">
+              <div class="ve-inline"><span>堆叠</span><label class="ve-switch"><input type="checkbox" data-set="bar.stack" ${s.stack? 'checked':''}/><i></i></label></div>
+            </label>
+            <label class="ve-field">
+              <div class="ve-inline"><span>x 轴留白</span><label class="ve-switch"><input type="checkbox" data-set="bar.boundaryGap" ${s.boundaryGap? 'checked':''}/><i></i></label></div>
+            </label>
+          </div>
+          <div class="ve-group">
+            <div class="ve-group__title">标签</div>
+            <label class="ve-field">
+              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="bar.label.show" ${s.label?.show? 'checked':''}/><i></i></label></div>
+            </label>
+            <div class="ve-field">
+              <div class="ve-label">标签位置</div>
+              <div class="ve-chip-group" role="group">
+                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="top" ${s.label?.position==='top'?'checked':''}/><span>top</span></label>
+                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="inside" ${s.label?.position==='inside'?'checked':''}/><span>inside</span></label>
+                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="insideTop" ${s.label?.position==='insideTop'?'checked':''}/><span>insideTop</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="ve-group">
+            <div class="ve-group__title">轴样式</div>
+          <label class="ve-field">x 轴标签旋转
+            <div class="ve-row" style="align-items:center; gap:8px;">
+              <input class="ve-range" type="range" min="-90" max="90" step="5" data-set="bar.xLabelRotate" value="${s.xLabelRotate ?? 0}" />
+              <span class="ve-label">${s.xLabelRotate ?? 0}°</span>
+            </div>
+          </label>
+          </div>
+        </div>`;
+    } else if (t === 'line') {
+      const s = this.perTypeSettings.line;
+      html = `
+        <div class="ve-type-settings">
+          <div class="ve-group">
+            <div class="ve-group__title">基础</div>
+            <label class="ve-field">
+              <div class="ve-inline"><span>平滑</span><label class="ve-switch"><input type="checkbox" data-set="line.smooth" ${s.smooth? 'checked':''}/><i></i></label></div>
+            </label>
+            <label class="ve-field">
+              <div class="ve-inline"><span>x 轴留白</span><label class="ve-switch"><input type="checkbox" data-set="line.boundaryGap" ${s.boundaryGap? 'checked':''}/><i></i></label></div>
+            </label>
+          </div>
+          <div class="ve-group">
+            <div class="ve-group__title">标签</div>
+            <label class="ve-field">
+              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="line.label.show" ${s.label?.show? 'checked':''}/><i></i></label></div>
+            </label>
+            <div class="ve-field">
+              <div class="ve-label">标签位置</div>
+              <div class="ve-chip-group" role="group">
+                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="top" ${s.label?.position==='top'?'checked':''}/><span>top</span></label>
+                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="left" ${s.label?.position==='left'?'checked':''}/><span>left</span></label>
+                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="right" ${s.label?.position==='right'?'checked':''}/><span>right</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="ve-group">
+            <div class="ve-group__title">轴样式</div>
+          <label class="ve-field">x 轴标签旋转
+            <div class="ve-row" style="align-items:center; gap:8px;">
+              <input class="ve-range" type="range" min="-90" max="90" step="5" data-set="line.xLabelRotate" value="${s.xLabelRotate ?? 0}" />
+              <span class="ve-label">${s.xLabelRotate ?? 0}°</span>
+            </div>
+          </label>
+          </div>
+        </div>`;
+    } else if (t === 'pie') {
+      const s = this.perTypeSettings.pie;
+      html = `
+        <div class="ve-type-settings">
+          <div class="ve-group">
+            <div class="ve-group__title">半径</div>
+            <label class="ve-field">内径(%)
+            <div class="ve-row" style="align-items:center; gap:8px;">
+              <input class="ve-range" type="range" min="0" max="95" step="5" data-set="pie.innerRadius" value="${s.innerRadius ?? 0}" />
+              <span class="ve-label">${s.innerRadius ?? 0}%</span>
+            </div>
+            <div class="ve-help">建议小于外径，形成环图</div>
+            </label>
+            <label class="ve-field">外径(%)
+            <div class="ve-row" style="align-items:center; gap:8px;">
+              <input class="ve-range" type="range" min="5" max="100" step="5" data-set="pie.outerRadius" value="${s.outerRadius ?? 70}" />
+              <span class="ve-label">${s.outerRadius ?? 70}%</span>
+            </div>
+            </label>
+          </div>
+          <div class="ve-group">
+            <div class="ve-group__title">类型与标签</div>
+            <div class="ve-field">
+            <div class="ve-label">玫瑰图 roseType</div>
+            <div class="ve-chip-group" role="group">
+              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="false" ${!s.roseType?'checked':''}/><span>无</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="radius" ${s.roseType==='radius'?'checked':''}/><span>radius</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="area" ${s.roseType==='area'?'checked':''}/><span>area</span></label>
+            </div>
+            </div>
+            <label class="ve-field">
+              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show? 'checked':''}/><i></i></label></div>
+            </label>
+            <div class="ve-field">
+            <div class="ve-label">标签位置</div>
+            <div class="ve-chip-group" role="group">
+              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="outside" ${s.label?.position==='outside'?'checked':''}/><span>outside</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="inside" ${s.label?.position==='inside'?'checked':''}/><span>inside</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="center" ${s.label?.position==='center'?'checked':''}/><span>center</span></label>
+            </div>
+          </div>
+        </div>`;
     }
-    const legend = (this.ctx.legend && this.ctx.legend.length) ? this.ctx.legend : (this.ctx.seriesExprs||[]).map(s=>s.name);
-    const xData = this.evalExpr<any[]>(this.ctx.xDataExpr || 'rows.map((_,i)=>String(i+1))', rows);
-    const needDualAxis = (this.ctx.seriesExprs||[]).some(s => (s as any).axisIndex === 1);
-    const series = (this.ctx.seriesExprs||[]).map((s,i)=>{
-      const type = s.type || 'line';
-      const data = this.evalExpr<any[]>(s.expr, rows);
-      const it: any = { name: s.name, type, data, smooth: !!(this.ctx.smooth && type==='line'), z:1 };
-      if (this.ctx.area && type==='line') it.areaStyle = { normal: {} };
-      if (this.ctx.stack) it.stack = 'total';
-      if (typeof (s as any).axisIndex === 'number' && (s as any).axisIndex! > 0) it.yAxisIndex = (s as any).axisIndex|0;
-      if (Array.isArray(this.ctx.colors) && this.ctx.colors[i]) it.itemStyle = { color: this.ctx.colors[i] };
-      return it;
+    this.currentSettingsEl.innerHTML = html;
+    // 绑定事件
+    const inputs = Array.from(this.currentSettingsEl.querySelectorAll('[data-set]')) as HTMLElement[];
+    inputs.forEach(el => {
+      const key = el.getAttribute('data-set') || '';
+      if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+        el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); this.rebuildPresetCode(); });
+      } else if (el instanceof HTMLInputElement && (el.type === 'number' || el.type === 'text' || el.type === 'range')) {
+        el.addEventListener('input', () => {
+          const v = (el.type==='number' || el.type==='range')? Number(el.value): el.value;
+          // 实时更新旁侧的数值
+          const labelSpan = el.parentElement?.querySelector('.ve-label') as HTMLElement | null;
+          if (labelSpan && (typeof v === 'number')) labelSpan.textContent = key.includes('Radius') ? `${v}%` : `${v}°`;
+          this.setDeepSetting(key, v); this.rebuildPresetCode();
+        });
+      } else if (el instanceof HTMLInputElement && el.type === 'radio') {
+        el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; this.setDeepSetting(key, v); this.rebuildPresetCode(); });
+      } else if (el instanceof HTMLSelectElement) {
+        el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; this.setDeepSetting(key, v || (v as any)); this.rebuildPresetCode(); });
+      }
     });
-    const option: any = {
-      title: { text: this.ctx.title || '' },
-      backgroundColor: 'transparent',
-      tooltip: { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } },
-      legend: { data: legend },
-      xAxis: [{ type: 'category', boundaryGap: !!this.ctx.boundaryGap, data: xData, axisTick: { show:false }, axisLine: { show:false } }],
-      yAxis: [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { lineStyle: { color: 'rgba(0, 0, 0, .38)', type: 'dashed' } } }],
-      series
-    };
-    if (needDualAxis) option.yAxis.push({ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } });
-    return option;
+    // 恢复默认
+    const resetBtn = this.currentSettingsEl.querySelector('[data-type-reset]') as HTMLButtonElement | null;
+    if (resetBtn) resetBtn.addEventListener('click', () => this.resetCurrentTypeSettings());
   }
 
-  private async renderChartPreview(rows: any[]) {
-    if (this.mode !== 'presetCount' && (!rows || !rows.length)) { this.previewBody.innerHTML = '<div class="ve-placeholder">无结果</div>'; return; }
+  private setDeepSetting(path: string, value: any) {
+    const segs = path.split('.');
+    let cur: any = this.perTypeSettings as any;
+    for (let i=0;i<segs.length-1;i++) {
+      const k = segs[i];
+      if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
+      cur = cur[k];
+    }
+    cur[segs[segs.length-1]] = value;
+    this.save();
+  }
+
+  private getCurrentTypeSettings() {
+    const t = (this.presetTypeSel?.value as any) || 'bar';
+    if (t === 'line') return this.perTypeSettings.line;
+    if (t === 'pie') return this.perTypeSettings.pie;
+    return this.perTypeSettings.bar;
+  }
+
+  private resetCurrentTypeSettings() {
+    const t = (this.presetTypeSel?.value as any) || 'bar';
+    if (t === 'line') {
+      this.perTypeSettings.line = { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } };
+    } else if (t === 'pie') {
+      this.perTypeSettings.pie = { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } };
+    } else {
+      this.perTypeSettings.bar = { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } };
+    }
+    this.save();
+    this.renderTypeSettingsUI();
+    this.rebuildPresetCode();
+  }
+
+  private async renderChartPreview() {
     this.previewBody.innerHTML = '<div data-chart style="width:100%;height:360px"></div>';
     this.chartDiv = this.previewBody.querySelector('[data-chart]') as HTMLDivElement;
     await this.ensureEcharts();
@@ -560,18 +597,11 @@ export class VisualEchartsUI {
     if (this.echartsInst) { try { this.echartsInst.dispose(); } catch {}
     }
     this.echartsInst = echarts.init(this.chartDiv);
-    const option = this.buildOptionForPreview(rows);
+    const option = this.buildOptionForPreview();
     this.echartsInst.setOption(option, true);
   }
 
   // ---------- 预设模式 ----------
-  private toggleSections() {
-    const normal = this.container.querySelector('details[data-section="normal"]') as HTMLDetailsElement | null;
-    const preset = this.container.querySelector('details[data-section="preset"]') as HTMLDetailsElement | null;
-    // 仅保留预设模式
-    normal?.setAttribute('style','display:none');
-    preset?.setAttribute('style','');
-  }
 
   private rebuildPresetListUI() {
     if (!this.presetListEl) return;
@@ -609,19 +639,33 @@ export class VisualEchartsUI {
 
   private rebuildPresetCode() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
-    const title = (this.presetTitleInput?.value ?? this.titleInput?.value ?? '') as string;
-    const colors = (this.presetColorsInput?.value ?? this.colorsInput?.value ?? '') as string;
-    const iife = buildPresetCountIIFE(this.presetItems, t, title || '', (colors||'').split(',').map(s=>s.trim()).filter(Boolean));
+    const title = (this.presetTitleInput?.value ?? '') as string;
+    const colors = (this.presetColorsInput?.value ?? '') as string;
+    const settings = this.getCurrentTypeSettings();
+    const iife = buildPresetCountIIFE(
+      this.presetItems,
+      t,
+      title || '',
+      settings,
+      (colors||'').split(',').map(s=>s.trim()).filter(Boolean)
+    );
     this.outputPre.textContent = iife;
     this.save();
-  this.renderChartPreview(this.lastRows).catch(()=>{});
+  this.renderChartPreview().catch(()=>{});
   }
 
   private async copyPresetCode() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
-    const title = (this.presetTitleInput?.value ?? this.titleInput?.value ?? '') as string;
-    const colors = (this.presetColorsInput?.value ?? this.colorsInput?.value ?? '') as string;
-    const iife = buildPresetCountIIFE(this.presetItems, t, title || '', (colors||'').split(',').map(s=>s.trim()).filter(Boolean));
+    const title = (this.presetTitleInput?.value ?? '') as string;
+    const colors = (this.presetColorsInput?.value ?? '') as string;
+    const settings = this.getCurrentTypeSettings();
+    const iife = buildPresetCountIIFE(
+      this.presetItems,
+      t,
+      title || '',
+      settings,
+      (colors||'').split(',').map(s=>s.trim()).filter(Boolean)
+    );
     try { await navigator.clipboard.writeText(iife); this.toast('已复制'); }
     catch {
       const ta = document.createElement('textarea'); ta.value = iife; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制');

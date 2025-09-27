@@ -136,7 +136,31 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
  * - items: [{ name, sql }]
  * - type: 'bar' | 'line' | 'pie'
  */
-export function buildPresetCountIIFE(items: Array<{ name: string; sql: string }>, type: 'bar'|'line'|'pie', title?: string, colors?: string[]) {
+export function buildPresetCountIIFE(
+  items: Array<{ name: string; sql: string }>,
+  type: 'bar'|'line'|'pie',
+  title?: string,
+  chartSettings?: any,
+  colors?: string[]
+) {
+  // 兼容旧/新签名处理
+  let settingsObj: any = chartSettings;
+  let palette: string[] | undefined = colors;
+  const maybeArgs: any[] = Array.prototype.slice.call(arguments);
+  // 4 参数老用法：第4位可能是颜色数组
+  if (maybeArgs.length === 4 && Array.isArray(maybeArgs[3])) {
+    palette = maybeArgs[3];
+    settingsObj = undefined;
+  }
+  // 4 参数老用法：第4位可能是设置对象
+  if (maybeArgs.length === 4 && !Array.isArray(maybeArgs[3]) && typeof maybeArgs[3] === 'object') {
+    settingsObj = maybeArgs[3];
+  }
+  // 5 参数新用法：第4位设置对象，第5位颜色数组
+  if (maybeArgs.length >= 5) {
+    settingsObj = maybeArgs[3];
+    palette = maybeArgs[4];
+  }
   const safeItems = (items || []).map(it => ({
     name: String(it?.name ?? ''),
     // 将反引号转义以便嵌入到模板字符串
@@ -145,7 +169,8 @@ export function buildPresetCountIIFE(items: Array<{ name: string; sql: string }>
   const itemsJson = JSON.stringify(safeItems);
   const t = type === 'pie' ? 'pie' : (type === 'line' ? 'line' : 'bar');
   const titleText = JSON.stringify(title || '预设计数');
-  const colorsJs = Array.isArray(colors) && colors.length ? JSON.stringify(colors) : '';
+  const colorsJs = Array.isArray(palette) && palette.length ? JSON.stringify(palette) : '';
+  const settingsJs = JSON.stringify(settingsObj || {});
   const body = `(() => {
     function fetchSqlSync(sql){
       try{
@@ -163,6 +188,7 @@ export function buildPresetCountIIFE(items: Array<{ name: string; sql: string }>
       return [];
     }
     var items = ${itemsJson};
+  var st = ${settingsJs};
     var names = [];
     var counts = [];
     for (var i=0;i<items.length;i++){
@@ -175,13 +201,28 @@ export function buildPresetCountIIFE(items: Array<{ name: string; sql: string }>
     ${t === 'pie' ? `
     option.tooltip = { trigger: 'item' };
     option.legend = { data: names };
-    option.series = [{ type: 'pie', name: '计数', data: names.map(function(n,i){ return { name: n, value: counts[i] }; }) }];
+    var pie = { type: 'pie', name: '计数', data: names.map(function(n,i){ return { name: n, value: counts[i] }; }) };
+    if (st && (st.innerRadius || st.outerRadius)) {
+      var ir = Math.max(0, Math.min(100, Number(st.innerRadius||0)));
+      var or = Math.max(ir, Math.min(100, Number(st.outerRadius||70)));
+      pie.radius = [ir + '%', or + '%'];
+    }
+    if (st && st.roseType) pie.roseType = st.roseType;
+    if (st && st.label) { pie.label = st.label; }
+    option.series = [pie];
     ` : `
     option.tooltip = { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } };
     option.legend = { data: ['计数'] };
-    option.xAxis = [{ type: 'category', boundaryGap: ${t === 'bar' ? 'true' : 'false'}, data: names, axisTick: { show:false }, axisLine: { show:false } }];
-    option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { lineStyle: { color: 'rgba(0, 0, 0, .38)', type: 'dashed' } } }];
-    option.series = [{ type: '${t}', name: '计数', data: counts }];
+    var xRotate = st && typeof st.xLabelRotate === 'number' ? st.xLabelRotate|0 : 0;
+    var boundaryGap = (st && typeof st.boundaryGap === 'boolean') ? !!st.boundaryGap : ${t === 'bar' ? 'true' : 'false'};
+    option.xAxis = [{ type: 'category', boundaryGap: boundaryGap, data: names, axisTick: { show:false }, axisLine: { show:false }, axisLabel: { rotate: xRotate } }];
+    var splitType = st && st.ySplitLine ? st.ySplitLine : 'dashed';
+    option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } } }];
+    var seriesItem = { type: '${t}', name: '计数', data: counts };
+    if (st && st.stack && '${t}'==='bar') seriesItem.stack = 'total';
+    if (st && st.smooth && '${t}'==='line') seriesItem.smooth = true;
+    if (st && st.label) seriesItem.label = st.label;
+    option.series = [seriesItem];
     `}
     ${colorsJs ? `option.color = ${colorsJs};` : ''}
     return option;
