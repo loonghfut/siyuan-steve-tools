@@ -25,7 +25,6 @@ export class VisualEchartsUI {
   private xFieldSel!: HTMLSelectElement;
   private seriesWrap!: HTMLElement;
   private previewBody!: HTMLElement;
-  private previewMode: 'table'|'chart' = 'chart';
   private mode: 'normal' | 'presetCount' = 'presetCount';
   private chartDiv?: HTMLDivElement;
   private echartsInst?: any;
@@ -117,14 +116,8 @@ export class VisualEchartsUI {
           </details>
         </details>
         <details class="ve-card" open data-section="preview">
-          <summary class="ve-legend">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button>
-            <span style="margin-left:8px; display:inline-flex; gap:6px; align-items:center;">
-              <button class="ve-btn" data-mode="table">数据</button>
-              <button class="ve-btn" data-mode="chart">图表</button>
-              <button class="ve-btn" data-goto-sql>转到 SQL</button>
-            </span>
-          </summary>
-          <div class="ve-result" data-result><div class="ve-placeholder">请在下方添加对比的 SQL 预设后，切换到“图表”查看预览</div></div>
+          <summary class="ve-legend">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></summary>
+          <div class="ve-result" data-result><div class="ve-placeholder">请在下方添加对比的 SQL 预设后，将在此显示图表</div></div>
         </details>
 
         <details class="ve-card" open data-section="preset">
@@ -147,6 +140,7 @@ export class VisualEchartsUI {
           </div>
           <div class="ve-row" style="margin:6px 0;">
             <button class="ve-btn" data-preset-add>从 SQL 预设添加</button>
+            <button class="ve-btn" data-goto-sql>转到 SQL</button>
             <button class="ve-btn" data-preset-clear>清空</button>
             <button class="ve-btn" data-preset-copy>复制 JS(IIFE)</button>
           </div>
@@ -173,14 +167,14 @@ export class VisualEchartsUI {
     (this.container.querySelector('[data-copy]') as HTMLButtonElement).addEventListener('click', () => this.copyCode());
     (this.container.querySelector('[data-reset]') as HTMLButtonElement).addEventListener('click', () => this.reset());
     (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', () => this.refreshPreview());
-  (this.container.querySelector('[data-mode="table"]') as HTMLButtonElement).addEventListener('click', () => { this.previewMode = 'table'; this.refreshPreview(); });
-  (this.container.querySelector('[data-mode="chart"]') as HTMLButtonElement).addEventListener('click', () => { this.previewMode = 'chart'; this.refreshPreview(); });
-  const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement;
-  if (this.opts?.onGotoSQL) {
-    gotoSqlBtn.addEventListener('click', () => this.opts!.onGotoSQL!());
-  } else {
-    gotoSqlBtn.style.display = 'none';
-  }
+    const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement | null;
+    if (gotoSqlBtn) {
+      if (this.opts?.onGotoSQL) {
+        gotoSqlBtn.addEventListener('click', () => this.opts!.onGotoSQL!());
+      } else {
+        gotoSqlBtn.style.display = 'none';
+      }
+    }
 
     this.sqlInput.addEventListener('input', () => this.rebuildCode());
     this.xFieldSel.addEventListener('change', () => {
@@ -300,7 +294,7 @@ export class VisualEchartsUI {
       if (!(this.ctx.xDataExpr && (this.ctx.seriesExprs||[]).length)) {
         this.suggestMappings();
       }
-      if (this.previewMode === 'chart') await this.renderChartPreview(rows); else this.renderPreviewTable(rows);
+  await this.renderChartPreview(rows);
     } catch (e:any) {
       this.previewBody.innerHTML = `<div class="ve-error">${this.escape(e?.message||'查询失败')}</div>`;
     }
@@ -326,13 +320,7 @@ export class VisualEchartsUI {
     this.rebuildCode();
   }
 
-  private renderPreviewTable(rows: any[]) {
-    if (!rows.length) { this.previewBody.innerHTML = '<div class="ve-placeholder">无结果</div>'; return; }
-    const keys = Object.keys(rows[0]);
-    const thead = `<thead><tr>${keys.map(k=>`<th>${this.escape(k)}</th>`).join('')}</tr></thead>`;
-    const tbody = `<tbody>${rows.slice(0,64).map(r=>`<tr>${keys.map(k=>`<td>${this.escape(this.format(r[k]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
-    this.previewBody.innerHTML = `<div class="ve-table-wrap"><table class="ve-table">${thead}${tbody}</table></div>`;
-  }
+  // 已移除表格预览，仅保留图表
 
   private fillFieldOptions(sel: HTMLSelectElement, rows: any[]) {
     const keys = rows.length ? Object.keys(rows[0]) : [];
@@ -347,9 +335,8 @@ export class VisualEchartsUI {
   }
 
   private async refreshPreview() {
-    // 仅保留预设模式
-    if (this.previewMode === 'chart') await this.renderChartPreview(this.lastRows);
-    else this.previewBody.innerHTML = '<div class="ve-placeholder">预设模式不提供数据表预览，请切换到“图表”</div>';
+    // 仅保留预设模式，结果预览默认显示图表
+    await this.renderChartPreview(this.lastRows);
   }
 
   private reset() {
@@ -406,12 +393,7 @@ export class VisualEchartsUI {
     } catch {}
   }
 
-  private format(v: any) {
-    if (v == null) return '';
-    if (typeof v === 'string') return v;
-    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-    try { return JSON.stringify(v); } catch { return String(v); }
-  }
+  // 已移除表格相关的格式化方法
 
   private escape(s: any) {
     const str = s == null ? '' : String(s);
@@ -632,7 +614,7 @@ export class VisualEchartsUI {
     const iife = buildPresetCountIIFE(this.presetItems, t, title || '', (colors||'').split(',').map(s=>s.trim()).filter(Boolean));
     this.outputPre.textContent = iife;
     this.save();
-    if (this.previewMode === 'chart') this.renderChartPreview(this.lastRows).catch(()=>{});
+  this.renderChartPreview(this.lastRows).catch(()=>{});
   }
 
   private async copyPresetCode() {
@@ -663,7 +645,7 @@ export class VisualEchartsUI {
         <div class="ve-preset-chooser">${names.map(n=>`<label class="ve-chip"><input type="checkbox" value="${this.escape(n)}"/><span>${this.escape(n)}</span></label>`).join('')}</div>
         <div class="ve-empty" data-empty style="display:none">无匹配结果</div>
       </div>
-      <div class="ve-modal__foot"><button class="ve-btn" data-ok>加入</button><button class="ve-btn ve-ghost" data-close2>取消</button></div>`;
+      <div class="ve-modal__foot"><button class="ve-btn ve-ghost" data-close2>取消</button><button class="ve-btn" data-ok>加入</button></div>`;
     overlay.appendChild(dlg); document.body.appendChild(overlay);
     const close = ()=> overlay.remove();
     (dlg.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', close);
