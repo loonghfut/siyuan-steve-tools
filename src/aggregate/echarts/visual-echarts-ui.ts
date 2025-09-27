@@ -114,6 +114,7 @@ export class VisualEchartsUI {
             <button class="ve-btn" data-goto-sql>转到 SQL</button>
             <button class="ve-btn" data-preset-clear>清空</button>
             <button class="ve-btn" data-preset-copy>复制 JS(IIFE)</button>
+            <button class="ve-btn" data-preset-copy-block>复制图表块</button>
           </div>
           <details class="ve-sub" data-type-settings>
             <summary class="ve-legend">图表自定义设置</summary>
@@ -152,6 +153,7 @@ export class VisualEchartsUI {
     (this.container.querySelector('[data-preset-add]') as HTMLButtonElement)?.addEventListener('click', () => this.addFromSqlPresets());
     (this.container.querySelector('[data-preset-clear]') as HTMLButtonElement)?.addEventListener('click', () => { this.presetItems = []; this.rebuildPresetListUI(); this.rebuildPresetCode(); });
     (this.container.querySelector('[data-preset-copy]') as HTMLButtonElement)?.addEventListener('click', () => this.copyPresetCode());
+  (this.container.querySelector('[data-preset-copy-block]') as HTMLButtonElement)?.addEventListener('click', () => this.copyChartBlock());
     this.presetTypeSel?.addEventListener('change', () => { this.renderTypeSettingsUI(); this.rebuildPresetCode(); });
     this.presetTitleInput?.addEventListener('input', () => this.rebuildPresetCode());
     // 颜色编辑器交互
@@ -699,6 +701,24 @@ export class VisualEchartsUI {
     try { await navigator.clipboard.writeText(iife); this.toast('已复制'); }
     catch {
       const ta = document.createElement('textarea'); ta.value = iife; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制');
+    }
+  }
+
+  private async copyChartBlock() {
+    const t = (this.presetTypeSel?.value as any) || 'bar';
+    const title = (this.presetTitleInput?.value ?? '') as string;
+    const settings = this.getCurrentTypeSettings();
+    const iife = buildPresetCountIIFE(
+      this.presetItems,
+      t,
+      title || '',
+      settings,
+      this.presetColors
+    );
+    const block = '```echarts\n' + iife + '\n```';
+    try { await navigator.clipboard.writeText(block); this.toast('已复制图表块'); }
+    catch {
+      const ta = document.createElement('textarea'); ta.value = block; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制图表块');
     }
   }
 
