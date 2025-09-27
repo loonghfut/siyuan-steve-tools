@@ -25,42 +25,42 @@ export const MODULE_CONFIG: ModuleConfig = {
         settingKey: 'cal-enable',
         logMessage: '日历模块加载'
     },
-    M_sync: {
-        class: M_sync,
-        name: 'M_sync',
-        settingKey: 'sync-enable',
-        logMessage: '同步模块加载'
-    },
-    M_ai: {
-        class: M_ai,
-        name: 'M_ai',
-        settingKey: 'ai-enable',
-        logMessage: 'ai模块加载'
-    },
-    M_imageCompression: {
-        class: M_imageCompression,
-        name: 'M_imageCompression',
-        settingKey: 'img-compress-enable',
-        logMessage: '图片压缩模块加载'
-    },
-    M_handwriting: {
-        class: M_handwriting,
-        name: 'M_handwriting',
-        settingKey: 'handwriting-enable',
-        logMessage: '画板模块加载'
-    },
-    M_lifelog: {
-        class: M_lifelog,
-        name: 'M_lifelog',
-        settingKey: 'lifelog-enable',
-        logMessage: 'LifeLog模块加载'
-    },
-    M_Wps: {
-        class: M_Wps,
-        name: 'M_Wps',
-        settingKey: 'wps-enable',
-        logMessage: 'Wps模块加载'
-    },
+    // M_sync: {
+    //     class: M_sync,
+    //     name: 'M_sync',
+    //     settingKey: 'sync-enable',
+    //     logMessage: '同步模块加载'
+    // },
+    // M_ai: {
+    //     class: M_ai,
+    //     name: 'M_ai',
+    //     settingKey: 'ai-enable',
+    //     logMessage: 'ai模块加载'
+    // },
+    // M_imageCompression: {
+    //     class: M_imageCompression,
+    //     name: 'M_imageCompression',
+    //     settingKey: 'img-compress-enable',
+    //     logMessage: '图片压缩模块加载'
+    // },
+    // M_handwriting: {
+    //     class: M_handwriting,
+    //     name: 'M_handwriting',
+    //     settingKey: 'handwriting-enable',
+    //     logMessage: '画板模块加载'
+    // },
+    // M_lifelog: {
+    //     class: M_lifelog,
+    //     name: 'M_lifelog',
+    //     settingKey: 'lifelog-enable',
+    //     logMessage: 'LifeLog模块加载'
+    // },
+    // M_Wps: {
+    //     class: M_Wps,
+    //     name: 'M_Wps',
+    //     settingKey: 'wps-enable',
+    //     logMessage: 'Wps模块加载'
+    // },
 
     M_Aggregate: {
         class: M_Aggregate,

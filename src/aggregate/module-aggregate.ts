@@ -295,8 +295,7 @@ export class M_Aggregate {
                         const code = (container.querySelector('[data-output]') as HTMLElement)?.textContent || '';
                         const curId = nodeElement.getAttribute('data-node-id');
                         const fenced = '```echarts\n' + code + '\n```';
-                        // 在当前块后插入新的 ECharts 代码块，避免覆盖原块引起渲染器类型不一致
-                        await insertBlock('markdown', fenced, undefined, curId || undefined, undefined);
+                        await updateBlock('markdown', fenced, curId);
                         dlg.destroy();
                     });
                     bar.appendChild(btn);
@@ -433,19 +432,19 @@ export class M_Aggregate {
         if (_settingdata["chart-enable"]) {
             menu.addSeparator();
             menu.addItem({
-                icon: "iconChart", // 使用现有图标名或后续替换
-                label: "ECharts 页签",
+                icon: "iconLayoutBottom", // 使用现有图标名或后续替换
+                label: "图表页签",
                 click: async () => {
                     await openTab({
                         app: (window as any).siyuan.ws.app,
-                        custom: { icon: "iconChart", title: "ECharts 视图", id: this.plugin.name + "visual-echarts", data: { id: null } },
+                        custom: { icon: "iconLayoutBottom", title: "ECharts 视图", id: this.plugin.name + "visual-echarts", data: { id: null } },
                         keepCursor: false,
                     });
                 }
             });
             menu.addItem({
-                icon: "iconChart",
-                label: "ECharts 弹窗",
+                icon: "iconLayoutBottom",
+                label: "图表弹窗",
                 click: async () => {
                     new Dialog({
                         title: "ECharts 可视化生成器",
