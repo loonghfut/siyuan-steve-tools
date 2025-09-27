@@ -29,7 +29,9 @@ export class VisualEchartsUI {
   private presetItems: Array<{ name: string; sql: string }> = [];
   private presetTypeSel?: HTMLSelectElement; // bar/line/pie
   private presetTitleInput?: HTMLInputElement;
-  private presetColorsInput?: HTMLInputElement;
+  // 颜色仅由调色盘控制，不再使用文本输入
+  private presetColors: string[] = [];
+  private paletteEl?: HTMLElement;
   // 每种图的自定义设置（持久化）
   private perTypeSettings: {
     bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
@@ -98,7 +100,6 @@ export class VisualEchartsUI {
             <div class="ve-field">
               <div class="ve-label">颜色</div>
               <div class="ve-row ve-color-row">
-                <input class="ve-input" data-preset-colors placeholder="#3b82f6,#ef4444,#10b981" style="width:230px" />
                 <div class="ve-color-editor">
                   <div class="ve-color-palette" data-color-palette></div>
                   <button class="ve-btn ve-ghost ve-small" data-color-add type="button">添加颜色</button>
@@ -144,50 +145,18 @@ export class VisualEchartsUI {
     this.presetListEl = this.container.querySelector('[data-preset-list]') as HTMLElement;
     this.presetTypeSel = this.container.querySelector('[data-preset-type]') as HTMLSelectElement;
     this.presetTitleInput = this.container.querySelector('[data-preset-title]') as HTMLInputElement;
-    this.presetColorsInput = this.container.querySelector('[data-preset-colors]') as HTMLInputElement;
+  this.paletteEl = this.container.querySelector('[data-color-palette]') as HTMLElement | undefined;
     this.currentSettingsEl = this.container.querySelector('[data-type-settings-body]') as HTMLElement;
     (this.container.querySelector('[data-preset-add]') as HTMLButtonElement)?.addEventListener('click', () => this.addFromSqlPresets());
     (this.container.querySelector('[data-preset-clear]') as HTMLButtonElement)?.addEventListener('click', () => { this.presetItems = []; this.rebuildPresetListUI(); this.rebuildPresetCode(); });
     (this.container.querySelector('[data-preset-copy]') as HTMLButtonElement)?.addEventListener('click', () => this.copyPresetCode());
     this.presetTypeSel?.addEventListener('change', () => { this.renderTypeSettingsUI(); this.rebuildPresetCode(); });
     this.presetTitleInput?.addEventListener('input', () => this.rebuildPresetCode());
-    this.presetColorsInput?.addEventListener('input', () => this.debouncedRebuildColorUpdate());
     // 颜色编辑器交互
-    const paletteEl = this.container.querySelector('[data-color-palette]') as HTMLElement | null;
     const addColorBtn = this.container.querySelector('[data-color-add]') as HTMLButtonElement | null;
-    const getColors = (): string[] => (this.presetColorsInput?.value || '').split(',').map(s=>s.trim()).filter(Boolean);
-    const setColors = (arr: string[]) => { if (this.presetColorsInput) this.presetColorsInput.value = arr.join(','); this.debouncedRebuildColorUpdate(); };
-    const renderPalette = () => {
-      if (!paletteEl) return;
-      const colors = getColors();
-      if (!colors.length) { paletteEl.innerHTML = '<div class="ve-color-empty">未设置颜色，使用内置默认配色</div>'; return; }
-      paletteEl.innerHTML = colors.map((c,i)=>`
-        <div class="ve-color-chip" data-idx="${i}">
-          <span class="ve-color-swatch" style="background:${c}"></span>
-          <button class="ve-color-del" title="删除" type="button">×</button>
-          <input type="color" value="${c}" />
-        </div>
-      `).join('');
-      // 绑定变化
-      Array.from(paletteEl.querySelectorAll('.ve-color-chip')).forEach((chip) => {
-        const idx = Number((chip as HTMLElement).getAttribute('data-idx')||'0');
-        const picker = chip.querySelector('input[type="color"]') as HTMLInputElement | null;
-        const del = chip.querySelector('.ve-color-del') as HTMLButtonElement | null;
-        const swatch = chip.querySelector('.ve-color-swatch') as HTMLElement | null;
-        if (picker) picker.addEventListener('input', () => {
-          const cs = getColors();
-          cs[idx] = picker.value;
-          if (swatch) swatch.style.background = picker.value;
-          setColors(cs);
-        });
-        if (del) del.addEventListener('click', () => {
-          const cs = getColors();
-          cs.splice(idx, 1);
-          setColors(cs);
-          renderPalette();
-        });
-      });
-    };
+    const getColors = (): string[] => this.presetColors.slice();
+    const setColors = (arr: string[]) => { this.presetColors = arr.slice(); this.debouncedRebuildColorUpdate(); };
+    const renderPalette = () => this.renderPaletteFromState(getColors, setColors);
     if (addColorBtn) addColorBtn.addEventListener('click', () => {
       const cs = getColors();
       cs.push('#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0'));
@@ -196,7 +165,6 @@ export class VisualEchartsUI {
     });
     // 初始化 palette
     renderPalette();
-    this.presetColorsInput?.addEventListener('input', renderPalette);
     // 初始化类型设置区（默认折叠）
     this.renderTypeSettingsUI();
     // 绑定折叠过渡动画
@@ -251,7 +219,7 @@ export class VisualEchartsUI {
           items: this.presetItems,
           type: this.presetTypeSel?.value || 'bar',
           title: this.presetTitleInput?.value || '',
-          colors: this.presetColorsInput?.value || '',
+          colors: this.presetColors.join(','),
           perTypeSettings: this.perTypeSettings
         }
       };
@@ -266,10 +234,12 @@ export class VisualEchartsUI {
         this.presetItems = Array.isArray(obj.preset.items) ? obj.preset.items : [];
         if (this.presetTypeSel && obj.preset.type) this.presetTypeSel.value = obj.preset.type;
         if (this.presetTitleInput) this.presetTitleInput.value = obj.preset.title || '';
-        if (this.presetColorsInput) this.presetColorsInput.value = obj.preset.colors || '';
+        this.presetColors = String(obj.preset.colors || '').split(',').map((s: string)=>s.trim()).filter(Boolean);
         if (obj.preset.perTypeSettings) this.perTypeSettings = { ...this.perTypeSettings, ...obj.preset.perTypeSettings };
         this.rebuildPresetListUI();
         this.renderTypeSettingsUI();
+        // 恢复后刷新调色盘
+        this.renderPaletteFromState(() => this.presetColors.slice(), (arr)=>{ this.presetColors = arr.slice(); });
       }
     } catch {}
   }
@@ -393,14 +363,13 @@ export class VisualEchartsUI {
     // 仅保留预设模式，通过 IIFE 生成 option
     try {
       const title = (this.presetTitleInput?.value ?? '') as string;
-      const colors = (this.presetColorsInput?.value ?? '') as string;
       const settings = this.getCurrentTypeSettings();
       const iife = buildPresetCountIIFE(
         this.presetItems,
         (this.presetTypeSel?.value as any) || 'bar',
         title || '',
         settings,
-        (colors||'').split(',').map(s=>s.trim()).filter(Boolean)
+        this.presetColors
       );
       // eslint-disable-next-line no-new-func
       const fn = new Function(`return ${iife};`);
@@ -640,14 +609,13 @@ export class VisualEchartsUI {
   private rebuildPresetCode() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
     const title = (this.presetTitleInput?.value ?? '') as string;
-    const colors = (this.presetColorsInput?.value ?? '') as string;
     const settings = this.getCurrentTypeSettings();
     const iife = buildPresetCountIIFE(
       this.presetItems,
       t,
       title || '',
       settings,
-      (colors||'').split(',').map(s=>s.trim()).filter(Boolean)
+      this.presetColors
     );
     this.outputPre.textContent = iife;
     this.save();
@@ -657,19 +625,52 @@ export class VisualEchartsUI {
   private async copyPresetCode() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
     const title = (this.presetTitleInput?.value ?? '') as string;
-    const colors = (this.presetColorsInput?.value ?? '') as string;
     const settings = this.getCurrentTypeSettings();
     const iife = buildPresetCountIIFE(
       this.presetItems,
       t,
       title || '',
       settings,
-      (colors||'').split(',').map(s=>s.trim()).filter(Boolean)
+      this.presetColors
     );
     try { await navigator.clipboard.writeText(iife); this.toast('已复制'); }
     catch {
       const ta = document.createElement('textarea'); ta.value = iife; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制');
     }
+  }
+
+  // 重新渲染调色盘（基于内部状态）
+  private renderPaletteFromState(getColors: () => string[], setColors: (arr: string[]) => void) {
+    const paletteEl = this.paletteEl;
+    if (!paletteEl) return;
+    const colors = getColors();
+    if (!colors.length) { paletteEl.innerHTML = '<div class="ve-color-empty">未设置颜色，使用内置默认配色</div>'; return; }
+    paletteEl.innerHTML = colors.map((c,i)=>`
+      <div class="ve-color-chip" data-idx="${i}">
+        <span class="ve-color-swatch" style="background:${c}"></span>
+        <button class="ve-color-del" title="删除" type="button">×</button>
+        <input type="color" value="${c}" />
+      </div>
+    `).join('');
+    // 绑定变化
+    Array.from(paletteEl.querySelectorAll('.ve-color-chip')).forEach((chip) => {
+      const idx = Number((chip as HTMLElement).getAttribute('data-idx')||'0');
+      const picker = chip.querySelector('input[type="color"]') as HTMLInputElement | null;
+      const del = chip.querySelector('.ve-color-del') as HTMLButtonElement | null;
+      const swatch = chip.querySelector('.ve-color-swatch') as HTMLElement | null;
+      if (picker) picker.addEventListener('input', () => {
+        const cs = getColors();
+        cs[idx] = picker.value;
+        if (swatch) swatch.style.background = picker.value;
+        setColors(cs);
+      });
+      if (del) del.addEventListener('click', () => {
+        const cs = getColors();
+        cs.splice(idx, 1);
+        setColors(cs);
+        this.renderPaletteFromState(getColors, setColors);
+      });
+    });
   }
 
   private async addFromSqlPresets() {
