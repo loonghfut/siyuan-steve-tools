@@ -27,6 +27,8 @@ export class VisualEchartsUI {
   // 预设计数相关
   private presetListEl?: HTMLElement;
   private presetItems: Array<{ name: string; sql: string }> = [];
+  // 拖拽排序相关
+  private draggingIndex: number | null = null;
   private presetTypeSel?: HTMLSelectElement; // bar/line/pie
   private presetTitleInput?: HTMLInputElement;
   // 颜色仅由调色盘控制，不再使用文本输入
@@ -36,12 +38,12 @@ export class VisualEchartsUI {
   private perTypeSettings: {
     bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
     line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
-    pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius'|'area'|false; label?: { show?: boolean; position?: string } };
+    pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
   } = {
-    bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
-    line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
-    pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
-  };
+      bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
+      line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
+      pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
+    };
   private currentSettingsEl?: HTMLElement;
   private loadSqlPresetsProvider?: () => Promise<Record<string, any>> | Record<string, any>;
   private opts?: VisualEchartsOptions;
@@ -145,7 +147,7 @@ export class VisualEchartsUI {
     this.presetListEl = this.container.querySelector('[data-preset-list]') as HTMLElement;
     this.presetTypeSel = this.container.querySelector('[data-preset-type]') as HTMLSelectElement;
     this.presetTitleInput = this.container.querySelector('[data-preset-title]') as HTMLInputElement;
-  this.paletteEl = this.container.querySelector('[data-color-palette]') as HTMLElement | undefined;
+    this.paletteEl = this.container.querySelector('[data-color-palette]') as HTMLElement | undefined;
     this.currentSettingsEl = this.container.querySelector('[data-type-settings-body]') as HTMLElement;
     (this.container.querySelector('[data-preset-add]') as HTMLButtonElement)?.addEventListener('click', () => this.addFromSqlPresets());
     (this.container.querySelector('[data-preset-clear]') as HTMLButtonElement)?.addEventListener('click', () => { this.presetItems = []; this.rebuildPresetListUI(); this.rebuildPresetCode(); });
@@ -159,7 +161,7 @@ export class VisualEchartsUI {
     const renderPalette = () => this.renderPaletteFromState(getColors, setColors);
     if (addColorBtn) addColorBtn.addEventListener('click', () => {
       const cs = getColors();
-      cs.push('#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0'));
+      cs.push('#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'));
       setColors(cs);
       renderPalette();
     });
@@ -224,7 +226,7 @@ export class VisualEchartsUI {
         }
       };
       localStorage.setItem(this.key, JSON.stringify(data));
-    } catch {}
+    } catch { }
   }
   private restore() {
     try {
@@ -234,21 +236,21 @@ export class VisualEchartsUI {
         this.presetItems = Array.isArray(obj.preset.items) ? obj.preset.items : [];
         if (this.presetTypeSel && obj.preset.type) this.presetTypeSel.value = obj.preset.type;
         if (this.presetTitleInput) this.presetTitleInput.value = obj.preset.title || '';
-        this.presetColors = String(obj.preset.colors || '').split(',').map((s: string)=>s.trim()).filter(Boolean);
+        this.presetColors = String(obj.preset.colors || '').split(',').map((s: string) => s.trim()).filter(Boolean);
         if (obj.preset.perTypeSettings) this.perTypeSettings = { ...this.perTypeSettings, ...obj.preset.perTypeSettings };
         this.rebuildPresetListUI();
         this.renderTypeSettingsUI();
         // 恢复后刷新调色盘
-        this.renderPaletteFromState(() => this.presetColors.slice(), (arr)=>{ this.presetColors = arr.slice(); });
+        this.renderPaletteFromState(() => this.presetColors.slice(), (arr) => { this.presetColors = arr.slice(); });
       }
-    } catch {}
+    } catch { }
   }
 
   // 已移除表格相关的格式化方法
 
   private escape(s: any) {
     const str = s == null ? '' : String(s);
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   private injectStyle() {
@@ -289,7 +291,19 @@ export class VisualEchartsUI {
   .ve-preset-list{display:flex; flex-direction:column; gap:8px}
   .ve-type-settings{display:grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px}
   @media(max-width:980px){.ve-type-settings{grid-template-columns: 1fr}}
-      .ve-preset-item{border:1px solid var(--border); border-radius:8px; padding:8px}
+      .ve-preset-item{border:1px solid var(--border); border-radius:8px; padding:8px; position:relative; background: var(--b3-theme-surface)}
+  .ve-preset-item.dragging{opacity:.65}
+  .ve-preset-item.drop-before::before,
+  .ve-preset-item.drop-after::after{content:""; position:absolute; left:6px; right:6px; height:0; border-top:2px dashed var(--b3-theme-primary)}
+  .ve-preset-item.drop-before::before{top:-2px}
+  .ve-preset-item.drop-after::after{bottom:-2px}
+      .ve-drag-handle{width:28px; height:28px; border:1px solid var(--border); border-radius:8px; background: var(--b3-theme-background); color:var(--muted); cursor:grab; display:inline-flex; align-items:center; justify-content:center; flex: 0 0 auto}
+      .ve-drag-handle:hover{border-color: color-mix(in oklab, var(--b3-theme-primary), var(--b3-border-color) 50%); box-shadow: 0 0 0 3px color-mix(in oklab, var(--b3-theme-primary), transparent 88%)}
+      .ve-drag-handle:active{cursor:grabbing; transform: translateY(0.5px)}
+      .ve-drag-handle:focus-visible{outline: 2px solid color-mix(in oklab, var(--b3-theme-primary), transparent 40%); outline-offset: 2px}
+      .ve-drag-grip{width:12px; height:12px; display:block; opacity:.9;
+        background-image: radial-gradient(color-mix(in oklab, var(--b3-theme-on-surface), transparent 60%) 1px, transparent 1px);
+        background-size: 4px 4px; background-position: 0 0, 2px 2px}
       .ve-chip{position:relative}
       .ve-chip input{position:absolute; opacity:0; pointer-events:none}
     .ve-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color: var(--fg); background: var(--b3-theme-background); cursor:pointer; transition: all .15s ease}
@@ -389,23 +403,23 @@ export class VisualEchartsUI {
           <div class="ve-group">
             <div class="ve-group__title">基础</div>
             <label class="ve-field">
-              <div class="ve-inline"><span>堆叠</span><label class="ve-switch"><input type="checkbox" data-set="bar.stack" ${s.stack? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>堆叠</span><label class="ve-switch"><input type="checkbox" data-set="bar.stack" ${s.stack ? 'checked' : ''}/><i></i></label></div>
             </label>
             <label class="ve-field">
-              <div class="ve-inline"><span>x 轴留白</span><label class="ve-switch"><input type="checkbox" data-set="bar.boundaryGap" ${s.boundaryGap? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>x 轴留白</span><label class="ve-switch"><input type="checkbox" data-set="bar.boundaryGap" ${s.boundaryGap ? 'checked' : ''}/><i></i></label></div>
             </label>
           </div>
           <div class="ve-group">
             <div class="ve-group__title">标签</div>
             <label class="ve-field">
-              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="bar.label.show" ${s.label?.show? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="bar.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></div>
             </label>
             <div class="ve-field">
               <div class="ve-label">标签位置</div>
               <div class="ve-chip-group" role="group">
-                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="top" ${s.label?.position==='top'?'checked':''}/><span>top</span></label>
-                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="inside" ${s.label?.position==='inside'?'checked':''}/><span>inside</span></label>
-                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="insideTop" ${s.label?.position==='insideTop'?'checked':''}/><span>insideTop</span></label>
+                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="top" ${s.label?.position === 'top' ? 'checked' : ''}/><span>top</span></label>
+                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="inside" ${s.label?.position === 'inside' ? 'checked' : ''}/><span>inside</span></label>
+                <label class="ve-chip"><input type="radio" name="bar_label_position" data-set="bar.label.position" value="insideTop" ${s.label?.position === 'insideTop' ? 'checked' : ''}/><span>insideTop</span></label>
               </div>
             </div>
           </div>
@@ -426,23 +440,23 @@ export class VisualEchartsUI {
           <div class="ve-group">
             <div class="ve-group__title">基础</div>
             <label class="ve-field">
-              <div class="ve-inline"><span>平滑</span><label class="ve-switch"><input type="checkbox" data-set="line.smooth" ${s.smooth? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>平滑</span><label class="ve-switch"><input type="checkbox" data-set="line.smooth" ${s.smooth ? 'checked' : ''}/><i></i></label></div>
             </label>
             <label class="ve-field">
-              <div class="ve-inline"><span>x 轴留白</span><label class="ve-switch"><input type="checkbox" data-set="line.boundaryGap" ${s.boundaryGap? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>x 轴留白</span><label class="ve-switch"><input type="checkbox" data-set="line.boundaryGap" ${s.boundaryGap ? 'checked' : ''}/><i></i></label></div>
             </label>
           </div>
           <div class="ve-group">
             <div class="ve-group__title">标签</div>
             <label class="ve-field">
-              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="line.label.show" ${s.label?.show? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="line.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></div>
             </label>
             <div class="ve-field">
               <div class="ve-label">标签位置</div>
               <div class="ve-chip-group" role="group">
-                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="top" ${s.label?.position==='top'?'checked':''}/><span>top</span></label>
-                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="left" ${s.label?.position==='left'?'checked':''}/><span>left</span></label>
-                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="right" ${s.label?.position==='right'?'checked':''}/><span>right</span></label>
+                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="top" ${s.label?.position === 'top' ? 'checked' : ''}/><span>top</span></label>
+                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="left" ${s.label?.position === 'left' ? 'checked' : ''}/><span>left</span></label>
+                <label class="ve-chip"><input type="radio" name="line_label_position" data-set="line.label.position" value="right" ${s.label?.position === 'right' ? 'checked' : ''}/><span>right</span></label>
               </div>
             </div>
           </div>
@@ -481,20 +495,20 @@ export class VisualEchartsUI {
             <div class="ve-field">
             <div class="ve-label">玫瑰图 roseType</div>
             <div class="ve-chip-group" role="group">
-              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="false" ${!s.roseType?'checked':''}/><span>无</span></label>
-              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="radius" ${s.roseType==='radius'?'checked':''}/><span>radius</span></label>
-              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="area" ${s.roseType==='area'?'checked':''}/><span>area</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="false" ${!s.roseType ? 'checked' : ''}/><span>无</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="radius" ${s.roseType === 'radius' ? 'checked' : ''}/><span>radius</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_rosetype" data-set="pie.roseType" value="area" ${s.roseType === 'area' ? 'checked' : ''}/><span>area</span></label>
             </div>
             </div>
             <label class="ve-field">
-              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show? 'checked':''}/><i></i></label></div>
+              <div class="ve-inline"><span>显示标签</span><label class="ve-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></div>
             </label>
             <div class="ve-field">
             <div class="ve-label">标签位置</div>
             <div class="ve-chip-group" role="group">
-              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="outside" ${s.label?.position==='outside'?'checked':''}/><span>outside</span></label>
-              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="inside" ${s.label?.position==='inside'?'checked':''}/><span>inside</span></label>
-              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="center" ${s.label?.position==='center'?'checked':''}/><span>center</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="outside" ${s.label?.position === 'outside' ? 'checked' : ''}/><span>outside</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="inside" ${s.label?.position === 'inside' ? 'checked' : ''}/><span>inside</span></label>
+              <label class="ve-chip"><input type="radio" name="pie_label_position" data-set="pie.label.position" value="center" ${s.label?.position === 'center' ? 'checked' : ''}/><span>center</span></label>
             </div>
           </div>
         </div>`;
@@ -508,7 +522,7 @@ export class VisualEchartsUI {
         el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); this.rebuildPresetCode(); });
       } else if (el instanceof HTMLInputElement && (el.type === 'number' || el.type === 'text' || el.type === 'range')) {
         el.addEventListener('input', () => {
-          const v = (el.type==='number' || el.type==='range')? Number(el.value): el.value;
+          const v = (el.type === 'number' || el.type === 'range') ? Number(el.value) : el.value;
           // 实时更新旁侧的数值
           const labelSpan = el.parentElement?.querySelector('.ve-label') as HTMLElement | null;
           if (labelSpan && (typeof v === 'number')) labelSpan.textContent = key.includes('Radius') ? `${v}%` : `${v}°`;
@@ -528,12 +542,12 @@ export class VisualEchartsUI {
   private setDeepSetting(path: string, value: any) {
     const segs = path.split('.');
     let cur: any = this.perTypeSettings as any;
-    for (let i=0;i<segs.length-1;i++) {
+    for (let i = 0; i < segs.length - 1; i++) {
       const k = segs[i];
       if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
       cur = cur[k];
     }
-    cur[segs[segs.length-1]] = value;
+    cur[segs[segs.length - 1]] = value;
     this.save();
   }
 
@@ -563,7 +577,8 @@ export class VisualEchartsUI {
     this.chartDiv = this.previewBody.querySelector('[data-chart]') as HTMLDivElement;
     await this.ensureEcharts();
     const echarts = (window as any).echarts;
-    if (this.echartsInst) { try { this.echartsInst.dispose(); } catch {}
+    if (this.echartsInst) {
+      try { this.echartsInst.dispose(); } catch { }
     }
     this.echartsInst = echarts.init(this.chartDiv);
     const option = this.buildOptionForPreview();
@@ -584,11 +599,59 @@ export class VisualEchartsUI {
       row.className = 've-preset-item';
       row.innerHTML = `
         <div class="ve-row" style="align-items:center; gap:6px;">
+          <button class="ve-drag-handle" title="拖动排序" type="button" data-drag-handle><span class="ve-drag-grip"></span></button>
           <input class="ve-input" data-name value="${this.escape(it.name)}" style="width:180px" />
           <textarea class="ve-input" data-sql rows="2" style="flex:1">${this.escape(it.sql)}</textarea>
           <button class="ve-btn ve-ghost" data-del title="删除">删除</button>
         </div>
       `;
+      // 启用通过句柄触发的拖拽
+      row.draggable = false;
+      const handle = row.querySelector('[data-drag-handle]') as HTMLButtonElement | null;
+      if (handle) {
+        handle.addEventListener('pointerdown', () => { row.draggable = true; });
+        handle.addEventListener('pointerup', () => { if (!row.classList.contains('dragging')) row.draggable = false; });
+        handle.addEventListener('pointercancel', () => { if (!row.classList.contains('dragging')) row.draggable = false; });
+      }
+      row.addEventListener('dragstart', (e) => {
+        this.draggingIndex = idx;
+        row.classList.add('dragging');
+        try { e.dataTransfer?.setData('text/plain', String(idx)); } catch { }
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+      });
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging');
+        row.draggable = false;
+        this.draggingIndex = null;
+        Array.from(this.presetListEl!.children).forEach((el) => el.classList.remove('drop-before', 'drop-after'));
+      });
+      row.addEventListener('dragover', (e) => {
+        if (this.draggingIndex === null) return; e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        const rect = row.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < rect.height / 2;
+        Array.from(this.presetListEl!.children).forEach((el) => el.classList.remove('drop-before', 'drop-after'));
+        row.classList.add(before ? 'drop-before' : 'drop-after');
+      });
+      row.addEventListener('dragleave', () => {
+        row.classList.remove('drop-before', 'drop-after');
+      });
+      row.addEventListener('drop', (e) => {
+        if (this.draggingIndex === null) return; e.preventDefault();
+        const from = this.draggingIndex;
+        const rect = row.getBoundingClientRect();
+        const before = (e.clientY - rect.top) < rect.height / 2;
+        let to = before ? idx : idx + 1;
+        if (!(from === to || from + 1 === to)) {
+          const item = this.presetItems.splice(from, 1)[0];
+          if (from < to) to--; // 移除后目标索引左移
+          this.presetItems.splice(Math.max(0, Math.min(this.presetItems.length, to)), 0, item);
+        }
+        this.draggingIndex = null;
+        Array.from(this.presetListEl!.children).forEach((el) => el.classList.remove('drop-before', 'drop-after', 'dragging'));
+        this.rebuildPresetListUI();
+        this.rebuildPresetCode();
+      });
       (row.querySelector('[data-name]') as HTMLInputElement).addEventListener('input', (e) => {
         this.presetItems[idx].name = (e.target as HTMLInputElement).value;
         this.rebuildPresetCode();
@@ -619,7 +682,7 @@ export class VisualEchartsUI {
     );
     this.outputPre.textContent = iife;
     this.save();
-  this.renderChartPreview().catch(()=>{});
+    this.renderChartPreview().catch(() => { });
   }
 
   private async copyPresetCode() {
@@ -645,7 +708,7 @@ export class VisualEchartsUI {
     if (!paletteEl) return;
     const colors = getColors();
     if (!colors.length) { paletteEl.innerHTML = '<div class="ve-color-empty">未设置颜色，使用内置默认配色</div>'; return; }
-    paletteEl.innerHTML = colors.map((c,i)=>`
+    paletteEl.innerHTML = colors.map((c, i) => `
       <div class="ve-color-chip" data-idx="${i}">
         <span class="ve-color-swatch" style="background:${c}"></span>
         <button class="ve-color-del" title="删除" type="button">×</button>
@@ -654,7 +717,7 @@ export class VisualEchartsUI {
     `).join('');
     // 绑定变化
     Array.from(paletteEl.querySelectorAll('.ve-color-chip')).forEach((chip) => {
-      const idx = Number((chip as HTMLElement).getAttribute('data-idx')||'0');
+      const idx = Number((chip as HTMLElement).getAttribute('data-idx') || '0');
       const picker = chip.querySelector('input[type="color"]') as HTMLInputElement | null;
       const del = chip.querySelector('.ve-color-del') as HTMLButtonElement | null;
       const swatch = chip.querySelector('.ve-color-swatch') as HTMLElement | null;
@@ -676,7 +739,7 @@ export class VisualEchartsUI {
   private async addFromSqlPresets() {
     // 读取 SQL 预设（优先使用外部提供的加载器，否则回退到 localStorage）
     const presets = await this.getSqlPresets();
-    const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b,'zh-CN'));
+    const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'zh-CN'));
     if (!names.length) { this.toast('暂无 SQL 预设'); return; }
     // 简易选择弹窗
     const overlay = document.createElement('div');
@@ -687,12 +750,12 @@ export class VisualEchartsUI {
       <div class="ve-modal__head"><div>选择要加入对比的预设</div><button class="ve-btn ve-ghost" data-close>×</button></div>
       <div class="ve-modal__body">
         <div class="ve-search"><input class="ve-input" type="search" data-filter placeholder="搜索预设名称…" /></div>
-        <div class="ve-preset-chooser">${names.map(n=>`<label class="ve-chip"><input type="checkbox" value="${this.escape(n)}"/><span>${this.escape(n)}</span></label>`).join('')}</div>
+        <div class="ve-preset-chooser">${names.map(n => `<label class="ve-chip"><input type="checkbox" value="${this.escape(n)}"/><span>${this.escape(n)}</span></label>`).join('')}</div>
         <div class="ve-empty" data-empty style="display:none">无匹配结果</div>
       </div>
       <div class="ve-modal__foot"><button class="ve-btn ve-ghost" data-close2>取消</button><button class="ve-btn" data-ok>加入</button></div>`;
     overlay.appendChild(dlg); document.body.appendChild(overlay);
-    const close = ()=> overlay.remove();
+    const close = () => overlay.remove();
     (dlg.querySelector('[data-close]') as HTMLButtonElement).addEventListener('click', close);
     (dlg.querySelector('[data-close2]') as HTMLButtonElement).addEventListener('click', close);
     // 过滤逻辑
@@ -718,7 +781,7 @@ export class VisualEchartsUI {
     }
     (dlg.querySelector('[data-ok]') as HTMLButtonElement).addEventListener('click', () => {
       const checks = Array.from(dlg.querySelectorAll('.ve-preset-chooser input[type="checkbox"]')) as HTMLInputElement[];
-      const picked = checks.filter(c=>c.checked).map(c=>c.value);
+      const picked = checks.filter(c => c.checked).map(c => c.value);
       picked.forEach(n => {
         const snap = presets[n];
         const sql = this.safeCompileSqlFromSnapshot(snap);
@@ -748,25 +811,25 @@ export class VisualEchartsUI {
       // 动态导入构建器的轻量实现：只复用已有的 snap 结构。
       // 这里内嵌一个简化生成函数以避免循环依赖
       const v = s || {};
-      const quote = (x: any) => x==null? 'NULL' : (typeof x==='number'? String(x) : `'${String(x).replace(/'/g, "''")}'`);
+      const quote = (x: any) => x == null ? 'NULL' : (typeof x === 'number' ? String(x) : `'${String(x).replace(/'/g, "''")}'`);
       const list = (arr: any[]) => `(${arr.map(quote).join(', ')})`;
       const parts: string[] = [];
-      const push = (p: string)=>{ if (p) parts.push(p); };
+      const push = (p: string) => { if (p) parts.push(p); };
       if (Array.isArray(v.types) && v.types.length) push(`type IN ${list(v.types)}`);
       if (Array.isArray(v.subtypes) && v.subtypes.length) push(`subtype IN ${list(v.subtypes)}`);
       if (Array.isArray(v.boxes) && v.boxes.length) push(`box IN ${list(v.boxes)}`);
       if (v.rootId) push(`root_id = ${quote(v.rootId)}`);
       if (v.parentId) push(`parent_id = ${quote(v.parentId)}`);
-      if (v.path) push(`path LIKE ${quote(v.path.includes('%')||v.path.includes('_')? v.path: '%'+v.path+'%')}`);
-      if (v.content) push(`content LIKE ${quote(v.content.includes('%')||v.content.includes('_')? v.content: '%'+v.content+'%')}`);
-      if (v.md) push(`markdown LIKE ${quote(v.md.includes('%')||v.md.includes('_')? v.md: '%'+v.md+'%')}`);
-      if (v.hpath) push(`hpath LIKE ${quote(v.hpath.includes('%')||v.hpath.includes('_')? v.hpath: '%'+v.hpath+'%')}`);
-      if (v.ial) push(`ial LIKE ${quote(v.ial.includes('%')||v.ial.includes('_')? v.ial: '%'+v.ial+'%')}`);
-  if (v.tag) push(`tag LIKE ${quote('%#' + String(v.tag).replace(/^#+/, '') + '%')}`);
+      if (v.path) push(`path LIKE ${quote(v.path.includes('%') || v.path.includes('_') ? v.path : '%' + v.path + '%')}`);
+      if (v.content) push(`content LIKE ${quote(v.content.includes('%') || v.content.includes('_') ? v.content : '%' + v.content + '%')}`);
+      if (v.md) push(`markdown LIKE ${quote(v.md.includes('%') || v.md.includes('_') ? v.md : '%' + v.md + '%')}`);
+      if (v.hpath) push(`hpath LIKE ${quote(v.hpath.includes('%') || v.hpath.includes('_') ? v.hpath : '%' + v.hpath + '%')}`);
+      if (v.ial) push(`ial LIKE ${quote(v.ial.includes('%') || v.ial.includes('_') ? v.ial : '%' + v.ial + '%')}`);
+      if (v.tag) push(`tag LIKE ${quote('%#' + String(v.tag).replace(/^#+/, '') + '%')}`);
       // 时间不在此简化处理，避免复杂性；用户预设一般包含常用筛选即可
       let where = parts.length ? ' WHERE ' + parts.join(' AND ') : '';
       let order = '';
-      if (v.orderField) order = ' ORDER BY ' + v.orderField + (v.orderDir? ' '+String(v.orderDir).toUpperCase(): '');
+      if (v.orderField) order = ' ORDER BY ' + v.orderField + (v.orderDir ? ' ' + String(v.orderDir).toUpperCase() : '');
       let limit = '';
       if (v.limit) limit = ' LIMIT ' + Math.min(999, Math.max(0, Number(v.limit) || 0));
       return `select * from blocks${where}${order}${limit}`;
