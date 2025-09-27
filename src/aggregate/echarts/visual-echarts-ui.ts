@@ -1,4 +1,5 @@
 import { buildPresetCountIIFE } from './option-templates';
+import { VisualEchartsQueryUI } from './visual-echarts-query-ui';
 
 export interface VisualEchartsOptions {
   persistKey?: string;
@@ -22,6 +23,9 @@ export class VisualEchartsUI {
   private previewBody!: HTMLElement;
   private chartDiv?: HTMLDivElement;
   private echartsInst?: any;
+  // 模式切换：预设计数 | 数据库查询
+  private mode: 'preset' | 'query' = 'preset';
+  private queryUI?: VisualEchartsQueryUI;
   // Debounced operations
   private debouncedRebuildColorUpdate!: () => void;
   // 预设计数相关
@@ -80,6 +84,10 @@ export class VisualEchartsUI {
     this.injectStyle();
     this.container.innerHTML = this.html`
       <div class="ve-wrap">
+        <div class="ve-mode-tabs" role="tablist">
+          <button class="ve-tab active" data-tab="preset" type="button">预设计数</button>
+          <button class="ve-tab" data-tab="query" type="button">数据库查询</button>
+        </div>
         <details class="ve-card" open data-section="preview">
           <summary class="ve-legend">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></summary>
           <div class="ve-result" data-result><div class="ve-placeholder">请在下方添加对比的 SQL 预设后，将在此显示图表</div></div>
@@ -128,6 +136,10 @@ export class VisualEchartsUI {
           </details>
           <div class="ve-preset-list" data-preset-list></div>
           <div class="ve-hint" style="color:var(--muted); font-size:12px; margin-top:6px;">说明：x 轴为各预设名称，y 为各自 SQL 查询结果的行数。</div>
+        </details>
+        <details class="ve-card" open data-section="query" style="display:none">
+          <summary class="ve-legend">数据库查询模式</summary>
+          <div data-query-container></div>
         </details>
       </div>
     `;
@@ -206,6 +218,36 @@ export class VisualEchartsUI {
       });
       ro.observe(collapse);
     }
+
+    // 初始化查询模式子 UI
+    const queryContainer = this.container.querySelector('[data-query-container]') as HTMLElement | null;
+    if (queryContainer) {
+      this.queryUI = new VisualEchartsQueryUI(queryContainer, {
+        persistKey: this.key + ':query',
+        onGotoSQL: this.opts?.onGotoSQL,
+        loadSqlPresets: this.loadSqlPresetsProvider,
+        onChange: () => this.rebuildCode(),
+      });
+    }
+
+    // 模式切换
+    const tabs = Array.from(this.container.querySelectorAll('[data-tab]')) as HTMLButtonElement[];
+    const presetCard = this.container.querySelector('[data-section="preset"]') as HTMLElement | null;
+    const queryCard = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
+    const applyMode = () => {
+      tabs.forEach(b => b.classList.toggle('active', (b.getAttribute('data-tab') as any) === this.mode));
+      if (presetCard) presetCard.style.display = this.mode==='preset' ? '' : 'none';
+      if (queryCard) queryCard.style.display = this.mode==='query' ? '' : 'none';
+    };
+    tabs.forEach(btn => btn.addEventListener('click', () => {
+      const t = btn.getAttribute('data-tab') as 'preset'|'query';
+      if (t && t !== this.mode) {
+        this.mode = t;
+        this.save();
+        applyMode();
+        this.rebuildCode();
+      }
+    }));
   }
 
   private rebuildCode() {
@@ -219,6 +261,7 @@ export class VisualEchartsUI {
   private save() {
     try {
       const data = {
+        mode: this.mode,
         preset: {
           items: this.presetItems,
           type: this.presetTypeSel?.value || 'bar',
@@ -234,6 +277,14 @@ export class VisualEchartsUI {
     try {
       const raw = localStorage.getItem(this.key); if (!raw) return;
       const obj = JSON.parse(raw);
+      if (obj?.mode) this.mode = obj.mode === 'query' ? 'query' : 'preset';
+      const tabs = Array.from(this.container.querySelectorAll('[data-tab]')) as HTMLButtonElement[];
+      const presetCard = this.container.querySelector('[data-section="preset"]') as HTMLElement | null;
+      const queryCard = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
+      tabs.forEach(b => b.classList.toggle('active', (b.getAttribute('data-tab') as any) === this.mode));
+      if (presetCard) presetCard.style.display = this.mode==='preset' ? '' : 'none';
+      if (queryCard) queryCard.style.display = this.mode==='query' ? '' : 'none';
+
       if (obj?.preset) {
         this.presetItems = Array.isArray(obj.preset.items) ? obj.preset.items : [];
         if (this.presetTypeSel && obj.preset.type) this.presetTypeSel.value = obj.preset.type;
@@ -342,6 +393,9 @@ export class VisualEchartsUI {
       .ve-preset-chooser{display:flex; flex-wrap:wrap; gap:6px}
       .ve-search{margin-bottom:8px}
       .ve-empty{color: var(--muted); font-size:12px; padding:4px 0}
+      .ve-mode-tabs{display:flex; gap:6px; margin: 0 0 8px 0}
+      .ve-tab{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); padding:6px 10px; border-radius:999px; cursor:pointer}
+      .ve-tab.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
     `; document.head.appendChild(st);
   }
 
@@ -376,17 +430,22 @@ export class VisualEchartsUI {
   }
 
   private buildOptionForPreview() {
-    // 仅保留预设模式，通过 IIFE 生成 option
+    // 根据模式选择对应 IIFE 并执行
     try {
-      const title = (this.presetTitleInput?.value ?? '') as string;
-      const settings = this.getCurrentTypeSettings();
-      const iife = buildPresetCountIIFE(
-        this.presetItems,
-        (this.presetTypeSel?.value as any) || 'bar',
-        title || '',
-        settings,
-        this.presetColors
-      );
+      let iife = '';
+      if (this.mode === 'preset') {
+        const title = (this.presetTitleInput?.value ?? '') as string;
+        const settings = this.getCurrentTypeSettings();
+        iife = buildPresetCountIIFE(
+          this.presetItems,
+          (this.presetTypeSel?.value as any) || 'bar',
+          title || '',
+          settings,
+          this.presetColors
+        );
+      } else {
+        iife = this.queryUI?.getIIFE() || '(()=>({}))()';
+      }
       // eslint-disable-next-line no-new-func
       const fn = new Function(`return ${iife};`);
       return fn();
@@ -672,16 +731,21 @@ export class VisualEchartsUI {
   }
 
   private rebuildPresetCode() {
-    const t = (this.presetTypeSel?.value as any) || 'bar';
-    const title = (this.presetTitleInput?.value ?? '') as string;
-    const settings = this.getCurrentTypeSettings();
-    const iife = buildPresetCountIIFE(
-      this.presetItems,
-      t,
-      title || '',
-      settings,
-      this.presetColors
-    );
+    let iife = '';
+    if (this.mode === 'preset') {
+      const t = (this.presetTypeSel?.value as any) || 'bar';
+      const title = (this.presetTitleInput?.value ?? '') as string;
+      const settings = this.getCurrentTypeSettings();
+      iife = buildPresetCountIIFE(
+        this.presetItems,
+        t,
+        title || '',
+        settings,
+        this.presetColors
+      );
+    } else {
+      iife = this.queryUI?.getIIFE() || '';
+    }
     this.outputPre.textContent = iife;
     this.save();
     this.renderChartPreview().catch(() => { });
