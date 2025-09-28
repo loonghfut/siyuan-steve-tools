@@ -20,6 +20,7 @@ export interface MappingInput {
   mergeMode: boolean;
   sort: SortOrder;
   xKey: string;
+  bucket?: 'none' | 'year' | 'month' | 'day' | 'hour';
   series: SeriesItem[];
 }
 
@@ -34,6 +35,19 @@ export interface MappingOutput {
  */
 export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
   const { visualMode, mergeMode, sort, xKey, series } = input;
+  const bucket = input.bucket || 'none';
+
+  // 将时间戳/日期字符串转为桶键与可读标签
+  const bucketFns = {
+    year: `function __bucketKey(v){ var n=Number(v); if(!isFinite(n)){ var d=new Date(String(v)); if(isNaN(+d)) return null; n=d.getTime(); } var d=new Date(n); return String(d.getFullYear()); };
+           function __bucketLabel(k){ return k; }`,
+    month: `function __bucketKey(v){ var n=Number(v); if(!isFinite(n)){ var d=new Date(String(v)); if(isNaN(+d)) return null; n=d.getTime(); } var d=new Date(n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+             function __bucketLabel(k){ return k; }`,
+    day: `function __bucketKey(v){ var n=Number(v); if(!isFinite(n)){ var d=new Date(String(v)); if(isNaN(+d)) return null; n=d.getTime(); } var d=new Date(n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+           function __bucketLabel(k){ return k; }`,
+    hour: `function __bucketKey(v){ var n=Number(v); if(!isFinite(n)){ var d=new Date(String(v)); if(isNaN(+d)) return null; n=d.getTime(); } var d=new Date(n); return String(d.getHours()).padStart(2,'0'); };
+      function __bucketLabel(k){ return String(k).padStart(2,'0')+':00'; }`
+  } as const;
 
   if (!visualMode) {
     // 可视化关闭时不改写表达式，沿用原 series.expr 与外部 xExpr
@@ -41,10 +55,13 @@ export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
   }
 
   if (mergeMode) {
+    const bucketPrelude = bucket==='none' ? '' : bucketFns[bucket as 'year'|'month'|'day'|'hour'];
     // 合并模式：唯一化并聚合
     const xExprRaw = (!xKey)
       ? 'rows.map((_, i) => String(i+1))'
-      : `Array.from(new Set(rows.flatMap(function(r){ var xv = r[${JSON.stringify(xKey)}]; if (Array.isArray(xv)) return xv.map(function(it){ return String(it); }); return [String(xv)]; })))`;
+      : (bucket==='none'
+        ? `Array.from(new Set(rows.flatMap(function(r){ var xv = r[${JSON.stringify(xKey)}]; if (Array.isArray(xv)) return xv.map(function(it){ return String(it); }); return [String(xv)]; })))`
+        : `(()=>{ ${bucketPrelude} var set = new Set(); rows.forEach(function(r){ var xv=r[${JSON.stringify(xKey)}]; if(Array.isArray(xv)) xv.forEach(function(it){ var k=__bucketKey(it); if(k!=null) set.add(k); }); else { var k=__bucketKey(xv); if(k!=null) set.add(k); } }); return Array.from(set); })()`);
 
     const xExprSorted = (() => {
       if (sort === 'none') return xExprRaw;
@@ -52,7 +69,9 @@ export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
       return `(()=>{ var arr = (${xExprRaw}).slice(); arr.sort(function(a,b){ if(a===b) return 0; return (a>b?1:-1)*${asc ? 1 : -1}; }); return arr; })()`;
     })();
 
-    const catsDef = `(function(){ var cats = (${xExprSorted}); return cats; })()`;
+    const catsDef = (bucket==='none')
+      ? `(function(){ var cats = (${xExprSorted}); return cats; })()`
+      : `(function(){ var raw=(${xExprSorted}); ${bucketPrelude} return raw.map(function(k){ return __bucketLabel(k); }); })()`;
 
     const mapped = series.map((s) => {
       const key = s.valueKey || xKey;
@@ -61,15 +80,35 @@ export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
       if (!key) {
         dataExpr = `${catsDef}.map(()=>0)`;
       } else if (agg === 'count') {
-        dataExpr = `${catsDef}.map(function(c){ return rows.filter(function(r){ var xv = r[${JSON.stringify(xKey)}]; return Array.isArray(xv) ? xv.some(function(it){ return String(it)===c; }) : String(xv)===c; }).length; })`;
+        if (bucket==='none') {
+          dataExpr = `${catsDef}.map(function(c){ return rows.filter(function(r){ var xv = r[${JSON.stringify(xKey)}]; return Array.isArray(xv) ? xv.some(function(it){ return String(it)===c; }) : String(xv)===c; }).length; })`;
+        } else {
+          dataExpr = `(function(){ ${bucketPrelude} var cats = (${xExprSorted}); return cats.map(function(k){ var cnt=0; rows.forEach(function(r){ var xv=r[${JSON.stringify(xKey)}]; if(Array.isArray(xv)) xv.forEach(function(it){ if(__bucketKey(it)===k) cnt++; }); else { if(__bucketKey(xv)===k) cnt++; } }); return cnt; }); })()`;
+        }
       } else if (agg === 'sum') {
-        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ return rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).reduce(function(a,b){ var n=toNum(b[${JSON.stringify(key)}]); return a + (n==null?0:n); },0); }); })()`;
+        if (bucket==='none') {
+          dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ return rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).reduce(function(a,b){ var n=toNum(b[${JSON.stringify(key)}]); return a + (n==null?0:n); },0); }); })()`;
+        } else {
+          dataExpr = `(function(){ ${bucketPrelude} var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(k){ var sum=0; rows.forEach(function(r){ var xv=r[${JSON.stringify(xKey)}]; var ok=false; if(Array.isArray(xv)) ok=xv.some(function(it){ return __bucketKey(it)===k; }); else ok=__bucketKey(xv)===k; if(ok){ var n=toNum(r[${JSON.stringify(key)}]); sum += (n==null?0:n); } }); return sum; }); })()`;
+        }
       } else if (agg === 'avg') {
-        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? (arr.reduce(function(a,b){return a+b;},0)/arr.length):0; }); })()`;
+        if (bucket==='none') {
+          dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? (arr.reduce(function(a,b){return a+b;},0)/arr.length):0; }); })()`;
+        } else {
+          dataExpr = `(function(){ ${bucketPrelude} var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(k){ var arr = []; rows.forEach(function(r){ var xv=r[${JSON.stringify(xKey)}]; var ok=false; if(Array.isArray(xv)) ok=xv.some(function(it){ return __bucketKey(it)===k; }); else ok=__bucketKey(xv)===k; if(ok){ var n=toNum(r[${JSON.stringify(key)}]); if(n!=null) arr.push(n); } }); return arr.length? (arr.reduce(function(a,b){return a+b;},0)/arr.length):0; }); })()`;
+        }
       } else if (agg === 'min') {
-        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.min.apply(null, arr):0; }); })()`;
+        if (bucket==='none') {
+          dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.min.apply(null, arr):0; }); })()`;
+        } else {
+          dataExpr = `(function(){ ${bucketPrelude} var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(k){ var arr = []; rows.forEach(function(r){ var xv=r[${JSON.stringify(xKey)}]; var ok=false; if(Array.isArray(xv)) ok=xv.some(function(it){ return __bucketKey(it)===k; }); else ok=__bucketKey(xv)===k; if(ok){ var n=toNum(r[${JSON.stringify(key)}]); if(n!=null) arr.push(n); } }); return arr.length? Math.min.apply(null, arr):0; }); })()`;
+        }
       } else if (agg === 'max') {
-        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.max.apply(null, arr):0; }); })()`;
+        if (bucket==='none') {
+          dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.max.apply(null, arr):0; }); })()`;
+        } else {
+          dataExpr = `(function(){ ${bucketPrelude} var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(k){ var arr = []; rows.forEach(function(r){ var xv=r[${JSON.stringify(xKey)}]; var ok=false; if(Array.isArray(xv)) ok=xv.some(function(it){ return __bucketKey(it)===k; }); else ok=__bucketKey(xv)===k; if(ok){ var n=toNum(r[${JSON.stringify(key)}]); if(n!=null) arr.push(n); } }); return arr.length? Math.max.apply(null, arr):0; }); })()`;
+        }
       } else {
         // 原值在合并模式下不提供
         dataExpr = `${catsDef}.map(()=>0)`;
@@ -83,7 +122,9 @@ export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
   // 非合并模式：逐行（原值），支持排序时的重排
   const baseArr = (!xKey)
     ? 'rows.map((_, i) => String(i+1))'
-    : `rows.map(function(r){ var xv = r[${JSON.stringify(xKey)}]; return Array.isArray(xv) ? xv.join(',') : xv; })`;
+    : (bucket==='none'
+      ? `rows.map(function(r){ var xv = r[${JSON.stringify(xKey)}]; return Array.isArray(xv) ? xv.join(',') : xv; })`
+      : `(()=>{ ${bucketFns[bucket as 'year'|'month'|'day'|'hour']} return rows.map(function(r){ var xv=r[${JSON.stringify(xKey)}]; if(Array.isArray(xv)){ var set=new Set(); xv.forEach(function(it){ var k=__bucketKey(it); if(k!=null) set.add(k); }); return Array.from(set).join(','); } var k=__bucketKey(xv); return k==null?null:k; })()`) ;
 
   let xExprFinal = baseArr;
   let idxsExpr = '';
@@ -93,7 +134,9 @@ export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
     xExprFinal = `(()=>{ var a = (${baseArr}); var idx = ${idxsExpr}; return idx.map(function(i){ return a[i]; }); })()`;
   }
 
-  const catsDef = `(function(){ var cats = (${xExprFinal}); return cats; })()`;
+  const catsDef = (bucket==='none')
+    ? `(function(){ var cats = (${xExprFinal}); return cats; })()`
+    : `(function(){ var raw = (${xExprFinal}); ${bucketFns[bucket as 'year'|'month'|'day'|'hour']} return (raw||[]).map(function(k){ return __bucketLabel(k); }); })()`;
   const mapped = series.map((s) => {
     const key = s.valueKey || xKey;
     let dataExpr = '';

@@ -68,6 +68,7 @@ export class VisualEchartsQueryUI {
   private keys: string[] = [];
   private xKey: string = '';
   private sort: 'none' | 'asc' | 'desc' = 'asc';
+  private xBucket: 'none' | 'year' | 'month' | 'day' | 'hour' = 'none';
   private mergeMode: boolean = true;
 
   constructor(container: HTMLElement, options?: VisualEchartsQueryOptions) {
@@ -177,6 +178,15 @@ export class VisualEchartsQueryUI {
                   <option value="desc">降序</option>
                 </select>
               </label>
+              <label class="veq-field">时间分桶
+                <select class="veq-input" data-bucket>
+                  <option value="none" selected>无</option>
+                  <option value="year">年</option>
+                  <option value="month">月</option>
+                  <option value="day">日</option>
+                  <option value="hour">时</option>
+                </select>
+              </label>
             </div>
             <div class="veq-field" data-expr-row style="display:none;">
               <label class="veq-field">x 轴数据表达式（高级）
@@ -218,6 +228,7 @@ export class VisualEchartsQueryUI {
     this.xExprTextarea = this.root.querySelector('[data-xexpr]') as HTMLTextAreaElement;
     const xkeySel = this.root.querySelector('[data-xkey]') as HTMLSelectElement;
     const sortSel = this.root.querySelector('[data-sort]') as HTMLSelectElement;
+  const bucketSel = this.root.querySelector('[data-bucket]') as HTMLSelectElement | null;
     const visualRow = this.root.querySelector('[data-visual-row]') as HTMLElement;
     const exprRow = this.root.querySelector('[data-expr-row]') as HTMLElement;
     const mergeToggle = this.root.querySelector('[data-merge]') as HTMLInputElement;
@@ -297,6 +308,7 @@ export class VisualEchartsQueryUI {
     exprRow.style.display = 'none';
     if (xkeySel) xkeySel.addEventListener('change', (e) => { this.xKey = (e.target as HTMLSelectElement).value; this.onChanged(); });
     if (sortSel) sortSel.addEventListener('change', (e) => { this.sort = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
+  if (bucketSel) bucketSel.addEventListener('change', (e) => { this.xBucket = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
     if (mergeToggle) mergeToggle.addEventListener('change', (e) => {
       this.mergeMode = (e.target as HTMLInputElement).checked;
       // 模式切换时，修正系列聚合：非合并模式强制原值；合并模式下如为 raw 则改为 count
@@ -509,6 +521,7 @@ export class VisualEchartsQueryUI {
       mergeMode: this.mergeMode,
       sort: this.sort,
       xKey: this.xKey,
+      bucket: this.xBucket,
       series: this.series,
     });
     if (this.xExprTextarea && xExpr) this.xExprTextarea.value = xExpr;
@@ -641,7 +654,7 @@ export class VisualEchartsQueryUI {
         chartType: this.chartType,
         chartSettings: { ...this.perTypeSettings, common: this.commonSettings },
         colors: this.colors.join(','),
-        visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode },
+        visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode, bucket: this.xBucket },
         fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie },
         db: { showId: this.showDbId }
       };
@@ -701,7 +714,9 @@ export class VisualEchartsQueryUI {
         this.xKey = obj.visual.xKey || '';
         this.sort = obj.visual.sort || 'asc';
         this.mergeMode = obj.visual.merge !== false; // 默认合并
+        this.xBucket = (obj.visual.bucket === 'year' || obj.visual.bucket === 'month' || obj.visual.bucket === 'day' || obj.visual.bucket === 'hour') ? obj.visual.bucket : 'none';
         const st = this.root.querySelector('[data-sort]') as HTMLSelectElement | null; if (st) st.value = this.sort;
+        const bk = this.root.querySelector('[data-bucket]') as HTMLSelectElement | null; if (bk) bk.value = this.xBucket;
         const mt = this.root.querySelector('[data-merge]') as HTMLInputElement | null; if (mt) mt.checked = this.mergeMode;
       }
       // 已移除调试设置恢复
