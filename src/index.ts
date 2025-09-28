@@ -132,6 +132,15 @@ export default class steveTools extends Plugin {
             if (settingdata["wps-pic-enable"]) {
                 enabledFeatures.push("wps-pic");
             }
+            if (settingdata["wps-file-enable"]) {
+                enabledFeatures.push("wps-file");
+            }
+            if (settingdata["wps-data-enable"]) {
+                enabledFeatures.push("wps-data");
+            }
+            if (settingdata["aggregate-enable"]) {
+                enabledFeatures.push("aggregate");
+            }
             const mergedFeatures = enabledFeatures.join("+");
             console.log("功能:", mergedFeatures);
             await trackFeatureUsage(this.pluginConfig, mergedFeatures);
