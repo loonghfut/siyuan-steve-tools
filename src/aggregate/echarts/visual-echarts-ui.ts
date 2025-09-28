@@ -23,6 +23,7 @@ export class VisualEchartsUI {
   private previewBody!: HTMLElement;
   private chartDiv?: HTMLDivElement;
   private echartsInst?: any;
+  private previewPinned: boolean = false;
   // 模式切换：预设计数 | 数据库查询
   private mode: 'preset' | 'query' = 'preset';
   private queryUI?: VisualEchartsQueryUI;
@@ -103,7 +104,7 @@ export class VisualEchartsUI {
       <div class="ve-wrap">
         <details class="ve-card" open data-section="preview">
           <summary class="ve-legend">
-            <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button><button class="ve-icon" data-copy-block-top title="复制图表块">⎘</button></span>
+            <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button><button class="ve-icon" data-copy-block-top title="复制图表块">⎘</button><button class="ve-icon" data-pin-preview title="顶住">📌</button></span>
             <div class="ve-mode-tabs" role="tablist">
               <button class="ve-tab ${initialMode==='preset' ? 'active' : ''}" data-tab="preset" type="button">SQL预设计数</button>
               <button class="ve-tab ${initialMode==='query' ? 'active' : ''}" data-tab="query" type="button">数据库查询</button>
@@ -168,6 +169,7 @@ export class VisualEchartsUI {
     // 预览刷新
   (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.refreshPreview(); });
   (this.container.querySelector('[data-copy-block-top]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.copyChartBlock(); });
+    (this.container.querySelector('[data-pin-preview]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.togglePinPreview(); });
     const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement | null;
     if (gotoSqlBtn) {
       if (this.opts?.onGotoSQL) {
@@ -390,6 +392,7 @@ export class VisualEchartsUI {
     try {
       const data = {
         mode: this.mode,
+        previewPinned: this.previewPinned,
         preset: {
           items: this.presetItems,
           type: this.presetTypeSel?.value || 'bar',
@@ -407,12 +410,15 @@ export class VisualEchartsUI {
       const raw = localStorage.getItem(this.key); if (!raw) return;
       const obj = JSON.parse(raw);
       if (obj?.mode) this.mode = obj.mode === 'query' ? 'query' : 'preset';
+      this.previewPinned = !!obj?.previewPinned;
       const tabs = Array.from(this.container.querySelectorAll('[data-tab]')) as HTMLButtonElement[];
       const presetCard = this.container.querySelector('[data-section="preset"]') as HTMLElement | null;
       const queryCard = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
       tabs.forEach(b => b.classList.toggle('active', (b.getAttribute('data-tab') as any) === this.mode));
       if (presetCard) presetCard.style.display = this.mode==='preset' ? '' : 'none';
       if (queryCard) queryCard.style.display = this.mode==='query' ? '' : 'none';
+      // 应用预览置顶状态
+      this.applyPinPreviewUI();
 
       if (obj?.preset) {
         this.presetItems = Array.isArray(obj.preset.items) ? obj.preset.items : [];
@@ -493,6 +499,7 @@ export class VisualEchartsUI {
       .ve-table{width:100%; border-collapse:collapse; font-size:12px}
       .ve-table th,.ve-table td{border-bottom:1px solid var(--border); padding:6px 8px; text-align:left}
       .ve-icon{border:1px solid var(--border); background: var(--b3-theme-background); color: var(--muted); width:22px; height:22px; padding:0; border-radius:6px; cursor:pointer; margin-left:6px}
+  .ve-icon.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
       @media(max-width:980px){.ve-grid-2{grid-template-columns:1fr}}
       /* 预设模式样式 */
   .ve-preset-list{display:flex; flex-direction:column; gap:8px}
@@ -541,6 +548,8 @@ export class VisualEchartsUI {
       .ve-tab.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
   /* 仅缩小预览顶部模式切换的两个按钮尺寸，不影响其它按钮 */
   .ve-mode-tabs .ve-tab{padding:3px 8px; font-size:12px}
+  /* 预览置顶 */
+  .ve-card.pinned{position: sticky; top: 0; z-index: 100}
     `; document.head.appendChild(st);
   }
 
@@ -847,6 +856,24 @@ export class VisualEchartsUI {
     this.echartsInst = echarts.init(this.chartDiv);
     const option = this.buildOptionForPreview();
     this.echartsInst.setOption(option, true);
+  }
+
+  private togglePinPreview() {
+    this.previewPinned = !this.previewPinned;
+    this.applyPinPreviewUI();
+    this.save();
+    // 重新计算图表尺寸
+    setTimeout(() => { try { this.echartsInst?.resize?.(); } catch { /* ignore */ } }, 50);
+  }
+
+  private applyPinPreviewUI() {
+    const previewCard = this.container.querySelector('[data-section="preview"]') as HTMLElement | null;
+    const pinBtn = this.container.querySelector('[data-pin-preview]') as HTMLButtonElement | null;
+    if (previewCard) previewCard.classList.toggle('pinned', !!this.previewPinned);
+    if (pinBtn) {
+      pinBtn.classList.toggle('active', !!this.previewPinned);
+      pinBtn.title = this.previewPinned ? '取消顶住' : '顶住';
+    }
   }
 
   // ---------- 预设模式 ----------

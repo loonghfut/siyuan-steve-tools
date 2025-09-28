@@ -167,7 +167,7 @@ export class VisualEchartsQueryUI {
                 <label class="veq-switch"><input type="checkbox" data-merge checked/><i></i></label>
               </div>
             </div>
-            <div class="veq-grid" style="grid-template-columns: 1fr 1fr; gap:8px;" data-visual-row>
+            <div class="veq-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:8px;" data-visual-row>
               <label class="veq-field">X 轴字段
                 <select class="veq-input" data-xkey></select>
               </label>
