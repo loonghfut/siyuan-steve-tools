@@ -500,8 +500,24 @@ export async function run(
             refreshButton: {
                 text: '🔄️',
                 click: async function () {
-                    showMessage('正在刷新视图...', 3000);
-                    refreshKanban();
+                    try {
+                        showMessage('正在刷新视图...', 3000);
+                        // 若启用了 QQ 日历并已配置日历 URL，则优先刷新 QQ 日历事件缓存
+                        const qqClient = moduleInstances['M_calendar']?.QQCalDAVClient as any;
+                        const qqCalUrl = settingdata['cal-qq-calendar-url'];
+                        if (qqClient && qqCalUrl) {
+                            try {
+                                showMessage('正在同步 QQ 日历…', 2000, 'info');
+                                await qqClient.updateEventsFromQQCalDAV(qqCalUrl);
+                            } catch (qqErr) {
+                                console.warn('同步 QQ 日历失败，将继续刷新本地视图', qqErr);
+                                showMessage('QQ 日历同步失败，已跳过', 3000, 'info');
+                            }
+                        }
+                    } finally {
+                        // 无论 QQ 日历是否成功，都刷新看板/日历视图
+                        refreshKanban();
+                    }
                 }
             },
             // 统计功能按钮
