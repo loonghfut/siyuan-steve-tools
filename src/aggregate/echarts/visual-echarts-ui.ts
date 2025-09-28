@@ -31,8 +31,6 @@ export class VisualEchartsUI {
   // 预设计数相关
   private presetListEl?: HTMLElement;
   private presetItems: Array<{ name: string; sql: string }> = [];
-  // 拖拽排序相关
-  private draggingIndex: number | null = null;
   private presetTypeSel?: HTMLSelectElement; // bar/line/pie
   private presetTitleInput?: HTMLInputElement;
   // 颜色仅由调色盘控制，不再使用文本输入
@@ -40,17 +38,27 @@ export class VisualEchartsUI {
   private paletteEl?: HTMLElement;
   // 每种图的自定义设置（持久化）
   private perTypeSettings: {
-    bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
-    line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
-    pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
+          bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
+          line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
+          scatter: { /* Add properties for scatter if needed */ }; // New scatter type
+          pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
   } = {
       bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
       line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
-      pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
+          scatter: { /* Initialize properties for scatter if needed */ }, // Initialize scatter type
+          pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
     };
+  // 与查询模式统一的“通用设置”
+  private commonSettings: { legendPos: 'top'|'bottom'|'left'|'right'; ySplitLine: 'dashed'|'solid'|'none'; grid: { top: number; right: number; bottom: number; left: number } } = {
+    legendPos: 'top',
+    ySplitLine: 'dashed',
+    grid: { top: 50, right: 10, bottom: 24, left: 10 }
+  };
   private currentSettingsEl?: HTMLElement;
   private loadSqlPresetsProvider?: () => Promise<Record<string, any>> | Record<string, any>;
   private opts?: VisualEchartsOptions;
+  // 避免设置时的回写触发重绘导致丢焦点：从预设面板向查询子面板同步设置期间置位
+  private syncingFromPreset: boolean = false;
 
   constructor(container: HTMLElement, options?: VisualEchartsOptions) {
     this.container = container;
@@ -110,6 +118,7 @@ export class VisualEchartsUI {
               <select class="ve-input" data-preset-type style="width:120px">
                 <option value="bar">柱状图</option>
                 <option value="line">折线图</option>
+                <option value="scatter">散点图</option>
                 <option value="pie">饼图</option>
               </select>
             </span>
@@ -181,7 +190,10 @@ export class VisualEchartsUI {
     this.presetTypeSel?.addEventListener('change', () => {
       this.renderTypeSettingsUI();
       // 同步到查询面板以保持统一
-      try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ }
+      try {
+        const t = (this.presetTypeSel!.value as any);
+        this.queryUI?.setViewSettings((t==='scatter'?'line':t) as any, this.getCurrentTypeSettings());
+      } catch { /* ignore */ }
       this.rebuildPresetCode();
     });
     this.presetTitleInput?.addEventListener('input', () => {
@@ -191,12 +203,18 @@ export class VisualEchartsUI {
     // 颜色编辑器交互
     const addColorBtn = this.container.querySelector('[data-color-add]') as HTMLButtonElement | null;
     const getColors = (): string[] => this.presetColors.slice();
-  const setColors = (arr: string[]) => { this.presetColors = arr.slice(); try { this.queryUI?.setColors(this.presetColors.slice()); } catch { /* ignore */ } this.debouncedRebuildColorUpdate(); };
+    const setColors = (arr: string[]) => {
+      this.presetColors = arr.slice();
+      try { this.queryUI?.setColors(this.presetColors.slice()); } catch { /* ignore */ }
+      // 立即保存，避免用户快速离开导致防抖未触发
+      this.save();
+      this.debouncedRebuildColorUpdate();
+    };
     const renderPalette = () => this.renderPaletteFromState(getColors, setColors);
     if (addColorBtn) addColorBtn.addEventListener('click', () => {
       const cs = getColors();
       cs.push('#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'));
-      setColors(cs);
+      try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; }
       renderPalette();
     });
     // 初始化 palette
@@ -247,14 +265,25 @@ export class VisualEchartsUI {
         onGotoSQL: this.opts?.onGotoSQL,
         loadSqlPresets: this.loadSqlPresetsProvider,
         onChange: () => {
+          // 若此变更由预设面板触发（例如调节滑块/输入框），跳过回写以避免重绘导致输入焦点丢失
+          if (this.syncingFromPreset) {
+            this.rebuildCode();
+            return;
+          }
           // 从查询面板拉取最新统一设置并同步到预设面板
           try {
             if (!this.queryUI) return;
             const vs = this.queryUI.getViewSettings();
             const colors = this.queryUI.getColors();
             const title = this.queryUI.getTitle();
-            // 同步图表类型
-            if (this.presetTypeSel) this.presetTypeSel.value = (vs?.type || 'bar') as any;
+            // 同步图表类型：仅在当前显示为“数据库查询”模式时回写；
+            // 并且当查询面板返回 line(统计) 时，优先保留预设选择中的 scatter/bar
+            if (this.mode === 'query' && this.presetTypeSel) {
+              const cur = (this.presetTypeSel.value as any) || 'bar';
+              let next = (vs?.type as any) || cur || 'bar';
+              if (next === 'line' && (cur === 'scatter' || cur === 'bar')) next = cur; // 保留散点/柱状
+              this.presetTypeSel.value = next;
+            }
             // 同步每类型设置
             if (vs && vs.settings) {
               const t = vs.type || 'bar';
@@ -285,11 +314,14 @@ export class VisualEchartsUI {
       try {
         // 读取查询面板自身的持久化类型，避免被预设类型覆盖
         const vs = this.queryUI.getViewSettings();
-        const qType = (vs?.type as any) || (this.presetTypeSel?.value as any) || 'bar';
-        // 同步预设选择器显示为查询面板类型（保持 UI 一致）
+        const curPreset = (this.presetTypeSel?.value as any) || 'bar';
+        let qType = (vs?.type as any) || curPreset || 'bar';
+        // 若查询返回 line(统计)，而预设已有 scatter/bar 选择，则保留预设选择
+        if (qType === 'line' && (curPreset === 'scatter' || curPreset === 'bar')) qType = curPreset;
+        // 同步预设选择器显示
         if (this.presetTypeSel) this.presetTypeSel.value = qType;
         // 按查询面板的类型推送对应设置
-        const settingsFor = (t: any) => (t === 'line' ? this.perTypeSettings.line : (t === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
+        const settingsFor = (t: any) => ((t === 'line' || t === 'scatter') ? this.perTypeSettings.line : (t === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
         this.queryUI.setViewSettings(qType, settingsFor(qType));
         this.queryUI.setColors(this.presetColors.slice());
         this.queryUI.setTitle(this.presetTitleInput?.value || '');
@@ -327,9 +359,11 @@ export class VisualEchartsUI {
         try {
           // 保留查询面板自身的类型，避免被预设覆盖
           const vs = this.queryUI?.getViewSettings();
-          const qType = (vs?.type as any) || (this.presetTypeSel?.value as any) || 'bar';
+          const curPreset = (this.presetTypeSel?.value as any) || 'bar';
+          let qType = (vs?.type as any) || curPreset || 'bar';
+          if (qType === 'line' && (curPreset === 'scatter' || curPreset === 'bar')) qType = curPreset;
           if (this.presetTypeSel) this.presetTypeSel.value = qType;
-          const settingsFor = (tt: any) => (tt === 'line' ? this.perTypeSettings.line : (tt === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
+          const settingsFor = (tt: any) => ((tt === 'line' || tt === 'scatter') ? this.perTypeSettings.line : (tt === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
           this.queryUI?.setViewSettings(qType, settingsFor(qType));
           this.queryUI?.setColors(this.presetColors.slice());
           this.queryUI?.setTitle(this.presetTitleInput?.value || '');
@@ -337,6 +371,11 @@ export class VisualEchartsUI {
       }
       this.rebuildCode();
     }));
+
+    // 离开前兜底保存一次，防止某些防抖中的更改未及时写入
+    window.addEventListener('beforeunload', () => {
+      try { this.save(); } catch { /* ignore */ }
+    });
   }
 
   private rebuildCode() {
@@ -356,7 +395,8 @@ export class VisualEchartsUI {
           type: this.presetTypeSel?.value || 'bar',
           title: this.presetTitleInput?.value || '',
           colors: this.presetColors.join(','),
-          perTypeSettings: this.perTypeSettings
+          perTypeSettings: this.perTypeSettings,
+          commonSettings: this.commonSettings
         }
       };
       localStorage.setItem(this.key, JSON.stringify(data));
@@ -380,6 +420,20 @@ export class VisualEchartsUI {
         if (this.presetTitleInput) this.presetTitleInput.value = obj.preset.title || '';
         this.presetColors = String(obj.preset.colors || '').split(',').map((s: string) => s.trim()).filter(Boolean);
         if (obj.preset.perTypeSettings) this.perTypeSettings = { ...this.perTypeSettings, ...obj.preset.perTypeSettings };
+        // 读取通用设置：优先从 preset.commonSettings；兼容旧数据从 perTypeSettings.common
+        const cs = obj.preset.commonSettings || (obj.preset.perTypeSettings && (obj.preset.perTypeSettings as any).common) || null;
+        if (cs && typeof cs === 'object') {
+          this.commonSettings = {
+            legendPos: (cs.legendPos === 'bottom' || cs.legendPos === 'left' || cs.legendPos === 'right') ? cs.legendPos : 'top',
+            ySplitLine: (cs.ySplitLine === 'solid' || cs.ySplitLine === 'none') ? cs.ySplitLine : 'dashed',
+            grid: {
+              top: Number(cs.grid?.top ?? 50),
+              right: Number(cs.grid?.right ?? 10),
+              bottom: Number(cs.grid?.bottom ?? 24),
+              left: Number(cs.grid?.left ?? 10)
+            }
+          };
+        }
         this.rebuildPresetListUI();
         this.renderTypeSettingsUI();
         // 恢复后刷新调色盘
@@ -444,19 +498,8 @@ export class VisualEchartsUI {
   .ve-preset-list{display:flex; flex-direction:column; gap:8px}
   .ve-type-settings{display:grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px}
   @media(max-width:980px){.ve-type-settings{grid-template-columns: 1fr}}
-      .ve-preset-item{border:1px solid var(--border); border-radius:8px; padding:8px; position:relative; background: var(--b3-theme-surface)}
-  .ve-preset-item.dragging{opacity:.65}
-  .ve-preset-item.drop-before::before,
-  .ve-preset-item.drop-after::after{content:""; position:absolute; left:6px; right:6px; height:0; border-top:2px dashed var(--b3-theme-primary)}
-  .ve-preset-item.drop-before::before{top:-2px}
-  .ve-preset-item.drop-after::after{bottom:-2px}
-      .ve-drag-handle{width:28px; height:28px; border:1px solid var(--border); border-radius:8px; background: var(--b3-theme-background); color:var(--muted); cursor:grab; display:inline-flex; align-items:center; justify-content:center; flex: 0 0 auto}
-      .ve-drag-handle:hover{border-color: color-mix(in oklab, var(--b3-theme-primary), var(--b3-border-color) 50%); box-shadow: 0 0 0 3px color-mix(in oklab, var(--b3-theme-primary), transparent 88%)}
-      .ve-drag-handle:active{cursor:grabbing; transform: translateY(0.5px)}
-      .ve-drag-handle:focus-visible{outline: 2px solid color-mix(in oklab, var(--b3-theme-primary), transparent 40%); outline-offset: 2px}
-      .ve-drag-grip{width:12px; height:12px; display:block; opacity:.9;
-        background-image: radial-gradient(color-mix(in oklab, var(--b3-theme-on-surface), transparent 60%) 1px, transparent 1px);
-        background-size: 4px 4px; background-position: 0 0, 2px 2px}
+    .ve-preset-item{border:1px solid var(--border); border-radius:8px; padding:8px; position:relative; background: var(--b3-theme-surface); cursor: move}
+  .ve-preset-item.drag-over{outline: 2px dashed var(--b3-theme-primary)}
       .ve-chip{position:relative}
       .ve-chip input{position:absolute; opacity:0; pointer-events:none}
     .ve-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color: var(--fg); background: var(--b3-theme-background); cursor:pointer; transition: all .15s ease}
@@ -537,10 +580,11 @@ export class VisualEchartsUI {
       let iife = '';
       if (this.mode === 'preset') {
         const title = (this.presetTitleInput?.value ?? '') as string;
-        const settings = this.getCurrentTypeSettings();
+        const t = (this.presetTypeSel?.value as any) || 'bar';
+        const settings = this.buildSettingsPayloadFor(t);
         iife = buildPresetCountIIFE(
           this.presetItems,
-          (this.presetTypeSel?.value as any) || 'bar',
+          t,
           title || '',
           settings,
           this.presetColors
@@ -557,11 +601,54 @@ export class VisualEchartsUI {
   // ------- 类型设置渲染与读取 -------
   private renderTypeSettingsUI() {
     if (!this.currentSettingsEl) return;
-    const t = (this.presetTypeSel?.value as any) || 'bar';
+  const t = (this.presetTypeSel?.value as any) || 'bar';
+    const mappedTypeForQuery = (t === 'scatter') ? 'line' : t; // 查询面板仅区分 stat(line) 与 pie
     let html = '';
-    if (t === 'bar') {
+    // 通用设置区（与查询模式一致）
+    const cs = this.commonSettings;
+    const commonHtml = `
+      <div class="ve-type-settings">
+        <div class="ve-group">
+          <div class="ve-group__title">通用</div>
+          <div class="ve-row" style="align-items:center; gap:8px;">
+            <label class="ve-field" style="min-width:220px">
+              <div class="ve-label">图例位置</div>
+              <select class="ve-input" data-set="common.legendPos" style="width:140px">
+                <option value="top" ${cs.legendPos==='top'?'selected':''}>上</option>
+                <option value="bottom" ${cs.legendPos==='bottom'?'selected':''}>下</option>
+                <option value="left" ${cs.legendPos==='left'?'selected':''}>左</option>
+                <option value="right" ${cs.legendPos==='right'?'selected':''}>右</option>
+              </select>
+            </label>
+            <label class="ve-field" style="min-width:220px">
+              <div class="ve-label">Y 分割线</div>
+              <select class="ve-input" data-set="common.ySplitLine" style="width:140px">
+                <option value="dashed" ${cs.ySplitLine==='dashed'?'selected':''}>虚线</option>
+                <option value="solid" ${cs.ySplitLine==='solid'?'selected':''}>实线</option>
+                <option value="none" ${cs.ySplitLine==='none'?'selected':''}>无</option>
+              </select>
+            </label>
+          </div>
+          <div class="ve-row" style="align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px;">
+            <label class="ve-field" style="min-width:160px">Grid 顶部(px)
+              <input class="ve-input" type="number" step="1" data-set="common.grid.top" value="${cs.grid.top}" />
+            </label>
+            <label class="ve-field" style="min-width:160px">Grid 右侧(px)
+              <input class="ve-input" type="number" step="1" data-set="common.grid.right" value="${cs.grid.right}" />
+            </label>
+            <label class="ve-field" style="min-width:160px">Grid 底部(px)
+              <input class="ve-input" type="number" step="1" data-set="common.grid.bottom" value="${cs.grid.bottom}" />
+            </label>
+            <label class="ve-field" style="min-width:160px">Grid 左侧(px)
+              <input class="ve-input" type="number" step="1" data-set="common.grid.left" value="${cs.grid.left}" />
+            </label>
+          </div>
+        </div>
+      </div>`;
+  if (t === 'bar') {
       const s = this.perTypeSettings.bar;
       html = `
+        ${commonHtml}
         <div class="ve-type-settings">
           <div class="ve-group">
             <div class="ve-group__title">基础</div>
@@ -596,9 +683,10 @@ export class VisualEchartsUI {
           </label>
           </div>
         </div>`;
-    } else if (t === 'line') {
+    } else if (t === 'line' || t === 'scatter') {
       const s = this.perTypeSettings.line;
       html = `
+        ${commonHtml}
         <div class="ve-type-settings">
           <div class="ve-group">
             <div class="ve-group__title">基础</div>
@@ -636,6 +724,7 @@ export class VisualEchartsUI {
     } else if (t === 'pie') {
       const s = this.perTypeSettings.pie;
       html = `
+        ${commonHtml}
         <div class="ve-type-settings">
           <div class="ve-group">
             <div class="ve-group__title">半径</div>
@@ -682,19 +771,19 @@ export class VisualEchartsUI {
     inputs.forEach(el => {
       const key = el.getAttribute('data-set') || '';
       if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-        el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode(); });
+        el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
       } else if (el instanceof HTMLInputElement && (el.type === 'number' || el.type === 'text' || el.type === 'range')) {
         el.addEventListener('input', () => {
           const v = (el.type === 'number' || el.type === 'range') ? Number(el.value) : el.value;
           // 实时更新旁侧的数值
           const labelSpan = el.parentElement?.querySelector('.ve-label') as HTMLElement | null;
           if (labelSpan && (typeof v === 'number')) labelSpan.textContent = key.includes('Radius') ? `${v}%` : `${v}°`;
-          this.setDeepSetting(key, v); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode();
+          this.setDeepSetting(key, v); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode();
         });
       } else if (el instanceof HTMLInputElement && el.type === 'radio') {
-        el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; this.setDeepSetting(key, v); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode(); });
+        el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; this.setDeepSetting(key, v); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
       } else if (el instanceof HTMLSelectElement) {
-        el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; this.setDeepSetting(key, v || (v as any)); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode(); });
+        el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; this.setDeepSetting(key, v || (v as any)); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
       }
     });
     // 恢复默认
@@ -704,26 +793,38 @@ export class VisualEchartsUI {
 
   private setDeepSetting(path: string, value: any) {
     const segs = path.split('.');
-    let cur: any = this.perTypeSettings as any;
-    for (let i = 0; i < segs.length - 1; i++) {
-      const k = segs[i];
-      if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
-      cur = cur[k];
+    if (segs[0] === 'common') {
+      // 写入通用设置
+      let cur: any = this.commonSettings as any;
+      for (let i = 1; i < segs.length - 1; i++) {
+        const k = segs[i];
+        if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
+        cur = cur[k];
+      }
+      cur[segs[segs.length - 1]] = value;
+    } else {
+      // 写入每类型设置
+      let cur: any = this.perTypeSettings as any;
+      for (let i = 0; i < segs.length - 1; i++) {
+        const k = segs[i];
+        if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
+        cur = cur[k];
+      }
+      cur[segs[segs.length - 1]] = value;
     }
-    cur[segs[segs.length - 1]] = value;
     this.save();
   }
 
   private getCurrentTypeSettings() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
-    if (t === 'line') return this.perTypeSettings.line;
+    if (t === 'line' || t === 'scatter') return this.perTypeSettings.line;
     if (t === 'pie') return this.perTypeSettings.pie;
     return this.perTypeSettings.bar;
   }
 
   private resetCurrentTypeSettings() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
-    if (t === 'line') {
+    if (t === 'line' || t === 'scatter') {
       this.perTypeSettings.line = { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } };
     } else if (t === 'pie') {
       this.perTypeSettings.pie = { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } };
@@ -762,56 +863,28 @@ export class VisualEchartsUI {
       row.className = 've-preset-item';
       row.innerHTML = `
         <div class="ve-row" style="align-items:center; gap:6px;">
-          <button class="ve-drag-handle" title="拖动排序" type="button" data-drag-handle><span class="ve-drag-grip"></span></button>
           <input class="ve-input" data-name value="${this.escape(it.name)}" style="width:180px" />
           <textarea class="ve-input" data-sql rows="2" style="flex:1">${this.escape(it.sql)}</textarea>
           <button class="ve-btn ve-ghost" data-del title="删除">删除</button>
         </div>
       `;
-      // 启用通过句柄触发的拖拽
-      row.draggable = false;
-      const handle = row.querySelector('[data-drag-handle]') as HTMLButtonElement | null;
-      if (handle) {
-        handle.addEventListener('pointerdown', () => { row.draggable = true; });
-        handle.addEventListener('pointerup', () => { if (!row.classList.contains('dragging')) row.draggable = false; });
-        handle.addEventListener('pointercancel', () => { if (!row.classList.contains('dragging')) row.draggable = false; });
-      }
-      row.addEventListener('dragstart', (e) => {
-        this.draggingIndex = idx;
+      // 整行拖拽（与查询模式一致）
+      row.draggable = true;
+      row.addEventListener('dragstart', (ev) => {
         row.classList.add('dragging');
-        try { e.dataTransfer?.setData('text/plain', String(idx)); } catch { }
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        try { ev.dataTransfer?.setData('text/plain', String(idx)); } catch {}
       });
-      row.addEventListener('dragend', () => {
-        row.classList.remove('dragging');
-        row.draggable = false;
-        this.draggingIndex = null;
-        Array.from(this.presetListEl!.children).forEach((el) => el.classList.remove('drop-before', 'drop-after'));
-      });
-      row.addEventListener('dragover', (e) => {
-        if (this.draggingIndex === null) return; e.preventDefault();
-        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-        const rect = row.getBoundingClientRect();
-        const before = (e.clientY - rect.top) < rect.height / 2;
-        Array.from(this.presetListEl!.children).forEach((el) => el.classList.remove('drop-before', 'drop-after'));
-        row.classList.add(before ? 'drop-before' : 'drop-after');
-      });
-      row.addEventListener('dragleave', () => {
-        row.classList.remove('drop-before', 'drop-after');
-      });
-      row.addEventListener('drop', (e) => {
-        if (this.draggingIndex === null) return; e.preventDefault();
-        const from = this.draggingIndex;
-        const rect = row.getBoundingClientRect();
-        const before = (e.clientY - rect.top) < rect.height / 2;
-        let to = before ? idx : idx + 1;
-        if (!(from === to || from + 1 === to)) {
-          const item = this.presetItems.splice(from, 1)[0];
-          if (from < to) to--; // 移除后目标索引左移
-          this.presetItems.splice(Math.max(0, Math.min(this.presetItems.length, to)), 0, item);
-        }
-        this.draggingIndex = null;
-        Array.from(this.presetListEl!.children).forEach((el) => el.classList.remove('drop-before', 'drop-after', 'dragging'));
+      row.addEventListener('dragend', () => { row.classList.remove('dragging'); });
+      row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drag-over'); });
+      row.addEventListener('dragleave', () => { row.classList.remove('drag-over'); });
+      row.addEventListener('drop', (ev) => {
+        ev.preventDefault(); row.classList.remove('drag-over');
+        let fromIdx = idx;
+        try { const data = ev.dataTransfer?.getData('text/plain'); if (data!=null && data!=='') fromIdx = Number(data)|0; } catch{}
+        const toIdx = idx;
+        if (fromIdx === toIdx || fromIdx < 0 || fromIdx >= this.presetItems.length) return;
+        const moved = this.presetItems.splice(fromIdx, 1)[0];
+        this.presetItems.splice(toIdx, 0, moved);
         this.rebuildPresetListUI();
         this.rebuildPresetCode();
       });
@@ -837,7 +910,7 @@ export class VisualEchartsUI {
     if (this.mode === 'preset') {
       const t = (this.presetTypeSel?.value as any) || 'bar';
       const title = (this.presetTitleInput?.value ?? '') as string;
-      const settings = this.getCurrentTypeSettings();
+      const settings = this.buildSettingsPayloadFor(t);
       iife = buildPresetCountIIFE(
         this.presetItems,
         t,
@@ -856,7 +929,7 @@ export class VisualEchartsUI {
   private async copyPresetCode() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
     const title = (this.presetTitleInput?.value ?? '') as string;
-    const settings = this.getCurrentTypeSettings();
+    const settings = this.buildSettingsPayloadFor(t);
     const iife = buildPresetCountIIFE(
       this.presetItems,
       t,
@@ -875,7 +948,7 @@ export class VisualEchartsUI {
     if (this.mode === 'preset') {
       const t = (this.presetTypeSel?.value as any) || 'bar';
       const title = (this.presetTitleInput?.value ?? '') as string;
-      const settings = this.getCurrentTypeSettings();
+      const settings = this.buildSettingsPayloadFor(t);
       iife = buildPresetCountIIFE(
         this.presetItems,
         t,
@@ -916,12 +989,12 @@ export class VisualEchartsUI {
         const cs = getColors();
         cs[idx] = picker.value;
         if (swatch) swatch.style.background = picker.value;
-        setColors(cs);
+        try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; }
       });
       if (del) del.addEventListener('click', () => {
         const cs = getColors();
         cs.splice(idx, 1);
-        setColors(cs);
+        try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; }
         this.renderPaletteFromState(getColors, setColors);
       });
     });
@@ -1025,5 +1098,13 @@ export class VisualEchartsUI {
       if (v.limit) limit = ' LIMIT ' + Math.min(999, Math.max(0, Number(v.limit) || 0));
       return `select * from blocks${where}${order}${limit}`;
     } catch { return ''; }
+  }
+
+  // 组装预设模式给模板的设置载荷：按类型打包，并包含 common
+  private buildSettingsPayloadFor(t: 'bar'|'line'|'scatter'|'pie') {
+    const common = this.commonSettings;
+    if (t === 'line' || t === 'scatter') return { line: this.perTypeSettings.line, common } as any;
+    if (t === 'pie') return { pie: this.perTypeSettings.pie, common } as any;
+    return { bar: this.perTypeSettings.bar, common } as any;
   }
 }

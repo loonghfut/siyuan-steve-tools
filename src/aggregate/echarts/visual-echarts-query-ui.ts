@@ -27,7 +27,7 @@ export class VisualEchartsQueryUI {
   private commonSettings: { legendPos: 'top'|'bottom'|'left'|'right'; ySplitLine: 'dashed'|'solid'|'none'; grid: { top: number; right: number; bottom: number; left: number } } = {
     legendPos: 'top',
     ySplitLine: 'dashed',
-    grid: { top: 10, right: 10, bottom: 24, left: 10 }
+    grid: { top: 50, right: 10, bottom: 24, left: 10 }
   };
   // 设置面板折叠状态（持久化）
   private foldCommon: boolean = false;
@@ -648,7 +648,7 @@ export class VisualEchartsQueryUI {
             legendPos: (common.legendPos==='bottom'||common.legendPos==='left'||common.legendPos==='right') ? common.legendPos : 'top',
             ySplitLine: (common.ySplitLine==='solid'||common.ySplitLine==='none') ? common.ySplitLine : 'dashed',
             grid: {
-              top: Number(common.grid?.top ?? 10),
+              top: Number(common.grid?.top ?? 50),
               right: Number(common.grid?.right ?? 10),
               bottom: Number(common.grid?.bottom ?? 24),
               left: Number(common.grid?.left ?? 10)
@@ -790,6 +790,7 @@ export class VisualEchartsQueryUI {
       const sharedBoundaryGap = (typeof sl.boundaryGap === 'boolean') ? sl.boundaryGap : (typeof sb.boundaryGap === 'boolean' ? sb.boundaryGap : false);
       const sharedRotate = (typeof sl.xLabelRotate === 'number') ? (sl.xLabelRotate as number) : (typeof sb.xLabelRotate === 'number' ? (sb.xLabelRotate as number) : 0);
       const sharedLabelShow = !!(sl.label?.show || sb.label?.show);
+      const sharedLabelPos = (sl.label?.position || sb.label?.position || 'top');
       html += `
         <details class="veq-sub" data-fold-stat ${this.foldStat ? 'open' : ''}>
           <summary class="veq-legend">统计图设置（折线/柱状）</summary>
@@ -800,6 +801,22 @@ export class VisualEchartsQueryUI {
           <div class="veq-grid veq-grid-switches-row" style="margin-top:10px;">
             <label class="veq-field"><div class="veq-inline"><span>x 轴留白</span><label class="veq-switch"><input type="checkbox" data-set="stat.boundaryGap" ${sharedBoundaryGap ? 'checked' : ''}/><i></i></label></div></label>
             <label class="veq-field"><div class="veq-inline"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="stat.label.show" ${sharedLabelShow ? 'checked' : ''}/><i></i></label></div></label>
+          </div>
+          <div class="veq-grid" style="grid-template-columns: minmax(220px,1fr); gap:10px 14px; margin-top:8px;">
+            <div class="veq-field">
+              <div class="veq-label">标签位置</div>
+              <select class="veq-input" data-set="stat.label.position" style="width:160px">
+                <option value="top" ${sharedLabelPos==='top'?'selected':''}>top</option>
+                <option value="bottom" ${sharedLabelPos==='bottom'?'selected':''}>bottom</option>
+                <option value="left" ${sharedLabelPos==='left'?'selected':''}>left</option>
+                <option value="right" ${sharedLabelPos==='right'?'selected':''}>right</option>
+                <option value="inside" ${sharedLabelPos==='inside'?'selected':''}>inside</option>
+                <option value="insideTop" ${sharedLabelPos==='insideTop'?'selected':''}>insideTop</option>
+                <option value="insideBottom" ${sharedLabelPos==='insideBottom'?'selected':''}>insideBottom</option>
+                <option value="insideLeft" ${sharedLabelPos==='insideLeft'?'selected':''}>insideLeft</option>
+                <option value="insideRight" ${sharedLabelPos==='insideRight'?'selected':''}>insideRight</option>
+              </select>
+            </div>
           </div>
           <label class="veq-field" style="margin-top:10px;">x 轴标签旋转
             <div class="veq-row" style="align-items:center; gap:8px;">
@@ -895,6 +912,12 @@ export class VisualEchartsQueryUI {
       }
       if (leaf === 'label.show') {
         const ensure = (obj: any) => { obj.label = obj.label || {}; obj.label.show = !!value; };
+        ensure((this.perTypeSettings as any).line);
+        ensure((this.perTypeSettings as any).bar);
+        return;
+      }
+      if (leaf === 'label.position') {
+        const ensure = (obj: any) => { obj.label = obj.label || {}; obj.label.position = String(value || 'top'); };
         ensure((this.perTypeSettings as any).line);
         ensure((this.perTypeSettings as any).bar);
         return;

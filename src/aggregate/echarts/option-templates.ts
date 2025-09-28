@@ -411,7 +411,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
  */
 export function buildPresetCountIIFE(
   items: Array<{ name: string; sql: string }>,
-  type: 'bar'|'line'|'pie',
+  type: 'bar'|'line'|'scatter'|'pie',
   title?: string,
   chartSettings?: any,
   colors?: string[]
@@ -440,7 +440,12 @@ export function buildPresetCountIIFE(
     sql: String(it?.sql ?? '').replace(/`/g, '\\`')
   }));
   const itemsJson = JSON.stringify(safeItems);
-  const t = type === 'pie' ? 'pie' : (type === 'line' ? 'line' : 'bar');
+  const t = (function(){
+    if (type === 'pie') return 'pie';
+    if (type === 'line') return 'line';
+    if (type === 'scatter') return 'scatter';
+    return 'bar';
+  })();
   const titleText = JSON.stringify(title || '预设计数');
   const colorsJs = Array.isArray(palette) && palette.length ? JSON.stringify(palette) : '';
   const settingsJs = JSON.stringify(settingsObj || {});
@@ -461,7 +466,7 @@ export function buildPresetCountIIFE(
       return [];
     }
     var items = ${itemsJson};
-  var st = ${settingsJs};
+    var st = ${settingsJs};
     var names = [];
     var counts = [];
     for (var i=0;i<items.length;i++){
@@ -471,32 +476,82 @@ export function buildPresetCountIIFE(
       counts.push(Array.isArray(rows) ? rows.length : 0);
     }
     var option = { title: { text: ${titleText} }, backgroundColor: 'transparent' };
-    ${t === 'pie' ? `
-    option.tooltip = { trigger: 'item' };
-    option.legend = { data: names };
-    var pie = { type: 'pie', name: '计数', data: names.map(function(n,i){ return { name: n, value: counts[i] }; }) };
-    if (st && (st.innerRadius || st.outerRadius)) {
-      var ir = Math.max(0, Math.min(100, Number(st.innerRadius||0)));
-      var or = Math.max(ir, Math.min(100, Number(st.outerRadius||70)));
-      pie.radius = [ir + '%', or + '%'];
+  if ('${t}' === 'pie') {
+      option.tooltip = { trigger: 'item' };
+      option.legend = { data: names };
+      var pie = { type: 'pie', name: '计数', data: names.map(function(n,i){ return { name: n, value: counts[i] }; }) };
+      // 半径与玫瑰图设置（支持嵌套 st.pie 与平铺兼容）
+      (function(){ try{
+        var sp = (st && st.pie) ? st.pie : {};
+        var irCfg = (sp && typeof sp.innerRadius === 'number') ? sp.innerRadius : ((st && typeof st.innerRadius === 'number') ? st.innerRadius : 0);
+        var orCfg = (sp && typeof sp.outerRadius === 'number') ? sp.outerRadius : ((st && typeof st.outerRadius === 'number') ? st.outerRadius : 70);
+        var ir = Math.max(0, Math.min(100, (irCfg|0)));
+        var or = Math.max(ir, Math.min(100, (orCfg|0)));
+        pie.radius = [ir + '%', or + '%'];
+        var rose = (sp && (sp.roseType==='radius' || sp.roseType==='area')) ? sp.roseType : ((st && (st.roseType==='radius' || st.roseType==='area')) ? st.roseType : null);
+        if (rose) pie.roseType = rose;
+        if (sp && sp.label) { pie.label = sp.label; } else if (st && st.label) { pie.label = st.label; }
+      }catch(e){} })();
+      option.series = [pie];
+  } else {
+      option.tooltip = { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } };
+      option.legend = { data: ['计数'] };
+      // 轴间隙与标签旋转（支持嵌套 st.bar/st.line 与平铺兼容）
+      var xRotate = (function(){
+        try{
+          if ('${t}'==='bar' && st && st.bar && typeof st.bar.xLabelRotate === 'number') return st.bar.xLabelRotate|0;
+          if (('${t}'==='line' || '${t}'==='scatter') && st && st.line && typeof st.line.xLabelRotate === 'number') return st.line.xLabelRotate|0;
+          if (st && typeof st.xLabelRotate === 'number') return st.xLabelRotate|0;
+        }catch(e){}
+        return 0;
+      })();
+      var boundaryGap = (function(){
+        try{
+          if ('${t}'==='bar'){ if (st && st.bar && typeof st.bar.boundaryGap === 'boolean') return !!st.bar.boundaryGap; if (st && typeof st.boundaryGap === 'boolean') return !!st.boundaryGap; return true; }
+          if ('${t}'==='line' || '${t}'==='scatter'){ if (st && st.line && typeof st.line.boundaryGap === 'boolean') return !!st.line.boundaryGap; if (st && typeof st.boundaryGap === 'boolean') return !!st.boundaryGap; return false; }
+        }catch(e){}
+        return ${t === 'bar' ? 'true' : 'false'};
+      })();
+      option.xAxis = [{ type: 'category', boundaryGap: boundaryGap, data: names, axisTick: { show:false }, axisLine: { show:false }, axisLabel: { rotate: xRotate } }];
+      var splitType = (function(){
+        try{
+          var t = (st && st.common && st.common.ySplitLine) ? st.common.ySplitLine : (st && st.ySplitLine);
+          return (t==='solid'||t==='none') ? t : 'dashed';
+        }catch(e){ return 'dashed'; }
+      })();
+      option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } } }];
+  var seriesItem = { type: '${t}', name: '计数', data: counts };
+      // 堆叠与平滑（支持嵌套与平铺兼容）
+      if ('${t}'==='bar') {
+        var doStack = (st && st.bar && st.bar.stack===true) || (st && st.stack===true);
+        if (doStack) seriesItem.stack = 'total';
+      }
+      if ('${t}'==='line') {
+        var doSmooth = (st && st.line && st.line.smooth===true) || (st && st.smooth===true);
+        if (doSmooth) seriesItem.smooth = true;
+      }
+      (function(){ try{
+        var lbl = null;
+        if ('${t}'==='bar') lbl = st && st.bar && st.bar.label;
+        else if ('${t}'==='line' || '${t}'==='scatter') lbl = st && st.line && st.line.label;
+        if (!lbl && st && st.label) lbl = st.label; // 平铺兼容
+        if (lbl) seriesItem.label = lbl;
+      }catch(e){} })();
+      option.series = [seriesItem];
     }
-    if (st && st.roseType) pie.roseType = st.roseType;
-    if (st && st.label) { pie.label = st.label; }
-    option.series = [pie];
-    ` : `
-    option.tooltip = { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } };
-    option.legend = { data: ['计数'] };
-    var xRotate = st && typeof st.xLabelRotate === 'number' ? st.xLabelRotate|0 : 0;
-    var boundaryGap = (st && typeof st.boundaryGap === 'boolean') ? !!st.boundaryGap : ${t === 'bar' ? 'true' : 'false'};
-    option.xAxis = [{ type: 'category', boundaryGap: boundaryGap, data: names, axisTick: { show:false }, axisLine: { show:false }, axisLabel: { rotate: xRotate } }];
-    var splitType = st && st.ySplitLine ? st.ySplitLine : 'dashed';
-    option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } } }];
-    var seriesItem = { type: '${t}', name: '计数', data: counts };
-    if (st && st.stack && '${t}'==='bar') seriesItem.stack = 'total';
-    if (st && st.smooth && '${t}'==='line') seriesItem.smooth = true;
-    if (st && st.label) seriesItem.label = st.label;
-    option.series = [seriesItem];
-    `}
+    // 统一 legend 位置（支持 st.common.legendPos，兼容平铺 st.legendPos）
+    (function(){ try{
+      var c = st && st.common ? st.common : null;
+      var pos = c && (c.legendPos==='top'||c.legendPos==='bottom'||c.legendPos==='left'||c.legendPos==='right') ? c.legendPos : (st && (st.legendPos==='top'||st.legendPos==='bottom'||st.legendPos==='left'||st.legendPos==='right') ? st.legendPos : null);
+      if (pos) { option.legend = option.legend || {}; option.legend.orient = (pos==='left'||pos==='right') ? 'vertical' : 'horizontal'; option.legend[pos] = 0; if (pos==='left'||pos==='right') option.legend.top = 'middle'; }
+    }catch(e){} })();
+    // 统一 grid（支持 st.common.grid）
+    (function(){ try{
+      var g = st && st.common && st.common.grid ? st.common.grid : null;
+      if (g && [g.top, g.right, g.bottom, g.left].every(function(v){ return typeof v==='number' && isFinite(v); })) {
+        option.grid = { top: Number(g.top)||0, right: Number(g.right)||0, bottom: Number(g.bottom)||0, left: Number(g.left)||0, containLabel: true };
+      }
+    }catch(e){} })();
     ${colorsJs ? `option.color = ${colorsJs};` : ''}
     return option;
   })()`;
