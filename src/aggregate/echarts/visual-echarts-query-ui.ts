@@ -758,6 +758,14 @@ export class VisualEchartsQueryUI {
   .veq-grid-switches-row{grid-template-columns: repeat(2, minmax(160px, 1fr)); align-items:center}
   .veq-control{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background: var(--b3-theme-background)}
   .veq-control > span{color: var(--fg); font-size:13.5px}
+  /* Stat settings layout */
+  .veq-stat-groups{display:grid; gap:14px; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); margin-top:10px}
+  .veq-stat-group{border:1px solid var(--b3-border-color); border-radius:10px; padding:10px; background: color-mix(in oklab, var(--b3-theme-background), transparent 4%); display:flex; flex-direction:column; gap:6px}
+  .veq-stat-group__title{font-weight:600; font-size:12px; color: var(--muted); letter-spacing:.5px}
+  .veq-switch-grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap:6px 10px}
+  .veq-switch-item{display:flex; align-items:center; justify-content:space-between; background: color-mix(in oklab, var(--b3-theme-surface), transparent 30%); padding:4px 8px; border:1px solid color-mix(in oklab, var(--b3-border-color), transparent 20%); border-radius:8px; font-size:12px}
+  .veq-field--range{min-width:180px}
+  @media(max-width:720px){ .veq-switch-grid{grid-template-columns: repeat(auto-fill, minmax(140px,1fr));} }
       @media(max-width:980px){.veq-grid-2{grid-template-columns: 1fr}}
       @media(max-width:680px){.veq-grid-switches{grid-template-columns: 1fr}}
   @media(max-width:680px){.veq-grid-switches-row{grid-template-columns: 1fr}}
@@ -856,68 +864,95 @@ export class VisualEchartsQueryUI {
       const sharedLabelPos = (sl.label?.position || sb.label?.position || 'top');
       html += `
         <details class="veq-sub" data-fold-stat ${this.foldStat ? 'open' : ''}>
-          <summary class="veq-legend">统计图设置（折线/柱状）</summary>
-          <div class="veq-grid veq-grid-switches-row">
-            <label class="veq-field"><div class="veq-inline"><span>折线平滑</span><label class="veq-switch"><input type="checkbox" data-set="line.smooth" ${sl.smooth ? 'checked' : ''}/><i></i></label></div></label>
-            <label class="veq-field"><div class="veq-inline"><span>柱状堆叠</span><label class="veq-switch"><input type="checkbox" data-set="bar.stack" ${sb.stack ? 'checked' : ''}/><i></i></label></div></label>
-          </div>
-          <div class="veq-grid veq-grid-switches-row" style="margin-top:10px;">
-            <label class="veq-field"><div class="veq-inline"><span>x 轴留白</span><label class="veq-switch"><input type="checkbox" data-set="stat.boundaryGap" ${sharedBoundaryGap ? 'checked' : ''}/><i></i></label></div></label>
-            <label class="veq-field"><div class="veq-inline"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="stat.label.show" ${sharedLabelShow ? 'checked' : ''}/><i></i></label></div></label>
-          </div>
-          <div class="veq-grid" style="grid-template-columns: minmax(220px,1fr); gap:10px 14px; margin-top:8px;">
-            <div class="veq-field">
-              <div class="veq-label">标签位置</div>
-              <select class="veq-input" data-set="stat.label.position" style="width:160px">
-                <option value="top" ${sharedLabelPos === 'top' ? 'selected' : ''}>top</option>
-                <option value="bottom" ${sharedLabelPos === 'bottom' ? 'selected' : ''}>bottom</option>
-                <option value="left" ${sharedLabelPos === 'left' ? 'selected' : ''}>left</option>
-                <option value="right" ${sharedLabelPos === 'right' ? 'selected' : ''}>right</option>
-                <option value="inside" ${sharedLabelPos === 'inside' ? 'selected' : ''}>inside</option>
-                <option value="insideTop" ${sharedLabelPos === 'insideTop' ? 'selected' : ''}>insideTop</option>
-                <option value="insideBottom" ${sharedLabelPos === 'insideBottom' ? 'selected' : ''}>insideBottom</option>
-                <option value="insideLeft" ${sharedLabelPos === 'insideLeft' ? 'selected' : ''}>insideLeft</option>
-                <option value="insideRight" ${sharedLabelPos === 'insideRight' ? 'selected' : ''}>insideRight</option>
-              </select>
+          <summary class="veq-legend">统计图设置（折线 / 柱状）</summary>
+          <div class="veq-stat-groups">
+            <div class="veq-stat-group">
+              <div class="veq-stat-group__title">基础</div>
+              <div class="veq-switch-grid">
+                <label class="veq-switch-item"><span>折线平滑</span><label class="veq-switch"><input type="checkbox" data-set="line.smooth" ${sl.smooth ? 'checked' : ''}/><i></i></label></label>
+                <label class="veq-switch-item"><span>柱状堆叠</span><label class="veq-switch"><input type="checkbox" data-set="bar.stack" ${sb.stack ? 'checked' : ''}/><i></i></label></label>
+                <label class="veq-switch-item"><span>x 轴留白</span><label class="veq-switch"><input type="checkbox" data-set="stat.boundaryGap" ${sharedBoundaryGap ? 'checked' : ''}/><i></i></label></label>
+                <label class="veq-switch-item"><span>面积填充</span><label class="veq-switch"><input type="checkbox" data-set="line.area" ${(sl as any).area ? 'checked' : ''}/><i></i></label></label>
+              </div>
             </div>
-          </div>
-          <label class="veq-field" style="margin-top:10px;">x 轴标签旋转
-            <div class="veq-row" style="align-items:center; gap:8px;">
-              <input class="veq-input" type="range" min="-90" max="90" step="5" data-set="stat.xLabelRotate" value="${sharedRotate}" />
-              <span class="veq-label">${sharedRotate}°</span>
+            <div class="veq-stat-group">
+              <div class="veq-stat-group__title">标签</div>
+              <div class="veq-switch-grid">
+                <label class="veq-switch-item"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="stat.label.show" ${sharedLabelShow ? 'checked' : ''}/><i></i></label></label>
+              </div>
+              <div class="veq-field" style="margin-top:6px;">
+                <div class="veq-label">标签位置</div>
+                <select class="veq-input" data-set="stat.label.position" style="width:160px">
+                  <option value="top" ${sharedLabelPos === 'top' ? 'selected' : ''}>top</option>
+                  <option value="bottom" ${sharedLabelPos === 'bottom' ? 'selected' : ''}>bottom</option>
+                  <option value="left" ${sharedLabelPos === 'left' ? 'selected' : ''}>left</option>
+                  <option value="right" ${sharedLabelPos === 'right' ? 'selected' : ''}>right</option>
+                  <option value="inside" ${sharedLabelPos === 'inside' ? 'selected' : ''}>inside</option>
+                  <option value="insideTop" ${sharedLabelPos === 'insideTop' ? 'selected' : ''}>insideTop</option>
+                  <option value="insideBottom" ${sharedLabelPos === 'insideBottom' ? 'selected' : ''}>insideBottom</option>
+                  <option value="insideLeft" ${sharedLabelPos === 'insideLeft' ? 'selected' : ''}>insideLeft</option>
+                  <option value="insideRight" ${sharedLabelPos === 'insideRight' ? 'selected' : ''}>insideRight</option>
+                </select>
+              </div>
             </div>
-          </label>
-          <div class="veq-grid veq-grid-switches-row" style="margin-top:10px;">
-            <label class="veq-field"><div class="veq-inline"><span>面积填充(折线)</span><label class="veq-switch"><input type="checkbox" data-set="line.area" ${(sl as any).area ? 'checked' : ''}/><i></i></label></div></label>
+            <div class="veq-stat-group">
+              <div class="veq-stat-group__title">轴 & 旋转</div>
+              <label class="veq-field veq-field--range">x 轴标签旋转
+                <div class="veq-row" style="align-items:center; gap:8px;">
+                  <input class="veq-input" type="range" min="-90" max="90" step="5" data-set="stat.xLabelRotate" value="${sharedRotate}" />
+                  <span class="veq-label">${sharedRotate}°</span>
+                </div>
+              </label>
+            </div>
           </div>
         </details>`;
     } else if (t === 'pie') {
       const s = this.perTypeSettings.pie;
+      const labelPos = s.label?.position || 'outside';
       html += `
         <details class="veq-sub" data-fold-pie ${this.foldPie ? 'open' : ''}>
           <summary class="veq-legend">饼图设置</summary>
-          <div class="veq-grid" style="grid-template-columns: repeat(2, minmax(220px,1fr)); gap:10px 14px; margin-top:8px;">
-          <label class="veq-field">内径(%)
-            <div class="veq-row" style="align-items:center; gap:8px;">
-              <input class="veq-input" type="range" min="0" max="95" step="5" data-set="pie.innerRadius" value="${s.innerRadius ?? 0}" />
-              <span class="veq-label">${s.innerRadius ?? 0}%</span>
+          <div class="veq-stat-groups" style="margin-top:10px;">
+            <div class="veq-stat-group">
+              <div class="veq-stat-group__title">半径</div>
+              <label class="veq-field veq-field--range">内径(%)
+                <div class="veq-row" style="align-items:center; gap:8px;">
+                  <input class="veq-input" type="range" min="0" max="95" step="5" data-set="pie.innerRadius" value="${s.innerRadius ?? 0}" />
+                  <span class="veq-label">${s.innerRadius ?? 0}%</span>
+                </div>
+              </label>
+              <label class="veq-field veq-field--range">外径(%)
+                <div class="veq-row" style="align-items:center; gap:8px;">
+                  <input class="veq-input" type="range" min="5" max="100" step="5" data-set="pie.outerRadius" value="${s.outerRadius ?? 70}" />
+                  <span class="veq-label">${s.outerRadius ?? 70}%</span>
+                </div>
+              </label>
             </div>
-          </label>
-          <label class="veq-field">外径(%)
-            <div class="veq-row" style="align-items:center; gap:8px;">
-              <input class="veq-input" type="range" min="5" max="100" step="5" data-set="pie.outerRadius" value="${s.outerRadius ?? 70}" />
-              <span class="veq-label">${s.outerRadius ?? 70}%</span>
+            <div class="veq-stat-group">
+              <div class="veq-stat-group__title">形态</div>
+              <div class="veq-field">
+                <div class="veq-label">玫瑰图 roseType</div>
+                <select class="veq-input" data-set="pie.roseType" style="width:140px">
+                  <option value="false" ${!s.roseType ? 'selected' : ''}>无</option>
+                  <option value="radius" ${s.roseType === 'radius' ? 'selected' : ''}>radius</option>
+                  <option value="area" ${s.roseType === 'area' ? 'selected' : ''}>area</option>
+                </select>
+              </div>
             </div>
-          </label>
-          <div class="veq-field">
-            <div class="veq-label">玫瑰图 roseType</div>
-            <select class="veq-input" data-set="pie.roseType" style="width:140px">
-              <option value="false" ${!s.roseType ? 'selected' : ''}>无</option>
-              <option value="radius" ${s.roseType === 'radius' ? 'selected' : ''}>radius</option>
-              <option value="area" ${s.roseType === 'area' ? 'selected' : ''}>area</option>
-            </select>
-          </div>
-          <label class="veq-field"><div class="veq-inline"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></div></label>
+            <div class="veq-stat-group">
+              <div class="veq-stat-group__title">标签</div>
+              <div class="veq-switch-grid">
+                <label class="veq-switch-item"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></label>
+              </div>
+              <div class="veq-field" style="margin-top:6px;">
+                <div class="veq-label">标签位置</div>
+                <select class="veq-input" data-set="pie.label.position" style="width:140px">
+                  <option value="outside" ${labelPos === 'outside' ? 'selected' : ''}>outside</option>
+                  <option value="inside" ${labelPos === 'inside' ? 'selected' : ''}>inside</option>
+                  <option value="center" ${labelPos === 'center' ? 'selected' : ''}>center</option>
+                </select>
+              </div>
+            </div>
           </div>
         </details>`;
     }
