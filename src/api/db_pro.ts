@@ -81,13 +81,24 @@ export class AVManager {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
-            const result = await response.json();
-
-            if (result.code !== 0) {
-                throw new Error(result.msg || '请求失败');
+            // 以文本读取以提高对空响应/非 JSON 响应的容错性
+            const raw = await response.text();
+            if (!raw || raw.trim() === '') {
+                throw new Error(`响应为空（${endpoint}）`);
+            }
+            let parsed: any;
+            try {
+                parsed = JSON.parse(raw);
+            } catch (e: any) {
+                const preview = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+                throw new Error(`JSON 解析失败（${endpoint}）：${e?.message || e}，响应片段：${preview}`);
             }
 
-            return result.data;
+            if (parsed.code !== 0) {
+                throw new Error(parsed.msg || '请求失败');
+            }
+
+            return parsed.data;
         } catch (error) {
             clearTimeout(timeoutId);
             if (error.name === 'AbortError') {

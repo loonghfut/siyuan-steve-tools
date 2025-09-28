@@ -17,9 +17,6 @@ export class VisualEchartsQueryUI {
 
   // 元素句柄
   private titleInput!: HTMLInputElement;
-  private avIdInput!: HTMLInputElement;
-  // 新增 viewID 输入
-  private viewIdInput!: HTMLInputElement;
   private xExprTextarea!: HTMLTextAreaElement;
   private seriesListEl!: HTMLElement;
   private paletteEl!: HTMLElement;
@@ -149,8 +146,10 @@ export class VisualEchartsQueryUI {
             </div>
             <div class="veq-grid" style="grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
               <label class="veq-field">数据库
-                <input class="vsb-input" data-dbcombo placeholder="选择或搜索数据库" autocomplete="off" list="veq-db-list" />
-                <datalist id="veq-db-list" data-dbcombo-list></datalist>
+                <div class="veq-combo-wrap">
+                  <input class="vsb-input" data-dbcombo placeholder="选择或搜索数据库" autocomplete="off" />
+                  <div class="veq-combo-list" data-dbcombo-popup style="display:none;"></div>
+                </div>
               </label>
               <label class="veq-field">视图
                 <select class="veq-input" data-viewsel disabled>
@@ -208,14 +207,13 @@ export class VisualEchartsQueryUI {
       </div>
     `;
 
-    this.titleInput = this.root.querySelector('[data-title]') as HTMLInputElement;
-    this.avIdInput = this.root.querySelector('[data-avid]') as HTMLInputElement;
-    // 选择 viewID 输入
-    this.viewIdInput = this.root.querySelector('[data-viewid]') as HTMLInputElement;
+  this.titleInput = this.root.querySelector('[data-title]') as HTMLInputElement;
     // 新增：下拉框句柄
     this.viewSelEl = this.root.querySelector('[data-viewsel]') as HTMLSelectElement | undefined || undefined;
     this.dbComboInput = this.root.querySelector('[data-dbcombo]') as HTMLInputElement | undefined || undefined;
-    this.dbComboList = this.root.querySelector('[data-dbcombo-list]') as HTMLElement | undefined || undefined;
+  this.dbComboList = undefined; // 不再使用 datalist
+  const popup = this.root.querySelector('[data-dbcombo-popup]') as HTMLElement | null;
+  (this as any).dbComboPopup = popup || undefined;
     this.xExprTextarea = this.root.querySelector('[data-xexpr]') as HTMLTextAreaElement;
     const xkeySel = this.root.querySelector('[data-xkey]') as HTMLSelectElement;
     const sortSel = this.root.querySelector('[data-sort]') as HTMLSelectElement;
@@ -233,20 +231,46 @@ export class VisualEchartsQueryUI {
     // 事件
     this.titleInput.addEventListener('input', () => this.onChanged());
     // 组合框：输入/聚焦/选择
-    if (this.dbComboInput) {
-      this.dbComboInput.addEventListener('input', () => this.updateDbComboList());
+    if (this.dbComboInput) { 
+      this.dbComboInput.addEventListener('input', () => { this.updateDbComboList(); this.openDbComboPopup(); });
+      this.dbComboInput.addEventListener('focus', () => { this.updateDbComboList(); this.openDbComboPopup(); });
+      this.dbComboInput.addEventListener('click', () => { this.updateDbComboList(); this.openDbComboPopup(); });
       this.dbComboInput.addEventListener('change', async () => {
         const v = (this.dbComboInput as HTMLInputElement).value.trim();
         if (!v) { this.selectedAvID = ''; this.selectedViewID = ''; this.onChanged(); await this.populateViewsFor(''); return; }
-        // 支持按显示名或 id 匹配
-        const cand = this.avList.find(x => x.id === v) || this.avList.find(x => x.name === v);
+        if (!this.avList.length) { // 列表尚未加载，尝试加载一次
+          await this.initDbList();
+        }
+        // 支持按显示名或 id 以及 datalist 的 label 反向匹配
+        const cand = this.avList.find(x => x.id === v) || this.avList.find(x => x.name === v) || this.avList.find(x => (this.showDbId ? x.name : x.id) === v);
         if (cand) {
           this.selectedAvID = cand.id;
           this.selectedViewID = '';
           this.setDbComboDisplayBySelection();
           this.onChanged();
           await this.populateViewsFor(cand.id);
+        } else if (!this.avList.length && this.dbComboList) {
+          // 仍未有列表，提示
+          this.dbComboList.innerHTML = '<option value="未加载到数据库"></option>';
         }
+      });
+      // blur 时稍延迟关闭，允许点击 popup 项
+      this.dbComboInput.addEventListener('blur', () => setTimeout(()=> this.closeDbComboPopup(), 150));
+    }
+    // popup 选择
+    const popupEl = (this as any).dbComboPopup as HTMLElement | undefined;
+    if (popupEl) {
+      popupEl.addEventListener('mousedown', (e)=> e.preventDefault()); // 保持输入框焦点
+      popupEl.addEventListener('click', async (e)=>{
+        const item = (e.target as HTMLElement).closest('.veq-combo-item') as HTMLElement | null;
+        if (!item) return;
+        const avID = item.getAttribute('data-id') || '';
+        this.selectedAvID = avID;
+        this.selectedViewID = '';
+        this.setDbComboDisplayBySelection();
+        this.onChanged();
+        await this.populateViewsFor(avID);
+        this.closeDbComboPopup();
       });
     }
     if (this.viewSelEl) this.viewSelEl.addEventListener('change', (e) => {
@@ -438,8 +462,11 @@ export class VisualEchartsQueryUI {
       if (viewID) payload.viewID = viewID;
 
       fetch('/api/av/renderAttributeView', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        .then(r => r.json())
-        .then(res => {
+        .then(async r => {
+          const raw = await r.text();
+          if (!raw || raw.trim() === '') throw new Error('响应为空');
+          let res: any;
+          try { res = JSON.parse(raw); } catch (e: any) { throw new Error('JSON 解析失败: ' + (e?.message || e)); }
           if (!res || res.code !== 0) throw new Error(res?.msg || '加载失败');
           const cols = res.data && res.data.view && Array.isArray(res.data.view.columns) ? res.data.view.columns : [];
           this.keys = (cols || []).map((c: any) => c && c.name).filter(Boolean);
@@ -459,7 +486,7 @@ export class VisualEchartsQueryUI {
           this.rebuildCode();
           if (this.opts?.onChange) this.opts.onChange();
         })
-        .catch(e => { this.toast('加载字段失败'); console.error(e); })
+        .catch(e => { this.toast('加载字段失败'); console.error('加载字段失败：', e); })
         .then(() => {
           // 收尾：恢复按钮与状态
           this.loadingKeys = false;
@@ -606,16 +633,16 @@ export class VisualEchartsQueryUI {
     try {
       const data = {
         title: this.titleInput?.value || '',
-        avID: this.avIdInput?.value || '',
-        // 保存 viewID
-        viewID: this.viewIdInput?.value || '',
+        avID: this.selectedAvID || '',
+        viewID: this.selectedViewID || '',
         xExpr: this.xExprTextarea?.value || '',
         series: this.series,
         chartType: this.chartType,
         chartSettings: { ...this.perTypeSettings, common: this.commonSettings },
         colors: this.colors.join(','),
         visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode },
-        fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie }
+        fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie },
+        db: { showId: this.showDbId }
       };
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch { /* ignore */ }
@@ -627,9 +654,9 @@ export class VisualEchartsQueryUI {
       const obj = JSON.parse(raw);
       if (!obj) return;
       if (this.titleInput) this.titleInput.value = obj.title || '';
-      if (this.avIdInput) this.avIdInput.value = obj.avID || '';
-      // 恢复 viewID
-      if (this.viewIdInput) this.viewIdInput.value = obj.viewID || '';
+      // 恢复到内部状态
+      this.selectedAvID = obj.avID || '';
+      this.selectedViewID = obj.viewID || '';
       if (this.xExprTextarea) this.xExprTextarea.value = obj.xExpr || '';
       this.series = Array.isArray(obj.series) ? obj.series : [];
       // 兼容旧 flags -> 迁移到统一设置
@@ -683,6 +710,12 @@ export class VisualEchartsQueryUI {
       this.applyTypeConstraints(this.root.querySelector('[data-merge]') as HTMLInputElement | null);
       // 刷新类型设置面板（仅刷新内容区域 body，避免替换 details 结构）
       this.renderTypeSettingsUI(this.root.querySelector('[data-type-settings-body]') as HTMLElement | null || undefined);
+      // 恢复显示 avID 开关
+      if (obj.db && typeof obj.db === 'object') {
+        this.showDbId = !!obj.db.showId;
+        const showIdSwitch = this.root.querySelector('[data-db-showid]') as HTMLInputElement | null;
+        if (showIdSwitch) showIdSwitch.checked = this.showDbId;
+      }
       // 同步下拉框并自动加载字段
       this.syncSelectorsWithInputs();
       this.loadKeys();
@@ -738,7 +771,15 @@ export class VisualEchartsQueryUI {
       .veq-color-empty{color: var(--muted); font-size:12px}
   .veq-justify-end{justify-content:flex-end}
   .veq-actions-compact{gap:6px; flex-wrap:wrap}
-      .veq-inline{display:flex; align-items:center; gap:10px}
+  .veq-inline{display:flex; align-items:center; gap:10px}
+  /* combo */
+  .veq-combo-wrap{position:relative}
+  .veq-combo-list{position:absolute; z-index:1000; left:0; right:0; top:100%; margin-top:4px; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius:8px; box-shadow: 0 4px 20px rgba(0,0,0,.2); max-height:240px; overflow:auto}
+  .veq-combo-item{display:flex; justify-content:space-between; gap:8px; padding:6px 8px; cursor:pointer}
+  .veq-combo-item:hover{background: color-mix(in oklab, var(--b3-theme-primary), transparent 85%)}
+  .veq-combo-item .main{color: var(--b3-theme-on-background)}
+  .veq-combo-item .minor{color: var(--b3-theme-on-surface); font-size:12px}
+  .veq-combo-empty{padding:8px; color: var(--b3-theme-on-surface)}
   .veq-type-settings{display:block}
   .veq-stack{display:flex; flex-direction:column; gap:10px}
   .veq-sub{border:1px solid var(--border); border-radius:10px; padding:8px; background: var(--bg);}
@@ -946,6 +987,16 @@ export class VisualEchartsQueryUI {
     return { bar: this.perTypeSettings.bar, line: this.perTypeSettings.line, common: this.commonSettings } as any;
   }
 
+  private openDbComboPopup() {
+    const popup = (this as any).dbComboPopup as HTMLElement | undefined; if (!popup) return;
+    popup.style.display = '';
+  }
+
+  private closeDbComboPopup() {
+    const popup = (this as any).dbComboPopup as HTMLElement | undefined; if (!popup) return;
+    popup.style.display = 'none';
+  }
+
   // 组合框：过滤/展示列表
   private getFilteredAvList(query?: string): Array<{ id: string; name: string }> {
     const q = (query ?? this.dbComboInput?.value ?? '').trim().toLowerCase();
@@ -954,10 +1005,15 @@ export class VisualEchartsQueryUI {
   }
 
   private updateDbComboList() {
-    const list = this.dbComboList; if (!list) return;
+    const popup = (this as any).dbComboPopup as HTMLElement | undefined; if (!popup) return;
+    if (!this.avList.length) { popup.innerHTML = '<div class="veq-combo-empty">加载中或无数据</div>'; return; }
     const arr = this.getFilteredAvList();
-    if (!arr.length) { list.innerHTML = ''; return; }
-    list.innerHTML = arr.map(it => `<option value="${this.escape(this.showDbId ? it.id : it.name)}"></option>`).join('');
+    if (!arr.length) { popup.innerHTML = '<div class="veq-combo-empty">无匹配数据库</div>'; return; }
+    popup.innerHTML = arr.map(it => {
+      const main = this.showDbId ? it.id : it.name;
+      const minor = this.showDbId ? it.name : it.id;
+      return `<div class="veq-combo-item" data-id="${this.escape(it.id)}"><span class="main">${this.escape(main)}</span><span class="minor">${this.escape(minor)}</span></div>`;
+    }).join('');
   }
 
   private setDbComboDisplayBySelection() {
@@ -973,6 +1029,8 @@ export class VisualEchartsQueryUI {
       // 加载列表
       const list = await getallavids();
       this.avList = Array.isArray(list) ? list.filter((x: any) => x && x.id).map((x: any) => ({ id: String(x.id), name: String(x.name || x.id) })) : [];
+  // 预填充 popup 列表，避免首次 focus 没有任何选项
+  this.updateDbComboList();
       // 恢复选择显示
       if (this.selectedAvID && this.avList.some(x => x.id === this.selectedAvID)) {
         this.setDbComboDisplayBySelection();
@@ -984,7 +1042,7 @@ export class VisualEchartsQueryUI {
       }
     } catch (e) {
       console.warn('加载数据库列表失败', e);
-      if (this.dbComboList) this.dbComboList.innerHTML = '<div class="veq-combobox-empty">加载失败</div>';
+  const popup = (this as any).dbComboPopup as HTMLElement | undefined; if (popup) popup.innerHTML = '<div class="veq-combo-empty">加载失败</div>';
     }
   }
 
@@ -994,8 +1052,9 @@ export class VisualEchartsQueryUI {
     try {
       viewSel.disabled = true;
       viewSel.innerHTML = '<option value="">加载视图中…</option>';
-      // 使用 renderAttributeView 获取视图列表与默认 viewID
-      const res = await this.avManager.renderAttributeView(avID, { page: -1, pageSize: 1 });
+  // 使用 renderAttributeView 获取视图列表与默认 viewID
+  // 注意：page/pageSize 传入正数，避免内核异常
+  const res = await this.avManager.renderAttributeView(avID, { page: 1, pageSize: -1 });
       const views = Array.isArray((res as any).views) ? (res as any).views : [];
       const defaultViewID = (res as any).viewID || '';
       if (!views.length) {
