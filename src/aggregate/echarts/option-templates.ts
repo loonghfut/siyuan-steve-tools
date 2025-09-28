@@ -100,9 +100,14 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitType!=='none' ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitType==='solid' ? 'solid' : 'dashed'}' } }
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     option.series = [${seriesJs}];
-    ${Array.isArray(ctx.colors) && ctx.colors.length ? `
-    try{ (option.series||[]).forEach(function(s, i){ s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}
-    ` : ''}
+  ${Array.isArray(ctx.colors) && ctx.colors.length ? `
+  // 非饼图系列：逐系列设置颜色
+  try{ (option.series||[]).forEach(function(s, i){ if (s && s.type === 'pie') return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}
+  ` : ''}
+  ${Array.isArray(ctx.colors) && ctx.colors.length && pieCount_ctx>0 ? `
+  // 饼图系列：通过全局调色板为数据项着色
+  try{ option.color = ${JSON.stringify(ctx.colors)}; }catch(e){}
+  ` : ''}
     return option;
   })()`;
   return body;
@@ -342,8 +347,13 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     ` : ''}
     option.series = [${seriesJs}];
     ${Array.isArray(ctx.colors) && ctx.colors.length ? `
-    try{ (option.series||[]).forEach(function(s, i){ s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}
-    ` : ''}
+  // 非饼图系列：逐系列设置颜色；饼图跳过，避免整饼同色
+  try{ (option.series||[]).forEach(function(s, i){ if (s && s.type === 'pie') return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}
+  ` : ''}
+    ${(Array.isArray(ctx.colors) && ctx.colors.length) ? `
+  // 若包含饼图系列，使用全局 color 调色板驱动扇区着色
+  try{ if ((option.series||[]).some(function(s){ return s && s.type==='pie'; })) option.color = ${JSON.stringify(ctx.colors)}; }catch(e){}
+  ` : ''}
     ${ctx.debug ? `
     try{
       var __N = ${Math.max(1, ctx.debugSampleSize || 5)};
