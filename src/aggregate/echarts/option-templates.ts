@@ -1,3 +1,4 @@
+import { genUnwrapAttrValFn, genNormalizeAvResponseSnippet, genBuildFlatRowsSnippet } from './av-iife-snippets';
 export interface EchartsTplCtx {
   title?: string;
   legend?: string[];
@@ -234,121 +235,14 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       }catch(e){ /* ignore */ }
       return null;
     }
-    function unwrapAttrVal(v){
-      if (!v || typeof v !== 'object') return null;
-      // 通用：若顶层存在 content 且为原始类型，直接返回
-      if (Object.prototype.hasOwnProperty.call(v, 'content')) {
-        var c = v.content; if (typeof c==='string' || typeof c==='number' || typeof c==='boolean') return c;
-      }
-      // 基础类型
-      if (v.text && typeof v.text.content === 'string') return v.text.content;
-      if (v.number && typeof v.number.content === 'number') return v.number.content;
-      if (v.date && typeof v.date.content === 'number') return v.date.content;
-      if (v.checkbox && typeof v.checkbox.checked === 'boolean') return v.checkbox.checked;
-      if (v.url && typeof v.url.content === 'string') return v.url.content;
-      if (v.email && typeof v.email.content === 'string') return v.email.content;
-      if (v.phone && typeof v.phone.content === 'string') return v.phone.content;
-      if (v.select && typeof v.select.content === 'string') return v.select.content;
-      // 单/多选：部分版本中单选也以 mSelect 数组返回
-      if (Array.isArray(v.mSelect)) {
-        var arr = v.mSelect.map(function(it){ return it && it.content; }).filter(function(x){ return x!=null; });
-        return arr; // 单选情况下通常长度为 1
-      }
-      // 关联：新形态 relation.contents 数组
-      if (v.relation && Array.isArray(v.relation.contents)) {
-        return v.relation.contents.map(function(it){
-          if (!it || typeof it !== 'object') return null;
-          if (it.block && (it.block.content || it.block.id)) return it.block.content || it.block.id;
-          // 兼容：若嵌套标准结构
-          if (Object.prototype.hasOwnProperty.call(it, 'content')) return it.content;
-          if (it.text && typeof it.text.content==='string') return it.text.content;
-          if (it.number && typeof it.number.content==='number') return it.number.content;
-          return null;
-        });
-      }
-      // 关联：旧形态数组
-      if (Array.isArray(v.relation)) return v.relation.map(function(it){ return it && (it.content || it.blockID); });
-      // 资产：返回数量（用于数值聚合），如需名称可后续扩展
-      if (Array.isArray(v.mAsset)) return v.mAsset.length;
-      // 模板：返回渲染后的字符串
-      if (v.template && (typeof v.template.content==='string' || typeof v.template.content==='number')) return v.template.content;
-      // 汇总：从 contents 中提取原始值；多数为数值，可做求和；若非纯数值则返回数组或首个
-      if (v.rollup && v.rollup.contents && Array.isArray(v.rollup.contents)) {
-        try {
-          var vals = v.rollup.contents.map(function(it){
-            if (!it || typeof it !== 'object') return null;
-            if (it.number && typeof it.number.content==='number') return it.number.content;
-            if (it.text && typeof it.text.content==='string') return it.text.content;
-            if (it.date && typeof it.date.content==='number') return it.date.content;
-            if (it.checkbox && typeof it.checkbox.checked==='boolean') return it.checkbox.checked;
-            if (it.url && typeof it.url.content==='string') return it.url.content;
-            if (it.email && typeof it.email.content==='string') return it.email.content;
-            if (it.phone && typeof it.phone.content==='string') return it.phone.content;
-            if (it.block && (it.block.content || it.block.id)) return it.block.content || it.block.id;
-            return null;
-          }).filter(function(x){ return x!=null; });
-          if (vals.length === 0) return null;
-          var allNum = vals.every(function(x){ return typeof x==='number' && isFinite(x); });
-          if (allNum) { var s=0; for (var i=0;i<vals.length;i++) s+=vals[i]; return s; }
-          if (vals.length === 1) return vals[0];
-          return vals;
-        } catch(e) { /* ignore */ }
-      }
-      // 创建/更新时间
-      if (v.created && typeof v.created.content === 'number') return v.created.content;
-      if (v.updated && typeof v.updated.content === 'number') return v.updated.content;
-      // 块：返回内容或 ID
-      if (v.block) return v.block.content || v.block.id || null;
-      return null;
-    }
+    ${genUnwrapAttrValFn()}
     // 使用 renderAttributeView 获取包含列定义与行值的完整数据
     var __payload = { id: ${JSON.stringify(ctx.avID)}, page: ${String(page)}, pageSize: ${String(pageSize)} };
     ${ctx.viewID ? `__payload.viewID = ${JSON.stringify(ctx.viewID)};` : ''}
     ${keyword ? `__payload.keyword = ${JSON.stringify(keyword)};` : ''}
     var rd = callAvSync('renderAttributeView', __payload) || {};
-    var columns = (rd && rd.view && Array.isArray(rd.view.columns)) ? rd.view.columns : ((rd && Array.isArray(rd.columns)) ? rd.columns : []);
-    var rowsRaw = (rd && rd.view && Array.isArray(rd.view.rows)) ? rd.view.rows : ((rd && Array.isArray(rd.rows)) ? rd.rows : []);
-    // 分组视图兼容：从 rd.view.groups 扁平化 rows，并补充列定义
-    var __groupCols = [];
-    var __rowsFromGroupsLen = 0;
-    (function __walkGroups(gs){ try{
-      if (!gs || !Array.isArray(gs)) return;
-      for (var gi=0; gi<gs.length; gi++){
-        var g = gs[gi] || {};
-        var gcols = Array.isArray(g.columns) ? g.columns : [];
-        for (var k=0;k<gcols.length;k++){
-          var gc = gcols[k] || {};
-          var exists = false;
-          for (var t=0;t<__groupCols.length;t++){ if (__groupCols[t] && __groupCols[t].id === gc.id) { exists = true; break; } }
-          if (!exists) __groupCols.push(gc);
-        }
-        var grows = Array.isArray(g.rows) ? g.rows : [];
-        if (grows.length){ __rowsFromGroupsLen += grows.length; rowsRaw = (rowsRaw || []).concat(grows); }
-        if (Array.isArray(g.groups) && g.groups.length) __walkGroups(g.groups);
-      }
-    }catch(e){/* ignore */}})(rd && rd.view && rd.view.groups);
-    if ((!columns || !columns.length) && __groupCols.length) columns = __groupCols;
-    var id2Name = {};
-    for (var i=0;i<columns.length;i++){ var c = columns[i]||{}; if (c && c.id) id2Name[c.id] = c.name || c.id; }
-    for (var i2=0;i2<__groupCols.length;i2++){ var gc2 = __groupCols[i2]||{}; if (gc2 && gc2.id) id2Name[gc2.id] = gc2.name || gc2.id; }
-    // 标准化行为按 keyName 命名的扁平对象（基于 cells[].value.keyID 映射到列名）
-    var rows = rowsRaw.map(function(r){
-      var o = { id: r && r.id };
-      var cs = r && Array.isArray(r.cells) ? r.cells : [];
-      for (var j=0;j<cs.length;j++){
-        var cell = cs[j] || {}; var v = cell.value || {}; var keyID = v.keyID || '';
-        var name = '';
-        // 优先使用同索引列名
-        if (columns[j] && (columns[j].name || columns[j].id)) name = columns[j].name || columns[j].id;
-        // 其次尝试通过 keyID 映射
-        if (!name && keyID) name = id2Name[keyID] || keyID;
-        // 仍失败则兜底列名
-        if (!name) name = 'C' + j;
-        if (!name) continue;
-        o[name] = unwrapAttrVal(v);
-      }
-      return o;
-    });
+    ${genNormalizeAvResponseSnippet()}
+    ${genBuildFlatRowsSnippet()}
     const option = {};
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
     option.backgroundColor = 'transparent';

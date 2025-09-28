@@ -2,6 +2,7 @@ import { buildIIFEFromAVCtx, EchartsAvTplCtx } from './option-templates';
 import { buildDbMappingExpressions, SeriesItem } from './db-data-mapping';
 import { getallavids } from '../../api/api3';
 import { AVManager } from '../../api/db_pro';
+import { getFieldNamesForUI } from './av-response-mapping';
 
 export interface VisualEchartsQueryOptions {
   persistKey?: string;
@@ -468,8 +469,8 @@ export class VisualEchartsQueryUI {
           let res: any;
           try { res = JSON.parse(raw); } catch (e: any) { throw new Error('JSON 解析失败: ' + (e?.message || e)); }
           if (!res || res.code !== 0) throw new Error(res?.msg || '加载失败');
-          const cols = res.data && res.data.view && Array.isArray(res.data.view.columns) ? res.data.view.columns : [];
-          this.keys = (cols || []).map((c: any) => c && c.name).filter(Boolean);
+          // 使用通用解析器以兼容新旧格式
+          this.keys = getFieldNamesForUI(res);
 
           // 渲染 X 轴字段下拉
           const xSel = this.root.querySelector('[data-xkey]') as HTMLSelectElement | null;
