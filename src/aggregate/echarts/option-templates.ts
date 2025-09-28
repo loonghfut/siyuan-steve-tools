@@ -10,6 +10,13 @@ export interface EchartsTplCtx {
   boundaryGap?: boolean; // x 轴是否保留间隙
   debug?: boolean; // 是否输出调试信息
   debugSampleSize?: number; // 调试输出的采样条数
+  /**
+   * 统一的图表视图设置（与预设模式保持一致）。
+   * bar: { stack, boundaryGap, xLabelRotate, label }
+   * line: { smooth, boundaryGap, xLabelRotate, label }
+   * pie: { innerRadius, outerRadius, roseType, label }
+   */
+  chartSettings?: any;
 }
 
 
@@ -20,6 +27,17 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
   const legendArr = JSON.stringify(legend || []);
   const xExpr = ctx.xDataExpr || 'rows.map((_,i)=>String(i+1))';
   const needDualAxis = (ctx.seriesExprs||[]).some(s => (s as any).axisIndex === 1);
+  const pieCount_ctx = (ctx.seriesExprs||[]).filter(s => (s.type||'line')==='pie').length;
+  let pieNo_ctx = -1;
+  const st: any = (ctx as any).chartSettings || {};
+  const stCommon: any = st && st.common ? st.common : {};
+  const legendPos = stCommon.legendPos as ('top'|'bottom'|'left'|'right'|undefined);
+  const legendPatch = legendPos ? `
+    try{ option.legend = option.legend || {}; option.legend.orient = ${(legendPos==='left'||legendPos==='right') ? `'vertical'` : `'horizontal'`}; option.legend.${legendPos} = 0; ${(legendPos==='left'||legendPos==='right') ? `option.legend.top = 'middle';` : ''} }catch(e){}` : '';
+  const gridPatch = (stCommon && stCommon.grid && [stCommon.grid.top, stCommon.grid.right, stCommon.grid.bottom, stCommon.grid.left].every((v: any)=>Number.isFinite(v))) ? `
+    option.grid = { top: ${Number(stCommon.grid.top)||0}, right: ${Number(stCommon.grid.right)||0}, bottom: ${Number(stCommon.grid.bottom)||0}, left: ${Number(stCommon.grid.left)||0}, containLabel: true };
+  ` : '';
+  const splitType = (function(){ const t = stCommon && stCommon.ySplitLine; return (t==='solid'||t==='none') ? t : 'dashed'; })();
   const seriesJs = (ctx.seriesExprs||[]).map(s=>{
     const type = s.type || 'line';
     const name = JSON.stringify(s.name);
@@ -28,10 +46,28 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     const stack = ctx.stack ? `stack: 'total',` : '';
     const yAxisIndex = (typeof (s as any).axisIndex === 'number' && (s as any).axisIndex! > 0) ? `yAxisIndex:${(s as any).axisIndex|0},` : '';
     const dataExpr = (type==='pie')
-      ? `(function(){ var xs = (${xExpr}); var ys = (${s.expr}); return xs.map(function(n,i){ return { name: String(n), value: ys[i] }; }); })()`
+      ? `(function(){
+        var ys = (${s.expr});
+        // 若用户表达式已返回 {name, value} 数组，则直接使用
+        if (Array.isArray(ys) && ys.length && typeof ys[0]==='object' && ys[0] && Object.prototype.hasOwnProperty.call(ys[0], 'value')) return ys;
+        var xs = (${xExpr});
+        var m = Math.min(xs.length, Array.isArray(ys)?ys.length:0);
+        return xs.slice(0,m).map(function(n,i){ return { name: String(n), value: ys[i] }; });
+      })()`
       : `(${s.expr})`;
+    // 多饼图系列：分配同心环，避免重叠
+    const pieExtra = (type==='pie' && pieCount_ctx>1) ? (function(){
+      pieNo_ctx++;
+      var ir0 = 0, or0 = 70; // SQL 模式默认 0%~70%
+      var span = Math.max(1, or0 - ir0);
+      var ring = span / pieCount_ctx;
+      var r1 = Math.round(ir0 + ring*pieNo_ctx);
+      var r2 = Math.round(ir0 + ring*(pieNo_ctx+1));
+      if (r2 <= r1) r2 = r1 + 1;
+      return `radius: ['${r1}%', '${r2}%'],`;
+    })() : '';
     return `{
-      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} z: 1,
+      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${pieExtra} z: 1,
       data: ${dataExpr}
     }`;
   }).join(',\n');
@@ -57,9 +93,11 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     option.backgroundColor = 'transparent';
     option.tooltip = { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } };
     option.legend = { data: ${legendArr} };
+    ${legendPatch}
+    ${gridPatch}
     option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false } }];
     option.yAxis = ${`[{
-      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { lineStyle: { color: 'rgba(0, 0, 0, .38)', type: 'dashed' } }
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitType!=='none' ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitType==='solid' ? 'solid' : 'dashed'}' } }
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     option.series = [${seriesJs}];
     ${Array.isArray(ctx.colors) && ctx.colors.length ? `
@@ -91,18 +129,67 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
   const legendArr = JSON.stringify(legend || []);
   const xExpr = ctx.xDataExpr || 'rows.map((_,i)=>String(i+1))';
   const needDualAxis = (ctx.seriesExprs||[]).some(s => (s as any).axisIndex === 1);
+  const isAllPie = (ctx.seriesExprs||[]).length>0 && (ctx.seriesExprs||[]).every(s => (s.type||'line')==='pie');
+  const st: any = (ctx as any).chartSettings || {};
+  // 兼容嵌套设置：{ bar: {...}, line: {...}, pie: {...} } 或平铺
+  const stBar: any = (st && st.bar) ? st.bar : st;
+  const stLine: any = (st && st.line) ? st.line : st;
+  const stPie: any = (st && st.pie) ? st.pie : st;
+  const stCommon: any = st && st.common ? st.common : {};
+  const hasBar = (ctx.seriesExprs||[]).some(s => (s.type||'line')==='bar');
+  const hasLine = (ctx.seriesExprs||[]).some(s => (s.type||'line')==='line');
+  const pieCount = (ctx.seriesExprs||[]).filter(s => (s.type||'line')==='pie').length;
+  let pieNo = -1;
   const seriesJs = (ctx.seriesExprs||[]).map(s=>{
     const type = s.type || 'line';
     const name = JSON.stringify(s.name);
-    const smooth = ctx.smooth && type==='line' ? 'true' : 'false';
-    const area = ctx.area && type==='line' ? `areaStyle: { normal: {} },` : '';
-    const stack = ctx.stack ? `stack: 'total',` : '';
+    // 若提供统一设置，则以统一设置优先；在嵌套模式下按系列类型读取
+    const smooth = ((type==='line') && ((typeof stLine.smooth === 'boolean' ? stLine.smooth : !!ctx.smooth))) ? 'true' : 'false';
+    // 面积填充：优先读取嵌套 line.area，其次回退到 ctx.area
+    const area = ((type==='line') && ((stLine && (stLine as any).area===true) || !!ctx.area)) ? `areaStyle: { normal: {} },` : '';
+    const stack = ((type==='bar') && (typeof stBar.stack === 'boolean' ? stBar.stack : !!ctx.stack)) ? `stack: 'total',` : '';
     const yAxisIndex = (typeof (s as any).axisIndex === 'number' && (s as any).axisIndex! > 0) ? `yAxisIndex:${(s as any).axisIndex|0},` : '';
     const dataExpr = (type==='pie')
-      ? `(function(){ var xs = (${xExpr}); var ys = (${s.expr}); return xs.map(function(n,i){ return { name: String(n), value: ys[i] }; }); })()`
+      ? `(function(){
+        var ys = (${s.expr});
+        // 若用户表达式已返回 {name, value} 数组，则直接使用
+        if (Array.isArray(ys) && ys.length && typeof ys[0]==='object' && ys[0] && Object.prototype.hasOwnProperty.call(ys[0], 'value')) return ys;
+        var xs = (${xExpr});
+        var m = Math.min(xs.length, Array.isArray(ys)?ys.length:0);
+        return xs.slice(0,m).map(function(n,i){ return { name: String(n), value: ys[i] }; });
+      })()`
       : `(${s.expr})`;
+    // 统一 label 设置：按系列类型读取（饼图取 pie.label）
+    const label = (function(){
+      let l: any;
+      if (type==='bar') l = stBar && stBar.label;
+      else if (type==='line') l = stLine && stLine.label;
+      else if (type==='pie') l = stPie && stPie.label;
+      return l ? `label: ${JSON.stringify(l)},` : '';
+    })();
+    // 饼图半径、玫瑰图
+    const pieExtra = (type==='pie') ? (function(){
+      const rose = (stPie && (stPie.roseType===false || stPie.roseType==='radius' || stPie.roseType==='area')) ? stPie.roseType : undefined;
+      const parts: string[] = [];
+      // 多饼图系列：把 [inner, outer] 区间分割为多条环带，避免重叠
+      const irCfg = typeof stPie.innerRadius === 'number' ? Math.max(0, Math.min(100, stPie.innerRadius|0)) : 0;
+      const orCfg = typeof stPie.outerRadius === 'number' ? Math.max(irCfg, Math.min(100, stPie.outerRadius|0)) : 70;
+      if (pieCount > 1) {
+        pieNo++;
+        const span = Math.max(1, orCfg - irCfg);
+        const ring = span / pieCount;
+        let r1 = Math.round(irCfg + ring*pieNo);
+        let r2 = Math.round(irCfg + ring*(pieNo+1));
+        if (r2 <= r1) r2 = r1 + 1;
+        parts.push(`radius: ['${r1}%', '${r2}%'],`);
+      } else {
+        parts.push(`radius: ['${irCfg}%', '${orCfg}%'],`);
+      }
+      if (rose!==undefined && rose!==false) parts.push(`roseType: '${rose}',`);
+      return parts.join(' ');
+    })() : '';
     return `{
-      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} z: 1,
+      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${label} ${pieExtra} z: 1,
       data: ${dataExpr}
     }`;
   }).join(',\n');
@@ -214,12 +301,45 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     const option = {};
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
     option.backgroundColor = 'transparent';
-    option.tooltip = { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } };
-    option.legend = { data: ${legendArr} };
-    option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false } }];
+    option.tooltip = ${isAllPie ? `{ trigger: 'item' }` : `{ trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } }`};
+    option.legend = ${isAllPie ? `{ data: (${xExpr}) }` : `{ data: ${legendArr} }`};
+    ${(function(){
+      const pos = (stCommon && (stCommon.legendPos==='top'||stCommon.legendPos==='bottom'||stCommon.legendPos==='left'||stCommon.legendPos==='right')) ? stCommon.legendPos : null;
+      if (!pos) return '';
+      const orient = (pos==='left'||pos==='right') ? 'vertical' : 'horizontal';
+      const extra = (pos==='left'||pos==='right') ? `option.legend.top = 'middle';` : '';
+      return `try{ option.legend.orient='${orient}'; option.legend.${pos}=0; ${extra} }catch(e){}`;
+    })()}
+    ${(function(){
+      try{
+        const g = stCommon && stCommon.grid;
+        if (g && [g.top,g.right,g.bottom,g.left].every((v: any)=>Number.isFinite(v))) {
+          return `option.grid = { top: ${Number(stCommon.grid.top)||0}, right: ${Number(stCommon.grid.right)||0}, bottom: ${Number(stCommon.grid.bottom)||0}, left: ${Number(stCommon.grid.left)||0}, containLabel: true };`;
+        }
+      }catch(e){}
+      return '';
+    })()}
+    ${!isAllPie ? `
+    option.xAxis = [{ type: 'category', boundaryGap: ${(function(){
+      if (typeof (ctx as any).boundaryGap === 'boolean') return (ctx as any).boundaryGap ? 'true' : 'false';
+      if (st && (st.bar || st.line)) {
+        if (hasBar && typeof stBar.boundaryGap === 'boolean') return stBar.boundaryGap ? 'true' : 'false';
+        if (hasLine && typeof stLine.boundaryGap === 'boolean') return stLine.boundaryGap ? 'true' : 'false';
+      }
+      if (typeof st.boundaryGap === 'boolean') return st.boundaryGap ? 'true' : 'false';
+      return 'false';
+    })()}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false }, axisLabel: { ${(function(){
+      if (st && (st.bar || st.line)) {
+        if (hasLine && typeof stLine.xLabelRotate === 'number') return `rotate: ${stLine.xLabelRotate|0}`;
+        if (hasBar && typeof stBar.xLabelRotate === 'number') return `rotate: ${stBar.xLabelRotate|0}`;
+      }
+      if (typeof st.xLabelRotate === 'number') return `rotate: ${st.xLabelRotate|0}`;
+      return '';
+    })()} } }];
     option.yAxis = ${`[{
-      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { lineStyle: { color: 'rgba(0, 0, 0, .38)', type: 'dashed' } }
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { ${(function(){ const t = stCommon && stCommon.ySplitLine; const tp = (t==='solid'||t==='none')?t:'dashed'; return `show: ${tp!=='none' ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${(tp==='solid')?'solid':'dashed'}' }`; })()} }
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
+    ` : ''}
     option.series = [${seriesJs}];
     ${Array.isArray(ctx.colors) && ctx.colors.length ? `
     try{ (option.series||[]).forEach(function(s, i){ s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}

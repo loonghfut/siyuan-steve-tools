@@ -84,17 +84,19 @@ export class VisualEchartsUI {
     this.injectStyle();
     this.container.innerHTML = this.html`
       <div class="ve-wrap">
-        <div class="ve-mode-tabs" role="tablist">
-          <button class="ve-tab active" data-tab="preset" type="button">预设计数</button>
-          <button class="ve-tab" data-tab="query" type="button">数据库查询</button>
-        </div>
         <details class="ve-card" open data-section="preview">
-          <summary class="ve-legend">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></summary>
-          <div class="ve-result" data-result><div class="ve-placeholder">请在下方添加对比的 SQL 预设后，将在此显示图表</div></div>
+          <summary class="ve-legend">
+            <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></span>
+            <div class="ve-mode-tabs" role="tablist">
+              <button class="ve-tab active" data-tab="preset" type="button">SQL预设计数</button>
+              <button class="ve-tab" data-tab="query" type="button">数据库查询</button>
+            </div>
+          </summary>
+          <div class="ve-result" data-result><div class="ve-placeholder">在下方完成配置后，这里会显示图表</div></div>
         </details>
 
         <details class="ve-card" open data-section="preset">
-          <summary class="ve-legend">预设对比计数
+          <summary class="ve-legend">SQL预设计数
             <span style="margin-left:8px; display:inline-flex; gap:6px; align-items:center;">
               <select class="ve-input" data-preset-type style="width:120px">
                 <option value="bar">柱状图</option>
@@ -146,7 +148,7 @@ export class VisualEchartsUI {
     this.outputPre = this.container.querySelector('[data-output]') as HTMLPreElement;
     this.previewBody = this.container.querySelector('[data-result]') as HTMLElement;
     // 预览刷新
-    (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', () => this.refreshPreview());
+  (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.refreshPreview(); });
     const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement | null;
     if (gotoSqlBtn) {
       if (this.opts?.onGotoSQL) {
@@ -166,12 +168,20 @@ export class VisualEchartsUI {
     (this.container.querySelector('[data-preset-clear]') as HTMLButtonElement)?.addEventListener('click', () => { this.presetItems = []; this.rebuildPresetListUI(); this.rebuildPresetCode(); });
     (this.container.querySelector('[data-preset-copy]') as HTMLButtonElement)?.addEventListener('click', () => this.copyPresetCode());
   (this.container.querySelector('[data-preset-copy-block]') as HTMLButtonElement)?.addEventListener('click', () => this.copyChartBlock());
-    this.presetTypeSel?.addEventListener('change', () => { this.renderTypeSettingsUI(); this.rebuildPresetCode(); });
-    this.presetTitleInput?.addEventListener('input', () => this.rebuildPresetCode());
+    this.presetTypeSel?.addEventListener('change', () => {
+      this.renderTypeSettingsUI();
+      // 同步到查询面板以保持统一
+      try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ }
+      this.rebuildPresetCode();
+    });
+    this.presetTitleInput?.addEventListener('input', () => {
+      try { this.queryUI?.setTitle(this.presetTitleInput!.value || ''); } catch { /* ignore */ }
+      this.rebuildPresetCode();
+    });
     // 颜色编辑器交互
     const addColorBtn = this.container.querySelector('[data-color-add]') as HTMLButtonElement | null;
     const getColors = (): string[] => this.presetColors.slice();
-    const setColors = (arr: string[]) => { this.presetColors = arr.slice(); this.debouncedRebuildColorUpdate(); };
+  const setColors = (arr: string[]) => { this.presetColors = arr.slice(); try { this.queryUI?.setColors(this.presetColors.slice()); } catch { /* ignore */ } this.debouncedRebuildColorUpdate(); };
     const renderPalette = () => this.renderPaletteFromState(getColors, setColors);
     if (addColorBtn) addColorBtn.addEventListener('click', () => {
       const cs = getColors();
@@ -226,8 +236,37 @@ export class VisualEchartsUI {
         persistKey: this.key + ':query',
         onGotoSQL: this.opts?.onGotoSQL,
         loadSqlPresets: this.loadSqlPresetsProvider,
-        onChange: () => this.rebuildCode(),
+        onChange: () => {
+          // 从查询面板拉取最新统一设置并同步到预设面板
+          try {
+            if (!this.queryUI) return;
+            const vs = this.queryUI.getViewSettings();
+            const colors = this.queryUI.getColors();
+            const title = this.queryUI.getTitle();
+            // 同步图表类型
+            if (this.presetTypeSel) this.presetTypeSel.value = (vs?.type || 'bar') as any;
+            // 同步每类型设置
+            if (vs && vs.settings) {
+              const t = vs.type || 'bar';
+              if (t === 'line') this.perTypeSettings.line = { ...this.perTypeSettings.line, ...vs.settings };
+              else if (t === 'pie') this.perTypeSettings.pie = { ...this.perTypeSettings.pie, ...vs.settings };
+              else this.perTypeSettings.bar = { ...this.perTypeSettings.bar, ...vs.settings };
+              this.renderTypeSettingsUI();
+            }
+            // 同步颜色与标题
+            if (Array.isArray(colors)) { this.presetColors = colors.slice(); this.renderPaletteFromState(() => this.presetColors.slice(), (arr)=>{ this.presetColors = arr.slice(); }); }
+            if (this.presetTitleInput && typeof title === 'string') this.presetTitleInput.value = title;
+          } catch { /* ignore */ }
+          this.rebuildCode();
+        },
       });
+      // 将当前预设视图设置与颜色/标题初始化同步到查询面板
+      try {
+        const t = (this.presetTypeSel?.value as any) || 'bar';
+        this.queryUI.setViewSettings(t, this.getCurrentTypeSettings());
+        this.queryUI.setColors(this.presetColors.slice());
+        this.queryUI.setTitle(this.presetTitleInput?.value || '');
+      } catch { /* ignore */ }
     }
 
     // 模式切换
@@ -239,14 +278,24 @@ export class VisualEchartsUI {
       if (presetCard) presetCard.style.display = this.mode==='preset' ? '' : 'none';
       if (queryCard) queryCard.style.display = this.mode==='query' ? '' : 'none';
     };
-    tabs.forEach(btn => btn.addEventListener('click', () => {
+    tabs.forEach(btn => btn.addEventListener('click', (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
       const t = btn.getAttribute('data-tab') as 'preset'|'query';
-      if (t && t !== this.mode) {
-        this.mode = t;
-        this.save();
-        applyMode();
-        this.rebuildCode();
+      if (!t) return;
+      const prev = this.mode;
+      this.mode = t;
+      this.save();
+      applyMode();
+      // 仅在从非 query 进入 query 时做一次同步
+      if (this.mode === 'query' && prev !== 'query') {
+        try {
+          const type = (this.presetTypeSel?.value as any) || 'bar';
+          this.queryUI?.setViewSettings(type, this.getCurrentTypeSettings());
+          this.queryUI?.setColors(this.presetColors.slice());
+          this.queryUI?.setTitle(this.presetTitleInput?.value || '');
+        } catch { /* ignore */ }
       }
+      this.rebuildCode();
     }));
   }
 
@@ -313,6 +362,8 @@ export class VisualEchartsUI {
       .ve-wrap{--fg: var(--b3-theme-on-background); --muted: var(--b3-theme-on-surface); --border: var(--b3-border-color); --bg: var(--b3-theme-surface); font-family: var(--b3-font-family); font-size: var(--b3-font-size);}
   .ve-card{border:1px solid var(--border); border-radius:10px; padding:12px; background: var(--bg); margin-bottom:12px; box-shadow: 0 6px 20px color-mix(in oklab, var(--b3-theme-on-background), transparent 92%)}
       .ve-legend{font-weight:600; color: var(--muted)}
+  details > summary.ve-legend{display:flex; align-items:center; justify-content:space-between; gap:8px}
+  .ve-legend-left{display:inline-flex; align-items:center; gap:6px}
       .ve-grid{display:grid; gap:8px}
       .ve-grid-2{grid-template-columns: 1fr 1fr}
   .ve-field{display:grid; gap:6px; font-size:13.5px; color: var(--fg)}
@@ -393,7 +444,7 @@ export class VisualEchartsUI {
       .ve-preset-chooser{display:flex; flex-wrap:wrap; gap:6px}
       .ve-search{margin-bottom:8px}
       .ve-empty{color: var(--muted); font-size:12px; padding:4px 0}
-      .ve-mode-tabs{display:flex; gap:6px; margin: 0 0 8px 0}
+  .ve-mode-tabs{display:flex; gap:6px}
       .ve-tab{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); padding:6px 10px; border-radius:999px; cursor:pointer}
       .ve-tab.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
     `; document.head.appendChild(st);
@@ -580,19 +631,19 @@ export class VisualEchartsUI {
     inputs.forEach(el => {
       const key = el.getAttribute('data-set') || '';
       if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-        el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); this.rebuildPresetCode(); });
+        el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode(); });
       } else if (el instanceof HTMLInputElement && (el.type === 'number' || el.type === 'text' || el.type === 'range')) {
         el.addEventListener('input', () => {
           const v = (el.type === 'number' || el.type === 'range') ? Number(el.value) : el.value;
           // 实时更新旁侧的数值
           const labelSpan = el.parentElement?.querySelector('.ve-label') as HTMLElement | null;
           if (labelSpan && (typeof v === 'number')) labelSpan.textContent = key.includes('Radius') ? `${v}%` : `${v}°`;
-          this.setDeepSetting(key, v); this.rebuildPresetCode();
+          this.setDeepSetting(key, v); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode();
         });
       } else if (el instanceof HTMLInputElement && el.type === 'radio') {
-        el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; this.setDeepSetting(key, v); this.rebuildPresetCode(); });
+        el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; this.setDeepSetting(key, v); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode(); });
       } else if (el instanceof HTMLSelectElement) {
-        el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; this.setDeepSetting(key, v || (v as any)); this.rebuildPresetCode(); });
+        el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; this.setDeepSetting(key, v || (v as any)); try { this.queryUI?.setViewSettings((this.presetTypeSel!.value as any), this.getCurrentTypeSettings()); } catch { /* ignore */ } this.rebuildPresetCode(); });
       }
     });
     // 恢复默认
