@@ -30,9 +30,9 @@ export class VisualEchartsQueryUI {
     grid: { top: 10, right: 10, bottom: 24, left: 10 }
   };
   // 设置面板折叠状态（持久化）
-  private foldCommon: boolean = true;
-  private foldStat: boolean = true;
-  private foldPie: boolean = true;
+  private foldCommon: boolean = false;
+  private foldStat: boolean = false;
+  private foldPie: boolean = false;
 
   // 统一图表设置（与预设模式保持一致）
   private chartType: 'stat'|'pie' = 'stat';
@@ -179,7 +179,7 @@ export class VisualEchartsQueryUI {
           </div>
         </div>
 
-        <details class="veq-sub" open>
+        <details class="veq-sub">
           <summary class="veq-legend">代码预览</summary>
           <pre class="veq-output" data-code></pre>
         </details>
@@ -656,13 +656,13 @@ export class VisualEchartsQueryUI {
           };
         }
       }
-      // 恢复折叠状态（默认展开）
+      // 恢复折叠状态（默认折叠）
       if (obj.fold && typeof obj.fold === 'object') {
-        this.foldCommon = obj.fold.common !== false; // 默认 true
-        this.foldStat = obj.fold.stat !== false;     // 默认 true
-        this.foldPie = obj.fold.pie !== false;       // 默认 true
+        this.foldCommon = obj.fold.common === true; // 仅当存储为 true 时展开
+        this.foldStat = obj.fold.stat === true;
+        this.foldPie = obj.fold.pie === true;
       } else {
-        this.foldCommon = true; this.foldStat = true; this.foldPie = true;
+        this.foldCommon = false; this.foldStat = false; this.foldPie = false;
       }
   const typeSel = this.root.querySelector('[data-chart-type]') as HTMLSelectElement | null; if (typeSel) typeSel.value = this.chartType;
   if (this.chartTypeSel) this.chartTypeSel.value = this.chartType;

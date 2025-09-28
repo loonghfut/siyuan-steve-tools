@@ -82,20 +82,29 @@ export class VisualEchartsUI {
 
   private render() {
     this.injectStyle();
+    // 预读取持久化的模式用于初始渲染，避免首次打开时显示为默认 preset
+    try {
+      const raw = localStorage.getItem(this.key);
+      if (raw) {
+        const obj = JSON.parse(raw);
+        if (obj && (obj.mode === 'preset' || obj.mode === 'query')) this.mode = obj.mode;
+      }
+    } catch { /* ignore */ }
+    const initialMode = this.mode;
     this.container.innerHTML = this.html`
       <div class="ve-wrap">
         <details class="ve-card" open data-section="preview">
           <summary class="ve-legend">
             <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></span>
             <div class="ve-mode-tabs" role="tablist">
-              <button class="ve-tab active" data-tab="preset" type="button">SQL预设计数</button>
-              <button class="ve-tab" data-tab="query" type="button">数据库查询</button>
+              <button class="ve-tab ${initialMode==='preset' ? 'active' : ''}" data-tab="preset" type="button">SQL预设计数</button>
+              <button class="ve-tab ${initialMode==='query' ? 'active' : ''}" data-tab="query" type="button">数据库查询</button>
             </div>
           </summary>
           <div class="ve-result" data-result><div class="ve-placeholder">在下方完成配置后，这里会显示图表</div></div>
         </details>
 
-        <details class="ve-card" open data-section="preset">
+        <details class="ve-card" open data-section="preset" style="display:${initialMode==='preset' ? '' : 'none'}">
           <summary class="ve-legend">SQL预设计数
             <span style="margin-left:8px; display:inline-flex; gap:6px; align-items:center;">
               <select class="ve-input" data-preset-type style="width:120px">
@@ -139,7 +148,7 @@ export class VisualEchartsUI {
           <div class="ve-preset-list" data-preset-list></div>
           <div class="ve-hint" style="color:var(--muted); font-size:12px; margin-top:6px;">说明：x 轴为各预设名称，y 为各自 SQL 查询结果的行数。</div>
         </details>
-        <details class="ve-card" open data-section="query" style="display:none">
+        <details class="ve-card" open data-section="query" style="display:${initialMode==='query' ? '' : 'none'}">
           <summary class="ve-legend">数据库查询模式</summary>
           <div data-query-container></div>
         </details>
@@ -258,6 +267,17 @@ export class VisualEchartsUI {
             if (this.presetTitleInput && typeof title === 'string') this.presetTitleInput.value = title;
           } catch { /* ignore */ }
           this.rebuildCode();
+          // 同步子面板的折叠状态到父存储中，方便未来跨会话读取（冗余一份，便于集中恢复）
+          try {
+            if (this.queryUI) {
+              const parentRaw = localStorage.getItem(this.key);
+              const parent = parentRaw ? JSON.parse(parentRaw) : {};
+              const childRaw = localStorage.getItem(this.key + ':query');
+              const child = childRaw ? JSON.parse(childRaw) : {};
+              parent.queryFold = child.fold || parent.queryFold || {};
+              localStorage.setItem(this.key, JSON.stringify(parent));
+            }
+          } catch { /* ignore */ }
         },
       });
       // 将当前预设视图设置与颜色/标题初始化同步到查询面板
@@ -266,6 +286,15 @@ export class VisualEchartsUI {
         this.queryUI.setViewSettings(t, this.getCurrentTypeSettings());
         this.queryUI.setColors(this.presetColors.slice());
         this.queryUI.setTitle(this.presetTitleInput?.value || '');
+        // 初始化后同步一次折叠状态到父存储（与 onChange 中逻辑一致）
+        try {
+          const parentRaw = localStorage.getItem(this.key);
+          const parent = parentRaw ? JSON.parse(parentRaw) : {};
+          const childRaw = localStorage.getItem(this.key + ':query');
+          const child = childRaw ? JSON.parse(childRaw) : {};
+          parent.queryFold = child.fold || parent.queryFold || {};
+          localStorage.setItem(this.key, JSON.stringify(parent));
+        } catch { /* ignore */ }
       } catch { /* ignore */ }
     }
 
@@ -345,6 +374,15 @@ export class VisualEchartsUI {
         // 恢复后刷新调色盘
         this.renderPaletteFromState(() => this.presetColors.slice(), (arr) => { this.presetColors = arr.slice(); });
       }
+      // 可选：将查询子面板的折叠状态从父存储中读回（如果子存储尚未生成）
+      try {
+        const childRaw = localStorage.getItem(this.key + ':query');
+        const child = childRaw ? JSON.parse(childRaw) : {};
+        if ((!child || !child.fold) && obj && obj.queryFold) {
+          child.fold = obj.queryFold;
+          localStorage.setItem(this.key + ':query', JSON.stringify(child));
+        }
+      } catch { /* ignore */ }
     } catch { }
   }
 
