@@ -173,7 +173,7 @@ export class VisualEchartsQueryUI {
 
         <div class="veq-group" style="margin-top:8px;">
           <div class="veq-type-settings" data-type-settings-body></div>
-          <div class="veq-row veq-justify-end veq-actions-compact" style="margin-top:8px;">
+          <div class="veq-row veq-actions-compact" style="margin-top:8px;">
             <button class="veq-btn" data-copy-iife type="button">复制 JS(IIFE)</button>
             <button class="veq-btn" data-copy-block type="button">复制图表块</button>
           </div>

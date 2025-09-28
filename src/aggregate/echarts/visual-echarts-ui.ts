@@ -95,7 +95,7 @@ export class VisualEchartsUI {
       <div class="ve-wrap">
         <details class="ve-card" open data-section="preview">
           <summary class="ve-legend">
-            <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button></span>
+            <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button><button class="ve-icon" data-copy-block-top title="复制图表块">⎘</button></span>
             <div class="ve-mode-tabs" role="tablist">
               <button class="ve-tab ${initialMode==='preset' ? 'active' : ''}" data-tab="preset" type="button">SQL预设计数</button>
               <button class="ve-tab ${initialMode==='query' ? 'active' : ''}" data-tab="query" type="button">数据库查询</button>
@@ -158,6 +158,7 @@ export class VisualEchartsUI {
     this.previewBody = this.container.querySelector('[data-result]') as HTMLElement;
     // 预览刷新
   (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.refreshPreview(); });
+  (this.container.querySelector('[data-copy-block-top]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.copyChartBlock(); });
     const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement | null;
     if (gotoSqlBtn) {
       if (this.opts?.onGotoSQL) {
@@ -282,8 +283,14 @@ export class VisualEchartsUI {
       });
       // 将当前预设视图设置与颜色/标题初始化同步到查询面板
       try {
-        const t = (this.presetTypeSel?.value as any) || 'bar';
-        this.queryUI.setViewSettings(t, this.getCurrentTypeSettings());
+        // 读取查询面板自身的持久化类型，避免被预设类型覆盖
+        const vs = this.queryUI.getViewSettings();
+        const qType = (vs?.type as any) || (this.presetTypeSel?.value as any) || 'bar';
+        // 同步预设选择器显示为查询面板类型（保持 UI 一致）
+        if (this.presetTypeSel) this.presetTypeSel.value = qType;
+        // 按查询面板的类型推送对应设置
+        const settingsFor = (t: any) => (t === 'line' ? this.perTypeSettings.line : (t === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
+        this.queryUI.setViewSettings(qType, settingsFor(qType));
         this.queryUI.setColors(this.presetColors.slice());
         this.queryUI.setTitle(this.presetTitleInput?.value || '');
         // 初始化后同步一次折叠状态到父存储（与 onChange 中逻辑一致）
@@ -318,8 +325,12 @@ export class VisualEchartsUI {
       // 仅在从非 query 进入 query 时做一次同步
       if (this.mode === 'query' && prev !== 'query') {
         try {
-          const type = (this.presetTypeSel?.value as any) || 'bar';
-          this.queryUI?.setViewSettings(type, this.getCurrentTypeSettings());
+          // 保留查询面板自身的类型，避免被预设覆盖
+          const vs = this.queryUI?.getViewSettings();
+          const qType = (vs?.type as any) || (this.presetTypeSel?.value as any) || 'bar';
+          if (this.presetTypeSel) this.presetTypeSel.value = qType;
+          const settingsFor = (tt: any) => (tt === 'line' ? this.perTypeSettings.line : (tt === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
+          this.queryUI?.setViewSettings(qType, settingsFor(qType));
           this.queryUI?.setColors(this.presetColors.slice());
           this.queryUI?.setTitle(this.presetTitleInput?.value || '');
         } catch { /* ignore */ }
@@ -485,6 +496,8 @@ export class VisualEchartsUI {
   .ve-mode-tabs{display:flex; gap:6px}
       .ve-tab{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); padding:6px 10px; border-radius:999px; cursor:pointer}
       .ve-tab.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
+  /* 仅缩小预览顶部模式切换的两个按钮尺寸，不影响其它按钮 */
+  .ve-mode-tabs .ve-tab{padding:3px 8px; font-size:12px}
     `; document.head.appendChild(st);
   }
 
@@ -858,16 +871,21 @@ export class VisualEchartsUI {
   }
 
   private async copyChartBlock() {
-    const t = (this.presetTypeSel?.value as any) || 'bar';
-    const title = (this.presetTitleInput?.value ?? '') as string;
-    const settings = this.getCurrentTypeSettings();
-    const iife = buildPresetCountIIFE(
-      this.presetItems,
-      t,
-      title || '',
-      settings,
-      this.presetColors
-    );
+    let iife = '';
+    if (this.mode === 'preset') {
+      const t = (this.presetTypeSel?.value as any) || 'bar';
+      const title = (this.presetTitleInput?.value ?? '') as string;
+      const settings = this.getCurrentTypeSettings();
+      iife = buildPresetCountIIFE(
+        this.presetItems,
+        t,
+        title || '',
+        settings,
+        this.presetColors
+      );
+    } else {
+      iife = this.queryUI?.getIIFE() || '';
+    }
     const block = '```echarts\n' + iife + '\n```';
     try { await navigator.clipboard.writeText(block); this.toast('已复制图表块'); }
     catch {
