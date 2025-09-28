@@ -1,4 +1,5 @@
 // showMessage 若需要可在运行环境通过 window.showMessage 使用，这里不直接导入以避免未使用警告
+import { api } from "@frostime/siyuan-plugin-kits";
 import { getTag, TagItem } from "./api";
 
 export function escapeHtml(s: string) {
@@ -210,4 +211,18 @@ export async function getalltages(): Promise<string[]> {
         console.warn("getalltages failed:", e);
         return [];
     }
+}
+
+
+export async function getallavids() {
+    const sqlStr = `SELECT markdown, content
+            FROM blocks
+            WHERE markdown LIKE '%NodeAttributeView%data-av-id%';`;
+    const res = await api.sql(sqlStr);
+    const avIds = res.map(item => ({
+        id: extractDataAvId(item.markdown),
+        name: item.content?.split(' ')[0] || 'N/A'
+    })).filter(item => item.id !== null);
+    console.log("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+    return avIds;
 }

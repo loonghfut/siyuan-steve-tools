@@ -1,5 +1,7 @@
 import { buildIIFEFromAVCtx, EchartsAvTplCtx } from './option-templates';
 import { buildDbMappingExpressions, SeriesItem } from './db-data-mapping';
+import { getallavids } from '../../api/api3';
+import { AVManager } from '../../api/db_pro';
 
 export interface VisualEchartsQueryOptions {
   persistKey?: string;
@@ -24,8 +26,19 @@ export class VisualEchartsQueryUI {
   private codePre!: HTMLPreElement;
   private chartTypeSel?: HTMLSelectElement;
   private typeSettingsEl?: HTMLElement;
+  // 新增：数据库/视图下拉与数据缓存
+
+  private viewSelEl?: HTMLSelectElement;
+  // 新：组合框（单一输入 + 下拉）
+  private dbComboInput?: HTMLInputElement;
+  private dbComboList?: HTMLElement;
+  private avList: Array<{ id: string; name: string }> = [];
+  private avManager = new AVManager('');
+  private selectedAvID: string = '';
+  private selectedViewID: string = '';
+  private showDbId: boolean = false; // 开关：切换 DB 下拉显示名称或 avID
   // 通用设置
-  private commonSettings: { legendPos: 'top'|'bottom'|'left'|'right'; ySplitLine: 'dashed'|'solid'|'none'; grid: { top: number; right: number; bottom: number; left: number } } = {
+  private commonSettings: { legendPos: 'top' | 'bottom' | 'left' | 'right'; ySplitLine: 'dashed' | 'solid' | 'none'; grid: { top: number; right: number; bottom: number; left: number } } = {
     legendPos: 'top',
     ySplitLine: 'dashed',
     grid: { top: 50, right: 10, bottom: 24, left: 10 }
@@ -36,16 +49,16 @@ export class VisualEchartsQueryUI {
   private foldPie: boolean = false;
 
   // 统一图表设置（与预设模式保持一致）
-  private chartType: 'stat'|'pie' = 'stat';
+  private chartType: 'stat' | 'pie' = 'stat';
   private perTypeSettings: {
     bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
     line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
     pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
   } = {
-    bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
-    line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
-    pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
-  };
+      bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
+      line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
+      pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
+    };
   private colors: string[] = [];
   private series: Array<SeriesItem> = [];
   private debug = false;
@@ -56,7 +69,7 @@ export class VisualEchartsQueryUI {
   private visualMode = true;
   private keys: string[] = [];
   private xKey: string = '';
-  private sort: 'none'|'asc'|'desc' = 'asc';
+  private sort: 'none' | 'asc' | 'desc' = 'asc';
   private mergeMode: boolean = true;
 
   constructor(container: HTMLElement, options?: VisualEchartsQueryOptions) {
@@ -71,12 +84,12 @@ export class VisualEchartsQueryUI {
   // 供外部读取 IIFE
   public getIIFE(): string {
     const ctx: EchartsAvTplCtx = {
-      avID: this.avIdInput?.value || '',
+      avID: this.selectedAvID || '',
       // 传递 viewID
-      viewID: this.viewIdInput?.value || '',
+      viewID: this.selectedViewID || '',
       title: this.titleInput?.value || '',
       xDataExpr: this.xExprTextarea?.value || 'rows.map((_, i) => String(i+1))',
-      seriesExprs: this.series.map(s => ({ name: s.name, expr: s.expr, type: (this.chartType==='pie' ? 'pie' : (s.type || 'line')), axisIndex: s.axisIndex })),
+      seriesExprs: this.series.map(s => ({ name: s.name, expr: s.expr, type: (this.chartType === 'pie' ? 'pie' : (s.type || 'line')), axisIndex: s.axisIndex })),
       chartSettings: this.getChartSettingsForTemplate(),
       debug: this.debug,
       debugSampleSize: this.debugSampleSize,
@@ -128,13 +141,21 @@ export class VisualEchartsQueryUI {
 
         <div class="veq-grid veq-grid-2">
           <div class="veq-group">
-            <div class="veq-group__title">数据库查询参数（AV API）</div>
-            <div class="veq-grid" style="grid-template-columns: 1fr 1fr 1fr; gap:8px;">
-              <label class="veq-field">avID
-                <input class="veq-input" data-avid placeholder="属性视图 avID，如 20250101-abcdefg" />
+            <div class="veq-group__title">数据库查询参数（AV API）
+              <div class="veq-inline" style="gap:8px; align-items:center;">
+                <span style="font-weight: normal; color: var(--b3-theme-on-surface);">显示 avID</span>
+                <label class="veq-switch"><input type="checkbox" data-db-showid/><i></i></label>
+              </div>
+            </div>
+            <div class="veq-grid" style="grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+              <label class="veq-field">数据库
+                <input class="vsb-input" data-dbcombo placeholder="选择或搜索数据库" autocomplete="off" list="veq-db-list" />
+                <datalist id="veq-db-list" data-dbcombo-list></datalist>
               </label>
-              <label class="veq-field">viewID
-                <input class="veq-input" data-viewid placeholder="可选，视图 ID（不填使用默认）" />
+              <label class="veq-field">视图
+                <select class="veq-input" data-viewsel disabled>
+                  <option value="">请选择数据库</option>
+                </select>
               </label>
             </div>
           </div>
@@ -191,31 +212,67 @@ export class VisualEchartsQueryUI {
     this.avIdInput = this.root.querySelector('[data-avid]') as HTMLInputElement;
     // 选择 viewID 输入
     this.viewIdInput = this.root.querySelector('[data-viewid]') as HTMLInputElement;
-  this.xExprTextarea = this.root.querySelector('[data-xexpr]') as HTMLTextAreaElement;
+    // 新增：下拉框句柄
+    this.viewSelEl = this.root.querySelector('[data-viewsel]') as HTMLSelectElement | undefined || undefined;
+    this.dbComboInput = this.root.querySelector('[data-dbcombo]') as HTMLInputElement | undefined || undefined;
+    this.dbComboList = this.root.querySelector('[data-dbcombo-list]') as HTMLElement | undefined || undefined;
+    this.xExprTextarea = this.root.querySelector('[data-xexpr]') as HTMLTextAreaElement;
     const xkeySel = this.root.querySelector('[data-xkey]') as HTMLSelectElement;
     const sortSel = this.root.querySelector('[data-sort]') as HTMLSelectElement;
-  const visualRow = this.root.querySelector('[data-visual-row]') as HTMLElement;
-  const exprRow = this.root.querySelector('[data-expr-row]') as HTMLElement;
-  const mergeToggle = this.root.querySelector('[data-merge]') as HTMLInputElement;
-  const chartTypeSel = this.root.querySelector('[data-chart-type]') as HTMLSelectElement;
+    const visualRow = this.root.querySelector('[data-visual-row]') as HTMLElement;
+    const exprRow = this.root.querySelector('[data-expr-row]') as HTMLElement;
+    const mergeToggle = this.root.querySelector('[data-merge]') as HTMLInputElement;
+    const chartTypeSel = this.root.querySelector('[data-chart-type]') as HTMLSelectElement;
     this.seriesListEl = this.root.querySelector('[data-series-list]') as HTMLElement;
     this.paletteEl = this.root.querySelector('[data-color-palette]') as HTMLElement;
     this.codePre = this.root.querySelector('[data-code]') as HTMLPreElement;
-  const typeSettingsEl = this.root.querySelector('[data-type-settings-body]') as HTMLElement | null;
-  this.chartTypeSel = chartTypeSel || undefined;
-  this.typeSettingsEl = typeSettingsEl || undefined;
+    const typeSettingsEl = this.root.querySelector('[data-type-settings-body]') as HTMLElement | null;
+    this.chartTypeSel = chartTypeSel || undefined;
+    this.typeSettingsEl = typeSettingsEl || undefined;
 
     // 事件
     this.titleInput.addEventListener('input', () => this.onChanged());
-  this.avIdInput.addEventListener('input', () => { this.onChanged(); this.loadKeys(); });
-  if (this.viewIdInput) this.viewIdInput.addEventListener('input', () => { this.onChanged(); this.loadKeys(); });
-  if (this.xExprTextarea) this.xExprTextarea.addEventListener('input', () => this.onChanged());
+    // 组合框：输入/聚焦/选择
+    if (this.dbComboInput) {
+      this.dbComboInput.addEventListener('input', () => this.updateDbComboList());
+      this.dbComboInput.addEventListener('change', async () => {
+        const v = (this.dbComboInput as HTMLInputElement).value.trim();
+        if (!v) { this.selectedAvID = ''; this.selectedViewID = ''; this.onChanged(); await this.populateViewsFor(''); return; }
+        // 支持按显示名或 id 匹配
+        const cand = this.avList.find(x => x.id === v) || this.avList.find(x => x.name === v);
+        if (cand) {
+          this.selectedAvID = cand.id;
+          this.selectedViewID = '';
+          this.setDbComboDisplayBySelection();
+          this.onChanged();
+          await this.populateViewsFor(cand.id);
+        }
+      });
+    }
+    if (this.viewSelEl) this.viewSelEl.addEventListener('change', (e) => {
+      const viewID = (e.target as HTMLSelectElement).value || '';
+      this.selectedViewID = viewID;
+      this.onChanged();
+      this.loadKeys();
+    });
+    // 显示 avID 开关
+    const showIdSwitch = this.root.querySelector('[data-db-showid]') as HTMLInputElement | null;
+    if (showIdSwitch) {
+      showIdSwitch.addEventListener('change', (e) => {
+        this.showDbId = (e.target as HTMLInputElement).checked;
+        // 更新组合框展示文本与下拉列表
+        this.setDbComboDisplayBySelection();
+        this.updateDbComboList();
+        this.save();
+      });
+    }
+    if (this.xExprTextarea) this.xExprTextarea.addEventListener('input', () => this.onChanged());
     // 默认可视化映射：visualRow 常显，表达式行隐藏
     visualRow.style.display = '';
     exprRow.style.display = 'none';
-    if (xkeySel) xkeySel.addEventListener('change', (e)=>{ this.xKey = (e.target as HTMLSelectElement).value; this.onChanged(); });
-    if (sortSel) sortSel.addEventListener('change', (e)=>{ this.sort = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
-    if (mergeToggle) mergeToggle.addEventListener('change', (e)=>{
+    if (xkeySel) xkeySel.addEventListener('change', (e) => { this.xKey = (e.target as HTMLSelectElement).value; this.onChanged(); });
+    if (sortSel) sortSel.addEventListener('change', (e) => { this.sort = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
+    if (mergeToggle) mergeToggle.addEventListener('change', (e) => {
       this.mergeMode = (e.target as HTMLInputElement).checked;
       // 模式切换时，修正系列聚合：非合并模式强制原值；合并模式下如为 raw 则改为 count
       this.series = this.series.map(s => ({
@@ -225,7 +282,7 @@ export class VisualEchartsQueryUI {
       this.renderSeriesList();
       this.onChanged();
     });
-    if (chartTypeSel) chartTypeSel.addEventListener('change', (e)=>{
+    if (chartTypeSel) chartTypeSel.addEventListener('change', (e) => {
       this.chartType = (e.target as HTMLSelectElement).value as any;
       // 切换图表类型：
       // - 若切到饼图：所有系列强制为 pie
@@ -245,18 +302,18 @@ export class VisualEchartsQueryUI {
     this.applyTypeConstraints(mergeToggle);
     (this.root.querySelector('[data-add-series]') as HTMLButtonElement).addEventListener('click', () => {
       const defType = this.chartType === 'pie' ? 'pie' : 'line';
-      this.series.push({ name: '系列' + (this.series.length+1), expr: 'rows.map(r => r.value)', type: defType as any, axisIndex: 0 });
+      this.series.push({ name: '系列' + (this.series.length + 1), expr: 'rows.map(r => r.value)', type: defType as any, axisIndex: 0 });
       this.renderSeriesList(); this.onChanged();
     });
     // 统一类型设置面板负责处理细节
     // 无调试设置
-  (this.root.querySelector('[data-copy-iife]') as HTMLButtonElement).addEventListener('click', () => this.copyIIFE());
-  (this.root.querySelector('[data-copy-block]') as HTMLButtonElement).addEventListener('click', () => this.copyChartBlock());
+    (this.root.querySelector('[data-copy-iife]') as HTMLButtonElement).addEventListener('click', () => this.copyIIFE());
+    (this.root.querySelector('[data-copy-block]') as HTMLButtonElement).addEventListener('click', () => this.copyChartBlock());
 
     // 颜色
     const addColorBtn = this.root.querySelector('[data-color-add]') as HTMLButtonElement;
     addColorBtn.addEventListener('click', () => {
-      this.colors.push('#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6, '0'));
+      this.colors.push('#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'));
       this.renderPalette();
       this.onChanged();
     });
@@ -264,6 +321,8 @@ export class VisualEchartsQueryUI {
 
     this.renderSeriesList();
     this.renderTypeSettingsUI(typeSettingsEl || undefined);
+    // 初始化加载数据库列表
+    this.initDbList();
   }
 
   private renderSeriesList() {
@@ -276,30 +335,30 @@ export class VisualEchartsQueryUI {
     }
     this.series.forEach((s, idx) => {
       const row = document.createElement('div');
-  row.className = 'veq-series-item';
-  row.setAttribute('data-idx', String(idx));
-  row.draggable = true;
+      row.className = 'veq-series-item';
+      row.setAttribute('data-idx', String(idx));
+      row.draggable = true;
       // 限制可选类型：根据 chartType 过滤
-      const typeOptions = ((): Array<{v:string; t:string}> => {
-        if (this.chartType === 'pie') return [{v:'pie', t:'饼图'}];
+      const typeOptions = ((): Array<{ v: string; t: string }> => {
+        if (this.chartType === 'pie') return [{ v: 'pie', t: '饼图' }];
         return [
-          {v:'line', t:'折线'},
-          {v:'bar', t:'柱状'},
-          {v:'scatter', t:'散点'}
+          { v: 'line', t: '折线' },
+          { v: 'bar', t: '柱状' },
+          { v: 'scatter', t: '散点' }
         ];
       })();
       // 如果当前 series 类型不在允许列表中，优先设置为当前图表类型（若可选），否则为列表第一个
-      if (!typeOptions.some(o => o.v === (s.type||''))) {
+      if (!typeOptions.some(o => o.v === (s.type || ''))) {
         const preferred = typeOptions.find(o => o.v === this.chartType);
         s.type = (preferred ? preferred.v : typeOptions[0].v) as any;
       }
       const aggSelHtml = this.mergeMode
         ? `<select class="veq-input" data-agg style="width:48px">
-             <option value="count" ${s.agg==='count'?'selected':''}>计数</option>
-             <option value="sum" ${s.agg==='sum'?'selected':''}>求和</option>
-             <option value="avg" ${s.agg==='avg'?'selected':''}>平均</option>
-             <option value="min" ${s.agg==='min'?'selected':''}>最小</option>
-             <option value="max" ${s.agg==='max'?'selected':''}>最大</option>
+             <option value="count" ${s.agg === 'count' ? 'selected' : ''}>计数</option>
+             <option value="sum" ${s.agg === 'sum' ? 'selected' : ''}>求和</option>
+             <option value="avg" ${s.agg === 'avg' ? 'selected' : ''}>平均</option>
+             <option value="min" ${s.agg === 'min' ? 'selected' : ''}>最小</option>
+             <option value="max" ${s.agg === 'max' ? 'selected' : ''}>最大</option>
            </select>`
         : `<select class="veq-input" data-agg style="width:48px" disabled>
              <option value="raw" selected>原值</option>
@@ -309,15 +368,15 @@ export class VisualEchartsQueryUI {
         <div class="veq-row" style="align-items:center; gap:6px;">
           <input class="veq-input" data-name placeholder="名称" value="${this.escape(s.name)}" style="width:160px"/>
           <select class="veq-input" data-type style="width:auto">
-            ${typeOptions.map(o=>`<option value="${o.v}" ${s.type===o.v?'selected':''}>${o.t}</option>`).join('')}
+            ${typeOptions.map(o => `<option value="${o.v}" ${s.type === o.v ? 'selected' : ''}>${o.t}</option>`).join('')}
           </select>
           <select class="veq-input" data-axis style="width:32px">
-            <option value="0" ${Number(s.axisIndex||0)===0?'selected':''}>左</option>
-            <option value="1" ${Number(s.axisIndex||0)===1?'selected':''}>右</option>
+            <option value="0" ${Number(s.axisIndex || 0) === 0 ? 'selected' : ''}>左</option>
+            <option value="1" ${Number(s.axisIndex || 0) === 1 ? 'selected' : ''}>右</option>
           </select>
           <div class="veq-row" data-visual-only style="gap:6px;">
             <select class="veq-input" data-value-key style="width:auto">
-              ${this.keys.map(k=>`<option value="${this.escape(k)}" ${s.valueKey===k?'selected':''}>${this.escape(k)}</option>`).join('')}
+              ${this.keys.map(k => `<option value="${this.escape(k)}" ${s.valueKey === k ? 'selected' : ''}>${this.escape(k)}</option>`).join('')}
             </select>
             ${aggSelHtml}
           </div>
@@ -326,17 +385,17 @@ export class VisualEchartsQueryUI {
         </div>`;
       (row.querySelector('[data-name]') as HTMLInputElement).addEventListener('input', (e) => { this.series[idx].name = (e.target as HTMLInputElement).value; this.onChanged(); });
       (row.querySelector('[data-type]') as HTMLSelectElement).addEventListener('change', (e) => { this.series[idx].type = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
-  (row.querySelector('[data-axis]') as HTMLSelectElement).addEventListener('change', (e) => { const v = Number((e.target as HTMLSelectElement).value)||0; this.series[idx].axisIndex = v; this.onChanged(); });
+      (row.querySelector('[data-axis]') as HTMLSelectElement).addEventListener('change', (e) => { const v = Number((e.target as HTMLSelectElement).value) || 0; this.series[idx].axisIndex = v; this.onChanged(); });
       (row.querySelector('[data-expr]') as HTMLTextAreaElement).addEventListener('input', (e) => { this.series[idx].expr = (e.target as HTMLTextAreaElement).value; this.onChanged(); });
       const vk = row.querySelector('[data-value-key]') as HTMLSelectElement | null;
-      if (vk) vk.addEventListener('change', (e)=>{ this.series[idx].valueKey = (e.target as HTMLSelectElement).value; this.autoBuildExpr(); this.onChanged(); this.rebuildCode(); });
-  const agg = row.querySelector('[data-agg]') as HTMLSelectElement | null;
-  if (agg && !agg.disabled) agg.addEventListener('change', (e)=>{ this.series[idx].agg = (e.target as HTMLSelectElement).value as any; this.autoBuildExpr(); this.onChanged(); this.rebuildCode(); });
+      if (vk) vk.addEventListener('change', (e) => { this.series[idx].valueKey = (e.target as HTMLSelectElement).value; this.autoBuildExpr(); this.onChanged(); this.rebuildCode(); });
+      const agg = row.querySelector('[data-agg]') as HTMLSelectElement | null;
+      if (agg && !agg.disabled) agg.addEventListener('change', (e) => { this.series[idx].agg = (e.target as HTMLSelectElement).value as any; this.autoBuildExpr(); this.onChanged(); this.rebuildCode(); });
       (row.querySelector('[data-del]') as HTMLButtonElement).addEventListener('click', () => { this.series.splice(idx, 1); this.renderSeriesList(); this.onChanged(); });
       // 拖拽排序事件
       row.addEventListener('dragstart', (ev) => {
         row.classList.add('dragging');
-        try { ev.dataTransfer?.setData('text/plain', String(idx)); } catch {}
+        try { ev.dataTransfer?.setData('text/plain', String(idx)); } catch { }
       });
       row.addEventListener('dragend', () => { row.classList.remove('dragging'); });
       row.addEventListener('dragover', (ev) => { ev.preventDefault(); row.classList.add('drag-over'); });
@@ -344,7 +403,7 @@ export class VisualEchartsQueryUI {
       row.addEventListener('drop', (ev) => {
         ev.preventDefault(); row.classList.remove('drag-over');
         let fromIdx = idx;
-        try { const data = ev.dataTransfer?.getData('text/plain'); if (data!=null && data!=='') fromIdx = Number(data)|0; } catch{}
+        try { const data = ev.dataTransfer?.getData('text/plain'); if (data != null && data !== '') fromIdx = Number(data) | 0; } catch { }
         const toIdx = idx;
         if (fromIdx === toIdx || fromIdx < 0 || fromIdx >= this.series.length) return;
         const moved = this.series.splice(fromIdx, 1)[0];
@@ -372,23 +431,23 @@ export class VisualEchartsQueryUI {
       if (btn) { const old = btn.textContent || ''; btn.setAttribute('data-old-text', old); btn.disabled = true; btn.textContent = '加载中…'; }
 
       // 改用 renderAttributeView 获取列定义
-      const avID = this.avIdInput?.value || '';
-      const viewID = this.viewIdInput?.value || '';
-      if (!avID) { this.toast('请先填写 avID'); return; }
+      const avID = this.selectedAvID || '';
+      const viewID = this.selectedViewID || '';
+      if (!avID) { this.toast('请先选择数据库'); this.loadingKeys = false; if (btn) { btn.disabled = false; const old = btn.getAttribute('data-old-text'); if (old != null) btn.textContent = old; } return; }
       const payload: any = { id: avID };
       if (viewID) payload.viewID = viewID;
 
-      fetch('/api/av/renderAttributeView', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
-        .then(r=>r.json())
-        .then(res=>{
-          if (!res || res.code !== 0) throw new Error(res?.msg||'加载失败');
+      fetch('/api/av/renderAttributeView', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(res => {
+          if (!res || res.code !== 0) throw new Error(res?.msg || '加载失败');
           const cols = res.data && res.data.view && Array.isArray(res.data.view.columns) ? res.data.view.columns : [];
-          this.keys = (cols||[]).map((c:any)=>c && c.name).filter(Boolean);
+          this.keys = (cols || []).map((c: any) => c && c.name).filter(Boolean);
 
           // 渲染 X 轴字段下拉
           const xSel = this.root.querySelector('[data-xkey]') as HTMLSelectElement | null;
           if (xSel) {
-            xSel.innerHTML = this.keys.map(k=>`<option value="${this.escape(k)}" ${this.xKey===k?'selected':''}>${this.escape(k)}</option>`).join('');
+            xSel.innerHTML = this.keys.map(k => `<option value="${this.escape(k)}" ${this.xKey === k ? 'selected' : ''}>${this.escape(k)}</option>`).join('');
             if (!this.xKey && this.keys.length) { this.xKey = this.keys[0]; }
           }
           // 系列行中的 valueKey
@@ -400,17 +459,17 @@ export class VisualEchartsQueryUI {
           this.rebuildCode();
           if (this.opts?.onChange) this.opts.onChange();
         })
-        .catch(e=>{ this.toast('加载字段失败'); console.error(e); })
-        .then(()=>{
+        .catch(e => { this.toast('加载字段失败'); console.error(e); })
+        .then(() => {
           // 收尾：恢复按钮与状态
           this.loadingKeys = false;
-          if (btn) { btn.disabled = false; const old = btn.getAttribute('data-old-text'); if (old!=null) btn.textContent = old; }
+          if (btn) { btn.disabled = false; const old = btn.getAttribute('data-old-text'); if (old != null) btn.textContent = old; }
         });
-    } catch(e){
+    } catch (e) {
       this.toast('加载字段失败');
       console.error(e);
       this.loadingKeys = false;
-      if (btn) { btn.disabled = false; const old = btn.getAttribute('data-old-text'); if (old!=null) btn.textContent = old; }
+      if (btn) { btn.disabled = false; const old = btn.getAttribute('data-old-text'); if (old != null) btn.textContent = old; }
     }
   }
 
@@ -439,16 +498,16 @@ export class VisualEchartsQueryUI {
       </div>
     `).join('');
     Array.from(el.querySelectorAll('.veq-color-chip')).forEach(chip => {
-      const idx = Number((chip as HTMLElement).getAttribute('data-idx')||'0');
+      const idx = Number((chip as HTMLElement).getAttribute('data-idx') || '0');
       const picker = chip.querySelector('input[type="color"]') as HTMLInputElement | null;
       const del = chip.querySelector('.veq-color-del') as HTMLButtonElement | null;
       const swatch = chip.querySelector('.veq-color-swatch') as HTMLElement | null;
       if (picker) picker.addEventListener('input', () => { this.colors[idx] = picker.value; if (swatch) swatch.style.background = picker.value; this.onChanged(); });
-      if (del) del.addEventListener('click', () => { this.colors.splice(idx,1); this.renderPalette(); this.onChanged(); });
+      if (del) del.addEventListener('click', () => { this.colors.splice(idx, 1); this.renderPalette(); this.onChanged(); });
     });
   }
 
-  
+
 
   private rebuildCode() {
     try {
@@ -469,7 +528,7 @@ export class VisualEchartsQueryUI {
   }
 
   // 对外 API：用于父容器同步视图设置和标题/颜色
-  public setViewSettings(type: 'bar'|'line'|'pie', settings: any) {
+  public setViewSettings(type: 'bar' | 'line' | 'pie', settings: any) {
     try {
       // 兼容旧接口：bar/line -> stat，pie 保持
       const incoming = type || 'line';
@@ -495,7 +554,7 @@ export class VisualEchartsQueryUI {
     } catch { /* ignore */ }
   }
 
-  public getViewSettings(): { type: 'bar'|'line'|'pie', settings: any } {
+  public getViewSettings(): { type: 'bar' | 'line' | 'pie', settings: any } {
     // 对外兼容：stat 作为 line 返回
     if (this.chartType === 'pie') return { type: 'pie', settings: this.perTypeSettings.pie };
     return { type: 'line', settings: this.perTypeSettings.line };
@@ -589,8 +648,8 @@ export class VisualEchartsQueryUI {
         this.perTypeSettings = { ...this.perTypeSettings, ...rest };
         if (common && typeof common === 'object') {
           this.commonSettings = {
-            legendPos: (common.legendPos==='bottom'||common.legendPos==='left'||common.legendPos==='right') ? common.legendPos : 'top',
-            ySplitLine: (common.ySplitLine==='solid'||common.ySplitLine==='none') ? common.ySplitLine : 'dashed',
+            legendPos: (common.legendPos === 'bottom' || common.legendPos === 'left' || common.legendPos === 'right') ? common.legendPos : 'top',
+            ySplitLine: (common.ySplitLine === 'solid' || common.ySplitLine === 'none') ? common.ySplitLine : 'dashed',
             grid: {
               top: Number(common.grid?.top ?? 50),
               right: Number(common.grid?.right ?? 10),
@@ -608,8 +667,8 @@ export class VisualEchartsQueryUI {
       } else {
         this.foldCommon = false; this.foldStat = false; this.foldPie = false;
       }
-  const typeSel = this.root.querySelector('[data-chart-type]') as HTMLSelectElement | null; if (typeSel) typeSel.value = this.chartType;
-  if (this.chartTypeSel) this.chartTypeSel.value = this.chartType;
+      const typeSel = this.root.querySelector('[data-chart-type]') as HTMLSelectElement | null; if (typeSel) typeSel.value = this.chartType;
+      if (this.chartTypeSel) this.chartTypeSel.value = this.chartType;
       if (obj.visual) {
         this.xKey = obj.visual.xKey || '';
         this.sort = obj.visual.sort || 'asc';
@@ -622,9 +681,10 @@ export class VisualEchartsQueryUI {
       this.renderPalette();
       this.renderSeriesList();
       this.applyTypeConstraints(this.root.querySelector('[data-merge]') as HTMLInputElement | null);
-  // 刷新类型设置面板（仅刷新内容区域 body，避免替换 details 结构）
-  this.renderTypeSettingsUI(this.root.querySelector('[data-type-settings-body]') as HTMLElement | null || undefined);
-      // 自动加载字段
+      // 刷新类型设置面板（仅刷新内容区域 body，避免替换 details 结构）
+      this.renderTypeSettingsUI(this.root.querySelector('[data-type-settings-body]') as HTMLElement | null || undefined);
+      // 同步下拉框并自动加载字段
+      this.syncSelectorsWithInputs();
       this.loadKeys();
     } catch { /* ignore */ }
   }
@@ -635,6 +695,8 @@ export class VisualEchartsQueryUI {
     const st = document.createElement('style'); st.id = ID; st.textContent = `
       .veq-wrap{--fg: var(--b3-theme-on-background); --muted: var(--b3-theme-on-surface); --border: var(--b3-border-color); --bg: var(--b3-theme-surface); font-family: var(--b3-font-family); font-size: var(--b3-font-size);}
       .veq-input{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); border-radius:6px; padding:6px 8px; outline:none}
+      .vsb-input{appearance:none; border:1px solid var(--b3-border-color); background: var(--b3-theme-background); color: var(--b3-theme-on-background); border-radius:6px; padding:6px 8px; outline:none; min-width: 220px}
+      .vsb-input:focus{border-color: var(--b3-theme-primary); box-shadow:0 0 0 2px var(--b3-theme-primary-light)}
       .veq-field{display:grid; gap:6px; font-size:13.5px; color: var(--fg)}
       .veq-label{font-size:12px; color: var(--muted)}
       .veq-row{display:flex; gap:8px; flex-wrap:wrap}
@@ -699,18 +761,18 @@ export class VisualEchartsQueryUI {
           <div class="veq-field">
             <div class="veq-label">图例位置</div>
             <select class="veq-input" data-set="common.legendPos" style="width:140px">
-              <option value="top" ${cs.legendPos==='top'?'selected':''}>上</option>
-              <option value="bottom" ${cs.legendPos==='bottom'?'selected':''}>下</option>
-              <option value="left" ${cs.legendPos==='left'?'selected':''}>左</option>
-              <option value="right" ${cs.legendPos==='right'?'selected':''}>右</option>
+              <option value="top" ${cs.legendPos === 'top' ? 'selected' : ''}>上</option>
+              <option value="bottom" ${cs.legendPos === 'bottom' ? 'selected' : ''}>下</option>
+              <option value="left" ${cs.legendPos === 'left' ? 'selected' : ''}>左</option>
+              <option value="right" ${cs.legendPos === 'right' ? 'selected' : ''}>右</option>
             </select>
           </div>
           <div class="veq-field">
             <div class="veq-label">Y 轴分割线</div>
             <select class="veq-input" data-set="common.ySplitLine" style="width:140px">
-              <option value="dashed" ${cs.ySplitLine==='dashed'?'selected':''}>虚线</option>
-              <option value="solid" ${cs.ySplitLine==='solid'?'selected':''}>实线</option>
-              <option value="none" ${cs.ySplitLine==='none'?'selected':''}>无</option>
+              <option value="dashed" ${cs.ySplitLine === 'dashed' ? 'selected' : ''}>虚线</option>
+              <option value="solid" ${cs.ySplitLine === 'solid' ? 'selected' : ''}>实线</option>
+              <option value="none" ${cs.ySplitLine === 'none' ? 'selected' : ''}>无</option>
             </select>
           </div>
           <label class="veq-field">Grid 顶部(px)
@@ -750,15 +812,15 @@ export class VisualEchartsQueryUI {
             <div class="veq-field">
               <div class="veq-label">标签位置</div>
               <select class="veq-input" data-set="stat.label.position" style="width:160px">
-                <option value="top" ${sharedLabelPos==='top'?'selected':''}>top</option>
-                <option value="bottom" ${sharedLabelPos==='bottom'?'selected':''}>bottom</option>
-                <option value="left" ${sharedLabelPos==='left'?'selected':''}>left</option>
-                <option value="right" ${sharedLabelPos==='right'?'selected':''}>right</option>
-                <option value="inside" ${sharedLabelPos==='inside'?'selected':''}>inside</option>
-                <option value="insideTop" ${sharedLabelPos==='insideTop'?'selected':''}>insideTop</option>
-                <option value="insideBottom" ${sharedLabelPos==='insideBottom'?'selected':''}>insideBottom</option>
-                <option value="insideLeft" ${sharedLabelPos==='insideLeft'?'selected':''}>insideLeft</option>
-                <option value="insideRight" ${sharedLabelPos==='insideRight'?'selected':''}>insideRight</option>
+                <option value="top" ${sharedLabelPos === 'top' ? 'selected' : ''}>top</option>
+                <option value="bottom" ${sharedLabelPos === 'bottom' ? 'selected' : ''}>bottom</option>
+                <option value="left" ${sharedLabelPos === 'left' ? 'selected' : ''}>left</option>
+                <option value="right" ${sharedLabelPos === 'right' ? 'selected' : ''}>right</option>
+                <option value="inside" ${sharedLabelPos === 'inside' ? 'selected' : ''}>inside</option>
+                <option value="insideTop" ${sharedLabelPos === 'insideTop' ? 'selected' : ''}>insideTop</option>
+                <option value="insideBottom" ${sharedLabelPos === 'insideBottom' ? 'selected' : ''}>insideBottom</option>
+                <option value="insideLeft" ${sharedLabelPos === 'insideLeft' ? 'selected' : ''}>insideLeft</option>
+                <option value="insideRight" ${sharedLabelPos === 'insideRight' ? 'selected' : ''}>insideRight</option>
               </select>
             </div>
           </div>
@@ -794,8 +856,8 @@ export class VisualEchartsQueryUI {
             <div class="veq-label">玫瑰图 roseType</div>
             <select class="veq-input" data-set="pie.roseType" style="width:140px">
               <option value="false" ${!s.roseType ? 'selected' : ''}>无</option>
-              <option value="radius" ${s.roseType==='radius' ? 'selected' : ''}>radius</option>
-              <option value="area" ${s.roseType==='area' ? 'selected' : ''}>area</option>
+              <option value="radius" ${s.roseType === 'radius' ? 'selected' : ''}>radius</option>
+              <option value="area" ${s.roseType === 'area' ? 'selected' : ''}>area</option>
             </select>
           </div>
           <label class="veq-field"><div class="veq-inline"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></div></label>
@@ -882,5 +944,96 @@ export class VisualEchartsQueryUI {
     if (this.chartType === 'pie') return this.perTypeSettings.pie;
     // 统计图：传给构建器按系列类型各自读取
     return { bar: this.perTypeSettings.bar, line: this.perTypeSettings.line, common: this.commonSettings } as any;
+  }
+
+  // 组合框：过滤/展示列表
+  private getFilteredAvList(query?: string): Array<{ id: string; name: string }> {
+    const q = (query ?? this.dbComboInput?.value ?? '').trim().toLowerCase();
+    if (!q) return this.avList.slice();
+    return this.avList.filter(x => x.name.toLowerCase().includes(q) || x.id.toLowerCase().includes(q));
+  }
+
+  private updateDbComboList() {
+    const list = this.dbComboList; if (!list) return;
+    const arr = this.getFilteredAvList();
+    if (!arr.length) { list.innerHTML = ''; return; }
+    list.innerHTML = arr.map(it => `<option value="${this.escape(this.showDbId ? it.id : it.name)}"></option>`).join('');
+  }
+
+  private setDbComboDisplayBySelection() {
+    const input = this.dbComboInput; if (!input) return;
+    if (!this.selectedAvID) { input.value = ''; return; }
+    const found = this.avList.find(x => x.id === this.selectedAvID);
+    input.value = this.showDbId ? (found?.id || this.selectedAvID) : (found?.name || '');
+  }
+
+  // ===== 新增：数据库/视图下拉逻辑 =====
+  private async initDbList() {
+    try {
+      // 加载列表
+      const list = await getallavids();
+      this.avList = Array.isArray(list) ? list.filter((x: any) => x && x.id).map((x: any) => ({ id: String(x.id), name: String(x.name || x.id) })) : [];
+      // 恢复选择显示
+      if (this.selectedAvID && this.avList.some(x => x.id === this.selectedAvID)) {
+        this.setDbComboDisplayBySelection();
+        await this.populateViewsFor(this.selectedAvID);
+      } else {
+        // 无选择，清空视图
+        this.setDbComboDisplayBySelection();
+        await this.populateViewsFor('');
+      }
+    } catch (e) {
+      console.warn('加载数据库列表失败', e);
+      if (this.dbComboList) this.dbComboList.innerHTML = '<div class="veq-combobox-empty">加载失败</div>';
+    }
+  }
+
+  private async populateViewsFor(avID: string) {
+    const viewSel = this.viewSelEl; if (!viewSel) return;
+    if (!avID) { viewSel.innerHTML = '<option value="">请选择数据库</option>'; viewSel.disabled = true; return; }
+    try {
+      viewSel.disabled = true;
+      viewSel.innerHTML = '<option value="">加载视图中…</option>';
+      // 使用 renderAttributeView 获取视图列表与默认 viewID
+      const res = await this.avManager.renderAttributeView(avID, { page: -1, pageSize: 1 });
+      const views = Array.isArray((res as any).views) ? (res as any).views : [];
+      const defaultViewID = (res as any).viewID || '';
+      if (!views.length) {
+        viewSel.innerHTML = '<option value="">无可用视图（默认）</option>';
+        viewSel.disabled = false;
+        // 清空 viewID，使用默认
+        this.selectedViewID = '';
+        this.loadKeys();
+        return;
+      }
+      viewSel.innerHTML = '<option value="">默认视图</option>' + views.map((v: any) => `<option value="${this.escape(v.id)}">${this.escape(v.name || v.id)}</option>`).join('');
+      viewSel.disabled = false;
+      // 若已有 viewID（恢复态）则优先
+      const curView = this.selectedViewID || '';
+      if (curView && views.some((v: any) => v.id === curView)) {
+        viewSel.value = curView;
+      } else if (defaultViewID && views.some((v: any) => v.id === defaultViewID)) {
+        viewSel.value = defaultViewID;
+        this.selectedViewID = defaultViewID;
+      } else {
+        // 保持默认空（用默认视图）
+        viewSel.value = '';
+        this.selectedViewID = '';
+      }
+      // 选择变化后刷新字段
+      this.loadKeys();
+    } catch (e) {
+      console.warn('加载视图失败', e);
+      viewSel.innerHTML = '<option value="">加载视图失败</option>';
+      viewSel.disabled = true;
+    }
+  }
+
+  private async syncSelectorsWithInputs() {
+    // 基于内部状态进行同步
+    if (!this.avList.length) { await this.initDbList(); return; }
+    this.setDbComboDisplayBySelection();
+    await this.populateViewsFor(this.selectedAvID || '');
+    // 视图下拉在 populateViewsFor 中同步
   }
 }
