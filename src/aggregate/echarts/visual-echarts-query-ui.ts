@@ -1,4 +1,5 @@
 import { buildIIFEFromAVCtx, EchartsAvTplCtx } from './option-templates';
+import { buildDbMappingExpressions, SeriesItem } from './db-data-mapping';
 
 export interface VisualEchartsQueryOptions {
   persistKey?: string;
@@ -46,7 +47,7 @@ export class VisualEchartsQueryUI {
     pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
   };
   private colors: string[] = [];
-  private series: Array<{ name: string; expr: string; type?: 'line'|'bar'|'scatter'|'pie'; axisIndex?: number; valueKey?: string; agg?: 'raw'|'count'|'sum'|'avg'|'min'|'max' }> = [];
+  private series: Array<SeriesItem> = [];
   private debug = false;
   private debugSampleSize = 5;
   private loadingKeys = false;
@@ -416,72 +417,15 @@ export class VisualEchartsQueryUI {
   // 根据可视化选择自动生成表达式
   private autoBuildExpr() {
     if (!this.visualMode) return;
-    const xKey = this.xKey;
-    if (this.mergeMode) {
-      // 合并模式：唯一化并聚合
-      const xExprRaw = (!xKey)
-        ? 'rows.map((_, i) => String(i+1))'
-        : `Array.from(new Set(rows.map(function(r){ return String(r[${JSON.stringify(xKey)}]); })))`;
-      let xExprFinal = xExprRaw;
-      if (this.sort !== 'none') {
-        const asc = this.sort === 'asc';
-        xExprFinal = `(()=>{ var arr = (${xExprRaw}).slice(); arr.sort(function(a,b){ if(a===b) return 0; return (a>b?1:-1)*${asc?1:-1}; }); return arr; })()`;
-      }
-      if (this.xExprTextarea) this.xExprTextarea.value = xExprFinal;
-      const catVar = 'cats';
-      const catsDef = `(function(){ var ${catVar} = (${xExprFinal}); return ${catVar}; })()`;
-      this.series = this.series.map(s => {
-        const key = s.valueKey || this.xKey;
-        const agg = s.agg || 'count';
-        let dataExpr = '';
-        if (!key) {
-          dataExpr = `${catsDef}.map(()=>0)`;
-        } else if (agg === 'count') {
-          dataExpr = `${catsDef}.map(function(c){ return rows.filter(function(r){ return String(r[${JSON.stringify(xKey)}])===c; }).length; })`;
-        } else if (agg === 'sum') {
-          dataExpr = `(function(){ var cats = (${xExprFinal}); function toNum(x){ if(x==null) return null; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ return rows.filter(function(r){ return String(r[${JSON.stringify(xKey)}])===c; }).reduce(function(a,b){ var n=toNum(b[${JSON.stringify(key)}]); return a + (n==null?0:n); },0); }); })()`;
-        } else if (agg === 'avg') {
-          dataExpr = `(function(){ var cats = (${xExprFinal}); function toNum(x){ if(x==null) return null; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ return String(r[${JSON.stringify(xKey)}])===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? (arr.reduce(function(a,b){return a+b;},0)/arr.length):0; }); })()`;
-        } else if (agg === 'min') {
-          dataExpr = `(function(){ var cats = (${xExprFinal}); function toNum(x){ if(x==null) return null; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ return String(r[${JSON.stringify(xKey)}])===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.min.apply(null, arr):0; }); })()`;
-        } else if (agg === 'max') {
-          dataExpr = `(function(){ var cats = (${xExprFinal}); function toNum(x){ if(x==null) return null; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ return String(r[${JSON.stringify(xKey)}])===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.max.apply(null, arr):0; }); })()`;
-        } else { // 原值在合并模式下不提供
-          dataExpr = `${catsDef}.map(()=>0)`;
-        }
-        return { ...s, expr: dataExpr };
-      });
-    } else {
-      // 非合并模式：逐行（原值），并支持排序时的重排
-      const baseArr = (!xKey)
-        ? 'rows.map((_, i) => String(i+1))'
-        : `rows.map(function(r){ return r[${JSON.stringify(xKey)}]; })`;
-      let xExprFinal = baseArr;
-      let idxsExpr = '';
-      if (this.sort !== 'none') {
-        const asc = this.sort === 'asc';
-        idxsExpr = `(()=>{ var a = (${baseArr}); var idx = a.map(function(_,i){return i}); idx.sort(function(i,j){ var x=a[i], y=a[j]; if(x===y) return 0; return (x>y?1:-1)*${asc?1:-1}; }); return idx; })()`;
-        xExprFinal = `(()=>{ var a = (${baseArr}); var idx = ${idxsExpr}; return idx.map(function(i){ return a[i]; }); })()`;
-      }
-      if (this.xExprTextarea) this.xExprTextarea.value = xExprFinal;
-      const catVar = 'cats';
-      const catsDef = `(function(){ var ${catVar} = (${xExprFinal}); return ${catVar}; })()`;
-      this.series = this.series.map(s => {
-        const key = s.valueKey || this.xKey;
-        let dataExpr = '';
-        if (!key) {
-          dataExpr = `${catsDef}.map(()=>0)`;
-        } else {
-          if (idxsExpr) {
-            dataExpr = `(function(){ var idx = ${idxsExpr}; function toNum(x){ if(x==null) return null; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return idx.map(function(i){ var v = rows[i][${JSON.stringify(key)}]; var n=toNum(v); return n==null?0:n; }); })()`;
-          } else {
-            dataExpr = `(function(){ function toNum(x){ if(x==null) return null; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return rows.map(function(r){ var n=toNum(r[${JSON.stringify(key)}]); return n==null?0:n; }); })()`;
-          }
-        }
-        return { ...s, agg: 'raw', expr: dataExpr };
-      });
-    }
-    // 排序已反映在 xExprFinal 中，series 使用 catsDef 与之保持一致
+    const { xExpr, series } = buildDbMappingExpressions({
+      visualMode: this.visualMode,
+      mergeMode: this.mergeMode,
+      sort: this.sort,
+      xKey: this.xKey,
+      series: this.series,
+    });
+    if (this.xExprTextarea && xExpr) this.xExprTextarea.value = xExpr;
+    this.series = series;
   }
 
   private renderPalette() {

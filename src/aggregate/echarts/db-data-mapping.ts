@@ -1,0 +1,111 @@
+/**
+ * 数据库模式下的数据映射逻辑（纯函数，不依赖 DOM）。
+ * 将可视化选择（xKey、排序、合并/非合并、系列聚合）映射为 x 轴与各系列的表达式字符串。
+ */
+
+export type SortOrder = 'none' | 'asc' | 'desc';
+export type SeriesAgg = 'raw' | 'count' | 'sum' | 'avg' | 'min' | 'max';
+
+export interface SeriesItem {
+  name: string;
+  expr: string;
+  type?: 'line' | 'bar' | 'scatter' | 'pie';
+  axisIndex?: number;
+  valueKey?: string;
+  agg?: SeriesAgg;
+}
+
+export interface MappingInput {
+  visualMode: boolean;
+  mergeMode: boolean;
+  sort: SortOrder;
+  xKey: string;
+  series: SeriesItem[];
+}
+
+export interface MappingOutput {
+  xExpr: string;
+  series: SeriesItem[];
+}
+
+/**
+ * 基于可视化配置构建 x 轴表达式与每个系列的数据表达式。
+ * 保持与原 UI 实现一致的字符串模板（包括 toNum 与排序逻辑）。
+ */
+export function buildDbMappingExpressions(input: MappingInput): MappingOutput {
+  const { visualMode, mergeMode, sort, xKey, series } = input;
+
+  if (!visualMode) {
+    // 可视化关闭时不改写表达式，沿用原 series.expr 与外部 xExpr
+    return { xExpr: '', series: series.slice() };
+  }
+
+  if (mergeMode) {
+    // 合并模式：唯一化并聚合
+    const xExprRaw = (!xKey)
+      ? 'rows.map((_, i) => String(i+1))'
+      : `Array.from(new Set(rows.flatMap(function(r){ var xv = r[${JSON.stringify(xKey)}]; if (Array.isArray(xv)) return xv.map(function(it){ return String(it); }); return [String(xv)]; })))`;
+
+    const xExprSorted = (() => {
+      if (sort === 'none') return xExprRaw;
+      const asc = sort === 'asc';
+      return `(()=>{ var arr = (${xExprRaw}).slice(); arr.sort(function(a,b){ if(a===b) return 0; return (a>b?1:-1)*${asc ? 1 : -1}; }); return arr; })()`;
+    })();
+
+    const catsDef = `(function(){ var cats = (${xExprSorted}); return cats; })()`;
+
+    const mapped = series.map((s) => {
+      const key = s.valueKey || xKey;
+      const agg = s.agg || 'count';
+      let dataExpr = '';
+      if (!key) {
+        dataExpr = `${catsDef}.map(()=>0)`;
+      } else if (agg === 'count') {
+        dataExpr = `${catsDef}.map(function(c){ return rows.filter(function(r){ var xv = r[${JSON.stringify(xKey)}]; return Array.isArray(xv) ? xv.some(function(it){ return String(it)===c; }) : String(xv)===c; }).length; })`;
+      } else if (agg === 'sum') {
+        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ return rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).reduce(function(a,b){ var n=toNum(b[${JSON.stringify(key)}]); return a + (n==null?0:n); },0); }); })()`;
+      } else if (agg === 'avg') {
+        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? (arr.reduce(function(a,b){return a+b;},0)/arr.length):0; }); })()`;
+      } else if (agg === 'min') {
+        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.min.apply(null, arr):0; }); })()`;
+      } else if (agg === 'max') {
+        dataExpr = `(function(){ var cats = (${xExprSorted}); function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return cats.map(function(c){ var arr = rows.filter(function(r){ var xv=r[${JSON.stringify(xKey)}]; return Array.isArray(xv)? xv.some(function(it){return String(it)===c;}) : String(xv)===c; }).map(function(b){ return toNum(b[${JSON.stringify(key)}]); }).filter(function(v){ return v!=null; }); return arr.length? Math.max.apply(null, arr):0; }); })()`;
+      } else {
+        // 原值在合并模式下不提供
+        dataExpr = `${catsDef}.map(()=>0)`;
+      }
+      return { ...s, expr: dataExpr } as SeriesItem;
+    });
+
+    return { xExpr: xExprSorted, series: mapped };
+  }
+
+  // 非合并模式：逐行（原值），支持排序时的重排
+  const baseArr = (!xKey)
+    ? 'rows.map((_, i) => String(i+1))'
+    : `rows.map(function(r){ var xv = r[${JSON.stringify(xKey)}]; return Array.isArray(xv) ? xv.join(',') : xv; })`;
+
+  let xExprFinal = baseArr;
+  let idxsExpr = '';
+  if (sort !== 'none') {
+    const asc = sort === 'asc';
+    idxsExpr = `(()=>{ var a = (${baseArr}); var idx = a.map(function(_,i){return i}); idx.sort(function(i,j){ var x=a[i], y=a[j]; if(x===y) return 0; return (x>y?1:-1)*${asc ? 1 : -1}; }); return idx; })()`;
+    xExprFinal = `(()=>{ var a = (${baseArr}); var idx = ${idxsExpr}; return idx.map(function(i){ return a[i]; }); })()`;
+  }
+
+  const catsDef = `(function(){ var cats = (${xExprFinal}); return cats; })()`;
+  const mapped = series.map((s) => {
+    const key = s.valueKey || xKey;
+    let dataExpr = '';
+    if (!key) {
+      dataExpr = `${catsDef}.map(()=>0)`;
+    } else if (idxsExpr) {
+      dataExpr = `(function(){ var idx = ${idxsExpr}; function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return idx.map(function(i){ var v = rows[i][${JSON.stringify(key)}]; var n=toNum(v); return n==null?0:n; }); })()`;
+    } else {
+      dataExpr = `(function(){ function toNum(x){ if(x==null) return null; if(Array.isArray(x)) return x.length; if(typeof x==='number') return isFinite(x)?x:null; if(typeof x==='boolean') return x?1:0; var s=String(x).trim(); if(!s) return null; s=s.replace(/,/g,''); var m=s.match(/^(-?\\d+(?:\\.\\d+)?)(%)$/); if(m) return parseFloat(m[1])/100; var n=Number(s); return isNaN(n)?null:n; } return rows.map(function(r){ var n=toNum(r[${JSON.stringify(key)}]); return n==null?0:n; }); })()`;
+    }
+    return { ...s, agg: 'raw', expr: dataExpr } as SeriesItem;
+  });
+
+  return { xExpr: xExprFinal, series: mapped };
+}
