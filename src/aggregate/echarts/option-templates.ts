@@ -31,21 +31,71 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
   const pieCount_ctx = (ctx.seriesExprs||[]).filter(s => (s.type||'line')==='pie').length;
   let pieNo_ctx = -1;
   const st: any = (ctx as any).chartSettings || {};
+  const stBar: any = (st && st.bar) ? st.bar : st;
+  const stLine: any = (st && st.line) ? st.line : st;
   const stCommon: any = st && st.common ? st.common : {};
+  const stStat: any = st && st.stat ? st.stat : {};
+  const onlyPie = pieCount_ctx > 0 && pieCount_ctx === (ctx.seriesExprs || []).length;
   const legendPos = stCommon.legendPos as ('top'|'bottom'|'left'|'right'|undefined);
   const legendPatch = legendPos ? `
     try{ option.legend = option.legend || {}; option.legend.orient = ${(legendPos==='left'||legendPos==='right') ? `'vertical'` : `'horizontal'`}; option.legend.${legendPos} = 0; ${(legendPos==='left'||legendPos==='right') ? `option.legend.top = 'middle';` : ''} }catch(e){}` : '';
   const gridPatch = (stCommon && stCommon.grid && [stCommon.grid.top, stCommon.grid.right, stCommon.grid.bottom, stCommon.grid.left].every((v: any)=>Number.isFinite(v))) ? `
     option.grid = { top: ${Number(stCommon.grid.top)||0}, right: ${Number(stCommon.grid.right)||0}, bottom: ${Number(stCommon.grid.bottom)||0}, left: ${Number(stCommon.grid.left)||0}, containLabel: true };
   ` : '';
-  const splitType = (function(){ const t = stCommon && stCommon.ySplitLine; return (t==='solid'||t==='none') ? t : 'dashed'; })();
+  const splitType = (function(){
+    const cand = (stStat && typeof stStat.ySplitLine === 'string') ? stStat.ySplitLine : (stCommon && typeof stCommon.ySplitLine === 'string' ? stCommon.ySplitLine : null);
+    return (cand === 'solid' || cand === 'none' || cand === 'dashed') ? cand : 'dashed';
+  })();
+  const splitTypeShow = splitType !== 'none';
+  const splitLineStyleType = splitType === 'solid' ? 'solid' : 'dashed';
+  const tooltipTrigger = (function(){
+    const explicitStat = stStat && (stStat.tooltipTrigger === 'item' || stStat.tooltipTrigger === 'axis') ? stStat.tooltipTrigger : null;
+    const explicitCommon = !explicitStat && stCommon && (stCommon.tooltipTrigger === 'item' || stCommon.tooltipTrigger === 'axis') ? stCommon.tooltipTrigger : null;
+    const explicit = explicitStat || explicitCommon;
+    if (explicit) return explicit;
+    return onlyPie ? 'item' : 'axis';
+  })();
+  const axisPointerType = (function(){
+    if (tooltipTrigger !== 'axis') return 'none';
+    const cand = (stStat && stStat.axisPointerType) ?? (stCommon && stCommon.axisPointerType);
+    return (cand === 'shadow' || cand === 'cross' || cand === 'none') ? cand : 'line';
+  })();
+  const tooltipPatch = (function(){
+    if (tooltipTrigger === 'axis') {
+      if (axisPointerType === 'none') return `option.tooltip = { trigger: 'axis' };`;
+      return `option.tooltip = { trigger: 'axis', axisPointer: { type: '${axisPointerType}' } };`;
+    }
+    return `option.tooltip = { trigger: 'item' };`;
+  })();
+  const dataZoomMode = (function(){
+    if (onlyPie) return 'none';
+    const dz = (stStat && stStat.dataZoom != null) ? stStat.dataZoom : (stCommon && stCommon.dataZoom);
+    return (dz === 'inside' || dz === 'slider' || dz === 'both') ? dz : 'none';
+  })();
+  const dataZoomPatch = (function(){
+    if (dataZoomMode === 'inside') return `option.dataZoom = [{ type: 'inside' }];`;
+    if (dataZoomMode === 'slider') return `option.dataZoom = [{ type: 'slider' }];`;
+    if (dataZoomMode === 'both') return `option.dataZoom = [{ type: 'inside' }, { type: 'slider' }];`;
+    return '';
+  })();
   const seriesJs = (ctx.seriesExprs||[]).map(s=>{
     const type = s.type || 'line';
     const name = JSON.stringify(s.name);
-    const smooth = ctx.smooth && type==='line' ? 'true' : 'false';
-    const area = ctx.area && type==='line' ? `areaStyle: {},` : '';
-    const stack = ctx.stack ? `stack: 'total',` : '';
+    const smooth = (type==='line' && ((typeof stLine.smooth === 'boolean' ? stLine.smooth : !!ctx.smooth))) ? 'true' : 'false';
+    const area = (type==='line' && (((stLine && (stLine as any).area) === true) || !!ctx.area)) ? `areaStyle: {},` : '';
+    const stack = (type==='bar' && ((typeof stBar.stack === 'boolean') ? stBar.stack : !!ctx.stack)) ? `stack: 'total',` : '';
     const yAxisIndex = (typeof (s as any).axisIndex === 'number' && (s as any).axisIndex! > 0) ? `yAxisIndex:${(s as any).axisIndex|0},` : '';
+    const extras: string[] = [];
+    if (type === 'line') {
+      if (typeof stLine.symbol === 'string' && stLine.symbol) extras.push(`symbol: '${stLine.symbol}',`);
+      if (Number.isFinite(stLine.symbolSize)) extras.push(`symbolSize: ${stLine.symbolSize|0},`);
+      if (Number.isFinite(stLine.lineWidth)) extras.push(`lineStyle: { width: ${stLine.lineWidth|0} },`);
+    }
+    if (type === 'bar') {
+      if (Number.isFinite(stBar.barWidth)) extras.push(`barWidth: ${Number(stBar.barWidth)},`);
+      if (typeof stBar.barGap === 'string' && stBar.barGap) extras.push(`barGap: '${stBar.barGap}',`);
+      else if (Number.isFinite(stBar.barGap)) extras.push(`barGap: '${Number(stBar.barGap)}%',`);
+    }
     const dataExpr = (type==='pie')
       ? `(function(){
         var ys = (${s.expr});
@@ -68,7 +118,7 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
       return `radius: ['${r1}%', '${r2}%'],`;
     })() : '';
     return `{
-      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${pieExtra} z: 1,
+      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${extras.join(' ')} ${pieExtra} z: 1,
       data: ${dataExpr}
     }`;
   }).join(',\n');
@@ -92,15 +142,16 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     const rows = fetchSqlSync($SQL$);
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
     option.backgroundColor = 'transparent';
-    option.tooltip = { trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } };
+    ${tooltipPatch}
     option.legend = { data: ${legendArr} };
     ${legendPatch}
     ${gridPatch}
     option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false } }];
     option.yAxis = ${`[{
-      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitType!=='none' ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitType==='solid' ? 'solid' : 'dashed'}' } }
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     option.series = [${seriesJs}];
+    ${dataZoomPatch}
   ${Array.isArray(ctx.colors) && ctx.colors.length ? `
   // 非饼图系列：逐系列设置颜色
   try{ (option.series||[]).forEach(function(s, i){ if (s && s.type === 'pie') return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}
@@ -142,10 +193,47 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
   const stLine: any = (st && st.line) ? st.line : st;
   const stPie: any = (st && st.pie) ? st.pie : st;
   const stCommon: any = st && st.common ? st.common : {};
+  const stStat: any = st && st.stat ? st.stat : {};
   const hasBar = (ctx.seriesExprs||[]).some(s => (s.type||'line')==='bar');
   const hasLine = (ctx.seriesExprs||[]).some(s => (s.type||'line')==='line');
   const pieCount = (ctx.seriesExprs||[]).filter(s => (s.type||'line')==='pie').length;
   let pieNo = -1;
+  const splitType = (function(){
+    const cand = (stStat && typeof stStat.ySplitLine === 'string') ? stStat.ySplitLine : (stCommon && typeof stCommon.ySplitLine === 'string' ? stCommon.ySplitLine : null);
+    return (cand === 'solid' || cand === 'none' || cand === 'dashed') ? cand : 'dashed';
+  })();
+  const splitTypeShow = splitType !== 'none';
+  const splitLineStyleType = splitType === 'solid' ? 'solid' : 'dashed';
+  const tooltipTrigger = (function(){
+    const explicitStat = stStat && (stStat.tooltipTrigger === 'item' || stStat.tooltipTrigger === 'axis') ? stStat.tooltipTrigger : null;
+    const explicitCommon = !explicitStat && stCommon && (stCommon.tooltipTrigger === 'item' || stCommon.tooltipTrigger === 'axis') ? stCommon.tooltipTrigger : null;
+    const explicit = explicitStat || explicitCommon;
+    if (explicit) return explicit;
+    return isAllPie ? 'item' : 'axis';
+  })();
+  const axisPointerType = (function(){
+    if (tooltipTrigger !== 'axis') return 'none';
+    const cand = (stStat && stStat.axisPointerType) ?? (stCommon && stCommon.axisPointerType);
+    return (cand === 'shadow' || cand === 'cross' || cand === 'none') ? cand : 'line';
+  })();
+  const tooltipPatch = (function(){
+    if (tooltipTrigger === 'axis' && !isAllPie) {
+      if (axisPointerType === 'none') return `option.tooltip = { trigger: 'axis' };`;
+      return `option.tooltip = { trigger: 'axis', axisPointer: { type: '${axisPointerType}' } };`;
+    }
+    return `option.tooltip = { trigger: 'item' };`;
+  })();
+  const dataZoomMode = (function(){
+    if (isAllPie) return 'none';
+    const dz = (stStat && stStat.dataZoom != null) ? stStat.dataZoom : (stCommon && stCommon.dataZoom);
+    return (dz === 'inside' || dz === 'slider' || dz === 'both') ? dz : 'none';
+  })();
+  const dataZoomPatch = (function(){
+    if (dataZoomMode === 'inside') return `option.dataZoom = [{ type: 'inside' }];`;
+    if (dataZoomMode === 'slider') return `option.dataZoom = [{ type: 'slider' }];`;
+    if (dataZoomMode === 'both') return `option.dataZoom = [{ type: 'inside' }, { type: 'slider' }];`;
+    return '';
+  })();
   const seriesJs = (ctx.seriesExprs||[]).map(s=>{
     const type = s.type || 'line';
     const name = JSON.stringify(s.name);
@@ -173,6 +261,22 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       else if (type==='pie') l = stPie && stPie.label;
       return l ? `label: ${JSON.stringify(l)},` : '';
     })();
+      const lineExtras = (function(){
+        if (type !== 'line') return '';
+        const parts: string[] = [];
+        if (typeof stLine.symbol === 'string' && stLine.symbol) parts.push(`symbol: '${stLine.symbol}',`);
+        if (Number.isFinite(stLine.symbolSize)) parts.push(`symbolSize: ${stLine.symbolSize|0},`);
+        if (Number.isFinite(stLine.lineWidth)) parts.push(`lineStyle: { width: ${stLine.lineWidth|0} },`);
+        return parts.join(' ');
+      })();
+      const barExtras = (function(){
+        if (type !== 'bar') return '';
+        const parts: string[] = [];
+        if (Number.isFinite(stBar.barWidth)) parts.push(`barWidth: ${Number(stBar.barWidth)},`);
+        if (typeof stBar.barGap === 'string' && stBar.barGap) parts.push(`barGap: '${stBar.barGap}',`);
+        else if (Number.isFinite(stBar.barGap)) parts.push(`barGap: '${Number(stBar.barGap)}%',`);
+        return parts.join(' ');
+      })();
     // 饼图半径、玫瑰图
     const pieExtra = (type==='pie') ? (function(){
       const rose = (stPie && (stPie.roseType===false || stPie.roseType==='radius' || stPie.roseType==='area')) ? stPie.roseType : undefined;
@@ -195,7 +299,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       return parts.join(' ');
     })() : '';
     return `{
-      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${label} ${pieExtra} z: 1,
+      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${label} ${lineExtras} ${barExtras} ${pieExtra} z: 1,
       data: ${dataExpr}
     }`;
   }).join(',\n');
@@ -246,7 +350,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     const option = {};
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
     option.backgroundColor = 'transparent';
-    option.tooltip = ${isAllPie ? `{ trigger: 'item' }` : `{ trigger: 'axis', axisPointer: { lineStyle: { width: 0 } } }`};
+    ${tooltipPatch}
     option.legend = ${isAllPie ? `{ data: (${xExpr}) }` : `{ data: ${legendArr} }`};
     ${(function(){
       const pos = (stCommon && (stCommon.legendPos==='top'||stCommon.legendPos==='bottom'||stCommon.legendPos==='left'||stCommon.legendPos==='right')) ? stCommon.legendPos : null;
@@ -282,7 +386,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       return '';
     })()} } }];
     option.yAxis = ${`[{
-      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { ${(function(){ const t = stCommon && stCommon.ySplitLine; const tp = (t==='solid'||t==='none')?t:'dashed'; return `show: ${tp!=='none' ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${(tp==='solid')?'solid':'dashed'}' }`; })()} }
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];
@@ -294,6 +398,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
   // 若包含饼图系列，使用全局 color 调色板驱动扇区着色
   try{ if ((option.series||[]).some(function(s){ return s && s.type==='pie'; })) option.color = ${JSON.stringify(ctx.colors)}; }catch(e){}
   ` : ''}
+    ${dataZoomPatch}
     ${ctx.debug ? `
     try{
       var __N = ${Math.max(1, ctx.debugSampleSize || 5)};
@@ -455,8 +560,10 @@ export function buildPresetCountIIFE(
       option.xAxis = [{ type: 'category', boundaryGap: boundaryGap, data: names, axisTick: { show:false }, axisLine: { show:false }, axisLabel: { rotate: xRotate } }];
       var splitType = (function(){
         try{
-          var t = (st && st.common && st.common.ySplitLine) ? st.common.ySplitLine : (st && st.ySplitLine);
-          return (t==='solid'||t==='none') ? t : 'dashed';
+          var stat = (st && st.stat) ? st.stat : null;
+          var common = (st && st.common) ? st.common : null;
+          var raw = (stat && typeof stat.ySplitLine === 'string') ? stat.ySplitLine : (common && typeof common.ySplitLine === 'string' ? common.ySplitLine : null);
+          return (raw === 'solid' || raw === 'none' || raw === 'dashed') ? raw : 'dashed';
         }catch(e){ return 'dashed'; }
       })();
       option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } } }];
@@ -477,8 +584,56 @@ export function buildPresetCountIIFE(
         if (!lbl && st && st.label) lbl = st.label; // 平铺兼容
         if (lbl) seriesItem.label = lbl;
       }catch(e){} })();
+      (function(){ try{
+        if ('${t}'==='line') {
+          var ln = (st && st.line) ? st.line : st;
+          if (ln && typeof ln.symbol === 'string' && ln.symbol) seriesItem.symbol = ln.symbol;
+          if (ln && typeof ln.symbolSize === 'number' && isFinite(ln.symbolSize)) seriesItem.symbolSize = ln.symbolSize|0;
+          if (ln && typeof ln.lineWidth === 'number' && isFinite(ln.lineWidth)) {
+            seriesItem.lineStyle = seriesItem.lineStyle || {};
+            seriesItem.lineStyle.width = ln.lineWidth|0;
+          }
+        }
+        if ('${t}'==='bar') {
+          var br = (st && st.bar) ? st.bar : st;
+          if (br && typeof br.barWidth === 'number' && isFinite(br.barWidth)) seriesItem.barWidth = br.barWidth;
+          if (br && br.barGap != null) {
+            if (typeof br.barGap === 'string') seriesItem.barGap = br.barGap;
+            else if (typeof br.barGap === 'number' && isFinite(br.barGap)) seriesItem.barGap = br.barGap + '%';
+          }
+        }
+      }catch(e){} })();
       option.series = [seriesItem];
     }
+      (function(){ try{
+        var common = (st && st.common) ? st.common : {};
+        var stat = (st && st.stat) ? st.stat : {};
+        var dftTrigger = ('${t}'==='pie') ? 'item' : 'axis';
+        var trigger = (stat && (stat.tooltipTrigger === 'item' || stat.tooltipTrigger === 'axis')) ? stat.tooltipTrigger : ((common && (common.tooltipTrigger === 'item' || common.tooltipTrigger === 'axis')) ? common.tooltipTrigger : dftTrigger);
+        if ('${t}'==='pie' && trigger === 'axis') trigger = 'item';
+        if (trigger === 'axis') {
+          var pointer = stat && stat.axisPointerType;
+          if (!pointer) pointer = common.axisPointerType;
+          if (!(pointer === 'shadow' || pointer === 'cross' || pointer === 'none')) pointer = 'line';
+          if (pointer === 'none') {
+            option.tooltip = { trigger: 'axis' };
+          } else {
+            option.tooltip = { trigger: 'axis', axisPointer: { type: pointer } };
+          }
+        } else {
+          option.tooltip = { trigger: 'item' };
+        }
+      }catch(e){}})();
+      (function(){ try{
+        if ('${t}'==='pie') return;
+        var common = (st && st.common) ? st.common : {};
+        var stat = (st && st.stat) ? st.stat : {};
+        var dz = (stat && stat.dataZoom != null) ? stat.dataZoom : common.dataZoom;
+        var mode = (dz === 'inside' || dz === 'slider' || dz === 'both') ? dz : 'none';
+        if (mode === 'inside') option.dataZoom = [{ type: 'inside' }];
+        else if (mode === 'slider') option.dataZoom = [{ type: 'slider' }];
+        else if (mode === 'both') option.dataZoom = [{ type: 'inside' }, { type: 'slider' }];
+      }catch(e){}})();
     // 统一 legend 位置（支持 st.common.legendPos，兼容平铺 st.legendPos）
     (function(){ try{
       var c = st && st.common ? st.common : null;
