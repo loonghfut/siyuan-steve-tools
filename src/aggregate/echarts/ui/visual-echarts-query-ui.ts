@@ -964,6 +964,10 @@ export class VisualEchartsQueryUI {
           <label class="veq-field">Grid 左侧(px)
             <input class="veq-input" type="number" step="1" data-set="common.grid.left" value="${cs.grid.left}" />
           </label>
+          <div class="veq-field">
+            <div class="veq-label">显示数据来源</div>
+            <label class="veq-switch"><input type="checkbox" data-set="showDbNameAndViewName" ${this.showDbNameAndViewName ? 'checked' : ''}/><i></i></label>
+          </div>
         </div>
       </details>`;
     if (t === 'stat') {
@@ -1000,7 +1004,6 @@ export class VisualEchartsQueryUI {
                 <label class="veq-switch-item"><span>柱状堆叠</span><label class="veq-switch"><input type="checkbox" data-set="bar.stack" ${sb.stack ? 'checked' : ''}/><i></i></label></label>
                 <label class="veq-switch-item"><span>x 轴留白</span><label class="veq-switch"><input type="checkbox" data-set="stat.boundaryGap" ${sharedBoundaryGap ? 'checked' : ''}/><i></i></label></label>
                 <label class="veq-switch-item"><span>面积填充</span><label class="veq-switch"><input type="checkbox" data-set="line.area" ${(sl as any).area ? 'checked' : ''}/><i></i></label></label>
-                <label class="veq-switch-item"><span>显示数据来源</span><label class="veq-switch"><input type="checkbox" data-set="showDbNameAndViewName" ${this.showDbNameAndViewName ? 'checked' : ''}/><i></i></label></label>
               </div>
             </div>
             <div class="veq-stat-group">
