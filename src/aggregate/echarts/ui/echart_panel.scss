@@ -618,6 +618,14 @@ details>summary.ve-legend {
     color: var(--fg)
 }
 
+.veq-field__caption {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    color: var(--fg);
+}
+
 .veq-label {
     font-size: 12px;
     color: var(--muted)
@@ -934,6 +942,20 @@ details>summary.ve-legend {
 /* combo */
 .veq-combo-wrap {
     position: relative
+}
+
+.veq-db-mirror {
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: help;
+    border-bottom: 1px dashed transparent;
+    transition: color .2s ease, border-color .2s ease;
+}
+
+.veq-db-mirror:hover {
+    color: var(--b3-theme-primary);
+    border-bottom-color: currentColor;
 }
 
 .veq-combo-list {

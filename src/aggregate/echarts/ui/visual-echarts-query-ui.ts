@@ -30,6 +30,7 @@ export class VisualEchartsQueryUI {
   // 新：组合框（单一输入 + 下拉）
   private dbComboInput?: HTMLInputElement;
   private dbComboList?: HTMLElement;
+  private dbMirrorEl?: HTMLSpanElement;
   private avList: Array<{ id: string; name: string }> = [];
   private avManager = new AVManager('');
   private selectedAvID: string = '';
@@ -196,7 +197,11 @@ export class VisualEchartsQueryUI {
               </div>
             </div>
             <div class="veq-grid" style="grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
-              <label class="veq-field">数据库
+              <label class="veq-field">
+                <div class="veq-field__caption">
+                  <span>数据库</span>
+                  <span class="popover__block veq-db-mirror" data-db-mirror data-popover-url="/api/av/getMirrorDatabaseBlocks" style="display:none;">未命名</span>
+                </div>
                 <div class="veq-combo-wrap">
                   <input class="vsb-input" data-dbcombo placeholder="选择或搜索数据库" autocomplete="off" />
                   <div class="veq-combo-list" data-dbcombo-popup style="display:none;"></div>
@@ -262,7 +267,7 @@ export class VisualEchartsQueryUI {
 
         <details class="veq-sub">
           <summary class="veq-legend">代码预览</summary>
-          <pre class="veq-output" data-code></pre>
+          <pre class="veq-output" data-code data-output></pre>
         </details>
       </div>
     `;
@@ -274,6 +279,7 @@ export class VisualEchartsQueryUI {
   this.dbComboList = undefined; // 不再使用 datalist
   const popup = this.root.querySelector('[data-dbcombo-popup]') as HTMLElement | null;
   (this as any).dbComboPopup = popup || undefined;
+  this.dbMirrorEl = this.root.querySelector('[data-db-mirror]') as HTMLSpanElement | null || undefined;
     this.xExprTextarea = this.root.querySelector('[data-xexpr]') as HTMLTextAreaElement;
     const xkeySel = this.root.querySelector('[data-xkey]') as HTMLSelectElement;
     const sortSel = this.root.querySelector('[data-sort]') as HTMLSelectElement;
@@ -298,7 +304,7 @@ export class VisualEchartsQueryUI {
       this.dbComboInput.addEventListener('click', () => { this.updateDbComboList(); this.openDbComboPopup(); });
       this.dbComboInput.addEventListener('change', async () => {
         const v = (this.dbComboInput as HTMLInputElement).value.trim();
-        if (!v) { this.selectedAvID = ''; this.selectedViewID = ''; this.onChanged(); await this.populateViewsFor(''); return; }
+        if (!v) { this.selectedAvID = ''; this.selectedViewID = ''; this.setDbComboDisplayBySelection(); this.onChanged(); await this.populateViewsFor(''); return; }
         if (!this.avList.length) { // 列表尚未加载，尝试加载一次
           await this.initDbList();
         }
@@ -1312,10 +1318,33 @@ export class VisualEchartsQueryUI {
   }
 
   private setDbComboDisplayBySelection() {
-    const input = this.dbComboInput; if (!input) return;
-    if (!this.selectedAvID) { input.value = ''; return; }
+    const input = this.dbComboInput;
+    if (input) {
+      if (!this.selectedAvID) {
+        input.value = '';
+      } else {
+        const found = this.avList.find(x => x.id === this.selectedAvID);
+        input.value = this.showDbId ? (found?.id || this.selectedAvID) : (found?.name || '');
+      }
+    }
+    this.updateDbMirrorBlock();
+  }
+
+  private updateDbMirrorBlock() {
+    const mirrorEl = this.dbMirrorEl;
+    if (!mirrorEl) return;
+    if (!this.selectedAvID) {
+      mirrorEl.style.display = 'none';
+      mirrorEl.removeAttribute('data-av-id');
+      mirrorEl.textContent = '未命名';
+      return;
+    }
     const found = this.avList.find(x => x.id === this.selectedAvID);
-    input.value = this.showDbId ? (found?.id || this.selectedAvID) : (found?.name || '');
+    const label = (found?.name || '').trim() || '未命名';
+    mirrorEl.setAttribute('data-av-id', this.selectedAvID);
+    mirrorEl.setAttribute('data-popover-url', '/api/av/getMirrorDatabaseBlocks');
+    mirrorEl.textContent = label;
+    mirrorEl.style.display = '';
   }
 
   // ===== 新增：数据库/视图下拉逻辑 =====
