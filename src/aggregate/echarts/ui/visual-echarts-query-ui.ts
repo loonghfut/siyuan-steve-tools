@@ -1,8 +1,8 @@
-import { buildIIFEFromAVCtx, EchartsAvTplCtx } from './option-templates';
-import { buildDbMappingExpressions, SeriesItem } from './db-data-mapping';
-import { getallavids } from '../../api/api3';
-import { AVManager } from '../../api/db_pro';
-import { getFieldNamesForUI } from './av-response-mapping';
+import { buildIIFEFromAVCtx, EchartsAvTplCtx } from '../core/option-templates';
+import { buildDbMappingExpressions, SeriesItem } from '../av_data/db-data-mapping';
+import { getallavids } from '../../../api/api3';
+import { AVManager } from '../../../api/db_pro';
+import { getFieldNamesForUI } from '../av_data/av-response-mapping';
 
 export interface VisualEchartsQueryOptions {
   persistKey?: string;

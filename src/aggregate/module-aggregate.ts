@@ -1,6 +1,6 @@
 import steveTools from "@/index";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
-import { VisualEchartsUI } from "./echarts/visual-echarts-ui";
+import { VisualEchartsUI } from "./echarts/ui/visual-echarts-ui";
 import { Dialog, Menu, openTab } from "siyuan";
 import { updateBlock, insertBlock } from "@/api/api";
 import { PluginConfig } from "@/savedata";

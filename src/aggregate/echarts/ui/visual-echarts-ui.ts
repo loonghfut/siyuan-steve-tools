@@ -1,8 +1,8 @@
 import { VisualEchartsQueryUI } from './visual-echarts-query-ui';
-import "@/aggregate/echarts/echart_panel.scss";
-import { ensureEcharts as ensureEchartsLib } from './echarts-loader';
-import { toast } from './utils';
-import type { VisualEchartsOptions } from './types';
+import "./echart_panel.scss";
+import { ensureEcharts as ensureEchartsLib } from './components/echarts-loader';
+import { toast } from '../utils/utils';
+import type { VisualEchartsOptions } from '../types/types';
 
 export class VisualEchartsUI {
   private container: HTMLElement;

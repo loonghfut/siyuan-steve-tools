@@ -1,4 +1,4 @@
-import { genUnwrapAttrValFn, genNormalizeAvResponseSnippet, genBuildFlatRowsSnippet } from './av-iife-snippets';
+import { genUnwrapAttrValFn, genNormalizeAvResponseSnippet, genBuildFlatRowsSnippet } from '../av_data/av-iife-snippets';
 export interface EchartsTplCtx {
   title?: string;
   legend?: string[];

@@ -1,4 +1,4 @@
-import type { ChartType, CommonSettings, PerTypeSettings } from './types';
+import type { ChartType, CommonSettings, PerTypeSettings } from '../types/types';
 
 export function html(strings: TemplateStringsArray, ...values: any[]) {
   return strings.reduce((acc, s, i) => acc + s + (values[i] ?? ''), '');
