@@ -41,9 +41,17 @@ export class VisualEchartsQueryUI {
   private commonSettings: {
     legendPos: 'top' | 'bottom' | 'left' | 'right';
     grid: { top: number; right: number; bottom: number; left: number };
+    title: {
+      textAlign: 'left' | 'center' | 'right';
+      textVerticalAlign: 'top' | 'middle' | 'bottom';
+    };
   } = {
       legendPos: 'top',
-      grid: { top: 90, right: 70, bottom: 24, left: 40 }
+      grid: { top: 90, right: 70, bottom: 24, left: 40 },
+      title: {
+        textAlign: 'center',
+        textVerticalAlign: 'top'
+      }
     };
   private statInteractions: {
     tooltipTrigger: 'axis' | 'item';
@@ -787,12 +795,20 @@ export class VisualEchartsQueryUI {
               right: Number(common.grid?.right ?? 10),
               bottom: Number(common.grid?.bottom ?? 24),
               left: Number(common.grid?.left ?? 10)
+            },
+            title: {
+              textAlign: (common.title?.textAlign === 'left' || common.title?.textAlign === 'right') ? common.title.textAlign : 'center',
+              textVerticalAlign: (common.title?.textVerticalAlign === 'middle' || common.title?.textVerticalAlign === 'bottom') ? common.title.textVerticalAlign : 'top'
             }
           };
         } else {
           this.commonSettings = {
             legendPos: 'top',
-            grid: { top: 50, right: 10, bottom: 24, left: 10 }
+            grid: { top: 50, right: 10, bottom: 24, left: 10 },
+            title: {
+              textAlign: 'center',
+              textVerticalAlign: 'top'
+            }
           };
         }
         // 恢复统计图交互设置（向下兼容原 common 存储）
@@ -892,6 +908,26 @@ export class VisualEchartsQueryUI {
             <div class="veq-label">显示数据来源</div>
             <label class="veq-switch"><input type="checkbox" data-set="showDbNameAndViewName" ${this.showDbNameAndViewName ? 'checked' : ''}/><i></i></label>
           </div>
+          
+          <div class="veq-field">
+            <div class="veq-label">标题水平位置</div>
+            <select class="veq-input" data-set="common.title.textAlign" style="width:auto;">
+              <option value="left" ${cs.title.textAlign === 'left' ? 'selected' : ''}>左对齐</option>
+              <option value="center" ${cs.title.textAlign === 'center' ? 'selected' : ''}>居中</option>
+              <option value="right" ${cs.title.textAlign === 'right' ? 'selected' : ''}>右对齐</option>
+            </select>
+          </div>
+          
+          <div class="veq-field">
+            <div class="veq-label">标题垂直位置</div>
+            <select class="veq-input" data-set="common.title.textVerticalAlign" style="width:auto;">
+              <option value="top" ${cs.title.textVerticalAlign === 'top' ? 'selected' : ''}>顶部</option>
+              <option value="middle" ${cs.title.textVerticalAlign === 'middle' ? 'selected' : ''}>中间</option>
+              <option value="bottom" ${cs.title.textVerticalAlign === 'bottom' ? 'selected' : ''}>底部</option>
+            </select>
+          </div>
+          
+
         </div>
       </details>`;
     if (t === 'stat') {

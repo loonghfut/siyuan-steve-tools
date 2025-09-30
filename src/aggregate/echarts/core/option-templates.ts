@@ -141,6 +141,18 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     const option = {};
     const rows = fetchSqlSync($SQL$);
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
+    ${(function(){
+      const titleAlign = stCommon.title?.textAlign;
+      const titleVAlign = stCommon.title?.textVerticalAlign;
+      let titlePos = '';
+      if (titleAlign === 'left') titlePos += 'option.title.left = 0; ';
+      else if (titleAlign === 'right') titlePos += 'option.title.right = 0; ';
+      else titlePos += 'option.title.left = "center"; ';
+      if (titleVAlign === 'middle') titlePos += 'option.title.top = "middle"; ';
+      else if (titleVAlign === 'bottom') titlePos += 'option.title.bottom = 0; ';
+      else titlePos += 'option.title.top = 0; ';
+      return titlePos ? `try{ ${titlePos} }catch(e){}` : '';
+    })()}
     option.backgroundColor = 'transparent';
     ${tooltipPatch}
     option.legend = { data: ${legendArr} };
@@ -362,6 +374,18 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     ${ctx.showDbNameAndViewName ? `
     option.title.subtext = ${JSON.stringify((ctx.dbName || '') + ' - ' + (ctx.viewName || ''))};
     ` : ''}
+    ${(function(){
+      const titleAlign = stCommon.title?.textAlign;
+      const titleVAlign = stCommon.title?.textVerticalAlign;
+      let titlePos = '';
+      if (titleAlign === 'left') titlePos += 'option.title.left = 0; ';
+      else if (titleAlign === 'right') titlePos += 'option.title.right = 0; ';
+      else titlePos += 'option.title.left = "center"; ';
+      if (titleVAlign === 'middle') titlePos += 'option.title.top = "middle"; ';
+      else if (titleVAlign === 'bottom') titlePos += 'option.title.bottom = 0; ';
+      else titlePos += 'option.title.top = 0; ';
+      return titlePos ? `try{ ${titlePos} }catch(e){}` : '';
+    })()}
     option.backgroundColor = 'transparent';
     ${tooltipPatch}
     option.legend = ${isAllPie ? `{ data: (${xExpr}) }` : `{ data: ${legendArr} }`};
@@ -684,6 +708,19 @@ export function buildPresetCountIIFE(
       var g = st && st.common && st.common.grid ? st.common.grid : null;
       if (g && [g.top, g.right, g.bottom, g.left].every(function(v){ return typeof v==='number' && isFinite(v); })) {
         option.grid = { top: Number(g.top)||0, right: Number(g.right)||0, bottom: Number(g.bottom)||0, left: Number(g.left)||0, containLabel: true };
+      }
+    }catch(e){} })();
+    // 标题位置（支持 st.common.title）
+    (function(){ try{
+      var c = st && st.common ? st.common : null;
+      var titleCfg = c && c.title ? c.title : null;
+      if (titleCfg) {
+        if (titleCfg.textAlign === 'left') option.title.left = 0;
+        else if (titleCfg.textAlign === 'right') option.title.right = 0;
+        else option.title.left = 'center';
+        if (titleCfg.textVerticalAlign === 'middle') option.title.top = 'middle';
+        else if (titleCfg.textVerticalAlign === 'bottom') option.title.bottom = 0;
+        else option.title.top = 0;
       }
     }catch(e){} })();
     ${colorsJs ? `option.color = ${colorsJs};` : ''}
