@@ -34,7 +34,9 @@ export class VisualEchartsQueryUI {
   private avManager = new AVManager('');
   private selectedAvID: string = '';
   private selectedViewID: string = '';
+  private selectedViewName: string = '';
   private showDbId: boolean = false; // 开关：切换 DB 下拉显示名称或 avID
+  private showDbNameAndViewName: boolean = false; // 开关：是否在标题下面显示数据库名称和视图名称
   // 通用设置
   private commonSettings: {
     legendPos: 'top' | 'bottom' | 'left' | 'right';
@@ -111,10 +113,15 @@ export class VisualEchartsQueryUI {
 
   // 供外部读取 IIFE
   public getIIFE(): string {
+    const dbName = this.avList.find(x => x.id === this.selectedAvID)?.name || this.selectedAvID;
+    const viewName = this.selectedViewName || (this.selectedViewID ? this.selectedViewID : '默认视图');
     const ctx: EchartsAvTplCtx = {
       avID: this.selectedAvID || '',
       // 传递 viewID
       viewID: this.selectedViewID || '',
+      dbName: dbName,
+      viewName: viewName,
+      showDbNameAndViewName: this.showDbNameAndViewName,
       title: this.titleInput?.value || '',
       xDataExpr: this.xExprTextarea?.value || 'rows.map((_, i) => String(i+1))',
       seriesExprs: this.series.map(s => ({ name: s.name, expr: s.expr, type: (this.chartType === 'pie' ? 'pie' : (s.type || 'line')), axisIndex: s.axisIndex })),
@@ -317,6 +324,9 @@ export class VisualEchartsQueryUI {
     if (this.viewSelEl) this.viewSelEl.addEventListener('change', (e) => {
       const viewID = (e.target as HTMLSelectElement).value || '';
       this.selectedViewID = viewID;
+      // 设置视图名称
+      const views = Array.from((e.target as HTMLSelectElement).options).map(opt => ({ id: opt.value, name: opt.textContent || '' }));
+      this.selectedViewName = views.find(v => v.id === viewID)?.name || '';
       this.onChanged();
       this.loadKeys();
     });
@@ -689,7 +699,8 @@ export class VisualEchartsQueryUI {
         colors: this.colors.join(','),
         visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode, bucket: this.xBucket },
         fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie },
-        db: { showId: this.showDbId }
+        db: { showId: this.showDbId },
+        showDbNameAndViewName: this.showDbNameAndViewName
       };
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch { /* ignore */ }
@@ -831,6 +842,8 @@ export class VisualEchartsQueryUI {
         const showIdSwitch = this.root.querySelector('[data-db-showid]') as HTMLInputElement | null;
         if (showIdSwitch) showIdSwitch.checked = this.showDbId;
       }
+      // 恢复显示数据来源开关
+      this.showDbNameAndViewName = !!obj.showDbNameAndViewName;
       // 同步下拉框并自动加载字段
       this.syncSelectorsWithInputs();
       this.loadKeys();
@@ -987,6 +1000,7 @@ export class VisualEchartsQueryUI {
                 <label class="veq-switch-item"><span>柱状堆叠</span><label class="veq-switch"><input type="checkbox" data-set="bar.stack" ${sb.stack ? 'checked' : ''}/><i></i></label></label>
                 <label class="veq-switch-item"><span>x 轴留白</span><label class="veq-switch"><input type="checkbox" data-set="stat.boundaryGap" ${sharedBoundaryGap ? 'checked' : ''}/><i></i></label></label>
                 <label class="veq-switch-item"><span>面积填充</span><label class="veq-switch"><input type="checkbox" data-set="line.area" ${(sl as any).area ? 'checked' : ''}/><i></i></label></label>
+                <label class="veq-switch-item"><span>显示数据来源</span><label class="veq-switch"><input type="checkbox" data-set="showDbNameAndViewName" ${this.showDbNameAndViewName ? 'checked' : ''}/><i></i></label></label>
               </div>
             </div>
             <div class="veq-stat-group">
@@ -1270,6 +1284,10 @@ export class VisualEchartsQueryUI {
       // 其他 stat.* 暂不处理
       return;
     }
+    if (segs[0] === 'showDbNameAndViewName') {
+      this.showDbNameAndViewName = !!value;
+      return;
+    }
     let cur: any = this.perTypeSettings as any;
     for (let i = 0; i < segs.length - 1; i++) {
       const k = segs[i];
@@ -1376,13 +1394,16 @@ export class VisualEchartsQueryUI {
       const curView = this.selectedViewID || '';
       if (curView && views.some((v: any) => v.id === curView)) {
         viewSel.value = curView;
+        this.selectedViewName = views.find((v: any) => v.id === curView)?.name || '';
       } else if (defaultViewID && views.some((v: any) => v.id === defaultViewID)) {
         viewSel.value = defaultViewID;
         this.selectedViewID = defaultViewID;
+        this.selectedViewName = views.find((v: any) => v.id === defaultViewID)?.name || '';
       } else {
         // 保持默认空（用默认视图）
         viewSel.value = '';
         this.selectedViewID = '';
+        this.selectedViewName = '';
       }
       // 选择变化后刷新字段
       this.loadKeys();

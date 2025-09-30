@@ -174,6 +174,9 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
 export interface EchartsAvTplCtx extends EchartsTplCtx {
   avID: string;
   viewID?: string;  // 可选：指定视图 ID，否则使用默认视图
+  dbName?: string;  // 数据库名称
+  viewName?: string; // 视图名称
+  showDbNameAndViewName?: boolean; // 是否在标题下面显示数据库名称和视图名称
   baseURL?: string;   // 例如 http://127.0.0.1:6806，留空表示同源
   page?: number;      // 默认 1
   pageSize?: number;  // 默认 -1 (全部)
@@ -350,6 +353,9 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     ${genBuildFlatRowsSnippet()}
     const option = {};
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
+    ${ctx.showDbNameAndViewName ? `
+    option.title.subtext = ${JSON.stringify((ctx.dbName || '') + ' - ' + (ctx.viewName || ''))};
+    ` : ''}
     option.backgroundColor = 'transparent';
     ${tooltipPatch}
     option.legend = ${isAllPie ? `{ data: (${xExpr}) }` : `{ data: ${legendArr} }`};
