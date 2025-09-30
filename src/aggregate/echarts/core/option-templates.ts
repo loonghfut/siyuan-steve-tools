@@ -146,9 +146,15 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     option.legend = { data: ${legendArr} };
     ${legendPatch}
     ${gridPatch}
-    option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false } }];
+    option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false }${(function(){
+      const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
+      return xName ? `, name: '${xName}'` : '';
+    })()} }];
     option.yAxis = ${`[{
-      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
+        const yName = (stBar && stBar.yAxisName) || (stLine && stLine.yAxisName) || '';
+        return yName ? `, name: '${yName}'` : '';
+      })()}
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     option.series = [${seriesJs}];
     ${dataZoomPatch}
@@ -391,9 +397,15 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       }
       if (typeof st.xLabelRotate === 'number') return `rotate: ${st.xLabelRotate|0}`;
       return '';
-    })()} } }];
+    })()} }${(function(){
+      const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
+      return xName ? `, name: '${xName}'` : '';
+    })()} }];
     option.yAxis = ${`[{
-      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
+        const yName = (stBar && stBar.yAxisName) || (stLine && stLine.yAxisName) || '';
+        return yName ? `, name: '${yName}'` : '';
+      })()}
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];
@@ -565,7 +577,23 @@ export function buildPresetCountIIFE(
         }catch(e){}
         return ${t === 'bar' ? 'true' : 'false'};
       })();
-      option.xAxis = [{ type: 'category', boundaryGap: boundaryGap, data: names, axisTick: { show:false }, axisLine: { show:false }, axisLabel: { rotate: xRotate } }];
+      var xAxisName = (function(){
+        try{
+          if ('${t}'==='bar' && st && st.bar && st.bar.xAxisName) return st.bar.xAxisName;
+          if (('${t}'==='line' || '${t}'==='scatter') && st && st.line && st.line.xAxisName) return st.line.xAxisName;
+          if (st && st.xAxisName) return st.xAxisName;
+        }catch(e){}
+        return '';
+      })();
+      var yAxisName = (function(){
+        try{
+          if ('${t}'==='bar' && st && st.bar && st.bar.yAxisName) return st.bar.yAxisName;
+          if (('${t}'==='line' || '${t}'==='scatter') && st && st.line && st.line.yAxisName) return st.line.yAxisName;
+          if (st && st.yAxisName) return st.yAxisName;
+        }catch(e){}
+        return '';
+      })();
+      option.xAxis = [{ type: 'category', boundaryGap: boundaryGap, data: names, axisTick: { show:false }, axisLine: { show:false }, axisLabel: { rotate: xRotate }, name: xAxisName || undefined }];
       var splitType = (function(){
         try{
           var stat = (st && st.stat) ? st.stat : null;
@@ -574,7 +602,7 @@ export function buildPresetCountIIFE(
           return (raw === 'solid' || raw === 'none' || raw === 'dashed') ? raw : 'dashed';
         }catch(e){ return 'dashed'; }
       })();
-      option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } } }];
+      option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } }, name: yAxisName || undefined }];
   var seriesItem = { type: '${t}', name: '计数', data: counts };
       // 堆叠与平滑（支持嵌套与平铺兼容）
       if ('${t}'==='bar') {
