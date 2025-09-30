@@ -171,7 +171,7 @@ export class VisualEchartsUI {
   }
 
   private async copyChartBlock() {
-    const iife = this.queryUI?.getIIFE() || '';
+    const iife = (this.queryUI?.getIIFE() || '').replace('option.animation = false;', 'option.animation = true;');
     const block = '```echarts\n' + iife + '\n```';
   try { await navigator.clipboard.writeText(block); toast('已复制图表块'); }
     catch {

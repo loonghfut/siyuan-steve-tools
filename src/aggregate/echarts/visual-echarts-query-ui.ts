@@ -596,7 +596,8 @@ export class VisualEchartsQueryUI {
   }
 
   private copyChartBlock() {
-    const block = '```echarts\n' + this.getIIFE() + '\n```';
+    const iife = this.getIIFE().replace('option.animation = false;', 'option.animation = true;');
+    const block = '```echarts\n' + iife + '\n```';
     this.copyText(block, '已复制');
   }
 
