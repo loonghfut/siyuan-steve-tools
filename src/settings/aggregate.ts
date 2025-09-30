@@ -17,7 +17,7 @@ export const aggregateDefaults: Record<string, any> = {
 };
 
 export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
-    name: "聚合查询",
+    name: "聚合可视化查询",
     subGroups: [
         {
             name: "SQL可视化",
@@ -63,7 +63,7 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             ],
         },
         {
-            name: "图表",
+            name: "数据库图表",
             items: [
                 { type: "checkbox", title: "启用图表功能", description: "启用后再进行下面的设置", key: "chart-enable", value: ctx.settings["chart-enable"] },
             ],
