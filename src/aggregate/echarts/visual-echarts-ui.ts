@@ -1,20 +1,11 @@
 import { buildPresetCountIIFE } from './option-templates';
 import { VisualEchartsQueryUI } from './visual-echarts-query-ui';
-
-export interface VisualEchartsOptions {
-  persistKey?: string;
-  initialSQL?: string; // 外部传入的初始 SQL
-  /**
-   * 提供 SQL 预设加载器，使 ECharts 面板可读取与 SQL 面板相同来源（如 PluginConfig）的预设。
-   * 若未提供则回退到 localStorage('siyuan-steve-tools:visual-sql-presets')。
-   */
-  loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
-  /**
-   * 转到 SQL 面板的回调（例如打开 SQL 生成器对话框或页签）。
-   * 若未提供，则隐藏“转到 SQL”按钮。
-   */
-  onGotoSQL?: () => void;
-}
+import { injectStyleOnce } from './style';
+import { ensureEcharts as ensureEchartsLib } from './echarts-loader';
+import { renderPaletteFromState } from './palette';
+import { getSqlPresets, safeCompileSqlFromSnapshot } from './sql-presets';
+import { debounce, escapeHtml, toast, setDeepSetting, buildSettingsPayloadFor } from './utils';
+import type { ChartType, CommonSettings, PerTypeSettings, PresetItem, VisualEchartsOptions } from './types';
 
 export class VisualEchartsUI {
   private container: HTMLElement;
@@ -31,26 +22,21 @@ export class VisualEchartsUI {
   private debouncedRebuildColorUpdate!: () => void;
   // 预设计数相关
   private presetListEl?: HTMLElement;
-  private presetItems: Array<{ name: string; sql: string }> = [];
-  private presetTypeSel?: HTMLSelectElement; // bar/line/pie
+  private presetItems: PresetItem[] = [];
+  private presetTypeSel?: HTMLSelectElement; // bar/line/scatter/pie
   private presetTitleInput?: HTMLInputElement;
   // 颜色仅由调色盘控制，不再使用文本输入
   private presetColors: string[] = [];
   private paletteEl?: HTMLElement;
   // 每种图的自定义设置（持久化）
-  private perTypeSettings: {
-          bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
-          line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
-          scatter: { /* Add properties for scatter if needed */ }; // New scatter type
-          pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
-  } = {
+  private perTypeSettings: PerTypeSettings = {
       bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } },
       line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' } },
-          scatter: { /* Initialize properties for scatter if needed */ }, // Initialize scatter type
-          pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
+    scatter: {},
+    pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
     };
   // 与查询模式统一的“通用设置”
-  private commonSettings: { legendPos: 'top'|'bottom'|'left'|'right'; ySplitLine: 'dashed'|'solid'|'none'; grid: { top: number; right: number; bottom: number; left: number } } = {
+  private commonSettings: CommonSettings = {
     legendPos: 'top',
     ySplitLine: 'dashed',
     grid: { top: 50, right: 10, bottom: 24, left: 10 }
@@ -61,180 +47,166 @@ export class VisualEchartsUI {
   // 避免设置时的回写触发重绘导致丢焦点：从预设面板向查询子面板同步设置期间置位
   private syncingFromPreset: boolean = false;
 
-  constructor(container: HTMLElement, options?: VisualEchartsOptions) {
+  constructor(container: HTMLElement, opts?: VisualEchartsOptions) {
     this.container = container;
-    this.key = options?.persistKey || 'siyuan-steve-tools:visual-echarts-ui';
-    this.loadSqlPresetsProvider = options?.loadSqlPresets;
-    this.opts = options;
-    // 初始化颜色相关的防抖重建
-    this.debouncedRebuildColorUpdate = this.debounce(() => this.rebuildPresetCode(), 160);
-    this.render();
-    this.restore();
-    this.rebuildCode();
-  }
-
-  private html(strings: TemplateStringsArray, ...values: any[]) {
-    return strings.reduce((acc, s, i) => acc + s + (values[i] ?? ''), '');
-  }
-
-  // 简单的防抖工具：在 wait 毫秒内只触发最后一次
-  private debounce<T extends (...args: any[]) => void>(fn: T, wait = 200) {
-    let timer: number | undefined;
-    return ((...args: Parameters<T>) => {
-      if (timer !== undefined) window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        timer = undefined;
-        fn(...args);
-      }, wait) as unknown as number;
-    }) as T;
-  }
-
-  private render() {
-    this.injectStyle();
-    // 预读取持久化的模式用于初始渲染，避免首次打开时显示为默认 preset
+    this.opts = opts;
+    this.key = opts?.persistKey || 'siyuan-steve-tools:visual-echarts-ui';
+    this.loadSqlPresetsProvider = opts?.loadSqlPresets;
+    injectStyleOnce();
     try {
       const raw = localStorage.getItem(this.key);
       if (raw) {
-        const obj = JSON.parse(raw);
-        if (obj && (obj.mode === 'preset' || obj.mode === 'query')) this.mode = obj.mode;
+        const s = JSON.parse(raw);
+        this.mode = s.mode || this.mode;
+        this.presetItems = Array.isArray(s.presetItems) ? s.presetItems : this.presetItems;
+        this.presetColors = Array.isArray(s.presetColors) ? s.presetColors : this.presetColors;
+        if (s.perTypeSettings) this.perTypeSettings = { ...this.perTypeSettings, ...s.perTypeSettings };
+        if (s.commonSettings) this.commonSettings = { ...this.commonSettings, ...s.commonSettings };
+        this.previewPinned = !!s.previewPinned;
       }
     } catch { /* ignore */ }
-    const initialMode = this.mode;
-    this.container.innerHTML = this.html`
-      <div class="ve-wrap">
-        <details class="ve-card" open data-section="preview">
-          <summary class="ve-legend">
-            <span class="ve-legend-left">结果预览 <button class="ve-icon" data-refresh title="刷新">⟳</button><button class="ve-icon" data-copy-block-top title="复制图表块">⎘</button><button class="ve-icon" data-pin-preview title="顶住">📌</button></span>
-            <div class="ve-mode-tabs" role="tablist">
-              <button class="ve-tab ${initialMode==='preset' ? 'active' : ''}" data-tab="preset" type="button">SQL预设计数</button>
-              <button class="ve-tab ${initialMode==='query' ? 'active' : ''}" data-tab="query" type="button">数据库查询</button>
-            </div>
-          </summary>
-          <div class="ve-result" data-result><div class="ve-placeholder">在下方完成配置后，这里会显示图表</div></div>
-        </details>
+    this.debouncedRebuildColorUpdate = debounce(() => this.rebuildPresetCode(), 150);
+    this.render();
+    this.rebuildPresetCode();
+    this.applyPinPreviewUI();
+  }
 
-        <details class="ve-card" open data-section="preset" style="display:${initialMode==='preset' ? '' : 'none'}">
-          <summary class="ve-legend">SQL预设计数
-            <span style="margin-left:8px; display:inline-flex; gap:6px; align-items:center;">
-              <select class="ve-input" data-preset-type style="width:120px">
-                <option value="bar">柱状图</option>
-                <option value="line">折线图</option>
-                <option value="scatter">散点图</option>
+  private persist() {
+    try {
+      const data = {
+        mode: this.mode,
+        presetItems: this.presetItems,
+        presetType: this.presetTypeSel?.value || 'bar',
+        presetTitle: this.presetTitleInput?.value || '',
+        presetColors: this.presetColors,
+        perTypeSettings: this.perTypeSettings,
+        commonSettings: this.commonSettings,
+        previewPinned: this.previewPinned,
+      };
+      localStorage.setItem(this.key, JSON.stringify(data));
+    } catch { /* ignore */ }
+  }
+
+  private render() {
+    this.container.innerHTML = `
+      <div class="ve-wrap">
+        <div class="ve-row ve-actions ve-mode-tabs">
+          <button class="ve-tab ${this.mode==='preset' ? 'active' : ''}" data-tab="preset">预设</button>
+          <button class="ve-tab ${this.mode==='query' ? 'active' : ''}" data-tab="query">查询</button>
+          <span style="flex:1"></span>
+          <button class="ve-btn" data-refresh>刷新</button>
+          <button class="ve-btn" data-copy-block-top>复制图表块</button>
+          <button class="ve-btn ve-icon ${this.previewPinned ? 'active' : ''}" title="置顶预览" data-pin-preview>📌</button>
+          ${this.opts?.onGotoSQL ? '<button class="ve-btn" data-goto-sql>转到 SQL</button>' : ''}
+        </div>
+        <div class="ve-card" data-section="preview">
+          <div class="ve-result" data-result><div class="ve-placeholder">暂无预览</div></div>
+        </div>
+        <details class="ve-card" open data-section="preset" style="display:${this.mode==='preset' ? '' : 'none'}">
+          <summary class="ve-legend">预设模式</summary>
+          <div class="ve-row" style="align-items:center; gap:8px; flex-wrap:wrap;">
+            <label class="ve-field">图类型
+              <select class="ve-input" data-preset-type>
+                <option value="bar">柱状</option>
+                <option value="line">折线</option>
+                <option value="scatter">散点</option>
                 <option value="pie">饼图</option>
               </select>
-            </span>
-          </summary>
-          <div class="ve-row" style="margin:6px 0;">
-            <label class="ve-field">标题
-              <input class="ve-input" data-preset-title placeholder="图表标题" />
             </label>
-            <div class="ve-field">
-              <div class="ve-label">颜色</div>
-              <div class="ve-row ve-color-row">
-                <div class="ve-color-editor">
-                  <div class="ve-color-palette" data-color-palette></div>
-                  <button class="ve-btn ve-ghost ve-small" data-color-add type="button">添加颜色</button>
-                </div>
-              </div>
-            </div>
+            <label class="ve-field">标题
+              <input class="ve-input" data-preset-title placeholder="标题..." />
+            </label>
           </div>
-          <div class="ve-row" style="margin:6px 0;">
-            <button class="ve-btn" data-preset-add>从 SQL 预设添加</button>
-            <button class="ve-btn" data-goto-sql>转到 SQL</button>
-            <button class="ve-btn" data-preset-clear>清空</button>
-            <button class="ve-btn" data-preset-copy>复制 JS(IIFE)</button>
-            <button class="ve-btn" data-preset-copy-block>复制图表块</button>
+          <div class="ve-group">
+            <div class="ve-group__title">调色盘</div>
+            <div class="ve-row ve-color-row"><button class="ve-btn ve-small" data-color-add>+ 颜色</button></div>
+            <div class="ve-color-palette" data-color-palette></div>
           </div>
-          <details class="ve-sub" data-type-settings>
-            <summary class="ve-legend">图表自定义设置</summary>
-            <div class="ve-collapse" data-collapse>
-              <div class="ve-type-settings" data-type-settings-body></div>
+          <div class="ve-group" data-type-settings>
+            <div class="ve-group__title">类型设置</div>
+            <div data-collapse><div data-type-settings-body></div></div>
+            <div class="ve-row ve-justify-end"><button class="ve-btn ve-small" data-type-reset>恢复默认</button></div>
+          </div>
+          <div class="ve-group">
+            <div class="ve-group__title">预设列表</div>
+            <div class="ve-row">
+              <button class="ve-btn ve-small" data-preset-add>从 SQL 预设添加</button>
+              <button class="ve-btn ve-small" data-preset-clear>清空</button>
+              <button class="ve-btn ve-small" data-preset-copy>复制 IIFE</button>
+              <button class="ve-btn ve-small" data-preset-copy-block>复制图表块</button>
             </div>
-          </details>
-          <details class="ve-sub">
-            <summary class="ve-legend">代码预览</summary>
-            <pre class="ve-output" data-output></pre>
-          </details>
-          <div class="ve-preset-list" data-preset-list></div>
-          <div class="ve-hint" style="color:var(--muted); font-size:12px; margin-top:6px;">说明：x 轴为各预设名称，y 为各自 SQL 查询结果的行数。</div>
+            <div class="ve-preset-list" data-preset-list></div>
+            <div class="ve-hint" style="color:var(--muted); font-size:12px; margin-top:6px;">说明：x 轴为各预设名称，y 为各自 SQL 查询结果的行数。</div>
+            <div class="ve-output" data-output></div>
+          </div>
         </details>
-        <details class="ve-card" open data-section="query" style="display:${initialMode==='query' ? '' : 'none'}">
+        <details class="ve-card" open data-section="query" style="display:${this.mode==='query' ? '' : 'none'}">
           <summary class="ve-legend">数据库查询模式</summary>
           <div data-query-container></div>
         </details>
       </div>
     `;
+    // 绑定基础元素
     this.outputPre = this.container.querySelector('[data-output]') as HTMLPreElement;
     this.previewBody = this.container.querySelector('[data-result]') as HTMLElement;
-    // 预览刷新
-  (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.refreshPreview(); });
-  (this.container.querySelector('[data-copy-block-top]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.copyChartBlock(); });
+    // 顶部按钮
+    (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.renderChartPreview().catch(()=>{}); });
+    (this.container.querySelector('[data-copy-block-top]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.copyChartBlock(); });
     (this.container.querySelector('[data-pin-preview]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.togglePinPreview(); });
     const gotoSqlBtn = this.container.querySelector('[data-goto-sql]') as HTMLButtonElement | null;
     if (gotoSqlBtn) {
-      if (this.opts?.onGotoSQL) {
-        gotoSqlBtn.addEventListener('click', () => this.opts!.onGotoSQL!());
-      } else {
-        gotoSqlBtn.style.display = 'none';
-      }
+      if (this.opts?.onGotoSQL) gotoSqlBtn.addEventListener('click', () => this.opts!.onGotoSQL!());
+      else gotoSqlBtn.style.display = 'none';
     }
-
     // 预设区控件
     this.presetListEl = this.container.querySelector('[data-preset-list]') as HTMLElement;
     this.presetTypeSel = this.container.querySelector('[data-preset-type]') as HTMLSelectElement;
     this.presetTitleInput = this.container.querySelector('[data-preset-title]') as HTMLInputElement;
     this.paletteEl = this.container.querySelector('[data-color-palette]') as HTMLElement | undefined;
     this.currentSettingsEl = this.container.querySelector('[data-type-settings-body]') as HTMLElement;
+    // 恢复选择器/标题
+    try {
+      const raw = localStorage.getItem(this.key);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s.presetType && this.presetTypeSel) this.presetTypeSel.value = s.presetType;
+        if (typeof s.presetTitle === 'string' && this.presetTitleInput) this.presetTitleInput.value = s.presetTitle;
+      }
+    } catch { /* ignore */ }
     (this.container.querySelector('[data-preset-add]') as HTMLButtonElement)?.addEventListener('click', () => this.addFromSqlPresets());
     (this.container.querySelector('[data-preset-clear]') as HTMLButtonElement)?.addEventListener('click', () => { this.presetItems = []; this.rebuildPresetListUI(); this.rebuildPresetCode(); });
     (this.container.querySelector('[data-preset-copy]') as HTMLButtonElement)?.addEventListener('click', () => this.copyPresetCode());
-  (this.container.querySelector('[data-preset-copy-block]') as HTMLButtonElement)?.addEventListener('click', () => this.copyChartBlock());
+    (this.container.querySelector('[data-preset-copy-block]') as HTMLButtonElement)?.addEventListener('click', () => this.copyChartBlock());
     this.presetTypeSel?.addEventListener('change', () => {
       this.renderTypeSettingsUI();
-      // 同步到查询面板以保持统一
-      try {
-        const t = (this.presetTypeSel!.value as any);
-        this.queryUI?.setViewSettings((t==='scatter'?'line':t) as any, this.getCurrentTypeSettings());
-      } catch { /* ignore */ }
+      try { const t = (this.presetTypeSel!.value as any); this.queryUI?.setViewSettings((t==='scatter'?'line':t) as any, this.getCurrentTypeSettings()); } catch { /* ignore */ }
       this.rebuildPresetCode();
     });
-    this.presetTitleInput?.addEventListener('input', () => {
-      try { this.queryUI?.setTitle(this.presetTitleInput!.value || ''); } catch { /* ignore */ }
-      this.rebuildPresetCode();
-    });
+    this.presetTitleInput?.addEventListener('input', () => { try { this.queryUI?.setTitle(this.presetTitleInput!.value || ''); } catch { /* ignore */ } this.rebuildPresetCode(); });
     // 颜色编辑器交互
     const addColorBtn = this.container.querySelector('[data-color-add]') as HTMLButtonElement | null;
     const getColors = (): string[] => this.presetColors.slice();
     const setColors = (arr: string[]) => {
       this.presetColors = arr.slice();
       try { this.queryUI?.setColors(this.presetColors.slice()); } catch { /* ignore */ }
-      // 立即保存，避免用户快速离开导致防抖未触发
-      this.save();
+      this.persist();
       this.debouncedRebuildColorUpdate();
     };
-    const renderPalette = () => this.renderPaletteFromState(getColors, setColors);
-    if (addColorBtn) addColorBtn.addEventListener('click', () => {
-      const cs = getColors();
-      cs.push('#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'));
-      try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; }
-      renderPalette();
-    });
-    // 初始化 palette
-    renderPalette();
-    // 初始化类型设置区（默认折叠）
+    const renderPal = () => renderPaletteFromState(this.paletteEl!, getColors, setColors, (apply) => { try { this.syncingFromPreset = true; apply(); } finally { this.syncingFromPreset = false; } });
+    if (addColorBtn) addColorBtn.addEventListener('click', () => { const cs = getColors(); cs.push('#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0')); try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; } renderPal(); });
+    renderPal();
+    // 类型设置区
     this.renderTypeSettingsUI();
-    // 绑定折叠过渡动画
+    // 折叠动画
     const typeDetails = this.container.querySelector('details[data-type-settings]') as HTMLDetailsElement | null;
     const collapse = this.container.querySelector('[data-collapse]') as HTMLElement | null;
     if (typeDetails && collapse) {
       const syncHeight = () => {
         if (!collapse) return;
         if (typeDetails.open) {
-          // 先设为 auto 获取高度，再回退到像素值以触发过渡
           collapse.style.height = 'auto';
           const h = collapse.getBoundingClientRect().height;
           collapse.style.height = '0px';
-          // 下一帧应用目标高度
           requestAnimationFrame(() => { collapse.style.height = h + 'px'; });
         } else {
           const h = collapse.getBoundingClientRect().height;
@@ -242,23 +214,11 @@ export class VisualEchartsUI {
           requestAnimationFrame(() => { collapse.style.height = '0px'; });
         }
       };
-      // 初始化：若 open 则同步到实际高度，否则为 0
-      if (typeDetails.open) {
-        collapse.style.height = 'auto';
-      } else {
-        collapse.style.height = '0px';
-      }
+      if (typeDetails.open) collapse.style.height = 'auto'; else collapse.style.height = '0px';
       typeDetails.addEventListener('toggle', syncHeight);
-      // 当内部内容变化（切换图类型或值变化导致高度变化）时，如果是展开状态，更新为 auto 再回流到像素值
-      const ro = new ResizeObserver(() => {
-        if (!typeDetails.open) return;
-        collapse.style.height = 'auto';
-        const h = collapse.getBoundingClientRect().height;
-        collapse.style.height = h + 'px';
-      });
+      const ro = new ResizeObserver(() => { if (!typeDetails.open) return; collapse.style.height = 'auto'; const h = collapse.getBoundingClientRect().height; collapse.style.height = h + 'px'; });
       ro.observe(collapse);
     }
-
     // 初始化查询模式子 UI
     const queryContainer = this.container.querySelector('[data-query-container]') as HTMLElement | null;
     if (queryContainer) {
@@ -267,26 +227,18 @@ export class VisualEchartsUI {
         onGotoSQL: this.opts?.onGotoSQL,
         loadSqlPresets: this.loadSqlPresetsProvider,
         onChange: () => {
-          // 若此变更由预设面板触发（例如调节滑块/输入框），跳过回写以避免重绘导致输入焦点丢失
-          if (this.syncingFromPreset) {
-            this.rebuildCode();
-            return;
-          }
-          // 从查询面板拉取最新统一设置并同步到预设面板
+          if (this.syncingFromPreset) { this.rebuildPresetCode(); return; }
           try {
             if (!this.queryUI) return;
             const vs = this.queryUI.getViewSettings();
             const colors = this.queryUI.getColors();
             const title = this.queryUI.getTitle();
-            // 同步图表类型：仅在当前显示为“数据库查询”模式时回写；
-            // 并且当查询面板返回 line(统计) 时，优先保留预设选择中的 scatter/bar
             if (this.mode === 'query' && this.presetTypeSel) {
               const cur = (this.presetTypeSel.value as any) || 'bar';
               let next = (vs?.type as any) || cur || 'bar';
-              if (next === 'line' && (cur === 'scatter' || cur === 'bar')) next = cur; // 保留散点/柱状
+              if (next === 'line' && (cur === 'scatter' || cur === 'bar')) next = cur;
               this.presetTypeSel.value = next;
             }
-            // 同步每类型设置
             if (vs && vs.settings) {
               const t = vs.type || 'bar';
               if (t === 'line') this.perTypeSettings.line = { ...this.perTypeSettings.line, ...vs.settings };
@@ -294,12 +246,10 @@ export class VisualEchartsUI {
               else this.perTypeSettings.bar = { ...this.perTypeSettings.bar, ...vs.settings };
               this.renderTypeSettingsUI();
             }
-            // 同步颜色与标题
-            if (Array.isArray(colors)) { this.presetColors = colors.slice(); this.renderPaletteFromState(() => this.presetColors.slice(), (arr)=>{ this.presetColors = arr.slice(); }); }
+            if (Array.isArray(colors)) { this.presetColors = colors.slice(); renderPal(); }
             if (this.presetTitleInput && typeof title === 'string') this.presetTitleInput.value = title;
           } catch { /* ignore */ }
-          this.rebuildCode();
-          // 同步子面板的折叠状态到父存储中，方便未来跨会话读取（冗余一份，便于集中恢复）
+          this.rebuildPresetCode();
           try {
             if (this.queryUI) {
               const parentRaw = localStorage.getItem(this.key);
@@ -312,22 +262,16 @@ export class VisualEchartsUI {
           } catch { /* ignore */ }
         },
       });
-      // 将当前预设视图设置与颜色/标题初始化同步到查询面板
       try {
-        // 读取查询面板自身的持久化类型，避免被预设类型覆盖
         const vs = this.queryUI.getViewSettings();
         const curPreset = (this.presetTypeSel?.value as any) || 'bar';
         let qType = (vs?.type as any) || curPreset || 'bar';
-        // 若查询返回 line(统计)，而预设已有 scatter/bar 选择，则保留预设选择
         if (qType === 'line' && (curPreset === 'scatter' || curPreset === 'bar')) qType = curPreset;
-        // 同步预设选择器显示
         if (this.presetTypeSel) this.presetTypeSel.value = qType;
-        // 按查询面板的类型推送对应设置
         const settingsFor = (t: any) => ((t === 'line' || t === 'scatter') ? this.perTypeSettings.line : (t === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
         this.queryUI.setViewSettings(qType, settingsFor(qType));
         this.queryUI.setColors(this.presetColors.slice());
         this.queryUI.setTitle(this.presetTitleInput?.value || '');
-        // 初始化后同步一次折叠状态到父存储（与 onChange 中逻辑一致）
         try {
           const parentRaw = localStorage.getItem(this.key);
           const parent = parentRaw ? JSON.parse(parentRaw) : {};
@@ -338,7 +282,6 @@ export class VisualEchartsUI {
         } catch { /* ignore */ }
       } catch { /* ignore */ }
     }
-
     // 模式切换
     const tabs = Array.from(this.container.querySelectorAll('[data-tab]')) as HTMLButtonElement[];
     const presetCard = this.container.querySelector('[data-section="preset"]') as HTMLElement | null;
@@ -348,210 +291,11 @@ export class VisualEchartsUI {
       if (presetCard) presetCard.style.display = this.mode==='preset' ? '' : 'none';
       if (queryCard) queryCard.style.display = this.mode==='query' ? '' : 'none';
     };
-    tabs.forEach(btn => btn.addEventListener('click', (ev) => {
-      ev.preventDefault(); ev.stopPropagation();
-      const t = btn.getAttribute('data-tab') as 'preset'|'query';
-      if (!t) return;
-      const prev = this.mode;
-      this.mode = t;
-      this.save();
-      applyMode();
-      // 仅在从非 query 进入 query 时做一次同步
-      if (this.mode === 'query' && prev !== 'query') {
-        try {
-          // 保留查询面板自身的类型，避免被预设覆盖
-          const vs = this.queryUI?.getViewSettings();
-          const curPreset = (this.presetTypeSel?.value as any) || 'bar';
-          let qType = (vs?.type as any) || curPreset || 'bar';
-          if (qType === 'line' && (curPreset === 'scatter' || curPreset === 'bar')) qType = curPreset;
-          if (this.presetTypeSel) this.presetTypeSel.value = qType;
-          const settingsFor = (tt: any) => ((tt === 'line' || tt === 'scatter') ? this.perTypeSettings.line : (tt === 'pie' ? this.perTypeSettings.pie : this.perTypeSettings.bar));
-          this.queryUI?.setViewSettings(qType, settingsFor(qType));
-          this.queryUI?.setColors(this.presetColors.slice());
-          this.queryUI?.setTitle(this.presetTitleInput?.value || '');
-        } catch { /* ignore */ }
-      }
-      this.rebuildCode();
-    }));
-
-    // 离开前兜底保存一次，防止某些防抖中的更改未及时写入
-    window.addEventListener('beforeunload', () => {
-      try { this.save(); } catch { /* ignore */ }
-    });
-  }
-
-  private rebuildCode() {
-    this.rebuildPresetCode();
-  }
-
-  private async refreshPreview() {
-    await this.renderChartPreview();
-  }
-
-  private save() {
-    try {
-      const data = {
-        mode: this.mode,
-        previewPinned: this.previewPinned,
-        preset: {
-          items: this.presetItems,
-          type: this.presetTypeSel?.value || 'bar',
-          title: this.presetTitleInput?.value || '',
-          colors: this.presetColors.join(','),
-          perTypeSettings: this.perTypeSettings,
-          commonSettings: this.commonSettings
-        }
-      };
-      localStorage.setItem(this.key, JSON.stringify(data));
-    } catch { }
-  }
-  private restore() {
-    try {
-      const raw = localStorage.getItem(this.key); if (!raw) return;
-      const obj = JSON.parse(raw);
-      if (obj?.mode) this.mode = obj.mode === 'query' ? 'query' : 'preset';
-      this.previewPinned = !!obj?.previewPinned;
-      const tabs = Array.from(this.container.querySelectorAll('[data-tab]')) as HTMLButtonElement[];
-      const presetCard = this.container.querySelector('[data-section="preset"]') as HTMLElement | null;
-      const queryCard = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
-      tabs.forEach(b => b.classList.toggle('active', (b.getAttribute('data-tab') as any) === this.mode));
-      if (presetCard) presetCard.style.display = this.mode==='preset' ? '' : 'none';
-      if (queryCard) queryCard.style.display = this.mode==='query' ? '' : 'none';
-      // 应用预览置顶状态
-      this.applyPinPreviewUI();
-
-      if (obj?.preset) {
-        this.presetItems = Array.isArray(obj.preset.items) ? obj.preset.items : [];
-        if (this.presetTypeSel && obj.preset.type) this.presetTypeSel.value = obj.preset.type;
-        if (this.presetTitleInput) this.presetTitleInput.value = obj.preset.title || '';
-        this.presetColors = String(obj.preset.colors || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-        if (obj.preset.perTypeSettings) this.perTypeSettings = { ...this.perTypeSettings, ...obj.preset.perTypeSettings };
-        // 读取通用设置：优先从 preset.commonSettings；兼容旧数据从 perTypeSettings.common
-        const cs = obj.preset.commonSettings || (obj.preset.perTypeSettings && (obj.preset.perTypeSettings as any).common) || null;
-        if (cs && typeof cs === 'object') {
-          this.commonSettings = {
-            legendPos: (cs.legendPos === 'bottom' || cs.legendPos === 'left' || cs.legendPos === 'right') ? cs.legendPos : 'top',
-            ySplitLine: (cs.ySplitLine === 'solid' || cs.ySplitLine === 'none') ? cs.ySplitLine : 'dashed',
-            grid: {
-              top: Number(cs.grid?.top ?? 50),
-              right: Number(cs.grid?.right ?? 10),
-              bottom: Number(cs.grid?.bottom ?? 24),
-              left: Number(cs.grid?.left ?? 10)
-            }
-          };
-        }
-        this.rebuildPresetListUI();
-        this.renderTypeSettingsUI();
-        // 恢复后刷新调色盘
-        this.renderPaletteFromState(() => this.presetColors.slice(), (arr) => { this.presetColors = arr.slice(); });
-      }
-      // 可选：将查询子面板的折叠状态从父存储中读回（如果子存储尚未生成）
-      try {
-        const childRaw = localStorage.getItem(this.key + ':query');
-        const child = childRaw ? JSON.parse(childRaw) : {};
-        if ((!child || !child.fold) && obj && obj.queryFold) {
-          child.fold = obj.queryFold;
-          localStorage.setItem(this.key + ':query', JSON.stringify(child));
-        }
-      } catch { /* ignore */ }
-    } catch { }
+    tabs.forEach(btn => btn.addEventListener('click', (ev) => { ev.preventDefault(); const t = (btn.getAttribute('data-tab') as 'preset'|'query') || 'preset'; if (this.mode === t) return; this.mode = t; applyMode(); this.rebuildPresetCode(); }));
   }
 
   // 已移除表格相关的格式化方法
 
-  private escape(s: any) {
-    const str = s == null ? '' : String(s);
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
-
-  private injectStyle() {
-    const ID = 'visual-echarts-ui-style';
-    if (document.getElementById(ID)) return;
-    const st = document.createElement('style'); st.id = ID; st.textContent = `
-      .ve-wrap{--fg: var(--b3-theme-on-background); --muted: var(--b3-theme-on-surface); --border: var(--b3-border-color); --bg: var(--b3-theme-surface); font-family: var(--b3-font-family); font-size: var(--b3-font-size);}
-  .ve-card{border:1px solid var(--border); border-radius:10px; padding:12px; background: var(--bg); margin-bottom:12px; box-shadow: 0 6px 20px color-mix(in oklab, var(--b3-theme-on-background), transparent 92%)}
-      .ve-legend{font-weight:600; color: var(--muted)}
-  details > summary.ve-legend{display:flex; align-items:center; justify-content:space-between; gap:8px}
-  .ve-legend-left{display:inline-flex; align-items:center; gap:6px}
-      .ve-grid{display:grid; gap:8px}
-      .ve-grid-2{grid-template-columns: 1fr 1fr}
-  .ve-field{display:grid; gap:6px; font-size:13.5px; color: var(--fg)}
-      .ve-label{font-size:12px; color: var(--muted)}
-  .ve-legend{font-size:13.5px}
-      .ve-input{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); border-radius:6px; padding:6px 8px; outline:none}
-  .ve-field input[type="checkbox"]{accent-color: var(--b3-theme-primary); transform: scale(1.05);}
-  .ve-inline{display:flex; align-items:center; gap:10px}
-  /* Switch style */
-  .ve-switch{position:relative; display:inline-flex; align-items:center}
-  .ve-switch input{position:absolute; opacity:0; width:0; height:0}
-  .ve-switch i{width:36px; height:20px; background: var(--b3-border-color); border-radius:999px; position:relative; transition:all .18s ease; box-shadow: inset 0 0 0 1px var(--b3-border-color)}
-  .ve-switch i:before{content:""; position:absolute; left:2px; top:2px; width:16px; height:16px; border-radius:50%; background: var(--b3-theme-on-surface); transition:transform .18s ease}
-  .ve-switch input:checked + i{background: var(--b3-theme-primary); box-shadow: inset 0 0 0 1px var(--b3-theme-primary)}
-  .ve-switch input:checked + i:before{background: var(--b3-theme-on-primary); transform: translateX(16px)}
-      .ve-row{display:flex; gap:8px; flex-wrap:wrap}
-      .ve-btn{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); padding:6px 10px; border-radius:6px; cursor:pointer}
-      .ve-btn.ve-ghost{background:transparent}
-  .ve-btn.ve-small{padding:4px 8px; font-size:12px}
-      .ve-actions{display:flex; gap:8px; margin:8px 0}
-      .ve-output{white-space:pre-wrap; background: var(--b3-protyle-code-background, var(--b3-theme-background)); border:1px solid var(--border); border-radius:6px; padding:8px; font-family: var(--b3-font-family-code, ui-monospace,monospace); font-size:11px}
-      .ve-result{border:1px solid var(--border); border-radius:8px; overflow:auto}
-      .ve-placeholder{padding:10px; color: var(--muted)}
-      .ve-table{width:100%; border-collapse:collapse; font-size:12px}
-      .ve-table th,.ve-table td{border-bottom:1px solid var(--border); padding:6px 8px; text-align:left}
-      .ve-icon{border:1px solid var(--border); background: var(--b3-theme-background); color: var(--muted); width:22px; height:22px; padding:0; border-radius:6px; cursor:pointer; margin-left:6px}
-  .ve-icon.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
-      @media(max-width:980px){.ve-grid-2{grid-template-columns:1fr}}
-      /* 预设模式样式 */
-  .ve-preset-list{display:flex; flex-direction:column; gap:8px}
-  .ve-type-settings{display:grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px 14px}
-  @media(max-width:980px){.ve-type-settings{grid-template-columns: 1fr}}
-    .ve-preset-item{border:1px solid var(--border); border-radius:8px; padding:8px; position:relative; background: var(--b3-theme-surface); cursor: move}
-  .ve-preset-item.drag-over{outline: 2px dashed var(--b3-theme-primary)}
-      .ve-chip{position:relative}
-      .ve-chip input{position:absolute; opacity:0; pointer-events:none}
-    .ve-chip span{display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color: var(--fg); background: var(--b3-theme-background); cursor:pointer; transition: all .15s ease}
-    .ve-chip input:checked + span{background: var(--b3-theme-primary); border-color: var(--b3-theme-primary); color: var(--b3-theme-on-primary)}
-    .ve-chip span:hover{border-color: var(--b3-theme-primary)}
-    .ve-chip input:focus-visible + span{outline:2px solid color-mix(in oklab, var(--b3-theme-primary), transparent 60%); outline-offset:2px}
-  .ve-chip-group{display:flex; gap:6px; flex-wrap:wrap}
-  .ve-range{width:220px}
-  .ve-range{appearance:none; height:4px; border-radius:999px; background: color-mix(in oklab, var(--b3-border-color), transparent 30%)}
-  .ve-range::-webkit-slider-thumb{appearance:none; width:14px; height:14px; border-radius:50%; background: var(--b3-theme-primary); border: 2px solid var(--b3-theme-on-primary); margin-top:-5px}
-  .ve-range::-moz-range-thumb{width:14px; height:14px; border-radius:50%; background: var(--b3-theme-primary); border: 2px solid var(--b3-theme-on-primary)}
-  .ve-help{color: var(--muted); font-size: 12px}
-  .ve-justify-end{justify-content: flex-end}
-  /* collapse wrapper for smooth open/close */
-  .ve-collapse{overflow:hidden; transition: height .24s cubic-bezier(0.4, 0, 0.2, 1)}
-  /* color editor */
-  .ve-color-editor{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
-  .ve-color-row{align-items:center}
-  .ve-color-palette{display:flex; gap:8px; flex-wrap:wrap}
-  .ve-color-chip{position:relative; width:28px; height:28px}
-  .ve-color-swatch{display:block; width:100%; height:100%; border-radius:6px; border:1px solid var(--border); box-shadow: inset 0 0 0 1px color-mix(in oklab, #000, transparent 85%)}
-  .ve-color-del{position:absolute; right:-6px; top:-6px; width:18px; height:18px; border-radius:50%; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--muted); cursor:pointer; line-height:16px; font-size:12px; z-index:2}
-  .ve-color-chip input[type="color"]{position:absolute; inset:0; opacity:0; cursor:pointer; z-index:1}
-  .ve-color-empty{color: var(--muted); font-size:12px}
-  /* Grouped sections */
-  .ve-group{border:1px solid var(--border); border-radius:10px; padding:10px; background: color-mix(in oklab, var(--b3-theme-surface), var(--b3-theme-background) 30%)}
-  .ve-group__title{font-weight:600; color: var(--muted); margin-bottom:6px}
-  .ve-type-settings > .ve-group{grid-column: 1 / -1}
-      .ve-modal-mask{position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:9999}
-      .ve-modal{width:min(640px, 92vw); max-height:86vh; background: var(--b3-theme-surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); display:flex; flex-direction:column}
-      .ve-modal__head{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--border)}
-      .ve-modal__body{padding:12px; overflow:auto}
-      .ve-modal__foot{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid var(--border)}
-      .ve-preset-chooser{display:flex; flex-wrap:wrap; gap:6px}
-      .ve-search{margin-bottom:8px}
-      .ve-empty{color: var(--muted); font-size:12px; padding:4px 0}
-  .ve-mode-tabs{display:flex; gap:6px}
-      .ve-tab{appearance:none; border:1px solid var(--border); background: var(--b3-theme-background); color: var(--fg); padding:6px 10px; border-radius:999px; cursor:pointer}
-      .ve-tab.active{background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); border-color: var(--b3-theme-primary)}
-  /* 仅缩小预览顶部模式切换的两个按钮尺寸，不影响其它按钮 */
-  .ve-mode-tabs .ve-tab{padding:3px 8px; font-size:12px}
-  /* 预览置顶 */
-  .ve-card.pinned{position: sticky; top: 0; z-index: 100}
-    `; document.head.appendChild(st);
-  }
 
   public resize() {
     // 保留扩展点，当前无重算需求
@@ -559,28 +303,13 @@ export class VisualEchartsUI {
 
   // 供外部设置 SQL 并可选择触发一次查询
   public setSQL(..._args: any[]) {
-    this.rebuildCode();
+    this.rebuildPresetCode();
   }
 
-  private toast(msg: string) {
-    const tip = document.createElement('div');
-    tip.textContent = msg;
-    tip.style.cssText = 'position:fixed; right:16px; bottom:16px; background:#323232; color:#fff; padding:8px 12px; border-radius:4px; z-index:9999; opacity:0; transition:opacity .2s';
-    document.body.appendChild(tip);
-    requestAnimationFrame(() => tip.style.opacity = '1');
-    setTimeout(() => { tip.style.opacity = '0'; setTimeout(() => tip.remove(), 200); }, 1200);
-  }
 
   // -------- 图表预览 --------
   private async ensureEcharts(): Promise<void> {
-    if ((window as any).echarts) return;
-    await new Promise<void>((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js';
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('无法加载 ECharts'));
-      document.head.appendChild(s);
-    });
+    await ensureEchartsLib();
   }
 
   private buildOptionForPreview() {
@@ -590,7 +319,7 @@ export class VisualEchartsUI {
       if (this.mode === 'preset') {
         const title = (this.presetTitleInput?.value ?? '') as string;
         const t = (this.presetTypeSel?.value as any) || 'bar';
-        const settings = this.buildSettingsPayloadFor(t);
+  const settings = buildSettingsPayloadFor(t as ChartType, this.commonSettings, this.perTypeSettings);
         iife = buildPresetCountIIFE(
           this.presetItems,
           t,
@@ -780,49 +509,27 @@ export class VisualEchartsUI {
     inputs.forEach(el => {
       const key = el.getAttribute('data-set') || '';
       if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-        el.addEventListener('change', () => { this.setDeepSetting(key, el.checked); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
+  el.addEventListener('change', () => { setDeepSetting(this.commonSettings, this.perTypeSettings, key, el.checked, () => this.persist()); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
       } else if (el instanceof HTMLInputElement && (el.type === 'number' || el.type === 'text' || el.type === 'range')) {
         el.addEventListener('input', () => {
           const v = (el.type === 'number' || el.type === 'range') ? Number(el.value) : el.value;
           // 实时更新旁侧的数值
           const labelSpan = el.parentElement?.querySelector('.ve-label') as HTMLElement | null;
           if (labelSpan && (typeof v === 'number')) labelSpan.textContent = key.includes('Radius') ? `${v}%` : `${v}°`;
-          this.setDeepSetting(key, v); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode();
+          setDeepSetting(this.commonSettings, this.perTypeSettings, key, v, () => this.persist()); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode();
         });
       } else if (el instanceof HTMLInputElement && el.type === 'radio') {
-        el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; this.setDeepSetting(key, v); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
+  el.addEventListener('change', () => { let v: any = el.value; if (v === 'false') v = false; setDeepSetting(this.commonSettings, this.perTypeSettings, key, v, () => this.persist()); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
       } else if (el instanceof HTMLSelectElement) {
-        el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; this.setDeepSetting(key, v || (v as any)); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
+  el.addEventListener('change', () => { const v = (el as HTMLSelectElement).value; setDeepSetting(this.commonSettings, this.perTypeSettings, key, v || (v as any), () => this.persist()); try { this.syncingFromPreset = true; this.queryUI?.setViewSettings(mappedTypeForQuery as any, this.getCurrentTypeSettings()); } catch { /* ignore */ } finally { this.syncingFromPreset = false; } this.rebuildPresetCode(); });
       }
     });
     // 恢复默认
-    const resetBtn = this.currentSettingsEl.querySelector('[data-type-reset]') as HTMLButtonElement | null;
+    const resetBtn = this.container.querySelector('[data-type-reset]') as HTMLButtonElement | null;
     if (resetBtn) resetBtn.addEventListener('click', () => this.resetCurrentTypeSettings());
   }
 
-  private setDeepSetting(path: string, value: any) {
-    const segs = path.split('.');
-    if (segs[0] === 'common') {
-      // 写入通用设置
-      let cur: any = this.commonSettings as any;
-      for (let i = 1; i < segs.length - 1; i++) {
-        const k = segs[i];
-        if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
-        cur = cur[k];
-      }
-      cur[segs[segs.length - 1]] = value;
-    } else {
-      // 写入每类型设置
-      let cur: any = this.perTypeSettings as any;
-      for (let i = 0; i < segs.length - 1; i++) {
-        const k = segs[i];
-        if (!(k in cur) || typeof cur[k] !== 'object' || cur[k] === null) cur[k] = {};
-        cur = cur[k];
-      }
-      cur[segs[segs.length - 1]] = value;
-    }
-    this.save();
-  }
+  // setDeepSetting 已抽离至 utils.ts
 
   private getCurrentTypeSettings() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
@@ -840,9 +547,9 @@ export class VisualEchartsUI {
     } else {
       this.perTypeSettings.bar = { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' } };
     }
-    this.save();
+  this.persist();
     this.renderTypeSettingsUI();
-    this.rebuildPresetCode();
+  // rebuildPresetCode 会在 renderTypeSettingsUI() 之后由事件触发
   }
 
   private async renderChartPreview() {
@@ -861,7 +568,7 @@ export class VisualEchartsUI {
   private togglePinPreview() {
     this.previewPinned = !this.previewPinned;
     this.applyPinPreviewUI();
-    this.save();
+  this.persist();
     // 重新计算图表尺寸
     setTimeout(() => { try { this.echartsInst?.resize?.(); } catch { /* ignore */ } }, 50);
   }
@@ -890,8 +597,8 @@ export class VisualEchartsUI {
       row.className = 've-preset-item';
       row.innerHTML = `
         <div class="ve-row" style="align-items:center; gap:6px;">
-          <input class="ve-input" data-name value="${this.escape(it.name)}" style="width:180px" />
-          <textarea class="ve-input" data-sql rows="2" style="flex:1">${this.escape(it.sql)}</textarea>
+          <input class="ve-input" data-name value="${escapeHtml(it.name)}" style="width:180px" />
+          <textarea class="ve-input" data-sql rows="2" style="flex:1">${escapeHtml(it.sql)}</textarea>
           <button class="ve-btn ve-ghost" data-del title="删除">删除</button>
         </div>
       `;
@@ -912,8 +619,8 @@ export class VisualEchartsUI {
         if (fromIdx === toIdx || fromIdx < 0 || fromIdx >= this.presetItems.length) return;
         const moved = this.presetItems.splice(fromIdx, 1)[0];
         this.presetItems.splice(toIdx, 0, moved);
-        this.rebuildPresetListUI();
-        this.rebuildPresetCode();
+    this.rebuildPresetListUI();
+    this.rebuildPresetCode();
       });
       (row.querySelector('[data-name]') as HTMLInputElement).addEventListener('input', (e) => {
         this.presetItems[idx].name = (e.target as HTMLInputElement).value;
@@ -937,7 +644,7 @@ export class VisualEchartsUI {
     if (this.mode === 'preset') {
       const t = (this.presetTypeSel?.value as any) || 'bar';
       const title = (this.presetTitleInput?.value ?? '') as string;
-      const settings = this.buildSettingsPayloadFor(t);
+  const settings = buildSettingsPayloadFor(t as ChartType, this.commonSettings, this.perTypeSettings);
       iife = buildPresetCountIIFE(
         this.presetItems,
         t,
@@ -948,15 +655,15 @@ export class VisualEchartsUI {
     } else {
       iife = this.queryUI?.getIIFE() || '';
     }
-    this.outputPre.textContent = iife;
-    this.save();
+  this.outputPre.textContent = iife;
+  this.persist();
     this.renderChartPreview().catch(() => { });
   }
 
   private async copyPresetCode() {
     const t = (this.presetTypeSel?.value as any) || 'bar';
     const title = (this.presetTitleInput?.value ?? '') as string;
-    const settings = this.buildSettingsPayloadFor(t);
+  const settings = buildSettingsPayloadFor(t as ChartType, this.commonSettings, this.perTypeSettings);
     const iife = buildPresetCountIIFE(
       this.presetItems,
       t,
@@ -964,9 +671,9 @@ export class VisualEchartsUI {
       settings,
       this.presetColors
     );
-    try { await navigator.clipboard.writeText(iife); this.toast('已复制'); }
+  try { await navigator.clipboard.writeText(iife); toast('已复制'); }
     catch {
-      const ta = document.createElement('textarea'); ta.value = iife; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制');
+  const ta = document.createElement('textarea'); ta.value = iife; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); toast('已复制');
     }
   }
 
@@ -975,7 +682,7 @@ export class VisualEchartsUI {
     if (this.mode === 'preset') {
       const t = (this.presetTypeSel?.value as any) || 'bar';
       const title = (this.presetTitleInput?.value ?? '') as string;
-      const settings = this.buildSettingsPayloadFor(t);
+  const settings = buildSettingsPayloadFor(t as ChartType, this.commonSettings, this.perTypeSettings);
       iife = buildPresetCountIIFE(
         this.presetItems,
         t,
@@ -987,51 +694,17 @@ export class VisualEchartsUI {
       iife = this.queryUI?.getIIFE() || '';
     }
     const block = '```echarts\n' + iife + '\n```';
-    try { await navigator.clipboard.writeText(block); this.toast('已复制图表块'); }
+  try { await navigator.clipboard.writeText(block); toast('已复制图表块'); }
     catch {
-      const ta = document.createElement('textarea'); ta.value = block; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); this.toast('已复制图表块');
+  const ta = document.createElement('textarea'); ta.value = block; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); toast('已复制图表块');
     }
-  }
-
-  // 重新渲染调色盘（基于内部状态）
-  private renderPaletteFromState(getColors: () => string[], setColors: (arr: string[]) => void) {
-    const paletteEl = this.paletteEl;
-    if (!paletteEl) return;
-    const colors = getColors();
-    if (!colors.length) { paletteEl.innerHTML = '<div class="ve-color-empty">未设置颜色，使用内置默认配色</div>'; return; }
-    paletteEl.innerHTML = colors.map((c, i) => `
-      <div class="ve-color-chip" data-idx="${i}">
-        <span class="ve-color-swatch" style="background:${c}"></span>
-        <button class="ve-color-del" title="删除" type="button">×</button>
-        <input type="color" value="${c}" />
-      </div>
-    `).join('');
-    // 绑定变化
-    Array.from(paletteEl.querySelectorAll('.ve-color-chip')).forEach((chip) => {
-      const idx = Number((chip as HTMLElement).getAttribute('data-idx') || '0');
-      const picker = chip.querySelector('input[type="color"]') as HTMLInputElement | null;
-      const del = chip.querySelector('.ve-color-del') as HTMLButtonElement | null;
-      const swatch = chip.querySelector('.ve-color-swatch') as HTMLElement | null;
-      if (picker) picker.addEventListener('input', () => {
-        const cs = getColors();
-        cs[idx] = picker.value;
-        if (swatch) swatch.style.background = picker.value;
-        try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; }
-      });
-      if (del) del.addEventListener('click', () => {
-        const cs = getColors();
-        cs.splice(idx, 1);
-        try { this.syncingFromPreset = true; setColors(cs); } finally { this.syncingFromPreset = false; }
-        this.renderPaletteFromState(getColors, setColors);
-      });
-    });
   }
 
   private async addFromSqlPresets() {
     // 读取 SQL 预设（优先使用外部提供的加载器，否则回退到 localStorage）
-    const presets = await this.getSqlPresets();
+  const presets = await getSqlPresets(this.loadSqlPresetsProvider);
     const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'zh-CN'));
-    if (!names.length) { this.toast('暂无 SQL 预设'); return; }
+  if (!names.length) { toast('暂无 SQL 预设'); return; }
     // 简易选择弹窗
     const overlay = document.createElement('div');
     overlay.className = 've-modal-mask';
@@ -1041,7 +714,7 @@ export class VisualEchartsUI {
       <div class="ve-modal__head"><div>选择要加入对比的预设</div><button class="ve-btn ve-ghost" data-close>×</button></div>
       <div class="ve-modal__body">
         <div class="ve-search"><input class="ve-input" type="search" data-filter placeholder="搜索预设名称…" /></div>
-        <div class="ve-preset-chooser">${names.map(n => `<label class="ve-chip"><input type="checkbox" value="${this.escape(n)}"/><span>${this.escape(n)}</span></label>`).join('')}</div>
+  <div class="ve-preset-chooser">${names.map(n => `<label class="ve-chip"><input type="checkbox" value="${escapeHtml(n)}"/><span>${escapeHtml(n)}</span></label>`).join('')}</div>
         <div class="ve-empty" data-empty style="display:none">无匹配结果</div>
       </div>
       <div class="ve-modal__foot"><button class="ve-btn ve-ghost" data-close2>取消</button><button class="ve-btn" data-ok>加入</button></div>`;
@@ -1075,63 +748,13 @@ export class VisualEchartsUI {
       const picked = checks.filter(c => c.checked).map(c => c.value);
       picked.forEach(n => {
         const snap = presets[n];
-        const sql = this.safeCompileSqlFromSnapshot(snap);
+  const sql = safeCompileSqlFromSnapshot(snap);
         if (sql) this.presetItems.push({ name: n, sql });
       });
       this.rebuildPresetListUI();
-      this.rebuildPresetCode();
+  this.rebuildPresetCode();
       close();
     });
   }
 
-  private async getSqlPresets(): Promise<Record<string, any>> {
-    try {
-      if (this.loadSqlPresetsProvider) {
-        const maybe = this.loadSqlPresetsProvider();
-        // 支持同步/异步
-        // @ts-ignore
-        return typeof maybe?.then === 'function' ? await (maybe as Promise<Record<string, any>>) : (maybe as Record<string, any>) || {};
-      }
-      const raw = localStorage.getItem('siyuan-steve-tools:visual-sql-presets');
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  }
-
-  private safeCompileSqlFromSnapshot(s: any): string {
-    try {
-      // 动态导入构建器的轻量实现：只复用已有的 snap 结构。
-      // 这里内嵌一个简化生成函数以避免循环依赖
-      const v = s || {};
-      const quote = (x: any) => x == null ? 'NULL' : (typeof x === 'number' ? String(x) : `'${String(x).replace(/'/g, "''")}'`);
-      const list = (arr: any[]) => `(${arr.map(quote).join(', ')})`;
-      const parts: string[] = [];
-      const push = (p: string) => { if (p) parts.push(p); };
-      if (Array.isArray(v.types) && v.types.length) push(`type IN ${list(v.types)}`);
-      if (Array.isArray(v.subtypes) && v.subtypes.length) push(`subtype IN ${list(v.subtypes)}`);
-      if (Array.isArray(v.boxes) && v.boxes.length) push(`box IN ${list(v.boxes)}`);
-      if (v.rootId) push(`root_id = ${quote(v.rootId)}`);
-      if (v.parentId) push(`parent_id = ${quote(v.parentId)}`);
-      if (v.path) push(`path LIKE ${quote(v.path.includes('%') || v.path.includes('_') ? v.path : '%' + v.path + '%')}`);
-      if (v.content) push(`content LIKE ${quote(v.content.includes('%') || v.content.includes('_') ? v.content : '%' + v.content + '%')}`);
-      if (v.md) push(`markdown LIKE ${quote(v.md.includes('%') || v.md.includes('_') ? v.md : '%' + v.md + '%')}`);
-      if (v.hpath) push(`hpath LIKE ${quote(v.hpath.includes('%') || v.hpath.includes('_') ? v.hpath : '%' + v.hpath + '%')}`);
-      if (v.ial) push(`ial LIKE ${quote(v.ial.includes('%') || v.ial.includes('_') ? v.ial : '%' + v.ial + '%')}`);
-      if (v.tag) push(`tag LIKE ${quote('%#' + String(v.tag).replace(/^#+/, '') + '%')}`);
-      // 时间不在此简化处理，避免复杂性；用户预设一般包含常用筛选即可
-      let where = parts.length ? ' WHERE ' + parts.join(' AND ') : '';
-      let order = '';
-      if (v.orderField) order = ' ORDER BY ' + v.orderField + (v.orderDir ? ' ' + String(v.orderDir).toUpperCase() : '');
-      let limit = '';
-      if (v.limit) limit = ' LIMIT ' + Math.min(999, Math.max(0, Number(v.limit) || 0));
-      return `select * from blocks${where}${order}${limit}`;
-    } catch { return ''; }
-  }
-
-  // 组装预设模式给模板的设置载荷：按类型打包，并包含 common
-  private buildSettingsPayloadFor(t: 'bar'|'line'|'scatter'|'pie') {
-    const common = this.commonSettings;
-    if (t === 'line' || t === 'scatter') return { line: this.perTypeSettings.line, common } as any;
-    if (t === 'pie') return { pie: this.perTypeSettings.pie, common } as any;
-    return { bar: this.perTypeSettings.bar, common } as any;
-  }
 }
