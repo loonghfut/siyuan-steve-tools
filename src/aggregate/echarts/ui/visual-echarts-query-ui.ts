@@ -72,7 +72,8 @@ export class VisualEchartsQueryUI {
       barWidth?: number | null;
       barGap?: string | number | null;
       xAxisName?: string;
-      yAxisName?: string;
+      yAxisLeftName?: string;
+      yAxisRightName?: string;
     };
     line: {
       smooth?: boolean;
@@ -84,12 +85,13 @@ export class VisualEchartsQueryUI {
       symbolSize?: number;
       lineWidth?: number;
       xAxisName?: string;
-      yAxisName?: string;
+      yAxisLeftName?: string;
+      yAxisRightName?: string;
     };
     pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
   } = {
-      bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' }, barWidth: null, barGap: '30%', xAxisName: '', yAxisName: '' },
-      line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' }, area: false, symbol: 'circle', symbolSize: 8, lineWidth: 2, xAxisName: '', yAxisName: '' },
+      bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' }, barWidth: null, barGap: '30%', xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
+      line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' }, area: false, symbol: 'circle', symbolSize: 8, lineWidth: 2, xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
       pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
     };
   private colors: string[] = [];
@@ -1028,8 +1030,11 @@ export class VisualEchartsQueryUI {
               <label class="veq-field">X 轴名称
                 <input class="veq-input" type="text" data-set="stat.xAxisName" placeholder="X 轴名称" value="${sl.xAxisName || sb.xAxisName || ''}" />
               </label>
-              <label class="veq-field">Y 轴名称
-                <input class="veq-input" type="text" data-set="stat.yAxisName" placeholder="Y 轴名称" value="${sl.yAxisName || sb.yAxisName || ''}" />
+              <label class="veq-field">Y 轴名称（左）
+                <input class="veq-input" type="text" data-set="stat.yAxisLeftName" placeholder="Y 轴左侧名称" value="${sl.yAxisLeftName || sb.yAxisLeftName || ''}" />
+              </label>
+              <label class="veq-field">Y 轴名称（右）
+                <input class="veq-input" type="text" data-set="stat.yAxisRightName" placeholder="Y 轴右侧名称" value="${sl.yAxisRightName || sb.yAxisRightName || ''}" />
               </label>
             </div>
           </div>
@@ -1194,7 +1199,7 @@ export class VisualEchartsQueryUI {
     // 统计图共享设置：同时作用于 line 与 bar
     if (segs[0] === 'stat') {
       const leaf = segs.slice(1).join('.');
-      if (leaf === 'boundaryGap' || leaf === 'xLabelRotate' || leaf === 'xAxisName' || leaf === 'yAxisName') {
+      if (leaf === 'boundaryGap' || leaf === 'xLabelRotate' || leaf === 'xAxisName' || leaf === 'yAxisLeftName' || leaf === 'yAxisRightName') {
         // 基本标量
         (this.perTypeSettings as any).line[leaf] = value;
         (this.perTypeSettings as any).bar[leaf] = value;

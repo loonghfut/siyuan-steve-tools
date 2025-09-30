@@ -403,10 +403,13 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
-        const yName = (stBar && stBar.yAxisName) || (stLine && stLine.yAxisName) || '';
-        return yName ? `, name: '${yName}'` : '';
+        const yLeftName = (stBar && stBar.yAxisLeftName) || (stLine && stLine.yAxisLeftName) || '';
+        return yLeftName ? `, name: '${yLeftName}'` : '';
       })()}
-    }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
+    }${needDualAxis ? (function(){
+      const yRightName = (stBar && stBar.yAxisRightName) || (stLine && stLine.yAxisRightName) || '';
+      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: '${yRightName}'` : ''} }`;
+    })() : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];
     ${Array.isArray(ctx.colors) && ctx.colors.length ? `
@@ -585,11 +588,11 @@ export function buildPresetCountIIFE(
         }catch(e){}
         return '';
       })();
-      var yAxisName = (function(){
+      var yAxisLeftName = (function(){
         try{
-          if ('${t}'==='bar' && st && st.bar && st.bar.yAxisName) return st.bar.yAxisName;
-          if (('${t}'==='line' || '${t}'==='scatter') && st && st.line && st.line.yAxisName) return st.line.yAxisName;
-          if (st && st.yAxisName) return st.yAxisName;
+          if ('${t}'==='bar' && st && st.bar && st.bar.yAxisLeftName) return st.bar.yAxisLeftName;
+          if (('${t}'==='line' || '${t}'==='scatter') && st && st.line && st.line.yAxisLeftName) return st.line.yAxisLeftName;
+          if (st && st.yAxisLeftName) return st.yAxisLeftName;
         }catch(e){}
         return '';
       })();
@@ -602,7 +605,7 @@ export function buildPresetCountIIFE(
           return (raw === 'solid' || raw === 'none' || raw === 'dashed') ? raw : 'dashed';
         }catch(e){ return 'dashed'; }
       })();
-      option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } }, name: yAxisName || undefined }];
+      option.yAxis = [{ type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: splitType!=='none', lineStyle: { color: 'rgba(0, 0, 0, .38)', type: splitType==='solid'?'solid':'dashed' } }, name: yAxisLeftName || undefined }];
   var seriesItem = { type: '${t}', name: '计数', data: counts };
       // 堆叠与平滑（支持嵌套与平铺兼容）
       if ('${t}'==='bar') {
