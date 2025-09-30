@@ -337,7 +337,7 @@ export class VisualEchartsQueryUI {
     exprRow.style.display = 'none';
     if (xkeySel) xkeySel.addEventListener('change', (e) => { this.xKey = (e.target as HTMLSelectElement).value; this.onChanged(); });
     if (sortSel) sortSel.addEventListener('change', (e) => { this.sort = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
-  if (bucketSel) bucketSel.addEventListener('change', (e) => { this.xBucket = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
+  if (bucketSel) bucketSel.addEventListener('change', (e) => { this.xBucket = (e.target as HTMLSelectElement).value as any; if (this.xBucket !== 'none') { this.mergeMode = true; this.series = this.series.map(s => ({ ...s, agg: s.agg === 'raw' ? 'count' : (s.agg || 'count') })); const mt = this.root.querySelector('[data-merge]') as HTMLInputElement | null; if (mt) mt.checked = true; this.renderSeriesList(); } this.onChanged(); });
     if (mergeToggle) mergeToggle.addEventListener('change', (e) => {
       this.mergeMode = (e.target as HTMLInputElement).checked;
       // 模式切换时，修正系列聚合：非合并模式强制原值；合并模式下如为 raw 则改为 count
@@ -809,6 +809,10 @@ export class VisualEchartsQueryUI {
         this.sort = obj.visual.sort || 'asc';
         this.mergeMode = obj.visual.merge !== false; // 默认合并
         this.xBucket = (obj.visual.bucket === 'year' || obj.visual.bucket === 'month' || obj.visual.bucket === 'day' || obj.visual.bucket === 'hour') ? obj.visual.bucket : 'none';
+        if (this.xBucket !== 'none') {
+          this.mergeMode = true;
+          this.series = this.series.map(s => ({ ...s, agg: s.agg === 'raw' ? 'count' : (s.agg || 'count') }));
+        }
         const st = this.root.querySelector('[data-sort]') as HTMLSelectElement | null; if (st) st.value = this.sort;
         const bk = this.root.querySelector('[data-bucket]') as HTMLSelectElement | null; if (bk) bk.value = this.xBucket;
         const mt = this.root.querySelector('[data-merge]') as HTMLInputElement | null; if (mt) mt.checked = this.mergeMode;

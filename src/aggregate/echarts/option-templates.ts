@@ -160,6 +160,7 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
   // 饼图系列：通过全局调色板为数据项着色
   try{ option.color = ${JSON.stringify(ctx.colors)}; }catch(e){}
   ` : ''}
+    option.animation = false;
     return option;
   })()`;
   return body;
@@ -444,6 +445,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       console.log('[ECharts AV Debug]', dbg);
     }catch(e){}
     ` : ''}
+    option.animation = false;
     return option;
   })()`;
   return body;
@@ -648,6 +650,7 @@ export function buildPresetCountIIFE(
       }
     }catch(e){} })();
     ${colorsJs ? `option.color = ${colorsJs};` : ''}
+    option.animation = false;
     return option;
   })()`;
   return body;
