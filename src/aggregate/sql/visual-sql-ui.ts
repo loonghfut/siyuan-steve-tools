@@ -1804,7 +1804,17 @@ export class VisualSqlUI {
       const ok = await this.openConfirmModal('同名预设已存在，是否覆盖？');
       if (!ok) return;
     }
-    presets[name] = snap;
+    
+    // 同时保存编译后的 SQL,供 ECharts 等其他组件使用
+    const compiledSQL = this.safeCompileSqlFromSnapshot(snap);
+    const presetWithSQL = {
+      ...snap,
+      name: name,
+      sql: compiledSQL,
+      _compiledAt: new Date().toISOString()
+    };
+    
+    presets[name] = presetWithSQL;
     await (this.opts.savePresets ? this.opts.savePresets(presets) : (async () => this.savePresets(presets))());
     this.toast('已保存筛选预设');
   }

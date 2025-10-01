@@ -4,6 +4,7 @@ import { preprocessSqlData } from './sql-data-preprocessor';
 export interface VisualEchartsSqlOptions {
   persistKey?: string;
   onChange?: () => void; // 配置变化回调,用于外部触发预览刷新
+  loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>; // 加载 SQL 预设
 }
 
 export class VisualEchartsSqlUI {
@@ -23,6 +24,14 @@ export class VisualEchartsSqlUI {
   
   // SQL 相关
   private sql: string = '';
+  private presets: Record<string, any> = {}; // SQL 预设映射
+  private presetSelectEl?: HTMLSelectElement; // 预设下拉框
+  
+  // 多SQL预设模式
+  private sqlMode: 'single' | 'multi-preset' = 'single'; // SQL模式: 单SQL 或 多SQL预设对比
+  private multiSqlPresets: Array<{ name: string; sql: string }> = []; // 多SQL预设列表
+  private multiSqlPresetsEl?: HTMLElement; // 多SQL预设列表容器
+  private sqlModeSwitchEl?: HTMLSelectElement; // SQL模式切换下拉框
   
   // 通用设置
   private commonSettings: {
@@ -110,6 +119,8 @@ export class VisualEchartsSqlUI {
     this.render();
     this.restore();
     this.rebuildCode();
+    // 异步加载预设
+    this.loadPresetsToUI().catch(err => console.error('加载 SQL 预设失败:', err));
   }
 
   // 供外部读取 IIFE
@@ -164,13 +175,41 @@ export class VisualEchartsSqlUI {
           </label>
         </div>
 
-        <div class="veq-grid veq-grid-2">
+        <div class="veq-grid" style="display:flex; flex-direction:column; gap:8px;">
           <div class="veq-group">
-            <div class="veq-group__title">SQL 查询语句</div>
-            <label class="veq-field">
-              <textarea class="veq-input" data-sql rows="4" placeholder="SELECT * FROM blocks WHERE type='d' LIMIT 100"></textarea>
-            </label>
-            <button class="veq-btn veq-small" data-load-keys type="button">加载字段</button>
+            <div class="veq-group__title">
+              SQL 查询语句
+              <label class="veq-field" style="display:inline-block; margin-left:16px; font-weight:normal;">
+                <span style="font-size:12px;">SQL模式:</span>
+                <select class="veq-input" data-sql-mode style="width:140px; margin-left:4px;">
+                  <option value="single">单SQL查询</option>
+                  <option value="multi-preset">多SQL预设对比</option>
+                </select>
+              </label>
+            </div>
+            
+            <!-- 单SQL模式 -->
+            <div data-single-sql-mode>
+              <label class="veq-field">
+                <div class="veq-label">预设模板</div>
+                <select class="veq-input" data-sql-preset style="margin-bottom:8px;">
+                  <option value="">-- 选择预设 --</option>
+                </select>
+              </label>
+              <label class="veq-field">
+                <textarea class="veq-input" data-sql rows="4" placeholder="SELECT * FROM blocks WHERE type='d' LIMIT 100"></textarea>
+              </label>
+              <button class="veq-btn veq-small" data-load-keys type="button">加载字段</button>
+            </div>
+            
+            <!-- 多SQL预设对比模式 -->
+            <div data-multi-sql-mode style="display:none;">
+              <div class="veq-field">
+                <div class="veq-label">SQL预设列表</div>
+                <div data-multi-sql-presets-list style="margin-bottom:8px;"></div>
+                <button class="veq-btn veq-small" data-add-multi-sql type="button">添加SQL预设</button>
+              </div>
+            </div>
           </div>
           <div class="veq-group">
             <div class="veq-group__title">数据映射
@@ -246,10 +285,73 @@ export class VisualEchartsSqlUI {
     const typeSettingsEl = this.root.querySelector('[data-type-settings-body]') as HTMLElement | null;
     this.chartTypeSel = chartTypeSel || undefined;
     this.typeSettingsEl = typeSettingsEl || undefined;
+    this.presetSelectEl = this.root.querySelector('[data-sql-preset]') as HTMLSelectElement | undefined;
+    this.sqlModeSwitchEl = this.root.querySelector('[data-sql-mode]') as HTMLSelectElement | undefined;
+    this.multiSqlPresetsEl = this.root.querySelector('[data-multi-sql-presets-list]') as HTMLElement | undefined;
 
     // 事件
     this.titleInput.addEventListener('input', () => this.onChanged());
     this.sqlTextarea.addEventListener('input', (e) => { this.sql = (e.target as HTMLTextAreaElement).value; this.onChanged(); });
+    
+    // SQL模式切换事件
+    this.sqlModeSwitchEl?.addEventListener('change', (e) => {
+      const mode = (e.target as HTMLSelectElement).value as 'single' | 'multi-preset';
+      this.sqlMode = mode;
+      const singleMode = this.root.querySelector('[data-single-sql-mode]') as HTMLElement | null;
+      const multiMode = this.root.querySelector('[data-multi-sql-mode]') as HTMLElement | null;
+      if (mode === 'single') {
+        if (singleMode) singleMode.style.display = '';
+        if (multiMode) multiMode.style.display = 'none';
+      } else {
+        if (singleMode) singleMode.style.display = 'none';
+        if (multiMode) multiMode.style.display = '';
+      }
+      this.onChanged();
+    });
+    
+    // 添加多SQL预设按钮事件
+    const addMultiSqlBtn = this.root.querySelector('[data-add-multi-sql]') as HTMLButtonElement | null;
+    addMultiSqlBtn?.addEventListener('click', () => {
+      this.multiSqlPresets.push({ name: 'SQL预设' + (this.multiSqlPresets.length + 1), sql: '' });
+      this.renderMultiSqlPresetsList();
+      this.onChanged();
+    });
+    
+    // 预设选择事件
+    this.presetSelectEl?.addEventListener('change', () => {
+      const key = this.presetSelectEl?.value || '';
+      console.log('[SQL预设] 选择了预设:', key);
+      
+      if (!key) {
+        console.log('[SQL预设] 预设 key 为空,已重置');
+        return;
+      }
+      
+      if (!this.presets[key]) {
+        console.warn('[SQL预设] 预设不存在:', key);
+        this.toast('预设不存在');
+        return;
+      }
+      
+      const preset = this.presets[key];
+      console.log('[SQL预设] 预设内容:', preset);
+      
+      // 新版预设会在保存时同时保存编译后的 SQL
+      const sql = preset.sql || '';
+      console.log('[SQL预设] 提取的 SQL:', sql);
+      
+      if (sql) {
+        this.sql = sql;
+        this.sqlTextarea.value = sql;
+        console.log('[SQL预设] SQL 已填充到 textarea');
+        this.onChanged();
+        this.toast('已应用预设');
+      } else {
+        console.warn('[SQL预设] 预设中没有 SQL 字段');
+        this.toast('旧版预设不包含 SQL,请重新保存预设');
+      }
+    });
+    
     if (this.xExprTextarea) this.xExprTextarea.addEventListener('input', () => this.onChanged());
     
     // 默认可视化映射:visualRow 常显,表达式行隐藏
@@ -415,6 +517,54 @@ export class VisualEchartsSqlUI {
     this.series = this.series.map(s => ({ ...s, agg: this.mergeMode ? (s.agg === 'raw' ? 'count' : (s.agg || 'count')) : 'raw' }));
   }
 
+  // 渲染多SQL预设列表
+  private renderMultiSqlPresetsList() {
+    const list = this.multiSqlPresetsEl;
+    if (!list) return;
+    
+    if (!this.multiSqlPresets.length) {
+      list.innerHTML = '<div class="veq-empty">尚未添加SQL预设,点击"添加SQL预设"。</div>';
+      return;
+    }
+    
+    list.innerHTML = '';
+    this.multiSqlPresets.forEach((preset, idx) => {
+      const row = document.createElement('div');
+      row.className = 'veq-series-item';
+      row.style.cssText = 'margin-bottom:8px; padding:8px; border:1px solid var(--b3-border-color); border-radius:4px;';
+      
+      row.innerHTML = `
+        <div class="veq-row" style="align-items:flex-start; gap:6px; margin-bottom:6px;">
+          <input class="veq-input" data-preset-name placeholder="预设名称" value="${this.escape(preset.name)}" style="width:200px"/>
+          <button class="veq-btn veq-ghost veq-small" data-del type="button">删除</button>
+        </div>
+        <textarea class="veq-input" data-preset-sql rows="3" placeholder="SELECT * FROM blocks WHERE ...">${this.escape(preset.sql)}</textarea>
+      `;
+      
+      const nameInput = row.querySelector('[data-preset-name]') as HTMLInputElement;
+      const sqlTextarea = row.querySelector('[data-preset-sql]') as HTMLTextAreaElement;
+      const delBtn = row.querySelector('[data-del]') as HTMLButtonElement;
+      
+      nameInput.addEventListener('input', (e) => {
+        this.multiSqlPresets[idx].name = (e.target as HTMLInputElement).value;
+        this.onChanged();
+      });
+      
+      sqlTextarea.addEventListener('input', (e) => {
+        this.multiSqlPresets[idx].sql = (e.target as HTMLTextAreaElement).value;
+        this.onChanged();
+      });
+      
+      delBtn.addEventListener('click', () => {
+        this.multiSqlPresets.splice(idx, 1);
+        this.renderMultiSqlPresetsList();
+        this.onChanged();
+      });
+      
+      list.appendChild(row);
+    });
+  }
+
   // 从 SQL 查询结果加载字段名
   private loadKeys() {
     try {
@@ -561,6 +711,13 @@ export class VisualEchartsSqlUI {
 
   private buildIIFE(): string {
     const title = this.titleInput?.value || '';
+    
+    // 多SQL预设对比模式
+    if (this.sqlMode === 'multi-preset') {
+      return this.buildMultiSqlPresetIIFE(title);
+    }
+    
+    // 单SQL查询模式
     const xExpr = this.xExprTextarea?.value || 'rows.map((_, i) => String(i+1))';
     const seriesExprs = this.series.map(s => ({ 
       name: s.name, 
@@ -569,9 +726,89 @@ export class VisualEchartsSqlUI {
       axisIndex: s.axisIndex 
     }));
     
-    // 使用 option-templates 中的构建函数(需要扩展支持 SQL)
-    // 这里先用简化版本,后面会在 option-templates 中添加完整实现
     return this.buildSimpleIIFE(title, this.sql, xExpr, seriesExprs);
+  }
+
+  // 构建多SQL预设对比的IIFE
+  private buildMultiSqlPresetIIFE(title: string): string {
+    if (!this.multiSqlPresets || this.multiSqlPresets.length === 0) {
+      return `(() => { return { title: { text: '${title || '请添加SQL预设'}' }, xAxis: { type: 'category', data: [] }, yAxis: { type: 'value' }, series: [] }; })()`;
+    }
+    
+    const presetsJson = JSON.stringify(this.multiSqlPresets.map(p => ({ name: p.name, sql: p.sql })));
+    
+    return `(() => {
+    function fetchSqlSync(sql){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST','/api/query/sql', false);
+        xhr.setRequestHeader('Content-Type','application/json');
+        xhr.send(JSON.stringify({stmt: sql}));
+        if (xhr.status>=200 && xhr.status<300){
+          var res = {};
+          try { res = JSON.parse(xhr.responseText || '[]'); } catch { res = []; }
+          var rows = Array.isArray(res) ? res : (res.data || []);
+          return Array.isArray(rows) ? rows : [];
+        }
+      } catch(e){ /* ignore */ }
+      return [];
+    }
+    
+    const option = {};
+    const presets = ${presetsJson};
+    
+    // 执行每个SQL预设并收集结果数量
+    const xAxisData = [];
+    const yAxisData = [];
+    
+    presets.forEach(function(preset) {
+      xAxisData.push(preset.name);
+      var rows = fetchSqlSync(preset.sql);
+      yAxisData.push(rows.length);
+    });
+    
+    console.group('🔍 多SQL预设对比 - 数据调试');
+    console.log('📊 预设列表:', presets);
+    console.log('📐 X轴(预设名称):', xAxisData);
+    console.log('📐 Y轴(查询数量):', yAxisData);
+    console.groupEnd();
+    
+    option.title = { text: ${JSON.stringify(title)}, left: 'center' };
+    option.backgroundColor = 'transparent';
+    option.tooltip = { trigger: 'axis', axisPointer: { type: 'shadow' } };
+    option.xAxis = {
+      type: 'category',
+      data: xAxisData,
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: { rotate: 0, interval: 0 }
+    };
+    option.yAxis = {
+      type: 'value',
+      name: '查询结果数量',
+      axisTick: { show: false },
+      axisLine: { show: false },
+      splitLine: { show: true, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: 'dashed' } }
+    };
+    option.series = [{
+      name: '查询结果数量',
+      type: 'bar',
+      data: yAxisData,
+      itemStyle: {
+        color: '#5470c6'
+      },
+      label: {
+        show: true,
+        position: 'top',
+        formatter: '{c}'
+      }
+    }];
+    ${Array.isArray(this.colors) && this.colors.length ? `
+    try{ option.series[0].itemStyle.color = ${JSON.stringify(this.colors[0])}; }catch(e){}
+    ` : ''}
+    option.animation = false;
+    return option;
+  })()`;
   }
 
   private buildSimpleIIFE(title: string, sql: string, xExpr: string, seriesExprs: any[]): string {
@@ -925,6 +1162,51 @@ export class VisualEchartsSqlUI {
     setTimeout(() => { tip.style.opacity = '0'; setTimeout(() => tip.remove(), 200); }, 1200);
   }
 
+  // 加载 SQL 预设到下拉框
+  private async loadPresetsToUI() {
+    console.log('[SQL预设] 开始加载预设');
+    if (!this.opts?.loadSqlPresets) {
+      console.warn('[SQL预设] loadSqlPresets 未提供');
+      return;
+    }
+    if (!this.presetSelectEl) {
+      console.warn('[SQL预设] presetSelectEl 未找到');
+      return;
+    }
+    try {
+      console.log('[SQL预设] 调用 loadSqlPresets()');
+      const result = this.opts.loadSqlPresets();
+      const presetsData = (result instanceof Promise) ? await result : result;
+      this.presets = presetsData || {};
+      console.log('[SQL预设] 加载到的预设数据:', this.presets);
+      
+      // 清空并重新填充下拉框
+      while (this.presetSelectEl.options.length > 1) {
+        this.presetSelectEl.remove(1);
+      }
+      
+      const keys = Object.keys(this.presets);
+      console.log('[SQL预设] 预设数量:', keys.length);
+      if (keys.length === 0) {
+        console.warn('[SQL预设] 没有可用的预设');
+        return;
+      }
+      
+      for (const key of keys) {
+        const preset = this.presets[key];
+        const name = preset.name || key;
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = name;
+        this.presetSelectEl.appendChild(opt);
+        console.log('[SQL预设] 添加预设选项:', { key, name, sql: preset.sql || preset.source?.sql });
+      }
+      console.log('[SQL预设] 预设加载完成');
+    } catch (err) {
+      console.error('[SQL预设] 加载失败:', err);
+    }
+  }
+
   private save() {
     try {
       const data = {
@@ -937,6 +1219,8 @@ export class VisualEchartsSqlUI {
         colors: this.colors.join(','),
         visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode, bucket: this.xBucket },
         fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie },
+        sqlMode: this.sqlMode,
+        multiSqlPresets: this.multiSqlPresets,
       };
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch { /* ignore */ }
@@ -956,6 +1240,27 @@ export class VisualEchartsSqlUI {
       
       if (obj.chartType) {
         this.chartType = (obj.chartType === 'pie') ? 'pie' : 'stat';
+      }
+      
+      // 恢复SQL模式
+      if (obj.sqlMode) {
+        this.sqlMode = obj.sqlMode;
+        if (this.sqlModeSwitchEl) this.sqlModeSwitchEl.value = this.sqlMode;
+        const singleMode = this.root.querySelector('[data-single-sql-mode]') as HTMLElement | null;
+        const multiMode = this.root.querySelector('[data-multi-sql-mode]') as HTMLElement | null;
+        if (this.sqlMode === 'single') {
+          if (singleMode) singleMode.style.display = '';
+          if (multiMode) multiMode.style.display = 'none';
+        } else {
+          if (singleMode) singleMode.style.display = 'none';
+          if (multiMode) multiMode.style.display = '';
+        }
+      }
+      
+      // 恢复多SQL预设
+      if (obj.multiSqlPresets && Array.isArray(obj.multiSqlPresets)) {
+        this.multiSqlPresets = obj.multiSqlPresets;
+        this.renderMultiSqlPresetsList();
       }
       
       if (obj.chartSettings) {

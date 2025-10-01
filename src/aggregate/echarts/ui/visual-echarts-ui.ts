@@ -140,6 +140,7 @@ export class VisualEchartsUI {
     if (sqlContainer) {
       this.sqlUI = new VisualEchartsSqlUI(sqlContainer, {
         persistKey: this.key + ':sql',
+        loadSqlPresets: this.loadSqlPresetsProvider,
         onChange: () => {
           try {
             if (!this.sqlUI) return;

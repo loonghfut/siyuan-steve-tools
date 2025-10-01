@@ -5,6 +5,14 @@ export interface PresetItem {
   sql: string;
 }
 
+/**
+ * 多SQL预设查询项
+ */
+export interface MultiSqlPresetItem {
+  name: string;  // 预设名称
+  sql: string;   // SQL查询语句
+}
+
 export interface CommonSettings {
   legendPos: 'top' | 'bottom' | 'left' | 'right';
   ySplitLine: 'dashed' | 'solid' | 'none';
@@ -31,9 +39,15 @@ export interface VisualEchartsOptions {
 export interface VisualEchartsSqlOptions {
   persistKey?: string;
   onChange?: () => void;
+  loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
 }
 
 /**
  * 数据模式类型
  */
 export type DataMode = 'database' | 'sql';
+
+/**
+ * SQL模式类型: 单SQL查询 或 多SQL预设对比
+ */
+export type SqlMode = 'single' | 'multi-preset';
