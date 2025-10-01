@@ -24,3 +24,16 @@ export interface VisualEchartsOptions {
   loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
   onGotoSQL?: () => void;
 }
+
+/**
+ * SQL 查询模式的配置选项
+ */
+export interface VisualEchartsSqlOptions {
+  persistKey?: string;
+  onChange?: () => void;
+}
+
+/**
+ * 数据模式类型
+ */
+export type DataMode = 'database' | 'sql';

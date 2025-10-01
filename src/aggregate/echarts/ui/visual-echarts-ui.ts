@@ -1,4 +1,5 @@
 import { VisualEchartsQueryUI } from './visual-echarts-query-ui';
+import { VisualEchartsSqlUI } from '../sql/visual-echarts-sql-ui';
 import "./echart_panel.scss";
 import { ensureEcharts as ensureEchartsLib } from './components/echarts-loader';
 import { toast } from '../utils/utils';
@@ -11,8 +12,10 @@ export class VisualEchartsUI {
   private chartDiv?: HTMLDivElement;
   private echartsInst?: any;
   private previewPinned: boolean = false;
-  // 仅保留数据库查询模式
+  // 支持两种数据模式
+  private dataMode: 'database' | 'sql' = 'database';
   private queryUI?: VisualEchartsQueryUI;
+  private sqlUI?: VisualEchartsSqlUI;
   private loadSqlPresetsProvider?: () => Promise<Record<string, any>> | Record<string, any>;
   private opts?: VisualEchartsOptions;
   // 仅保留查询面板
@@ -28,6 +31,7 @@ export class VisualEchartsUI {
       if (raw) {
         const s = JSON.parse(raw);
         this.previewPinned = !!s.previewPinned;
+        this.dataMode = (s.dataMode === 'sql') ? 'sql' : 'database';
       }
     } catch { /* ignore */ }
     this.render();
@@ -39,6 +43,7 @@ export class VisualEchartsUI {
     try {
       const data = {
         previewPinned: this.previewPinned,
+        dataMode: this.dataMode,
       };
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch { /* ignore */ }
@@ -58,6 +63,13 @@ export class VisualEchartsUI {
           </div>
           <div class="ve-sep"></div>
           <div class="ve-tool-group">
+            <label class="ve-field" style="margin:0; display:flex; align-items:center; gap:6px;">
+              <span style="font-size:12px; color:var(--b3-theme-on-surface);">数据源:</span>
+              <select class="veq-input" data-mode-switch style="width:100px">
+                <option value="database">数据库</option>
+                <option value="sql">SQL</option>
+              </select>
+            </label>
             ${this.opts?.onGotoSQL ? '<button class="ve-btn ve-link" data-goto-sql title="跳转到 SQL 编辑位置">转到 SQL ➜</button>' : ''}
             <button class="ve-btn ve-icon ${this.previewPinned ? 'active' : ''}" title="置顶预览" data-pin-preview>📌</button>
           </div>
@@ -65,9 +77,13 @@ export class VisualEchartsUI {
         <div class="ve-card" data-section="preview">
           <div class="ve-result" data-result><div class="ve-placeholder">暂无预览</div></div>
         </div>
-        <details class="ve-card" open data-section="query">
+        <details class="ve-card" open data-section="query" style="display:${this.dataMode === 'database' ? '' : 'none'}">
           <summary class="ve-legend">数据库查询模式</summary>
           <div data-query-container></div>
+        </details>
+        <details class="ve-card" open data-section="sql" style="display:${this.dataMode === 'sql' ? '' : 'none'}">
+          <summary class="ve-legend">SQL 查询模式</summary>
+          <div data-sql-container></div>
         </details>
       </div>
     `;
@@ -77,13 +93,23 @@ export class VisualEchartsUI {
     (this.container.querySelector('[data-refresh]') as HTMLButtonElement).addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.renderChartPreview().catch(()=>{}); });
   (this.container.querySelector('[data-copy-block-top]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.copyChartBlock(); });
   (this.container.querySelector('[data-pin-preview]') as HTMLButtonElement)?.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); this.togglePinPreview(); });
+    
+    // 模式切换
+    const modeSwitch = this.container.querySelector('[data-mode-switch]') as HTMLSelectElement | null;
+    if (modeSwitch) {
+      modeSwitch.value = this.dataMode;
+      modeSwitch.addEventListener('change', (ev) => {
+        const newMode = (ev.target as HTMLSelectElement).value as 'database' | 'sql';
+        this.switchMode(newMode);
+      });
+    }
+    
     if (this.opts?.onGotoSQL) {
       (this.container.querySelector('[data-goto-sql]') as HTMLButtonElement)?.addEventListener('click', (ev) => {
         ev.stopPropagation(); ev.preventDefault();
         try { this.opts?.onGotoSQL?.(); } catch { /* ignore */ }
       });
     }
-    // 初始化查询模式子 UI
     // 初始化查询模式子 UI
     const queryContainer = this.container.querySelector('[data-query-container]') as HTMLElement | null;
     if (queryContainer) {
@@ -109,6 +135,19 @@ export class VisualEchartsUI {
         },
       });
     }
+    // 初始化 SQL 模式子 UI
+    const sqlContainer = this.container.querySelector('[data-sql-container]') as HTMLElement | null;
+    if (sqlContainer) {
+      this.sqlUI = new VisualEchartsSqlUI(sqlContainer, {
+        persistKey: this.key + ':sql',
+        onChange: () => {
+          try {
+            if (!this.sqlUI) return;
+          } catch { /* ignore */ }
+          this.renderChartPreview().catch(() => {});
+        },
+      });
+    }
   }
 
   // 已移除表格相关的格式化方法
@@ -123,6 +162,22 @@ export class VisualEchartsUI {
     this.renderChartPreview();
   }
 
+  // 切换数据模式
+  private switchMode(mode: 'database' | 'sql') {
+    this.dataMode = mode;
+    this.persist();
+    
+    // 显示/隐藏对应的面板
+    const querySection = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
+    const sqlSection = this.container.querySelector('[data-section="sql"]') as HTMLElement | null;
+    
+    if (querySection) querySection.style.display = mode === 'database' ? '' : 'none';
+    if (sqlSection) sqlSection.style.display = mode === 'sql' ? '' : 'none';
+    
+    // 刷新预览
+    this.renderChartPreview().catch(() => {});
+  }
+
 
   // -------- 图表预览 --------
   private async ensureEcharts(): Promise<void> {
@@ -130,9 +185,14 @@ export class VisualEchartsUI {
   }
 
   private buildOptionForPreview() {
-    // 根据模式选择对应 IIFE 并执行
+    // 根据模式选择对应 UI 并执行
     try {
-      const iife = this.queryUI?.getIIFE() || '(()=>({}))()';
+      let iife = '';
+      if (this.dataMode === 'sql') {
+        iife = this.sqlUI?.getIIFE() || '(()=>({}))()';
+      } else {
+        iife = this.queryUI?.getIIFE() || '(()=>({}))()';
+      }
       // eslint-disable-next-line no-new-func
       const fn = new Function(`return ${iife};`);
       return fn();
@@ -171,7 +231,12 @@ export class VisualEchartsUI {
   }
 
   private async copyChartBlock() {
-    const iife = (this.queryUI?.getIIFE() || '').replace('option.animation = false;', 'option.animation = true;');
+    let iife = '';
+    if (this.dataMode === 'sql') {
+      iife = (this.sqlUI?.getIIFE() || '').replace('option.animation = false;', 'option.animation = true;');
+    } else {
+      iife = (this.queryUI?.getIIFE() || '').replace('option.animation = false;', 'option.animation = true;');
+    }
     const block = '```echarts\n' + iife + '\n```';
   try { await navigator.clipboard.writeText(block); toast('已复制图表块'); }
     catch {

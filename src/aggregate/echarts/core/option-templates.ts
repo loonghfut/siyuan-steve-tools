@@ -20,6 +20,13 @@ export interface EchartsTplCtx {
   chartSettings?: any;
 }
 
+/**
+ * SQL 查询模式的上下文接口
+ */
+export interface EchartsSqlTplCtx extends EchartsTplCtx {
+  sql: string; // SQL 查询语句
+}
+
 
 export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
   const legend = (ctx.legend && ctx.legend.length)
@@ -724,6 +731,256 @@ export function buildPresetCountIIFE(
       }
     }catch(e){} })();
     ${colorsJs ? `option.color = ${colorsJs};` : ''}
+    option.animation = false;
+    return option;
+  })()`;
+  return body;
+}
+
+/**
+ * 生成基于 SQL 查询的 ECharts IIFE 代码
+ * - 使用 /api/query/sql 接口获取数据
+ * - 支持与 AV 模式相同的图表设置
+ */
+export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
+  const legend = (ctx.legend && ctx.legend.length)
+    ? ctx.legend
+    : (ctx.seriesExprs || []).map(s => s.name);
+  const legendArr = JSON.stringify(legend || []);
+  const xExpr = ctx.xDataExpr || 'rows.map((_,i)=>String(i+1))';
+  const needDualAxis = (ctx.seriesExprs || []).some(s => (s as any).axisIndex === 1);
+  const isAllPie = (ctx.seriesExprs || []).length > 0 && (ctx.seriesExprs || []).every(s => (s.type || 'line') === 'pie');
+  const st: any = (ctx as any).chartSettings || {};
+  const stBar: any = (st && st.bar) ? st.bar : st;
+  const stLine: any = (st && st.line) ? st.line : st;
+  const stPie: any = (st && st.pie) ? st.pie : st;
+  const stCommon: any = st && st.common ? st.common : {};
+  const stStat: any = st && st.stat ? st.stat : {};
+  const hasBar = (ctx.seriesExprs || []).some(s => (s.type || 'line') === 'bar');
+  const hasLine = (ctx.seriesExprs || []).some(s => (s.type || 'line') === 'line');
+  const pieCount = (ctx.seriesExprs || []).filter(s => (s.type || 'line') === 'pie').length;
+  let pieNo = -1;
+  
+  const splitType = (function () {
+    const cand = (stStat && typeof stStat.ySplitLine === 'string') ? stStat.ySplitLine : (stCommon && typeof stCommon.ySplitLine === 'string' ? stCommon.ySplitLine : null);
+    return (cand === 'solid' || cand === 'none' || cand === 'dashed') ? cand : 'dashed';
+  })();
+  const splitTypeShow = splitType !== 'none';
+  const splitLineStyleType = splitType === 'solid' ? 'solid' : 'dashed';
+  
+  const tooltipTrigger = (function () {
+    const explicitStat = stStat && (stStat.tooltipTrigger === 'item' || stStat.tooltipTrigger === 'axis') ? stStat.tooltipTrigger : null;
+    const explicitCommon = !explicitStat && stCommon && (stCommon.tooltipTrigger === 'item' || stCommon.tooltipTrigger === 'axis') ? stCommon.tooltipTrigger : null;
+    const explicit = explicitStat || explicitCommon;
+    if (explicit) return explicit;
+    return isAllPie ? 'item' : 'axis';
+  })();
+  
+  const axisPointerType = (function () {
+    if (tooltipTrigger !== 'axis') return 'none';
+    const cand = (stStat && stStat.axisPointerType) ?? (stCommon && stCommon.axisPointerType);
+    return (cand === 'shadow' || cand === 'cross' || cand === 'none') ? cand : 'line';
+  })();
+  
+  const tooltipPatch = (function () {
+    if (tooltipTrigger === 'axis' && !isAllPie) {
+      if (axisPointerType === 'none') return `option.tooltip = { trigger: 'axis' };`;
+      return `option.tooltip = { trigger: 'axis', axisPointer: { type: '${axisPointerType}' } };`;
+    }
+    return `option.tooltip = { trigger: 'item' };`;
+  })();
+  
+  const dataZoomMode = (function () {
+    if (isAllPie) return 'none';
+    const dz = (stStat && stStat.dataZoom != null) ? stStat.dataZoom : (stCommon && stCommon.dataZoom);
+    return (dz === 'inside' || dz === 'slider' || dz === 'both') ? dz : 'none';
+  })();
+  
+  const dataZoomPatch = (function () {
+    if (dataZoomMode === 'inside') return `option.dataZoom = [{ type: 'inside' }];`;
+    if (dataZoomMode === 'slider') return `option.dataZoom = [{ type: 'slider' }];`;
+    if (dataZoomMode === 'both') return `option.dataZoom = [{ type: 'inside' }, { type: 'slider' }];`;
+    return '';
+  })();
+  
+  const seriesJs = (ctx.seriesExprs || []).map(s => {
+    const type = s.type || 'line';
+    const name = JSON.stringify(s.name);
+    const smooth = ((type === 'line') && ((typeof stLine.smooth === 'boolean' ? stLine.smooth : !!ctx.smooth))) ? 'true' : 'false';
+    const area = ((type === 'line') && ((stLine && (stLine as any).area === true) || !!ctx.area)) ? `areaStyle: { normal: {} },` : '';
+    const stack = ((type === 'bar') && (typeof stBar.stack === 'boolean' ? stBar.stack : !!ctx.stack)) ? `stack: 'total',` : '';
+    const yAxisIndex = (typeof (s as any).axisIndex === 'number' && (s as any).axisIndex! > 0) ? `yAxisIndex:${(s as any).axisIndex | 0},` : '';
+    
+    const dataExpr = (type === 'pie')
+      ? `(function(){
+        var ys = (${s.expr});
+        if (Array.isArray(ys) && ys.length && typeof ys[0]==='object' && ys[0] && Object.prototype.hasOwnProperty.call(ys[0], 'value')) return ys;
+        var xs = (${xExpr});
+        var m = Math.min(xs.length, Array.isArray(ys)?ys.length:0);
+        return xs.slice(0,m).map(function(n,i){ return { name: String(n), value: ys[i] }; });
+      })()`
+      : `(${s.expr})`;
+    
+    const label = (function () {
+      let l: any;
+      if (type === 'bar') l = stBar && stBar.label;
+      else if (type === 'line') l = stLine && stLine.label;
+      else if (type === 'pie') l = stPie && stPie.label;
+      return l ? `label: ${JSON.stringify(l)},` : '';
+    })();
+    
+    const lineExtras = (function () {
+      if (type !== 'line') return '';
+      const parts: string[] = [];
+      if (typeof stLine.symbol === 'string' && stLine.symbol) parts.push(`symbol: '${stLine.symbol}',`);
+      if (Number.isFinite(stLine.symbolSize)) parts.push(`symbolSize: ${stLine.symbolSize | 0},`);
+      if (Number.isFinite(stLine.lineWidth)) parts.push(`lineStyle: { width: ${stLine.lineWidth | 0} },`);
+      return parts.join(' ');
+    })();
+    
+    const barExtras = (function () {
+      if (type !== 'bar') return '';
+      const parts: string[] = [];
+      if (Number.isFinite(stBar.barWidth)) parts.push(`barWidth: ${Number(stBar.barWidth)},`);
+      if (typeof stBar.barGap === 'string' && stBar.barGap) parts.push(`barGap: '${stBar.barGap}',`);
+      else if (Number.isFinite(stBar.barGap)) parts.push(`barGap: '${Number(stBar.barGap)}%',`);
+      return parts.join(' ');
+    })();
+    
+    const pieExtra = (type === 'pie') ? (function () {
+      const rose = (stPie && (stPie.roseType === false || stPie.roseType === 'radius' || stPie.roseType === 'area')) ? stPie.roseType : undefined;
+      const parts: string[] = [];
+      const irCfg = typeof stPie.innerRadius === 'number' ? Math.max(0, Math.min(100, stPie.innerRadius | 0)) : 0;
+      const orCfg = typeof stPie.outerRadius === 'number' ? Math.max(irCfg, Math.min(100, stPie.outerRadius | 0)) : 70;
+      if (pieCount > 1) {
+        pieNo++;
+        const span = Math.max(1, orCfg - irCfg);
+        const ring = span / pieCount;
+        let r1 = Math.round(irCfg + ring * pieNo);
+        let r2 = Math.round(irCfg + ring * (pieNo + 1));
+        if (r2 <= r1) r2 = r1 + 1;
+        parts.push(`radius: ['${r1}%', '${r2}%'],`);
+      } else {
+        parts.push(`radius: ['${irCfg}%', '${orCfg}%'],`);
+      }
+      if (rose !== undefined && rose !== false) parts.push(`roseType: '${rose}',`);
+      return parts.join(' ');
+    })() : '';
+    
+    return `{
+      name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${label} ${lineExtras} ${barExtras} ${pieExtra} z: 1,
+      data: ${dataExpr}
+    }`;
+  }).join(',\n');
+  
+  const body = `(() => {
+    function fetchSqlSync(sql){
+      try{
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST','/api/query/sql', false);
+        xhr.setRequestHeader('Content-Type','application/json');
+        xhr.send(JSON.stringify({stmt: sql}));
+        if (xhr.status>=200 && xhr.status<300){
+          var res = {};
+          try { res = JSON.parse(xhr.responseText || '[]'); } catch { res = []; }
+          var rows = Array.isArray(res) ? res : (res.data || []);
+          return Array.isArray(rows) ? rows : [];
+        }
+      } catch(e){ /* ignore */ }
+      return [];
+    }
+    const option = {};
+    const rows = fetchSqlSync(${JSON.stringify(ctx.sql)});
+    option.title = { text: ${JSON.stringify(ctx.title || '')} };
+    ${(function () {
+      const titleAlign = stCommon.title?.textAlign;
+      const titleVAlign = stCommon.title?.textVerticalAlign;
+      let titlePos = '';
+      if (titleAlign === 'left') titlePos += 'option.title.left = 0; ';
+      else if (titleAlign === 'right') titlePos += 'option.title.right = 0; ';
+      else titlePos += 'option.title.left = "center"; ';
+      if (titleVAlign === 'middle') titlePos += 'option.title.top = "middle"; ';
+      else if (titleVAlign === 'bottom') titlePos += 'option.title.bottom = 0; ';
+      else titlePos += 'option.title.top = 0; ';
+      return titlePos ? `try{ ${titlePos} }catch(e){}` : '';
+    })()}
+    option.backgroundColor = 'transparent';
+    ${tooltipPatch}
+    option.legend = ${isAllPie ? `{ data: (${xExpr}) }` : `{ data: ${legendArr} }`};
+    ${(function () {
+      const pos = (stCommon && (stCommon.legendPos === 'top' || stCommon.legendPos === 'bottom' || stCommon.legendPos === 'left' || stCommon.legendPos === 'right')) ? stCommon.legendPos : null;
+      if (!pos) return '';
+      const orient = (pos === 'left' || pos === 'right') ? 'vertical' : 'horizontal';
+      const extra = (pos === 'left' || pos === 'right') ? `option.legend.top = 'middle';` : '';
+      return `try{ option.legend.orient='${orient}'; option.legend.${pos}=0; ${extra} }catch(e){}`;
+    })()}
+    ${(function () {
+      try {
+        const g = stCommon && stCommon.grid;
+        if (g && [g.top, g.right, g.bottom, g.left].every((v: any) => Number.isFinite(v))) {
+          return `option.grid = { top: ${Number(stCommon.grid.top) || 0}, right: ${Number(stCommon.grid.right) || 0}, bottom: ${Number(stCommon.grid.bottom) || 0}, left: ${Number(stCommon.grid.left) || 0}, containLabel: true };`;
+        }
+      } catch (e) { }
+      return '';
+    })()}
+    ${!isAllPie ? `
+    option.xAxis = [{ type: 'category', boundaryGap: ${(function () {
+      if (typeof (ctx as any).boundaryGap === 'boolean') return (ctx as any).boundaryGap ? 'true' : 'false';
+      if (st && (st.bar || st.line)) {
+        if (hasBar && typeof stBar.boundaryGap === 'boolean') return stBar.boundaryGap ? 'true' : 'false';
+        if (hasLine && typeof stLine.boundaryGap === 'boolean') return stLine.boundaryGap ? 'true' : 'false';
+      }
+      if (typeof st.boundaryGap === 'boolean') return st.boundaryGap ? 'true' : 'false';
+      return 'false';
+    })()}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false }, axisLabel: { ${(function () {
+      if (st && (st.bar || st.line)) {
+        if (hasLine && typeof stLine.xLabelRotate === 'number') return `rotate: ${stLine.xLabelRotate | 0}`;
+        if (hasBar && typeof stBar.xLabelRotate === 'number') return `rotate: ${stBar.xLabelRotate | 0}`;
+      }
+      if (typeof st.xLabelRotate === 'number') return `rotate: ${st.xLabelRotate | 0}`;
+      return '';
+    })()} }${(function () {
+      const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
+      return xName ? `, name: '${xName}'` : '';
+    })()} }];
+    option.yAxis = ${`[{
+      type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function () {
+      const yLeftName = (stBar && stBar.yAxisLeftName) || (stLine && stLine.yAxisLeftName) || '';
+      return yLeftName ? `, name: '${yLeftName}'` : '';
+    })()}
+    }${needDualAxis ? (function () {
+      const yRightName = (stBar && stBar.yAxisRightName) || (stLine && stLine.yAxisRightName) || '';
+      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: '${yRightName}'` : ''} }`;
+    })() : ''}]`};
+    ` : ''}
+    option.series = [${seriesJs}];
+    ${Array.isArray(ctx.colors) && ctx.colors.length ? `
+  try{ (option.series||[]).forEach(function(s, i){ if (s && s.type === 'pie') return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(ctx.colors)}[i] || s.itemStyle.color; }); }catch(e){}
+  ` : ''}
+    ${(Array.isArray(ctx.colors) && ctx.colors.length) ? `
+  try{ if ((option.series||[]).some(function(s){ return s && s.type==='pie'; })) option.color = ${JSON.stringify(ctx.colors)}; }catch(e){}
+  ` : ''}
+    ${dataZoomPatch}
+    ${ctx.debug ? `
+    try{
+      var __N = ${Math.max(1, ctx.debugSampleSize || 5)};
+      var xData = (option.xAxis && option.xAxis[0] && option.xAxis[0].data) ? option.xAxis[0].data : [];
+      var seriesDbg = (option.series||[]).map(function(s){
+        var d = Array.isArray(s.data)? s.data:[];
+        var pairsSample = (function(){ var m=Math.min(__N, Math.min(d.length, xData.length)); var ps=[]; for(var i=0;i<m;i++){ ps.push({ x: xData[i], y: d[i] }); } return ps; })();
+        return { name: s.name, type: s.type, yLen: d.length, ySample: d.slice(0, __N), pairsSample: pairsSample };
+      });
+      var dbg = {
+        sql: ${JSON.stringify(ctx.sql)},
+        rowsLen: Array.isArray(rows)? rows.length : 0,
+        rowsSample: Array.isArray(rows)? rows.slice(0, __N) : [],
+        xLen: Array.isArray(xData)? xData.length : 0,
+        xSample: Array.isArray(xData)? xData.slice(0, __N) : [],
+        series: seriesDbg
+      };
+      console.log('[ECharts SQL Debug]', dbg);
+    }catch(e){}
+    ` : ''}
     option.animation = false;
     return option;
   })()`;
