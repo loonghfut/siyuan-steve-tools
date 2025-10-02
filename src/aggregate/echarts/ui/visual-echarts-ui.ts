@@ -161,9 +161,13 @@ export class VisualEchartsUI {
     // 保留扩展点，当前无重算需求
   }
 
-  // 供外部设置 SQL 并可选择触发一次查询
-  public setSQL(..._args: any[]) {
-    this.renderChartPreview();
+  // 供外部读取 IIFE
+  public getIIFE(): string {
+    if (this.dataMode === 'sql') {
+      return this.sqlUI?.getIIFE() || '';
+    } else {
+      return this.queryUI?.getIIFE() || '';
+    }
   }
 
   // 切换数据模式

@@ -295,7 +295,8 @@ export class M_Aggregate {
                     btn.className = 'b3-button';
                     btn.textContent = '插入ECharts IIFE';
                     btn.addEventListener('click', async () => {
-                        const code = (container.querySelector('[data-output]') as HTMLElement)?.textContent || '';
+                        // 直接从UI实例获取最新的IIFE代码
+                        const code = ui.getIIFE();
                         const curId = nodeElement.getAttribute('data-node-id');
                         const fenced = '```echarts\n' + code + '\n```';
                         await updateBlock('markdown', fenced, curId);

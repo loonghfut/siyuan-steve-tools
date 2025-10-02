@@ -422,6 +422,7 @@ export class VisualEchartsSqlUI {
               <div class="veq-row" style="gap:8px; margin-bottom:8px;">
                 <button class="veq-btn veq-small" data-save-preset type="button">保存筛选</button>
                 <button class="veq-btn veq-small" data-apply-preset type="button">应用筛选</button>
+                <button class="veq-btn veq-small" data-retry-sql type="button">重试查询</button>
               </div>
               <label class="veq-field">
                 <textarea class="veq-input" data-sql rows="4" placeholder="SELECT * FROM blocks WHERE type='d' LIMIT 100"></textarea>
@@ -524,8 +525,10 @@ export class VisualEchartsSqlUI {
     // 保存和应用筛选按钮事件
     const savePresetBtn = this.root.querySelector('[data-save-preset]') as HTMLButtonElement | null;
     const applyPresetBtn = this.root.querySelector('[data-apply-preset]') as HTMLButtonElement | null;
+    const retrySqlBtn = this.root.querySelector('[data-retry-sql]') as HTMLButtonElement | null;
     savePresetBtn?.addEventListener('click', () => this.savePresetFlow());
     applyPresetBtn?.addEventListener('click', () => this.openPresetModal());
+    retrySqlBtn?.addEventListener('click', () => this.loadKeys());
 
     // SQL模式切换事件
     this.sqlModeSwitchEl?.addEventListener('change', (e) => {
@@ -940,12 +943,6 @@ export class VisualEchartsSqlUI {
           // 获取第一行的所有键作为字段名(使用预处理后的数据)
           this.keys = Object.keys(rows[0]);
 
-          console.log('🔍 字段加载调试:', {
-            原始字段: Object.keys(rawRows[0] || {}),
-            预处理后字段: this.keys,
-            box字段转换: rawRows[0]?.box !== rows[0]?.box ? `${rawRows[0]?.box} -> ${rows[0]?.box}` : '无变化'
-          });
-
           // 渲染 X 轴字段下拉
           const xSel = this.root.querySelector('[data-xkey]') as HTMLSelectElement | null;
           if (xSel) {
@@ -982,22 +979,6 @@ export class VisualEchartsSqlUI {
   private autoBuildExpr() {
     if (!this.visualMode) return;
 
-    // 调试输出:打印输入参数
-    console.group('🔍 SQL数据映射调试');
-    console.log('📊 X轴配置:', {
-      xKey: this.xKey,
-      sort: this.sort,
-      bucket: this.xBucket,
-      mergeMode: this.mergeMode
-    });
-    console.log('📈 系列配置:', this.series.map(s => ({
-      name: s.name,
-      valueKey: s.valueKey,
-      agg: s.agg,
-      type: s.type,
-      axisIndex: s.axisIndex
-    })));
-
     const { xExpr, series } = buildSqlMappingExpressions({
       visualMode: this.visualMode,
       mergeMode: this.mergeMode,
@@ -1006,16 +987,6 @@ export class VisualEchartsSqlUI {
       bucket: this.xBucket,
       series: this.series,
     });
-
-    // 调试输出:打印生成的表达式
-    console.log('✅ 生成的X轴表达式:', xExpr);
-    console.log('✅ 生成的系列表达式:', series.map(s => ({
-      name: s.name,
-      expr: s.expr,
-      type: s.type,
-      axisIndex: s.axisIndex
-    })));
-    console.groupEnd();
 
     if (this.xExprTextarea && xExpr) this.xExprTextarea.value = xExpr;
     this.series = series;
@@ -1479,31 +1450,8 @@ export class VisualEchartsSqlUI {
     var rawRows = fetchSqlSync(${JSON.stringify(sql)});
     const rows = preprocessData(rawRows);
     
-    // 🔍 调试输出: 打印SQL查询结果和预处理结果
-    console.group('🔍 ECharts SQL数据调试');
-    console.log('📦 SQL原始查询结果:', rawRows);
-    console.log('🔧 预处理后的数据:', rows);
-    console.log('📊 数据行数:', rows.length);
-    if (rows.length > 0) {
-      console.log('📄 原始第一条数据:', rawRows[0]);
-      console.log('📄 预处理后第一条数据:', rows[0]);
-      console.log('🔑 可用字段:', Object.keys(rows[0] || {}));
-      
-      // 显示box字段转换情况
-      if (rawRows[0] && rawRows[0].box && rows[0] && rows[0].box && rawRows[0].box !== rows[0].box) {
-        console.log('🔄 box字段转换: "' + rawRows[0].box + '" -> "' + rows[0].box + '"');
-      }
-    }
-    
     // 计算 X轴 数据
     const xAxisData = (${xExpr});
-    console.log('📐 X轴表达式:', ${JSON.stringify(xExpr)});
-    console.log('📐 X轴数据结果:', xAxisData);
-    console.log('📐 X轴数据类型:', typeof xAxisData, Array.isArray(xAxisData) ? '(Array)' : '');
-    console.log('📐 X轴数据长度:', Array.isArray(xAxisData) ? xAxisData.length : 'N/A');
-    if (Array.isArray(xAxisData) && xAxisData.length > 0) {
-      console.log('📐 X轴前5项:', xAxisData.slice(0, 5));
-    }
     
     option.title = { text: ${JSON.stringify(title)} };
     ${ChartSettingsBuilder.buildTitlePosition(stCommon)}
@@ -1515,20 +1463,6 @@ export class VisualEchartsSqlUI {
     ${!isAllPie ? ChartSettingsBuilder.buildXAxisSettings(stBar, stLine) : ''}
     ${!isAllPie ? ChartSettingsBuilder.buildYAxisSettings(stBar, stLine, stStat, needDualAxis) : ''}
     option.series = [${seriesJs}];
-    
-    // 🔍 调试输出: 打印系列数据
-    console.log('📈 系列配置:', option.series);
-    if (option.series && option.series.length > 0) {
-      option.series.forEach(function(s, idx) {
-        console.log('📈 系列 #' + idx + ' [' + s.name + ']:', {
-          type: s.type,
-          data: s.data,
-          dataLength: Array.isArray(s.data) ? s.data.length : 'N/A',
-          firstItems: Array.isArray(s.data) ? s.data.slice(0, 5) : s.data
-        });
-      });
-    }
-    console.groupEnd();
     
     ${dataZoomPatch}
     ${Array.isArray(this.colors) && this.colors.length ? `
