@@ -2,7 +2,7 @@ import steveTools from "@/index";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
 import { VisualEchartsUI } from "./echarts/ui/visual-echarts-ui";
 import { Dialog, Menu, openTab } from "siyuan";
-import { updateBlock, insertBlock } from "@/api/api";
+import { updateBlock } from "@/api/api";
 import { PluginConfig } from "@/savedata";
 
 // Aggregate 模块
@@ -133,7 +133,7 @@ export class M_Aggregate {
                     const container = document.getElementById(`visual-echarts-tab-${id}`)! as HTMLElement;
                     const conf = new PluginConfig(aggregate.plugin.name, 'aggregate-sql');
                     await conf.load();
-                    const ui = new VisualEchartsUI(container, {
+                    new VisualEchartsUI(container, {
                         persistKey: `visual-echarts-tab`,
                         loadSqlPresets: () => (conf.get('presets') || {}),
                         saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
