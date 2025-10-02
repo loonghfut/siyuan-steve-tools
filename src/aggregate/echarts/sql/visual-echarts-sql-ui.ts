@@ -321,6 +321,9 @@ export class VisualEchartsSqlUI {
   private series: Array<SeriesItem> = [];
   private loadingKeys = false; // 加载字段时防止重复
 
+  // 防抖相关
+  private debounceTimer: number | null = null;
+
   // 可视化映射状态(默认启用且无开关)
   private visualMode = true;
   private keys: string[] = [];
@@ -368,6 +371,17 @@ export class VisualEchartsSqlUI {
     }
   }
 
+  // 防抖方法
+  private debounceLoadKeys() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = window.setTimeout(() => {
+      this.loadKeys();
+      this.debounceTimer = null;
+    }, 500); // 500ms 防抖延迟
+  }
+
   private render() {
     this.root.innerHTML = `
       <div class="veq-wrap">
@@ -412,7 +426,6 @@ export class VisualEchartsSqlUI {
               <label class="veq-field">
                 <textarea class="veq-input" data-sql rows="4" placeholder="SELECT * FROM blocks WHERE type='d' LIMIT 100"></textarea>
               </label>
-              <button class="veq-btn veq-small" data-load-keys type="button">加载字段</button>
             </div>
             
             <!-- 多SQL预设对比模式 -->
@@ -503,7 +516,10 @@ export class VisualEchartsSqlUI {
 
     // 事件
     this.titleInput.addEventListener('input', () => this.onChanged());
-    this.sqlTextarea.addEventListener('input', (e) => { this.sql = (e.target as HTMLTextAreaElement).value; this.onChanged(); });
+    this.sqlTextarea.addEventListener('input', (e) => { 
+      this.sql = (e.target as HTMLTextAreaElement).value; 
+      this.debounceLoadKeys(); // 使用防抖的字段加载
+    });
 
     // 保存和应用筛选按钮事件
     const savePresetBtn = this.root.querySelector('[data-save-preset]') as HTMLButtonElement | null;
@@ -591,7 +607,6 @@ export class VisualEchartsSqlUI {
       this.onChanged();
     });
 
-    (this.root.querySelector('[data-load-keys]') as HTMLButtonElement).addEventListener('click', () => this.loadKeys());
     (this.root.querySelector('[data-copy-iife]') as HTMLButtonElement).addEventListener('click', () => this.copyIIFE());
     (this.root.querySelector('[data-copy-block]') as HTMLButtonElement).addEventListener('click', () => this.copyChartBlock());
 
@@ -901,17 +916,10 @@ export class VisualEchartsSqlUI {
       if (this.loadingKeys) return;
       this.loadingKeys = true;
 
-      const btn = this.root.querySelector('[data-load-keys]') as HTMLButtonElement;
-      const oldText = btn.textContent || '';
-      btn.disabled = true;
-      btn.textContent = '加载中…';
-
       const sql = this.sql.trim();
       if (!sql) {
         this.toast('请先输入 SQL 查询语句');
         this.loadingKeys = false;
-        btn.disabled = false;
-        btn.textContent = oldText;
         return;
       }
 
@@ -966,9 +974,7 @@ export class VisualEchartsSqlUI {
       console.error(e);
     } finally {
       this.loadingKeys = false;
-      const btn = this.root.querySelector('[data-load-keys]') as HTMLButtonElement;
-      btn.disabled = false;
-      btn.textContent = '加载字段';
+      // 不再需要更新按钮状态，因为按钮已被移除
     }
   }
 
@@ -1500,12 +1506,12 @@ export class VisualEchartsSqlUI {
     }
     
     option.title = { text: ${JSON.stringify(title)} };
-    ${ChartSettingsBuilder.buildTitlePosition(stCommon.title)}
+    ${ChartSettingsBuilder.buildTitlePosition(stCommon)}
     option.backgroundColor = 'transparent';
     ${tooltipPatch}
     option.legend = { data: ${isAllPie ? `(${xExpr})` : legendArr} };
-    ${ChartSettingsBuilder.buildLegendPosition(stCommon.legendPos)}
-    ${ChartSettingsBuilder.buildGridSettings(stCommon.grid)}
+    ${ChartSettingsBuilder.buildLegendPosition(stCommon)}
+    ${ChartSettingsBuilder.buildGridSettings(stCommon)}
     ${!isAllPie ? ChartSettingsBuilder.buildXAxisSettings(stBar, stLine) : ''}
     ${!isAllPie ? ChartSettingsBuilder.buildYAxisSettings(stBar, stLine, stStat, needDualAxis) : ''}
     option.series = [${seriesJs}];
