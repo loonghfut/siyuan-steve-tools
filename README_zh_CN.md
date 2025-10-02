@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.16.7 (2025年10月02日)
+### v0.16.8 (2025年10月02日)
 - 优化部分逻辑 (loonghfut)
 - 改进持久化逻辑 (loonghfut)
 - 优化界面 (loonghfut)
@@ -90,6 +90,10 @@ win端s3同步后，docker端感知s3同步。
 - 修复插入图表功能 (loonghfut)
 - 更新版本号至0.16.5 (loonghfut)
 - 更新版本号至0.16.7 (loonghfut)
+- docs: 更新 v0.16.7 版本的更新日志 (loonghfut)
+- 调整默认 pageSize 为 99999 (loonghfut)
+- 系列数据支持筛选 (loonghfut)
+- 更新版本号至0.16.8 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
