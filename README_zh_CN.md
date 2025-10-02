@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.16.0 (2025年09月28日)
+### v0.16.7 (2025年10月02日)
 - 优化部分逻辑 (loonghfut)
 - 改进持久化逻辑 (loonghfut)
 - 优化界面 (loonghfut)
@@ -67,6 +67,29 @@ win端s3同步后，docker端感知s3同步。
 - 增加预览置顶功能，允许用户固定结果预览区域 (loonghfut)
 - 美化设置界面 (loonghfut)
 - 更新版本号至0.16.0 (loonghfut)
+- docs: 更新 v0.16.0 版本的更新日志 (loonghfut)
+- 优化界面 (loonghfut)
+- 小部分重构 (loonghfut)
+- 移除SQL图表 (loonghfut)
+- 优化图表设置体验 (loonghfut)
+- 优化图表块复制功能，启用动画效果 (loonghfut)
+- 整理代码文件结构 (loonghfut)
+- 添加数据库名称和视图名称选项，支持在标题下方显示 (loonghfut)
+- 添加“显示数据来源”选项，允许用户控制是否在图表中显示数据库名称和视图名称 (loonghfut)
+- 将样式文件分开 (loonghfut)
+- 更新 ECharts 配置，添加 X 轴和 Y 轴名称选项，调整图表网格位置 (loonghfut)
+- 更新 ECharts 配置，支持左右 Y 轴名称选项 (loonghfut)
+- 添加标题位置设置选项，支持水平和垂直对齐方式 (loonghfut)
+- 添加数据库镜像显示功能，优化数据库选择界面 (loonghfut)
+- 修改部分描述 (loonghfut)
+- 记录点 (loonghfut)
+- 记录点（多SQL查询统计） (loonghfut)
+- 阶段性，完成数据库，SQL查询图表可视化生成 (loonghfut)
+- 删除无用文档 (loonghfut)
+- 完善部分细节 (loonghfut)
+- 修复插入图表功能 (loonghfut)
+- 更新版本号至0.16.5 (loonghfut)
+- 更新版本号至0.16.7 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
