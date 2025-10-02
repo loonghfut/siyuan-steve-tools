@@ -1051,3 +1051,85 @@ details>summary.ve-legend {
         grid-template-columns: 1fr
     }
 }
+
+/* 筛选器样式 */
+.veq-filter-section {
+    border-top: 1px solid var(--b3-border-color);
+    padding-top: 4px;
+    margin-top: 8px;
+}
+
+.veq-filter-section summary {
+    padding: 4px 0;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+}
+
+.veq-filter-section summary::-webkit-details-marker,
+.veq-filter-section summary::marker {
+    display: none;
+}
+
+/* 折叠时的行内代码预览 */
+.veq-filter-preview-inline {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    opacity: 0.7;
+    font-style: italic;
+    margin-left: auto;
+}
+
+/* 展开时隐藏行内预览 */
+.veq-filter-section[open] .veq-filter-preview-inline {
+    display: none;
+}
+
+.veq-filter-preview-inline {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    opacity: 0.7;
+    font-style: italic;
+}
+
+/* 展开时隐藏行内预览 */
+.veq-filter-section[open] .veq-filter-preview-inline {
+    display: none;
+}
+
+.veq-filter-list {
+    padding: 4px 0;
+}
+
+.veq-filter-row {
+    position: relative;
+    animation: veq-filter-row-in 0.2s ease-out;
+}
+
+@keyframes veq-filter-row-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.veq-filter-row:hover {
+    background: var(--b3-list-hover) !important;
+}
+
+.veq-series-item-content {
+    width: 100%;
+}
