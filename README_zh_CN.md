@@ -33,8 +33,9 @@ win端s3同步后，docker端感知s3同步。
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
 7. WPS联动：  
 方便在思源中使用WPS（office文件嵌入，预览、编辑、同步），多维表格数据导入，图片上传。
-8. SQL聚合查询：  
-可视化生成SQL语句，查询思源数据库，支持多条件筛选，排序等功能，支持结果预览和嵌入块。
+8. 聚合查询：  
+可视化生成SQL语句，查询思源数据库，支持多条件筛选，排序等功能，支持结果预览和嵌入块。  
+可视化图表生成器（基于数据库，SQL查询）
 
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
