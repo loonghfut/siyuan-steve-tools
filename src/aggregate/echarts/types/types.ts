@@ -30,6 +30,7 @@ export interface VisualEchartsOptions {
   persistKey?: string;
   initialSQL?: string;
   loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
+  saveSqlPresets?: (presets: Record<string, any>) => Promise<void> | void;
   onGotoSQL?: () => void;
 }
 
@@ -40,6 +41,7 @@ export interface VisualEchartsSqlOptions {
   persistKey?: string;
   onChange?: () => void;
   loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
+  saveSqlPresets?: (presets: Record<string, any>) => Promise<void> | void;
 }
 
 /**

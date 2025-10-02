@@ -136,6 +136,7 @@ export class M_Aggregate {
                     const ui = new VisualEchartsUI(container, {
                         persistKey: `visual-echarts-tab`,
                         loadSqlPresets: () => (conf.get('presets') || {}),
+                        saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                         onGotoSQL: () => {
                             // 打开弹窗版 SQL 生成器
                             new Dialog({
@@ -230,6 +231,7 @@ export class M_Aggregate {
                                         persistKey: 'siyuan-steve-tools:visual-echarts-from-sql',
                                         initialSQL: sql,
                                         loadSqlPresets: () => (conf2.get('presets') || {}),
+                                        saveSqlPresets: async (obj) => { conf2.set('presets', obj); await conf2.save(); },
                                         onGotoSQL: () => {
                                             // 在 Slash 场景下，直接弹 SQL 生成器
                                             new Dialog({
@@ -283,7 +285,8 @@ export class M_Aggregate {
                     await conf3.load();
                     const ui = new VisualEchartsUI(container, {
                         persistKey: 'siyuan-steve-tools:visual-echarts-slash',
-                        loadSqlPresets: () => (conf3.get('presets') || {})
+                        loadSqlPresets: () => (conf3.get('presets') || {}),
+                        saveSqlPresets: async (obj) => { conf3.set('presets', obj); await conf3.save(); }
                     });
                     // 追加“插入代码块”按钮
                     const bar = document.createElement('div');
@@ -400,6 +403,7 @@ export class M_Aggregate {
                                     persistKey: 'siyuan-steve-tools:visual-echarts-from-sql-modal',
                                     initialSQL: sql,
                                     loadSqlPresets: () => (conf.get('presets') || {}),
+                                    saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                                     onGotoSQL: () => {
                                         new Dialog({
                                             title: 'SQL 可视化生成器',
@@ -461,6 +465,7 @@ export class M_Aggregate {
                     const ui = new VisualEchartsUI(container, {
                         persistKey: 'siyuan-steve-tools:visual-echarts-modal',
                         loadSqlPresets: () => (conf.get('presets') || {}),
+                        saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                         onGotoSQL: () => {
                             new Dialog({
                                 title: 'SQL 可视化生成器',

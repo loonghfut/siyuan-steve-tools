@@ -17,6 +17,7 @@ export class VisualEchartsUI {
   private queryUI?: VisualEchartsQueryUI;
   private sqlUI?: VisualEchartsSqlUI;
   private loadSqlPresetsProvider?: () => Promise<Record<string, any>> | Record<string, any>;
+  private saveSqlPresetsProvider?: (presets: Record<string, any>) => Promise<void> | void;
   private opts?: VisualEchartsOptions;
   // 仅保留查询面板
 
@@ -25,6 +26,7 @@ export class VisualEchartsUI {
     this.opts = opts;
     this.key = opts?.persistKey || 'siyuan-steve-tools:visual-echarts-ui';
     this.loadSqlPresetsProvider = opts?.loadSqlPresets;
+    this.saveSqlPresetsProvider = opts?.saveSqlPresets;
     // injectStyleOnce();
     try {
       const raw = localStorage.getItem(this.key);
@@ -141,6 +143,7 @@ export class VisualEchartsUI {
       this.sqlUI = new VisualEchartsSqlUI(sqlContainer, {
         persistKey: this.key + ':sql',
         loadSqlPresets: this.loadSqlPresetsProvider,
+        saveSqlPresets: this.saveSqlPresetsProvider,
         onChange: () => {
           try {
             if (!this.sqlUI) return;
