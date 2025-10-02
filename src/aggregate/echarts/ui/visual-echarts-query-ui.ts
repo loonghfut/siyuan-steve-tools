@@ -1378,7 +1378,7 @@ export class VisualEchartsQueryUI {
       viewSel.innerHTML = '<option value="">加载视图中…</option>';
   // 使用 renderAttributeView 获取视图列表与默认 viewID
   // 注意：page/pageSize 传入正数，避免内核异常
-  const res = await this.avManager.renderAttributeView(avID, { page: 1, pageSize: -1 });
+  const res = await this.avManager.renderAttributeView(avID, { page: 1, pageSize: 99999 });
       const views = Array.isArray((res as any).views) ? (res as any).views : [];
       const defaultViewID = (res as any).viewID || '';
       if (!views.length) {

@@ -204,7 +204,7 @@ export interface EchartsAvTplCtx extends EchartsTplCtx {
   showDbNameAndViewName?: boolean; // 是否在标题下面显示数据库名称和视图名称
   baseURL?: string;   // 例如 http://127.0.0.1:6806，留空表示同源
   page?: number;      // 默认 1
-  pageSize?: number;  // 默认 -1 (全部)
+  pageSize?: number;  // 默认 99999 (全部)
   keyword?: string;   // 可选关键词过滤
 }
 
@@ -334,7 +334,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
   }).join(',\n');
   const baseURL = typeof ctx.baseURL === 'string' ? ctx.baseURL : '';
   const page = typeof ctx.page === 'number' ? (ctx.page|0) : 1;
-  const pageSize = typeof ctx.pageSize === 'number' ? (ctx.pageSize|0) : -1;
+  const pageSize = typeof ctx.pageSize === 'number' ? (ctx.pageSize|0) : 99999;
   const keyword = ctx.keyword == null ? '' : String(ctx.keyword);
   const body = `(() => {
     // 调试：记录最近一次 AV 响应

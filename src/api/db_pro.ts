@@ -188,7 +188,7 @@ export class AVManager {
             id: avID,
             viewID: options.viewID || undefined,
             page: options.page || 1,
-            pageSize: options.pageSize || -1,
+            pageSize: options.pageSize || 99999,
             query: options.query || undefined
         };
 
@@ -538,7 +538,7 @@ export class AVManager {
         const params = {
             id: avID,
             page: options.page || 1,
-            pageSize: options.pageSize || -1,
+            pageSize: options.pageSize || 99999,
             keyword: options.keyword || undefined
         };
 

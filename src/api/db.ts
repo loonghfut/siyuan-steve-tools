@@ -40,7 +40,7 @@ export class DbService {
      * @param page 页码
      * @param pageSize 每页数量
      */
-    async render(viewId = '', page = 1, pageSize = -1) {
+    async render(viewId = '', page = 1, pageSize = 99999) {
         const res = await this.api('/api/av/renderAttributeView', { id: this._avId, viewID: viewId, query: '', page, pageSize });
         return res.data || {};
     }
