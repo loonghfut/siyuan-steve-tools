@@ -85,7 +85,9 @@ export class VisualSqlUI {
   private parentIdInput!: HTMLInputElement;
   private pathLikeInput!: HTMLInputElement;
   private contentLikeInput!: HTMLInputElement;
+  private contentOpSel!: HTMLSelectElement;
   private mdLikeInput!: HTMLInputElement;
+  private mdOpSel!: HTMLSelectElement;
   private hpathLikeInput!: HTMLInputElement;
   private ialLikeInput!: HTMLInputElement;
   private tagInput!: HTMLInputElement; // 使用带 datalist 的单一输入
@@ -177,19 +179,19 @@ export class VisualSqlUI {
                 <div class="vsb-multi__panel" role="listbox" aria-multiselectable="true">
                   <div class="vsb-chips" aria-label="类型">
                     ${(([
-                      { v: 'd', n: '文档' },
-                      { v: 'h', n: '标题' },
-                      { v: 'm', n: '数学公式' },
-                      { v: 'c', n: '代码块' },
-                      { v: 't', n: '表格块' },
-                      { v: 'l', n: '列表块' },
-                      { v: 'b', n: '引述块' },
-                      { v: 's', n: '超级块' },
-                      { v: 'p', n: '段落块' },
-                      { v: 'av', n: '数据库' }
-                    ] as Array<{ v: BlockType; n: string }>).map(it =>
-                      `<label class=\"vsb-chip\"><input type=\"checkbox\" data-type value=\"${it.v}\"/><span>${it.n}</span></label>`
-                    ).join(''))}
+        { v: 'd', n: '文档' },
+        { v: 'h', n: '标题' },
+        { v: 'm', n: '数学公式' },
+        { v: 'c', n: '代码块' },
+        { v: 't', n: '表格块' },
+        { v: 'l', n: '列表块' },
+        { v: 'b', n: '引述块' },
+        { v: 's', n: '超级块' },
+        { v: 'p', n: '段落块' },
+        { v: 'av', n: '数据库' }
+      ] as Array<{ v: BlockType; n: string }>).map(it =>
+        `<label class=\"vsb-chip\"><input type=\"checkbox\" data-type value=\"${it.v}\"/><span>${it.n}</span></label>`
+      ).join(''))}
                   </div>
                   <div class="vsb-multi__footer">
                     <button class="vsb-btn vsb-ghost" type="button" data-multi-clear>清空</button>
@@ -204,19 +206,19 @@ export class VisualSqlUI {
                 <button type="button" class="vsb-input vsb-multi__btn" data-multi-btn aria-haspopup="listbox" aria-expanded="false">选择子类型</button>
                 <div class="vsb-multi__panel" role="listbox" aria-multiselectable="true">
                   <div class="vsb-chips" aria-label="子类型">
-                    ${(([ 
-                      { v: 'h1', n: '标题 H1' },
-                      { v: 'h2', n: '标题 H2' },
-                      { v: 'h3', n: '标题 H3' },
-                      { v: 'h4', n: '标题 H4' },
-                      { v: 'h5', n: '标题 H5' },
-                      { v: 'h6', n: '标题 H6' },
-                      { v: 'u', n: '无序列表' },
-                      { v: 't', n: '任务项' },
-                      { v: 'o', n: '有序列表' }
-                    ] as Array<{ v: string; n: string }>).map(it =>
-                      `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
-                    ).join(''))}
+                    ${(([
+        { v: 'h1', n: '标题 H1' },
+        { v: 'h2', n: '标题 H2' },
+        { v: 'h3', n: '标题 H3' },
+        { v: 'h4', n: '标题 H4' },
+        { v: 'h5', n: '标题 H5' },
+        { v: 'h6', n: '标题 H6' },
+        { v: 'u', n: '无序列表' },
+        { v: 't', n: '任务项' },
+        { v: 'o', n: '有序列表' }
+      ] as Array<{ v: string; n: string }>).map(it =>
+        `<label class=\"vsb-chip\"><input type=\"checkbox\" data-subtype value=\"${it.v}\"/><span>${it.n}</span></label>`
+      ).join(''))}
                   </div>
                   <div class="vsb-multi__footer">
                     <button class="vsb-btn vsb-ghost" type="button" data-multi-clear>清空</button>
@@ -253,8 +255,24 @@ export class VisualSqlUI {
               <input class="vsb-input" data-tag list="vsb-tags-list" placeholder="选择或搜索标签" />
               <datalist id="vsb-tags-list"></datalist>
             </label>
-            <label class="vsb-field">markdown like<input class="vsb-input" data-md type="text" placeholder="* [ ] %"/></label>
-            <label class="vsb-field">content like<input class="vsb-input" data-content type="text" placeholder="%关键字%"/></label>
+            <label class="vsb-field">markdown
+              <div style="display:flex; gap:6px; align-items:center;">
+                <select class="vsb-input" data-md-op>
+                  <option value="like">LIKE</option>
+                  <option value="regexp">REGEXP</option>
+                </select>
+                <input class="vsb-input" data-md type="text" placeholder="* [ ] % 或 正则表达式"/>
+              </div>
+            </label>
+            <label class="vsb-field">content
+              <div style="display:flex; gap:6px; align-items:center;">
+                <select class="vsb-input" data-content-op>
+                  <option value="like">LIKE</option>
+                  <option value="regexp">REGEXP</option>
+                </select>
+                <input class="vsb-input" data-content type="text" placeholder="%关键字% 或 正则表达式"/>
+              </div>
+            </label>
             <label class="vsb-field">limit<input class="vsb-input" data-limit type="number" min="0" max="999" placeholder="默认64（未指定，最大999）"/></label>
           </div>
           </fieldset>
@@ -346,6 +364,8 @@ export class VisualSqlUI {
     this.pathLikeInput = this.container.querySelector('input[data-path]') as HTMLInputElement;
     this.contentLikeInput = this.container.querySelector('input[data-content]') as HTMLInputElement;
     this.mdLikeInput = this.container.querySelector('input[data-md]') as HTMLInputElement;
+    this.contentOpSel = this.container.querySelector('select[data-content-op]') as HTMLSelectElement;
+    this.mdOpSel = this.container.querySelector('select[data-md-op]') as HTMLSelectElement;
     this.hpathLikeInput = this.container.querySelector('input[data-hpath]') as HTMLInputElement;
     this.ialLikeInput = this.container.querySelector('input[data-ial]') as HTMLInputElement;
     this.tagInput = this.container.querySelector('input[data-tag]') as HTMLInputElement;
@@ -363,24 +383,24 @@ export class VisualSqlUI {
     this.outputPre = this.container.querySelector('pre[data-output]') as HTMLPreElement;
     this.resultsEl = this.container.querySelector('div[data-result]') as HTMLElement;
     this.copyBtn = this.container.querySelector('button[data-copy]') as HTMLButtonElement;
-  this.copyEmbedBtn = this.container.querySelector('button[data-copy-embed]') as HTMLButtonElement;
-  this.copySegmentEmbedBtn = this.container.querySelector('button[data-copy-seg-embed]') as HTMLButtonElement;
+    this.copyEmbedBtn = this.container.querySelector('button[data-copy-embed]') as HTMLButtonElement;
+    this.copySegmentEmbedBtn = this.container.querySelector('button[data-copy-seg-embed]') as HTMLButtonElement;
     this.resetBtn = this.container.querySelector('button[data-reset]') as HTMLButtonElement;
     this.actionsEl = this.container.querySelector('.vsb-actions') as HTMLElement;
     const advOpenBtn = this.container.querySelector('button[data-adv-open]') as HTMLButtonElement;
-  const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
-  const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
-  const previewRefreshBtn = this.container.querySelector('button[data-preview-refresh]') as HTMLButtonElement | null;
-  const previewSegEmbedBtn = this.container.querySelector('button[data-preview-seg-embed]') as HTMLButtonElement | null;
+    const filtersSection = this.container.querySelector('details[data-section="filters"]') as HTMLDetailsElement | null;
+    const previewSection = this.container.querySelector('details[data-section="preview"]') as HTMLDetailsElement | null;
+    const previewRefreshBtn = this.container.querySelector('button[data-preview-refresh]') as HTMLButtonElement | null;
+    const previewSegEmbedBtn = this.container.querySelector('button[data-preview-seg-embed]') as HTMLButtonElement | null;
     this.currentPresetEl = this.container.querySelector('[data-current-preset]') as HTMLElement;
     this.updateCurrentPresetLabel();
-  this.currentPresetEl?.addEventListener('click', (e) => this.openPresetQuickMenu(e));
+    this.currentPresetEl?.addEventListener('click', (e) => this.openPresetQuickMenu(e));
 
 
-  // 异步加载标签下拉
-  this.populateTags();
-  // 初始化下拉多选交互
-  this.initMultiSelectDropdowns();
+    // 异步加载标签下拉
+    this.populateTags();
+    // 初始化下拉多选交互
+    this.initMultiSelectDropdowns();
 
     // 事件
     const changeInputs = this.container.querySelectorAll('input, select');
@@ -395,7 +415,7 @@ export class VisualSqlUI {
     });
     this.copyBtn.addEventListener('click', () => this.copySql());
     this.copyEmbedBtn.addEventListener('click', () => this.copyEmbedSql());
-  this.copySegmentEmbedBtn.addEventListener('click', () => this.copySegmentedEmbed());
+    this.copySegmentEmbedBtn.addEventListener('click', () => this.copySegmentedEmbed());
     this.resetBtn.addEventListener('click', () => this.resetForm());
     advOpenBtn?.addEventListener('click', () => this.openAdvancedModal());
     // 刷新按钮：刷新当前模式
@@ -412,7 +432,7 @@ export class VisualSqlUI {
           this.queryNow(token, this.ensureLimit(sql));
         }
         this.toast('已刷新预览');
-      } catch {}
+      } catch { }
     });
     // 分段按钮：切换模式（normal ↔ segment）并渲染
     previewSegEmbedBtn?.addEventListener('click', (ev) => {
@@ -427,9 +447,9 @@ export class VisualSqlUI {
         this.queryNow(token, this.ensureLimit(sql));
       }
     });
-  // 折叠状态变更时持久化
-  filtersSection?.addEventListener('toggle', () => this.saveState());
-  previewSection?.addEventListener('toggle', () => this.saveState());
+    // 折叠状态变更时持久化
+    filtersSection?.addEventListener('toggle', () => this.saveState());
+    previewSection?.addEventListener('toggle', () => this.saveState());
 
 
     // 渲染自定义按钮（如有）
@@ -496,7 +516,7 @@ export class VisualSqlUI {
     // 拉取预设
     const maybe = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
     const presets = maybe || {};
-    const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b,'zh-CN'));
+    const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'zh-CN'));
     // 构建 DOM
     const pop = document.createElement('div');
     pop.className = 'vsb-popover vsb-preset-popover';
@@ -553,7 +573,7 @@ export class VisualSqlUI {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') this.closePresetQuickMenu(); };
     const body = this.resultsEl?.querySelector?.('.vsb-result__body');
     const onScroll = () => this.closePresetQuickMenu();
-    setTimeout(()=> document.addEventListener('click', onDocClick), 0);
+    setTimeout(() => document.addEventListener('click', onDocClick), 0);
     document.addEventListener('keydown', onKey);
     if (body) body.addEventListener('scroll', onScroll);
     this.presetPopHandlers = { onDocClick, onKey, onScroll };
@@ -606,13 +626,21 @@ export class VisualSqlUI {
     this.builder.inDoc(this.rootIdInput.value.trim());
     this.builder.parentIs(this.parentIdInput.value.trim());
     const pathLike = this.smartLike(this.pathLikeInput.value);
-    const contentLike = this.smartLike(this.contentLikeInput.value);
-    const mdLike = this.smartLike(this.mdLikeInput.value);
+    const contentRaw = (this.contentLikeInput.value || '').trim();
+    const mdRaw = (this.mdLikeInput.value || '').trim();
+    const contentLike = contentRaw ? (this.contentOpSel?.value === 'regexp' ? contentRaw : this.smartLike(contentRaw)) : undefined;
+    const mdLike = mdRaw ? (this.mdOpSel?.value === 'regexp' ? mdRaw : this.smartLike(mdRaw)) : undefined;
     const hpathLike = this.smartLike(this.hpathLikeInput?.value);
     const ialLike = this.smartLike(this.ialLikeInput?.value);
     if (pathLike) this.builder.pathLike(pathLike);
-    if (contentLike) this.builder.contentLike(contentLike);
-    if (mdLike) this.builder.markdownLike(mdLike);
+    if (contentLike) {
+      if (this.contentOpSel?.value === 'regexp') this.builder.addFilter({ field: 'content', op: 'regexp', value: contentLike });
+      else this.builder.contentLike(contentLike);
+    }
+    if (mdLike) {
+      if (this.mdOpSel?.value === 'regexp') this.builder.addFilter({ field: 'markdown', op: 'regexp', value: mdLike });
+      else this.builder.markdownLike(mdLike);
+    }
     if (hpathLike) this.builder.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
     if (ialLike) this.builder.addFilter({ field: 'ial', op: 'like', value: ialLike });
     const tagRaw = (this.tagInput.value || '').trim();
@@ -669,7 +697,7 @@ export class VisualSqlUI {
       this.scheduleQuery(sql);
     }
     // 重建后根据当前筛选与已保存预设的内容一致性，自动更新“当前预设”标签
-    this.refreshCurrentPresetByContent().catch(() => {});
+    this.refreshCurrentPresetByContent().catch(() => { });
   }
 
   // ===== 实时查询 =====
@@ -849,13 +877,21 @@ export class VisualSqlUI {
     b.inDoc((s?.rootId || '').trim());
     b.parentIs((s?.parentId || '').trim());
     const pathLike = smartLike(s?.path);
-    const contentLike = smartLike(s?.content);
-    const mdLike = smartLike(s?.md);
+    const contentRaw = (s?.content || '').toString().trim();
+    const mdRaw = (s?.md || '').toString().trim();
+    const contentLike = contentRaw ? ((s?.contentOp === 'regexp') ? contentRaw : smartLike(contentRaw)) : undefined;
+    const mdLike = mdRaw ? ((s?.mdOp === 'regexp') ? mdRaw : smartLike(mdRaw)) : undefined;
     const hpathLike = smartLike(s?.hpath);
     const ialLike = smartLike(s?.ial);
     if (pathLike) b.pathLike(pathLike);
-    if (contentLike) b.contentLike(contentLike);
-    if (mdLike) b.markdownLike(mdLike);
+    if (contentLike) {
+      if (s?.contentOp === 'regexp') b.addFilter({ field: 'content', op: 'regexp', value: contentLike });
+      else b.contentLike(contentLike);
+    }
+    if (mdLike) {
+      if (s?.mdOp === 'regexp') b.addFilter({ field: 'markdown', op: 'regexp', value: mdLike });
+      else b.markdownLike(mdLike);
+    }
     if (hpathLike) b.addFilter({ field: 'hpath', op: 'like', value: hpathLike });
     if (ialLike) b.addFilter({ field: 'ial', op: 'like', value: ialLike });
     const tagRaw = (s?.tag || '').toString().trim();
@@ -918,9 +954,9 @@ export class VisualSqlUI {
     const style = window.getComputedStyle(tbl);
     const font = `${style.getPropertyValue('font-weight')} ${style.getPropertyValue('font-size')} ${style.getPropertyValue('font-family')}`;
     if (ctx) ctx.font = font;
-  const padding = 16; // 左右 padding 合计
-  const minW = 60;
-  const maxW = this.getPreviewColMaxWidth();
+    const padding = 16; // 左右 padding 合计
+    const minW = 60;
+    const maxW = this.getPreviewColMaxWidth();
     const widths = ths.map((th, idx) => {
       const base = th.textContent ? (th.textContent.length * 8 + padding) : minW;
       const colMin = idx === 0 ? 40 : minW; // 行号列更窄一些
@@ -1165,7 +1201,7 @@ export class VisualSqlUI {
 
   // 将 SQL 的 LIMIT 强制为指定数值；若无 LIMIT 则追加
   private forceLimit(sql: string, n: number): string {
-    const s = (sql || '').trim().replace(/;\s*$/,'');
+    const s = (sql || '').trim().replace(/;\s*$/, '');
     const re = /limit\s+\d+(\s+offset\s+\d+)?/i;
     if (re.test(s)) return s.replace(re, `LIMIT ${Math.max(0, Math.floor(n))}`);
     return `${s} LIMIT ${Math.max(0, Math.floor(n))}`;
@@ -1613,7 +1649,9 @@ export class VisualSqlUI {
       parentId: this.parentIdInput?.value ?? '',
       path: this.pathLikeInput?.value ?? '',
       content: this.contentLikeInput?.value ?? '',
+      contentOp: this.contentOpSel?.value ?? 'like',
       md: this.mdLikeInput?.value ?? '',
+      mdOp: this.mdOpSel?.value ?? 'like',
       hpath: this.hpathLikeInput?.value ?? '',
       ial: this.ialLikeInput?.value ?? '',
       tag: this.tagInput?.value ?? '',
@@ -1662,7 +1700,9 @@ export class VisualSqlUI {
       parentId: normStr(pick('parentId')),
       path: normStr(pick('path')),
       content: normStr(pick('content')),
+      contentOp: normStr(pick('contentOp', 'like')),
       md: normStr(pick('md')),
+      mdOp: normStr(pick('mdOp', 'like')),
       hpath: normStr(pick('hpath')),
       ial: normStr(pick('ial')),
       tag: normStr(pick('tag')),
@@ -1692,7 +1732,7 @@ export class VisualSqlUI {
       for (const [name, val] of Object.entries(presets || {})) {
         if (this.isSamePreset(val, snap)) return name;
       }
-    } catch {}
+    } catch { }
     return undefined;
   }
 
@@ -1708,7 +1748,7 @@ export class VisualSqlUI {
         this.currentPresetName = matched;
         this.updateCurrentPresetLabel();
       }
-    } catch {}
+    } catch { }
   }
 
   private hydrateState(s: any, opts?: { applyCollapse?: boolean }) {
@@ -1729,7 +1769,9 @@ export class VisualSqlUI {
       if (this.parentIdInput) this.parentIdInput.value = s?.parentId ?? '';
       if (this.pathLikeInput) this.pathLikeInput.value = s?.path ?? '';
       if (this.contentLikeInput) this.contentLikeInput.value = s?.content ?? '';
+      if (this.contentOpSel) this.contentOpSel.value = s?.contentOp ?? 'like';
       if (this.mdLikeInput) this.mdLikeInput.value = s?.md ?? '';
+      if (this.mdOpSel) this.mdOpSel.value = s?.mdOp ?? 'like';
       if (this.hpathLikeInput) this.hpathLikeInput.value = s?.hpath ?? '';
       if (this.ialLikeInput) this.ialLikeInput.value = s?.ial ?? '';
       if (this.tagInput) this.tagInput.value = s?.tag ?? '';
@@ -1756,7 +1798,7 @@ export class VisualSqlUI {
       }
       const pm = (s?.previewMode || '').toString();
       this.previewMode = pm === 'segment' ? 'segment' : 'normal';
-    } catch {}
+    } catch { }
   }
 
   private loadPresets(): Record<string, any> {
@@ -1781,10 +1823,10 @@ export class VisualSqlUI {
 
   private savePresets(obj: Record<string, any>) {
     if (this.opts.savePresets) {
-      try { (this.opts.savePresets(obj) as any); } catch {}
+      try { (this.opts.savePresets(obj) as any); } catch { }
       return;
     }
-    try { localStorage.setItem(this.presetsKey!, JSON.stringify(obj)); } catch {}
+    try { localStorage.setItem(this.presetsKey!, JSON.stringify(obj)); } catch { }
   }
 
   private async savePresetFlow() {
@@ -1804,7 +1846,7 @@ export class VisualSqlUI {
       const ok = await this.openConfirmModal('同名预设已存在，是否覆盖？');
       if (!ok) return;
     }
-    
+
     // 同时保存编译后的 SQL,供 ECharts 等其他组件使用
     const compiledSQL = this.safeCompileSqlFromSnapshot(snap);
     const presetWithSQL = {
@@ -1813,7 +1855,7 @@ export class VisualSqlUI {
       sql: compiledSQL,
       _compiledAt: new Date().toISOString()
     };
-    
+
     presets[name] = presetWithSQL;
     await (this.opts.savePresets ? this.opts.savePresets(presets) : (async () => this.savePresets(presets))());
     this.toast('已保存筛选预设');
@@ -1857,7 +1899,7 @@ export class VisualSqlUI {
       const maybe = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
       const presets = maybe || {};
       const q = (searchEl?.value || '').trim().toLowerCase();
-      const names = Object.keys(presets).sort((a,b)=>a.localeCompare(b,'zh-CN'))
+      const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'zh-CN'))
         .filter(n => !q || n.toLowerCase().includes(q));
       if (!names.length) {
         listEl.innerHTML = `<div class="vsb-item"><div class="vsb-item-name" style="color: var(--vsb-muted)">暂无预设</div></div>`;
