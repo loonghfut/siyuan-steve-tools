@@ -179,16 +179,24 @@ export class VisualSqlUI {
                 <div class="vsb-multi__panel" role="listbox" aria-multiselectable="true">
                   <div class="vsb-chips" aria-label="类型">
                     ${(([
-        { v: 'd', n: '文档' },
-        { v: 'h', n: '标题' },
-        { v: 'm', n: '数学公式' },
-        { v: 'c', n: '代码块' },
-        { v: 't', n: '表格块' },
+        { v: 'd', n: '文档块' },
+        { v: 'h', n: '标题块' },
         { v: 'l', n: '列表块' },
+        { v: 'i', n: '列表项' },
         { v: 'b', n: '引述块' },
         { v: 's', n: '超级块' },
         { v: 'p', n: '段落块' },
-        { v: 'av', n: '数据库' }
+        { v: 'c', n: '代码块' },
+        { v: 'm', n: '数学公式' },
+        { v: 't', n: '表格块' },
+        { v: 'tb', n: '分隔线' },
+        { v: 'av', n: '数据库块' },
+        { v: 'query_embed', n: '嵌入块' },
+        { v: 'video', n: '视频块' },
+        { v: 'audio', n: '音频块' },
+        { v: 'widget', n: '挂件块' },
+        { v: 'iframe', n: 'IFrame 块' },
+        { v: 'html', n: 'HTML 块' }
       ] as Array<{ v: BlockType; n: string }>).map(it =>
         `<label class=\"vsb-chip\"><input type=\"checkbox\" data-type value=\"${it.v}\"/><span>${it.n}</span></label>`
       ).join(''))}
