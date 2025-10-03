@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.16.8 (2025年10月02日)
+### v0.16.9 (2025年10月03日)
 - 优化部分逻辑 (loonghfut)
 - 改进持久化逻辑 (loonghfut)
 - 优化界面 (loonghfut)
@@ -94,6 +94,10 @@ win端s3同步后，docker端感知s3同步。
 - 调整默认 pageSize 为 99999 (loonghfut)
 - 系列数据支持筛选 (loonghfut)
 - 更新版本号至0.16.8 (loonghfut)
+- docs: 更新 v0.16.8 版本的更新日志 (loonghfut)
+- feat: 添加内容和 Markdown 筛选操作选择功能，支持正则匹配查询 (loonghfut)
+- feat: 更新可视化 SQL 生成器 UI，添加更多块类型选项 (loonghfut)
+- 更新版本号至0.16.9 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
