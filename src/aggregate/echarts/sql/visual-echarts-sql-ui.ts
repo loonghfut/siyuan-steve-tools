@@ -1,5 +1,6 @@
 import { buildSqlMappingExpressions, SeriesItem } from './sql-data-mapping';
 import { preprocessSqlData } from './sql-data-preprocessor';
+import { FilterCondition, buildFilterExpression, renderFilterList, createEmptyFilter } from '../ui/filter-manager';
 
 /**
  * 统一的 ECharts 设置生成器
@@ -667,23 +668,38 @@ export class VisualEchartsSqlUI {
            </select>`;
 
       row.innerHTML = `
-        <div class="veq-row" style="align-items:center; gap:6px;">
-          <input class="veq-input" data-name placeholder="名称" value="${this.escape(s.name)}" style="width:160px"/>
-          <select class="veq-input" data-type style="width:auto">
-            ${typeOptions.map(o => `<option value="${o.v}" ${s.type === o.v ? 'selected' : ''}>${o.t}</option>`).join('')}
-          </select>
-          <select class="veq-input" data-axis style="width:32px">
-            <option value="0" ${Number(s.axisIndex || 0) === 0 ? 'selected' : ''}>左</option>
-            <option value="1" ${Number(s.axisIndex || 0) === 1 ? 'selected' : ''}>右</option>
-          </select>
-          <div class="veq-row" data-visual-only style="gap:6px;">
-            <select class="veq-input" data-value-key style="width:auto">
-              ${this.keys.map(k => `<option value="${this.escape(k)}" ${s.valueKey === k ? 'selected' : ''}>${this.escape(k)}</option>`).join('')}
+        <div class="veq-series-item-content">
+          <div class="veq-row" style="align-items:center; gap:6px; margin-bottom:4px;">
+            <input class="veq-input" data-name placeholder="名称" value="${this.escape(s.name)}" style="width:160px"/>
+            <select class="veq-input" data-type style="width:auto">
+              ${typeOptions.map(o => `<option value="${o.v}" ${s.type === o.v ? 'selected' : ''}>${o.t}</option>`).join('')}
             </select>
-            ${aggSelHtml}
+            <select class="veq-input" data-axis style="width:32px">
+              <option value="0" ${Number(s.axisIndex || 0) === 0 ? 'selected' : ''}>左</option>
+              <option value="1" ${Number(s.axisIndex || 0) === 1 ? 'selected' : ''}>右</option>
+            </select>
+            <div class="veq-row" data-visual-only style="gap:6px;">
+              <select class="veq-input" data-value-key style="width:auto">
+                ${this.keys.map(k => `<option value="${this.escape(k)}" ${s.valueKey === k ? 'selected' : ''}>${this.escape(k)}</option>`).join('')}
+              </select>
+              ${aggSelHtml}
+            </div>
+            <textarea class="veq-input" data-expr rows="2" style="flex:1; display:none;" placeholder="rows.map(r=>r.value)">${this.escape(s.expr)}</textarea>
+            <button class="veq-btn veq-ghost" data-del type="button">删除</button>
           </div>
-          <textarea class="veq-input" data-expr rows="2" style="flex:1; display:none;" placeholder="rows.map(r=>r.value)">${this.escape(s.expr)}</textarea>
-          <button class="veq-btn veq-ghost" data-del type="button">删除</button>
+          <details class="veq-filter-section" style="margin-top:8px;">
+            <summary style="cursor:pointer; font-size:12px; color:var(--b3-theme-on-surface); user-select:none;">
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span>🔍 筛选条件</span>
+                <span data-filter-count style="color:var(--b3-theme-on-surface-light);">${(s.filters && s.filters.length) ? `(${s.filters.length} 条)` : '(无)'}</span>
+              </span>
+              <code class="veq-filter-preview-inline" data-filter-preview-inline style="font-size:11px; color:var(--b3-theme-on-surface-light); font-family:var(--b3-font-family-code);">// 暂无筛选</code>
+            </summary>
+            <div class="veq-filter-content" style="margin-top:8px;">
+              <div class="veq-filter-list" data-filter-list></div>
+              <button class="veq-btn veq-small" data-add-filter type="button" style="margin-top:6px;">+ 添加筛选条件</button>
+            </div>
+          </details>
         </div>`;
       (row.querySelector('[data-name]') as HTMLInputElement).addEventListener('input', (e) => { this.series[idx].name = (e.target as HTMLInputElement).value; this.onChanged(); });
       (row.querySelector('[data-type]') as HTMLSelectElement).addEventListener('change', (e) => { this.series[idx].type = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
@@ -694,6 +710,20 @@ export class VisualEchartsSqlUI {
       const agg = row.querySelector('[data-agg]') as HTMLSelectElement | null;
       if (agg && !agg.disabled) agg.addEventListener('change', (e) => { this.series[idx].agg = (e.target as HTMLSelectElement).value as any; this.autoBuildExpr(); this.onChanged(); this.rebuildCode(); });
       (row.querySelector('[data-del]') as HTMLButtonElement).addEventListener('click', () => { this.series.splice(idx, 1); this.renderSeriesList(); this.onChanged(); });
+
+      // 渲染筛选器列表
+      const filterListEl = row.querySelector('[data-filter-list]') as HTMLElement | null;
+      if (filterListEl) this.renderSeriesFilterList(filterListEl, row, idx);
+      
+      // 添加筛选条件按钮
+      const addFilterBtn = row.querySelector('[data-add-filter]') as HTMLButtonElement | null;
+      if (addFilterBtn) addFilterBtn.addEventListener('click', () => {
+        if (!this.series[idx].filters) this.series[idx].filters = [];
+        this.series[idx].filters!.push(createEmptyFilter(this.keys[0] || ''));
+        if (filterListEl) this.renderSeriesFilterList(filterListEl, row, idx);
+        this.autoBuildExpr();
+        this.onChanged();
+      });
 
       // 拖拽排序事件
       row.addEventListener('dragstart', (ev) => {
@@ -2616,5 +2646,85 @@ export class VisualEchartsSqlUI {
       this.renderTypeSettingsUI(); // 添加设置面板渲染
       this.applyTypeConstraints(this.root.querySelector('[data-merge]') as HTMLInputElement | null);
     } catch { /* ignore */ }
+  }
+
+  /**
+   * 渲染系列的筛选器列表（使用独立的 filter-manager 模块）
+   */
+  private renderSeriesFilterList(container: HTMLElement, rowContainer: HTMLElement, seriesIdx: number) {
+    const filters = this.series[seriesIdx].filters || [];
+    
+    // 使用 filter-manager 模块渲染筛选器列表
+    renderFilterList(
+      container,
+      filters,
+      this.keys,
+      {
+        onFieldChange: (idx, value) => {
+          filters[idx].field = value;
+          this.updateFilterPreview(rowContainer, filters);
+          this.autoBuildExpr();
+          this.onChanged();
+        },
+        onOperatorChange: (idx, value) => {
+          filters[idx].operator = value;
+          this.updateFilterPreview(rowContainer, filters);
+          this.autoBuildExpr();
+          this.onChanged();
+        },
+        onValueChange: (idx, value) => {
+          filters[idx].value = value;
+          this.updateFilterPreview(rowContainer, filters);
+          this.autoBuildExpr();
+          this.onChanged();
+        },
+        onConnectorChange: (idx, value) => {
+          filters[idx].connector = value;
+          this.updateFilterPreview(rowContainer, filters);
+          this.autoBuildExpr();
+          this.onChanged();
+        },
+        onDelete: (idx) => {
+          filters.splice(idx, 1);
+          this.renderSeriesFilterList(container, rowContainer, seriesIdx);
+          this.updateFilterPreview(rowContainer, filters);
+          this.autoBuildExpr();
+          this.onChanged();
+        }
+      },
+      this.escape.bind(this)
+    );
+    
+    // 更新预览
+    this.updateFilterPreview(rowContainer, filters);
+  }
+
+  /**
+   * 更新筛选代码预览（仅更新折叠时的行内预览）
+   */
+  private updateFilterPreview(containerEl: HTMLElement | null, filters: FilterCondition[]) {
+    if (!containerEl) return;
+    
+    // 更新筛选条件数量
+    const countEl = containerEl.querySelector('[data-filter-count]');
+    if (countEl) {
+      const count = filters?.length || 0;
+      countEl.textContent = count > 0 ? `(${count} 条)` : '(无)';
+    }
+    
+    // 查找行内预览元素
+    const inlinePreview = containerEl.querySelector('[data-filter-preview-inline]');
+    if (!inlinePreview) return;
+    
+    const expr = buildFilterExpression(filters);
+    const isEmpty = !filters || filters.length === 0 || !expr;
+    
+    if (isEmpty) {
+      inlinePreview.textContent = '// 暂无筛选';
+    } else {
+      // 提取简短预览：限制长度，去除多余空格
+      const shortExpr = expr.length > 60 ? expr.substring(0, 57) + '...' : expr;
+      inlinePreview.textContent = shortExpr.replace(/\s+/g, ' ');
+    }
   }
 }
