@@ -8,8 +8,6 @@ export const aggregateDefaults: Record<string, any> = {
     "aggregate-sql-preview-columns": "",
     // SQL 结果预览列最大宽度（像素）
     "aggregate-sql-preview-col-max-width": 480,
-    // 预览最大行数
-    "aggregate-sql-preview-max-rows": 50,
     // 分段嵌入：起始、结束与间隔（天）
     "aggregate-segment-embed-start": "",
     "aggregate-segment-embed-end": "",
@@ -43,13 +41,6 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                     description: "限制结果表格中每一列的最大宽度，避免列过宽影响阅读。建议范围 240~1200，默认 480。",
                     key: "aggregate-sql-preview-col-max-width",
                     value: ctx.settings["aggregate-sql-preview-col-max-width"] ?? 480,
-                },
-                {
-                    type: "number",
-                    title: "预览最大行数",
-                    description: "限制预览界面显示的最大行数，避免过多数据影响性能。建议范围 10~200，默认 50。",
-                    key: "aggregate-sql-preview-max-rows",
-                    value: ctx.settings["aggregate-sql-preview-max-rows"] ?? 50,
                 },
                 {
                     type: "datetime-local",
