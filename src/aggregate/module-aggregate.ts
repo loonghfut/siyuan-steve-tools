@@ -71,6 +71,8 @@ export class M_Aggregate {
                                         persistKey: `visual-echarts-from-sql-tab:${id}`,
                                         initialSQL: sql,
                                         loadSqlPresets: () => (conf.get('presets') || {}),
+                                        loadEchartsPresets: () => (conf.get('echartsPresets') || {}),
+                                        saveEchartsPresets: async (obj) => { conf.set('echartsPresets', obj); await conf.save(); },
                                         onGotoSQL: () => {
                                             // 打开弹窗版 SQL 生成器（共享同一套 PluginConfig 预设）
                                             new Dialog({
@@ -137,6 +139,8 @@ export class M_Aggregate {
                         persistKey: `visual-echarts-tab`,
                         loadSqlPresets: () => (conf.get('presets') || {}),
                         saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                        loadEchartsPresets: () => (conf.get('echartsPresets') || {}),
+                        saveEchartsPresets: async (obj) => { conf.set('echartsPresets', obj); await conf.save(); },
                         onGotoSQL: () => {
                             // 打开弹窗版 SQL 生成器
                             new Dialog({
@@ -232,6 +236,8 @@ export class M_Aggregate {
                                         initialSQL: sql,
                                         loadSqlPresets: () => (conf2.get('presets') || {}),
                                         saveSqlPresets: async (obj) => { conf2.set('presets', obj); await conf2.save(); },
+                                        loadEchartsPresets: () => (conf2.get('echartsPresets') || {}),
+                                        saveEchartsPresets: async (obj) => { conf2.set('echartsPresets', obj); await conf2.save(); },
                                         onGotoSQL: () => {
                                             // 在 Slash 场景下，直接弹 SQL 生成器
                                             new Dialog({
@@ -286,7 +292,9 @@ export class M_Aggregate {
                     const ui = new VisualEchartsUI(container, {
                         persistKey: 'siyuan-steve-tools:visual-echarts-slash',
                         loadSqlPresets: () => (conf3.get('presets') || {}),
-                        saveSqlPresets: async (obj) => { conf3.set('presets', obj); await conf3.save(); }
+                        saveSqlPresets: async (obj) => { conf3.set('presets', obj); await conf3.save(); },
+                        loadEchartsPresets: () => (conf3.get('echartsPresets') || {}),
+                        saveEchartsPresets: async (obj) => { conf3.set('echartsPresets', obj); await conf3.save(); }
                     });
                     // 追加“插入代码块”按钮
                     const bar = document.createElement('div');
@@ -405,6 +413,8 @@ export class M_Aggregate {
                                     initialSQL: sql,
                                     loadSqlPresets: () => (conf.get('presets') || {}),
                                     saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                                    loadEchartsPresets: () => (conf.get('echartsPresets') || {}),
+                                    saveEchartsPresets: async (obj) => { conf.set('echartsPresets', obj); await conf.save(); },
                                     onGotoSQL: () => {
                                         new Dialog({
                                             title: 'SQL 可视化生成器',
@@ -467,6 +477,8 @@ export class M_Aggregate {
                         persistKey: 'siyuan-steve-tools:visual-echarts-modal',
                         loadSqlPresets: () => (conf.get('presets') || {}),
                         saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
+                        loadEchartsPresets: () => (conf.get('echartsPresets') || {}),
+                        saveEchartsPresets: async (obj) => { conf.set('echartsPresets', obj); await conf.save(); },
                         onGotoSQL: () => {
                             new Dialog({
                                 title: 'SQL 可视化生成器',

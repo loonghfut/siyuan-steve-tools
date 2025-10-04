@@ -31,6 +31,8 @@ export interface VisualEchartsOptions {
   initialSQL?: string;
   loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
   saveSqlPresets?: (presets: Record<string, any>) => Promise<void> | void;
+  loadEchartsPresets?: () => Promise<Record<string, any>> | Record<string, any>;
+  saveEchartsPresets?: (presets: Record<string, any>) => Promise<void> | void;
   onGotoSQL?: () => void;
 }
 
@@ -42,6 +44,8 @@ export interface VisualEchartsSqlOptions {
   onChange?: () => void;
   loadSqlPresets?: () => Promise<Record<string, any>> | Record<string, any>;
   saveSqlPresets?: (presets: Record<string, any>) => Promise<void> | void;
+  loadEchartsPresets?: () => Promise<Record<string, any>> | Record<string, any>;
+  saveEchartsPresets?: (presets: Record<string, any>) => Promise<void> | void;
 }
 
 /**

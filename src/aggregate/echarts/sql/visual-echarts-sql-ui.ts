@@ -2044,6 +2044,7 @@ export class VisualEchartsSqlUI {
   // 获取当前状态快照
   private getStateSnapshot() {
     return {
+      title: this.titleInput?.value || '',
       sql: this.sql,
       xKey: this.xKey,
       sort: this.sort,
@@ -2055,11 +2056,19 @@ export class VisualEchartsSqlUI {
       perTypeSettings: this.perTypeSettings,
       commonSettings: this.commonSettings,
       statInteractions: this.statInteractions,
+      sqlMode: this.sqlMode,
+      multiSqlPresets: this.multiSqlPresets,
+      foldCommon: this.foldCommon,
+      foldStat: this.foldStat,
+      foldPie: this.foldPie,
     };
   }
 
   // 恢复状态
   private hydrateState(s: any) {
+    if (s.title !== undefined && this.titleInput) {
+      this.titleInput.value = s.title;
+    }
     if (s.sql !== undefined) {
       this.sql = s.sql;
       if (this.sqlTextarea) this.sqlTextarea.value = s.sql;
@@ -2086,13 +2095,45 @@ export class VisualEchartsSqlUI {
     }
     if (s.series) this.series = s.series;
     if (s.colors) this.colors = s.colors;
-    if (s.chartType) this.chartType = s.chartType;
+    if (s.chartType) {
+      this.chartType = s.chartType;
+      if (this.chartTypeSel) this.chartTypeSel.value = s.chartType;
+    }
     if (s.perTypeSettings) this.perTypeSettings = s.perTypeSettings;
     if (s.commonSettings) this.commonSettings = s.commonSettings;
     if (s.statInteractions) this.statInteractions = s.statInteractions;
+    if (s.sqlMode !== undefined) {
+      this.sqlMode = s.sqlMode;
+      if (this.sqlModeSwitchEl) this.sqlModeSwitchEl.value = s.sqlMode;
+      // 更新显示模式
+      const singleMode = this.root.querySelector('[data-single-sql-mode]') as HTMLElement | null;
+      const multiMode = this.root.querySelector('[data-multi-sql-mode]') as HTMLElement | null;
+      const mappingSection = this.root.querySelector('[data-mapping-section]') as HTMLElement | null;
+      const seriesSection = this.root.querySelector('[data-series-section]') as HTMLElement | null;
+      
+      if (s.sqlMode === 'single') {
+        if (singleMode) singleMode.style.display = '';
+        if (multiMode) multiMode.style.display = 'none';
+        if (mappingSection) mappingSection.style.display = '';
+        if (seriesSection) seriesSection.style.display = '';
+      } else {
+        if (singleMode) singleMode.style.display = 'none';
+        if (multiMode) multiMode.style.display = '';
+        if (mappingSection) mappingSection.style.display = 'none';
+        if (seriesSection) seriesSection.style.display = 'none';
+      }
+    }
+    if (s.multiSqlPresets) {
+      this.multiSqlPresets = s.multiSqlPresets;
+      this.renderMultiSqlPresetsList();
+    }
+    if (s.foldCommon !== undefined) this.foldCommon = s.foldCommon;
+    if (s.foldStat !== undefined) this.foldStat = s.foldStat;
+    if (s.foldPie !== undefined) this.foldPie = s.foldPie;
 
     this.renderSeriesList();
     this.renderPalette();
+    this.renderTypeSettingsUI(this.typeSettingsEl);
   }
 
   // 保存预设流程

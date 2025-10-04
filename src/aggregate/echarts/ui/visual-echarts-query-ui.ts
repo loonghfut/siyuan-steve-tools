@@ -1538,4 +1538,83 @@ export class VisualEchartsQueryUI {
       inlinePreview.textContent = shortExpr.replace(/\s+/g, ' ');
     }
   }
+
+  /**
+   * 获取当前状态快照
+   */
+  public getStateSnapshot(): any {
+    return {
+      title: this.titleInput?.value || '',
+      selectedAvID: this.selectedAvID,
+      selectedViewID: this.selectedViewID,
+      selectedViewName: this.selectedViewName,
+      showDbId: this.showDbId,
+      showDbNameAndViewName: this.showDbNameAndViewName,
+      xKey: this.xKey,
+      sort: this.sort,
+      xBucket: this.xBucket,
+      mergeMode: this.mergeMode,
+      series: this.series,
+      colors: this.colors,
+      chartType: this.chartType,
+      perTypeSettings: this.perTypeSettings,
+      commonSettings: this.commonSettings,
+      statInteractions: this.statInteractions,
+      foldCommon: this.foldCommon,
+      foldStat: this.foldStat,
+      foldPie: this.foldPie,
+    };
+  }
+
+  /**
+   * 恢复状态
+   */
+  public hydrateState(s: any): void {
+    if (s.title !== undefined && this.titleInput) {
+      this.titleInput.value = s.title;
+    }
+    if (s.selectedAvID) this.selectedAvID = s.selectedAvID;
+    if (s.selectedViewID) this.selectedViewID = s.selectedViewID;
+    if (s.selectedViewName) this.selectedViewName = s.selectedViewName;
+    if (s.showDbId !== undefined) this.showDbId = s.showDbId;
+    if (s.showDbNameAndViewName !== undefined) this.showDbNameAndViewName = s.showDbNameAndViewName;
+    
+    if (s.xKey !== undefined) {
+      this.xKey = s.xKey;
+      const xkeySel = this.root.querySelector('[data-xkey]') as HTMLSelectElement | null;
+      if (xkeySel) xkeySel.value = s.xKey;
+    }
+    if (s.sort !== undefined) {
+      this.sort = s.sort;
+      const sortSel = this.root.querySelector('[data-sort]') as HTMLSelectElement | null;
+      if (sortSel) sortSel.value = s.sort;
+    }
+    if (s.xBucket !== undefined) {
+      this.xBucket = s.xBucket;
+      const bucketSel = this.root.querySelector('[data-bucket]') as HTMLSelectElement | null;
+      if (bucketSel) bucketSel.value = s.xBucket;
+    }
+    if (s.mergeMode !== undefined) {
+      this.mergeMode = s.mergeMode;
+      const mergeToggle = this.root.querySelector('[data-merge]') as HTMLInputElement | null;
+      if (mergeToggle) mergeToggle.checked = s.mergeMode;
+    }
+    if (s.series) this.series = s.series;
+    if (s.colors) this.colors = s.colors;
+    if (s.chartType) {
+      this.chartType = s.chartType;
+      if (this.chartTypeSel) this.chartTypeSel.value = s.chartType;
+    }
+    if (s.perTypeSettings) this.perTypeSettings = s.perTypeSettings;
+    if (s.commonSettings) this.commonSettings = s.commonSettings;
+    if (s.statInteractions) this.statInteractions = s.statInteractions;
+    if (s.foldCommon !== undefined) this.foldCommon = s.foldCommon;
+    if (s.foldStat !== undefined) this.foldStat = s.foldStat;
+    if (s.foldPie !== undefined) this.foldPie = s.foldPie;
+
+    // 重新渲染UI
+    this.renderSeriesList();
+    this.renderPalette();
+    this.renderTypeSettingsUI(this.typeSettingsEl);
+  }
 }
