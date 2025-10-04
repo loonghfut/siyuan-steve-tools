@@ -72,7 +72,7 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             ],
         },
         {   
-            name: "聚合器",
+            name: "🚧聚合器🚧",
             items: [
                 { type: "checkbox", title: "启用聚合器", description: "启用后再进行下面的设置", key: "aggregate-enable-content-aggregator", value: ctx.settings["aggregate-enable-content-aggregator"] },
             ],
