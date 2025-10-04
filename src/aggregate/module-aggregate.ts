@@ -4,19 +4,26 @@ import { VisualEchartsUI } from "./echarts/ui/visual-echarts-ui";
 import { Dialog, Menu, openTab } from "siyuan";
 import { updateBlock } from "@/api/api";
 import { PluginConfig } from "@/savedata";
+import { aggregatorBlock } from "./aggregator_block";
 
 // Aggregate 模块
 export class M_Aggregate {
     private plugin: steveTools;
     private _ui?: VisualSqlUI; // 嵌入式 UI 引用（仅生命周期持有）
     private _tabInstances = new Map<string, VisualSqlUI>(); // Tab 实例映射
-
+    private _aggregatorBlockInstance?: aggregatorBlock; // 内容聚合器实例
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
 
     async init(_settingdata: any) {
         console.log("Aggregate 模块初始化");
+        if (_settingdata["aggregate-enable-content-aggregator"]) {
+            // Provide PluginConfig for persistent presets storage
+            const confAgg = new PluginConfig(this.plugin.name, 'aggregate-sql');
+            await confAgg.load();
+            await (this._aggregatorBlockInstance = new aggregatorBlock(this.plugin, confAgg)).init(_settingdata);
+        }
 
         if (_settingdata["aggregate-enable-sql-visualizer"]) {
             const topBarElement = this.plugin.addTopBar({
@@ -499,6 +506,16 @@ export class M_Aggregate {
                         }
                     });
                     requestAnimationFrame(() => ui.resize());
+                }
+            });
+        }
+        if (_settingdata["aggregate-enable-content-aggregator"]) {
+            menu.addSeparator();
+            menu.addItem({
+                icon: "iconDatabase",
+                label: "内容聚合器",
+                click: async () => {
+                    this._aggregatorBlockInstance?.runPresetPreviewFlow();
                 }
             });
         }

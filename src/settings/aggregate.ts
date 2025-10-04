@@ -8,19 +8,24 @@ export const aggregateDefaults: Record<string, any> = {
     "aggregate-sql-preview-columns": "",
     // SQL 结果预览列最大宽度（像素）
     "aggregate-sql-preview-col-max-width": 480,
+    // 预览最大行数
+    "aggregate-sql-preview-max-rows": 50,
     // 分段嵌入：起始、结束与间隔（天）
     "aggregate-segment-embed-start": "",
     "aggregate-segment-embed-end": "",
     "aggregate-segment-embed-interval-days": 7,
     // 图表功能
     "chart-enable": false,
+    // 聚合器功能
+    "aggregate-enable-content-aggregator": false,
+    
 };
 
 export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
-    name: "聚合可视化查询",
+    name: "可视化聚合",
     subGroups: [
         {
-            name: "SQL可视化",
+            name: "SQL聚合",
             items: [
                 { type: "checkbox", title: "启用聚合查询", description: "启用后再进行下面的设置", key: "aggregate-enable", value: ctx.settings["aggregate-enable"] },
                 { type: "checkbox", title: "启用 SQL 可视化生成器", description: "在顶部栏显示 SQL 可视化生成器按钮", key: "aggregate-enable-sql-visualizer", value: ctx.settings["aggregate-enable-sql-visualizer"] },
@@ -38,6 +43,13 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                     description: "限制结果表格中每一列的最大宽度，避免列过宽影响阅读。建议范围 240~1200，默认 480。",
                     key: "aggregate-sql-preview-col-max-width",
                     value: ctx.settings["aggregate-sql-preview-col-max-width"] ?? 480,
+                },
+                {
+                    type: "number",
+                    title: "预览最大行数",
+                    description: "限制预览界面显示的最大行数，避免过多数据影响性能。建议范围 10~200，默认 50。",
+                    key: "aggregate-sql-preview-max-rows",
+                    value: ctx.settings["aggregate-sql-preview-max-rows"] ?? 50,
                 },
                 {
                     type: "datetime-local",
@@ -63,11 +75,16 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             ],
         },
         {
-            name: "数据库图表",
+            name: "聚合图表",
             items: [
                 { type: "checkbox", title: "启用图表功能", description: "启用后再进行下面的设置", key: "chart-enable", value: ctx.settings["chart-enable"] },
             ],
-        }
+        },
+        {   
+            name: "聚合器",
+            items: [
+                { type: "checkbox", title: "启用聚合器", description: "启用后再进行下面的设置", key: "aggregate-enable-content-aggregator", value: ctx.settings["aggregate-enable-content-aggregator"] },
+            ],
+        },
     ],
-
 });
