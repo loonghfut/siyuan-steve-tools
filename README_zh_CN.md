@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.16.9 (2025年10月03日)
+### v0.16.10 (2025年10月04日)
 - 优化部分逻辑 (loonghfut)
 - 改进持久化逻辑 (loonghfut)
 - 优化界面 (loonghfut)
@@ -98,6 +98,13 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加内容和 Markdown 筛选操作选择功能，支持正则匹配查询 (loonghfut)
 - feat: 更新可视化 SQL 生成器 UI，添加更多块类型选项 (loonghfut)
 - 更新版本号至0.16.9 (loonghfut)
+- docs: 更新 v0.16.9 版本的更新日志 (loonghfut)
+- feat: 添加筛选条件功能，增强可视化 SQL 生成器的灵活性 (loonghfut)
+- feat: 添加 ECharts 配置管理功能，支持加载和保存预设 (loonghfut)
+- feat: 添加内容聚合器功能 (loonghfut)
+- 回退设置修改 (loonghfut)
+- feat: 更新聚合器名称 (loonghfut)
+- feat: 更新插件版本并恢复模块配置 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
