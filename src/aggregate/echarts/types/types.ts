@@ -6,6 +6,14 @@ export interface PresetItem {
   targetDocId?: string;  // 绑定插入文档的 ID
   template?: string;     // 可选的独立模板
   lastInsertTime?: string; // 上次插入文档的时间戳(思源格式: YYYYMMDDHHmmss)
+  
+  // 定时更新相关配置
+  timerEnabled?: boolean;  // 是否启用定时更新
+  timerInterval?: number;  // 定时更新间隔(毫秒)
+  timerUnit?: 'minutes' | 'hours' | 'days';  // 时间单位
+  timerValue?: number;     // 时间值(如: 5 分钟, 2 小时, 1 天)
+  lastExecuteTime?: number;  // 上次执行时间(时间戳)
+  nextExecuteTime?: number;  // 下次执行时间(时间戳)
 }
 
 /**

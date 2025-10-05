@@ -3,6 +3,7 @@ import { getBlockByID, insertBlock, sql as runSql } from '@/api/api';
 import { PluginConfig } from '@/savedata';
 import { showMessage } from "siyuan";
 import { PresetItem, SQLRawRow } from "../echarts/types/types";
+import { TimerManager } from "./TimerManager";
 
 export class aggregatorBlock {
     private _settingdata: any;
@@ -10,6 +11,9 @@ export class aggregatorBlock {
 
     // 可选的 PluginConfig 实例（若宿主模块提供）
     private pluginConfig?: PluginConfig;
+
+    // 定时任务管理器
+    private timerManager?: TimerManager;
 
     constructor(plugin: steveTools, pluginConfig?: PluginConfig) {
         this._plugin = plugin;
@@ -280,6 +284,45 @@ export class aggregatorBlock {
         void this._plugin;
         void this._settingdata;
         console.log("aggregatorBlock 模块初始化");
+
+        // 初始化定时任务管理器
+        this.timerManager = new TimerManager(this);
+
+        // 加载已有的定时任务
+        await this.loadTimerTasks();
+    }
+
+    /**
+     * 加载所有启用了定时的预设任务
+     */
+    private async loadTimerTasks(): Promise<void> {
+        try {
+            const presets = await this.getSqlPresets();
+            const names = Object.keys(presets);
+
+            console.log(`[aggregatorBlock] 加载定时任务，共 ${names.length} 个预设`);
+
+            for (const name of names) {
+                const preset = presets[name];
+                if (preset.timerEnabled && preset.timerInterval) {
+                    console.log(`[aggregatorBlock] 启动定时任务: ${name}`);
+                    await this.timerManager?.startTimer(name, preset);
+                }
+            }
+
+            const activeTimers = this.timerManager?.getActiveTimers() || [];
+            console.log(`[aggregatorBlock] 已启动 ${activeTimers.length} 个定时任务:`, activeTimers);
+        } catch (error) {
+            console.error('[aggregatorBlock] 加载定时任务失败:', error);
+        }
+    }
+
+    /**
+     * 销毁方法，停止所有定时器
+     */
+    destroy(): void {
+        console.log("[aggregatorBlock] 销毁模块，停止所有定时任务");
+        this.timerManager?.stopAll();
     }
 
     // 1. 获取 SQL 可视化面板中保存的预设筛选
@@ -502,6 +545,27 @@ export class aggregatorBlock {
                                             无效文档绑定
                                         </span>
                                     `) : ''}
+                                    ${preset.timerEnabled ? (() => {
+                                        const nextTime = preset.nextExecuteTime ? new Date(preset.nextExecuteTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未知';
+                                        const intervalText = preset.timerUnit && preset.timerValue 
+                                            ? `${preset.timerValue}${preset.timerUnit === 'minutes' ? '分钟' : preset.timerUnit === 'hours' ? '小时' : '天'}`
+                                            : '未设置';
+                                        return `
+                                        <span style="
+                                            font-size: 11px;
+                                            padding: 2px 8px;
+                                            background: rgba(255, 193, 7, 0.12);
+                                            color: #f57c00;
+                                            border-radius: var(--b3-border-radius-s);
+                                            display: inline-flex;
+                                            align-items: center;
+                                            gap: 4px;
+                                        " title="下次执行: ${nextTime}">
+                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconTimer"></use></svg>
+                                            定时: ${intervalText} | 下次: ${nextTime}
+                                        </span>
+                                        `;
+                                    })() : ''}
                                 </div>
                             </div>
                             
@@ -514,8 +578,19 @@ export class aggregatorBlock {
                                     align-items: center;
                                     gap: 4px;
                                 ">
-                                    <svg style="width: 14px; height: 14px;"><use xlink:href="#iconEdit"></use></svg>
-                                    编辑
+                                    <svg style="width: 14px; height: 14px; margin-right: 0px;"><use xlink:href="#iconEdit"></use></svg>
+                                    
+                                </button>
+                                <button class="b3-button b3-button--outline timer-preset-btn" style="
+                                    padding: 6px 12px;
+                                    font-size: 13px;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 4px;
+                                    ${preset.timerEnabled ? 'background: rgba(255, 193, 7, 0.12); border-color: #f57c00; color: #f57c00;' : ''}
+                                " title="${preset.timerEnabled ? '定时已启用' : '设置定时更新'}">
+                                    <svg style="width: 14px; height: 14px; margin-right: 0px;"><use xlink:href="#iconClock"></use></svg>
+                                    
                                 </button>
                                 <button class="b3-button b3-button--primary use-preset-btn" style="
                                     padding: 6px 12px;
@@ -524,8 +599,8 @@ export class aggregatorBlock {
                                     align-items: center;
                                     gap: 4px;
                                 ">
-                                    <svg style="width: 14px; height: 14px;"><use xlink:href="#iconSelect"></use></svg>
-                                    使用
+                                    <svg style="width: 14px; height: 14px; margin-right: 0px;"><use xlink:href="#iconSelect"></use></svg>
+                                    
                                 </button>
                             </div>
                         </div>
@@ -562,6 +637,17 @@ export class aggregatorBlock {
                         const updated = await this.showPresetEditor(n, preset, presets);
                         if (updated) {
                             // 重新渲染列表以更新标签
+                            await renderPresets(searchInput.value);
+                        }
+                    });
+
+                    // 定时按钮
+                    const timerBtn = item.querySelector('.timer-preset-btn');
+                    timerBtn?.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const updated = await this.showTimerSettings(n, preset, presets);
+                        if (updated) {
+                            // 重新渲染列表以更新定时状态显示
                             await renderPresets(searchInput.value);
                         }
                     });
@@ -608,7 +694,7 @@ export class aggregatorBlock {
                                 readonly
                                 style="
                                     width: 100%; 
-                                    height: 120px; 
+                                    height: 35px; 
                                     resize: vertical;
                                     font-family: var(--b3-font-family-code);
                                     font-size: 13px;
@@ -885,6 +971,249 @@ export class aggregatorBlock {
                 }
             });
         });
+    }
+
+    /**
+     * 显示定时设置对话框
+     * @returns 返回是否有更新
+     */
+    private async showTimerSettings(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<boolean> {
+        return new Promise((resolve) => {
+            const currentEnabled = preset.timerEnabled || false;
+            const currentUnit = preset.timerUnit || 'hours';
+            const currentValue = preset.timerValue || 1;
+
+            const { element, destroy } = this.createNativeDialog({
+                title: `定时设置: ${name}`,
+                content: `
+                    <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                        <!-- 启用开关 -->
+                        <div style="
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            padding: 16px;
+                            background: var(--b3-theme-surface);
+                            border-radius: var(--b3-border-radius);
+                            border: 1px solid var(--b3-border-color);
+                        ">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <svg style="width: 20px; height: 20px; fill: var(--b3-theme-primary);"><use xlink:href="#iconClock"></use></svg>
+                                <div>
+                                    <div style="font-weight: 500; color: var(--b3-theme-on-background);">启用定时更新</div>
+                                    <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 2px;">
+                                        自动执行聚合并插入到目标文档
+                                    </div>
+                                </div>
+                            </div>
+                            <label class="veq-switch" style="margin: 0;">
+                                <input id="timer-enabled-switch" type="checkbox" ${currentEnabled ? 'checked' : ''}>
+                                <i></i>
+                            </label>
+                        </div>
+
+                        <!-- 定时间隔设置 -->
+                        <div id="timer-interval-settings" style="
+                            display: ${currentEnabled ? 'block' : 'none'};
+                            padding: 16px;
+                            background: var(--b3-theme-surface);
+                            border-radius: var(--b3-border-radius);
+                            border: 1px solid var(--b3-border-color);
+                        ">
+                            <label style="
+                                display: block;
+                                margin-bottom: 12px;
+                                font-weight: 500;
+                                color: var(--b3-theme-on-background);
+                                font-size: 14px;
+                            ">
+                                <svg style="width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px;"><use xlink:href="#iconClock"></use></svg>
+                                执行间隔
+                            </label>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <input 
+                                    id="timer-value" 
+                                    type="number" 
+                                    min="1" 
+                                    value="${currentValue}"
+                                    class="b3-text-field"
+                                    style="
+                                        flex: 1;
+                                        padding: 8px 12px;
+                                        border: 1px solid var(--b3-border-color);
+                                        border-radius: var(--b3-border-radius);
+                                        font-size: 14px;
+                                    "
+                                />
+                                <select 
+                                    id="timer-unit" 
+                                    class="b3-select"
+                                >
+                                    <option value="minutes" ${currentUnit === 'minutes' ? 'selected' : ''}>分钟</option>
+                                    <option value="hours" ${currentUnit === 'hours' ? 'selected' : ''}>小时</option>
+                                    <option value="days" ${currentUnit === 'days' ? 'selected' : ''}>天</option>
+                                </select>
+                            </div>
+                            <div style="
+                                font-size: 12px;
+                                color: var(--b3-theme-on-surface-light);
+                                margin-top: 8px;
+                                display: flex;
+                                align-items: center;
+                                gap: 4px;
+                            ">
+                                <svg style="width: 12px; height: 12px;"><use xlink:href="#iconInfo"></use></svg>
+                                定时器将在保存后立即生效
+                            </div>
+                        </div>
+
+                        <!-- 执行信息 -->
+                        ${currentEnabled && preset.lastExecuteTime ? `
+                        <div style="
+                            padding: 12px;
+                            background: var(--b3-theme-surface-light);
+                            border-radius: var(--b3-border-radius);
+                            font-size: 12px;
+                            color: var(--b3-theme-on-surface);
+                        ">
+                            <div style="margin-bottom: 4px;">
+                                <strong>上次执行:</strong> ${new Date(preset.lastExecuteTime).toLocaleString('zh-CN')}
+                            </div>
+                            ${preset.nextExecuteTime ? `
+                            <div>
+                                <strong>下次执行:</strong> ${new Date(preset.nextExecuteTime).toLocaleString('zh-CN')}
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
+
+                        <!-- 操作按钮 -->
+                        <div style="
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 8px;
+                            padding-top: 12px;
+                            border-top: 1px solid var(--b3-border-color);
+                        ">
+                            <button class="b3-button b3-button--cancel">取消</button>
+                            <button class="b3-button b3-button--primary">保存</button>
+                        </div>
+                    </div>
+                `,
+                width: 'min(500px, 95vw)',
+                onClose: () => {
+                    resolve(false);
+                }
+            });
+
+            // 获取元素
+            const enabledSwitch = element.querySelector('#timer-enabled-switch') as HTMLInputElement;
+            const intervalSettings = element.querySelector('#timer-interval-settings') as HTMLElement;
+            const valueInput = element.querySelector('#timer-value') as HTMLInputElement;
+            const unitSelect = element.querySelector('#timer-unit') as HTMLSelectElement;
+            const cancelBtn = element.querySelector('.b3-button--cancel');
+            const confirmBtn = element.querySelector('.b3-button--primary');
+
+            // 切换显示/隐藏间隔设置
+            enabledSwitch?.addEventListener('change', () => {
+                if (intervalSettings) {
+                    intervalSettings.style.display = enabledSwitch.checked ? 'block' : 'none';
+                }
+            });
+
+            // 取消按钮
+            cancelBtn?.addEventListener('click', () => {
+                resolve(false);
+                destroy();
+            });
+
+            // 保存按钮
+            confirmBtn?.addEventListener('click', async () => {
+                const enabled = enabledSwitch?.checked || false;
+                const value = parseInt(valueInput?.value || '1');
+                const unit = unitSelect?.value as 'minutes' | 'hours' | 'days';
+
+                if (enabled && (!value || value < 1)) {
+                    showMessage('请输入有效的时间间隔', 3000, 'error');
+                    return;
+                }
+
+                // 计算间隔毫秒数
+                let intervalMs = 0;
+                if (enabled) {
+                    switch (unit) {
+                        case 'minutes':
+                            intervalMs = value * 60 * 1000;
+                            break;
+                        case 'hours':
+                            intervalMs = value * 60 * 60 * 1000;
+                            break;
+                        case 'days':
+                            intervalMs = value * 24 * 60 * 60 * 1000;
+                            break;
+                    }
+                }
+
+                // 更新预设
+                preset.timerEnabled = enabled;
+                preset.timerInterval = intervalMs;
+                preset.timerUnit = unit;
+                preset.timerValue = value;
+
+                // 如果启用定时，设置下次执行时间
+                if (enabled) {
+                    const now = Date.now();
+                    preset.nextExecuteTime = now + intervalMs;
+                } else {
+                    preset.nextExecuteTime = undefined;
+                    preset.lastExecuteTime = undefined;
+                }
+
+                allPresets[name] = preset;
+
+                // 保存到配置
+                await this.updatePresetTimerSettings(name, preset);
+
+                // 通知定时管理器更新
+                if (this.timerManager) {
+                    if (enabled) {
+                        await this.timerManager.startTimer(name, preset);
+                    } else {
+                        this.timerManager.stopTimer(name);
+                    }
+                }
+
+                showMessage(enabled ? '定时已启用' : '定时已禁用', 3000, 'info');
+                resolve(true);
+                destroy();
+            });
+        });
+    }
+
+    // 更新预设的定时设置
+    async updatePresetTimerSettings(presetName: string, preset: PresetItem): Promise<void> {
+        try {
+            if (!this.pluginConfig) {
+                console.error('[aggregatorBlock] cannot update preset: pluginConfig not provided');
+                return;
+            }
+            const current = this.pluginConfig.get('presets') || {};
+            if (current[presetName]) {
+                current[presetName].timerEnabled = preset.timerEnabled;
+                current[presetName].timerInterval = preset.timerInterval;
+                current[presetName].timerUnit = preset.timerUnit;
+                current[presetName].timerValue = preset.timerValue;
+                current[presetName].lastExecuteTime = preset.lastExecuteTime;
+                current[presetName].nextExecuteTime = preset.nextExecuteTime;
+                this.pluginConfig.set('presets', current);
+                await this.pluginConfig.save();
+                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的定时设置`);
+            } else {
+                console.warn('[aggregatorBlock] preset not found:', presetName);
+            }
+        } catch (e) {
+            console.error('[aggregatorBlock] updatePresetTimerSettings error', e);
+        }
     }
 
     // 3. 根据用户选择的 SQL 代码，进行 SQL 查询。
