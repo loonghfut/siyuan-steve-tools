@@ -1355,8 +1355,9 @@ export class aggregatorBlock {
         });
 
         // 用分隔符连接所有 row 的渲染结果
-        const separator = this._settingdata['aggregate-row-separator'] || '---';
-        return renderedRows.join(`\n\n${separator}\n\n`);
+        // const separator = this._settingdata['aggregate-row-separator'] || '';
+        // return renderedRows.join(`\n\n${separator}\n\n`);
+        return renderedRows.join(`\n\n \n\n`);
     }
 
     // 插入 Markdown 到指定文档

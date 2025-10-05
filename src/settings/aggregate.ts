@@ -88,14 +88,14 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                     value: ctx.settings["aggregate-sql-preview-template"] ?? "",
                     direction: "row",
                 },
-                {
-                    type: "textinput",
-                    title: "Row 分隔符",
-                    description: "用于分隔每个 SQL 结果行的字符串，支持 Markdown 语法，默认 ---",
-                    key: "aggregate-row-separator",
-                    value: ctx.settings["aggregate-row-separator"] ?? "",
-                    direction: "row",
-                },
+                // {
+                //     type: "textinput",
+                //     title: "Row 分隔符",
+                //     description: "用于分隔每个 SQL 结果行的字符串，支持 Markdown 语法，默认 ---",
+                //     key: "aggregate-row-separator",
+                //     value: ctx.settings["aggregate-row-separator"] ?? "",
+                //     direction: "row",
+                // },
                 {
                     type: "select",
                     title: "时间过滤字段",
