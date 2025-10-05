@@ -30,7 +30,7 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
         {
             name: "SQL聚合",
             items: [
-                { type: "checkbox", title: "启用聚合查询", description: "启用后再进行下面的设置", key: "aggregate-enable", value: ctx.settings["aggregate-enable"] },
+                { type: "checkbox", title: "启用可视化聚合", description: "启用后再进行此模块的设置", key: "aggregate-enable", value: ctx.settings["aggregate-enable"] },
                 { type: "checkbox", title: "启用 SQL 可视化生成器", description: "在顶部栏显示 SQL 可视化生成器按钮", key: "aggregate-enable-sql-visualizer", value: ctx.settings["aggregate-enable-sql-visualizer"] },
                 {
                     type: "textarea",

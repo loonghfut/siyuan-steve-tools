@@ -109,7 +109,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
         {
             name: "基础设置",
             items: [
-                { type: "checkbox", title: "启用日程管理", description: "启用日程管理功能后再进行下面的设置", key: "cal-enable", value: ctx.settings["cal-enable"] },
+                { type: "checkbox", title: "启用日程管理", description: "启用日程管理功能后再进行此模块的设置", key: "cal-enable", value: ctx.settings["cal-enable"] },
                 { type: "checkbox", title: "全局日程视图", description: "启用后再左上角加一个日历视图的入口", key: "cal-show-view", value: ctx.settings["cal-show-view"] },
                 { type: "select", title: "日程创建位置", description: "选择日记本", key: "cal-create-pos", value: ctx.settings["cal-create-pos"], options: notebookOptions() },
                 { type: "select", title: "日程数据库选择", description: "选择默认添加事件的数据库", key: "cal-db-id", value: ctx.settings["cal-db-id"], dynamicOptions: calendarDbOptions },
