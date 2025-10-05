@@ -1,6 +1,7 @@
 import { showMessage } from "siyuan";
 import { PresetItem } from "../echarts/types/types";
 import type { aggregatorBlock } from "./index";
+import { showStatusMessage } from "@/api/api";
 
 /**
  * 定时任务管理器
@@ -120,7 +121,7 @@ export class TimerManager {
             }
 
             // 可选：显示通知
-            showMessage(`定时任务 "${presetName}" 已执行，插入 ${sqlResult.length} 条数据`, 3000, 'info');
+            showStatusMessage(`定时任务 "${presetName}" 已执行，插入 ${sqlResult.length} 条数据`, 3000, 'info');
 
         } catch (error) {
             console.error(`[TimerManager] 执行定时任务失败: ${presetName}`, error);
