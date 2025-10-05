@@ -27,6 +27,17 @@ export class aggregatorBlock {
         return `${year}${month}${day}${hour}${minute}${second}`;
     }
 
+    // 检查文档是否有效
+    private async checkDocValidity(docId: string): Promise<boolean> {
+        if (!docId || !docId.trim()) return false;
+        try {
+            const data = await getBlockByID(docId);
+            return !!data;
+        } catch (e) {
+            return false;
+        }
+    }
+
     // HTML转义
     private escapeHtml(text: string): string {
         const div = document.createElement('div');
@@ -362,7 +373,7 @@ export class aggregatorBlock {
             });
 
             // 渲染预设列表
-            const renderPresets = (filterText: string = '') => {
+            const renderPresets = async (filterText: string = '') => {
                 container.innerHTML = '';
                 const filter = filterText.toLowerCase().trim();
                 const filteredNames = filter
@@ -387,6 +398,16 @@ export class aggregatorBlock {
                     container.appendChild(empty);
                     return;
                 }
+
+                // 并行检查所有文档的有效性
+                const validityChecks = await Promise.all(
+                    filteredNames.map(async n => {
+                        const preset = presets[n];
+                        const isValid = preset.targetDocId ? await this.checkDocValidity(preset.targetDocId) : true;
+                        return { name: n, isValid };
+                    })
+                );
+                const validityMap = new Map(validityChecks.map(v => [v.name, v.isValid]));
 
                 filteredNames.forEach(n => {
                     const preset = presets[n];
@@ -452,7 +473,7 @@ export class aggregatorBlock {
                                             自定义模板
                                         </span>
                                     ` : ''}
-                                    ${preset.targetDocId ? `
+                                    ${preset.targetDocId ? (validityMap.get(n) ? `
                                         <span style="
                                             font-size: 11px;
                                             padding: 2px 8px;
@@ -466,7 +487,21 @@ export class aggregatorBlock {
                                             <svg style="width: 12px; height: 12px;"><use xlink:href="#iconLink"></use></svg>
                                             已绑定文档
                                         </span>
-                                    ` : ''}
+                                    ` : `
+                                        <span style="
+                                            font-size: 11px;
+                                            padding: 2px 8px;
+                                            background: var(--b3-card-error-background);
+                                            color: var(--b3-card-error-color);
+                                            border-radius: var(--b3-border-radius-s);
+                                            display: inline-flex;
+                                            align-items: center;
+                                            gap: 4px;
+                                        ">
+                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCloseRound"></use></svg>
+                                            无效文档绑定
+                                        </span>
+                                    `) : ''}
                                 </div>
                             </div>
                             
@@ -524,7 +559,11 @@ export class aggregatorBlock {
                     const editBtn = item.querySelector('.edit-preset-btn');
                     editBtn?.addEventListener('click', async (e) => {
                         e.stopPropagation();
-                        await this.showPresetEditor(n, preset, presets);
+                        const updated = await this.showPresetEditor(n, preset, presets);
+                        if (updated) {
+                            // 重新渲染列表以更新标签
+                            await renderPresets(searchInput.value);
+                        }
                     });
 
                     container.appendChild(item);
@@ -543,8 +582,9 @@ export class aggregatorBlock {
 
     /**
      * 显示预设编辑器（二级界面）
+     * @returns 返回是否有更新
      */
-    private async showPresetEditor(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<void> {
+    private async showPresetEditor(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<boolean> {
         return new Promise((resolve) => {
             const { element, destroy } = this.createNativeDialog({
                 title: `编辑预设: ${name}`,
@@ -728,7 +768,7 @@ export class aggregatorBlock {
                 `,
                 width: 'min(680px, 95vw)',
                 onClose: () => {
-                    resolve();
+                    resolve(false);
                 }
             });
 
@@ -739,8 +779,8 @@ export class aggregatorBlock {
             const previewContainer = element.querySelector('#sql-preview-container') as HTMLElement;
 
             cancelBtn?.addEventListener('click', () => {
+                resolve(false);
                 destroy();
-                resolve();
             });
 
             confirmBtn?.addEventListener('click', async () => {
@@ -764,8 +804,8 @@ export class aggregatorBlock {
                 await this.updatePresetLastInsertTime(name, newLastInsertTime);
 
                 showMessage('预设已更新', 3000, 'info');
+                resolve(true);
                 destroy();
-                resolve();
             });
 
             // 预览按钮事件
@@ -997,7 +1037,7 @@ export class aggregatorBlock {
                 throw new Error('无效的文档 ID');
             }
             const data = await getBlockByID(docId);
-            if(!data){
+            if (!data) {
                 throw new Error('未找到指定的文档块');
             }
             await insertBlock("markdown", markdown, "", "", docId);
