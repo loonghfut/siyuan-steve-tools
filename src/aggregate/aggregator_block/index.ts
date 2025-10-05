@@ -1,5 +1,5 @@
 import steveTools from "@/index";
-import { sql as runSql } from '@/api/api';
+import { getBlockByID, insertBlock, sql as runSql } from '@/api/api';
 import { PluginConfig } from '@/savedata';
 import { showMessage } from "siyuan";
 import { PresetItem, SQLRawRow } from "../echarts/types/types";
@@ -97,7 +97,7 @@ export class aggregatorBlock {
                 color: var(--b3-theme-on-surface-light);
                 background: var(--b3-theme-surface);
             ">${idx + 1}</td>`;
-            
+
             if (!r || typeof r !== 'object') {
                 const txt = this.escapeHtml(String(r));
                 return `<tr>${rowNo}<td colspan="${Math.max(1, cols.length)}" style="
@@ -108,7 +108,7 @@ export class aggregatorBlock {
                     font-family: var(--b3-font-family-code);
                 ">${txt}</td></tr>`;
             }
-            
+
             const cells = cols.map(c => `<td style="
                 padding: 6px 12px;
                 border-bottom: 1px solid var(--b3-border-color);
@@ -120,7 +120,7 @@ export class aggregatorBlock {
                 text-overflow: ellipsis;
                 white-space: nowrap;
             " title="${this.escapeHtml(this.formatCell(r[c]))}">${this.escapeHtml(this.formatCell(r[c]))}</td>`).join('');
-            
+
             return `<tr class="preview-table-row" style="hover: background: var(--b3-list-hover);">${rowNo}${cells}</tr>`;
         }).join('')}</tbody>`;
 
@@ -314,7 +314,7 @@ export class aggregatorBlock {
             let settled = false;
             const containerId = `st-preset-container-${Date.now()}`;
             const searchId = `st-preset-search-${Date.now()}`;
-            
+
             const { element, destroy } = this.createNativeDialog({
                 title: '选择 SQL 预设',
                 content: `
@@ -354,10 +354,10 @@ export class aggregatorBlock {
                     resolve(null);
                 }
             });
-            
+
             const container = element.querySelector(`#${containerId}`) as HTMLElement | null;
             const searchInput = element.querySelector(`#${searchId}`) as HTMLInputElement | null;
-            
+
             if (!container || !searchInput) {
                 try { destroy(); } catch (e) { /* ignore */ }
                 if (!settled) {
@@ -381,9 +381,9 @@ export class aggregatorBlock {
             const renderPresets = (filterText: string = '') => {
                 container.innerHTML = '';
                 const filter = filterText.toLowerCase().trim();
-                const filteredNames = filter 
-                    ? names.filter(n => 
-                        n.toLowerCase().includes(filter) || 
+                const filteredNames = filter
+                    ? names.filter(n =>
+                        n.toLowerCase().includes(filter) ||
                         presets[n].sql.toLowerCase().includes(filter)
                     )
                     : names;
@@ -753,32 +753,32 @@ export class aggregatorBlock {
             const confirmBtn = element.querySelector('.b3-button--primary');
             const previewBtn = element.querySelector('#preview-sql-btn') as HTMLButtonElement;
             const previewContainer = element.querySelector('#sql-preview-container') as HTMLElement;
-            
+
             cancelBtn?.addEventListener('click', () => {
                 destroy();
                 resolve();
             });
-            
+
             confirmBtn?.addEventListener('click', async () => {
                 const templateTextarea = element.querySelector('#edit-template') as HTMLTextAreaElement;
                 const targetDocInput = element.querySelector('#edit-target-doc') as HTMLInputElement;
                 const lastInsertTimeInput = element.querySelector('#edit-last-insert-time') as HTMLInputElement;
-                
+
                 const newTemplate = templateTextarea?.value.trim() || '';
                 const newTargetDocId = targetDocInput?.value.trim() || '';
                 const newLastInsertTime = lastInsertTimeInput?.value.trim() || '';
-                
+
                 // 更新预设
                 preset.template = newTemplate || undefined;
                 preset.targetDocId = newTargetDocId || undefined;
                 preset.lastInsertTime = newLastInsertTime || undefined;
                 allPresets[name] = preset;
-                
+
                 // 保存到配置
                 await this.updatePresetTemplate(name, newTemplate);
                 await this.updatePresetTargetDocId(name, newTargetDocId);
                 await this.updatePresetLastInsertTime(name, newLastInsertTime);
-                
+
                 showMessage('预设已更新', 3000, 'info');
                 destroy();
                 resolve();
@@ -787,7 +787,7 @@ export class aggregatorBlock {
             // 预览按钮事件
             previewBtn?.addEventListener('click', async () => {
                 const isExpanded = previewContainer.style.display === 'block';
-                
+
                 if (isExpanded) {
                     // 收起预览
                     previewContainer.style.display = 'none';
@@ -806,36 +806,36 @@ export class aggregatorBlock {
                     </svg>
                     查询中...
                 `;
-                
+
                 try {
                     // 获取当前编辑的值
                     const targetDocInput = element.querySelector('#edit-target-doc') as HTMLInputElement;
                     const lastInsertTimeInput = element.querySelector('#edit-last-insert-time') as HTMLInputElement;
-                    
+
                     const currentTargetDocId = targetDocInput?.value.trim() || '';
                     const currentLastInsertTime = lastInsertTimeInput?.value.trim() || '';
-                    
+
                     // 执行SQL查询（限制结果数量，避免预览过多数据）
                     let previewSql = preset.sql;
                     const upperSql = previewSql.toUpperCase();
-                    
+
                     // 如果没有LIMIT子句，添加LIMIT 5来限制预览结果
                     if (!upperSql.includes(' LIMIT ')) {
                         previewSql += ' LIMIT 5';
                     }
-                    
+
                     // 使用和实际执行相同的参数：排除文档ID和时间过滤
                     const results = await this.executeSql(previewSql, currentTargetDocId || undefined, currentLastInsertTime || undefined);
-                    
+
                     // 使用表格形式渲染结果
                     this.renderResultTable(results, previewContainer);
-                    
+
                     previewContainer.style.display = 'block';
                     previewBtn.innerHTML = `
                         <svg style="width: 12px; height: 12px;"><use xlink:href="#iconEye"></use></svg>
                         收起预览
                     `;
-                    
+
                 } catch (error) {
                     console.error('SQL预览失败:', error);
                     previewContainer.innerHTML = `
@@ -894,7 +894,7 @@ export class aggregatorBlock {
             if (lastInsertTime && lastInsertTime.length === 14) {
                 // 获取用户设置的时间字段（created 或 updated）
                 const timeField = this._settingdata['aggregate-time-field'] || 'created';
-                
+
                 // 思源的时间戳格式是秒，与 lastInsertTime 一致
                 const upperStmt = stmt.toUpperCase();
                 const hasWhere = upperStmt.includes(' WHERE ');
@@ -958,7 +958,7 @@ export class aggregatorBlock {
 
         // 使用模板渲染 SQL 结果为 Markdown（优先使用预设模板）
         const renderedMd = this.renderTemplate(preset.preset, sqlResult);
-        console.log('Rendered Markdown:', renderedMd);
+        // console.log('Rendered Markdown:', renderedMd);
 
         // 插入到指定文档
         try {
@@ -981,7 +981,7 @@ export class aggregatorBlock {
         // 优先使用预设中的模板，如果没有则使用全局设置的模板
         const globalTemplate = this._settingdata['aggregate-sql-preview-template'] || '';
         const template = preset?.template?.trim() || globalTemplate?.trim();
-        
+
         // 如果模板为空，使用默认模板：为每个 row 生成字段列表
         let effectiveTemplate = template;
         if (!effectiveTemplate) {
@@ -1007,21 +1007,14 @@ export class aggregatorBlock {
     // 插入 Markdown 到指定文档
     async insertMarkdownToDoc(docId: string, markdown: string, presetName?: string): Promise<void> {
         try {
-            const response = await fetch('/api/block/insertBlock', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    dataType: 'markdown',
-                    data: markdown,
-                    parentID: docId
-                })
-            });
-            const result = await response.json();
-            if (result.code !== 0) {
-                throw new Error(result.msg || '插入失败');
+            if (!docId || !docId.trim()) {
+                throw new Error('无效的文档 ID');
             }
-            console.log('Markdown 插入成功:', result);
-            
+            const data = await getBlockByID(docId);
+            if(!data){
+                throw new Error('未找到指定的文档块');
+            }
+            await insertBlock("markdown", markdown, "", "", docId);
             // 插入成功后更新预设的 lastInsertTime
             if (presetName) {
                 const currentTime = this.getSiyuanTimestamp(); // 当前时间戳(思源格式)
@@ -1086,7 +1079,7 @@ export class aggregatorBlock {
             const input = element.querySelector('#docIdInput') as HTMLInputElement;
             const cancelBtn = element.querySelector('.b3-button--cancel');
             const confirmBtn = element.querySelector('.b3-button--primary');
-            
+
             if (input) {
                 input.focus();
                 input.addEventListener('keydown', (e) => {
