@@ -257,22 +257,6 @@ export class aggregatorBlock {
         const closeBtn = header.querySelector('.dialog-close-btn');
         closeBtn?.addEventListener('click', destroy);
 
-        // 点击遮罩关闭
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                destroy();
-            }
-        });
-
-        // ESC键关闭
-        const escHandler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                destroy();
-                document.removeEventListener('keydown', escHandler);
-            }
-        };
-        document.addEventListener('keydown', escHandler);
-
         document.body.appendChild(overlay);
 
         return { element: dialog, destroy };
@@ -934,11 +918,13 @@ export class aggregatorBlock {
         let targetDocId = preset.preset.targetDocId;
         if (!targetDocId) {
             targetDocId = await this.promptForDocId(preset.name);
+            console.log('用户输入的目标文档 ID:', targetDocId);
             if (!targetDocId) {
                 console.log('用户取消输入文档 ID');
                 return;
             }
             // 保存到预设
+            console.log('保存目标文档 ID:', targetDocId);
             await this.updatePresetTargetDocId(preset.name, targetDocId);
             preset.preset.targetDocId = targetDocId; // 更新本地对象
         }
@@ -1072,7 +1058,7 @@ export class aggregatorBlock {
                 `,
                 width: '500px',
                 onClose: () => {
-                    resolve(null);
+                    resolve(input?.value.trim() || null);
                 }
             });
 
@@ -1085,21 +1071,21 @@ export class aggregatorBlock {
                 input.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
                         const value = input.value.trim();
-                        destroy();
                         resolve(value || null);
+                        destroy();
                     }
                 });
             }
 
             cancelBtn?.addEventListener('click', () => {
-                destroy();
                 resolve(null);
+                destroy();
             });
 
             confirmBtn?.addEventListener('click', () => {
                 const value = input?.value.trim();
-                destroy();
                 resolve(value || null);
+                destroy();
             });
         });
     }
