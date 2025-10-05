@@ -3,6 +3,9 @@ export type ChartType = 'bar' | 'line' | 'scatter' | 'pie';
 export interface PresetItem {
   name: string;
   sql: string;
+  targetDocId?: string;  // 绑定插入文档的 ID
+  template?: string;     // 可选的独立模板
+  lastInsertTime?: string; // 上次插入文档的时间戳(思源格式: YYYYMMDDHHmmss)
 }
 
 /**
@@ -57,3 +60,29 @@ export type DataMode = 'database' | 'sql';
  * SQL模式类型: 单SQL查询 或 多SQL预设对比
  */
 export type SqlMode = 'single' | 'multi-preset';
+
+export interface SQLRawRow {
+  alias?: string;
+  box?: string;                 // 通常是 notebook id
+  content?: string;
+  created?: string;             // 原始可能是 YYYYMMDDHHMMSS 格式或其它
+  fcontent?: string;
+  hash?: string;
+  hpath?: string;
+  ial?: string;                 // 原始 IAL 字符串 '{: id="..." updated="..."}'
+  id?: string;
+  length?: number;
+  markdown?: string;
+  memo?: string;
+  name?: string;
+  parent_id?: string;
+  path?: string;
+  root_id?: string;
+  sort?: number;
+  subtype?: string;
+  tag?: string;
+  type?: string;                // e.g. 'p', 'c', 's', 'query_embed'...
+  updated?: string;
+  // 允许存在任意额外字段（例如 ial_custom-time、custom-avs 等）
+  [key: string]: unknown;
+}

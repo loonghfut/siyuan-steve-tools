@@ -16,7 +16,12 @@ export const aggregateDefaults: Record<string, any> = {
     "chart-enable": false,
     // 聚合器功能
     "aggregate-enable-content-aggregator": false,
-    
+    // SQL 结果预览模板（支持占位符，例如 {{markdown}} {{content}} {{id}}）
+    "aggregate-sql-preview-template": "",
+    // Row 之间的分隔符（默认 ---）
+    "aggregate-row-separator": "---",
+    // 时间过滤字段（用于避免重复插入已处理的内容）
+    "aggregate-time-field": "created",
 };
 
 export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -75,6 +80,34 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: "🚧聚合器🚧",
             items: [
                 { type: "checkbox", title: "启用聚合器", description: "启用后再进行下面的设置", key: "aggregate-enable-content-aggregator", value: ctx.settings["aggregate-enable-content-aggregator"] },
+                {
+                    type: "textarea",
+                    title: "SQL 聚合默认模板",
+                    description: "模板用于渲染 SQL 结果预览和插入文档方式，可使用占位符例如 {{markdown}} {{content}} {{id}}，留空使用默认自动渲染",
+                    key: "aggregate-sql-preview-template",
+                    value: ctx.settings["aggregate-sql-preview-template"] ?? "",
+                    direction: "row",
+                },
+                {
+                    type: "textinput",
+                    title: "Row 分隔符",
+                    description: "用于分隔每个 SQL 结果行的字符串，支持 Markdown 语法，默认 ---",
+                    key: "aggregate-row-separator",
+                    value: ctx.settings["aggregate-row-separator"] ?? "",
+                    direction: "row",
+                },
+                {
+                    type: "select",
+                    title: "时间过滤字段",
+                    description: "用于过滤已插入内容的时间字段(避免重复插入)，选择 created(创建时间) 或 updated(更新时间)",
+                    key: "aggregate-time-field",
+                    value: ctx.settings["aggregate-time-field"] ?? "created",
+                    options: {
+                        created: "创建时间 (created)",
+                        updated: "更新时间 (updated)",
+                    },
+                },
+
             ],
         },
     ],
