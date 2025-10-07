@@ -103,11 +103,11 @@ export class VisualEchartsQueryUI {
       yAxisLeftName?: string;
       yAxisRightName?: string;
     };
-    pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
+  pie: { innerRadius?: number; outerRadius?: number; gap?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
   } = {
       bar: { stack: false, boundaryGap: true, xLabelRotate: 0, label: { show: false, position: 'top' }, barWidth: null, barGap: '30%', xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
       line: { smooth: true, boundaryGap: false, xLabelRotate: 0, label: { show: false, position: 'top' }, area: false, symbol: 'circle', symbolSize: 8, lineWidth: 2, xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
-      pie: { innerRadius: 0, outerRadius: 70, roseType: false, label: { show: false, position: 'outside' } },
+  pie: { innerRadius: 0, outerRadius: 70, gap: 2, roseType: false, label: { show: false, position: 'outside' } },
     };
   private colors: string[] = [];
   private series: Array<SeriesItem> = [];

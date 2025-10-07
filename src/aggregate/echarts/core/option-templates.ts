@@ -114,15 +114,26 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
       })()`
       : `(${s.expr})`;
     // 多饼图系列：分配同心环，避免重叠
-    const pieExtra = (type==='pie' && pieCount_ctx>1) ? (function(){
-      pieNo_ctx++;
-      var ir0 = 0, or0 = 70; // SQL 模式默认 0%~70%
-      var span = Math.max(1, or0 - ir0);
-      var ring = span / pieCount_ctx;
-      var r1 = Math.round(ir0 + ring*pieNo_ctx);
-      var r2 = Math.round(ir0 + ring*(pieNo_ctx+1));
-      if (r2 <= r1) r2 = r1 + 1;
-      return `radius: ['${r1}%', '${r2}%'],`;
+    const pieExtra = (type==='pie') ? (function(){
+      // support optional gap between concentric rings
+      var cfgIr = 0, cfgOr = 70;
+      try { var stPie = (ctx && ctx.chartSettings && ctx.chartSettings.pie) ? ctx.chartSettings.pie : null; if (stPie) { if (typeof stPie.innerRadius === 'number') cfgIr = Math.max(0, Math.min(100, stPie.innerRadius|0)); if (typeof stPie.outerRadius === 'number') cfgOr = Math.max(cfgIr, Math.min(100, stPie.outerRadius|0)); } } catch(e){}
+      var gap = 2; // default gap in percentage points
+      try { var sp = (ctx && ctx.chartSettings && ctx.chartSettings.pie) ? ctx.chartSettings.pie : null; if (sp && typeof sp.gap === 'number') gap = Math.max(0, Math.min(20, sp.gap|0)); } catch(e){}
+      if (pieCount_ctx > 1) {
+        pieNo_ctx++;
+        var fullSpan = Math.max(1, cfgOr - cfgIr);
+        // total gap space between rings = gap * (pieCount_ctx - 1)
+        var totalGapSpace = gap * Math.max(0, pieCount_ctx - 1);
+        // available span for rings after subtracting gaps
+        var usable = Math.max(1, fullSpan - totalGapSpace);
+        var ring = usable / pieCount_ctx;
+        var r1 = Math.round(cfgIr + pieNo_ctx * (ring + gap));
+        var r2 = Math.round(cfgIr + pieNo_ctx * (ring + gap) + ring);
+        if (r2 <= r1) r2 = r1 + 1;
+        return `radius: ['${r1}%', '${r2}%'],`;
+      }
+      return `radius: ['${cfgIr}%', '${cfgOr}%'],`;
     })() : '';
     return `{
       name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${extras.join(' ')} ${pieExtra} z: 1,
@@ -313,15 +324,18 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     const pieExtra = (type==='pie') ? (function(){
       const rose = (stPie && (stPie.roseType===false || stPie.roseType==='radius' || stPie.roseType==='area')) ? stPie.roseType : undefined;
       const parts: string[] = [];
-      // 多饼图系列：把 [inner, outer] 区间分割为多条环带，避免重叠
       const irCfg = typeof stPie.innerRadius === 'number' ? Math.max(0, Math.min(100, stPie.innerRadius|0)) : 0;
       const orCfg = typeof stPie.outerRadius === 'number' ? Math.max(irCfg, Math.min(100, stPie.outerRadius|0)) : 70;
+      var gap = 2;
+      try { if (stPie && typeof stPie.gap === 'number') gap = Math.max(0, Math.min(20, stPie.gap|0)); } catch(e){}
       if (pieCount > 1) {
         pieNo++;
-        const span = Math.max(1, orCfg - irCfg);
-        const ring = span / pieCount;
-        let r1 = Math.round(irCfg + ring*pieNo);
-        let r2 = Math.round(irCfg + ring*(pieNo+1));
+        var span = Math.max(1, orCfg - irCfg);
+        var totalGapSpace = gap * Math.max(0, pieCount - 1);
+        var usable = Math.max(1, span - totalGapSpace);
+        var ring = usable / pieCount;
+        let r1 = Math.round(irCfg + pieNo * (ring + gap));
+        let r2 = Math.round(irCfg + pieNo * (ring + gap) + ring);
         if (r2 <= r1) r2 = r1 + 1;
         parts.push(`radius: ['${r1}%', '${r2}%'],`);
       } else {
@@ -855,12 +869,16 @@ export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
       const parts: string[] = [];
       const irCfg = typeof stPie.innerRadius === 'number' ? Math.max(0, Math.min(100, stPie.innerRadius | 0)) : 0;
       const orCfg = typeof stPie.outerRadius === 'number' ? Math.max(irCfg, Math.min(100, stPie.outerRadius | 0)) : 70;
+      var gap = 2;
+      try { if (stPie && typeof stPie.gap === 'number') gap = Math.max(0, Math.min(20, stPie.gap|0)); } catch(e){}
       if (pieCount > 1) {
         pieNo++;
-        const span = Math.max(1, orCfg - irCfg);
-        const ring = span / pieCount;
-        let r1 = Math.round(irCfg + ring * pieNo);
-        let r2 = Math.round(irCfg + ring * (pieNo + 1));
+        var span = Math.max(1, orCfg - irCfg);
+        var totalGapSpace = gap * Math.max(0, pieCount - 1);
+        var usable = Math.max(1, span - totalGapSpace);
+        var ring = usable / pieCount;
+        let r1 = Math.round(irCfg + pieNo * (ring + gap));
+        let r2 = Math.round(irCfg + pieNo * (ring + gap) + ring);
         if (r2 <= r1) r2 = r1 + 1;
         parts.push(`radius: ['${r1}%', '${r2}%'],`);
       } else {
