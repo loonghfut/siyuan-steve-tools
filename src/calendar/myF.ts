@@ -2,7 +2,7 @@ import * as api from '@/api/api';
 import { ViewItem } from '@/calendar/interface';
 import * as sy from 'siyuan'
 import { settingdata } from '@/index';
-import { Calendar } from '@fullcalendar/core';
+import { Calendar, DurationInput } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/interface";
@@ -52,7 +52,7 @@ interface CalendarEventItem {
     end?: Date | null;
     allDay: boolean;
     rrule?: string;
-    duration?: number | string;
+    duration?: DurationInput;
     timeZone?: string;
     extendedProps: CalendarEventExtendedProps;
 }
@@ -553,6 +553,25 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     //     (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))) ||
                     // (endDate && startDate.getTime() === endDate.getTime());
 
+                    // 计算 duration：
+                    // - 非全天事件用“分钟”
+                    // - 全天事件用“天”（FullCalendar 要求）
+                    let durationMinutes: number;
+                    if (endDate) {
+                        // 有结束时间：按开始/结束差值计算分钟数
+                        durationMinutes = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60)));
+                    } else {
+                        // 无结束时间：使用“持续时间”字段（默认按小时）
+                        const durationHours = parseFloat(item['持续时间']?.content) || 1;
+                        durationMinutes = Math.max(1, Math.round(durationHours * 60));
+                    }
+                    // FullCalendar 的 rrule 事件 duration 需要传 DurationInput：
+                    // - 全天：{ days: n }
+                    // - 非全天：{ minutes: n }
+                    const durationObj = isAllDay
+                        ? { days: Math.max(1, Math.ceil(durationMinutes / (60 * 24))) }
+                        : { minutes: durationMinutes };
+
                     const rruleStr = item['重复规则']?.content
                         ? `DTSTART:${startDate.toISOString().replace(/[-:]/g, '').split('.')[0]}Z\n${item['重复规则'].content}`
                         : '';
@@ -568,11 +587,11 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         id: eventBlockId,
                         title: item['事件']?.content || '',
                         start: startDate,
-                        // end: endDate,
+                        // end: endDate, // 对于rrule事件，不设置end（那是系列结束时间）
                         timeZone: 'local',
                         allDay: isAllDay,
                         rrule: rruleStr,
-                        duration: item['持续时间']?.content || 1,
+                        duration: durationObj,
                         extendedProps: {
                             blockId: eventBlockId,
                             itemID: eventItemId,
