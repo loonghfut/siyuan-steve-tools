@@ -71,15 +71,15 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             ],
         },
         {
-            name: "聚合图表",
+            name: "图表聚合",
             items: [
                 { type: "checkbox", title: "启用图表功能", description: "启用后再进行下面的设置", key: "chart-enable", value: ctx.settings["chart-enable"] },
             ],
         },
         {   
-            name: "🚧聚合器🚧",
+            name: "块聚合",
             items: [
-                { type: "checkbox", title: "启用聚合器", description: "启用后再进行下面的设置", key: "aggregate-enable-content-aggregator", value: ctx.settings["aggregate-enable-content-aggregator"] },
+                { type: "checkbox", title: "启用块聚合", description: "启用后再进行下面的设置", key: "aggregate-enable-content-aggregator", value: ctx.settings["aggregate-enable-content-aggregator"] },
                 {
                     type: "textarea",
                     title: "SQL 聚合默认模板",
