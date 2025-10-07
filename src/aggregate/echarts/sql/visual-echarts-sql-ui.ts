@@ -284,9 +284,10 @@ export class VisualEchartsSqlUI {
   private foldCommon: boolean = false;
   private foldStat: boolean = false;
   private foldPie: boolean = false;
+  private foldRadar: boolean = false;
 
   // 统一图表设置
-  private chartType: 'stat' | 'pie' = 'stat';
+  private chartType: 'stat' | 'pie' | 'radar' = 'stat';
   private perTypeSettings: {
     bar: {
       stack?: boolean;
@@ -313,10 +314,12 @@ export class VisualEchartsSqlUI {
       yAxisRightName?: string;
     };
     pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
+    radar?: { uniformMax?: number | null };
   } = {
   bar: { stack: false, boundaryGap: true, xLabelRotate: 0, barWidth: null, barGap: '30%', xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
   line: { smooth: true, boundaryGap: false, xLabelRotate: 0, area: false, symbol: 'circle', symbolSize: 8, lineWidth: 2, xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
   pie: { innerRadius: 0, outerRadius: 70, roseType: false },
+  radar: { uniformMax: null },
     };
   private colors: string[] = [];
   private series: Array<SeriesItem> = [];
@@ -401,6 +404,7 @@ export class VisualEchartsSqlUI {
             <select class="veq-input" data-chart-type style="width:120px">
               <option value="stat">统计图</option>
               <option value="pie">饼图</option>
+              <option value="radar">雷达图</option>
             </select>
           </label>
         </div>
@@ -550,6 +554,7 @@ export class VisualEchartsSqlUI {
         if (multiMode) multiMode.style.display = '';
         if (mappingSection) mappingSection.style.display = 'none';
         if (seriesSection) seriesSection.style.display = 'none';
+        // 多SQL对比模式也允许雷达图
       }
       this.onChanged();
     });
@@ -589,13 +594,18 @@ export class VisualEchartsSqlUI {
     });
     if (chartTypeSel) chartTypeSel.addEventListener('change', (e) => {
       this.chartType = (e.target as HTMLSelectElement).value as any;
+      // 多SQL对比模式允许雷达图
       if (this.chartType === 'pie') {
         this.series = this.series.map(s => ({ ...s, type: 'pie' }));
         if (this.statInteractions.tooltipTrigger !== 'item') {
           this.statInteractions.tooltipTrigger = 'item';
         }
+      } else if (this.chartType === 'radar') {
+        this.series = this.series.map(s => ({ ...s, type: 'radar', axisIndex: 0 }));
+        // 雷达图默认使用 item 提示
+        this.statInteractions.tooltipTrigger = 'item';
       } else {
-        this.series = this.series.map(s => (s.type === 'pie' ? { ...s, type: 'line' } : s));
+        this.series = this.series.map(s => ((s.type === 'pie' || s.type === 'radar') ? { ...s, type: 'line' } : s));
       }
       this.applyTypeConstraints(mergeToggle);
       this.renderSeriesList();
@@ -605,7 +615,7 @@ export class VisualEchartsSqlUI {
 
     this.applyTypeConstraints(mergeToggle);
     (this.root.querySelector('[data-add-series]') as HTMLButtonElement).addEventListener('click', () => {
-      const defType = this.chartType === 'pie' ? 'pie' : 'line';
+      const defType = this.chartType === 'pie' ? 'pie' : (this.chartType === 'radar' ? 'radar' : 'line');
       this.series.push({ name: '系列' + (this.series.length + 1), expr: 'rows.map(r => 0)', type: defType as any, axisIndex: 0, label: { show: false, position: 'top' } });
       this.renderSeriesList();
       this.onChanged();
@@ -643,6 +653,7 @@ export class VisualEchartsSqlUI {
 
       const typeOptions = ((): Array<{ v: string; t: string }> => {
         if (this.chartType === 'pie') return [{ v: 'pie', t: '饼图' }];
+        if (this.chartType === 'radar') return [{ v: 'radar', t: '雷达' }];
         return [
           { v: 'line', t: '折线' },
           { v: 'bar', t: '柱状' },
@@ -1129,6 +1140,11 @@ export class VisualEchartsSqlUI {
       radius: ['${innerRadius}%', '${outerRadius}%'],
       center: ['50%', '50%'],
       ${roseType ? `roseType: '${roseType}',` : ''}`;
+    } else if (chartType === 'radar') {
+      seriesType = 'radar';
+      labelShow = false;
+      labelPos = 'top';
+      extraSettings = ``;
     } else {
       // 柱状图设置
       seriesType = 'bar';
@@ -1174,6 +1190,14 @@ export class VisualEchartsSqlUI {
       var rows = fetchSqlSync(preset.sql);
       pieData.push({ name: preset.name, value: rows.length });
     });
+    ` : chartType === 'radar' ? `
+    // 雷达图模式：预设名称作为指标，每个预设的查询数量作为对应值
+  var indicator = presets.map(function(preset){ return { name: preset.name }; });
+    const radarValues = [];
+    presets.forEach(function(preset){
+      var rows = fetchSqlSync(preset.sql);
+      radarValues.push(rows.length);
+    });
     ` : `
     // 柱状图模式：每个预设是X轴的一个分类
     const xAxisData = [];
@@ -1185,24 +1209,27 @@ export class VisualEchartsSqlUI {
     });
     `}
     
-    console.group('🔍 多SQL预设对比 - 数据调试');
-    console.log('📊 预设列表:', presets);
-    ${isPie ? `
-    console.log('📊 饼图数据:', pieData);
-    ` : `
-    console.log('📐 X轴(预设名称):', xAxisData);
-    console.log('📐 Y轴(查询数量):', yAxisData);
-    `}
+  console.group('🔍 多SQL预设对比 - 数据调试');
+  console.log('📊 预设列表:', presets);
+  ${isPie ? `
+  console.log('📊 饼图数据:', pieData);
+  ` : chartType === 'radar' ? `
+  console.log('📐 指标(indicator):', indicator);
+  console.log('📐 值(radarValues):', radarValues);
+  ` : `
+  console.log('📐 X轴(预设名称):', xAxisData);
+  console.log('📐 Y轴(查询数量):', yAxisData);
+  `}
     console.groupEnd();
     
     option.title = { text: ${JSON.stringify(title)} };
     ${titlePos}
     option.backgroundColor = 'transparent';
-    ${tooltipPatch}
-    option.legend = { data: ${isPie ? 'pieData.map(d => d.name)' : "['查询结果数量']"} };
+    ${chartType === 'radar' ? `option.tooltip = { trigger: 'item' };` : tooltipPatch}
+    option.legend = { data: ${isPie ? 'pieData.map(d => d.name)' : (chartType === 'radar' ? "['查询结果数量']" : "['查询结果数量']")} };
     ${legendPosCode}
-    ${!isPie && gridCode ? gridCode : ''}
-    ${!isPie ? `
+    ${!isPie && chartType !== 'radar' && gridCode ? gridCode : ''}
+    ${(!isPie && chartType !== 'radar') ? `
     option.xAxis = {
       type: 'category',
       data: xAxisData,
@@ -1219,6 +1246,19 @@ export class VisualEchartsSqlUI {
       splitLine: { show: ${splitLine.show}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLine.type}' } }
     };
     ` : ''}
+    ${chartType === 'radar' ? `
+    // 应用统一最大值
+    var radarUniformMax = ${(this.perTypeSettings.radar && this.perTypeSettings.radar.uniformMax != null) ? Number(this.perTypeSettings.radar.uniformMax) : 'null'};
+    if (radarUniformMax != null && isFinite(radarUniformMax)) {
+      indicator = indicator.map(function(it){ return Object.assign({}, it, { max: radarUniformMax }); });
+    } else {
+      var maxVal = 0; (radarValues||[]).forEach(function(n){ if (typeof n === 'number' && isFinite(n) && n > maxVal) maxVal = n; });
+      if (!(maxVal > 0)) maxVal = 100;
+      indicator = indicator.map(function(it){ return Object.assign({}, it, { max: maxVal }); });
+    }
+    option.radar = { indicator: indicator };
+    option.series = [{ name: '查询结果数量', type: 'radar', data: [ { value: radarValues, name: '查询结果数量' } ] }];
+    ` : `
     option.series = [{
       name: '查询结果数量',
       type: '${seriesType}',${extraSettings}
@@ -1237,14 +1277,20 @@ export class VisualEchartsSqlUI {
     ${!isPie && !(Array.isArray(this.colors) && this.colors.length) ? `
     try{ option.series[0].itemStyle = option.series[0].itemStyle || {}; option.series[0].itemStyle.color = '#5470c6'; }catch(e){}
     ` : ''}
+    `}
+    ${chartType === 'radar' ? `
+    // Radar 颜色：使用全局 option.color
+    ${Array.isArray(this.colors) && this.colors.length ? `try{ option.color = ${JSON.stringify(this.colors)}; }catch(e){}` : ''}
+    ` : ''}
     option.animation = false;
     return option;
   })()`;
   }
 
   private buildSimpleIIFE(title: string, sql: string, xExpr: string, seriesExprs: any[]): string {
-    const needDualAxis = seriesExprs.some(s => (s as any).axisIndex === 1);
-    const isAllPie = seriesExprs.length > 0 && seriesExprs.every(s => (s.type || 'line') === 'pie');
+  const needDualAxis = seriesExprs.some(s => (s as any).axisIndex === 1);
+  const isAllPie = seriesExprs.length > 0 && seriesExprs.every(s => (s.type || 'line') === 'pie');
+  const isAllRadar = seriesExprs.length > 0 && seriesExprs.every(s => (s.type || 'line') === 'radar');
     const st: any = this.perTypeSettings;
     const stCommon: any = this.commonSettings;
     const stStat: any = this.statInteractions;
@@ -1310,7 +1356,9 @@ export class VisualEchartsSqlUI {
           var m = Math.min(xs.length, Array.isArray(ys)?ys.length:0);
           return xs.slice(0,m).map(function(n,i){ return { name: String(n), value: ys[i] }; });
         })()`
-        : `(${s.expr})`;
+        : (type === 'radar'
+        ? `(function(){ var ys = (${s.expr}); return Array.isArray(ys)?ys:[]; })()`
+        : `(${s.expr})`);
 
       // 饼图半径和玫瑰图设置
       const pieExtra = (type === 'pie') ? (function () {
@@ -1333,17 +1381,19 @@ export class VisualEchartsSqlUI {
         
         if (rose !== undefined && rose !== false) parts.push(`roseType: '${rose}',`);
         return parts.join(' ');
-      })() : '';
+  })() : '';
 
+      // 雷达序列需要封装为 { value: [...], name }
+      const dataField = (type === 'radar') ? `[ { value: ${dataExpr}, name: ${name} } ]` : `${dataExpr}`;
       return `{
         name: ${name}, type: '${type}', ${stack} ${yAxisIndex} smooth: ${smooth}, ${area} ${label} ${lineExtras} ${barExtras} ${pieExtra} z: 1,
-        data: ${dataExpr}
+        data: ${dataField}
       }`;
     }).join(',\n');
 
     // 使用统一设置构建器
-    const tooltipPatch = ChartSettingsBuilder.buildTooltipSettingsCode(tooltipTrigger, axisPointerType, isAllPie);
-    const dataZoomPatch = ChartSettingsBuilder.buildDataZoomCode(dataZoomMode);
+  const tooltipPatch = ChartSettingsBuilder.buildTooltipSettingsCode(isAllRadar ? 'item' : tooltipTrigger, isAllRadar ? 'none' : axisPointerType, isAllPie);
+  const dataZoomPatch = ChartSettingsBuilder.buildDataZoomCode(isAllPie || isAllRadar ? 'none' : dataZoomMode);
 
     return `(() => {
     function fetchSqlSync(sql){
@@ -1362,7 +1412,7 @@ export class VisualEchartsSqlUI {
       return [];
     }
     
-    // 数据预处理函数: box字段ID转name + 时间戳转换 + IAL解析
+  // 数据预处理函数: box字段ID转name + 时间戳转换 + IAL解析
     function preprocessData(rows) {
       if (!rows || !rows.length) return rows;
       
@@ -1506,14 +1556,44 @@ export class VisualEchartsSqlUI {
     option.legend = { data: ${isAllPie ? `(${xExpr})` : legendArr} };
     ${ChartSettingsBuilder.buildLegendPosition(stCommon)}
     ${ChartSettingsBuilder.buildGridSettings(stCommon)}
-    ${!isAllPie ? ChartSettingsBuilder.buildXAxisSettings(stBar, stLine) : ''}
-    ${!isAllPie ? ChartSettingsBuilder.buildYAxisSettings(stBar, stLine, stStat, needDualAxis) : ''}
+    ${!isAllPie && !isAllRadar ? ChartSettingsBuilder.buildXAxisSettings(stBar, stLine) : ''}
+    ${!isAllPie && !isAllRadar ? ChartSettingsBuilder.buildYAxisSettings(stBar, stLine, stStat, needDualAxis) : ''}
+    ${isAllRadar ? `
+    // 构建雷达图指标
+    var indicator = (function(){
+      var xs = (${xExpr});
+      var inds = Array.isArray(xs) ? xs.map(function(x){ return { name: String(x) }; }) : [];
+      return inds;
+    })();
+    // 统一最大值
+    var radarUniformMax = ${(this.perTypeSettings.radar && this.perTypeSettings.radar.uniformMax != null) ? Number(this.perTypeSettings.radar.uniformMax) : 'null'};
+    if (radarUniformMax != null && isFinite(radarUniformMax)) {
+      indicator = indicator.map(function(it){ return Object.assign({}, it, { max: radarUniformMax }); });
+    } else {
+      // 自动计算最大值
+      try {
+        var seriesDataForMax = [${seriesJs}].map(function(s){
+          if (!Array.isArray(s.data)) return [];
+          var first = s.data[0];
+          if (first && Array.isArray(first.value)) return first.value;
+          return s.data;
+        });
+        var maxVal = 0;
+        seriesDataForMax.forEach(function(arr){ (arr||[]).forEach(function(n){ if (typeof n === 'number' && isFinite(n)) { if (n > maxVal) maxVal = n; } }); });
+        if (!(maxVal > 0)) maxVal = 100;
+        indicator = indicator.map(function(it){ return Object.assign({}, it, { max: maxVal }); });
+      } catch(e) { /* ignore */ }
+    }
+    option.radar = { indicator: indicator };
     option.series = [${seriesJs}];
+    ` : `
+    option.series = [${seriesJs}];
+    `}
     
     ${dataZoomPatch}
-    ${Array.isArray(this.colors) && this.colors.length ? `
-    try{ (option.series||[]).forEach(function(s, i){ if (s && s.type === 'pie') return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(this.colors)}[i] || s.itemStyle.color; }); }catch(e){}
-    ` : ''}
+  ${Array.isArray(this.colors) && this.colors.length ? `
+  try{ (option.series||[]).forEach(function(s, i){ if (s && (s.type === 'pie' || s.type === 'radar')) return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(this.colors)}[i] || s.itemStyle.color; }); }catch(e){}
+  ` : ''}
     ${(Array.isArray(this.colors) && this.colors.length && pieCount > 0) ? `
     try{ option.color = ${JSON.stringify(this.colors)}; }catch(e){}
     ` : ''}
@@ -1545,12 +1625,13 @@ export class VisualEchartsSqlUI {
     const el = target || (this.root.querySelector('[data-type-settings-body]') as HTMLElement | null);
     if (!el) return;
     
-    // 判断当前是否为饼图模式
-    // 对于 SQL 单模式,检查 series 中是否全是饼图
+    // 判断当前是否为饼图或雷达图模式
+    // 对于 SQL 单模式,检查 series 中是否全为某类型
     let t = this.chartType;
     if (this.sqlMode === 'single' && this.series.length > 0) {
       const isAllPie = this.series.every(s => (s.type || 'line') === 'pie');
-      t = isAllPie ? 'pie' : 'stat';
+      const isAllRadar = this.series.every(s => (s.type || 'line') === 'radar');
+      t = isAllPie ? 'pie' : (isAllRadar ? 'radar' as any : 'stat');
     }
     
     let html = '';
@@ -1604,7 +1685,7 @@ export class VisualEchartsSqlUI {
         </div>
       </details>`;
     // 只在非饼图模式下显示统计图设置
-    if (t !== 'pie') {
+  if (t !== 'pie' && t !== 'radar') {
       const sb = this.perTypeSettings.bar;
       const sl = this.perTypeSettings.line;
       // 共享值：若两者不一致，优先取折线的值，其次取柱状；目标是通过该面板统一两者
@@ -1767,6 +1848,20 @@ export class VisualEchartsSqlUI {
           </div>
         </details>`;
     }
+    // 雷达图设置（仅当选择雷达图）
+    if (this.chartType === 'radar') {
+      const r = this.perTypeSettings.radar || { uniformMax: null };
+      const uni = (r.uniformMax == null || isNaN(r.uniformMax as any)) ? '' : String(r.uniformMax);
+      html += `
+        <details class="veq-sub" data-fold-radar ${this.foldRadar ? '' : 'open'}>
+          <summary class="veq-legend">雷达图设置</summary>
+          <div class="veq-grid-responsive" style="margin-top:10px;">
+            <label class="veq-field">统一最大值
+              <input class="veq-input" type="number" step="1" min="0" data-set="radar.uniformMax" data-allow-empty="true" placeholder="自动计算" value="${uni}" />
+            </label>
+          </div>
+        </details>`;
+    }
     el.innerHTML = html;
     
     // 阻止 veq-switch 的点击事件冒泡,防止触发 details 折叠
@@ -1811,6 +1906,13 @@ export class VisualEchartsSqlUI {
         this.save(); 
       });
     }
+    const dRadar = el.querySelector('details[data-fold-radar]') as HTMLDetailsElement | null;
+    if (dRadar) {
+      dRadar.addEventListener('toggle', () => {
+        this.foldRadar = !dRadar.open;
+        this.save();
+      });
+    }
     const inputs = Array.from(el.querySelectorAll('[data-set]')) as HTMLElement[];
     inputs.forEach(elm => {
       const key = elm.getAttribute('data-set') || '';
@@ -1820,9 +1922,11 @@ export class VisualEchartsSqlUI {
           const dCommonCurrent = el.querySelector('details[data-fold-common]') as HTMLDetailsElement | null;
           const dStatCurrent = el.querySelector('details[data-fold-stat]') as HTMLDetailsElement | null;
           const dPieCurrent = el.querySelector('details[data-fold-pie]') as HTMLDetailsElement | null;
+          const dRadarCurrent = el.querySelector('details[data-fold-radar]') as HTMLDetailsElement | null;
           if (dCommonCurrent) this.foldCommon = !dCommonCurrent.open;
           if (dStatCurrent) this.foldStat = !dStatCurrent.open;
           if (dPieCurrent) this.foldPie = !dPieCurrent.open;
+          if (dRadarCurrent) this.foldRadar = !dRadarCurrent.open;
           
           this.setDeepSetting(key, elm.checked); 
           this.onChanged(); 
@@ -1883,9 +1987,11 @@ export class VisualEchartsSqlUI {
             const dCommonCurrent = el.querySelector('details[data-fold-common]') as HTMLDetailsElement | null;
             const dStatCurrent = el.querySelector('details[data-fold-stat]') as HTMLDetailsElement | null;
             const dPieCurrent = el.querySelector('details[data-fold-pie]') as HTMLDetailsElement | null;
+            const dRadarCurrent = el.querySelector('details[data-fold-radar]') as HTMLDetailsElement | null;
             if (dCommonCurrent) this.foldCommon = !dCommonCurrent.open;
             if (dStatCurrent) this.foldStat = !dStatCurrent.open;
             if (dPieCurrent) this.foldPie = !dPieCurrent.open;
+            if (dRadarCurrent) this.foldRadar = !dRadarCurrent.open;
             
             this.renderTypeSettingsUI(el);
           }
@@ -2018,6 +2124,7 @@ export class VisualEchartsSqlUI {
       foldCommon: this.foldCommon,
       foldStat: this.foldStat,
       foldPie: this.foldPie,
+      foldRadar: this.foldRadar,
     };
   }
 
@@ -2053,7 +2160,7 @@ export class VisualEchartsSqlUI {
     if (s.series) this.series = s.series;
     if (s.colors) this.colors = s.colors;
     if (s.chartType) {
-      this.chartType = s.chartType;
+      this.chartType = s.chartType as any;
       if (this.chartTypeSel) this.chartTypeSel.value = s.chartType;
     }
     if (s.perTypeSettings) this.perTypeSettings = s.perTypeSettings;
@@ -2086,7 +2193,8 @@ export class VisualEchartsSqlUI {
     }
     if (s.foldCommon !== undefined) this.foldCommon = s.foldCommon;
     if (s.foldStat !== undefined) this.foldStat = s.foldStat;
-    if (s.foldPie !== undefined) this.foldPie = s.foldPie;
+  if (s.foldPie !== undefined) this.foldPie = s.foldPie;
+  if (s.foldRadar !== undefined) this.foldRadar = s.foldRadar;
 
     this.renderSeriesList();
     this.renderPalette();
@@ -2547,7 +2655,7 @@ export class VisualEchartsSqlUI {
         chartSettings: { ...this.perTypeSettings, common: this.commonSettings, stat: this.statInteractions },
         colors: this.colors.join(','),
         visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode, bucket: this.xBucket },
-        fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie },
+        fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie, radar: this.foldRadar },
         sqlMode: this.sqlMode,
         multiSqlPresets: this.multiSqlPresets,
       };
@@ -2568,7 +2676,7 @@ export class VisualEchartsSqlUI {
       this.series = Array.isArray(obj.series) ? obj.series : [];
 
       if (obj.chartType) {
-        this.chartType = (obj.chartType === 'pie') ? 'pie' : 'stat';
+        this.chartType = (obj.chartType === 'pie' || obj.chartType === 'radar') ? obj.chartType : 'stat';
       }
 
       // 恢复SQL模式
@@ -2601,10 +2709,11 @@ export class VisualEchartsSqlUI {
 
       if (obj.chartSettings) {
         // 恢复设置(简化版)
-        const merged = { ...this.perTypeSettings } as any;
+  const merged = { ...this.perTypeSettings } as any;
         if (obj.chartSettings.bar) merged.bar = { ...merged.bar, ...obj.chartSettings.bar };
         if (obj.chartSettings.line) merged.line = { ...merged.line, ...obj.chartSettings.line };
         if (obj.chartSettings.pie) merged.pie = { ...merged.pie, ...obj.chartSettings.pie };
+  if (obj.chartSettings.radar) merged.radar = { ...(merged.radar||{}), ...obj.chartSettings.radar };
         this.perTypeSettings = merged;
 
         if (obj.chartSettings.common) {
@@ -2620,6 +2729,7 @@ export class VisualEchartsSqlUI {
         this.foldCommon = obj.fold.common === true;
         this.foldStat = obj.fold.stat === true;
         this.foldPie = obj.fold.pie === true;
+        this.foldRadar = obj.fold.radar === true;
       }
 
       const typeSel = this.root.querySelector('[data-chart-type]') as HTMLSelectElement | null;

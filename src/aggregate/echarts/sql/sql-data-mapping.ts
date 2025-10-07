@@ -11,7 +11,7 @@ export type SeriesAgg = 'raw' | 'count' | 'sum' | 'avg' | 'min' | 'max';
 export interface SeriesItem {
   name: string;
   expr: string;
-  type?: 'line' | 'bar' | 'scatter' | 'pie';
+  type?: 'line' | 'bar' | 'scatter' | 'pie' | 'radar';
   axisIndex?: number;
   valueKey?: string;
   agg?: SeriesAgg;
