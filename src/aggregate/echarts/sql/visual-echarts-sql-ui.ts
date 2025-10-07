@@ -314,12 +314,12 @@ export class VisualEchartsSqlUI {
       yAxisRightName?: string;
     };
     pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
-    radar?: { uniformMax?: number | null };
+    radar?: { uniformMax?: number | null; tooltipShow?: boolean };
   } = {
   bar: { stack: false, boundaryGap: true, xLabelRotate: 0, barWidth: null, barGap: '30%', xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
   line: { smooth: true, boundaryGap: false, xLabelRotate: 0, area: false, symbol: 'circle', symbolSize: 8, lineWidth: 2, xAxisName: '', yAxisLeftName: '', yAxisRightName: '' },
   pie: { innerRadius: 0, outerRadius: 70, roseType: false },
-  radar: { uniformMax: null },
+  radar: { uniformMax: null, tooltipShow: true },
     };
   private colors: string[] = [];
   private series: Array<SeriesItem> = [];
@@ -352,7 +352,7 @@ export class VisualEchartsSqlUI {
 
   public setSQL(sql: string) {
     this.sql = sql;
-    if (this.sqlTextarea) {
+        if (this.sqlTextarea) {
       this.sqlTextarea.value = sql;
     }
     this.rebuildCode();
@@ -365,7 +365,7 @@ export class VisualEchartsSqlUI {
   // 统一的变化处理:可视化时自动生成表达式,然后保存并刷新预览
   private onChanged() {
     try {
-      if (this.visualMode) this.autoBuildExpr();
+          if (this.visualMode) this.autoBuildExpr();
       this.save();
       this.rebuildCode();
       if (this.opts?.onChange) this.opts.onChange();
@@ -1109,14 +1109,16 @@ export class VisualEchartsSqlUI {
     const stCommon: any = this.commonSettings;
     const stStat: any = this.statInteractions;
     const stBar: any = this.perTypeSettings.bar || {};
-    const stPie: any = this.perTypeSettings.pie || {};
+  const stPie: any = this.perTypeSettings.pie || {};
+  const stRadar: any = this.perTypeSettings.radar || {};
     
     // 使用统一的设置构建器
     const titlePos = ChartSettingsBuilder.buildTitlePosition(stCommon);
     const legendPosCode = ChartSettingsBuilder.buildLegendPosition(stCommon);
     const gridCode = ChartSettingsBuilder.buildGridSettings(stCommon);
     const splitLine = ChartSettingsBuilder.buildSplitLineSettings(stStat);
-    const tooltipPatch = ChartSettingsBuilder.buildTooltipSettingsCode(isPie ? 'item' : (stStat.tooltipTrigger || 'axis'), isPie ? 'none' : (stStat.axisPointerType || 'shadow'), isPie);
+  const tooltipPatch = ChartSettingsBuilder.buildTooltipSettingsCode(isPie ? 'item' : (stStat.tooltipTrigger || 'axis'), isPie ? 'none' : (stStat.axisPointerType || 'shadow'), isPie);
+  const radarTooltipShow = (stRadar.tooltipShow === false) ? false : true;
     const dataZoomPatch = ChartSettingsBuilder.buildDataZoomCode(isPie ? 'none' : (stStat.dataZoom || 'none'));
     
     // 根据图表类型获取对应设置
@@ -1225,7 +1227,7 @@ export class VisualEchartsSqlUI {
     option.title = { text: ${JSON.stringify(title)} };
     ${titlePos}
     option.backgroundColor = 'transparent';
-    ${chartType === 'radar' ? `option.tooltip = { trigger: 'item' };` : tooltipPatch}
+  ${chartType === 'radar' ? `option.tooltip = { trigger: 'item', show: ${radarTooltipShow} };` : tooltipPatch}
     option.legend = { data: ${isPie ? 'pieData.map(d => d.name)' : (chartType === 'radar' ? "['查询结果数量']" : "['查询结果数量']")} };
     ${legendPosCode}
     ${!isPie && chartType !== 'radar' && gridCode ? gridCode : ''}
@@ -1296,7 +1298,8 @@ export class VisualEchartsSqlUI {
     const stStat: any = this.statInteractions;
     const stBar: any = st.bar || {};
     const stLine: any = st.line || {};
-    const stPie: any = st.pie || {};
+  const stPie: any = st.pie || {};
+  const radarTooltipShow = (st.radar && (st.radar as any).tooltipShow === false) ? false : true;
 
     const legendArr = JSON.stringify(seriesExprs.map(s => s.name));
 
@@ -1392,7 +1395,8 @@ export class VisualEchartsSqlUI {
     }).join(',\n');
 
     // 使用统一设置构建器
-  const tooltipPatch = ChartSettingsBuilder.buildTooltipSettingsCode(isAllRadar ? 'item' : tooltipTrigger, isAllRadar ? 'none' : axisPointerType, isAllPie);
+  let tooltipPatch = ChartSettingsBuilder.buildTooltipSettingsCode(isAllRadar ? 'item' : tooltipTrigger, isAllRadar ? 'none' : axisPointerType, isAllPie);
+  if (isAllRadar) { tooltipPatch += ` option.tooltip.show = ${radarTooltipShow};`; }
   const dataZoomPatch = ChartSettingsBuilder.buildDataZoomCode(isAllPie || isAllRadar ? 'none' : dataZoomMode);
 
     return `(() => {
@@ -1595,6 +1599,9 @@ export class VisualEchartsSqlUI {
   try{ (option.series||[]).forEach(function(s, i){ if (s && (s.type === 'pie' || s.type === 'radar')) return; s.itemStyle = s.itemStyle || {}; s.itemStyle.color = ${JSON.stringify(this.colors)}[i] || s.itemStyle.color; }); }catch(e){}
   ` : ''}
     ${(Array.isArray(this.colors) && this.colors.length && pieCount > 0) ? `
+    try{ option.color = ${JSON.stringify(this.colors)}; }catch(e){}
+    ` : ''}
+    ${(Array.isArray(this.colors) && this.colors.length && isAllRadar) ? `
     try{ option.color = ${JSON.stringify(this.colors)}; }catch(e){}
     ` : ''}
     option.animation = false;
@@ -1850,7 +1857,7 @@ export class VisualEchartsSqlUI {
     }
     // 雷达图设置（仅当选择雷达图）
     if (this.chartType === 'radar') {
-      const r = this.perTypeSettings.radar || { uniformMax: null };
+      const r = this.perTypeSettings.radar || { uniformMax: null, tooltipShow: true };
       const uni = (r.uniformMax == null || isNaN(r.uniformMax as any)) ? '' : String(r.uniformMax);
       html += `
         <details class="veq-sub" data-fold-radar ${this.foldRadar ? '' : 'open'}>
@@ -1859,6 +1866,10 @@ export class VisualEchartsSqlUI {
             <label class="veq-field">统一最大值
               <input class="veq-input" type="number" step="1" min="0" data-set="radar.uniformMax" data-allow-empty="true" placeholder="自动计算" value="${uni}" />
             </label>
+            <div class="veq-field">
+              <div class="veq-label">显示提示框</div>
+              <label class="veq-switch"><input type="checkbox" data-set="radar.tooltipShow" ${r.tooltipShow !== false ? 'checked' : ''}/><i></i></label>
+            </div>
           </div>
         </details>`;
     }

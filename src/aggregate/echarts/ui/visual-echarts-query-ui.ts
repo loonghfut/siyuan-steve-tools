@@ -114,6 +114,8 @@ export class VisualEchartsQueryUI {
   private series: Array<SeriesItem> = [];
   // 雷达图统一最大值设置
   private radarUniformMax: number | null = null;
+  // 雷达图：显示提示框
+  private radarTooltipShow: boolean = true;
   private debug = false;
   private debugSampleSize = 5;
   private loadingKeys = false;
@@ -161,8 +163,10 @@ export class VisualEchartsQueryUI {
         if (uniformMax !== null) {
           (ctx as any).radarUniformMax = uniformMax;
         }
-        // radarSeries: map series -> valuesExpr (reuse series.expr)
-        (ctx as any).radarSeries = this.series.map(s => ({ name: s.name, valuesExpr: s.expr }));
+  // radarSeries: map series -> valuesExpr (reuse series.expr)
+  (ctx as any).radarSeries = this.series.map(s => ({ name: s.name, valuesExpr: s.expr }));
+  // 显示提示框（由 UI 控制，默认 true）
+  (ctx as any).radarTooltipShow = this.radarTooltipShow !== false;
         return buildRadarIIFEFromAVCtx(ctx as any);
       } catch (e) {
         // fallback
@@ -759,6 +763,7 @@ export class VisualEchartsQueryUI {
         type: 'radar',
         settings: {
           radarUniformMax: (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? this.radarUniformMax : undefined,
+          radarTooltipShow: this.radarTooltipShow !== false,
         }
       };
     }
@@ -823,6 +828,7 @@ export class VisualEchartsQueryUI {
         db: { showId: this.showDbId },
         showDbNameAndViewName: this.showDbNameAndViewName,
         radarUniformMax: (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? this.radarUniformMax : undefined,
+        radarTooltipShow: this.radarTooltipShow !== false,
       };
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch { /* ignore */ }
@@ -973,12 +979,13 @@ export class VisualEchartsQueryUI {
       // 刷新类型设置面板（仅刷新内容区域 body，避免替换 details 结构）
       this.renderTypeSettingsUI(this.root.querySelector('[data-type-settings-body]') as HTMLElement | null || undefined);
   // 恢复 radar 选择
-      // 恢复雷达指标设定（兼容旧数据）
+      // 恢复雷达设置（兼容旧数据）
       if (typeof obj.radarUniformMax === 'number' && Number.isFinite(obj.radarUniformMax)) {
         this.radarUniformMax = obj.radarUniformMax;
       } else {
         this.radarUniformMax = null;
       }
+      this.radarTooltipShow = obj.radarTooltipShow !== false;
       // 恢复显示 avID 开关
       if (obj.db && typeof obj.db === 'object') {
         this.showDbId = !!obj.db.showId;
@@ -1227,6 +1234,10 @@ export class VisualEchartsQueryUI {
               </label>
               <div class="veq-note" style="font-size:12px; color:var(--b3-theme-on-surface-variant); margin-top:4px;">设置后所有指标的 max 值将统一为该数值。</div>
             </div>
+            <div class="veq-field" style="margin-top:8px;">
+              <div class="veq-label">显示提示框</div>
+              <label class="veq-switch"><input type="checkbox" data-radar-tooltip-show ${this.radarTooltipShow ? 'checked' : ''}/><i></i></label>
+            </div>
           </div>
         </details>`;
     }
@@ -1319,6 +1330,14 @@ export class VisualEchartsQueryUI {
         };
         uniformInput.addEventListener('change', updateUniform);
         uniformInput.addEventListener('blur', updateUniform);
+      }
+      const tooltipChk = el.querySelector('[data-radar-tooltip-show]') as HTMLInputElement | null;
+      if (tooltipChk) {
+        tooltipChk.addEventListener('change', (e) => {
+          this.radarTooltipShow = (e.target as HTMLInputElement).checked;
+          this.save();
+          this.onChanged();
+        });
       }
     }
   }

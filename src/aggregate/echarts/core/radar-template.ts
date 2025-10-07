@@ -17,6 +17,7 @@ export function buildRadarIIFEFromAVCtx(ctx: EchartsAvTplCtx & any) {
   const fallbackSeriesExprs = Array.isArray(ctx.seriesExprs || []) ? JSON.stringify((ctx.seriesExprs || []).map((s: any) => ({ name: s.name, expr: s.expr }))) : '[]';
   const colorsJs = Array.isArray(ctx.colors) && ctx.colors.length ? JSON.stringify(ctx.colors) : 'null';
   const uniformMaxJs = (typeof (ctx as any).radarUniformMax === 'number' && Number.isFinite((ctx as any).radarUniformMax)) ? String((ctx as any).radarUniformMax) : 'null';
+  const tooltipShowJs = (typeof (ctx as any).radarTooltipShow === 'boolean') ? String(!!(ctx as any).radarTooltipShow) : 'true';
 
   const body = `(() => {
     function getBase(){
@@ -97,7 +98,7 @@ export function buildRadarIIFEFromAVCtx(ctx: EchartsAvTplCtx & any) {
       } catch(e) { radarSeries = []; }
     }
 
-    var option = { title: { text: ${title} }, backgroundColor: 'transparent' };
+  var option = { title: { text: ${title} }, backgroundColor: 'transparent' };
     // build radar.indicator with optional max (will be filled by data scanning when missing)
   var indicatorOut = indicators.map(function(it, idx){ return { name: String(it && it.name ? it.name : ('指标' + (idx+1))), max: (typeof (it && it.max) === 'number' && isFinite(it.max)) ? it.max : undefined }; });
   var uniformMax = ${uniformMaxJs};
@@ -144,7 +145,8 @@ export function buildRadarIIFEFromAVCtx(ctx: EchartsAvTplCtx & any) {
     for (var k=0;k<seriesData.length;k++){
       outSeries.push({ name: radarSeries[k].name || ('系列'+(k+1)), type: 'radar', data: [ { value: seriesData[k], name: radarSeries[k].name || ('系列'+(k+1)) } ] });
     }
-    option.radar = { indicator: indicatorOut };
+  option.radar = { indicator: indicatorOut };
+  option.tooltip = { trigger: 'item', show: ${tooltipShowJs} };
     option.series = outSeries;
     option.legend = { data: radarSeries.map(function(s){ return s.name; }) };
     try{ 
