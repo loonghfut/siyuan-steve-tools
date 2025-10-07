@@ -1,4 +1,5 @@
 import { buildIIFEFromAVCtx, EchartsAvTplCtx } from '../core/option-templates';
+import { buildRadarIIFEFromAVCtx } from '../core/radar-template';
 import { buildDbMappingExpressions, SeriesItem } from '../av_data/db-data-mapping';
 import { getallavids } from '../../../api/api3';
 import { AVManager } from '../../../api/db_pro';
@@ -77,7 +78,7 @@ export class VisualEchartsQueryUI {
   private foldPie: boolean = false;
 
   // 统一图表设置（与预设模式保持一致）
-  private chartType: 'stat' | 'pie' = 'stat';
+  private chartType: 'stat' | 'pie' | 'radar' = 'stat';
   private perTypeSettings: {
     bar: {
       stack?: boolean;
@@ -111,6 +112,8 @@ export class VisualEchartsQueryUI {
     };
   private colors: string[] = [];
   private series: Array<SeriesItem> = [];
+  // 雷达图统一最大值设置
+  private radarUniformMax: number | null = null;
   private debug = false;
   private debugSampleSize = 5;
   private loadingKeys = false;
@@ -136,7 +139,7 @@ export class VisualEchartsQueryUI {
   public getIIFE(): string {
     const dbName = this.avList.find(x => x.id === this.selectedAvID)?.name || this.selectedAvID;
     const viewName = this.selectedViewName || (this.selectedViewID ? this.selectedViewID : '默认视图');
-    const ctx: EchartsAvTplCtx = {
+    const ctx: EchartsAvTplCtx & any = {
       avID: this.selectedAvID || '',
       // 传递 viewID
       viewID: this.selectedViewID || '',
@@ -151,6 +154,21 @@ export class VisualEchartsQueryUI {
       debugSampleSize: this.debugSampleSize,
       colors: this.colors.length ? this.colors.slice() : undefined,
     };
+    // radar 特殊处理：注入统一最大值与 radarSeries，直接走 radar 模板
+    if (this.chartType === 'radar') {
+      try {
+        const uniformMax = (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? this.radarUniformMax : null;
+        if (uniformMax !== null) {
+          (ctx as any).radarUniformMax = uniformMax;
+        }
+        // radarSeries: map series -> valuesExpr (reuse series.expr)
+        (ctx as any).radarSeries = this.series.map(s => ({ name: s.name, valuesExpr: s.expr }));
+        return buildRadarIIFEFromAVCtx(ctx as any);
+      } catch (e) {
+        // fallback
+        return buildIIFEFromAVCtx(ctx);
+      }
+    }
     return buildIIFEFromAVCtx(ctx);
   }
 
@@ -190,6 +208,7 @@ export class VisualEchartsQueryUI {
             <select class="veq-input" data-chart-type style="width:120px">
               <option value="stat">统计图</option>
               <option value="pie">饼图</option>
+              <option value="radar">雷达图</option>
             </select>
           </label>
         </div>
@@ -613,6 +632,7 @@ export class VisualEchartsQueryUI {
           }
           // 系列行中的 valueKey
           this.renderSeriesList();
+          this.renderTypeSettingsUI(this.typeSettingsEl);
 
           // 等字段加载完成后再进行下一步：自动构建表达式并刷新预览
           this.autoBuildExpr();
@@ -691,16 +711,30 @@ export class VisualEchartsQueryUI {
   }
 
   // 对外 API：用于父容器同步视图设置和标题/颜色
-  public setViewSettings(type: 'bar' | 'line' | 'pie', settings: any) {
+  public setViewSettings(type: 'bar' | 'line' | 'pie' | 'radar', settings: any) {
     try {
       // 兼容旧接口：bar/line -> stat，pie 保持
       const incoming = type || 'line';
-      this.chartType = incoming === 'pie' ? 'pie' : 'stat';
+      if (incoming === 'pie') {
+        this.chartType = 'pie';
+      } else if (incoming === 'radar') {
+        this.chartType = 'radar';
+      } else {
+        this.chartType = 'stat';
+      }
       if (settings && typeof settings === 'object') {
         const merged = { ...this.perTypeSettings } as any;
         if (incoming === 'bar') merged.bar = { ...merged.bar, ...settings };
         if (incoming === 'line') merged.line = { ...merged.line, ...settings };
         if (incoming === 'pie') merged.pie = { ...merged.pie, ...settings };
+        if (incoming === 'radar') {
+          const incomingUniform = (settings as any)?.radarUniformMax;
+          if (typeof incomingUniform === 'number' && Number.isFinite(incomingUniform)) {
+            this.radarUniformMax = incomingUniform;
+          } else {
+            this.radarUniformMax = null;
+          }
+        }
         this.perTypeSettings = merged;
       }
       if (this.chartTypeSel) this.chartTypeSel.value = this.chartType;
@@ -717,9 +751,17 @@ export class VisualEchartsQueryUI {
     } catch { /* ignore */ }
   }
 
-  public getViewSettings(): { type: 'bar' | 'line' | 'pie', settings: any } {
+  public getViewSettings(): { type: 'bar' | 'line' | 'pie' | 'radar', settings: any } {
     // 对外兼容：stat 作为 line 返回
     if (this.chartType === 'pie') return { type: 'pie', settings: this.perTypeSettings.pie };
+    if (this.chartType === 'radar') {
+      return {
+        type: 'radar',
+        settings: {
+          radarUniformMax: (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? this.radarUniformMax : undefined,
+        }
+      };
+    }
     return { type: 'line', settings: this.perTypeSettings.line };
   }
 
@@ -779,7 +821,8 @@ export class VisualEchartsQueryUI {
         visual: { xKey: this.xKey, sort: this.sort, merge: this.mergeMode, bucket: this.xBucket },
         fold: { common: this.foldCommon, stat: this.foldStat, pie: this.foldPie },
         db: { showId: this.showDbId },
-        showDbNameAndViewName: this.showDbNameAndViewName
+        showDbNameAndViewName: this.showDbNameAndViewName,
+        radarUniformMax: (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? this.radarUniformMax : undefined,
       };
       localStorage.setItem(this.key, JSON.stringify(data));
     } catch { /* ignore */ }
@@ -804,8 +847,14 @@ export class VisualEchartsQueryUI {
         this.perTypeSettings.bar.boundaryGap = !!obj.flags.boundaryGap;
       }
       if (obj.chartType) {
-        // 兼容旧值：bar/line 映射为 stat
-        this.chartType = (obj.chartType === 'pie') ? 'pie' : 'stat';
+        // 兼容旧值：bar/line 映射为 stat，其余保留
+        if (obj.chartType === 'pie') {
+          this.chartType = 'pie';
+        } else if (obj.chartType === 'radar') {
+          this.chartType = 'radar';
+        } else {
+          this.chartType = 'stat';
+        }
       }
       if (obj.chartSettings) {
         const { common, stat, ...rest } = obj.chartSettings || {};
@@ -923,6 +972,13 @@ export class VisualEchartsQueryUI {
       this.applyTypeConstraints(this.root.querySelector('[data-merge]') as HTMLInputElement | null);
       // 刷新类型设置面板（仅刷新内容区域 body，避免替换 details 结构）
       this.renderTypeSettingsUI(this.root.querySelector('[data-type-settings-body]') as HTMLElement | null || undefined);
+  // 恢复 radar 选择
+      // 恢复雷达指标设定（兼容旧数据）
+      if (typeof obj.radarUniformMax === 'number' && Number.isFinite(obj.radarUniformMax)) {
+        this.radarUniformMax = obj.radarUniformMax;
+      } else {
+        this.radarUniformMax = null;
+      }
       // 恢复显示 avID 开关
       if (obj.db && typeof obj.db === 'object') {
         this.showDbId = !!obj.db.showId;
@@ -1157,6 +1213,23 @@ export class VisualEchartsQueryUI {
           </div>
         </details>`;
     }
+    // 雷达图设置
+    if (t === 'radar') {
+      const uniformMaxStr = (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? String(this.radarUniformMax) : '';
+      html += `
+        <details class="veq-sub" open>
+          <summary class="veq-legend">雷达图设置</summary>
+          <div style="margin-top:8px;">
+            <div class="veq-field" style="margin-bottom:12px;">
+              <label class="veq-field" style="width:100%;">
+                <span class="veq-label" style="display:block; margin-bottom:4px;">统一最大值 (max)</span>
+                <input class="veq-input" data-radar-uniform-max type="number" step="1" min="0" placeholder="留空则根据数据自动计算" value="${this.escape(uniformMaxStr)}" />
+              </label>
+              <div class="veq-note" style="font-size:12px; color:var(--b3-theme-on-surface-variant); margin-top:4px;">设置后所有指标的 max 值将统一为该数值。</div>
+            </div>
+          </div>
+        </details>`;
+    }
     el.innerHTML = html;
     // 监听折叠切换并持久化
     const dCommon = el.querySelector('details[data-fold-common]') as HTMLDetailsElement | null;
@@ -1226,6 +1299,28 @@ export class VisualEchartsQueryUI {
         });
       }
     });
+    if (t === 'radar') {
+      const uniformInput = el.querySelector('[data-radar-uniform-max]') as HTMLInputElement | null;
+      if (uniformInput) {
+        const updateUniform = () => {
+          const raw = uniformInput.value.trim();
+          if (raw === '') {
+            this.radarUniformMax = null;
+          } else {
+            const num = Number(raw);
+            if (Number.isFinite(num) && num >= 0) {
+              this.radarUniformMax = num;
+            } else {
+              this.radarUniformMax = null;
+              uniformInput.value = '';
+            }
+          }
+          this.onChanged();
+        };
+        uniformInput.addEventListener('change', updateUniform);
+        uniformInput.addEventListener('blur', updateUniform);
+      }
+    }
   }
 
   private setDeepSetting(path: string, value: any) {
@@ -1542,6 +1637,7 @@ export class VisualEchartsQueryUI {
       foldCommon: this.foldCommon,
       foldStat: this.foldStat,
       foldPie: this.foldPie,
+      radarUniformMax: (typeof this.radarUniformMax === 'number' && Number.isFinite(this.radarUniformMax)) ? this.radarUniformMax : null,
     };
   }
 
@@ -1581,8 +1677,10 @@ export class VisualEchartsQueryUI {
     if (s.series) this.series = s.series;
     if (s.colors) this.colors = s.colors;
     if (s.chartType) {
-      this.chartType = s.chartType;
-      if (this.chartTypeSel) this.chartTypeSel.value = s.chartType;
+      if (s.chartType === 'pie' || s.chartType === 'stat' || s.chartType === 'radar') {
+        this.chartType = s.chartType;
+        if (this.chartTypeSel) this.chartTypeSel.value = s.chartType;
+      }
     }
     if (s.perTypeSettings) this.perTypeSettings = s.perTypeSettings;
     if (s.commonSettings) this.commonSettings = s.commonSettings;
@@ -1590,6 +1688,13 @@ export class VisualEchartsQueryUI {
     if (s.foldCommon !== undefined) this.foldCommon = s.foldCommon;
     if (s.foldStat !== undefined) this.foldStat = s.foldStat;
     if (s.foldPie !== undefined) this.foldPie = s.foldPie;
+    if (s.radarUniformMax !== undefined) {
+      if (typeof s.radarUniformMax === 'number' && Number.isFinite(s.radarUniformMax)) {
+        this.radarUniformMax = s.radarUniformMax;
+      } else {
+        this.radarUniformMax = null;
+      }
+    }
 
     // 重新渲染UI
     this.renderSeriesList();
