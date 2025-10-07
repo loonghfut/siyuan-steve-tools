@@ -31,10 +31,10 @@ export interface CommonSettings {
 }
 
 export interface PerTypeSettings {
-  bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
-  line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number; label?: { show?: boolean; position?: string } };
+  bar: { stack?: boolean; boundaryGap?: boolean; xLabelRotate?: number };
+  line: { smooth?: boolean; boundaryGap?: boolean; xLabelRotate?: number };
   scatter: Record<string, unknown>; // 预留
-  pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false; label?: { show?: boolean; position?: string } };
+  pie: { innerRadius?: number; outerRadius?: number; roseType?: 'radius' | 'area' | false };
 }
 
 export interface VisualEchartsOptions {

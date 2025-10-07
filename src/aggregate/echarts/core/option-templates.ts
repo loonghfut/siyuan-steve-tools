@@ -3,7 +3,7 @@ export interface EchartsTplCtx {
   title?: string;
   legend?: string[];
   xDataExpr?: string; // JS 表达式，从 rows 推导 xAxis data
-  seriesExprs?: Array<{ name: string; expr: string; type?: 'line'|'bar'|'scatter'|'pie', axisIndex?: number }>; // 从 rows 推导 series.data
+  seriesExprs?: Array<{ name: string; expr: string; type?: 'line'|'bar'|'scatter'|'pie', axisIndex?: number, label?: { show?: boolean; position?: string } }>; // 从 rows 推导 series.data
   smooth?: boolean; // 全局平滑（针对 line）
   area?: boolean;   // 是否填充面积（针对 line）
   stack?: boolean;  // 是否堆叠（针对同类型）
@@ -282,8 +282,11 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
         return xs.slice(0,m).map(function(n,i){ return { name: String(n), value: ys[i] }; });
       })()`
       : `(${s.expr})`;
-    // 统一 label 设置：按系列类型读取（饼图取 pie.label）
+    // 优先使用 series 提供的 label 设置（seriesExprs 中可包含 label），否则回退到统一设置
     const label = (function(){
+      try{
+        if (s && s.label) return `label: ${JSON.stringify(s.label)},`;
+      }catch(e){}
       let l: any;
       if (type==='bar') l = stBar && stBar.label;
       else if (type==='line') l = stLine && stLine.label;

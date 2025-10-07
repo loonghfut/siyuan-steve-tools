@@ -20,6 +20,7 @@ export interface SeriesItem {
   agg?: SeriesAgg;
   filter?: string; // 数据筛选表达式，例如："r.created > '2024-01-01'"
   filters?: FilterCondition[]; // 可视化筛选条件
+  label?: { show?: boolean; position?: string };
 }
 
 export interface MappingInput {

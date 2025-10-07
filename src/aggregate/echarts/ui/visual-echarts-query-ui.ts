@@ -145,7 +145,7 @@ export class VisualEchartsQueryUI {
       showDbNameAndViewName: this.showDbNameAndViewName,
       title: this.titleInput?.value || '',
       xDataExpr: this.xExprTextarea?.value || 'rows.map((_, i) => String(i+1))',
-      seriesExprs: this.series.map(s => ({ name: s.name, expr: s.expr, type: (this.chartType === 'pie' ? 'pie' : (s.type || 'line')), axisIndex: s.axisIndex })),
+  seriesExprs: this.series.map(s => ({ name: s.name, expr: s.expr, type: (this.chartType === 'pie' ? 'pie' : (s.type || 'line')), axisIndex: s.axisIndex, label: s.label })),
       chartSettings: this.getChartSettingsForTemplate(),
       debug: this.debug,
       debugSampleSize: this.debugSampleSize,
@@ -406,7 +406,7 @@ export class VisualEchartsQueryUI {
     this.applyTypeConstraints(mergeToggle);
     (this.root.querySelector('[data-add-series]') as HTMLButtonElement).addEventListener('click', () => {
       const defType = this.chartType === 'pie' ? 'pie' : 'line';
-      this.series.push({ name: '系列' + (this.series.length + 1), expr: 'rows.map(r => r.value)', type: defType as any, axisIndex: 0 });
+      this.series.push({ name: '系列' + (this.series.length + 1), expr: 'rows.map(r => r.value)', type: defType as any, axisIndex: 0, label: { show: false, position: 'top' } });
       this.renderSeriesList(); this.onChanged();
     });
     // 统一类型设置面板负责处理细节
@@ -485,6 +485,18 @@ export class VisualEchartsQueryUI {
               </select>
               ${aggSelHtml}
             </div>
+            <label class="veq-switch-item"><label class="veq-switch"><input type="checkbox" data-show-label ${s.label && s.label.show ? 'checked' : ''}/><i></i></label></label>
+            <select class="veq-input" data-label-pos style="width:120px; margin-left:8px; ${s.label && s.label.show ? '' : 'display:none;'}">
+              <option value="top" ${s.label && s.label.position === 'top' ? 'selected' : ''}>top</option>
+              <option value="bottom" ${s.label && s.label.position === 'bottom' ? 'selected' : ''}>bottom</option>
+              <option value="left" ${s.label && s.label.position === 'left' ? 'selected' : ''}>left</option>
+              <option value="right" ${s.label && s.label.position === 'right' ? 'selected' : ''}>right</option>
+              <option value="inside" ${s.label && s.label.position === 'inside' ? 'selected' : ''}>inside</option>
+              <option value="insideTop" ${s.label && s.label.position === 'insideTop' ? 'selected' : ''}>insideTop</option>
+              <option value="insideBottom" ${s.label && s.label.position === 'insideBottom' ? 'selected' : ''}>insideBottom</option>
+              <option value="insideLeft" ${s.label && s.label.position === 'insideLeft' ? 'selected' : ''}>insideLeft</option>
+              <option value="insideRight" ${s.label && s.label.position === 'insideRight' ? 'selected' : ''}>insideRight</option>
+            </select>
             <textarea class="veq-input" data-expr rows="2" style="flex:1; display:none;" placeholder="rows.map(r=>r.value)">${this.escape(s.expr)}</textarea>
             <button class="veq-btn veq-ghost" data-del type="button">删除</button>
           </div>
@@ -505,7 +517,19 @@ export class VisualEchartsQueryUI {
       (row.querySelector('[data-name]') as HTMLInputElement).addEventListener('input', (e) => { this.series[idx].name = (e.target as HTMLInputElement).value; this.onChanged(); });
       (row.querySelector('[data-type]') as HTMLSelectElement).addEventListener('change', (e) => { this.series[idx].type = (e.target as HTMLSelectElement).value as any; this.onChanged(); });
       (row.querySelector('[data-axis]') as HTMLSelectElement).addEventListener('change', (e) => { const v = Number((e.target as HTMLSelectElement).value) || 0; this.series[idx].axisIndex = v; this.onChanged(); });
-      (row.querySelector('[data-expr]') as HTMLTextAreaElement).addEventListener('input', (e) => { this.series[idx].expr = (e.target as HTMLTextAreaElement).value; this.onChanged(); });
+  (row.querySelector('[data-expr]') as HTMLTextAreaElement).addEventListener('input', (e) => { this.series[idx].expr = (e.target as HTMLTextAreaElement).value; this.onChanged(); });
+  const lblChk = row.querySelector('[data-show-label]') as HTMLInputElement | null;
+  const lblPosSel = row.querySelector('[data-label-pos]') as HTMLSelectElement | null;
+  if (lblChk) lblChk.addEventListener('change', (e) => { 
+    if (!this.series[idx].label) this.series[idx].label = {};
+    const checked = (e.target as HTMLInputElement).checked;
+    this.series[idx].label!.show = checked;
+    if (lblPosSel) lblPosSel.style.display = checked ? '' : 'none';
+    // ensure default position
+    if (checked && !this.series[idx].label!.position) this.series[idx].label!.position = 'top';
+    this.onChanged(); 
+  });
+  if (lblPosSel) lblPosSel.addEventListener('change', (e) => { if (!this.series[idx].label) this.series[idx].label = {}; this.series[idx].label!.position = (e.target as HTMLSelectElement).value; this.onChanged(); });
       const vk = row.querySelector('[data-value-key]') as HTMLSelectElement | null;
       if (vk) vk.addEventListener('change', (e) => { this.series[idx].valueKey = (e.target as HTMLSelectElement).value; this.autoBuildExpr(); this.onChanged(); this.rebuildCode(); });
       const agg = row.querySelector('[data-agg]') as HTMLSelectElement | null;
@@ -978,8 +1002,7 @@ export class VisualEchartsQueryUI {
       // 共享值：若两者不一致，优先取折线的值，其次取柱状；目标是通过该面板统一两者
       const sharedBoundaryGap = (typeof sl.boundaryGap === 'boolean') ? sl.boundaryGap : (typeof sb.boundaryGap === 'boolean' ? sb.boundaryGap : false);
       const sharedRotate = (typeof sl.xLabelRotate === 'number') ? (sl.xLabelRotate as number) : (typeof sb.xLabelRotate === 'number' ? (sb.xLabelRotate as number) : 0);
-      const sharedLabelShow = !!(sl.label?.show || sb.label?.show);
-      const sharedLabelPos = (sl.label?.position || sb.label?.position || 'top');
+    
       const lineSymbol = (typeof sl.symbol === 'string' && sl.symbol) ? sl.symbol : 'circle';
       const lineSymbolSize = Number.isFinite(sl.symbolSize) ? Number(sl.symbolSize) : 8;
       const lineWidth = Number.isFinite((sl as any).lineWidth) ? Number((sl as any).lineWidth) : 2;
@@ -1008,26 +1031,7 @@ export class VisualEchartsQueryUI {
                 <label class="veq-switch-item"><span>面积填充</span><label class="veq-switch"><input type="checkbox" data-set="line.area" ${(sl as any).area ? 'checked' : ''}/><i></i></label></label>
               </div>
             </div>
-            <div class="veq-stat-group">
-              <div class="veq-stat-group__title">标签</div>
-              <div class="veq-switch-grid">
-                <label class="veq-switch-item"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="stat.label.show" ${sharedLabelShow ? 'checked' : ''}/><i></i></label></label>
-              </div>
-              <div class="veq-field" style="margin-top:6px;">
-                <div class="veq-label">标签位置</div>
-                <select class="veq-input" data-set="stat.label.position" style="width:160px">
-                  <option value="top" ${sharedLabelPos === 'top' ? 'selected' : ''}>top</option>
-                  <option value="bottom" ${sharedLabelPos === 'bottom' ? 'selected' : ''}>bottom</option>
-                  <option value="left" ${sharedLabelPos === 'left' ? 'selected' : ''}>left</option>
-                  <option value="right" ${sharedLabelPos === 'right' ? 'selected' : ''}>right</option>
-                  <option value="inside" ${sharedLabelPos === 'inside' ? 'selected' : ''}>inside</option>
-                  <option value="insideTop" ${sharedLabelPos === 'insideTop' ? 'selected' : ''}>insideTop</option>
-                  <option value="insideBottom" ${sharedLabelPos === 'insideBottom' ? 'selected' : ''}>insideBottom</option>
-                  <option value="insideLeft" ${sharedLabelPos === 'insideLeft' ? 'selected' : ''}>insideLeft</option>
-                  <option value="insideRight" ${sharedLabelPos === 'insideRight' ? 'selected' : ''}>insideRight</option>
-                </select>
-              </div>
-            </div>
+            <!-- 标签设置已移至每个系列内部 -->
             <div class="veq-stat-group">
               <div class="veq-stat-group__title">折线样式</div>
               <div class="veq-field">
@@ -1118,8 +1122,7 @@ export class VisualEchartsQueryUI {
           </div>
         </details>`;
     } else if (t === 'pie') {
-      const s = this.perTypeSettings.pie;
-      const labelPos = s.label?.position || 'outside';
+  const s = this.perTypeSettings.pie;
       html += `
         <details class="veq-sub" data-fold-pie ${this.foldPie ? 'open' : ''}>
           <summary class="veq-legend">饼图设置</summary>
@@ -1150,20 +1153,7 @@ export class VisualEchartsQueryUI {
                 </select>
               </div>
             </div>
-            <div class="veq-stat-group">
-              <div class="veq-stat-group__title">标签</div>
-              <div class="veq-switch-grid">
-                <label class="veq-switch-item"><span>显示标签</span><label class="veq-switch"><input type="checkbox" data-set="pie.label.show" ${s.label?.show ? 'checked' : ''}/><i></i></label></label>
-              </div>
-              <div class="veq-field" style="margin-top:6px;">
-                <div class="veq-label">标签位置</div>
-                <select class="veq-input" data-set="pie.label.position" style="width:auto;">
-                  <option value="outside" ${labelPos === 'outside' ? 'selected' : ''}>outside</option>
-                  <option value="inside" ${labelPos === 'inside' ? 'selected' : ''}>inside</option>
-                  <option value="center" ${labelPos === 'center' ? 'selected' : ''}>center</option>
-                </select>
-              </div>
-            </div>
+            <!-- 饼图标签设置已移至每个系列内部 -->
           </div>
         </details>`;
     }
@@ -1283,18 +1273,7 @@ export class VisualEchartsQueryUI {
         (this.perTypeSettings as any).bar[leaf] = value;
         return;
       }
-      if (leaf === 'label.show') {
-        const ensure = (obj: any) => { obj.label = obj.label || {}; obj.label.show = !!value; };
-        ensure((this.perTypeSettings as any).line);
-        ensure((this.perTypeSettings as any).bar);
-        return;
-      }
-      if (leaf === 'label.position') {
-        const ensure = (obj: any) => { obj.label = obj.label || {}; obj.label.position = String(value || 'top'); };
-        ensure((this.perTypeSettings as any).line);
-        ensure((this.perTypeSettings as any).bar);
-        return;
-      }
+      // label moved to per-series; no-op for stat label settings here
       // 其他 stat.* 暂不处理
       return;
     }

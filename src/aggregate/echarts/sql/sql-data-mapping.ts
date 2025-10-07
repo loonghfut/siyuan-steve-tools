@@ -16,6 +16,7 @@ export interface SeriesItem {
   valueKey?: string;
   agg?: SeriesAgg;
   filters?: FilterCondition[];  // 数据筛选条件
+  label?: { show?: boolean; position?: string };
 }
 
 export interface MappingInput {
