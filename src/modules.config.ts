@@ -7,6 +7,7 @@ import { M_lifelog } from "./lifelog/module-lifelog";
 
 import { M_Wps } from "./wps/module-wps";
 import { M_Aggregate } from "./aggregate/module-aggregate";
+import { M_Minutiae } from "./minutiae/module-minutiae";
 // 模块配置接口
 export interface ModuleConfig {
     [key: string]: {
@@ -67,6 +68,13 @@ export const MODULE_CONFIG: ModuleConfig = {
         name: 'M_Aggregate',
         settingKey: 'aggregate-enable',
         logMessage: 'Aggregate模块加载'
+    },
+
+    M_Minutiae: {
+        class: M_Minutiae,
+        name: 'M_Minutiae',
+        settingKey: 'minutiae-enable',
+        logMessage: 'Minutiae模块加载'
     },
 
 };
