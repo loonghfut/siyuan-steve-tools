@@ -42,27 +42,11 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.17.2 (2025年10月07日)
-- 初步完善聚合器 (loonghfut)
-- feat: 优化 SQL 预设编辑器 (loonghfut)
-- feat: 移除弹窗关闭的遮罩和 ESC 键事件处理，优化用户输入文档 ID 的逻辑 (loonghfut)
-- feat: 添加文档有效性检查，优化预设列表渲染逻辑 (loonghfut)
-- feat: 添加定时任务管理器，支持定时更新预设任务 (loonghfut)
-- feat: 使用 showStatusMessage 替换 showMessage，优化定时任务执行通知 (loonghfut)
-- feat: 优化设置项描述，明确启用模块的提示信息 (loonghfut)
-- feat: 移除行分隔符设置项，优化 SQL 结果行渲染逻辑 (loonghfut)
-- feat: 更新插件版本至 0.17.0 (loonghfut)
-- docs: 更新 v0.17.0 版本的更新日志 (loonghfut)
-- fix: 修复周期事件持续时间问题 持续时间不生效 Fixes #66 (loonghfut)
-- fix: 优化 toNum 函数以处理更多数据格式，确保数据映射准确性 (loonghfut)
-- feat: 为系列项添加标签设置，优化图表配置 (loonghfut)
-- feat: 更新插件版本至 0.17.1，优化聚合设置名称 (loonghfut)
-- docs: 更新 v0.17.1 版本的更新日志 (loonghfut)
-- feat: 为饼图设置添加间隙 (loonghfut)
-- feat: 添加雷达图支持，更新图表设置和数据处理逻辑 (loonghfut)
-- feat: 添加雷达图支持（SQL数据源） (loonghfut)
-- feat: 为雷达图添加提示框显示选项 (loonghfut)
-- feat: 更新插件版本至 0.17.2 (loonghfut)
+### v0.18.0 (2025年10月09日)
+- feat: 添加 Minutiae 模块及其设置，支持自动题头图功能 (loonghfut)
+- feat: 添加文档ID题头图映射配置，支持根据文档路径自动匹配题头图链接 (loonghfut)
+- feat: 添加文档ID到图片URL的映射解析功能，支持多种输入格式 (loonghfut)
+- feat: 更新插件版本至 0.18.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
