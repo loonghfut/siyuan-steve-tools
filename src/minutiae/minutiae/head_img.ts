@@ -100,17 +100,82 @@ export class headImg {
     }
 
     /**
+     * 解析配置里的 文档ID -> 图片URL 映射
+     * 支持：
+     * - 严格JSON
+     * - 使用中文引号/单引号
+     * - 允许行尾多余逗号
+     * - 允许按行 id:url 或 id = url 的简单格式
+     */
+    private parseIdMapping(input: any): Record<string, string> | null {
+        try {
+            // 已是对象
+            if (input && typeof input === 'object') {
+                const out: Record<string, string> = {};
+                for (const k of Object.keys(input)) {
+                    const v = input[k];
+                    if (v != null) out[String(k).trim()] = String(v).trim();
+                }
+                return out;
+            }
+
+            // 字符串：尽量宽松解析
+            if (typeof input === 'string') {
+                let s = input.trim();
+                if (!s) return null;
+                // 归一化引号
+                s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, '"');
+                // 去除注释
+                s = s.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*#.*$/gm, '');
+                // 去掉行尾多余逗号
+                s = s.replace(/,(\s*[}\]])/g, '$1');
+
+                // 优先按JSON解析
+                try {
+                    const obj = JSON.parse(s);
+                    if (obj && typeof obj === 'object') {
+                        const out: Record<string, string> = {};
+                        for (const k of Object.keys(obj)) {
+                            const v = obj[k];
+                            if (v != null) out[String(k).trim()] = String(v).trim();
+                        }
+                        return out;
+                    }
+                } catch {
+                    // 退化为逐行解析：id : url 或 id = url
+                    const out: Record<string, string> = {};
+                    const lines = s.split(/\r?\n/);
+                    for (const rawLine of lines) {
+                        const line = rawLine.trim();
+                        if (!line) continue;
+                        // 去掉可能的逗号、分号
+                        const cleaned = line.replace(/[;,]+\s*$/, '');
+                        // 拆分第一个 : 或 =
+                        const m = cleaned.match(/^(.*?)\s*[:=]\s*(.*)$/);
+                        if (m) {
+                            let key = m[1].trim().replace(/^"|"$/g, '').replace(/[“”]/g, '');
+                            let val = m[2].trim().replace(/^"|"$/g, '').replace(/[“”]/g, '');
+                            if (key && val) out[key] = val;
+                        }
+                    }
+                    return Object.keys(out).length ? out : null;
+                }
+            }
+        } catch (e) {
+            console.warn('parseIdMapping 解析失败', e);
+        }
+        return null;
+    }
+
+    /**
      * 根据文档路径查找配置的映射链接
      * @param path 文档路径
      * @returns 如果找到映射则返回对应的图片链接，否则返回null
      */
     private getMappedUrlFromPath(path: string): string | null {
         try {
-            const mappingJson = this.settingdata["minutiae-headimg-id-mapping"];
-            if (!mappingJson || typeof mappingJson !== 'string') return null;
-            
-            const mapping = JSON.parse(mappingJson.trim() || '{}');
-            if (typeof mapping !== 'object' || !mapping) return null;
+            const mapping = this.parseIdMapping(this.settingdata["minutiae-headimg-id-mapping"]);
+            if (!mapping) return null;
             
             // 从路径中提取ID列表（从右往左）
             const ids = this.extractIdsFromPath(path);
