@@ -9,6 +9,7 @@ import { commonGroup } from "./common";
 import { imageCompressionGroup } from "./imageCompression";
 
 import { aggregateGroup } from "./aggregate";
+import { minutiaeGroup } from "./minutiae";
 export * from "./types";
 
 export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] {
@@ -21,6 +22,7 @@ export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] 
     lifelogGroup(ctx),
     wpsGroup(ctx),
     aggregateGroup(ctx),
+    minutiaeGroup(ctx),
     commonGroup(ctx),
     ];
 }
