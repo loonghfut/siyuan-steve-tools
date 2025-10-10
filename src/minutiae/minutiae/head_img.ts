@@ -1,14 +1,13 @@
 import { setBlockAttrs } from "@/api/api";
 import { NetworkClient } from "@/api/network";
 import steveTools from "@/index";
-import { IProtyle, showMessage } from "siyuan";
+import { showMessage } from "siyuan";
 
 
 
 export class headImg {
     private settingdata: any;
     private plugin: steveTools;
-    private protyle: IProtyle;
     private net: NetworkClient;
 
     constructor(plugin: steveTools, settingdata: any) {
@@ -249,8 +248,15 @@ export class headImg {
      * @param url 要验证的URL
      * @returns 验证后的图片URL，如果无法验证则返回原始URL
      */
-    private async validateAndResolveImageUrl(url: string): Promise<string> {
+    private async validateAndResolveImageUrl(url: string, depth = 0): Promise<string> {
         if (!url || typeof url !== 'string') return url;
+
+        // 限制最大递归层级，避免循环重定向
+        const MAX_REDIRECTS = 5;
+        if (depth > MAX_REDIRECTS) {
+            console.warn("Minutiae 模块重定向层级过深，返回当前URL", url);
+            return url;
+        }
 
         // helper: image extension test (handles query/hash)
         const isImageUrl = (s: string) => /\.(png|jpe?g|gif|webp)(?:[?#].*)?$/i.test(s);
@@ -261,82 +267,44 @@ export class headImg {
             return url;
         }
 
-        // 尝试HEAD请求验证URL是否指向图片或重定向
-        try {
-            console.log("Minutiae 模块验证图片链接，发起HEAD请求", url);
-            const headResponse = await this.net.request({ method: "HEAD", path: url });
-            if (headResponse) {
-                // 如果浏览器已自动跟随重定向，可直接使用最终URL
-                if ((headResponse as any).redirected && headResponse.url && headResponse.url !== url) {
-                    console.log("Minutiae 模块HEAD已跟随重定向，最终URL:", headResponse.url);
-                    return headResponse.url;
-                }
-                // 优先检查重定向，无论Content-Type是什么
-                const location = headResponse.headers.get("location") || headResponse.headers.get("Location");
-                if (location) {
-                    const abs = this.resolveAbsoluteRedirectUrl(url, headResponse.headers, location);
-                    if (abs) {
-                        console.log("Minutiae 模块HEAD请求发现重定向", abs);
-                        return this.validateAndResolveImageUrl(abs);
-                    }
-                }
-                // 某些环境下可从伪头中拼出URL（如 :authority 和 :path）
-                const pseudoAbs = this.resolveAbsoluteRedirectUrl(url, headResponse.headers);
-                if (pseudoAbs) {
-                    console.log("Minutiae 模块HEAD根据伪头推断重定向URL", pseudoAbs);
-                    return this.validateAndResolveImageUrl(pseudoAbs);
-                }
-
-                // 没有重定向，检查Content-Type是否为图片
-                const contentType = (headResponse.headers.get("content-type") || "").toLowerCase();
-                if (contentType.startsWith("image/")) {
-                    console.log("Minutiae 模块HEAD请求确认是图片类型", contentType, url);
-                    return url;
-                }
-            }
-        } catch (headErr) {
-            console.warn("Minutiae 模块HEAD请求失败，尝试GET请求", headErr);
-        }
-
-        // HEAD请求失败或不是图片，尝试GET请求
+        // 统一使用 GET 进行验证与解析（不再使用 HEAD）
         try {
             console.log("Minutiae 模块验证图片链接，发起GET请求", url);
             const getResponse = await this.net.request({ method: "GET", path: url });
             if (getResponse) {
-                // 如果浏览器已自动跟随重定向，可直接使用最终URL
-                if ((getResponse as any).redirected && getResponse.url && getResponse.url !== url) {
-                    console.log("Minutiae 模块GET已跟随重定向，最终URL:", getResponse.url);
-                    return getResponse.url;
-                }
+                // 如果浏览器已自动跟随重定向，记录最终URL，但仍需继续校验
+                const effectiveUrl = ((getResponse as any).redirected && getResponse.url && getResponse.url !== url)
+                    ? (console.log("Minutiae 模块GET已跟随重定向，最终URL:", getResponse.url), getResponse.url)
+                    : url;
                 // 优先检查重定向，无论Content-Type是什么
-                const location = getResponse.headers.get("location") || getResponse.headers.get("Location");
+                const location = getResponse.headers.get("location") || getResponse.headers.get("Location") || getResponse.headers.get("content-location") || getResponse.headers.get("Content-Location");
                 if (location) {
-                    const abs = this.resolveAbsoluteRedirectUrl(url, getResponse.headers, location);
+                    const abs = this.resolveAbsoluteRedirectUrl(effectiveUrl, getResponse.headers, location);
                     if (abs) {
                         console.log("Minutiae 模块GET请求发现重定向", abs);
-                        return this.validateAndResolveImageUrl(abs);
+                        return this.validateAndResolveImageUrl(abs, depth + 1);
                     }
                 }
                 // 某些环境下可从伪头中拼出URL（如 :authority 和 :path）
-                const pseudoAbs = this.resolveAbsoluteRedirectUrl(url, getResponse.headers);
+                const pseudoAbs = this.resolveAbsoluteRedirectUrl(effectiveUrl, getResponse.headers);
                 if (pseudoAbs) {
                     console.log("Minutiae 模块GET根据伪头推断重定向URL", pseudoAbs);
-                    return this.validateAndResolveImageUrl(pseudoAbs);
+                    return this.validateAndResolveImageUrl(pseudoAbs, depth + 1);
                 }
 
                 // 没有重定向，检查Content-Type是否为图片
                 const contentType = (getResponse.headers.get("content-type") || "").toLowerCase();
                 if (contentType.startsWith("image/")) {
-                    console.log("Minutiae 模块GET请求确认是图片类型", contentType, url);
-                    return url;
+                    console.log("Minutiae 模块GET请求确认是图片类型", contentType, effectiveUrl);
+                    return effectiveUrl;
                 }
 
                 // 如果响应是文本，尝试解析内容
                 try {
                     const text = await getResponse.text();
-                    const body = String(text).trim();
+                    let body = String(text).trim();
 
-                    // 检查响应文本是否是图片URL
+                    // 检查响应文本是否是图片URL（直接返回图片链接的情况）
                     if (isImageUrl(body) && /^(https?:)?\/\//i.test(body)) {
                         console.log("Minutiae 模块GET响应文本是图片链接", body);
                         return body;
@@ -354,10 +322,14 @@ export class headImg {
                         // 不是JSON，继续
                     }
 
+                    // 处理 HTML/警告场景：去除标签并实体解码
+                    const stripped = this.stripHtmlTags(body);
+                    const normalized = this.normalizeWhitespace(this.decodeHtmlEntities(stripped));
+
                     // 从文本中提取图片URL
                     const urlRegex = /(https?:\/\/[^\s'"<>]+)/gi;
                     let match: RegExpExecArray | null;
-                    while ((match = urlRegex.exec(body)) !== null) {
+                    while ((match = urlRegex.exec(normalized)) !== null) {
                         const candidate = match[1].replace(/[)\]"',>]+$/g, "");
                         if (isImageUrl(candidate)) {
                             console.log("Minutiae 模块从GET响应文本中提取到图片链接", candidate);
@@ -396,16 +368,44 @@ export class headImg {
             // 2) 一些代理/环境会把重定向目标反映在伪头里
             const authority = headers.get(":authority") || headers.get("authority") || headers.get("host") || headers.get("Host");
             const path = headers.get(":path") || headers.get("path");
-            if (authority && path) {
+            if (path) {
+                // 如果有 authority，用其构造；否则回退到 base 的 origin
                 const parsed = new URL(base);
                 const proto = parsed.protocol || "https:";
-                const abs = `${proto}//${authority}${path.startsWith('/') ? path : '/' + path}`;
+                const host = authority || parsed.host;
+                const normalizedPath = path.startsWith('/') ? path : '/' + path;
+                const abs = `${proto}//${host}${normalizedPath}`;
                 return abs;
             }
         } catch (e) {
             console.warn('resolveAbsoluteRedirectUrl 失败', e);
         }
         return null;
+    }
+
+    // 基础工具：去除 HTML 标签
+    private stripHtmlTags(input: string): string {
+        if (!input) return input;
+        return input.replace(/<[^>]*>/g, ' ');
+    }
+
+    // 基础工具：压缩空白字符
+    private normalizeWhitespace(input: string): string {
+        if (!input) return input;
+        return input.replace(/\s+/g, ' ').trim();
+    }
+
+    // 基础工具：解码常见 HTML 实体
+    private decodeHtmlEntities(input: string): string {
+        if (!input) return input;
+        const map: Record<string, string> = {
+            '&amp;': '&',
+            '&lt;': '<',
+            '&gt;': '>',
+            '&quot;': '"',
+            '&#39;': "'",
+        };
+        return input.replace(/&(amp|lt|gt|quot|#39);/g, (m) => map[m] || m);
     }
 
     /**
