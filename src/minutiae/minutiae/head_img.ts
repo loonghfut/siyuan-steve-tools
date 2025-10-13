@@ -24,10 +24,29 @@ export class headImg {
         this.plugin.eventBus.on("switch-protyle", async (e: any) => {
             const docID = e.detail.protyle.background.ial.id;
             const docPath = e.detail.protyle.path;
+            // 清理：移除或隐藏不需要的默认图标（例如 data-type="show-random" 和 上传 input）
+            try {
+                const iconsContainer: HTMLElement | null = e.detail.protyle.contentElement.querySelector?.('.protyle-icons') || document.querySelector('.protyle-icons');
+                if (iconsContainer) {
+                    // 移除 data-type="show-random" 的图标
+                    const showRandomEls = Array.from(iconsContainer.querySelectorAll('.protyle-icon[data-type="show-random"]'));
+                    showRandomEls.forEach(el => el.remove());
+                    // 移除包含上传 input 的图标（class b3-form__upload）
+                    const uploadInputs = Array.from(iconsContainer.querySelectorAll('input.b3-form__upload'));
+                    uploadInputs.forEach((inp) => {
+                        const parent = inp.closest('.protyle-icon');
+                        if (parent) parent.remove();
+                        else inp.remove();
+                    });
+                }
+            } catch (err) {
+                console.warn('清理不需要的 protyle 图标失败', err);
+            }
             // console.log("DDDDD", docID);
             this.insertProtyleIcon(
                 e.detail.protyle.contentElement,
-                "刷新题头图",
+                "ST刷新题头图",
+                "iconRefresh",
                 async (ev: Event) => {
                     ev.stopPropagation();
                     // 点击时重新设置当前文档的题头图（复用上面获取到的 docID 和 picUrl）
@@ -51,7 +70,8 @@ export class headImg {
             // 下载按钮：把当前题头图（若为外链）下载到本地目录并替换为 /assets 链接
             this.insertProtyleIcon(
                 e.detail.protyle.contentElement,
-                "下载题头图",
+                "ST下载题头图",
+                "iconDownload",
                 async (ev: Event) => {
                     ev.stopPropagation();
                     try {
@@ -82,7 +102,8 @@ export class headImg {
             // 上传按钮：快速把图片加入到推导目录并刷新
             this.insertProtyleIcon(
                 e.detail.protyle.contentElement,
-                "上传题头图",
+                "ST上传题头图",
+                "iconUpload",
                 async (ev: Event) => {
                     ev.stopPropagation();
                     try {
@@ -128,17 +149,17 @@ export class headImg {
      */
     private extractIdsFromPath(path: string): string[] {
         if (!path) return [];
-        
+
         // 移除 .sy 扩展名
         const pathWithoutExt = path.replace(/\.sy$/, '');
-        
+
         // 分割路径并反转（从右往左）
         const segments = pathWithoutExt.split('/').filter(s => s.trim());
-        
+
         // 提取符合ID格式的部分：yyyyMMddHHmmss-xxxxxxx（14位数字-7位字符）
         const idPattern = /(\d{14}-[a-z0-9]{7})/i;
         const ids: string[] = [];
-        
+
         // 从右往左遍历
         for (let i = segments.length - 1; i >= 0; i--) {
             const match = segments[i].match(idPattern);
@@ -146,7 +167,7 @@ export class headImg {
                 ids.push(match[1]);
             }
         }
-        
+
         return ids;
     }
 
@@ -333,7 +354,7 @@ export class headImg {
                 console.warn('本地目录不是数组或不可读', basePath, list);
                 return null;
             }
-            const exts = ['png','jpg','jpeg','gif','webp','bmp','svg','avif','apng','ico'];
+            const exts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif', 'apng', 'ico'];
             const imgFiles = list
                 .filter((it: any) => it && it.isDir === false)
                 .map((it: any) => it.name)
@@ -653,7 +674,7 @@ export class headImg {
             const ext = hasExt ? (name.split('.').pop() || '').toLowerCase() : extFromCT || 'png';
             if (!hasExt) name = `${name}.${ext}`;
             const ts = new Date();
-            const suffix = `${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}${String(ts.getSeconds()).padStart(2,'0')}`;
+            const suffix = `${String(ts.getHours()).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}${String(ts.getSeconds()).padStart(2, '0')}`;
             const base = name.replace(/\.[^.]+$/, '');
             const finalName = `${base}-${suffix}.${ext}`;
 
@@ -702,7 +723,7 @@ export class headImg {
      * @param contentElement protyle 的 contentElement 或父元素，用于查找 .protyle-icons
      * @param label 
      */
-    private insertProtyleIcon(contentElement: HTMLElement | null, label: string, onClick?: (ev: Event, el: HTMLElement) => void) {
+    private insertProtyleIcon(contentElement: HTMLElement | null, label: string, icon: string, onClick?: (ev: Event, el: HTMLElement) => void) {
         try {
             if (!contentElement) return;
 
@@ -724,7 +745,7 @@ export class headImg {
             span.setAttribute('data-type', `st-headimg-${label}`);
             span.setAttribute('aria-label', label);
             // 内嵌 SVG（复用现有 image 图标）
-            span.innerHTML = '<svg><use xlink:href="#iconST"></use></svg>';
+            span.innerHTML = `<svg><use xlink:href="#${icon}"></use></svg>`;
 
             // 在插入位置上，优先放到倒数第二位（即在有 --last 的元素之前）
             const last = iconsEl.querySelector('.protyle-icon--last');
