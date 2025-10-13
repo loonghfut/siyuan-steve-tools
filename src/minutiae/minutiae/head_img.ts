@@ -1,4 +1,4 @@
-import { setBlockAttrs } from "@/api/api";
+import { readDir, setBlockAttrs, putFile } from "@/api/api";
 import { NetworkClient } from "@/api/network";
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
@@ -34,7 +34,7 @@ export class headImg {
                     try {
                         const newurl = await this.get_pic_url(docPath);
                         setBlockAttrs(docID, {
-                            'title-img': `background-image:url("${newurl}");`,
+                            'title-img': `background-image:url(\"${newurl}\");`,
                             'custom-st-head-img': 'true'
                         }).then(() => {
                             showMessage('已重新设置题头图');
@@ -45,6 +45,58 @@ export class headImg {
                     } catch (err) {
                         console.warn('重设题头图异常', err);
                         showMessage('重设题头图异常');
+                    }
+                }
+            );
+            // 下载按钮：把当前题头图（若为外链）下载到本地目录并替换为 /assets 链接
+            this.insertProtyleIcon(
+                e.detail.protyle.contentElement,
+                "下载题头图",
+                async (ev: Event) => {
+                    ev.stopPropagation();
+                    try {
+                        // 优先从当前文档属性读取 title-img
+                        const attrStr: string | undefined = e.detail?.protyle?.background?.ial?.['title-img'];
+                        const curUrl = this.extractUrlFromTitleImgAttr(attrStr || '');
+                        const url = curUrl || (await this.get_pic_url(docPath));
+                        if (!url) {
+                            showMessage('未找到题头图链接');
+                            return;
+                        }
+                        const localUrl = await this.maybeDownloadToLocal(url, docPath);
+                        if (!localUrl) {
+                            showMessage('未能下载到本地（未识别到保存目录或链接非图片）');
+                            return;
+                        }
+                        await setBlockAttrs(docID, {
+                            'title-img': `background-image:url(\"${localUrl}\");`,
+                            'custom-st-head-img': 'true'
+                        });
+                        showMessage('已下载并替换为本地题头图');
+                    } catch (err) {
+                        console.warn('下载并替换题头图失败', err);
+                        showMessage('下载并替换题头图失败');
+                    }
+                }
+            );
+            // 上传按钮：快速把图片加入到推导目录并刷新
+            this.insertProtyleIcon(
+                e.detail.protyle.contentElement,
+                "上传题头图",
+                async (ev: Event) => {
+                    ev.stopPropagation();
+                    try {
+                        const url = await this.quickUploadToTargetDir(docPath);
+                        if (url) {
+                            await setBlockAttrs(docID, {
+                                'title-img': `background-image:url("${url}");`,
+                                'custom-st-head-img': 'true'
+                            });
+                            showMessage('图片已上传并设置为题头图');
+                        }
+                    } catch (err) {
+                        console.warn('上传题头图失败', err);
+                        showMessage('上传题头图失败');
                     }
                 }
             );
@@ -98,70 +150,80 @@ export class headImg {
         return ids;
     }
 
-    /**
-     * 解析配置里的 文档ID -> 图片URL 映射
-     * 支持：
-     * - 严格JSON
-     * - 使用中文引号/单引号
-     * - 允许行尾多余逗号
-     * - 允许按行 id:url 或 id = url 的简单格式
-     */
-    private parseIdMapping(input: any): Record<string, string> | null {
+    // 旧版 parseIdMapping 已移除，统一用 parseIdMappingRich
+
+    // 宽松解析（直接解析原始输入），支持：
+    // id -> string | string[] | { urls?: string[]|string; dir?: string|array; file?: string|array }
+    private parseIdMappingRich(input: any): Record<string, { urls: string[]; dirs: string[]; files: string[] }> | null {
+        const rich: Record<string, { urls: string[]; dirs: string[]; files: string[] }> = {};
+        const ensureBucket = (id: string) => (rich[id] ||= { urls: [], dirs: [], files: [] });
+        const pushOne = (id: string, val: string) => {
+            const bucket = ensureBucket(id);
+            const info = this.toAssetsLocalInfo(val);
+            if (info) {
+                if (info.isDir) bucket.dirs.push(`assets/${info.subdir}`);
+                else bucket.files.push(`assets/${info.subdir}${info.filename ? '/' + info.filename : ''}`);
+            } else {
+                bucket.urls.push(val);
+            }
+        };
+        const pushMany = (id: string, vals: any) => {
+            if (Array.isArray(vals)) vals.map(String).forEach(v => pushOne(id, v));
+            else if (vals != null) pushOne(id, String(vals));
+        };
+
         try {
-            // 已是对象
             if (input && typeof input === 'object') {
-                const out: Record<string, string> = {};
-                for (const k of Object.keys(input)) {
-                    const v = input[k];
-                    if (v != null) out[String(k).trim()] = String(v).trim();
+                for (const [idRaw, v] of Object.entries(input)) {
+                    const id = String(idRaw).trim();
+                    if (!id) continue;
+                    if (Array.isArray(v)) {
+                        pushMany(id, v);
+                    } else if (v && typeof v === 'object') {
+                        const obj: any = v;
+                        if (obj.urls) pushMany(id, obj.urls);
+                        if (obj.url) pushMany(id, obj.url);
+                        if (obj.dir) pushMany(id, obj.dir);
+                        if (obj.dirs) pushMany(id, obj.dirs);
+                        if (obj.file) pushMany(id, obj.file);
+                        if (obj.files) pushMany(id, obj.files);
+                    } else {
+                        pushOne(id, String(v ?? ''));
+                    }
                 }
-                return out;
+                return Object.keys(rich).length ? rich : null;
             }
 
-            // 字符串：尽量宽松解析
             if (typeof input === 'string') {
                 let s = input.trim();
                 if (!s) return null;
-                // 归一化引号
                 s = s.replace(/[“”]/g, '"').replace(/[‘’]/g, '"');
-                // 去除注释
                 s = s.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*#.*$/gm, '');
-                // 去掉行尾多余逗号
                 s = s.replace(/,(\s*[}\]])/g, '$1');
-
-                // 优先按JSON解析
                 try {
                     const obj = JSON.parse(s);
                     if (obj && typeof obj === 'object') {
-                        const out: Record<string, string> = {};
-                        for (const k of Object.keys(obj)) {
-                            const v = obj[k];
-                            if (v != null) out[String(k).trim()] = String(v).trim();
-                        }
-                        return out;
+                        return this.parseIdMappingRich(obj);
                     }
                 } catch {
-                    // 退化为逐行解析：id : url 或 id = url
-                    const out: Record<string, string> = {};
+                    // 宽松逐行 + 允许重复键：id : value1,value2
                     const lines = s.split(/\r?\n/);
                     for (const rawLine of lines) {
                         const line = rawLine.trim();
                         if (!line) continue;
-                        // 去掉可能的逗号、分号
                         const cleaned = line.replace(/[;,]+\s*$/, '');
-                        // 拆分第一个 : 或 =
                         const m = cleaned.match(/^(.*?)\s*[:=]\s*(.*)$/);
                         if (m) {
-                            let key = m[1].trim().replace(/^"|"$/g, '').replace(/[“”]/g, '');
-                            let val = m[2].trim().replace(/^"|"$/g, '').replace(/[“”]/g, '');
-                            if (key && val) out[key] = val;
+                            const id = m[1].trim().replace(/^"|"$/g, '').replace(/[“”]/g, '');
+                            const list = m[2].split(',').map(x => x.trim()).filter(Boolean);
+                            list.forEach(v => pushOne(id, v));
                         }
                     }
-                    return Object.keys(out).length ? out : null;
+                    return Object.keys(rich).length ? rich : null;
                 }
             }
         } catch (e) {
-            console.warn('parseIdMapping 解析失败', e);
+            console.warn('parseIdMappingRich 解析失败', e);
         }
         return null;
     }
@@ -171,45 +233,126 @@ export class headImg {
      * @param path 文档路径
      * @returns 如果找到映射则返回对应的图片链接，否则返回null
      */
-    private getMappedUrlFromPath(path: string): string | null {
+    // 已弃用：保留注释说明（统一改用 getIdCandidatesFromPath）
+
+    // 返回匹配文档ID的候选集合：{ remotes, files, dirs }
+    private getIdCandidatesFromPath(path: string): { remotes: string[]; files: string[]; dirs: string[] } | null {
         try {
-            const mapping = this.parseIdMapping(this.settingdata["minutiae-headimg-id-mapping"]);
+            const mapping = this.parseIdMappingRich(this.settingdata["minutiae-headimg-id-mapping"]);
             if (!mapping) return null;
-            
-            // 从路径中提取ID列表（从右往左）
             const ids = this.extractIdsFromPath(path);
-            
-            // 按顺序检查每个ID，找到第一个匹配的就返回
             for (const id of ids) {
-                if (mapping[id]) {
-                    console.log(`Minutiae 模块找到ID映射: ${id} -> ${mapping[id]}`);
-                    return String(mapping[id]);
-                }
+                const bucket = mapping[id];
+                if (bucket) return { remotes: bucket.urls, files: bucket.files, dirs: bucket.dirs };
             }
-            
             return null;
-        } catch (err) {
-            console.warn('Minutiae getMappedUrlFromPath 解析失败', err);
+        } catch (e) {
+            console.warn('getIdCandidatesFromPath 失败', e);
             return null;
         }
     }
 
     async get_pic_url(path?: string): Promise<string | null> {
-        // 优先检查路径映射
+        // 1) 文档ID候选（优先使用远程；其次本地文件；最后目录随机）
         if (path) {
-            const mappedUrl = this.getMappedUrlFromPath(path);
-            if (mappedUrl) {
-                console.log("Minutiae 模块使用路径ID映射的图片地址", mappedUrl);
-                return this.validateAndResolveImageUrl(mappedUrl);
+            const cand = this.getIdCandidatesFromPath(path);
+            if (cand) {
+                // 远程优先
+                for (const u of cand.remotes) {
+                    const r = await this.resolveUrlCandidate(u);
+                    if (r) return r;
+                }
+                // 本地文件
+                for (const f of cand.files) {
+                    const r = await this.resolveUrlCandidate(f);
+                    if (r) return r;
+                }
+                // 目录随机
+                for (const d of cand.dirs) {
+                    const r = await this.resolveUrlCandidate(d.endsWith('/') ? d : (d + '/'));
+                    if (r) return r;
+                }
             }
         }
-        
+
+        // 2) 全局题头图地址（同样支持三种形态）
         const raw = this.settingdata["minutiae-headimg-url"];
         if (!raw) return null;
-        let url = String(raw).trim();
+        return this.resolveUrlCandidate(String(raw).trim());
+    }
 
-        // 直接验证并解析URL
-        return this.validateAndResolveImageUrl(url);
+    // 解析候选：assets 目录 => 随机；assets 文件 => 标准化；其他 => 远程解析
+    private async resolveUrlCandidate(candidate: string): Promise<string | null> {
+        if (!candidate) return null;
+        const c = candidate.trim();
+        const info = this.toAssetsLocalInfo(c);
+        if (info) {
+            if (info.isDir) return this.pickRandomLocalAsset(info.subdir);
+            const prefix = info.subdir ? info.subdir + '/' : '';
+            return `assets/${prefix}${info.filename ? encodeURIComponent(info.filename) : ''}`;
+        }
+        return this.validateAndResolveImageUrl(c);
+    }
+
+    // 识别 assets 路径：assets/... 或 /assets/... 或 /data/assets/...
+    private toAssetsLocalInfo(input: string): { subdir: string, isDir: boolean, filename?: string } | null {
+        try {
+            let s = input.trim();
+            if (!s) return null;
+            // 统一到 assets/ 前缀
+            if (/^\/data\/assets\//i.test(s)) s = s.replace(/^\/data\//i, ''); // /data/assets => assets
+            if (/^\/assets\//i.test(s)) s = s.replace(/^\//, ''); // /assets => assets
+            if (!/^assets\//i.test(s)) return null;
+            s = s.replace(/^assets\//i, '');
+            // 目录（以 / 结尾）
+            if (/\/$/.test(s)) return { subdir: s.replace(/\/$/, ''), isDir: true };
+            // 是否看起来像文件（包含图片扩展名）
+            const hasExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|apng|ico)(?:$|[?#])/i.test(s);
+            if (hasExt) {
+                const idx = s.lastIndexOf('/');
+                if (idx === -1) return { subdir: '', isDir: false, filename: s };
+                return { subdir: s.slice(0, idx), isDir: false, filename: s.slice(idx + 1) };
+            }
+            // 否则按目录处理
+            return { subdir: s, isDir: true };
+        } catch {
+            return null;
+        }
+    }
+
+    // 从 /data/assets/{dir} 下随机选取一张图片，返回可在 CSS 中使用的绝对或相对 URL（使用 /assets/ 前缀）
+    private async pickRandomLocalAsset(dir: string): Promise<string | null> {
+        try {
+            // 规范化：移除开头/结尾斜杠
+            const sub = dir.replace(/^\/+|\/+$/g, '');
+            if (!sub) return null;
+            const basePath = `/data/assets/${sub}/`;
+            const list = await readDir(basePath).catch(e => { console.warn('readDir 失败', basePath, e); return null; });
+            if (!Array.isArray(list)) {
+                // 兼容 API 返回非数组（某些封装可能返回单个对象），放弃
+                console.warn('本地目录不是数组或不可读', basePath, list);
+                return null;
+            }
+            const exts = ['png','jpg','jpeg','gif','webp','bmp','svg','avif','apng','ico'];
+            const imgFiles = list
+                .filter((it: any) => it && it.isDir === false)
+                .map((it: any) => it.name)
+                .filter((name: string) => new RegExp(`\\.(${exts.join('|')})(?:$|[?#])`, 'i').test(name));
+
+            if (!imgFiles.length) {
+                console.warn('本地目录下没有图片文件', basePath);
+                return null;
+            }
+            // 随机
+            const pick = imgFiles[Math.floor(Math.random() * imgFiles.length)];
+            // 思源静态资源访问路径：/assets/ 相对 data/assets
+            const url = `assets/${sub}/${encodeURIComponent(pick)}`;
+            console.log('Minutiae 本地随机选取图片', url);
+            return url;
+        } catch (e) {
+            console.warn('pickRandomLocalAsset 异常', e);
+            return null;
+        }
     }
 
     // 递归在对象中查找符合 isImageUrl 的字符串属性
@@ -383,6 +526,40 @@ export class headImg {
         return null;
     }
 
+    // 选择图片并上传到推导目录（由映射或全局地址推导），返回 /assets/... 访问路径
+    private async quickUploadToTargetDir(docPath?: string): Promise<string | null> {
+        const subdir = this.deriveTargetAssetsSubdir(docPath);
+        if (!subdir) {
+            showMessage('请将“题头图地址”或文档映射设置为 assets/<目录>（或 /data/assets/<目录>）');
+            return null;
+        }
+        // 构造隐藏的文件选择器
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        return new Promise((resolve) => {
+            input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return resolve(null);
+                try {
+                    // 保存到 /data/assets/{subdir}/{filename}
+                    const sub = subdir.replace(/^\/+|\/+$/g, '');
+                    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                    const assetPath = `/data/assets/${sub}/${safeName}`;
+                    await putFile(assetPath, false, file);
+                    const url = `assets/${sub}/${encodeURIComponent(safeName)}`;
+                    resolve(url);
+                } catch (err) {
+                    console.warn('上传图片到本地目录失败', err);
+                    showMessage('上传图片失败');
+                    resolve(null);
+                }
+            };
+            // 触发选择
+            input.click();
+        });
+    }
+
     // 基础工具：去除 HTML 标签
     private stripHtmlTags(input: string): string {
         if (!input) return input;
@@ -406,6 +583,118 @@ export class headImg {
             '&#39;': "'",
         };
         return input.replace(/&(amp|lt|gt|quot|#39);/g, (m) => map[m] || m);
+    }
+
+    // 从 title-img 属性值（background-image:url("...");）中提取 URL
+    private extractUrlFromTitleImgAttr(attr: string): string | null {
+        if (!attr) return null;
+        const m = attr.match(/url\(("|')?(.*?)(\1)?\)/i);
+        if (m && m[2]) return m[2];
+        return null;
+    }
+
+    // 如果 URL 已经是本地资源（/assets 或 data/assets），直接返回标准化的 /assets/... 形式
+    private normalizeLocalAssetUrl(url: string): string | null {
+        try {
+            const u = url.trim();
+            if (!u) return null;
+            if (/^assets\//i.test(u) || /^\/assets\//i.test(u)) {
+                return u.replace(/^\/+/, '');
+            }
+            if (/^\/data\/assets\//i.test(u)) {
+                return u.replace(/^\/data\//i, ''); // data/assets/... -> assets/...
+            }
+            return null;
+        } catch { return null; }
+    }
+
+    // 尝试将远程图片下载保存到推导目录并返回本地 /assets/... 路径；若不需要或失败则返回 null
+    private async maybeDownloadToLocal(url: string, docPath?: string): Promise<string | null> {
+        try {
+            if (!url) return null;
+            // 已是本地资源
+            const localAlready = this.normalizeLocalAssetUrl(url);
+            if (localAlready) return localAlready;
+
+            // 推导保存目录（文档映射优先，其次全局地址）
+            const subdir = this.deriveTargetAssetsSubdir(docPath);
+            if (!subdir) return null;
+
+            // 仅处理 http/https
+            if (!/^https?:\/\//i.test(url)) return null;
+
+            // 发起请求下载
+            const resp = await fetch(url);
+            if (!resp.ok) return null;
+            const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+            if (!contentType.startsWith('image/')) return null;
+            const blob = await resp.blob();
+            if (!blob || (blob as any).size === 0) return null;
+
+            // 生成文件名
+            const extFromCT = (() => {
+                if (contentType.includes('image/jpeg')) return 'jpg';
+                if (contentType.includes('image/png')) return 'png';
+                if (contentType.includes('image/gif')) return 'gif';
+                if (contentType.includes('image/webp')) return 'webp';
+                if (contentType.includes('image/svg')) return 'svg';
+                if (contentType.includes('image/bmp')) return 'bmp';
+                if (contentType.includes('image/avif')) return 'avif';
+                if (contentType.includes('image/apng')) return 'apng';
+                return '';
+            })();
+            let name = 'image';
+            try {
+                const u = new URL(url);
+                const last = decodeURIComponent(u.pathname.split('/').pop() || '');
+                if (last) name = last.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'image';
+            } catch { /* ignore */ }
+            const hasExt = /\.[a-z0-9]{2,5}$/i.test(name);
+            const ext = hasExt ? (name.split('.').pop() || '').toLowerCase() : extFromCT || 'png';
+            if (!hasExt) name = `${name}.${ext}`;
+            const ts = new Date();
+            const suffix = `${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}${String(ts.getSeconds()).padStart(2,'0')}`;
+            const base = name.replace(/\.[^.]+$/, '');
+            const finalName = `${base}-${suffix}.${ext}`;
+
+            const sub = subdir.replace(/^\/+|\/+$/g, '');
+            const assetPath = `/data/assets/${sub}/${finalName}`;
+            await putFile(assetPath, false, blob);
+            const assetUrl = `assets/${sub}/${encodeURIComponent(finalName)}`;
+            console.log('Minutiae 下载远程题头图到本地', assetUrl);
+            return assetUrl;
+        } catch (e) {
+            console.warn('maybeDownloadToLocal 失败', e);
+            return null;
+        }
+    }
+
+    // 根据文档ID映射或全局地址推导目标 assets 子目录（支持目录或文件形式）
+    private deriveTargetAssetsSubdir(docPath?: string): string | null {
+        // 1) 文档映射优先：先目录，其次文件的目录
+        if (docPath) {
+            const cand = this.getIdCandidatesFromPath(docPath);
+            if (cand) {
+                if (cand.dirs.length) {
+                    const info = this.toAssetsLocalInfo(cand.dirs[0]);
+                    if (info) return info.subdir;
+                }
+                if (cand.files.length) {
+                    const info = this.toAssetsLocalInfo(cand.files[0]);
+                    if (info) return info.subdir || null;
+                }
+            }
+        }
+        // 2) 全局地址
+        const raw = String(this.settingdata["minutiae-headimg-url"] || '').trim();
+        if (raw) {
+            const info = this.toAssetsLocalInfo(raw);
+            if (info) return info.isDir ? info.subdir : (info.subdir || null);
+        }
+        // 3) 默认保存目录设置
+        const def = String(this.settingdata["minutiae-headimg-default-save-dir"] || '').trim();
+        if (def) return def.replace(/^\/+|\/+$/g, '');
+        return null;
     }
 
     /**
