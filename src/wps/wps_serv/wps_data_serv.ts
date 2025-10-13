@@ -136,7 +136,75 @@ export class WpsDataServ {
         if (typeof v === 'object') {
             try { return '`' + JSON.stringify(v) + '`'; } catch { return String(v); }
         }
-        return String(v).replace(/\n/g, '<br/>');
+        // 统一日期格式为 `YYYY-MM-DD HH:MM:SS`，处理常见的带斜杠日期或时间戳
+        const s = String(v).trim();
+        const normalized = this.formatDateString(s);
+        if (normalized) return normalized.replace(/\n/g, '<br/>');
+        return s.replace(/\n/g, '<br/>');
+    }
+
+    /**
+     * 尝试将字符串或数字表示的日期/时间标准化为 `YYYY-MM-DD HH:MM:SS`。
+     * 支持：
+     * - 形如 2025/10/11 08:08:16 或 2025-10-11 08:08:16
+     * - 仅日期部分 2025/10/11 或 2025-10-11
+     * - 毫秒或秒级时间戳（数字字符串）
+     * 若无法解析则返回空字符串。
+     */
+    private formatDateString(input: string): string {
+        if (!input) return '';
+        // 纯数字的时间戳（秒或毫秒）
+        if (/^\d{10}$/.test(input)) {
+            // 10 位 -> 秒
+            const t = parseInt(input, 10) * 1000;
+            return this.dateToYMDHMS(new Date(t));
+        }
+        if (/^\d{13}$/.test(input)) {
+            // 13 位 -> 毫秒
+            const t = parseInt(input, 10);
+            return this.dateToYMDHMS(new Date(t));
+        }
+
+        // 替换中文括号/全角空格，并把斜杠改为中划线，便于解析
+        const s = input.replace(/[\u3000\s]+/g, ' ').trim();
+        // 常见格式：YYYY/MM/DD 或 YYYY-MM-DD，可能带时间部分
+        const dateTimeParts = s.split(' ');
+        const datePart = dateTimeParts[0].replace(/\//g, '-');
+        const timePart = dateTimeParts.slice(1).join(' ');
+        // 简单校验日期部分是否为 YYYY-MM-DD 或 YYYY-M-D
+        if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(datePart)) {
+            // 补齐月/日为两位
+            const [y, m, d] = datePart.split('-').map(p => p.padStart(2, '0'));
+            let hm = '00:00:00';
+            if (timePart) {
+                // 只保留时分秒部分
+                const t = timePart.trim().split(/[T\s]/)[0];
+                const parts = t.split(':').map(p => p.padStart(2, '0'));
+                const hh = parts[0] || '00';
+                const mm = parts[1] || '00';
+                const ss = parts[2] || '00';
+                hm = `${hh}:${mm}:${ss}`;
+            }
+            return `${y}-${m}-${d} ${hm}`;
+        }
+
+        // 尝试用 Date 构造解析（作为最后手段）
+        const parsed = Date.parse(s);
+        if (!isNaN(parsed)) {
+            return this.dateToYMDHMS(new Date(parsed));
+        }
+        return '';
+    }
+
+    private dateToYMDHMS(d: Date): string {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const y = d.getFullYear();
+        const m = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hh = pad(d.getHours());
+        const mm = pad(d.getMinutes());
+        const ss = pad(d.getSeconds());
+        return `${y}-${m}-${day} ${hh}:${mm}:${ss}`;
     }
 
     /**
