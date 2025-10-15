@@ -22,6 +22,7 @@ export const aggregateDefaults: Record<string, any> = {
     "aggregate-row-separator": "---",
     // 时间过滤字段（用于避免重复插入已处理的内容）
     "aggregate-time-field": "created",
+    "aggregate-recent-update-minutes": 5, // 检查最近更新的时间阈值（分钟）
 };
 
 export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -107,7 +108,13 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                         updated: "更新时间 (updated)",
                     },
                 },
-
+                {
+                    type: "number",
+                    title: "最近更新检查阈值（分钟）",
+                    description: "检查 SQL 返回结果中，是否有在最近 N 分钟内更新的块，避免用户编辑块时，聚合块",
+                    key: "aggregate-recent-update-minutes",
+                    value: ctx.settings["aggregate-recent-update-minutes"] ?? 5,
+                },
             ],
         },
     ],

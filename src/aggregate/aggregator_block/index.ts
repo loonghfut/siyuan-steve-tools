@@ -293,6 +293,21 @@ export class aggregatorBlock {
     }
 
     /**
+     * 返回用于判断“最近更新”的阈值（单位：分钟），由用户通过插件设置 `aggregate-recent-update-minutes` 配置。
+     * 如果未配置或值无效，默认返回 5 分钟。
+     */
+    public getRecentUpdateThresholdMinutes(): number {
+        try {
+            const v = this._settingdata?.['aggregate-recent-update-minutes'];
+            const n = parseInt(String(v ?? ''), 10);
+            if (!isFinite(n) || n <= 0) return 5;
+            return n;
+        } catch (e) {
+            return 5;
+        }
+    }
+
+    /**
      * 加载所有启用了定时的预设任务
      */
     private async loadTimerTasks(): Promise<void> {

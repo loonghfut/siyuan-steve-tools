@@ -88,6 +88,66 @@ export class TimerManager {
                 lastInsertTime
             );
 
+            // ----- 新增：检查返回结果中是否有在最近 5 分钟内更新的块 -----
+            if (Array.isArray(sqlResult) && sqlResult.length > 0) {
+                const minutes = Math.max(1, this.aggregatorBlock.getRecentUpdateThresholdMinutes() || 5);
+                const FIVE_MIN_MS = minutes * 60 * 1000;
+                const now = Date.now();
+
+                const parseToMs = (val: any): number | null => {
+                    if (val === null || val === undefined) return null;
+                    // 数字类型
+                    if (typeof val === 'number') {
+                        // 13 位视为毫秒，10 位视为秒
+                        if (val > 1e12) return val; // 已经是 ms
+                        if (val > 1e9) return val * 1000; // 秒 -> ms
+                        return null;
+                    }
+                    // 字符串类型
+                    if (typeof val === 'string') {
+                        const s = val.trim();
+                        // 思源格式 YYYYMMDDHHmmss (14 位)
+                        if (/^\d{14}$/.test(s)) {
+                            // 转换为 yyyy-MM-ddTHH:mm:ssZ 形式解析为本地时间
+                            const year = parseInt(s.slice(0, 4), 10);
+                            const month = parseInt(s.slice(4, 6), 10) - 1;
+                            const day = parseInt(s.slice(6, 8), 10);
+                            const hour = parseInt(s.slice(8, 10), 10);
+                            const minute = parseInt(s.slice(10, 12), 10);
+                            const second = parseInt(s.slice(12, 14), 10);
+                            return new Date(year, month, day, hour, minute, second).getTime();
+                        }
+                        // 13 位数字字符串 -> ms
+                        if (/^\d{13}$/.test(s)) return parseInt(s, 10);
+                        // 10 位数字字符串 -> 秒
+                        if (/^\d{10}$/.test(s)) return parseInt(s, 10) * 1000;
+                        // 尝试 ISO/可解析日期字符串
+                        const parsed = Date.parse(s);
+                        if (!isNaN(parsed)) return parsed;
+                        return null;
+                    }
+                    return null;
+                };
+
+                // 检查每一行的 updated 字段（若存在）
+                const hasRecentUpdate = sqlResult.some((row: any) => {
+                    if (!row || typeof row !== 'object') return false;
+                    const updatedVal = row['updated'];
+                    const ts = parseToMs(updatedVal);
+                    if (!ts) return false;
+                    return (now - ts) <= FIVE_MIN_MS;
+                });
+
+                if (hasRecentUpdate) {
+                    console.log(`[TimerManager] 预设 "${presetName}" 检测到存在 5 分钟内更新的块，跳过本次定时触发`);
+                    // 更新执行时间信息并跳过本次执行
+                    await this.updateExecutionTime(presetName, preset);
+                    showStatusMessage(`定时任务 "${presetName}" 因存在最近更新的块而被跳过`, 5000, 'info');
+                    return;
+                }
+            }
+            // ----- 新增检查结束 -----
+
             // 如果没有新数据，跳过
             if (!sqlResult || sqlResult.length === 0) {
                 console.log(`[TimerManager] 预设 "${presetName}" 没有新数据`);
