@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.18.4 (2025年10月16日)
+### v0.18.5 (2025年10月16日)
 - feat: 添加 Minutiae 模块及其设置，支持自动题头图功能 (loonghfut)
 - feat: 添加文档ID题头图映射配置，支持根据文档路径自动匹配题头图链接 (loonghfut)
 - feat: 添加文档ID到图片URL的映射解析功能，支持多种输入格式 (loonghfut)
@@ -62,6 +62,11 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加最近更新检查功能，允许用户配置检查阈值以避免重复处理 (loonghfut)
 - feat: 添加日期格式化功能，支持多种日期格式和短时间格式，更新导入模板说明 (loonghfut)
 - feat: 更新插件版本至 0.18.4 (loonghfut)
+- docs: 更新 v0.18.4 版本的更新日志 (loonghfut)
+- feat: 优化预设保存逻辑，支持覆盖现有预设并保留自定义字段 (loonghfut)
+- feat: 优化看板和四象限对周期事件的支持 (loonghfut)
+- feat: 添加对目标数据库 ID 的支持，优化定时任务执行逻辑 (loonghfut)
+- feat: 更新插件版本至 0.18.5，优化用户提示信息以支持正版思源 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
