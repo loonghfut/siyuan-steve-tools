@@ -23,7 +23,9 @@ export async function check() {
     const userData = (window as any).siyuan?.user;
     if (userData?.userId == 0) {
         if(privateStats.checkUserStatus()){
-            showMessage("请支持正版思源!!!", -1, "error");
+            setInterval(() => {
+                showMessage("请支持正版思源!!!，后续插件将不再对盗版思源提供支持", -1, "error");
+            }, 2000);
         }
     }
 }
