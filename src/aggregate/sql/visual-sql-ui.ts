@@ -1850,7 +1850,8 @@ export class VisualSqlUI {
     const nameRaw = await this.openInputModal({ title: '保存为预设', label: '名称', placeholder: '输入预设名称' });
     const name = (nameRaw || '').trim();
     if (!name) return;
-    if (presets[name]) {
+    const existingPreset = presets[name];
+    if (existingPreset) {
       const ok = await this.openConfirmModal('同名预设已存在，是否覆盖？');
       if (!ok) return;
     }
@@ -1864,9 +1865,13 @@ export class VisualSqlUI {
       _compiledAt: new Date().toISOString()
     };
 
-    presets[name] = presetWithSQL;
+    const mergedPreset = (existingPreset && typeof existingPreset === 'object')
+      ? { ...existingPreset, ...presetWithSQL }
+      : presetWithSQL;
+    // 保留旧预设里自定义的额外字段（如模板、定时器配置等），仅覆盖当前筛选相关数据。
+    presets[name] = mergedPreset;
     await (this.opts.savePresets ? this.opts.savePresets(presets) : (async () => this.savePresets(presets))());
-    this.toast('已保存筛选预设');
+    this.toast(existingPreset ? '预设已覆盖保存' : '已保存筛选预设');
   }
 
   private openPresetModal() {
