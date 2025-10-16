@@ -318,6 +318,29 @@ export class ICSImporter {
         return date.toLocaleString('zh-CN');
     }
 
+    private formatDateOnly(date: Date): string {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    private formatShortTime(date: Date, isAllDay: boolean): string {
+        if (isAllDay) {
+            return '全天';
+        }
+        const hour = date.getHours().toString().padStart(2, '0');
+        const minute = date.getMinutes().toString().padStart(2, '0');
+        return `${hour}:${minute}`;
+    }
+
+    private formatDateTimeCompact(date: Date, isAllDay: boolean): string {
+        if (isAllDay) {
+            return this.formatDateOnly(date);
+        }
+        return `${this.formatDateOnly(date)} ${this.formatShortTime(date, false)}`;
+    }
+
     /**
      * 简单的模板变量替换
      */
@@ -347,8 +370,15 @@ export class ICSImporter {
         const contentTemplate = this.settings['cal-ics-custom-template'] || this.getDefaultContentTemplate();
 
         // 准备模板数据
-        const startTimeStr = event.startTime ? this.formatDateTime(event.startTime, event.isAllDay) : '';
-        const endTimeStr = event.endTime ? this.formatDateTime(event.endTime, event.isAllDay) : '';
+        const isAllDay = event.isAllDay === true;
+        const startTimeStr = event.startTime ? this.formatDateTime(event.startTime, isAllDay) : '';
+        const endTimeStr = event.endTime ? this.formatDateTime(event.endTime, isAllDay) : '';
+        const startDateOnly = event.startTime ? this.formatDateOnly(event.startTime) : '';
+        const endDateOnly = event.endTime ? this.formatDateOnly(event.endTime) : '';
+        const startCompact = event.startTime ? this.formatDateTimeCompact(event.startTime, isAllDay) : '';
+        const endCompact = event.endTime ? this.formatDateTimeCompact(event.endTime, isAllDay) : '';
+        const shortStartTime = event.startTime ? this.formatShortTime(event.startTime, isAllDay) : '';
+        const shortEndTime = event.endTime ? this.formatShortTime(event.endTime, isAllDay) : '';
 
         // 处理状态映射
         const statusMap = {
@@ -380,6 +410,12 @@ export class ICSImporter {
             title: event.title || '',
             startTime: startTimeStr,
             endTime: endTimeStr,
+            startDate: startDateOnly,
+            endDate: endDateOnly,
+            startDateTime: startCompact,
+            endDateTime: endCompact,
+            short_startTime: shortStartTime,
+            short_endTime: shortEndTime,
             location: event.location || '',
             description: processedDescription,
             status: statusText,

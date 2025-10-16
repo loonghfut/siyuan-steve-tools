@@ -176,7 +176,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "select", title: "导入模式", description: "如何放置导入事件", key: "cal-ics-import-mode", value: ctx.settings["cal-ics-import-mode"], options: { "single-document": "导入到当日日记本", "daily-notes": "按事件日期" } },
                 { type: "checkbox", title: "添加到数据库", description: "导入块添加到指定数据库", key: "cal-ics-add-to-database", value: ctx.settings["cal-ics-add-to-database"] },
                 { type: "select", title: "ICS导入数据库", description: "选择要添加的数据库", key: "cal-ics-database-id", value: ctx.settings["cal-ics-database-id"], dynamicOptions: calendarDbOptions },
-                { type: "textarea", title: "ICS导入模板", description: "自定义导入块模板(支持占位符){{title}} - 事件标题 {{startTime}} - 开始时间 {{endTime}} - 结束时间 {{location}} - 地点 {{description}} - 描述 {{status}} - 状态 {{recurrence}} - 重复规则 {{tags}} - 标签", key: "cal-ics-custom-template", value: ctx.settings["cal-ics-custom-template"], direction: "row" },
+                { type: "textarea", title: "ICS导入模板", description: "自定义导入块模板(支持占位符)\n{{title}} - 事件标题\n{{startTime}} - 开始时间 (本地格式)\n{{endTime}} - 结束时间 (本地格式)\n{{startDate}} - 开始日期 (YYYY-MM-DD)\n{{endDate}} - 结束日期 (YYYY-MM-DD)\n{{startDateTime}} - 开始日期时间 (YYYY-MM-DD HH:mm)\n{{endDateTime}} - 结束日期时间 (YYYY-MM-DD HH:mm)\n{{short_startTime}} - 开始时间 (短格式, 如 01:45 或 全天)\n{{short_endTime}} - 结束时间 (短格式, 如 18:00 或 全天)\n{{location}} - 地点\n{{description}} - 描述\n{{status}} - 状态\n{{recurrence}} - 重复规则\n{{tags}} - 标签", key: "cal-ics-custom-template", value: ctx.settings["cal-ics-custom-template"], direction: "row" },
             ]
         },
         {
