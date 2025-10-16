@@ -20,6 +20,31 @@ const getUrgentThresholdDays = () => {
 };
 
 let dataArray: NestedKBCalendarEvent[] = [];
+let flatEventCache: NestedKBCalendarEvent[] = [];
+
+const flattenEvents = (events: NestedKBCalendarEvent[]): NestedKBCalendarEvent[] => {
+  const result: NestedKBCalendarEvent[] = [];
+  const stack: NestedKBCalendarEvent[] = [...events];
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current) continue;
+    result.push(current);
+    if (current.children?.length) {
+      stack.push(...current.children);
+    }
+  }
+  return result;
+};
+
+const findEventInCache = (blockId: string | null, startDate?: string | null): NestedKBCalendarEvent | undefined => {
+  if (!blockId) return undefined;
+  const candidates = flatEventCache.filter(e => e.extendedProps.blockId === blockId);
+  if (!candidates.length) return undefined;
+  const normalized = startDate?.trim();
+  if (!normalized) return candidates[0];
+  const match = candidates.find(ev => ev.range?.start instanceof Date && ev.range.start.toISOString().split('T')[0] === normalized);
+  return match || candidates[0];
+};
 
 // 简单防抖
 function debounce<T extends (...args: any[]) => any>(fn: T, wait = 500) {
@@ -160,6 +185,8 @@ const QuadrantViewConfig = {
 
   // 过滤归档事件
   dataArray = dataArray.filter(e => e.extendedProps.status !== '归档');
+
+    flatEventCache = flattenEvents(dataArray);
 
     // 四象限分类：
     // 1) 先按优先级固定：高->q1，中->q2，低->q3，无->q4（确保q1含所有高，q3含所有低）
@@ -306,8 +333,8 @@ const QuadrantViewConfig = {
               if (card) {
                 const blockId = card.getAttribute('data-block-id');
                 const startDate = card.getAttribute('data-start-date');
-                const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
-                if (eventData) changestatus_for_zq(eventData.extendedProps, startDate);
+                const eventData = findEventInCache(blockId, startDate);
+                if (eventData) changestatus_for_zq(eventData.extendedProps, startDate || '');
               }
             }
             // 添加
@@ -329,7 +356,7 @@ const QuadrantViewConfig = {
             if (!card) return;
             const blockId = card.getAttribute('data-block-id') || '';
             const isRecurring = card.hasAttribute('data-recurring');
-            const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
+            const eventData = findEventInCache(blockId, isRecurring ? card.getAttribute('data-start-date') : null);
             if (!eventData) return;
 
             // 避免重复创建
@@ -440,7 +467,7 @@ const QuadrantViewConfig = {
                   const toQuadrant = (evt.to as HTMLElement).getAttribute('data-quadrant');
                   const fromQuadrant = (evt.from as HTMLElement).getAttribute('data-quadrant');
                   if (!blockId || !toQuadrant) return;
-                  const eventData = dataArray.find(e => e.extendedProps.blockId === blockId);
+                  const eventData = findEventInCache(blockId, itemEl.getAttribute('data-start-date'));
                   if (!eventData) return;
       // 映射优先级：q1->高, q2->中, q3->低, q4->无
       const map: Record<string, string> = { q1: '高', q2: '中', q3: '低', q4: '无' };

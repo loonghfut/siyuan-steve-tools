@@ -289,24 +289,35 @@ export async function globalOpen2() {
 
 
 // 新增过滤周期事件的函数
-export function filterRecurringEvents(events: KBCalendarEvent[], 
-    options = { 
-        futureOccurrences: 3,  // Show 3 future occurrences by default
-        pastOccurrences: 1,    // Show 1 past occurrence by default
-        excludeStatuses: []     // 需要过滤掉的状态数组，例如 ['完成']
+export function filterRecurringEvents(events: KBCalendarEvent[],
+    options = {
+        futureOccurrences: 3,
+        pastOccurrences: 1,
+        excludeStatuses: []
     }): KBCalendarEvent[] {
     const now = new Date();
     const processedEvents = new Set<string>();
     const filteredEvents: KBCalendarEvent[] = [];
     const recurringEventMap = new Map<string, KBCalendarEvent[]>();
 
+    const getOccurrenceKey = (event: KBCalendarEvent) => {
+        const base = event.publicId || event.extendedProps?.blockId || '';
+        const start = event.range?.start instanceof Date ? event.range.start.toISOString() : '';
+        return start ? `${base}__${start}` : base;
+    };
+
+    const pushIfNew = (event: KBCalendarEvent) => {
+        const key = getOccurrenceKey(event);
+        if (!key || processedEvents.has(key)) return;
+        processedEvents.add(key);
+        filteredEvents.push(event);
+    };
+
     // 首先处理非周期事件 - 直接添加到结果中
     events.forEach(event => {
         if (!event.extendedProps?.isRecurring) {
-            // 非周期事件直接添加，不做任何处理
-            filteredEvents.push(event);
+            pushIfNew(event);
         } else {
-            // 周期事件进行分类处理
             const blockId = event.extendedProps.blockId;
             if (!recurringEventMap.has(blockId)) {
                 recurringEventMap.set(blockId, []);
@@ -315,27 +326,18 @@ export function filterRecurringEvents(events: KBCalendarEvent[],
         }
     });
 
-    // 处理周期事件
-    recurringEventMap.forEach((events, blockId) => {
-        const sortedEvents = events
+    recurringEventMap.forEach(eventsForBlock => {
+        const sortedEvents = eventsForBlock
             .filter(event => !options.excludeStatuses?.includes(event.extendedProps?.status))
             .sort((a, b) => a.range.start.getTime() - b.range.start.getTime());
-        
-        // 找到当前位置
+
         const currentIndex = sortedEvents.findIndex(e => e.range.start > now);
         const validCurrentIndex = currentIndex === -1 ? sortedEvents.length : currentIndex;
-        
-        // 在指定范围内选择事件
+
         const startIndex = Math.max(validCurrentIndex - options.pastOccurrences, 0);
         const endIndex = Math.min(validCurrentIndex + options.futureOccurrences, sortedEvents.length);
-        
-        // 添加筛选后的周期事件
-        sortedEvents.slice(startIndex, endIndex).forEach(e => {
-            if (!processedEvents.has(e.publicId)) {
-                filteredEvents.push(e);
-                processedEvents.add(e.publicId);
-            }
-        });
+
+        sortedEvents.slice(startIndex, endIndex).forEach(pushIfNew);
     });
 
     return filteredEvents;
