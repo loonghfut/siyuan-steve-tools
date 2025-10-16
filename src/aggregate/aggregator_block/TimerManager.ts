@@ -74,9 +74,12 @@ export class TimerManager {
         try {
             console.log(`[TimerManager] 执行定时任务: ${presetName}`);
 
-            // 检查目标文档
-            if (!preset.targetDocId) {
-                console.warn(`[TimerManager] 预设 "${presetName}" 没有设置目标文档ID`);
+            const targetDocId = preset.targetDocId;
+            const targetDatabaseId = preset.targetDatabaseId;
+
+            // 至少需要一个目标
+            if (!targetDocId && !targetDatabaseId) {
+                console.warn(`[TimerManager] 预设 "${presetName}" 未设置目标文档或数据库 ID`);
                 return;
             }
 
@@ -84,7 +87,7 @@ export class TimerManager {
             const lastInsertTime = preset.lastInsertTime || '';
             const sqlResult = await this.aggregatorBlock.executeSql(
                 preset.sql, 
-                preset.targetDocId, 
+                targetDocId, 
                 lastInsertTime
             );
 
@@ -157,19 +160,57 @@ export class TimerManager {
                 return;
             }
 
-            // 渲染模板
-            const renderedMd = this.aggregatorBlock.renderTemplate(preset, sqlResult);
+            let docInserted = false;
+            let databaseInsertedCount = 0;
+            const errors: string[] = [];
 
-            // 插入到文档
-            await this.aggregatorBlock.insertMarkdownToDoc(
-                preset.targetDocId, 
-                renderedMd, 
-                presetName
-            );
+            if (targetDocId) {
+                try {
+                    const renderedMd = this.aggregatorBlock.renderTemplate(preset, sqlResult);
+                    await this.aggregatorBlock.insertMarkdownToDoc(
+                        targetDocId,
+                        renderedMd,
+                        presetName
+                    );
+                    docInserted = true;
+                } catch (error: any) {
+                    const msg = error?.message || String(error);
+                    errors.push(`文档: ${msg}`);
+                }
+            }
 
-            console.log(`[TimerManager] 成功执行定时任务: ${presetName}, 插入 ${sqlResult.length} 条数据`);
+            if (targetDatabaseId) {
+                try {
+                    databaseInsertedCount = await this.aggregatorBlock.insertBlocksToDatabase(
+                        targetDatabaseId,
+                        sqlResult,
+                        presetName
+                    );
+                } catch (error: any) {
+                    const msg = error?.message || String(error);
+                    errors.push(`数据库: ${msg}`);
+                }
+            }
 
-            // 重新获取预设配置（因为 insertMarkdownToDoc 已经更新了 lastInsertTime）
+            const operations: string[] = [];
+            if (docInserted) {
+                operations.push(`文档 ${sqlResult.length} 条`);
+            }
+            if (databaseInsertedCount > 0) {
+                operations.push(`数据库 ${databaseInsertedCount} 块`);
+            }
+
+            if (operations.length) {
+                console.log(`[TimerManager] 成功执行定时任务: ${presetName}, 插入 ${operations.join('，')}`);
+            } else {
+                console.log(`[TimerManager] 预设 "${presetName}" 没有可执行的插入操作`);
+            }
+
+            if (errors.length) {
+                showMessage(`定时任务 "${presetName}" 部分失败: ${errors.join('；')}`, 5000, 'error');
+            }
+
+            // 重新获取预设配置（插入操作可能更新了 lastInsertTime）
             const allPresets = await this.aggregatorBlock.getSqlPresets();
             const updatedPreset = allPresets[presetName];
             if (updatedPreset) {
@@ -181,7 +222,9 @@ export class TimerManager {
             }
 
             // 可选：显示通知
-            showStatusMessage(`定时任务 "${presetName}" 已执行，插入 ${sqlResult.length} 条数据`, 3000, 'info');
+            if (operations.length) {
+                showStatusMessage(`定时任务 "${presetName}" 已执行，${operations.join('，')}`, 3000, 'info');
+            }
 
         } catch (error) {
             console.error(`[TimerManager] 执行定时任务失败: ${presetName}`, error);

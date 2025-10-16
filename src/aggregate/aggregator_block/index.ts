@@ -1,5 +1,6 @@
 import steveTools from "@/index";
 import { getBlockByID, insertBlock, sql as runSql } from '@/api/api';
+import { AVManager } from "@/api/db_pro";
 import { PluginConfig } from '@/savedata';
 import { showMessage } from "siyuan";
 import { PresetItem, SQLRawRow } from "../echarts/types/types";
@@ -11,6 +12,9 @@ export class aggregatorBlock {
 
     // 可选的 PluginConfig 实例（若宿主模块提供）
     private pluginConfig?: PluginConfig;
+
+    // AV 管理器实例，用于数据库操作
+    private avManager: AVManager = new AVManager('');
 
     // 定时任务管理器
     private timerManager?: TimerManager;
@@ -461,14 +465,24 @@ export class aggregatorBlock {
                 const validityChecks = await Promise.all(
                     filteredNames.map(async n => {
                         const preset = presets[n];
-                        const isValid = preset.targetDocId ? await this.checkDocValidity(preset.targetDocId) : true;
-                        return { name: n, isValid };
+                        const docValid = preset.targetDocId ? await this.checkDocValidity(preset.targetDocId) : true;
+                        let databaseValid = true;
+                        if (preset.targetDatabaseId) {
+                            try {
+                                await this.avManager.getAttributeView(preset.targetDatabaseId);
+                            } catch (error) {
+                                console.debug('[aggregatorBlock] 数据库校验失败', preset.targetDatabaseId, error);
+                                databaseValid = false;
+                            }
+                        }
+                        return { name: n, docValid, databaseValid };
                     })
                 );
-                const validityMap = new Map(validityChecks.map(v => [v.name, v.isValid]));
+                const validityMap = new Map(validityChecks.map(v => [v.name, { docValid: v.docValid, databaseValid: v.databaseValid }]));
 
                 filteredNames.forEach(n => {
                     const preset = presets[n];
+                    const validity = validityMap.get(n);
                     const item = document.createElement('div');
                     item.className = 'preset-item';
                     item.style.cssText = `
@@ -531,7 +545,7 @@ export class aggregatorBlock {
                                             自定义模板
                                         </span>
                                     ` : ''}
-                                    ${preset.targetDocId ? (validityMap.get(n) ? `
+                                    ${preset.targetDocId ? (validity?.docValid ? `
                                         <span style="
                                             font-size: 11px;
                                             padding: 2px 8px;
@@ -558,6 +572,35 @@ export class aggregatorBlock {
                                         ">
                                             <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCloseRound"></use></svg>
                                             无效文档绑定
+                                        </span>
+                                    `) : ''}
+                                    ${preset.targetDatabaseId ? (validity?.databaseValid ? `
+                                        <span style="
+                                            font-size: 11px;
+                                            padding: 2px 8px;
+                                            background: rgba(70, 130, 180, 0.12);
+                                            color: #1976d2;
+                                            border-radius: var(--b3-border-radius-s);
+                                            display: inline-flex;
+                                            align-items: center;
+                                            gap: 4px;
+                                        ">
+                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconDatabase"></use></svg>
+                                            已绑定数据库
+                                        </span>
+                                    ` : `
+                                        <span style="
+                                            font-size: 11px;
+                                            padding: 2px 8px;
+                                            background: var(--b3-card-error-background);
+                                            color: var(--b3-card-error-color);
+                                            border-radius: var(--b3-border-radius-s);
+                                            display: inline-flex;
+                                            align-items: center;
+                                            gap: 4px;
+                                        ">
+                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCloseRound"></use></svg>
+                                            无效数据库绑定
                                         </span>
                                     `) : ''}
                                     ${preset.timerEnabled ? (() => {
@@ -814,6 +857,33 @@ export class aggregatorBlock {
                                 "
                             />
                         </div>
+
+                        <!-- 目标数据库 ID -->
+                        <div>
+                            <label style="
+                                display: block; 
+                                margin-bottom: 6px; 
+                                font-weight: 500;
+                                color: var(--b3-theme-on-background);
+                                font-size: 14px;
+                            ">
+                                <svg style="width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px;"><use xlink:href="#iconDatabase"></use></svg>
+                                目标数据库 ID (可选)
+                            </label>
+                            <input 
+                                id="edit-target-db" 
+                                class="b3-text-field" 
+                                value="${preset.targetDatabaseId || ''}"
+                                placeholder="输入属性视图 (数据库) ID, 用于插入查询到的块"
+                                style="
+                                    width: 100%;
+                                    padding: 8px;
+                                    border: 1px solid var(--b3-border-color);
+                                    border-radius: var(--b3-border-radius);
+                                    font-size: 13px;
+                                "
+                            />
+                        </div>
                         
                         <!-- 上次插入时间戳 -->
                         <div>
@@ -887,21 +957,25 @@ export class aggregatorBlock {
             confirmBtn?.addEventListener('click', async () => {
                 const templateTextarea = element.querySelector('#edit-template') as HTMLTextAreaElement;
                 const targetDocInput = element.querySelector('#edit-target-doc') as HTMLInputElement;
+                const targetDatabaseInput = element.querySelector('#edit-target-db') as HTMLInputElement;
                 const lastInsertTimeInput = element.querySelector('#edit-last-insert-time') as HTMLInputElement;
 
                 const newTemplate = templateTextarea?.value.trim() || '';
                 const newTargetDocId = targetDocInput?.value.trim() || '';
+                const newTargetDatabaseId = targetDatabaseInput?.value.trim() || '';
                 const newLastInsertTime = lastInsertTimeInput?.value.trim() || '';
 
                 // 更新预设
                 preset.template = newTemplate || undefined;
                 preset.targetDocId = newTargetDocId || undefined;
+                preset.targetDatabaseId = newTargetDatabaseId || undefined;
                 preset.lastInsertTime = newLastInsertTime || undefined;
                 allPresets[name] = preset;
 
                 // 保存到配置
                 await this.updatePresetTemplate(name, newTemplate);
                 await this.updatePresetTargetDocId(name, newTargetDocId);
+                await this.updatePresetTargetDatabaseId(name, newTargetDatabaseId);
                 await this.updatePresetLastInsertTime(name, newLastInsertTime);
 
                 showMessage('预设已更新', 3000, 'info');
@@ -1298,19 +1372,21 @@ export class aggregatorBlock {
         if (!preset) return;
         console.log(preset);
 
-        // 检查是否有目标文档 ID，如果没有，提示用户输入并保存
         let targetDocId = preset.preset.targetDocId;
-        if (!targetDocId) {
+        const targetDatabaseId = preset.preset.targetDatabaseId;
+
+        // 至少需要配置一个目标（文档或数据库）
+        if (!targetDocId && !targetDatabaseId) {
             targetDocId = await this.promptForDocId(preset.name);
             console.log('用户输入的目标文档 ID:', targetDocId);
             if (!targetDocId) {
-                console.log('用户取消输入文档 ID');
+                console.warn(`[aggregatorBlock] 预设 "${preset.name}" 未配置目标文档或数据库`);
+                showMessage('请先在预设中设置目标文档或数据库 ID', 4000, 'info');
                 return;
             }
-            // 保存到预设
             console.log('保存目标文档 ID:', targetDocId);
             await this.updatePresetTargetDocId(preset.name, targetDocId);
-            preset.preset.targetDocId = targetDocId; // 更新本地对象
+            preset.preset.targetDocId = targetDocId;
         }
 
         // 获取上次插入时间，用于过滤已处理的内容
@@ -1326,18 +1402,48 @@ export class aggregatorBlock {
             return;
         }
 
-        // 使用模板渲染 SQL 结果为 Markdown（优先使用预设模板）
-        const renderedMd = this.renderTemplate(preset.preset, sqlResult);
-        // console.log('Rendered Markdown:', renderedMd);
+        const operations: string[] = [];
+        const errors: string[] = [];
 
-        // 插入到指定文档
-        try {
-            await this.insertMarkdownToDoc(targetDocId, renderedMd, preset.name);
-            console.log('成功插入到文档:', targetDocId);
-            showMessage(`成功插入 ${sqlResult.length} 条数据`, 3000, 'info');
-        } catch (e) {
-            console.error('插入失败:', e);
-            showMessage('插入失败: ' + e.message, 3000, 'error');
+        if (targetDocId) {
+            const renderedMd = this.renderTemplate(preset.preset, sqlResult);
+            try {
+                await this.insertMarkdownToDoc(targetDocId, renderedMd, preset.name);
+                console.log('成功插入到文档:', targetDocId);
+                operations.push(`文档 ${sqlResult.length} 条`);
+            } catch (error: any) {
+                console.error('[aggregatorBlock] 插入文档失败:', error);
+                const msg = error?.message || String(error);
+                errors.push(`文档: ${msg}`);
+            }
+        }
+
+        if (targetDatabaseId) {
+            try {
+                const insertedCount = await this.insertBlocksToDatabase(targetDatabaseId, sqlResult, preset.name);
+                if (insertedCount > 0) {
+                    console.log('成功插入到数据库:', targetDatabaseId, '数量:', insertedCount);
+                    operations.push(`数据库 ${insertedCount} 块`);
+                } else {
+                    console.log(`[aggregatorBlock] 预设 "${preset.name}" 未找到可插入的块 ID`);
+                }
+            } catch (error: any) {
+                console.error('[aggregatorBlock] 插入数据库失败:', error);
+                const msg = error?.message || String(error);
+                errors.push(`数据库: ${msg}`);
+            }
+        }
+
+        if (operations.length) {
+            showMessage(`成功插入 ${operations.join('，')}`, 3000, 'info');
+        }
+
+        if (errors.length) {
+            showMessage(`部分操作失败: ${errors.join('；')}`, 5000, 'error');
+        }
+
+        if (!operations.length && errors.length === 0) {
+            showMessage('未执行任何插入操作，请检查预设配置', 4000, 'info');
         }
     }
 
@@ -1394,6 +1500,56 @@ export class aggregatorBlock {
         } catch (e) {
             console.error('[aggregatorBlock] insertMarkdownToDoc error', e);
             throw e;
+        }
+    }
+
+    // 将查询到的块绑定到指定的数据库（属性视图）
+    async insertBlocksToDatabase(databaseId: string, rows: SQLRawRow[], presetName?: string): Promise<number> {
+        if (!databaseId || !databaseId.trim()) {
+            throw new Error('无效的数据库 ID');
+        }
+        if (!Array.isArray(rows) || rows.length === 0) {
+            return 0;
+        }
+
+        const candidateKeys = ['block_id', 'blockId', 'id'];
+        const blockIds: string[] = [];
+
+        for (const row of rows) {
+            if (!row || typeof row !== 'object') continue;
+            let foundId: string | undefined;
+            for (const key of candidateKeys) {
+                const value = row[key];
+                if (typeof value === 'string' && value.trim()) {
+                    foundId = value.trim();
+                    break;
+                }
+            }
+            if (foundId) {
+                blockIds.push(foundId);
+            }
+        }
+
+        const uniqueIds = Array.from(new Set(blockIds));
+        if (!uniqueIds.length) {
+            throw new Error('SQL 结果中缺少可用的块 ID 字段 (id / block_id)');
+        }
+
+        try {
+            const sources = uniqueIds.map(id => ({
+                id,
+                isDetached: false,
+                itemID: this.avManager.generateId()
+            }));
+            await this.avManager.batchAddBlocks(databaseId, sources);
+            if (presetName) {
+                const currentTime = this.getSiyuanTimestamp();
+                await this.updatePresetLastInsertTime(presetName, currentTime);
+            }
+            return uniqueIds.length;
+        } catch (error) {
+            console.error('[aggregatorBlock] insertBlocksToDatabase error', error);
+            throw error;
         }
     }
 
@@ -1492,6 +1648,26 @@ export class aggregatorBlock {
             }
         } catch (e) {
             console.error('[aggregatorBlock] updatePresetTargetDocId error', e);
+        }
+    }
+
+    // 更新预设的目标数据库 ID
+    async updatePresetTargetDatabaseId(presetName: string, targetDatabaseId: string): Promise<void> {
+        try {
+            if (!this.pluginConfig) {
+                console.error('[aggregatorBlock] cannot update preset: pluginConfig not provided');
+                return;
+            }
+            const current = this.pluginConfig.get('presets') || {};
+            if (current[presetName]) {
+                current[presetName].targetDatabaseId = targetDatabaseId || undefined;
+                this.pluginConfig.set('presets', current);
+                await this.pluginConfig.save();
+            } else {
+                console.warn('[aggregatorBlock] preset not found:', presetName);
+            }
+        } catch (e) {
+            console.error('[aggregatorBlock] updatePresetTargetDatabaseId error', e);
         }
     }
 
