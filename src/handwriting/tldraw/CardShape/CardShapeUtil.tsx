@@ -221,16 +221,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							try {
 								// 创建一个Promise，其他实例可以等待它
 								pendingCreationPromise = (async () => {
-									const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["tl-draw-create-note-id"])).id
-									if (!daynote_id) {
-										showMessage('未找到日记块');
-										return null;
-									}
+									// const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["tl-draw-create-note-id"])).id
+									// if (!daynote_id) {
+									// 	showMessage('未找到日记块');
+									// 	return null;
+									// }
 									const idid = await api.generateSiyuanID() as string;
 									const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 									const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
 									const redata = await api.appendBlock("markdown", `##### [${timestamp}](${link})[🔗](${link})
-{: id="${idid}" custom-st-tldraw="1" }`, tldrawId || daynote_id)
+{: id="${idid}" custom-st-tldraw="1" }`, tldrawId)
 
 									const newBlockId = redata[0].doOperations[0].id;
 									lastCreatedBlockId = newBlockId;
