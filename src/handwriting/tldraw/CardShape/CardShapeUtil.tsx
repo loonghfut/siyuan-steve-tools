@@ -81,13 +81,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const [isEditingState, setIsEditingState] = useState(isEditing);
-		
+
 		const protyleRef = useRef(null)
 
-		
+
 		const containerRef = useRef<HTMLDivElement>(null)
 
-		
+
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
@@ -281,7 +281,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							breadcrumbDocName: shape.props.isMain,
 							// scroll:false,
 						},
-						// action: ["cb-get-focus"],
+						action: ["cb-get-all", "cb-get-focus"],
 						mode: "wysiwyg",
 						// typewriterMode: true,
 						after: (protyle: Protyle) => {
@@ -289,7 +289,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							protyle.protyle.wysiwyg.preventKeyup = true;
 							// protyle.resize();
 							// console.log('after', protyle.wysiwyg);
-						}
+						},
+						handleEmptyContent: () => {
+							showMessage('块已被删除');
+						},
+
 					});
 					// pt.focusBlock(blockId);
 
