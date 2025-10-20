@@ -140,7 +140,7 @@ const CustomStylePanel = track(() => {
         (e: React.ChangeEvent<HTMLInputElement>) => {
             if (slideShape) {
                 // 使用事务来确保撤销/重做能正确处理连续输入
-                editor.batch(() => {
+                editor.run(() => {
                     editor.updateShape({
                         id: slideShape.id,
                         type: 'slide',
@@ -283,7 +283,7 @@ function CustomQuickActions() {
                             return
                         }
                         const nonce = Date.now()
-                        editor.batch(() => {
+                        editor.run(() => {
                             for (const s of shapes) {
                                 editor.updateShape({
                                     id: s.id,
