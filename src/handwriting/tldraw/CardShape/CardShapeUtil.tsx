@@ -6,7 +6,6 @@ import {
 	ShapeUtil,
 	SvgExportContext,
 	TLResizeInfo,
-	TLShape,
 	getDefaultColorTheme,
 	resizeBox,
 } from '@tldraw/tldraw'
@@ -18,8 +17,10 @@ import * as api from '@/api/api';
 import { settingdata } from '@/index';
 
 let isCreatingBlock = false;
-let lastCreatedBlockId = null;
+// 仅用于并发创建控制，不再缓存最近创建的块ID
 let pendingCreationPromise = null;
+
+// 移除轻量预览相关工具，保持编辑态与非编辑态显示一致（均使用 Protyle 渲染）
 
 
 export class CardShapeUtil extends ShapeUtil<ICardShape> {
@@ -77,12 +78,18 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	}
 	// [6]
 	component(shape: ICardShape) {
-		const bounds = this.editor.getShapeGeometry(shape).bounds
+		// const bounds = this.editor.getShapeGeometry(shape).bounds
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 
-		const protyleRef = useRef(null)
+
+		// 仅在编辑时创建 Protyle 实例
+		const protyleRef = useRef<Protyle | null>(null)
+		// Protyle 的承载元素（脱离 containerRef 创建，再 append 进去）
+		const protyleHostRef = useRef<HTMLDivElement | null>(null)
+		// 非编辑态下的静态预览节点（由 Protyle contentElement 克隆而来）
+		const staticPreviewRef = useRef<HTMLElement | null>(null)
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
@@ -92,234 +99,228 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
 
+		// 移除轻量预览逻辑，统一使用 Protyle 渲染
+
+		// 字体大小变更时，如果处于编辑且存在 Protyle，则更新其样式
 		useEffect(() => {
-			if (protyleRef.current && protyleRef.current.protyle && protyleRef.current.protyle.wysiwyg) {
+			if (protyleRef.current?.protyle?.wysiwyg?.element) {
 				protyleRef.current.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
 			} else if (containerRef.current) {
-				const protyleElement = containerRef.current.querySelector(".protyle-wysiwyg");
-				if (protyleElement) {
-					(protyleElement as HTMLElement).style.fontSize = `${shape.props.fontSize || 16}px`;
-				}
+				const wys = containerRef.current.querySelector(".protyle-wysiwyg");
+				if (wys) (wys as HTMLElement).style.fontSize = `${shape.props.fontSize || 16}px`;
 			}
 		}, [shape.props.fontSize]);
-
+		// 非编辑态下做一次存在性检查，避免频繁 API 调用
 		useEffect(() => {
-			//检查块是否存在
 			const container = containerRef.current;
-			const blockId = container?.getAttribute('blockid');
-			// console.log('containerAAAAAA啊', container);
-			// console.log('id', shape.props.blockId, "/n shapeid", shape.id);
-			// console.log('blockId', blockId);
-			if (protyleRef.current) {
-				if (isEditingState) {
-					protyleRef.current.enable();
-					// console.log('进入编辑状态', protyleRef.current.protyle.wysiwyg);
-				} else {
-					protyleRef.current.disable();
-					// console.log('退出编辑状态', protyleRef.current.protyle.wysiwyg);
-				}
-			}
-			if (!shape.props.blockId) {
+			const blockId = container?.getAttribute('blockid') || shape.props.blockId;
+			if (!shape.props.blockId && blockId) {
 				this.editor.updateShape({
 					id: shape.id,
 					type: shape.type,
-					props: {
-						...shape.props,
-						blockId: blockId,
-					},
+					props: { ...shape.props, blockId }
 				});
 			}
-			if (blockId) {
-				// console.log('检查块是否存在:', blockId);
-				// Add delay before checking if block exists to avoid unnecessary API calls
+			if (blockId && !isEditingState) {
 				if (shape.props.isNewlyCreated) {
 					this.editor.updateShape({
 						id: shape.id,
 						type: shape.type,
-						props: {
-							...shape.props,
-							isNewlyCreated: false,
-						},
+						props: { ...shape.props, isNewlyCreated: false }
 					});
 				} else {
-					const checkBlockExistence = setTimeout(() => {
+					const h = setTimeout(() => {
 						api.getBlockByID(blockId).then((res) => {
-							if (res) {
-								// console.log('块存在:', res);
-							} else {
+							if (!res) {
 								showMessage('块不存在,已被删除');
 								this.editor.deleteShape(shape.id);
 							}
 						});
 					}, 4000);
-					return () => clearTimeout(checkBlockExistence);
+					return () => clearTimeout(h);
 				}
 			}
-		}, [isEditingState]);
-		// eslint-disable-next-line react-hooks/rules-of-hooks
+		}, [isEditingState, shape.props.blockId]);
+		// 仅在编辑时保留 Protyle 实例；非编辑时克隆 contentElement 作为静态预览并销毁实例
 		useEffect(() => {
-			// 确保容器和SiYuan API都已加载
-			if (containerRef.current && window.siyuan && window.siyuan.ws && window.siyuan.ws.app) {
-				// 如果已有Protyle实例，先清理
-				if (protyleRef.current) {
-					// 如果Protyle有销毁方法，调用它
-					if (protyleRef.current.destroy) {
-						protyleRef.current.destroy();
-						// console.log('bbbbbbbbbb', protyleRef.current.protyle.wysiwyg);
+			if (!containerRef.current || !window.siyuan?.ws?.app) return;
+			const renderMode = (settingdata["card-render-mode"] || "static-dom") as "static-dom" | "live-protyle";
+
+			const mountProtyle = async () => {
+				let blockId: string | null = containerRef.current!.getAttribute('blockid') || shape.props.blockId || null;
+				if (!blockId) {
+					const editorElement = containerRef.current!.closest('.tldraw__editor');
+					const tldrawId = editorElement?.getAttribute('data-tldraw-id');
+					const title = editorElement?.getAttribute('data-tldraw-title');
+					if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
+						showMessage('配置不完整,请检查设置');
+						return;
 					}
-					protyleRef.current = null;
-				}
-
-				const createBlockIfNeeded = async () => {
-					let blockId = null;
-					// 如果元素上没有找到，则使用shape.props中的blockId
-					if (containerRef.current) {
-						blockId = containerRef.current.getAttribute('blockid');
-						// console.log('获取到的blockId', blockId);
-					}
-
-					// console.log('shape', shape.props.blockId);
-					if (!blockId) {
-						blockId = shape.props.blockId;
-					}
-
-					if (!blockId) {
-						const editorElement = containerRef.current?.closest('.tldraw__editor');
-						const tldrawId = editorElement?.getAttribute('data-tldraw-id');
-						const title = editorElement?.getAttribute('data-tldraw-title');
-						console.log('当前TLdraw实例ID:', tldrawId);
-
-						if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
-							showMessage('配置不完整,请检查设置');
-							return;
+					if (isCreatingBlock && pendingCreationPromise) {
+						try {
+							blockId = await pendingCreationPromise;
+						} catch (e) {
+							console.error('等待块创建失败', e);
 						}
-
-						// 检查是否有其他操作正在创建块
-						if (isCreatingBlock) {
-							// 如果有，等待那个操作完成并使用它创建的块ID
-							try {
-								if (pendingCreationPromise) {
-									blockId = await pendingCreationPromise;
-									if (blockId) {
-										this.editor.updateShape({
-											id: shape.id,
-											type: shape.type,
-											props: {
-												...shape.props,
-												blockId: blockId,
-											},
-										});
-									}
-								}
-							} catch (err) {
-								console.error("等待块创建失败:", err);
-							}
-						} else {
-							// 设置锁，标记正在创建块
-							isCreatingBlock = true;
-
-							try {
-								// 创建一个Promise，其他实例可以等待它
-								pendingCreationPromise = (async () => {
-									// const daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["tl-draw-create-note-id"])).id
-									// if (!daynote_id) {
-									// 	showMessage('未找到日记块');
-									// 	return null;
-									// }
-									const idid = await api.generateSiyuanID() as string;
-									const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-									const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
-									const redata = await api.appendBlock("markdown", `##### [${timestamp}](${link})[🔗](${link})
+					} else if (!blockId) {
+						isCreatingBlock = true;
+						try {
+							pendingCreationPromise = (async () => {
+								const idid = await api.generateSiyuanID() as string;
+								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+								const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
+								const redata = await api.appendBlock("markdown", `##### [${timestamp}](${link})[🔗](${link})
 {: id="${idid}" custom-st-tldraw="1" }
 
 {: custom-st-tldraw-none="1" }
-`, tldrawId)
-
-									const newBlockId = redata[0].doOperations[0].id;
-									lastCreatedBlockId = newBlockId;
-									return newBlockId;
-								})();
-
-								// 等待块创建完成
-								blockId = await pendingCreationPromise;
-
-								// 更新当前shape
-								this.editor.updateShape({
-									id: shape.id,
-									type: shape.type,
-									props: {
-										...shape.props,
-										blockId: blockId,
-									},
-								});
-							} catch (error) {
-								console.error("创建块失败:", error);
-							} finally {
-								// 释放锁
-								isCreatingBlock = false;
-								// 一段时间后清除缓存的Promise和ID
-								setTimeout(() => {
-									pendingCreationPromise = null;
-								}, 5000);
-							}
+`, tldrawId!)
+								const newBlockId = redata[0].doOperations[0].id;
+								return newBlockId;
+							})();
+							blockId = await pendingCreationPromise;
+						} catch (err) {
+							console.error('创建块失败', err);
+						} finally {
+							isCreatingBlock = false;
+							setTimeout(() => (pendingCreationPromise = null), 5000);
 						}
 					}
-
-					// 如果仍然没有blockId，显示错误
-					if (!blockId) {
-						showMessage('未找到块');
-						return;
 					}
-					const pt = new Protyle(window.siyuan.ws.app, containerRef.current, {
-						blockId: blockId,
-						rootId: blockId,
-						defId: blockId,
-						render: {
-							breadcrumb: shape.props.isMain,
-							gutter: true,
-							title: shape.props.isMain,
-							breadcrumbDocName: shape.props.isMain,
-							// scroll:false,
-						},
-						action: ["cb-get-all", "cb-get-focus"],
-						mode: "wysiwyg",
-						// typewriterMode: true,
-						after: (protyle: Protyle) => {
-							// console.log('after');
-							protyle.protyle.wysiwyg.preventKeyup = true;
-							// protyle.resize();
-							// console.log('after', protyle.wysiwyg);
-						},
-						handleEmptyContent: () => {
-							showMessage('块已被删除');
-						},
 
-					});
-					// pt.focusBlock(blockId);
+				if (!blockId) {
+					showMessage('未找到块');
+					return;
+				}
 
-					protyleRef.current = pt;
-					if (containerRef.current) {
-						containerRef.current.setAttribute('blockid', blockId);
-					}
-					// 应用字体大小设置
-					if (pt.protyle && pt.protyle.wysiwyg && pt.protyle.wysiwyg.element) {
-						pt.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
-					}
-					// console.log('bbbQQQQQbbb', containerRef);
-				};
-				// 创建新的Protyle实例
-				createBlockIfNeeded();
+				// 保存到 shape.props 并到容器属性
+				this.editor.updateShape({ id: shape.id, type: shape.type, props: { ...shape.props, blockId } });
+				containerRef.current!.setAttribute('blockid', blockId);
 
-			}
+				// 创建独立 host，并在其中初始化 Protyle，再 append 到 containerRef
+				const host = document.createElement('div');
+				host.style.width = '100%';
+				host.style.height = '100%';
+				host.style.overflow = 'hidden';
+				protyleHostRef.current = host;
 
-			// 组件卸载时清理
-			return () => {
-				if (protyleRef.current && protyleRef.current.destroy) {
-					protyleRef.current.destroy();
-					protyleRef.current = null;
+				let resolveReady: (() => void) | null = null;
+				const readyPromise = new Promise<void>(r => resolveReady = r);
+				const pt = new Protyle(window.siyuan.ws.app, host, {
+					blockId: blockId,
+					rootId: blockId,
+					defId: blockId,
+					render: {
+						breadcrumb: shape.props.isMain,
+						gutter: true,
+						title: shape.props.isMain,
+						breadcrumbDocName: shape.props.isMain,
+					},
+					action: ["cb-get-all", "cb-get-focus"],
+					mode: "wysiwyg",
+					after: (protyle: Protyle) => {
+						protyle.protyle.wysiwyg.preventKeyup = true;
+						resolveReady && resolveReady();
+					},
+					handleEmptyContent: () => {
+						showMessage('块已被删除');
+					},
+				});
+
+				protyleRef.current = pt;
+				containerRef.current!.appendChild(host);
+				if (pt.protyle?.wysiwyg?.element) {
+					pt.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
+				}
+				await readyPromise.catch(() => {});
+			};
+
+			const useStaticPreviewFromProtyle = async () => {
+				if (!protyleRef.current) return;
+				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
+				if (!ce) return;
+				// 克隆只读 DOM
+				const clone = ce.cloneNode(true) as HTMLElement;
+				clone.style.width = '100%';
+				clone.style.height = '100%';
+				clone.style.overflow = 'auto';
+				clone.style.fontSize = `${shape.props.fontSize || 16}px`;
+				// 清理 Protyle host
+				if (protyleHostRef.current?.parentElement) {
+					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
+				}
+				// 销毁 Protyle 实例
+				try { protyleRef.current.destroy(); } catch {}
+				protyleRef.current = null;
+				protyleHostRef.current = null;
+				// 挂载克隆预览
+				staticPreviewRef.current = clone;
+				if (containerRef.current) {
+					containerRef.current.appendChild(clone);
 				}
 			};
-		}, [shape.id]);
+
+			(async () => {
+				if (isEditingState) {
+					// 进入编辑：移除静态预览，创建并启用 Protyle
+					if (staticPreviewRef.current?.parentElement === containerRef.current) {
+						containerRef.current.removeChild(staticPreviewRef.current);
+					}
+					staticPreviewRef.current = null;
+					if (!protyleRef.current) {
+						await mountProtyle();
+					}
+					if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
+						containerRef.current.appendChild(protyleHostRef.current);
+					}
+					try { protyleRef.current?.enable(); } catch {}
+				} else {
+					// 非编辑
+					if (renderMode === 'static-dom') {
+						// 若已有 Protyle，用其生成静态预览后销毁实例；若没有且有 blockId，则临时创建->克隆->销毁
+						if (protyleRef.current) {
+							await useStaticPreviewFromProtyle();
+						} else {
+							const id = containerRef.current?.getAttribute('blockid') || shape.props.blockId;
+							if (id) {
+								await mountProtyle();
+								await useStaticPreviewFromProtyle();
+							}
+						}
+					} else {
+						// live-protyle：保留实例但禁用交互
+						if (!protyleRef.current) {
+							await mountProtyle();
+						}
+						if (staticPreviewRef.current?.parentElement === containerRef.current) {
+							containerRef.current.removeChild(staticPreviewRef.current);
+						}
+						staticPreviewRef.current = null;
+						if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
+							containerRef.current.appendChild(protyleHostRef.current);
+						}
+						try { protyleRef.current?.disable(); } catch {}
+					}
+				}
+			})()
+
+			// 组件卸载清理
+			return () => {
+				// 卸载：清理静态预览与 Protyle/host
+				if (staticPreviewRef.current?.parentElement) {
+					staticPreviewRef.current.parentElement.removeChild(staticPreviewRef.current);
+				}
+				staticPreviewRef.current = null;
+				// 彻底销毁 Protyle，并清理 host
+				if (protyleRef.current) {
+					try { protyleRef.current.destroy(); } catch {}
+					protyleRef.current = null;
+				}
+				if (protyleHostRef.current?.parentElement) {
+					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
+				}
+				protyleHostRef.current = null;
+			};
+		}, [isEditingState, shape.id]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
@@ -374,7 +375,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						padding: '0px', // 为内容添加最小边距
 						// borderRadius: 'inherit', // 继承父元素的圆角
 					}}
-				></div>
+				>
+					{/* 非编辑态下也使用 Protyle host 进行渲染，无需额外占位 */}
+				</div>
 			</HTMLContainer >
 		)
 	}
