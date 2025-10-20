@@ -413,7 +413,19 @@ export const components: TLComponents = {
                 <button
                     style={buttonStyle}
                     onClick={() => {
-                        showMessage('开发中。。。');
+                        // 刷新卡片：通过刷新 nonce 触发 Card 组件的重新挂载逻辑
+                        const shape = editor.getShape(selectionInfo.id) as ICardShape
+                        if (!shape) return
+                        editor.updateShape({
+                            id: selectionInfo.id,
+                            type: 'card',
+                            props: {
+                                ...shape.props,
+                                // 更新 nonce 以触发 useEffect，重建静态/实例视图
+                                refreshNonce: Date.now(),
+                            },
+                        })
+                        showMessage('卡片已刷新')
                     }}
                     title="刷新卡片"
                 >

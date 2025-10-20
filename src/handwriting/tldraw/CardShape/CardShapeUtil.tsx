@@ -265,6 +265,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				// 保险起见，再等待一次渲染完成
 				await waitForProtyleRendered(protyleRef.current);
 				// 克隆只读 DOM
+				if (staticPreviewRef.current?.parentElement === containerRef.current) {
+					containerRef.current.removeChild(staticPreviewRef.current);
+				}
 				const clone = ce.cloneNode(true) as HTMLElement;
 				clone.style.width = '100%';
 				clone.style.height = '100%';
@@ -314,7 +317,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							}
 						}
 					} else {
-						// live-protyle：保留实例但禁用交互
+						// live-protyle：保留实例但禁用交互，并尝试刷新内容
 						if (!protyleRef.current) {
 							await mountProtyle();
 						}
@@ -326,6 +329,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							containerRef.current.appendChild(protyleHostRef.current);
 						}
 						try { protyleRef.current?.disable(); } catch {}
+						try { protyleRef.current?.reload(false); } catch {}
 					}
 				}
 			})()
@@ -347,7 +351,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 				protyleHostRef.current = null;
 			};
-		}, [isEditingState, shape.id]);
+		}, [isEditingState, shape.id, shape.props.refreshNonce]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
