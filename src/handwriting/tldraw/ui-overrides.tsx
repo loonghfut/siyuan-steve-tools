@@ -271,6 +271,31 @@ function CustomQuickActions() {
                     });
                 }} />
             </div>
+            <div>
+                <TldrawUiMenuItem
+                    id="refresh-all-cards"
+                    icon="refresh"
+                    label="刷新所有卡片"
+                    onSelect={() => {
+                        const shapes = editor.getCurrentPageShapes().filter(s => s.type === 'card') as ICardShape[]
+                        if (shapes.length === 0) {
+                            showMessage('当前画布无卡片')
+                            return
+                        }
+                        const nonce = Date.now()
+                        editor.batch(() => {
+                            for (const s of shapes) {
+                                editor.updateShape({
+                                    id: s.id,
+                                    type: 'card',
+                                    props: { ...s.props, refreshNonce: nonce },
+                                })
+                            }
+                        })
+                        showMessage(`已刷新 ${shapes.length} 张卡片`)
+                    }}
+                />
+            </div>
         </DefaultQuickActions>
     )
 }
