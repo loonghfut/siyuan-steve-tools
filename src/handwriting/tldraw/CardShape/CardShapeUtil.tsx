@@ -146,6 +146,30 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			if (!containerRef.current || !window.siyuan?.ws?.app) return;
 			const renderMode = (settingdata["card-render-mode"] || "static-dom") as "static-dom" | "live-protyle";
 
+			// 等待 Protyle 完成首次内容渲染（尽量接近编辑态样式）
+			const waitForProtyleRendered = async (pt: Protyle, timeout = 800) => {
+				const ce = pt.protyle?.contentElement as HTMLElement | undefined;
+				if (!ce) return;
+				if (ce.childElementCount > 0) {
+					await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+					return;
+				}
+				await new Promise<void>((resolve) => {
+					let done = false;
+					const finish = () => {
+						if (done) return; done = true; resolve();
+					};
+					const obs = new MutationObserver(() => {
+						if (ce.childElementCount > 0) {
+							obs.disconnect();
+							requestAnimationFrame(() => requestAnimationFrame(finish));
+						}
+					});
+					obs.observe(ce, { childList: true, subtree: true });
+					setTimeout(() => { try { obs.disconnect(); } catch {} finish(); }, timeout);
+				});
+			};
+
 			const mountProtyle = async () => {
 				let blockId: string | null = containerRef.current!.getAttribute('blockid') || shape.props.blockId || null;
 				if (!blockId) {
@@ -238,6 +262,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (!protyleRef.current) return;
 				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
 				if (!ce) return;
+				// 保险起见，再等待一次渲染完成
+				await waitForProtyleRendered(protyleRef.current);
 				// 克隆只读 DOM
 				const clone = ce.cloneNode(true) as HTMLElement;
 				clone.style.width = '100%';
@@ -283,6 +309,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							const id = containerRef.current?.getAttribute('blockid') || shape.props.blockId;
 							if (id) {
 								await mountProtyle();
+								if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
 								await useStaticPreviewFromProtyle();
 							}
 						}
