@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.19.0 (2025年10月20日)
+### v0.19.1 (2025年10月20日)
 - 开始优化白板： 取消与日记的关联 (loonghfut)
 - 创建块时增加一个空格 (loonghfut)
 - feat: 更新依赖项 siyuan 至 1.1.5 版本 (loonghfut)
@@ -55,6 +55,9 @@ win端s3同步后，docker端感知s3同步。
 - 更新白板静态资源 (loonghfut)
 - 修复部分图标无法显示的BUG (loonghfut)
 - feat: 更新插件版本至0.19.0 增加高性能模式 Fixes #51 (loonghfut)
+- docs: 更新 v0.19.0 版本的更新日志 (loonghfut)
+- 完善tldraw相关许可 (loonghfut)
+- feat: 更新插件版本至0.19.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
