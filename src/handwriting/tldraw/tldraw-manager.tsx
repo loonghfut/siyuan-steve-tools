@@ -178,6 +178,7 @@ export class TldrawManager {
                 data-tldraw-id={this.id}
                 data-tldraw-title={this.title}>
                 <Tldraw
+                    licenseKey="tldraw-2026-01-28/WyJzTmo2UUJDRSIsWyIqIl0sMTYsIjIwMjYtMDEtMjgiXQ.TPO1s+ITkaa0Ou5Xt1vXDVgtuRkEmOLWH+bM+P/GNjaiw0f158QNVK97eCRJTFGF9Lpv1RoaJrvGX4mV+Ioxwg" 
                     store={store}
                     shapeUtils={customShapeUtils}
                     tools={customTools}
