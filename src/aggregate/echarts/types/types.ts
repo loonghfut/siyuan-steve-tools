@@ -5,6 +5,12 @@ export interface PresetItem {
   sql: string;
   targetDocId?: string;  // 绑定插入文档的 ID
   targetDatabaseId?: string; // 绑定插入数据库 (属性视图) 的 ID
+  /**
+   * 当将查询结果作为来源块加入到属性视图时，使用哪一个字段作为来源块ID。
+   * - 'id': 使用块自身 id（默认）
+   * - 'parent_id': 使用父块 id（例如只希望把父块加入到数据库时）
+   */
+  databaseIdField?: 'id' | 'parent_id';
   template?: string;     // 可选的独立模板
   lastInsertTime?: string; // 上次插入文档的时间戳(思源格式: YYYYMMDDHHmmss)
   

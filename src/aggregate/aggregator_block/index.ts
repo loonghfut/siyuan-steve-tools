@@ -883,6 +883,29 @@ export class aggregatorBlock {
                                     font-size: 13px;
                                 "
                             />
+                            <div style="
+                                margin-top: 8px;
+                                display: flex;
+                                gap: 8px;
+                                align-items: center;
+                            ">
+                                <label for="edit-db-id-field" style="font-size: 12px; color: var(--b3-theme-on-surface);">加入数据库时使用的 ID 字段:</label>
+                                <select id="edit-db-id-field" class="b3-select">
+                                    <option value="id" ${preset.databaseIdField !== 'parent_id' ? 'selected' : ''}>块 id (id)</option>
+                                    <option value="parent_id" ${preset.databaseIdField === 'parent_id' ? 'selected' : ''}>父块 id (parent_id)</option>
+                                </select>
+                            </div>
+                            <div style="
+                                font-size: 12px; 
+                                color: var(--b3-theme-on-surface-light); 
+                                margin-top: 4px;
+                                display: flex;
+                                align-items: center;
+                                gap: 4px;
+                            ">
+                                <svg style="width: 12px; height: 12px;"><use xlink:href="#iconInfo"></use></svg>
+                                SQL 结果中需包含对应的字段；若缺失将自动回退到其它可用字段。
+                            </div>
                         </div>
                         
                         <!-- 上次插入时间戳 -->
@@ -959,17 +982,20 @@ export class aggregatorBlock {
                 const targetDocInput = element.querySelector('#edit-target-doc') as HTMLInputElement;
                 const targetDatabaseInput = element.querySelector('#edit-target-db') as HTMLInputElement;
                 const lastInsertTimeInput = element.querySelector('#edit-last-insert-time') as HTMLInputElement;
+                const dbIdFieldSelect = element.querySelector('#edit-db-id-field') as HTMLSelectElement;
 
                 const newTemplate = templateTextarea?.value.trim() || '';
                 const newTargetDocId = targetDocInput?.value.trim() || '';
                 const newTargetDatabaseId = targetDatabaseInput?.value.trim() || '';
                 const newLastInsertTime = lastInsertTimeInput?.value.trim() || '';
+                const newDatabaseIdField = (dbIdFieldSelect?.value === 'parent_id' ? 'parent_id' : 'id') as 'id' | 'parent_id';
 
                 // 更新预设
                 preset.template = newTemplate || undefined;
                 preset.targetDocId = newTargetDocId || undefined;
                 preset.targetDatabaseId = newTargetDatabaseId || undefined;
                 preset.lastInsertTime = newLastInsertTime || undefined;
+                preset.databaseIdField = newTargetDatabaseId ? newDatabaseIdField : undefined; // 仅在设置了数据库ID时生效
                 allPresets[name] = preset;
 
                 // 保存到配置
@@ -977,6 +1003,7 @@ export class aggregatorBlock {
                 await this.updatePresetTargetDocId(name, newTargetDocId);
                 await this.updatePresetTargetDatabaseId(name, newTargetDatabaseId);
                 await this.updatePresetLastInsertTime(name, newLastInsertTime);
+                await this.updatePresetDatabaseIdField(name, preset.databaseIdField || '');
 
                 showMessage('预设已更新', 3000, 'info');
                 resolve(true);
@@ -1512,7 +1539,13 @@ export class aggregatorBlock {
             return 0;
         }
 
-        const candidateKeys = ['block_id', 'blockId', 'id'];
+        // 构建候选字段顺序：若预设指定使用 parent_id，则优先 parent_id；否则优先 id
+        const configuredField: ('id' | 'parent_id') | undefined = (presetName
+            ? (await this.getSqlPresets())[presetName]?.databaseIdField
+            : undefined) as ('id' | 'parent_id') | undefined;
+        const candidateKeys = configuredField === 'parent_id'
+            ? ['parent_id', 'block_parent_id', 'id', 'block_id', 'blockId']
+            : ['id', 'block_id', 'blockId', 'parent_id', 'block_parent_id'];
         const blockIds: string[] = [];
 
         for (const row of rows) {
@@ -1532,7 +1565,7 @@ export class aggregatorBlock {
 
         const uniqueIds = Array.from(new Set(blockIds));
         if (!uniqueIds.length) {
-            throw new Error('SQL 结果中缺少可用的块 ID 字段 (id / block_id)');
+            throw new Error('SQL 结果中缺少可用的块 ID 字段，请在 SQL 中包含 id 或 parent_id (或 block_id)');
         }
 
         try {
@@ -1688,6 +1721,27 @@ export class aggregatorBlock {
             }
         } catch (e) {
             console.error('[aggregatorBlock] updatePresetTemplate error', e);
+        }
+    }
+
+    // 更新预设的 databaseIdField（id 或 parent_id）
+    async updatePresetDatabaseIdField(presetName: string, field: '' | 'id' | 'parent_id'): Promise<void> {
+        try {
+            if (!this.pluginConfig) {
+                console.error('[aggregatorBlock] cannot update preset: pluginConfig not provided');
+                return;
+            }
+            const current = this.pluginConfig.get('presets') || {};
+            if (current[presetName]) {
+                current[presetName].databaseIdField = field || undefined;
+                this.pluginConfig.set('presets', current);
+                await this.pluginConfig.save();
+                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的 databaseIdField: ${field || '默认(id)'}`);
+            } else {
+                console.warn('[aggregatorBlock] preset not found:', presetName);
+            }
+        } catch (e) {
+            console.error('[aggregatorBlock] updatePresetDatabaseIdField error', e);
         }
     }
 
