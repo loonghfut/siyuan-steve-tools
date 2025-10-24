@@ -690,6 +690,16 @@ export async function run(
 
         eventDidMount: async function (info) {
             if (!info || !info.event) return;
+            // 为事件元素本身添加块引用属性，便于外部识别/交互（可配置）
+            if (settingdata["cal-event-dom-blockref"]) {
+                try {
+                    const blockRefId = info.event?.extendedProps?.blockId;
+                    if (blockRefId) {
+                        info.el.setAttribute('data-type', 'block-ref');
+                        info.el.setAttribute('data-id', blockRefId);
+                    }
+                } catch (e) { console.warn('设置事件元素块引用属性失败:', e); }
+            }
             // 添加右键菜单事件监听
             if (settingdata["cal-show-right-click"]) {
                 info.el.addEventListener('contextmenu', async (e: MouseEvent) => {
@@ -856,7 +866,7 @@ export async function run(
             const statusText = statusValForTip === '归档'
                 ? '归档'
                 : (isCompleted ? '完成' : (statusValForTip || '未设置'));
-            tippy(info.el, {
+            if (settingdata["cal-event-tooltip"]) tippy(info.el, {
                 content: `
                     <div class="event-tooltip">
                         <span class="event-tooltip__title"
