@@ -8,7 +8,8 @@ import { showStatusMessage } from "@/api/api";
  * 管理所有预设的定时执行任务
  */
 export class TimerManager {
-    private timers: Map<string, NodeJS.Timeout> = new Map();
+    // 同时管理首个 setTimeout 与后续 setInterval
+    private timers: Map<string, { timeout?: NodeJS.Timeout; interval?: NodeJS.Timeout }> = new Map();
     private aggregatorBlock: aggregatorBlock;
 
     constructor(aggregatorBlock: aggregatorBlock) {
@@ -27,15 +28,32 @@ export class TimerManager {
             return;
         }
 
-        console.log(`[TimerManager] 启动定时器: ${presetName}, 间隔: ${preset.timerInterval}ms`);
+        const intervalMs = preset.timerInterval;
 
-        // 创建定时器
-        // 注意：不要直接捕获 preset 对象，每次执行时从配置中重新读取最新的预设
-        const timer = setInterval(async () => {
+        // 计算首次延迟：
+        // - 若有 nextExecuteTime 且已过期 -> 延迟 1 分钟后执行一次
+        // - 若有 nextExecuteTime 且未来 -> 等到该时间点
+        // - 否则使用一个完整的间隔
+        const now = Date.now();
+        let initialDelay = intervalMs;
+        if (typeof preset.nextExecuteTime === 'number' && isFinite(preset.nextExecuteTime)) {
+            if (preset.nextExecuteTime <= now) {
+                initialDelay = Math.max(1, 1 * 60 * 1000); // 1 分钟后执行
+                console.log(`[TimerManager] 预设 "${presetName}" 已错过下次执行时间，安排在 ${Math.round(initialDelay / 1000)} 秒后补跑一次`);
+            } else {
+                initialDelay = preset.nextExecuteTime - now;
+            }
+        }
+
+        console.log(`[TimerManager] 启动定时器: ${presetName}, 首次延迟: ${initialDelay}ms, 间隔: ${intervalMs}ms`);
+
+        const handles: { timeout?: NodeJS.Timeout; interval?: NodeJS.Timeout } = {};
+
+        const tickOnce = async () => {
             // 每次执行时重新获取最新的预设配置
             const allPresets = await this.aggregatorBlock.getSqlPresets();
             const currentPreset = allPresets[presetName];
-            
+
             if (!currentPreset) {
                 console.warn(`[TimerManager] 预设 "${presetName}" 不存在，停止定时器`);
                 this.stopTimer(presetName);
@@ -43,25 +61,49 @@ export class TimerManager {
             }
 
             // 检查定时器是否仍然启用
-            if (!currentPreset.timerEnabled) {
-                console.log(`[TimerManager] 预设 "${presetName}" 定时已禁用，停止定时器`);
+            if (!currentPreset.timerEnabled || !currentPreset.timerInterval) {
+                console.log(`[TimerManager] 预设 "${presetName}" 定时已禁用或间隔无效，停止定时器`);
                 this.stopTimer(presetName);
                 return;
             }
 
             await this.executePreset(presetName, currentPreset);
-        }, preset.timerInterval);
+        };
 
-        this.timers.set(presetName, timer);
+        const startIntervalLoop = () => {
+            // 再次从配置取当前间隔，避免期间被修改
+            handles.interval = setInterval(async () => {
+                await tickOnce();
+            }, intervalMs);
+        };
+
+        // 先按首次延迟 setTimeout 一次，然后再切换为 setInterval 循环
+        handles.timeout = setTimeout(async () => {
+            // 若在等待期间被停止则不再继续
+            const active = this.timers.get(presetName);
+            if (!active) return;
+
+            await tickOnce();
+            startIntervalLoop();
+
+            // timeout 只用一次，清理它（不从 Map 中删除条目）
+            if (handles.timeout) {
+                clearTimeout(handles.timeout);
+                delete handles.timeout;
+            }
+        }, Math.max(0, initialDelay));
+
+        this.timers.set(presetName, handles);
     }
 
     /**
      * 停止定时器
      */
     stopTimer(presetName: string): void {
-        const timer = this.timers.get(presetName);
-        if (timer) {
-            clearInterval(timer);
+        const handles = this.timers.get(presetName);
+        if (handles) {
+            if (handles.timeout) clearTimeout(handles.timeout);
+            if (handles.interval) clearInterval(handles.interval);
             this.timers.delete(presetName);
             console.log(`[TimerManager] 停止定时器: ${presetName}`);
         }
@@ -251,8 +293,9 @@ export class TimerManager {
      * 停止所有定时器
      */
     stopAll(): void {
-        this.timers.forEach((timer, name) => {
-            clearInterval(timer);
+        this.timers.forEach((handles, name) => {
+            if (handles.timeout) clearTimeout(handles.timeout);
+            if (handles.interval) clearInterval(handles.interval);
             console.log(`[TimerManager] 停止定时器: ${name}`);
         });
         this.timers.clear();
