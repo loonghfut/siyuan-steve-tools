@@ -691,12 +691,16 @@ export async function run(
         eventDidMount: async function (info) {
             if (!info || !info.event) return;
             // 为事件元素本身添加块引用属性，便于外部识别/交互（可配置）
+            // 周期事件不添加该属性
             if (settingdata["cal-event-dom-blockref"]) {
                 try {
-                    const blockRefId = info.event?.extendedProps?.blockId;
-                    if (blockRefId) {
-                        info.el.setAttribute('data-type', 'block-ref');
-                        info.el.setAttribute('data-id', blockRefId);
+                    const isRecurring = !!info.event?.extendedProps?.isRecurring;
+                    if (!isRecurring) {
+                        const blockRefId = info.event?.extendedProps?.blockId;
+                        if (blockRefId) {
+                            info.el.setAttribute('data-type', 'block-ref');
+                            info.el.setAttribute('data-id', blockRefId);
+                        }
                     }
                 } catch (e) { console.warn('设置事件元素块引用属性失败:', e); }
             }
