@@ -74,6 +74,10 @@ export const calendarDefaults: Record<string, any> = {
     "cal-slot-max-time": "24:00:00",
     "cal-snap-duration": "00:30:00",
     "cal-event-color": true,
+    // 标签上色
+    "cal-color-by-tag": false,
+    // 以每行一条的形式定义：标签=颜色，例如： 工作=#5B8FF9\n学习=rgb(64, 192, 87)
+    "cal-tag-color-map": "",
     "kanban-default-view": "kanban",
     "cal-default-view": "dayGridMonth",
     "quadrant-default-view": "priorityQuadrant",
@@ -188,6 +192,8 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "拖拽时间间隔", description: "拖拽调整最小单位", key: "cal-snap-duration", value: ctx.settings["cal-snap-duration"] },
                 { type: "select", title: "日历周起始日", description: "周首日", key: "cal-week-start", value: ctx.settings["cal-week-start"], options: { monday: "周一", sunday: "周日" } },
                 { type: "checkbox", title: "事件颜色样式切换", description: "启用后使用另一套事件颜色", key: "cal-event-color", value: ctx.settings["cal-event-color"] },
+                { type: "checkbox", title: "按标签为事件上色", description: "优先使用事件的第一个标签决定颜色（优先级颜色将被覆盖）", key: "cal-color-by-tag", value: ctx.settings["cal-color-by-tag"] },
+                { type: "textarea", title: "标签-颜色映射", description: "每行一条，格式：标签=颜色；支持 #HEX、rgb()、hsl()、颜色名。如：\n工作=#5B8FF9\n学习=rgb(64, 192, 87)", key: "cal-tag-color-map", value: ctx.settings["cal-tag-color-map"], direction: "row" },
                 { type: "select", title: "默认日历视图模式", description: "首次打开默认模式", key: "cal-default-view", value: ctx.settings["cal-default-view"], options: { multiMonthYear: "MultiMonthYear", dayGridMonth: "DayGridMonth", timeGridWeek: "TimeGridWeek", timeGridThreeDays: "TimeGridThreeDays", timeGridDay: "TimeGridDay" } },
                 { type: "select", title: "默认看板视图模式", description: "看板默认模式", key: "kanban-default-view", value: ctx.settings["kanban-default-view"], options: { weekkanban: "WeekKanban", kanban: "Kanban", yearkanban: "YearKanban" } },
                 { type: "select", title: "默认四象限视图模式", description: "四象限默认模式", key: "quadrant-default-view", value: ctx.settings["quadrant-default-view"], options: { weekpriorityQuadrant: "WeekQuadrant", priorityQuadrant: "Quadrant", yearpriorityQuadrant: "YearQuadrant" } },

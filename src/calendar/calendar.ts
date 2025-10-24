@@ -737,21 +737,51 @@ export async function run(
             const source = info.event.extendedProps.source;
             let colorConfig;
 
+            // 1) lifelog 事件继续使用既有配色
             if (source === 'lifelog') {
                 const type = info.event.extendedProps.logType || '固定';
                 colorConfig = lifelogColors[type] || lifelogColors['固定'];
             } else {
-                const priority = info.event.extendedProps.priority || '无';
-                colorConfig = getCategoryColor(priority);
-                // info.el.style.borderLeft = `2px solid ${colorConfig.border}`;
+                // 2) 如果启用了“按标签上色”并且事件包含标签，则优先使用标签颜色
+                const enableTagColor = settingdata["cal-color-by-tag"]; 
+                const tags: string[] = Array.isArray(info.event.extendedProps.tags) ? info.event.extendedProps.tags : [];
+                let tagColorBg: string | null = null;
+
+                if (enableTagColor && tags.length > 0) {
+                    // 解析映射
+                    const mapStr = (settingdata["cal-tag-color-map"] || "") as string;
+                    const tagColorMap = parseTagColorMap(mapStr);
+
+                    // 取第一个标签做主色
+                    const mainTag = String(tags[0]);
+                    if (tagColorMap[mainTag]) {
+                        tagColorBg = tagColorMap[mainTag];
+                    } else {
+                        // 未在映射中，使用稳定哈希生成颜色
+                        const hash = hashString(mainTag);
+                        const [bg] = getColors(Math.abs(hash));
+                        tagColorBg = bg;
+                    }
+                }
+
+                if (tagColorBg) {
+                    const text = guessTextColor(tagColorBg);
+                    colorConfig = { background: tagColorBg, text } as any;
+                } else {
+                    // 3) 默认：沿用优先级配色
+                    const priority = info.event.extendedProps.priority || '无';
+                    colorConfig = getCategoryColor(priority);
+                }
             }
             // 应用颜色
-            info.el.style.backgroundColor = colorConfig.background;
+            if (colorConfig?.background) {
+                info.el.style.backgroundColor = colorConfig.background;
+            }
             // Also apply text color to child elements
             const timeEl = info.el.querySelector('.fc-event-time');
             const titleEl = info.el.querySelector('.fc-event-title');
-            if (timeEl) (timeEl as HTMLElement).style.color = colorConfig.text;
-            if (titleEl) (titleEl as HTMLElement).style.color = colorConfig.text;
+            if (timeEl && colorConfig?.text) (timeEl as HTMLElement).style.color = colorConfig.text;
+            if (titleEl && colorConfig?.text) (titleEl as HTMLElement).style.color = colorConfig.text;
 
             if (info.event.extendedProps.isRecurring && info.event.extendedProps.source !== 'qqcalendar') {
                 const isCompleted = isEventCompleted(info.event);
@@ -840,6 +870,8 @@ export async function run(
                             <p><span class="event-tooltip__label">结束:</span> ${info.event.end?.toLocaleString() || "无"}</p>
                             <p><span class="event-tooltip__label">状态:</span> ${statusText}</p>
                             <p><span class="event-tooltip__label">优先级:</span> ${info.event.extendedProps.priority || "未设置"}</p>
+                            ${Array.isArray(info.event.extendedProps.tags) && info.event.extendedProps.tags.length ?
+                        `<p><span class="event-tooltip__label">标签:</span> ${info.event.extendedProps.tags.join(', ')}</p>` : ''}
                             ${info.event.extendedProps.description ?
                         `<p><span class="event-tooltip__label">描述:</span> ${info.event.extendedProps.description}</p>`
                         : ''
@@ -1013,6 +1045,54 @@ var colourIsLight = function (r: number, g: number, b: number) { // Copied from 
     // human eye favors green color...
     var a = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return (a < 0.5);
+}
+
+// ====== 标签颜色相关辅助函数 ======
+function hashString(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+    }
+    return hash;
+}
+
+function parseTagColorMap(input: string): Record<string, string> {
+    const map: Record<string, string> = {};
+    if (!input || typeof input !== 'string') return map;
+    const lines = input.split(/\r?\n/);
+    for (const line of lines) {
+        const t = line.trim();
+        if (!t || t.startsWith('#')) continue; // 跳过空行与注释
+        const m = t.split(/[:=]/);
+        if (m.length >= 2) {
+            const key = m[0].trim();
+            const value = m.slice(1).join('=')  // 允许颜色里包含冒号
+                .trim();
+            if (key && value) {
+                map[key] = value;
+            }
+        }
+    }
+    return map;
+}
+
+function guessTextColor(bgColor: string): string {
+    // 借助 DOM 将任意 CSS 颜色解析为 rgb()
+    const el = document.createElement('div');
+    el.style.color = bgColor;
+    document.body.appendChild(el);
+    const cs = getComputedStyle(el).color; // 形如 "rgb(r, g, b)"
+    document.body.removeChild(el);
+    const m = cs.match(/rgb\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\)/i);
+    if (m) {
+        const r = parseInt(m[1], 10);
+        const g = parseInt(m[2], 10);
+        const b = parseInt(m[3], 10);
+        return colourIsLight(r, g, b) ? 'black' : 'white';
+    }
+    // 兜底
+    return 'var(--b3-theme-on-background)';
 }
 
 // 添加一个独立的辅助函数来检查事件完成状态
