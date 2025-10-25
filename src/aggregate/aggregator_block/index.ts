@@ -1,5 +1,5 @@
 import steveTools from "@/index";
-import { getBlockByID, insertBlock, sql as runSql } from '@/api/api';
+import { getBlockByID, insertBlock, sql as runSql, lsNotebooks, createDailyNote } from '@/api/api';
 import { AVManager } from "@/api/db_pro";
 import { PluginConfig } from '@/savedata';
 import { showMessage } from "siyuan";
@@ -51,6 +51,45 @@ export class aggregatorBlock {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // 判断是否为有效的笔记本 ID
+    private async isNotebookId(id: string): Promise<boolean> {
+        try {
+            if (!id) return false;
+            const nbs = await lsNotebooks();
+            if (!Array.isArray(nbs?.notebooks)) return false;
+            return nbs.notebooks.some((nb: any) => nb?.id === id);
+        } catch {
+            return false;
+        }
+    }
+
+    // 将“文档ID或笔记本ID”解析为今日可插入的文档ID
+    private async resolveInsertDocId(targetId: string): Promise<{ docId: string; type: 'doc' | 'notebook' } | null> {
+        if (!targetId) return null;
+        // 先当成块/文档ID
+        const blk = await this.safeGetBlock(targetId);
+        if (blk) return { docId: targetId, type: 'doc' };
+        // 再判断是否是笔记本ID，若是则创建/获取今日日记
+        if (await this.isNotebookId(targetId)) {
+            // @ts-ignore - 运行时存在
+            const appId: string = (window as any)?.siyuan?.ws?.app?.appId || '';
+            const dailyId = await createDailyNote(appId, targetId);
+            if (typeof dailyId === 'string' && dailyId) {
+                return { docId: dailyId, type: 'notebook' };
+            }
+            // 某些内核版本可能返回对象，尝试读取常见字段
+            if (dailyId && typeof dailyId === 'object') {
+                const maybeId = (dailyId.id || dailyId.docId || dailyId.data || '').toString();
+                if (maybeId) return { docId: maybeId, type: 'notebook' };
+            }
+        }
+        return null;
+    }
+
+    private async safeGetBlock(id: string) {
+        try { return await getBlockByID(id); } catch { return null; }
     }
 
     // 格式化单元格值
@@ -465,7 +504,17 @@ export class aggregatorBlock {
                 const validityChecks = await Promise.all(
                     filteredNames.map(async n => {
                         const preset = presets[n];
-                        const docValid = preset.targetDocId ? await this.checkDocValidity(preset.targetDocId) : true;
+                        let docValid = true;
+                        let docType: 'doc' | 'notebook' | undefined;
+                        if (preset.targetDocId) {
+                            const isDoc = await this.checkDocValidity(preset.targetDocId);
+                            if (isDoc) {
+                                docValid = true; docType = 'doc';
+                            } else {
+                                const isNb = await this.isNotebookId(preset.targetDocId);
+                                docValid = !!isNb; docType = isNb ? 'notebook' : undefined;
+                            }
+                        }
                         let databaseValid = true;
                         if (preset.targetDatabaseId) {
                             try {
@@ -475,10 +524,10 @@ export class aggregatorBlock {
                                 databaseValid = false;
                             }
                         }
-                        return { name: n, docValid, databaseValid };
+                        return { name: n, docValid, databaseValid, docType };
                     })
                 );
-                const validityMap = new Map(validityChecks.map(v => [v.name, { docValid: v.docValid, databaseValid: v.databaseValid }]));
+                const validityMap = new Map(validityChecks.map(v => [v.name, { docValid: v.docValid, databaseValid: v.databaseValid, docType: v.docType }]));
 
                 filteredNames.forEach(n => {
                     const preset = presets[n];
@@ -557,7 +606,7 @@ export class aggregatorBlock {
                                             gap: 4px;
                                         ">
                                             <svg style="width: 12px; height: 12px;"><use xlink:href="#iconLink"></use></svg>
-                                            已绑定文档
+                                            ${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}
                                         </span>
                                     ` : `
                                         <span style="
@@ -841,13 +890,13 @@ export class aggregatorBlock {
                                 font-size: 14px;
                             ">
                                 <svg style="width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px;"><use xlink:href="#iconLink"></use></svg>
-                                目标文档 ID (可选)
+                                目标文档/笔记本 ID (可选)
                             </label>
                             <input 
                                 id="edit-target-doc" 
                                 class="b3-text-field" 
                                 value="${preset.targetDocId || ''}"
-                                placeholder="输入文档 ID,用于自动插入渲染结果"
+                                placeholder="输入文档ID，或输入笔记本ID以插入到该笔记本的【日记】"
                                 style="
                                     width: 100%;
                                     padding: 8px;
@@ -1050,8 +1099,13 @@ export class aggregatorBlock {
                         previewSql += ' LIMIT 5';
                     }
 
-                    // 使用和实际执行相同的参数：排除文档ID和时间过滤
-                    const results = await this.executeSql(previewSql, currentTargetDocId || undefined, currentLastInsertTime || undefined);
+                    // 使用和实际执行相同的参数：排除目标（文档或日记文档）和时间过滤
+                    let excludeId: string | undefined;
+                    if (currentTargetDocId) {
+                        const resolved = await this.resolveInsertDocId(currentTargetDocId);
+                        excludeId = resolved?.docId || undefined;
+                    }
+                    const results = await this.executeSql(previewSql, excludeId, currentLastInsertTime || undefined);
 
                     // 使用表格形式渲染结果
                     this.renderResultTable(results, previewContainer);
@@ -1399,7 +1453,7 @@ export class aggregatorBlock {
         if (!preset) return;
         console.log(preset);
 
-        let targetDocId = preset.preset.targetDocId;
+    let targetDocId = preset.preset.targetDocId;
         const targetDatabaseId = preset.preset.targetDatabaseId;
 
         // 至少需要配置一个目标（文档或数据库）
@@ -1420,7 +1474,17 @@ export class aggregatorBlock {
         const lastInsertTime = preset.preset.lastInsertTime || '';
         console.log(`[aggregatorBlock] 上次插入时间: ${lastInsertTime}`);
 
-        const sqlResult = await this.executeSql(preset.preset.sql, targetDocId, lastInsertTime);
+        // 解析目标：若为笔记本ID，则获取当日日记文档ID，以便用于 SQL 排除和插入
+        let resolvedDoc: { docId: string; type: 'doc' | 'notebook' } | null = null;
+        if (targetDocId) {
+            resolvedDoc = await this.resolveInsertDocId(targetDocId);
+            if (!resolvedDoc) {
+                showMessage('目标文档/笔记本无效，请检查预设配置', 4000, 'error');
+                return;
+            }
+        }
+
+        const sqlResult = await this.executeSql(preset.preset.sql, resolvedDoc?.docId, lastInsertTime);
         console.log(sqlResult);
 
         // 如果没有新数据，提示用户
@@ -1432,11 +1496,11 @@ export class aggregatorBlock {
         const operations: string[] = [];
         const errors: string[] = [];
 
-        if (targetDocId) {
+        if (resolvedDoc?.docId) {
             const renderedMd = this.renderTemplate(preset.preset, sqlResult);
             try {
-                await this.insertMarkdownToDoc(targetDocId, renderedMd, preset.name);
-                console.log('成功插入到文档:', targetDocId);
+                await this.insertMarkdownToDoc(resolvedDoc.docId, renderedMd, preset.name);
+                console.log('成功插入到文档:', resolvedDoc.docId);
                 operations.push(`文档 ${sqlResult.length} 条`);
             } catch (error: any) {
                 console.error('[aggregatorBlock] 插入文档失败:', error);
