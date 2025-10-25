@@ -97,6 +97,8 @@ export class VisualSqlUI {
   private updatedDaysInput!: HTMLInputElement;
   private createdTodayCheck!: HTMLInputElement;
   private updatedTodayCheck!: HTMLInputElement;
+  private createdUnitSel!: HTMLSelectElement;
+  private updatedUnitSel!: HTMLSelectElement;
   private createdOpSel!: HTMLSelectElement;
   private createdAtInput!: HTMLInputElement;
   private updatedOpSel!: HTMLSelectElement;
@@ -296,14 +298,32 @@ export class VisualSqlUI {
             <label class="vsb-field">hpath（人类可读路径）<input class="vsb-input" data-hpath type="text" placeholder="%/目录/子目录%"/></label>
             <label class="vsb-field">ial自定义属性要带custom-前缀<input class="vsb-input" data-ial type="text" placeholder="%name=\"value\"%"/></label>
 
-            <label class="vsb-field">created 近 N 天<input class="vsb-input" data-created-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">created 近 N
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input class="vsb-input" data-created-days type="number" min="0" value="0" style="width:80px;"/>
+                <select class="vsb-input" data-created-unit style="width:84px;">
+                  <option value="day" selected>天</option>
+                  <option value="hour">小时</option>
+                  <option value="minute">分钟</option>
+                </select>
+              </div>
+            </label>
             <label class="vsb-field">created 今天
               <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px; align-items:center;">
                 <input type="checkbox" data-created-today />
                 <span style="font-size:12px;color:var(--vsb-muted)">仅限本地时区的今天</span>
               </div>
             </label>
-            <label class="vsb-field">updated 近 N 天<input class="vsb-input" data-updated-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">updated 近 N
+              <div style="display:flex; gap:6px; align-items:center;">
+                <input class="vsb-input" data-updated-days type="number" min="0" value="0" style="width:80px;"/>
+                <select class="vsb-input" data-updated-unit style="width:84px;">
+                  <option value="day" selected>天</option>
+                  <option value="hour">小时</option>
+                  <option value="minute">分钟</option>
+                </select>
+              </div>
+            </label>
             <label class="vsb-field">updated 今天
               <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px; align-items:center;">
                 <input type="checkbox" data-updated-today />
@@ -396,6 +416,8 @@ export class VisualSqlUI {
     this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
   this.createdTodayCheck = this.container.querySelector('input[data-created-today]') as HTMLInputElement;
   this.updatedTodayCheck = this.container.querySelector('input[data-updated-today]') as HTMLInputElement;
+  this.createdUnitSel = this.container.querySelector('select[data-created-unit]') as HTMLSelectElement;
+  this.updatedUnitSel = this.container.querySelector('select[data-updated-unit]') as HTMLSelectElement;
     this.createdOpSel = this.container.querySelector('select[data-created-op]') as HTMLSelectElement;
     this.createdAtInput = this.container.querySelector('input[data-created-at]') as HTMLInputElement;
     this.updatedOpSel = this.container.querySelector('select[data-updated-op]') as HTMLSelectElement;
@@ -438,9 +460,11 @@ export class VisualSqlUI {
       const cToday = !!this.createdTodayCheck?.checked;
       const uToday = !!this.updatedTodayCheck?.checked;
       if (this.createdDaysInput) this.createdDaysInput.disabled = cToday;
+      if (this.createdUnitSel) this.createdUnitSel.disabled = cToday;
       if (this.createdOpSel) this.createdOpSel.disabled = cToday;
       if (this.createdAtInput) this.createdAtInput.disabled = cToday;
       if (this.updatedDaysInput) this.updatedDaysInput.disabled = uToday;
+      if (this.updatedUnitSel) this.updatedUnitSel.disabled = uToday;
       if (this.updatedOpSel) this.updatedOpSel.disabled = uToday;
       if (this.updatedAtInput) this.updatedAtInput.disabled = uToday;
     };
@@ -693,7 +717,9 @@ export class VisualSqlUI {
       const ts = this.datetimeLocalToTS(createdAt);
       if (ts) this.builder.addFilter({ field: 'created', op: this.createdOpSel?.value || '>', value: ts });
     } else {
-      this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
+      const n = Number(this.createdDaysInput.value || 0);
+      const u = (this.createdUnitSel?.value as any) || 'day';
+      if (n > 0) (this.builder as any).createdSince?.(n, u) || this.builder.createdSinceDays(n);
     }
     const updatedAt = (this.updatedAtInput?.value || '').trim();
     if (this.updatedTodayCheck?.checked) {
@@ -702,7 +728,9 @@ export class VisualSqlUI {
       const ts = this.datetimeLocalToTS(updatedAt);
       if (ts) this.builder.addFilter({ field: 'updated', op: this.updatedOpSel?.value || '>', value: ts });
     } else {
-      this.builder.updatedSinceDays(Number(this.updatedDaysInput.value || 0));
+      const n = Number(this.updatedDaysInput.value || 0);
+      const u = (this.updatedUnitSel?.value as any) || 'day';
+      if (n > 0) (this.builder as any).updatedSince?.(n, u) || this.builder.updatedSinceDays(n);
     }
 
     // 排序
@@ -952,7 +980,9 @@ export class VisualSqlUI {
       const ts = toTS(s.createdAt);
       if (ts) b.addFilter({ field: 'created', op: (s?.createdOp || '>') as any, value: ts });
     } else if (s?.createdDays) {
-      b.createdSinceDays(Number(s.createdDays || 0));
+      const n = Number(s.createdDays || 0);
+      const u = (s?.createdUnit || 'day') as any;
+      if ((b as any).createdSince) (b as any).createdSince(n, u); else b.createdSinceDays(n);
     }
     if (s?.updatedToday) {
       (b as any).updatedToday?.() || b.addFilter({ rawSql: `updated >= strftime('%Y%m%d%H%M%S','now','localtime','start of day') AND updated < strftime('%Y%m%d%H%M%S','now','localtime','start of day','+1 day')` });
@@ -960,7 +990,9 @@ export class VisualSqlUI {
       const ts = toTS(s.updatedAt);
       if (ts) b.addFilter({ field: 'updated', op: (s?.updatedOp || '>') as any, value: ts });
     } else if (s?.updatedDays) {
-      b.updatedSinceDays(Number(s.updatedDays || 0));
+      const n = Number(s.updatedDays || 0);
+      const u = (s?.updatedUnit || 'day') as any;
+      if ((b as any).updatedSince) (b as any).updatedSince(n, u); else b.updatedSinceDays(n);
     }
     const orderExpr = (s?.orderField || '').toString();
     const orderDir = (s?.orderDir || 'desc') as OrderDir;
@@ -1704,6 +1736,8 @@ export class VisualSqlUI {
       tag: this.tagInput?.value ?? '',
       createdDays: this.createdDaysInput?.value ?? '',
       updatedDays: this.updatedDaysInput?.value ?? '',
+  createdUnit: this.createdUnitSel?.value ?? 'day',
+  updatedUnit: this.updatedUnitSel?.value ?? 'day',
   createdToday: this.createdTodayCheck?.checked ?? false,
   updatedToday: this.updatedTodayCheck?.checked ?? false,
       createdOp: this.createdOpSel?.value ?? '>',
@@ -1757,6 +1791,8 @@ export class VisualSqlUI {
       tag: normStr(pick('tag')),
       createdDays: normStr(pick('createdDays')),
       updatedDays: normStr(pick('updatedDays')),
+  createdUnit: normStr(pick('createdUnit','day')),
+  updatedUnit: normStr(pick('updatedUnit','day')),
   createdToday: !!pick('createdToday', false),
   updatedToday: !!pick('updatedToday', false),
       createdOp: normStr(pick('createdOp', '>')),
@@ -1840,9 +1876,12 @@ export class VisualSqlUI {
       if (this.updatedTodayCheck) {
         const uToday = !!this.updatedTodayCheck.checked;
         if (this.updatedDaysInput) this.updatedDaysInput.disabled = uToday;
+        if (this.updatedUnitSel) this.updatedUnitSel.disabled = uToday;
         if (this.updatedOpSel) this.updatedOpSel.disabled = uToday;
         if (this.updatedAtInput) this.updatedAtInput.disabled = uToday;
       }
+      if (this.createdUnitSel) this.createdUnitSel.value = s?.createdUnit ?? 'day';
+      if (this.updatedUnitSel) this.updatedUnitSel.value = s?.updatedUnit ?? 'day';
       if (this.createdOpSel) this.createdOpSel.value = s?.createdOp ?? '>';
       if (this.createdAtInput) this.createdAtInput.value = s?.createdAt ?? '';
       if (this.updatedOpSel) this.updatedOpSel.value = s?.updatedOp ?? '>';
