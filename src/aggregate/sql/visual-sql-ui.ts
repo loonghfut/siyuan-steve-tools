@@ -95,6 +95,8 @@ export class VisualSqlUI {
   private recentTagsKey = 'siyuan-steve-tools:recent-tags';
   private createdDaysInput!: HTMLInputElement;
   private updatedDaysInput!: HTMLInputElement;
+  private createdTodayCheck!: HTMLInputElement;
+  private updatedTodayCheck!: HTMLInputElement;
   private createdOpSel!: HTMLSelectElement;
   private createdAtInput!: HTMLInputElement;
   private updatedOpSel!: HTMLSelectElement;
@@ -295,7 +297,19 @@ export class VisualSqlUI {
             <label class="vsb-field">ial自定义属性要带custom-前缀<input class="vsb-input" data-ial type="text" placeholder="%name=\"value\"%"/></label>
 
             <label class="vsb-field">created 近 N 天<input class="vsb-input" data-created-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">created 今天
+              <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px; align-items:center;">
+                <input type="checkbox" data-created-today />
+                <span style="font-size:12px;color:var(--vsb-muted)">仅限本地时区的今天</span>
+              </div>
+            </label>
             <label class="vsb-field">updated 近 N 天<input class="vsb-input" data-updated-days type="number" min="0" value="0"/></label>
+            <label class="vsb-field">updated 今天
+              <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px; align-items:center;">
+                <input type="checkbox" data-updated-today />
+                <span style="font-size:12px;color:var(--vsb-muted)">仅限本地时区的今天</span>
+              </div>
+            </label>
             <label class="vsb-field">created 时间比较
               <div class="vsb-seg" style="background:transparent; border:none; padding:0; gap:6px;">
                 <select class="vsb-input" data-created-op style="width:26px;">
@@ -380,6 +394,8 @@ export class VisualSqlUI {
     this.tagsDatalist = this.container.querySelector('#vsb-tags-list') as HTMLDataListElement;
     this.createdDaysInput = this.container.querySelector('input[data-created-days]') as HTMLInputElement;
     this.updatedDaysInput = this.container.querySelector('input[data-updated-days]') as HTMLInputElement;
+  this.createdTodayCheck = this.container.querySelector('input[data-created-today]') as HTMLInputElement;
+  this.updatedTodayCheck = this.container.querySelector('input[data-updated-today]') as HTMLInputElement;
     this.createdOpSel = this.container.querySelector('select[data-created-op]') as HTMLSelectElement;
     this.createdAtInput = this.container.querySelector('input[data-created-at]') as HTMLInputElement;
     this.updatedOpSel = this.container.querySelector('select[data-updated-op]') as HTMLSelectElement;
@@ -417,6 +433,21 @@ export class VisualSqlUI {
       this.rebuildSql();
     };
     changeInputs.forEach(el => el.addEventListener('change', onUserChange));
+    // “今天”复选框切换时，禁用/启用相关时间输入
+    const updateTimeControlsDisabled = () => {
+      const cToday = !!this.createdTodayCheck?.checked;
+      const uToday = !!this.updatedTodayCheck?.checked;
+      if (this.createdDaysInput) this.createdDaysInput.disabled = cToday;
+      if (this.createdOpSel) this.createdOpSel.disabled = cToday;
+      if (this.createdAtInput) this.createdAtInput.disabled = cToday;
+      if (this.updatedDaysInput) this.updatedDaysInput.disabled = uToday;
+      if (this.updatedOpSel) this.updatedOpSel.disabled = uToday;
+      if (this.updatedAtInput) this.updatedAtInput.disabled = uToday;
+    };
+    this.createdTodayCheck?.addEventListener('change', () => updateTimeControlsDisabled());
+    this.updatedTodayCheck?.addEventListener('change', () => updateTimeControlsDisabled());
+    // 初始更新禁用态
+    updateTimeControlsDisabled();
     this.tagInput.addEventListener('change', () => {
       const v = (this.tagInput.value || '').trim();
       if (v) this.pushRecentTags([v]);
@@ -656,14 +687,18 @@ export class VisualSqlUI {
     this.builder.hasTag(tag);
     // 时间：若设置了具体时间比较，则优先使用；否则使用“近 N 天”
     const createdAt = (this.createdAtInput?.value || '').trim();
-    if (createdAt) {
+    if (this.createdTodayCheck?.checked) {
+      this.builder.createdToday();
+    } else if (createdAt) {
       const ts = this.datetimeLocalToTS(createdAt);
       if (ts) this.builder.addFilter({ field: 'created', op: this.createdOpSel?.value || '>', value: ts });
     } else {
       this.builder.createdSinceDays(Number(this.createdDaysInput.value || 0));
     }
     const updatedAt = (this.updatedAtInput?.value || '').trim();
-    if (updatedAt) {
+    if (this.updatedTodayCheck?.checked) {
+      this.builder.updatedToday();
+    } else if (updatedAt) {
       const ts = this.datetimeLocalToTS(updatedAt);
       if (ts) this.builder.addFilter({ field: 'updated', op: this.updatedOpSel?.value || '>', value: ts });
     } else {
@@ -905,19 +940,23 @@ export class VisualSqlUI {
     const tagRaw = (s?.tag || '').toString().trim();
     const tag = tagRaw.replace(/^#+/, '');
     b.hasTag(tag);
-    // 时间优先具体时间比较，否则使用近 N 天
+    // 时间优先级：今天 > 具体时间比较 > 近 N 天
     const toTS = (v: string) => {
       const m = (v || '').match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?$/);
       if (m) return `${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}${m[6] ?? '00'}`;
       return '';
     };
-    if (s?.createdAt) {
+    if (s?.createdToday) {
+      (b as any).createdToday?.() || b.addFilter({ rawSql: `created >= strftime('%Y%m%d%H%M%S','now','localtime','start of day') AND created < strftime('%Y%m%d%H%M%S','now','localtime','start of day','+1 day')` });
+    } else if (s?.createdAt) {
       const ts = toTS(s.createdAt);
       if (ts) b.addFilter({ field: 'created', op: (s?.createdOp || '>') as any, value: ts });
     } else if (s?.createdDays) {
       b.createdSinceDays(Number(s.createdDays || 0));
     }
-    if (s?.updatedAt) {
+    if (s?.updatedToday) {
+      (b as any).updatedToday?.() || b.addFilter({ rawSql: `updated >= strftime('%Y%m%d%H%M%S','now','localtime','start of day') AND updated < strftime('%Y%m%d%H%M%S','now','localtime','start of day','+1 day')` });
+    } else if (s?.updatedAt) {
       const ts = toTS(s.updatedAt);
       if (ts) b.addFilter({ field: 'updated', op: (s?.updatedOp || '>') as any, value: ts });
     } else if (s?.updatedDays) {
@@ -1665,6 +1704,8 @@ export class VisualSqlUI {
       tag: this.tagInput?.value ?? '',
       createdDays: this.createdDaysInput?.value ?? '',
       updatedDays: this.updatedDaysInput?.value ?? '',
+  createdToday: this.createdTodayCheck?.checked ?? false,
+  updatedToday: this.updatedTodayCheck?.checked ?? false,
       createdOp: this.createdOpSel?.value ?? '>',
       createdAt: this.createdAtInput?.value ?? '',
       updatedOp: this.updatedOpSel?.value ?? '>',
@@ -1716,6 +1757,8 @@ export class VisualSqlUI {
       tag: normStr(pick('tag')),
       createdDays: normStr(pick('createdDays')),
       updatedDays: normStr(pick('updatedDays')),
+  createdToday: !!pick('createdToday', false),
+  updatedToday: !!pick('updatedToday', false),
       createdOp: normStr(pick('createdOp', '>')),
       createdAt: normStr(pick('createdAt')),
       updatedOp: normStr(pick('updatedOp', '>')),
@@ -1785,6 +1828,21 @@ export class VisualSqlUI {
       if (this.tagInput) this.tagInput.value = s?.tag ?? '';
       if (this.createdDaysInput) this.createdDaysInput.value = String(s?.createdDays ?? '');
       if (this.updatedDaysInput) this.updatedDaysInput.value = String(s?.updatedDays ?? '');
+  if (this.createdTodayCheck) this.createdTodayCheck.checked = !!s?.createdToday;
+  if (this.updatedTodayCheck) this.updatedTodayCheck.checked = !!s?.updatedToday;
+      // 同步禁用态
+      if (this.createdTodayCheck) {
+        const cToday = !!this.createdTodayCheck.checked;
+        if (this.createdDaysInput) this.createdDaysInput.disabled = cToday;
+        if (this.createdOpSel) this.createdOpSel.disabled = cToday;
+        if (this.createdAtInput) this.createdAtInput.disabled = cToday;
+      }
+      if (this.updatedTodayCheck) {
+        const uToday = !!this.updatedTodayCheck.checked;
+        if (this.updatedDaysInput) this.updatedDaysInput.disabled = uToday;
+        if (this.updatedOpSel) this.updatedOpSel.disabled = uToday;
+        if (this.updatedAtInput) this.updatedAtInput.disabled = uToday;
+      }
       if (this.createdOpSel) this.createdOpSel.value = s?.createdOp ?? '>';
       if (this.createdAtInput) this.createdAtInput.value = s?.createdAt ?? '';
       if (this.updatedOpSel) this.updatedOpSel.value = s?.updatedOp ?? '>';

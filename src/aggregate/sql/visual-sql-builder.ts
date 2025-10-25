@@ -71,6 +71,28 @@ export class VisualSqlBuilder {
     return this;
   }
 
+  /**
+   * 今日创建（本地时区）：
+   * created >= 今天 00:00:00 AND created < 明天 00:00:00
+   */
+  createdToday() {
+    this.addFilter({
+      rawSql: `created >= strftime('%Y%m%d%H%M%S','now','localtime','start of day') AND created < strftime('%Y%m%d%H%M%S','now','localtime','start of day','+1 day')`
+    });
+    return this;
+  }
+
+  /**
+   * 今日更新（本地时区）：
+   * updated >= 今天 00:00:00 AND updated < 明天 00:00:00
+   */
+  updatedToday() {
+    this.addFilter({
+      rawSql: `updated >= strftime('%Y%m%d%H%M%S','now','localtime','start of day') AND updated < strftime('%Y%m%d%H%M%S','now','localtime','start of day','+1 day')`
+    });
+    return this;
+  }
+
   private buildWhere(): string {
     const parts: string[] = [];
     for (const f of this.cfg.filters || []) {
