@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.19.2 (2025年10月25日)
+### v0.19.3 (2025年10月25日)
 - 开始优化白板： 取消与日记的关联 (loonghfut)
 - 创建块时增加一个空格 (loonghfut)
 - feat: 更新依赖项 siyuan 至 1.1.5 版本 (loonghfut)
@@ -69,6 +69,11 @@ win端s3同步后，docker端感知s3同步。
 - feat: 更新生成日程超级块内容，支持返回模板内指定块 ID (loonghfut)
 - feat: 更新定时器管理逻辑，支持同时管理 setTimeout 和 setInterval，优化首次延迟计算 (loonghfut)
 - feat: 更新插件版本至 0.19.2 (loonghfut)
+- docs: 更新 v0.19.2 版本的更新日志 (loonghfut)
+- feat: 聚合块支持聚合到日记里 (loonghfut)
+- feat: 添加今日创建和今日更新过滤功能，支持本地时区 (loonghfut)
+- feat: 添加时间单位选择功能，支持创建和更新的时间过滤 (loonghfut)
+- feat: 更新插件版本至 0.19.3 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
