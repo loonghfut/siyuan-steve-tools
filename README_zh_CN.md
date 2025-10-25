@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.19.1 (2025年10月20日)
+### v0.19.2 (2025年10月25日)
 - 开始优化白板： 取消与日记的关联 (loonghfut)
 - 创建块时增加一个空格 (loonghfut)
 - feat: 更新依赖项 siyuan 至 1.1.5 版本 (loonghfut)
@@ -58,6 +58,17 @@ win端s3同步后，docker端感知s3同步。
 - docs: 更新 v0.19.0 版本的更新日志 (loonghfut)
 - 完善tldraw相关许可 (loonghfut)
 - feat: 更新插件版本至0.19.1 (loonghfut)
+- docs: 更新 v0.19.1 版本的更新日志 (loonghfut)
+- 更新 README.md (LoongSteve)
+- 更新 README.md (LoongSteve)
+- feat: 添加数据库 ID 字段选择功能，支持选择块 ID 或父块 ID (loonghfut)
+- Merge branch 'main-2' of https://github.com/loonghfut/siyuan-steve-tools into main-2 (loonghfut)
+- feat: 添加事件标签上色功能，支持通过标签自定义事件颜色 (loonghfut)
+- feat: 添加事件元素块引用属性和事件提示气泡配置选项 (loonghfut)
+- feat: 避免周期事件设置属性 (loonghfut)
+- feat: 更新生成日程超级块内容，支持返回模板内指定块 ID (loonghfut)
+- feat: 更新定时器管理逻辑，支持同时管理 setTimeout 和 setInterval，优化首次延迟计算 (loonghfut)
+- feat: 更新插件版本至 0.19.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
