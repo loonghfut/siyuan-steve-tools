@@ -299,7 +299,7 @@ export class TimerManager {
         }
 
         // 保存到配置
-        await this.aggregatorBlock.updatePresetTimerSettings(presetName, preset);
+    await this.aggregatorBlock.updatePresetTimerSettings(presetName, preset, { skipUpdatedAt: true });
     }
 
     /**

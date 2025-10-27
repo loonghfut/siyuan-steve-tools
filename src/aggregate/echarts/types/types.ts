@@ -21,6 +21,11 @@ export interface PresetItem {
   timerValue?: number;     // 时间值(如: 5 分钟, 2 小时, 1 天)
   lastExecuteTime?: number;  // 上次执行时间(时间戳)
   nextExecuteTime?: number;  // 下次执行时间(时间戳)
+  /**
+   * 预设项最近修改时间（时间戳，毫秒）。用于在 UI 中按“最近修改”排序。
+   * 在任何更新预设配置的保存操作时应更新该字段。
+   */
+  updatedAt?: number;
 }
 
 /**

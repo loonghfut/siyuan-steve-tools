@@ -123,15 +123,38 @@ export class aggregatorBlock {
             return;
         }
 
-        // 获取列名（最多12列）
-        const colSet = new Set<string>();
-        for (const r of rows) {
-            if (r && typeof r === 'object') {
-                Object.keys(r).forEach(k => colSet.add(k));
-            }
-            if (colSet.size > 24) break;
+        // 获取列名（最多12列），可由设置项 `aggregate-sql-preview-columns` 控制
+        const configuredCols = this._settingdata?.['aggregate-sql-preview-columns'];
+        let cols: string[] = [];
+        if (Array.isArray(configuredCols)) {
+            cols = configuredCols.map((s: any) => String(s).trim()).filter((s: string) => !!s);
+        } else if (typeof configuredCols === 'string') {
+            // 支持逗号分隔、空格分隔，或二者混合
+            cols = configuredCols
+                .split(/[\,\s]+/)
+                .map(s => s.trim())
+                .filter(s => !!s);
         }
-        const cols = Array.from(colSet).slice(0, 12);
+
+        if (!cols.length) {
+            // 未配置则自动推断并按常见字段优先级排序
+            const colSet = new Set<string>();
+            for (const r of rows) {
+                if (r && typeof r === 'object') {
+                    Object.keys(r).forEach(k => colSet.add(k));
+                }
+                if (colSet.size > 48) break;
+            }
+            const preferred = ['alias','box','content','created','fcontent','hash','hpath','ial','id','length','markdown','memo'];
+            const ordered: string[] = [];
+            preferred.forEach(k => { if (colSet.has(k)) ordered.push(k); });
+            // 追加剩余未包含的列
+            colSet.forEach(k => { if (!ordered.includes(k)) ordered.push(k); });
+            cols = ordered;
+        }
+
+        // 限制最多 12 列，避免 UI 过挤
+        cols = cols.slice(0, 24);
 
         // 创建表头
         const thead = `<thead><tr><th style="
@@ -417,7 +440,16 @@ export class aggregatorBlock {
     // 2. 生成预设选择面板（支持模板编辑）
     async showPresetSelector(): Promise<{ name: string; preset: PresetItem } | null> {
         const presets = await this.getSqlPresets();
-        const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+        // 默认按最近修改排序：优先使用 updatedAt，其次 lastExecuteTime，最后按名称
+        const sortedEntries = Object.entries(presets).sort((a, b) => {
+            const pa = a[1] as PresetItem;
+            const pb = b[1] as PresetItem;
+            const aTime = (pa.updatedAt || pa.lastExecuteTime || 0);
+            const bTime = (pb.updatedAt || pb.lastExecuteTime || 0);
+            if (aTime !== bTime) return bTime - aTime;
+            return a[0].localeCompare(b[0], 'zh-CN');
+        });
+        const names = sortedEntries.map(([n]) => n);
         return new Promise(resolve => {
             let settled = false;
             const containerId = `st-preset-container-${Date.now()}`;
@@ -606,6 +638,25 @@ export class aggregatorBlock {
                                             自定义模板
                                         </span>
                                     ` : ''}
+                                    ${preset.updatedAt ? (() => {
+                                        const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+                                        const full = new Date(preset.updatedAt as number).toLocaleString('zh-CN');
+                                        return `
+                                            <span style="
+                                                font-size: 11px;
+                                                padding: 2px 8px;
+                                                background: var(--b3-theme-surface-light);
+                                                color: var(--b3-theme-on-surface);
+                                                border-radius: var(--b3-border-radius-s);
+                                                display: inline-flex;
+                                                align-items: center;
+                                                gap: 4px;
+                                            " title="最近修改: ${full}">
+                                                <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCalendar"></use></svg>
+                                                最近修改: ${short}
+                                            </span>
+                                        `;
+                                    })() : ''}
                                     ${preset.targetDocId ? (validity?.docValid ? `
                                         <span style="
                                             font-size: 11px;
@@ -1373,7 +1424,7 @@ export class aggregatorBlock {
     }
 
     // 更新预设的定时设置
-    async updatePresetTimerSettings(presetName: string, preset: PresetItem): Promise<void> {
+    async updatePresetTimerSettings(presetName: string, preset: PresetItem, options?: { skipUpdatedAt?: boolean }): Promise<void> {
         try {
             if (!this.pluginConfig) {
                 console.error('[aggregatorBlock] cannot update preset: pluginConfig not provided');
@@ -1387,6 +1438,10 @@ export class aggregatorBlock {
                 current[presetName].timerValue = preset.timerValue;
                 current[presetName].lastExecuteTime = preset.lastExecuteTime;
                 current[presetName].nextExecuteTime = preset.nextExecuteTime;
+                // 仅在手动修改定时设置时更新最近修改时间
+                if (!options?.skipUpdatedAt) {
+                    current[presetName].updatedAt = Date.now();
+                }
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
                 console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的定时设置`);
@@ -1750,6 +1805,7 @@ export class aggregatorBlock {
             const current = this.pluginConfig.get('presets') || {};
             if (current[presetName]) {
                 current[presetName].targetDocId = targetDocId;
+                current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
             } else {
@@ -1770,6 +1826,7 @@ export class aggregatorBlock {
             const current = this.pluginConfig.get('presets') || {};
             if (current[presetName]) {
                 current[presetName].targetDatabaseId = targetDatabaseId || undefined;
+                current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
             } else {
@@ -1790,6 +1847,7 @@ export class aggregatorBlock {
             const current = this.pluginConfig.get('presets') || {};
             if (current[presetName]) {
                 current[presetName].template = template || undefined; // 空字符串存为 undefined
+                current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
             } else {
@@ -1810,6 +1868,7 @@ export class aggregatorBlock {
             const current = this.pluginConfig.get('presets') || {};
             if (current[presetName]) {
                 current[presetName].databaseIdField = field || undefined;
+                current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
                 console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的 databaseIdField: ${field || '默认(id)'}`);
