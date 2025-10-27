@@ -125,11 +125,23 @@ export class TimerManager {
                 return;
             }
 
-            // 执行 SQL 查询
+            // 若配置的是笔记本ID，需要解析为当日日记文档ID；文档ID则原样返回
+            let resolvedDocId: string | undefined;
+            if (targetDocId) {
+                const resolved = await this.aggregatorBlock.resolveTargetDocId(targetDocId);
+                if (resolved?.docId) {
+                    resolvedDocId = resolved.docId;
+                } else {
+                    // 解析失败时，不中断整个任务，但记录告警
+                    console.warn(`[TimerManager] 解析目标文档失败: ${targetDocId}`);
+                }
+            }
+
+            // 执行 SQL 查询（排除目标文档，避免自包含）
             const lastInsertTime = preset.lastInsertTime || '';
             const sqlResult = await this.aggregatorBlock.executeSql(
-                preset.sql, 
-                targetDocId, 
+                preset.sql,
+                resolvedDocId,
                 lastInsertTime
             );
 
@@ -208,9 +220,10 @@ export class TimerManager {
 
             if (targetDocId) {
                 try {
+                    const actualDocId = resolvedDocId || targetDocId;
                     const renderedMd = this.aggregatorBlock.renderTemplate(preset, sqlResult);
                     await this.aggregatorBlock.insertMarkdownToDoc(
-                        targetDocId,
+                        actualDocId,
                         renderedMd,
                         presetName
                     );

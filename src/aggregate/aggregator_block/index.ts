@@ -88,6 +88,18 @@ export class aggregatorBlock {
         return null;
     }
 
+    // 对外公开的解析方法：将“文档ID或笔记本ID”解析为当前可插入的文档ID
+    // 若是笔记本ID则解析为当日日记的文档ID；若是文档ID则原样返回。
+    // 返回 null 表示解析失败或无效 ID。
+    public async resolveTargetDocId(targetId: string): Promise<{ docId: string; type: 'doc' | 'notebook' } | null> {
+        try {
+            return await this.resolveInsertDocId(targetId);
+        } catch (e) {
+            console.warn('[aggregatorBlock] 解析目标文档ID失败:', e);
+            return null;
+        }
+    }
+
     private async safeGetBlock(id: string) {
         try { return await getBlockByID(id); } catch { return null; }
     }
