@@ -123,7 +123,7 @@ export class aggregatorBlock {
             return;
         }
 
-        // 获取列名（最多12列），可由设置项 `aggregate-sql-preview-columns` 控制
+        // 获取列名（最多24列），可由设置项 `aggregate-sql-preview-columns` 控制
         const configuredCols = this._settingdata?.['aggregate-sql-preview-columns'];
         let cols: string[] = [];
         if (Array.isArray(configuredCols)) {
@@ -153,7 +153,7 @@ export class aggregatorBlock {
             cols = ordered;
         }
 
-        // 限制最多 12 列，避免 UI 过挤
+        // 限制最多 24 列，避免 UI 过挤
         cols = cols.slice(0, 24);
 
         // 创建表头
