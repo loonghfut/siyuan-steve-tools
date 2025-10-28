@@ -16,6 +16,8 @@ export const aggregateDefaults: Record<string, any> = {
     "chart-enable": false,
     // 聚合器功能
     "aggregate-enable-content-aggregator": false,
+    // 文档插入位置（append: 末尾，prepend: 开头）
+    "aggregate-insert-mode": "append",
     // SQL 结果预览模板（支持占位符，例如 {{markdown}} {{content}} {{id}}）
     "aggregate-sql-preview-template": "",
     // Row 之间的分隔符（默认 ---）
@@ -81,6 +83,17 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             name: "块聚合",
             items: [
                 { type: "checkbox", title: "启用块聚合", description: "启用后再进行下面的设置", key: "aggregate-enable-content-aggregator", value: ctx.settings["aggregate-enable-content-aggregator"] },
+                {
+                    type: "select",
+                    title: "文档插入位置",
+                    description: "将聚合内容插入到目标文档的开头或末尾",
+                    key: "aggregate-insert-mode",
+                    value: ctx.settings["aggregate-insert-mode"] ?? "append",
+                    options: {
+                        append: "末尾 (append)",
+                        prepend: "开头 (prepend)",
+                    },
+                },
                 {
                     type: "textarea",
                     title: "SQL 聚合默认模板",

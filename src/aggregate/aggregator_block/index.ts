@@ -1,5 +1,5 @@
 import steveTools from "@/index";
-import { getBlockByID, insertBlock, sql as runSql, lsNotebooks, createDailyNote } from '@/api/api';
+import { getBlockByID, sql as runSql, lsNotebooks, createDailyNote, appendBlock, prependBlock } from '@/api/api';
 import { AVManager } from "@/api/db_pro";
 import { PluginConfig } from '@/savedata';
 import { showMessage } from "siyuan";
@@ -968,6 +968,24 @@ export class aggregatorBlock {
                                     font-size: 13px;
                                 "
                             />
+                            <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                                <label for="edit-doc-insert-mode" style="font-size: 12px; color: var(--b3-theme-on-surface);">文档插入位置:</label>
+                                <select id="edit-doc-insert-mode" class="b3-select">
+                                    <option value="append" ${((preset as any).docInsertMode === 'append') || (!('docInsertMode' in preset) && (this._settingdata?.['aggregate-insert-mode'] !== 'prepend')) ? 'selected' : ''}>末尾 (append)</option>
+                                    <option value="prepend" ${((preset as any).docInsertMode === 'prepend') || (!('docInsertMode' in preset) && (this._settingdata?.['aggregate-insert-mode'] === 'prepend')) ? 'selected' : ''}>开头 (prepend)</option>
+                                </select>
+                            </div>
+                            <div style="
+                                font-size: 12px; 
+                                color: var(--b3-theme-on-surface-light); 
+                                margin-top: 4px;
+                                display: flex;
+                                align-items: center;
+                                gap: 4px;
+                            ">
+                                <svg style="width: 12px; height: 12px;"><use xlink:href="#iconInfo"></use></svg>
+                                这里设置仅影响该预设；留空则使用全局设置（默认：末尾）。
+                            </div>
                         </div>
 
                         <!-- 目标数据库 ID -->
@@ -1095,12 +1113,14 @@ export class aggregatorBlock {
                 const targetDatabaseInput = element.querySelector('#edit-target-db') as HTMLInputElement;
                 const lastInsertTimeInput = element.querySelector('#edit-last-insert-time') as HTMLInputElement;
                 const dbIdFieldSelect = element.querySelector('#edit-db-id-field') as HTMLSelectElement;
+                const docInsertModeSelect = element.querySelector('#edit-doc-insert-mode') as HTMLSelectElement;
 
                 const newTemplate = templateTextarea?.value.trim() || '';
                 const newTargetDocId = targetDocInput?.value.trim() || '';
                 const newTargetDatabaseId = targetDatabaseInput?.value.trim() || '';
                 const newLastInsertTime = lastInsertTimeInput?.value.trim() || '';
                 const newDatabaseIdField = (dbIdFieldSelect?.value === 'parent_id' ? 'parent_id' : 'id') as 'id' | 'parent_id';
+                const newDocInsertMode = (docInsertModeSelect?.value === 'prepend' ? 'prepend' : 'append') as 'append' | 'prepend';
 
                 // 更新预设
                 preset.template = newTemplate || undefined;
@@ -1108,6 +1128,7 @@ export class aggregatorBlock {
                 preset.targetDatabaseId = newTargetDatabaseId || undefined;
                 preset.lastInsertTime = newLastInsertTime || undefined;
                 preset.databaseIdField = newTargetDatabaseId ? newDatabaseIdField : undefined; // 仅在设置了数据库ID时生效
+                (preset as any).docInsertMode = newDocInsertMode || undefined;
                 allPresets[name] = preset;
 
                 // 保存到配置
@@ -1116,6 +1137,7 @@ export class aggregatorBlock {
                 await this.updatePresetTargetDatabaseId(name, newTargetDatabaseId);
                 await this.updatePresetLastInsertTime(name, newLastInsertTime);
                 await this.updatePresetDatabaseIdField(name, preset.databaseIdField || '');
+                await this.updatePresetDocInsertMode(name, newDocInsertMode);
 
                 showMessage('预设已更新', 3000, 'info');
                 resolve(true);
@@ -1639,7 +1661,7 @@ export class aggregatorBlock {
         return renderedRows.join(`\n\n \n\n`);
     }
 
-    // 插入 Markdown 到指定文档
+    // 插入 Markdown 到指定文档（支持开头/末尾两种模式）
     async insertMarkdownToDoc(docId: string, markdown: string, presetName?: string): Promise<void> {
         try {
             if (!docId || !docId.trim()) {
@@ -1649,7 +1671,29 @@ export class aggregatorBlock {
             if (!data) {
                 throw new Error('未找到指定的文档块');
             }
-            await insertBlock("markdown", markdown, "", "", docId);
+            // 读取插入模式：优先预设项，其次全局设置，默认 append
+            let insertMode: 'append' | 'prepend' = 'append';
+            if (presetName) {
+                try {
+                    const presets = await this.getSqlPresets();
+                    const preset = presets[presetName] as PresetItem | undefined;
+                    if (preset && (preset as any).docInsertMode && (preset as any).docInsertMode !== '') {
+                        const m = String((preset as any).docInsertMode);
+                        if (m === 'prepend' || m === 'append') insertMode = m;
+                    }
+                } catch {}
+            }
+            if (!presetName || insertMode === 'append') {
+                // 如果全局设置覆盖
+                const globalMode = String(this._settingdata?.['aggregate-insert-mode'] || '').trim();
+                if (globalMode === 'prepend') insertMode = 'prepend';
+            }
+
+            if (insertMode === 'prepend') {
+                await prependBlock('markdown', markdown, docId);
+            } else {
+                await appendBlock('markdown', markdown, docId);
+            }
             // 插入成功后更新预设的 lastInsertTime
             if (presetName) {
                 const currentTime = this.getSiyuanTimestamp(); // 当前时间戳(思源格式)
@@ -1898,6 +1942,28 @@ export class aggregatorBlock {
             }
         } catch (e) {
             console.error('[aggregatorBlock] updatePresetLastInsertTime error', e);
+        }
+    }
+
+    // 更新预设的文档插入位置（append 或 prepend）
+    async updatePresetDocInsertMode(presetName: string, mode: '' | 'append' | 'prepend'): Promise<void> {
+        try {
+            if (!this.pluginConfig) {
+                console.error('[aggregatorBlock] cannot update preset: pluginConfig not provided');
+                return;
+            }
+            const current = this.pluginConfig.get('presets') || {};
+            if (current[presetName]) {
+                current[presetName].docInsertMode = mode || undefined; // 空字符串存为 undefined
+                current[presetName].updatedAt = Date.now();
+                this.pluginConfig.set('presets', current);
+                await this.pluginConfig.save();
+                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的文档插入位置: ${mode || '默认(跟随全局)'}`);
+            } else {
+                console.warn('[aggregatorBlock] preset not found:', presetName);
+            }
+        } catch (e) {
+            console.error('[aggregatorBlock] updatePresetDocInsertMode error', e);
         }
     }
 }
