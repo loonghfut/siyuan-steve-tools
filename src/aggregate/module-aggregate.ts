@@ -5,6 +5,7 @@ import { Dialog, Menu, openTab } from "siyuan";
 import { updateBlock } from "@/api/api";
 import { PluginConfig } from "@/savedata";
 import { aggregatorBlock } from "./aggregator_block";
+import { ContentAggregatorTabUI } from "./ui/content-aggregator-tab";
 
 // Aggregate 模块
 export class M_Aggregate {
@@ -23,6 +24,23 @@ export class M_Aggregate {
             const confAgg = new PluginConfig(this.plugin.name, 'aggregate-sql');
             await confAgg.load();
             await (this._aggregatorBlockInstance = new aggregatorBlock(this.plugin, confAgg)).init(_settingdata);
+
+            // 注册 内容聚合器 为思源选项卡
+            const aggregate = this;
+            this.plugin.addTab({
+                type: "content-aggregator",
+                async init() {
+                    const id = new Date().getTime().toString();
+                    this.element.innerHTML = `<div id=\"content-aggregator-tab-${id}\" style=\"width:100%;height:100%;overflow:auto;\"></div>`;
+                    const container = document.getElementById(`content-aggregator-tab-${id}`)! as HTMLElement;
+                    // 使用新的页签 UI 类（非模态）
+                    ;(this as any)._caUI = new ContentAggregatorTabUI(container, (aggregate as any)._aggregatorBlockInstance);
+                },
+                async destroy() {
+                    // 销毁页签 UI
+                    try { (this as any)._caUI?.destroy?.(); } catch {}
+                },
+            });
         }
 
         if (_settingdata["aggregate-enable-sql-visualizer"]) {
@@ -516,6 +534,18 @@ export class M_Aggregate {
                 label: "内容聚合器",
                 click: async () => {
                     this._aggregatorBlockInstance?.runPresetPreviewFlow();
+                }
+            });
+            // 页签打开内容聚合器
+            menu.addItem({
+                icon: "iconLayoutBottom",
+                label: "内容聚合器页签",
+                click: async () => {
+                    await openTab({
+                        app: (window as any).siyuan.ws.app,
+                        custom: { icon: "iconDatabase", title: "内容聚合器", id: this.plugin.name + "content-aggregator", data: { id: null } },
+                        keepCursor: false,
+                    });
                 }
             });
         }
