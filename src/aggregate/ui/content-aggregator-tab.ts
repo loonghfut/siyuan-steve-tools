@@ -1,4 +1,4 @@
-import { showMessage } from "siyuan";
+import { showMessage, openTab } from "siyuan";
 import { aggregatorBlock } from "../aggregator_block";
 import type { PresetItem } from "../echarts/types/types";
 
@@ -115,7 +115,7 @@ export class ContentAggregatorTabUI {
       item.innerHTML = `
         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
           <div style="flex:1; min-width:0;">
-            <div style="font-weight:500; color: var(--b3-theme-on-background); margin-bottom:6px; display:flex; gap:6px; align-items:center;">
+            <div class="ca-title" style="font-weight:500; color: var(--b3-theme-on-background); margin-bottom:6px; display:flex; gap:6px; align-items:center;">
               <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
               ${n}
             </div>
@@ -126,8 +126,8 @@ export class ContentAggregatorTabUI {
                 const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
                 return `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface-light); color: var(--b3-theme-on-surface); border-radius: var(--b3-border-radius-s);\">最近修改: ${short}</span>`;
               })() : ''}
-              ${preset.targetDocId ? (validity?.docValid ? `<span style=\"font-size:11px;padding:2px 8px;background: rgba(101,184,77,0.12); color: var(--b3-theme-success); border-radius: var(--b3-border-radius-s);\">${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效文档绑定</span>`) : ''}
-              ${preset.targetDatabaseId ? (validity?.databaseValid ? `<span style=\"font-size:11px;padding:2px 8px;background: rgba(70,130,180,0.12); color:#1976d2; border-radius: var(--b3-border-radius-s);\">已绑定数据库</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效数据库绑定</span>`) : ''}
+              ${preset.targetDocId ? (validity?.docValid ? `<span class=\"ca-badge-doc\" style=\"font-size:11px;padding:2px 8px;background: rgba(101,184,77,0.12); color: var(--b3-theme-success); border-radius: var(--b3-border-radius-s); cursor:pointer;\" title=\"点击打开${validity?.docType === 'notebook' ? '当日日记' : '文档'}\">${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效文档绑定</span>`) : ''}
+              ${preset.targetDatabaseId ? (validity?.databaseValid ? `<span class=\"ca-badge-db\" style=\"font-size:11px;padding:2px 8px;background: rgba(70,130,180,0.12); color:#1976d2; border-radius: var(--b3-border-radius-s); cursor:pointer;\" title=\"点击打开数据库\">已绑定数据库</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效数据库绑定</span>`) : ''}
               ${(preset as any).docInsertMode ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); border:1px dashed var(--b3-border-color); border-radius: var(--b3-border-radius-s);\">插入: ${(preset as any).docInsertMode === 'prepend' ? '开头' : '末尾'}</span>` : ''}
             </div>
           </div>
@@ -173,6 +173,99 @@ export class ContentAggregatorTabUI {
         e.stopPropagation();
         await this.aggregator.runPresetByName(n);
       });
+
+      // 绑定点击跳转：标题优先打开文档/当日日记，否则打开数据库
+      const titleEl = item.querySelector('.ca-title') as HTMLElement | null;
+      if (titleEl) {
+        const clickable = (preset.targetDocId && validity?.docValid) || (preset.targetDatabaseId && validity?.databaseValid);
+        if (clickable) {
+          titleEl.style.cursor = 'pointer';
+          titleEl.title = preset.targetDocId && validity?.docValid
+            ? (validity?.docType === 'notebook' ? '打开当日日记' : '打开文档')
+            : '打开数据库';
+          titleEl.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+              if (preset.targetDocId && validity?.docValid) {
+                const resolved = await (this.aggregator as any).resolveInsertDocId(preset.targetDocId);
+                const blockId = resolved?.docId || preset.targetDocId;
+                await openTab({
+                  app: (window as any).siyuan.ws.app,
+                  doc: {
+                    id: blockId,
+                    action: ["cb-get-hl", "cb-get-focus"],
+                    zoomIn: true,
+                  },
+                  position: "right",
+                  keepCursor: false,
+                });
+              } else if (preset.targetDatabaseId && validity?.databaseValid) {
+                const dbBlockId = await (this.aggregator as any).resolveAttributeViewBlockId(preset.targetDatabaseId);
+                if (!dbBlockId) throw new Error('DB block not found');
+                await openTab({
+                  app: (window as any).siyuan.ws.app,
+                  doc: {
+                    id: dbBlockId,
+                    action: ["cb-get-hl", "cb-get-focus"],
+                    zoomIn: true,
+                  },
+                  position: "right",
+                  keepCursor: false,
+                });
+              }
+            } catch (err) {
+              showMessage('打开失败，请检查目标是否存在', 3000, 'error');
+            }
+          });
+        }
+      }
+
+      // 单独徽章跳转：文档/数据库
+      const docBadge = item.querySelector('.ca-badge-doc');
+      if (docBadge && preset.targetDocId && validity?.docValid) {
+        (docBadge as HTMLElement).addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const resolved = await (this.aggregator as any).resolveInsertDocId(preset.targetDocId);
+            const blockId = resolved?.docId || preset.targetDocId;
+            await openTab({
+              app: (window as any).siyuan.ws.app,
+              doc: {
+                id: blockId,
+                action: ["cb-get-hl", "cb-get-focus"],
+                zoomIn: true,
+              },
+              position: "right",
+              keepCursor: false,
+            });
+          } catch {
+            showMessage('打开文档失败', 3000, 'error');
+          }
+        });
+      }
+
+      const dbBadge = item.querySelector('.ca-badge-db');
+      if (dbBadge && preset.targetDatabaseId && validity?.databaseValid) {
+        (dbBadge as HTMLElement).addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const dbBlockId = await (this.aggregator as any).resolveAttributeViewBlockId(preset.targetDatabaseId);
+            if (!dbBlockId) throw new Error('DB block not found');
+            await openTab({
+              app: (window as any).siyuan.ws.app,
+              doc: {
+                id: dbBlockId,
+                action: ["cb-get-hl", "cb-get-focus"],
+                zoomIn: true,
+              },
+              position: "right",
+              keepCursor: false,
+            });
+          } catch {
+            showMessage('打开数据库失败', 3000, 'error');
+          }
+        });
+      }
 
       listEl.appendChild(item);
     }

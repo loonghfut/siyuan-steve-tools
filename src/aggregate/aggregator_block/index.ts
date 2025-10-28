@@ -248,6 +248,34 @@ export class aggregatorBlock {
         `;
     }
 
+    /**
+     * 根据数据库 avID（属性视图 ID，而非块 ID）解析其所在块的 blockId。
+     * 通过查询 blocks 表中包含该 avID 的 NodeAttributeView 块来定位。
+     * 返回首个匹配的块 ID，未找到则返回 null。
+     */
+    public async resolveAttributeViewBlockId(avID: string): Promise<string | null> {
+        if (!avID) return null;
+        try {
+            const safe = avID.replace(/'/g, "''");
+            // 更精确：要求同时包含 NodeAttributeView 标记与 data-av-id，以及具体 avID
+            const sql = `
+                SELECT id, markdown FROM blocks
+                WHERE type = 'av'
+                  AND markdown LIKE '%NodeAttributeView%data-av-id%'
+                  AND markdown LIKE '%${safe}%'
+                ORDER BY updated DESC
+                LIMIT 1;
+            `;
+            const rows = await runSql(sql);
+            if (Array.isArray(rows) && rows.length > 0 && rows[0]?.id) {
+                return rows[0].id as string;
+            }
+        } catch (e) {
+            console.warn('[aggregatorBlock] resolveAttributeViewBlockId failed', e);
+        }
+        return null;
+    }
+
     // 创建原生弹窗
     private createNativeDialog(options: {
         title: string;
