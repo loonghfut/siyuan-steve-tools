@@ -529,17 +529,10 @@ export class M_Aggregate {
         }
         if (_settingdata["aggregate-enable-content-aggregator"]) {
             menu.addSeparator();
+            // 内容聚合器 - 仅保留页签形式
             menu.addItem({
                 icon: "iconDatabase",
-                label: "内容聚合弹窗",
-                click: async () => {
-                    this._aggregatorBlockInstance?.runPresetPreviewFlow();
-                }
-            });
-            // 页签打开内容聚合器
-            menu.addItem({
-                icon: "iconDatabase",
-                label: "内容聚合页签",
+                label: "内容聚合器",
                 click: async () => {
                     await openTab({
                         app: (window as any).siyuan.ws.app,

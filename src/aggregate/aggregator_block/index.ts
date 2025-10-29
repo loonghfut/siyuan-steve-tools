@@ -2,7 +2,7 @@ import steveTools from "@/index";
 import { getBlockByID, sql as runSql, lsNotebooks, createDailyNote, appendBlock, prependBlock } from '@/api/api';
 import { AVManager } from "@/api/db_pro";
 import { PluginConfig } from '@/savedata';
-import { showMessage } from "siyuan";
+import { showMessage, openTab } from "siyuan";
 import { PresetItem, SQLRawRow } from "../echarts/types/types";
 import { TimerManager } from "./TimerManager";
 
@@ -112,6 +112,10 @@ export class aggregatorBlock {
     }
 
     // 渲染查询结果表格
+    /**
+     * @deprecated 弹窗形式已删除。此方法现已弃用，仅保留以避免破坏向后兼容性。
+     * 表格渲染现在仅在页签 UI (ContentAggregatorTabUI) 中使用。
+     */
     private renderResultTable(rows: any[], container: HTMLElement): void {
         const total = rows.length;
         if (!total) {
@@ -424,8 +428,12 @@ export class aggregatorBlock {
             console.log(`[aggregatorBlock] 加载定时任务，共 ${names.length} 个预设`);
 
             for (const name of names) {
-                const preset = presets[name];
-                if (preset.timerEnabled && preset.timerInterval) {
+                const preset = presets[name] as PresetItem;
+                if (!preset?.timerEnabled) continue;
+                const mode = preset.timerMode || 'interval';
+                const dailyValid = (mode === 'daily') && Number.isFinite(preset.dailyHour) && Number.isFinite(preset.dailyMinute);
+                const intervalValid = (mode === 'interval') && !!preset.timerInterval;
+                if (dailyValid || intervalValid) {
                     console.log(`[aggregatorBlock] 启动定时任务: ${name}`);
                     await this.timerManager?.startTimer(name, preset);
                 }
@@ -466,403 +474,9 @@ export class aggregatorBlock {
 
 
     // 2. 生成预设选择面板（支持模板编辑）
-    async showPresetSelector(): Promise<{ name: string; preset: PresetItem } | null> {
-        const presets = await this.getSqlPresets();
-        // 默认按最近修改排序：优先使用 updatedAt，其次 lastExecuteTime，最后按名称
-        const sortedEntries = Object.entries(presets).sort((a, b) => {
-            const pa = a[1] as PresetItem;
-            const pb = b[1] as PresetItem;
-            const aTime = (pa.updatedAt || pa.lastExecuteTime || 0);
-            const bTime = (pb.updatedAt || pb.lastExecuteTime || 0);
-            if (aTime !== bTime) return bTime - aTime;
-            return a[0].localeCompare(b[0], 'zh-CN');
-        });
-        const names = sortedEntries.map(([n]) => n);
-        return new Promise(resolve => {
-            let settled = false;
-            const containerId = `st-preset-container-${Date.now()}`;
-            const searchId = `st-preset-search-${Date.now()}`;
-
-            const { element, destroy } = this.createNativeDialog({
-                title: '选择 SQL 预设',
-                content: `
-                    <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                        <!-- 搜索框 -->
-                        <div style="position: sticky; top: 0; background: var(--b3-theme-background); z-index: 1;">
-                            <input 
-                                id="${searchId}" 
-                                class="b3-text-field" 
-                                placeholder="🔍 搜索预设名称或 SQL..." 
-                                style="
-                                    width: 100%; 
-                                    padding: 8px 12px;
-                                    border: 1px solid var(--b3-border-color);
-                                    border-radius: var(--b3-border-radius);
-                                    background: var(--b3-theme-surface);
-                                    color: var(--b3-theme-on-background);
-                                    transition: var(--b3-transition);
-                                    font-size: 14px;
-                                "
-                            />
-                        </div>
-                        <!-- 预设列表 -->
-                        <div id="${containerId}" style="
-                            max-height: 450px; 
-                            overflow-y: auto;
-                            display: flex;
-                            flex-direction: column;
-                            gap: 8px;
-                        "></div>
-                    </div>
-                `,
-                width: 'min(720px, 95vw)',
-                onClose: () => {
-                    if (settled) return;
-                    settled = true;
-                    resolve(null);
-                }
-            });
-
-            const container = element.querySelector(`#${containerId}`) as HTMLElement | null;
-            const searchInput = element.querySelector(`#${searchId}`) as HTMLInputElement | null;
-
-            if (!container || !searchInput) {
-                try { destroy(); } catch (e) { /* ignore */ }
-                if (!settled) {
-                    settled = true;
-                    resolve(null);
-                }
-                return;
-            }
-
-            // 搜索输入效果
-            searchInput.addEventListener('focus', () => {
-                searchInput.style.borderColor = 'var(--b3-theme-primary)';
-                searchInput.style.boxShadow = '0 0 0 2px var(--b3-theme-primary-lightest)';
-            });
-            searchInput.addEventListener('blur', () => {
-                searchInput.style.borderColor = 'var(--b3-border-color)';
-                searchInput.style.boxShadow = 'none';
-            });
-
-            // 渲染预设列表
-            const renderPresets = async (filterText: string = '') => {
-                container.innerHTML = '';
-                const filter = filterText.toLowerCase().trim();
-                const filteredNames = filter
-                    ? names.filter(n =>
-                        n.toLowerCase().includes(filter) ||
-                        presets[n].sql.toLowerCase().includes(filter)
-                    )
-                    : names;
-
-                if (!filteredNames.length) {
-                    const empty = document.createElement('div');
-                    empty.innerHTML = `
-                        <div style="
-                            text-align: center; 
-                            padding: 40px 20px;
-                            color: var(--b3-theme-on-surface-light);
-                        ">
-                            <div style="font-size: 48px; margin-bottom: 12px;">🔍</div>
-                            <div style="font-size: 14px;">${filter ? '未找到匹配的预设' : '暂无预设'}</div>
-                        </div>
-                    `;
-                    container.appendChild(empty);
-                    return;
-                }
-
-                // 并行检查所有文档的有效性
-                const validityChecks = await Promise.all(
-                    filteredNames.map(async n => {
-                        const preset = presets[n];
-                        let docValid = true;
-                        let docType: 'doc' | 'notebook' | undefined;
-                        if (preset.targetDocId) {
-                            const isDoc = await this.checkDocValidity(preset.targetDocId);
-                            if (isDoc) {
-                                docValid = true; docType = 'doc';
-                            } else {
-                                const isNb = await this.isNotebookId(preset.targetDocId);
-                                docValid = !!isNb; docType = isNb ? 'notebook' : undefined;
-                            }
-                        }
-                        let databaseValid = true;
-                        if (preset.targetDatabaseId) {
-                            try {
-                                await this.avManager.getAttributeView(preset.targetDatabaseId);
-                            } catch (error) {
-                                console.debug('[aggregatorBlock] 数据库校验失败', preset.targetDatabaseId, error);
-                                databaseValid = false;
-                            }
-                        }
-                        return { name: n, docValid, databaseValid, docType };
-                    })
-                );
-                const validityMap = new Map(validityChecks.map(v => [v.name, { docValid: v.docValid, databaseValid: v.databaseValid, docType: v.docType }]));
-
-                filteredNames.forEach(n => {
-                    const preset = presets[n];
-                    const validity = validityMap.get(n);
-                    const item = document.createElement('div');
-                    item.className = 'preset-item';
-                    item.style.cssText = `
-                        padding: 14px 16px;
-                        background: var(--b3-theme-surface);
-                        border: 1px solid var(--b3-border-color);
-                        border-radius: var(--b3-border-radius);
-                        cursor: pointer;
-                        transition: var(--b3-transition);
-                    `;
-
-                    item.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-                            <div style="flex: 1; min-width: 0;">
-                                <!-- 预设名称 -->
-                                <div style="
-                                    font-weight: 500;
-                                    font-size: 15px;
-                                    color: var(--b3-theme-on-background);
-                                    margin-bottom: 6px;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 6px;
-                                ">
-                                    <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
-                                    ${n}
-                                </div>
-                                
-                                <!-- SQL 预览 -->
-                                <div style="
-                                    font-size: 12px;
-                                    color: var(--b3-theme-on-surface);
-                                    font-family: var(--b3-font-family-code);
-                                    background: var(--b3-protyle-code-background);
-                                    padding: 6px 8px;
-                                    border-radius: var(--b3-border-radius-s);
-                                    overflow: hidden;
-                                    text-overflow: ellipsis;
-                                    white-space: nowrap;
-                                    margin-bottom: 8px;
-                                    line-height: 1.4;
-                                ">
-                                    ${preset.sql}
-                                </div>
-                                
-                                <!-- 标签区 -->
-                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                    ${preset.template ? `
-                                        <span style="
-                                            font-size: 11px;
-                                            padding: 2px 8px;
-                                            background: var(--b3-theme-primary-lightest);
-                                            color: var(--b3-theme-primary);
-                                            border-radius: var(--b3-border-radius-s);
-                                            display: inline-flex;
-                                            align-items: center;
-                                            gap: 4px;
-                                        ">
-                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconEdit"></use></svg>
-                                            自定义模板
-                                        </span>
-                                    ` : ''}
-                                    ${preset.updatedAt ? (() => {
-                                        const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-                                        const full = new Date(preset.updatedAt as number).toLocaleString('zh-CN');
-                                        return `
-                                            <span style="
-                                                font-size: 11px;
-                                                padding: 2px 8px;
-                                                background: var(--b3-theme-surface-light);
-                                                color: var(--b3-theme-on-surface);
-                                                border-radius: var(--b3-border-radius-s);
-                                                display: inline-flex;
-                                                align-items: center;
-                                                gap: 4px;
-                                            " title="最近修改: ${full}">
-                                                <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCalendar"></use></svg>
-                                                最近修改: ${short}
-                                            </span>
-                                        `;
-                                    })() : ''}
-                                    ${preset.targetDocId ? (validity?.docValid ? `
-                                        <span style="
-                                            font-size: 11px;
-                                            padding: 2px 8px;
-                                            background: rgba(101, 184, 77, 0.12);
-                                            color: var(--b3-theme-success);
-                                            border-radius: var(--b3-border-radius-s);
-                                            display: inline-flex;
-                                            align-items: center;
-                                            gap: 4px;
-                                        ">
-                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconLink"></use></svg>
-                                            ${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}
-                                        </span>
-                                    ` : `
-                                        <span style="
-                                            font-size: 11px;
-                                            padding: 2px 8px;
-                                            background: var(--b3-card-error-background);
-                                            color: var(--b3-card-error-color);
-                                            border-radius: var(--b3-border-radius-s);
-                                            display: inline-flex;
-                                            align-items: center;
-                                            gap: 4px;
-                                        ">
-                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCloseRound"></use></svg>
-                                            无效文档绑定
-                                        </span>
-                                    `) : ''}
-                                    ${preset.targetDatabaseId ? (validity?.databaseValid ? `
-                                        <span style="
-                                            font-size: 11px;
-                                            padding: 2px 8px;
-                                            background: rgba(70, 130, 180, 0.12);
-                                            color: #1976d2;
-                                            border-radius: var(--b3-border-radius-s);
-                                            display: inline-flex;
-                                            align-items: center;
-                                            gap: 4px;
-                                        ">
-                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconDatabase"></use></svg>
-                                            已绑定数据库
-                                        </span>
-                                    ` : `
-                                        <span style="
-                                            font-size: 11px;
-                                            padding: 2px 8px;
-                                            background: var(--b3-card-error-background);
-                                            color: var(--b3-card-error-color);
-                                            border-radius: var(--b3-border-radius-s);
-                                            display: inline-flex;
-                                            align-items: center;
-                                            gap: 4px;
-                                        ">
-                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconCloseRound"></use></svg>
-                                            无效数据库绑定
-                                        </span>
-                                    `) : ''}
-                                    ${preset.timerEnabled ? (() => {
-                                        const nextTime = preset.nextExecuteTime ? new Date(preset.nextExecuteTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未知';
-                                        const intervalText = preset.timerUnit && preset.timerValue 
-                                            ? `${preset.timerValue}${preset.timerUnit === 'minutes' ? '分钟' : preset.timerUnit === 'hours' ? '小时' : '天'}`
-                                            : '未设置';
-                                        return `
-                                        <span style="
-                                            font-size: 11px;
-                                            padding: 2px 8px;
-                                            background: rgba(255, 193, 7, 0.12);
-                                            color: #f57c00;
-                                            border-radius: var(--b3-border-radius-s);
-                                            display: inline-flex;
-                                            align-items: center;
-                                            gap: 4px;
-                                        " title="下次执行: ${nextTime}">
-                                            <svg style="width: 12px; height: 12px;"><use xlink:href="#iconTimer"></use></svg>
-                                            定时: ${intervalText} | 下次: ${nextTime}
-                                        </span>
-                                        `;
-                                    })() : ''}
-                                </div>
-                            </div>
-                            
-                            <!-- 操作按钮 -->
-                            <div style="display: flex; gap: 8px; flex-shrink: 0;">
-                                <button class="b3-button b3-button--outline edit-preset-btn" style="
-                                    padding: 6px 12px;
-                                    font-size: 13px;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 4px;
-                                ">
-                                    <svg style="width: 14px; height: 14px; margin-right: 0px;"><use xlink:href="#iconEdit"></use></svg>
-                                    
-                                </button>
-                                <button class="b3-button b3-button--outline timer-preset-btn" style="
-                                    padding: 6px 12px;
-                                    font-size: 13px;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 4px;
-                                    ${preset.timerEnabled ? 'background: rgba(255, 193, 7, 0.12); border-color: #f57c00; color: #f57c00;' : ''}
-                                " title="${preset.timerEnabled ? '定时已启用' : '设置定时更新'}">
-                                    <svg style="width: 14px; height: 14px; margin-right: 0px;"><use xlink:href="#iconClock"></use></svg>
-                                    
-                                </button>
-                                <button class="b3-button b3-button--primary use-preset-btn" style="
-                                    padding: 6px 12px;
-                                    font-size: 13px;
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 4px;
-                                ">
-                                    <svg style="width: 14px; height: 14px; margin-right: 0px;"><use xlink:href="#iconSelect"></use></svg>
-                                    
-                                </button>
-                            </div>
-                        </div>
-                    `;
-
-                    // 悬停效果
-                    item.addEventListener('mouseenter', () => {
-                        item.style.background = 'var(--b3-list-hover)';
-                        item.style.borderColor = 'var(--b3-theme-primary-lighter)';
-                        item.style.transform = 'translateY(-1px)';
-                        item.style.boxShadow = 'var(--b3-point-shadow)';
-                    });
-                    item.addEventListener('mouseleave', () => {
-                        item.style.background = 'var(--b3-theme-surface)';
-                        item.style.borderColor = 'var(--b3-border-color)';
-                        item.style.transform = 'translateY(0)';
-                        item.style.boxShadow = 'none';
-                    });
-
-                    // 使用按钮
-                    const useBtn = item.querySelector('.use-preset-btn');
-                    useBtn?.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        if (settled) return;
-                        settled = true;
-                        try { destroy(); } catch (e) { /* ignore */ }
-                        resolve({ name: n, preset });
-                    });
-
-                    // 编辑按钮
-                    const editBtn = item.querySelector('.edit-preset-btn');
-                    editBtn?.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        const updated = await this.showPresetEditor(n, preset, presets);
-                        if (updated) {
-                            // 重新渲染列表以更新标签
-                            await renderPresets(searchInput.value);
-                        }
-                    });
-
-                    // 定时按钮
-                    const timerBtn = item.querySelector('.timer-preset-btn');
-                    timerBtn?.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        const updated = await this.showTimerSettings(n, preset, presets);
-                        if (updated) {
-                            // 重新渲染列表以更新定时状态显示
-                            await renderPresets(searchInput.value);
-                        }
-                    });
-
-                    container.appendChild(item);
-                });
-            };
-
-            // 搜索事件
-            searchInput.addEventListener('input', () => {
-                renderPresets(searchInput.value);
-            });
-
-            // 初始渲染
-            renderPresets();
-        });
-    }
+    /**
+     * showPresetSelector 已移除 - 该方法使用弹窗形式，现在预设选择通过页签(ContentAggregatorTabUI)完成
+     */
 
     /**
      * 在指定容器内渲染“预设列表”的非模态版
@@ -965,17 +579,43 @@ export class aggregatorBlock {
 
                     // 绑定事件
                     const editBtn = item.querySelector('.inline-edit');
-                    editBtn?.addEventListener('click', async (e) => {
+                    editBtn?.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        const updated = await this.showPresetEditor(n, preset, presets);
-                        if (updated) await renderPresets(searchInput?.value || '');
+                        // 打开内容聚合器页签（编辑在其中进行）
+                        try {
+                            openTab({
+                                app: (window as any).siyuan.ws.app,
+                                custom: {
+                                    icon: 'iconDatabase',
+                                    title: '内容聚合器',
+                                    id: this._plugin.name + 'content-aggregator',
+                                    data: { id: null }
+                                },
+                                keepCursor: false,
+                            });
+                        } catch (err) {
+                            console.warn('打开内容聚合页签失败:', err);
+                        }
                     });
 
                     const timerBtn = item.querySelector('.inline-timer');
-                    timerBtn?.addEventListener('click', async (e) => {
+                    timerBtn?.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        const updated = await this.showTimerSettings(n, preset, presets);
-                        if (updated) await renderPresets(searchInput?.value || '');
+                        // 打开内容聚合器页签（定时设置在其中进行）
+                        try {
+                            openTab({
+                                app: (window as any).siyuan.ws.app,
+                                custom: {
+                                    icon: 'iconDatabase',
+                                    title: '内容聚合器',
+                                    id: this._plugin.name + 'content-aggregator',
+                                    data: { id: null }
+                                },
+                                keepCursor: false,
+                            });
+                        } catch (err) {
+                            console.warn('打开内容聚合页签失败:', err);
+                        }
                     });
 
                     const useBtn = item.querySelector('.inline-use');
@@ -1009,12 +649,12 @@ export class aggregatorBlock {
     }
 
     /**
-     * 显示预设编辑器（二级界面）
-     * @returns 返回是否有更新
+     * showPresetEditor 已移除（弹窗形式已删除）
+     * 编辑功能现在通过 ContentAggregatorTabUI（页签）完成
      */
-    private async showPresetEditor(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<boolean> {
-        return new Promise((resolve) => {
-            const { element, destroy } = this.createNativeDialog({
+
+    /**
+     * 显示定时设置对话框
                 title: `编辑预设: ${name}`,
                 content: `
                     <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
@@ -1404,24 +1044,105 @@ export class aggregatorBlock {
      * 显示定时设置对话框
      * @returns 返回是否有更新
      */
+    /**
+     * @deprecated 弹窗形式已删除。此方法现已弃用。
+     * 定时设置现在通过页签 UI (ContentAggregatorTabUI) 完成。
+     */
     private async showTimerSettings(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<boolean> {
         return new Promise((resolve) => {
             const currentEnabled = preset.timerEnabled || false;
+            const currentMode = (preset.timerMode || 'interval') as ('interval'|'daily');
             const currentUnit = preset.timerUnit || 'hours';
             const currentValue = preset.timerValue || 1;
+            const currentDailyHour = Number.isFinite(preset.dailyHour) ? (preset.dailyHour as number) : 9;
+            const currentDailyMinute = Number.isFinite(preset.dailyMinute) ? (preset.dailyMinute as number) : 0;
 
             const { element, destroy } = this.createNativeDialog({
                 title: `定时设置: ${name}`,
                 content: `
                     <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
-                        <!-- 启用开关 -->
-                        <div style="
-                            display: flex;
+                        <!-- 模式切换 -->
+                        <div id="timer-mode-wrap" style="
+                            display: ${currentEnabled ? 'block' : 'none'};
                             align-items: center;
                             justify-content: space-between;
                             padding: 16px;
                             background: var(--b3-theme-surface);
                             border-radius: var(--b3-border-radius);
+                            <label style="
+                                display: block;
+                                margin-bottom: 12px;
+                                font-weight: 500;
+                                color: var(--b3-theme-on-background);
+                                font-size: 14px;
+                            ">
+                                <svg style="width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px;"><use xlink:href="#iconSetting"></use></svg>
+                                定时模式
+                            </label>
+                            <div style="display:flex; gap: 8px; align-items:center; margin-bottom: 12px;">
+                                <select id="timer-mode" class="b3-select">
+                                    <option value="interval" ${currentMode === 'interval' ? 'selected' : ''}>按间隔</option>
+                                    <option value="daily" ${currentMode === 'daily' ? 'selected' : ''}>每日固定时间</option>
+                                </select>
+                            </div>
+                            <!-- 定时间隔设置 -->
+                            <div id="timer-interval-settings" style="display: ${currentMode === 'interval' ? 'block' : 'none'};">
+                                <label style="
+                                    display: block;
+                                    margin-bottom: 12px;
+                                    font-weight: 500;
+                                    color: var(--b3-theme-on-background);
+                                    font-size: 14px;
+                                ">
+                                    <svg style="width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px;"><use xlink:href="#iconClock"></use></svg>
+                                    执行间隔
+                                </label>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <input 
+                                        id="timer-value" 
+                                        type="number" 
+                                        min="1" 
+                                        value="${currentValue}"
+                                        class="b3-text-field"
+                                        style="
+                                            flex: 1;
+                                            padding: 8px 12px;
+                                            border: 1px solid var(--b3-border-color);
+                                            border-radius: var(--b3-border-radius);
+                                            font-size: 14px;
+                                        "
+                                    />
+                                    <select 
+                                        id="timer-unit" 
+                                        class="b3-select"
+                                    >
+                                        <option value="minutes" ${currentUnit === 'minutes' ? 'selected' : ''}>分钟</option>
+                                        <option value="hours" ${currentUnit === 'hours' ? 'selected' : ''}>小时</option>
+                                        <option value="days" ${currentUnit === 'days' ? 'selected' : ''}>天</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- 每日固定时间设置 -->
+                            <div id="timer-daily-settings" style="display: ${currentMode === 'daily' ? 'block' : 'none'}; margin-top: 12px;">
+                                <label style="
+                                    display: block;
+                                    margin-bottom: 12px;
+                                    font-weight: 500;
+                                    color: var(--b3-theme-on-background);
+                                    font-size: 14px;
+                                ">
+                                    <svg style="width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px;"><use xlink:href="#iconCalendar"></use></svg>
+                                    每日执行时间
+                                </label>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <input id="daily-hour" type="number" min="0" max="23" value="${currentDailyHour}" class="b3-text-field" style="width: 80px;" />
+                                    <span style="color: var(--b3-theme-on-surface);">:</span>
+                                    <input id="daily-minute" type="number" min="0" max="59" value="${currentDailyMinute}" class="b3-text-field" style="width: 80px;" />
+                                    <span style="font-size:12px; color: var(--b3-theme-on-surface-light);">24小时制</span>
+                                </div>
+                            </div>
+
                             border: 1px solid var(--b3-border-color);
                         ">
                             <div style="display: flex; align-items: center; gap: 8px;">
@@ -1431,9 +1152,9 @@ export class aggregatorBlock {
                                     <div style="font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 2px;">
                                         自动执行聚合并插入到目标文档
                                     </div>
-                                </div>
+                                定时器将在保存后立即生效
                             </div>
-                            <label class="veq-switch" style="margin: 0;">
+                        </div>
                                 <input id="timer-enabled-switch" type="checkbox" ${currentEnabled ? 'checked' : ''}>
                                 <i></i>
                             </label>
@@ -1535,18 +1256,29 @@ export class aggregatorBlock {
 
             // 获取元素
             const enabledSwitch = element.querySelector('#timer-enabled-switch') as HTMLInputElement;
+            const modeWrap = element.querySelector('#timer-mode-wrap') as HTMLElement;
+            const modeSelect = element.querySelector('#timer-mode') as HTMLSelectElement;
             const intervalSettings = element.querySelector('#timer-interval-settings') as HTMLElement;
+            const dailySettings = element.querySelector('#timer-daily-settings') as HTMLElement;
             const valueInput = element.querySelector('#timer-value') as HTMLInputElement;
             const unitSelect = element.querySelector('#timer-unit') as HTMLSelectElement;
+            const dailyHourInput = element.querySelector('#daily-hour') as HTMLInputElement;
+            const dailyMinuteInput = element.querySelector('#daily-minute') as HTMLInputElement;
             const cancelBtn = element.querySelector('.b3-button--cancel');
             const confirmBtn = element.querySelector('.b3-button--primary');
 
             // 切换显示/隐藏间隔设置
-            enabledSwitch?.addEventListener('change', () => {
-                if (intervalSettings) {
-                    intervalSettings.style.display = enabledSwitch.checked ? 'block' : 'none';
-                }
-            });
+            const refreshModeVisibility = () => {
+                if (!modeWrap) return;
+                modeWrap.style.display = enabledSwitch.checked ? 'block' : 'none';
+                const mode = (modeSelect?.value || 'interval');
+                if (intervalSettings) intervalSettings.style.display = mode === 'interval' ? 'block' : 'none';
+                if (dailySettings) dailySettings.style.display = mode === 'daily' ? 'block' : 'none';
+            };
+            enabledSwitch?.addEventListener('change', refreshModeVisibility);
+            modeSelect?.addEventListener('change', refreshModeVisibility);
+            // 初始化一次
+            refreshModeVisibility();
 
             // 取消按钮
             cancelBtn?.addEventListener('click', () => {
@@ -1557,43 +1289,58 @@ export class aggregatorBlock {
             // 保存按钮
             confirmBtn?.addEventListener('click', async () => {
                 const enabled = enabledSwitch?.checked || false;
-                const value = parseInt(valueInput?.value || '1');
-                const unit = unitSelect?.value as 'minutes' | 'hours' | 'days';
-
-                if (enabled && (!value || value < 1)) {
-                    showMessage('请输入有效的时间间隔', 3000, 'error');
-                    return;
-                }
-
-                // 计算间隔毫秒数
-                let intervalMs = 0;
-                if (enabled) {
-                    switch (unit) {
-                        case 'minutes':
-                            intervalMs = value * 60 * 1000;
-                            break;
-                        case 'hours':
-                            intervalMs = value * 60 * 60 * 1000;
-                            break;
-                        case 'days':
-                            intervalMs = value * 24 * 60 * 60 * 1000;
-                            break;
-                    }
-                }
-
-                // 更新预设
+                const modeVal = (modeSelect?.value || 'interval') as ('interval'|'daily');
+                // 更新预设共通
                 preset.timerEnabled = enabled;
-                preset.timerInterval = intervalMs;
-                preset.timerUnit = unit;
-                preset.timerValue = value;
+                preset.timerMode = modeVal;
 
-                // 如果启用定时，设置下次执行时间
-                if (enabled) {
-                    const now = Date.now();
-                    preset.nextExecuteTime = now + intervalMs;
-                } else {
+                if (!enabled) {
                     preset.nextExecuteTime = undefined;
                     preset.lastExecuteTime = undefined;
+                    // 清理与模式相关的参数但保留之前配置以便再次启用时回填
+                    // 不做强制清理，减少意外丢失；仅不计算 next
+                } else if (modeVal === 'interval') {
+                    const value = parseInt(valueInput?.value || '1');
+                    const unit = unitSelect?.value as 'minutes' | 'hours' | 'days';
+                    if (!value || value < 1) {
+                        showMessage('请输入有效的时间间隔', 3000, 'error');
+                        return;
+                    }
+                    let intervalMs = 0;
+                    switch (unit) {
+                        case 'minutes': intervalMs = value * 60 * 1000; break;
+                        case 'hours': intervalMs = value * 60 * 60 * 1000; break;
+                        case 'days': intervalMs = value * 24 * 60 * 60 * 1000; break;
+                    }
+                    preset.timerInterval = intervalMs;
+                    preset.timerUnit = unit;
+                    preset.timerValue = value;
+                    // 立即安排下一次
+                    const now = Date.now();
+                    preset.nextExecuteTime = now + intervalMs;
+                    // 清理 daily 字段
+                    preset.dailyHour = undefined;
+                    preset.dailyMinute = undefined;
+                } else {
+                    // daily
+                    const h = Math.max(0, Math.min(23, parseInt(dailyHourInput?.value || '0')));
+                    const mm = Math.max(0, Math.min(59, parseInt(dailyMinuteInput?.value || '0')));
+                    preset.dailyHour = h;
+                    preset.dailyMinute = mm;
+                    // 清理 interval 字段（互斥）
+                    preset.timerInterval = undefined;
+                    // nextExecuteTime: 如果未来还有今日时点，则为今日，否则为明日
+                    const now = new Date();
+                    const today = new Date();
+                    today.setHours(h, mm, 0, 0);
+                    if (now.getTime() < today.getTime()) {
+                        preset.nextExecuteTime = today.getTime();
+                    } else {
+                        const tmr = new Date();
+                        tmr.setDate(tmr.getDate() + 1);
+                        tmr.setHours(h, mm, 0, 0);
+                        preset.nextExecuteTime = tmr.getTime();
+                    }
                 }
 
                 allPresets[name] = preset;
@@ -1627,9 +1374,12 @@ export class aggregatorBlock {
             const current = this.pluginConfig.get('presets') || {};
             if (current[presetName]) {
                 current[presetName].timerEnabled = preset.timerEnabled;
+                current[presetName].timerMode = preset.timerMode;
                 current[presetName].timerInterval = preset.timerInterval;
                 current[presetName].timerUnit = preset.timerUnit;
                 current[presetName].timerValue = preset.timerValue;
+                current[presetName].dailyHour = preset.dailyHour;
+                current[presetName].dailyMinute = preset.dailyMinute;
                 current[presetName].lastExecuteTime = preset.lastExecuteTime;
                 current[presetName].nextExecuteTime = preset.nextExecuteTime;
                 // 仅在手动修改定时设置时更新最近修改时间
@@ -1709,95 +1459,14 @@ export class aggregatorBlock {
 
     // 高阶：整合流程：选择预设 -> 执行预设内 sql（或 compiled sql） -> 获取块预览集合
     // 返回 { presetName, preset, blockIds, previews }
-    async runPresetPreviewFlow() {
-        const preset = await this.showPresetSelector();
-        if (!preset) return;
-        console.log(preset);
+    /**
+     * runPresetPreviewFlow 已移除 - 该方法依赖于弹窗选择器(showPresetSelector)
+     * 相关流程现通过 ContentAggregatorTabUI（页签）完成
+     */
 
-    let targetDocId = preset.preset.targetDocId;
-        const targetDatabaseId = preset.preset.targetDatabaseId;
-
-        // 至少需要配置一个目标（文档或数据库）
-        if (!targetDocId && !targetDatabaseId) {
-            targetDocId = await this.promptForDocId(preset.name);
-            console.log('用户输入的目标文档 ID:', targetDocId);
-            if (!targetDocId) {
-                console.warn(`[aggregatorBlock] 预设 "${preset.name}" 未配置目标文档或数据库`);
-                showMessage('请先在预设中设置目标文档或数据库 ID', 4000, 'info');
-                return;
-            }
-            console.log('保存目标文档 ID:', targetDocId);
-            await this.updatePresetTargetDocId(preset.name, targetDocId);
-            preset.preset.targetDocId = targetDocId;
-        }
-
-        // 获取上次插入时间，用于过滤已处理的内容
-        const lastInsertTime = preset.preset.lastInsertTime || '';
-        console.log(`[aggregatorBlock] 上次插入时间: ${lastInsertTime}`);
-
-        // 解析目标：若为笔记本ID，则获取当日日记文档ID，以便用于 SQL 排除和插入
-        let resolvedDoc: { docId: string; type: 'doc' | 'notebook' } | null = null;
-        if (targetDocId) {
-            resolvedDoc = await this.resolveInsertDocId(targetDocId);
-            if (!resolvedDoc) {
-                showMessage('目标文档/笔记本无效，请检查预设配置', 4000, 'error');
-                return;
-            }
-        }
-
-        const sqlResult = await this.executeSql(preset.preset.sql, resolvedDoc?.docId, lastInsertTime);
-        console.log(sqlResult);
-
-        // 如果没有新数据，提示用户
-        if (!sqlResult || sqlResult.length === 0) {
-            showMessage('没有新的数据需要插入', 3000, 'info');
-            return;
-        }
-
-        const operations: string[] = [];
-        const errors: string[] = [];
-
-        if (resolvedDoc?.docId) {
-            const renderedMd = this.renderTemplate(preset.preset, sqlResult);
-            try {
-                await this.insertMarkdownToDoc(resolvedDoc.docId, renderedMd, preset.name);
-                console.log('成功插入到文档:', resolvedDoc.docId);
-                operations.push(`文档 ${sqlResult.length} 条`);
-            } catch (error: any) {
-                console.error('[aggregatorBlock] 插入文档失败:', error);
-                const msg = error?.message || String(error);
-                errors.push(`文档: ${msg}`);
-            }
-        }
-
-        if (targetDatabaseId) {
-            try {
-                const insertedCount = await this.insertBlocksToDatabase(targetDatabaseId, sqlResult, preset.name);
-                if (insertedCount > 0) {
-                    console.log('成功插入到数据库:', targetDatabaseId, '数量:', insertedCount);
-                    operations.push(`数据库 ${insertedCount} 块`);
-                } else {
-                    console.log(`[aggregatorBlock] 预设 "${preset.name}" 未找到可插入的块 ID`);
-                }
-            } catch (error: any) {
-                console.error('[aggregatorBlock] 插入数据库失败:', error);
-                const msg = error?.message || String(error);
-                errors.push(`数据库: ${msg}`);
-            }
-        }
-
-        if (operations.length) {
-            showMessage(`成功插入 ${operations.join('，')}`, 3000, 'info');
-        }
-
-        if (errors.length) {
-            showMessage(`部分操作失败: ${errors.join('；')}`, 5000, 'error');
-        }
-
-        if (!operations.length && errors.length === 0) {
-            showMessage('未执行任何插入操作，请检查预设配置', 4000, 'info');
-        }
-    }
+    /**
+     * promptForDocId 已移除 - 仅用于弹窗流程，页签中有自己的处理方式
+     */
 
     // 直接按名称执行预设（无选择器）
     public async runPresetByName(name: string): Promise<void> {

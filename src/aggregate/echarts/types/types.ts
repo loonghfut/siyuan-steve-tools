@@ -22,9 +22,20 @@ export interface PresetItem {
   
   // 定时更新相关配置
   timerEnabled?: boolean;  // 是否启用定时更新
+  /**
+   * 定时模式：
+   * - interval: 按固定间隔执行（保持向后兼容，默认）
+   * - daily: 每天固定时间执行（小时:分钟）
+   */
+  timerMode?: 'interval' | 'daily';
+  /** interval 模式下的毫秒数间隔 */
   timerInterval?: number;  // 定时更新间隔(毫秒)
+  /** interval 模式下的单位和值（仅用于 UI 展示与回填） */
   timerUnit?: 'minutes' | 'hours' | 'days';  // 时间单位
   timerValue?: number;     // 时间值(如: 5 分钟, 2 小时, 1 天)
+  /** daily 模式下的执行时间（24小时制） */
+  dailyHour?: number;      // 0-23
+  dailyMinute?: number;    // 0-59
   lastExecuteTime?: number;  // 上次执行时间(时间戳)
   nextExecuteTime?: number;  // 下次执行时间(时间戳)
   /**

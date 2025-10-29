@@ -22,31 +22,12 @@ export class TimerManager {
     async startTimer(presetName: string, preset: PresetItem): Promise<void> {
         // 先停止已有的定时器
         this.stopTimer(presetName);
-
-        if (!preset.timerEnabled || !preset.timerInterval) {
-            console.log(`[TimerManager] 预设 "${presetName}" 定时未启用或间隔无效`);
+        if (!preset.timerEnabled) {
+            console.log(`[TimerManager] 预设 "${presetName}" 定时未启用`);
             return;
         }
 
-        const intervalMs = preset.timerInterval;
-
-        // 计算首次延迟：
-        // - 若有 nextExecuteTime 且已过期 -> 延迟 1 分钟后执行一次
-        // - 若有 nextExecuteTime 且未来 -> 等到该时间点
-        // - 否则使用一个完整的间隔
-        const now = Date.now();
-        let initialDelay = intervalMs;
-        if (typeof preset.nextExecuteTime === 'number' && isFinite(preset.nextExecuteTime)) {
-            if (preset.nextExecuteTime <= now) {
-                initialDelay = Math.max(1, 1 * 60 * 1000); // 1 分钟后执行
-                console.log(`[TimerManager] 预设 "${presetName}" 已错过下次执行时间，安排在 ${Math.round(initialDelay / 1000)} 秒后补跑一次`);
-            } else {
-                initialDelay = preset.nextExecuteTime - now;
-            }
-        }
-
-        console.log(`[TimerManager] 启动定时器: ${presetName}, 首次延迟: ${initialDelay}ms, 间隔: ${intervalMs}ms`);
-
+        const mode = preset.timerMode || 'interval';
         const handles: { timeout?: NodeJS.Timeout; interval?: NodeJS.Timeout } = {};
 
         const tickOnce = async () => {
@@ -61,8 +42,8 @@ export class TimerManager {
             }
 
             // 检查定时器是否仍然启用
-            if (!currentPreset.timerEnabled || !currentPreset.timerInterval) {
-                console.log(`[TimerManager] 预设 "${presetName}" 定时已禁用或间隔无效，停止定时器`);
+            if (!currentPreset.timerEnabled) {
+                console.log(`[TimerManager] 预设 "${presetName}" 定时已禁用，停止定时器`);
                 this.stopTimer(presetName);
                 return;
             }
@@ -70,29 +51,106 @@ export class TimerManager {
             await this.executePreset(presetName, currentPreset);
         };
 
-        const startIntervalLoop = () => {
-            // 再次从配置取当前间隔，避免期间被修改
-            handles.interval = setInterval(async () => {
+        if (mode === 'interval') {
+            if (!preset.timerInterval) {
+                console.log(`[TimerManager] 预设 "${presetName}" 间隔模式下未设置有效间隔，跳过`);
+                return;
+            }
+
+            const intervalMs = preset.timerInterval;
+            // 计算首次延迟
+            const now = Date.now();
+            let initialDelay = intervalMs;
+            if (typeof preset.nextExecuteTime === 'number' && isFinite(preset.nextExecuteTime)) {
+                if (preset.nextExecuteTime <= now) {
+                    initialDelay = Math.max(1, 1 * 60 * 1000); // 1 分钟后执行
+                    console.log(`[TimerManager] 预设 "${presetName}" 已错过下次执行时间，安排在 ${Math.round(initialDelay / 1000)} 秒后补跑一次`);
+                } else {
+                    initialDelay = preset.nextExecuteTime - now;
+                }
+            }
+
+            console.log(`[TimerManager] 启动定时器(interval): ${presetName}, 首次延迟: ${initialDelay}ms, 间隔: ${intervalMs}ms`);
+
+            const startIntervalLoop = () => {
+                handles.interval = setInterval(async () => {
+                    await tickOnce();
+                }, intervalMs);
+            };
+
+            handles.timeout = setTimeout(async () => {
+                const active = this.timers.get(presetName);
+                if (!active) return;
                 await tickOnce();
-            }, intervalMs);
+                startIntervalLoop();
+                if (handles.timeout) {
+                    clearTimeout(handles.timeout);
+                    delete handles.timeout;
+                }
+            }, Math.max(0, initialDelay));
+
+            this.timers.set(presetName, handles);
+            return;
+        }
+
+        // daily 模式
+        const h = Number.isFinite(preset.dailyHour) ? (preset.dailyHour as number) : NaN;
+        const m = Number.isFinite(preset.dailyMinute) ? (preset.dailyMinute as number) : NaN;
+        if (!(h >= 0 && h <= 23) || !(m >= 0 && m <= 59)) {
+            console.log(`[TimerManager] 预设 "${presetName}" 每日模式时间无效，需设置小时(0-23)与分钟(0-59)`);
+            return;
+        }
+
+        const computeTodayTs = () => {
+            const d = new Date();
+            d.setHours(h, m, 0, 0);
+            return d.getTime();
+        };
+        const computeTomorrowTs = () => {
+            const d = new Date();
+            d.setDate(d.getDate() + 1);
+            d.setHours(h, m, 0, 0);
+            return d.getTime();
         };
 
-        // 先按首次延迟 setTimeout 一次，然后再切换为 setInterval 循环
-        handles.timeout = setTimeout(async () => {
-            // 若在等待期间被停止则不再继续
-            const active = this.timers.get(presetName);
-            if (!active) return;
+        const now = Date.now();
+        const todayTs = computeTodayTs();
+        let initialDelay: number;
+        // 是否错过今日执行：now 已过今日时点 且 上次执行时间 < 今日时点
+        const last = typeof preset.lastExecuteTime === 'number' ? preset.lastExecuteTime : 0;
+        const missedToday = now >= todayTs && last < todayTs;
+        if (missedToday) {
+            initialDelay = 60 * 1000; // 1 分钟后补跑
+            console.log(`[TimerManager] 预设 "${presetName}" 今日 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} 已错过，1 分钟后补跑`);
+        } else if (now < todayTs) {
+            initialDelay = todayTs - now;
+        } else {
+            initialDelay = computeTomorrowTs() - now;
+        }
 
-            await tickOnce();
-            startIntervalLoop();
+        console.log(`[TimerManager] 启动定时器(daily): ${presetName}, 首次延迟: ${initialDelay}ms (每日 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')})`);
 
-            // timeout 只用一次，清理它（不从 Map 中删除条目）
+        const scheduleNextDaily = (delayMs: number) => {
             if (handles.timeout) {
                 clearTimeout(handles.timeout);
                 delete handles.timeout;
             }
-        }, Math.max(0, initialDelay));
+            handles.timeout = setTimeout(async () => {
+                const active = this.timers.get(presetName);
+                if (!active) return;
+                await tickOnce();
+                // 计算下一次（明日同一时刻）
+                const nextDelay = (() => {
+                    const now2 = Date.now();
+                    const tmr = computeTomorrowTs();
+                    return Math.max(0, tmr - now2);
+                })();
+                scheduleNextDaily(nextDelay);
+            }, Math.max(0, delayMs));
+        };
 
+        // 启动首次调度
+        scheduleNextDaily(initialDelay);
         this.timers.set(presetName, handles);
     }
 
@@ -197,9 +255,11 @@ export class TimerManager {
 
                 if (hasRecentUpdate) {
                     console.log(`[TimerManager] 预设 "${presetName}" 检测到存在 5 分钟内更新的块，跳过本次定时触发`);
-                    // 更新执行时间信息并跳过本次执行
-                    await this.updateExecutionTime(presetName, preset);
-                    showStatusMessage(`定时任务 "${presetName}" 因存在最近更新的块而被跳过`, 5000, 'info');
+                    // 跳过本次执行，下次执行时间改为 1 分钟后
+                    preset.lastExecuteTime = now;
+                    preset.nextExecuteTime = now + 60 * 1000; // 一分钟后
+                    await this.aggregatorBlock.updatePresetTimerSettings(presetName, preset, { skipUpdatedAt: true });
+                    showStatusMessage(`定时任务 "${presetName}" 因存在最近更新的块而被跳过，将在 1 分钟后重试`, 5000, 'info');
                     return;
                 }
             }
@@ -293,13 +353,37 @@ export class TimerManager {
     private async updateExecutionTime(presetName: string, preset: PresetItem): Promise<void> {
         const now = Date.now();
         preset.lastExecuteTime = now;
-        
-        if (preset.timerInterval) {
-            preset.nextExecuteTime = now + preset.timerInterval;
+
+        const mode = preset.timerMode || 'interval';
+        if (mode === 'interval') {
+            if (preset.timerInterval) {
+                preset.nextExecuteTime = now + preset.timerInterval;
+            } else {
+                preset.nextExecuteTime = undefined;
+            }
+        } else {
+            // 计算下一个每日执行时间的时间戳
+            const h = Number.isFinite(preset.dailyHour) ? (preset.dailyHour as number) : NaN;
+            const m = Number.isFinite(preset.dailyMinute) ? (preset.dailyMinute as number) : NaN;
+            if ((h >= 0 && h <= 23) && (m >= 0 && m <= 59)) {
+                const today = new Date();
+                today.setHours(h, m, 0, 0);
+                const todayTs = today.getTime();
+                if (now < todayTs) {
+                    preset.nextExecuteTime = todayTs;
+                } else {
+                    const tmr = new Date();
+                    tmr.setDate(tmr.getDate() + 1);
+                    tmr.setHours(h, m, 0, 0);
+                    preset.nextExecuteTime = tmr.getTime();
+                }
+            } else {
+                preset.nextExecuteTime = undefined;
+            }
         }
 
         // 保存到配置
-    await this.aggregatorBlock.updatePresetTimerSettings(presetName, preset, { skipUpdatedAt: true });
+        await this.aggregatorBlock.updatePresetTimerSettings(presetName, preset, { skipUpdatedAt: true });
     }
 
     /**

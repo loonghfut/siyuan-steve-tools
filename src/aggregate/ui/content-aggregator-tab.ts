@@ -129,6 +129,16 @@ export class ContentAggregatorTabUI {
               ${preset.targetDocId ? (validity?.docValid ? `<span class=\"ca-badge-doc\" style=\"font-size:11px;padding:2px 8px;background: rgba(101,184,77,0.12); color: var(--b3-theme-success); border-radius: var(--b3-border-radius-s); cursor:pointer;\" title=\"点击打开${validity?.docType === 'notebook' ? '当日日记' : '文档'}\">${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效文档绑定</span>`) : ''}
               ${preset.targetDatabaseId ? (validity?.databaseValid ? `<span class=\"ca-badge-db\" style=\"font-size:11px;padding:2px 8px;background: rgba(70,130,180,0.12); color:#1976d2; border-radius: var(--b3-border-radius-s); cursor:pointer;\" title=\"点击打开数据库\">已绑定数据库</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效数据库绑定</span>`) : ''}
               ${(preset as any).docInsertMode ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); border:1px dashed var(--b3-border-color); border-radius: var(--b3-border-radius-s);\">插入: ${(preset as any).docInsertMode === 'prepend' ? '开头' : '末尾'}</span>` : ''}
+              ${preset.timerEnabled ? (() => {
+                const nextTime = preset.nextExecuteTime ? new Date(preset.nextExecuteTime as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+                const mode = (preset as any).timerMode || 'interval';
+                const label = mode === 'daily'
+                  ? `每日 ${(String((preset as any).dailyHour ?? 0)).padStart(2,'0')}:${(String((preset as any).dailyMinute ?? 0)).padStart(2,'0')}`
+                  : ((preset as any).timerUnit && (preset as any).timerValue
+                      ? `${(preset as any).timerValue}${(preset as any).timerUnit === 'minutes' ? '分钟' : (preset as any).timerUnit === 'hours' ? '小时' : '天'}`
+                      : '未设置');
+                return `<span style=\"font-size:11px;padding:2px 8px;background: rgba(255,193,7,0.12); color:#f57c00; border-radius: var(--b3-border-radius-s);\">定时: ${label}${nextTime ? ' | 下次: ' + nextTime : ''}</span>`;
+              })() : ''}
             </div>
           </div>
           <div style="display:flex; gap:8px; flex-shrink:0;">
@@ -411,8 +421,11 @@ export class ContentAggregatorTabUI {
     if (!panel) return;
 
     const currentEnabled = p.timerEnabled || false;
+    const currentMode = (p.timerMode || 'interval') as ('interval'|'daily');
     const currentUnit = p.timerUnit || 'hours';
     const currentValue = p.timerValue || 1;
+    const currentDailyHour = Number.isFinite(p.dailyHour) ? (p.dailyHour as number) : 9;
+    const currentDailyMinute = Number.isFinite(p.dailyMinute) ? (p.dailyMinute as number) : 0;
 
   panel.style.display = 'block';
   panel.dataset.mode = 'timer';
@@ -431,17 +444,39 @@ export class ContentAggregatorTabUI {
             <i></i>
           </label>
         </div>
-        <div id="it-interval" style="display:${currentEnabled ? 'block' : 'none'}; padding: 12px; background: var(--b3-theme-surface); border-radius: var(--b3-border-radius); border: 1px solid var(--b3-border-color);">
+        <div id="it-mode-wrap" style="display:${currentEnabled ? 'block' : 'none'}; padding: 12px; background: var(--b3-theme-surface); border-radius: var(--b3-border-radius); border: 1px solid var(--b3-border-color);">
           <label style="display:block; margin-bottom:8px; font-weight:500; color: var(--b3-theme-on-background); font-size:14px;">
-            <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconClock"></use></svg>执行间隔
+            <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconSetting"></use></svg>定时模式
           </label>
-          <div style="display:flex; gap:12px; align-items:center;">
-            <input id="it-value" type="number" min="1" value="${currentValue}" class="b3-text-field" style="flex:1; padding:8px 12px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:14px;" />
-            <select id="it-unit" class="b3-select">
-              <option value="minutes" ${currentUnit === 'minutes' ? 'selected' : ''}>分钟</option>
-              <option value="hours" ${currentUnit === 'hours' ? 'selected' : ''}>小时</option>
-              <option value="days" ${currentUnit === 'days' ? 'selected' : ''}>天</option>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <select id="it-mode" class="b3-select">
+              <option value="interval" ${currentMode === 'interval' ? 'selected' : ''}>按间隔</option>
+              <option value="daily" ${currentMode === 'daily' ? 'selected' : ''}>每日固定时间</option>
             </select>
+          </div>
+          <div id="it-interval" style="display:${currentMode === 'interval' ? 'block' : 'none'};">
+            <label style="display:block; margin-bottom:8px; font-weight:500; color: var(--b3-theme-on-background); font-size:14px;">
+              <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconClock"></use></svg>执行间隔
+            </label>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <input id="it-value" type="number" min="1" value="${currentValue}" class="b3-text-field" style="flex:1; padding:8px 12px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:14px;" />
+              <select id="it-unit" class="b3-select">
+                <option value="minutes" ${currentUnit === 'minutes' ? 'selected' : ''}>分钟</option>
+                <option value="hours" ${currentUnit === 'hours' ? 'selected' : ''}>小时</option>
+                <option value="days" ${currentUnit === 'days' ? 'selected' : ''}>天</option>
+              </select>
+            </div>
+          </div>
+          <div id="it-daily" style="display:${currentMode === 'daily' ? 'block' : 'none'}; margin-top:8px;">
+            <label style="display:block; margin-bottom:8px; font-weight:500; color: var(--b3-theme-on-background); font-size:14px;">
+              <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconCalendar"></use></svg>每日执行时间
+            </label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input id="it-dh" type="number" min="0" max="23" value="${currentDailyHour}" class="b3-text-field" style="width:80px;" />
+              <span style="color:var(--b3-theme-on-surface);">:</span>
+              <input id="it-dm" type="number" min="0" max="59" value="${currentDailyMinute}" class="b3-text-field" style="width:80px;" />
+              <span style="font-size:12px; color:var(--b3-theme-on-surface-light);">24小时制</span>
+            </div>
           </div>
           <div style="font-size:12px; color: var(--b3-theme-on-surface-light); margin-top:8px; display:flex; align-items:center; gap:4px;">
             <svg style="width:12px;height:12px;"><use xlink:href="#iconInfo"></use></svg>定时器将在保存后立即生效
@@ -459,14 +494,25 @@ export class ContentAggregatorTabUI {
       </div>
     `;
 
-    const enabledSwitch = panel.querySelector('#it-enabled') as HTMLInputElement;
-    const intervalWrap = panel.querySelector('#it-interval') as HTMLElement;
-    const valueInput = panel.querySelector('#it-value') as HTMLInputElement;
-    const unitSelect = panel.querySelector('#it-unit') as HTMLSelectElement;
+  const enabledSwitch = panel.querySelector('#it-enabled') as HTMLInputElement;
+  const modeWrap = panel.querySelector('#it-mode-wrap') as HTMLElement;
+  const modeSelect = panel.querySelector('#it-mode') as HTMLSelectElement;
+  const intervalWrap = panel.querySelector('#it-interval') as HTMLElement;
+  const dailyWrap = panel.querySelector('#it-daily') as HTMLElement;
+  const valueInput = panel.querySelector('#it-value') as HTMLInputElement;
+  const unitSelect = panel.querySelector('#it-unit') as HTMLSelectElement;
+  const dhInput = panel.querySelector('#it-dh') as HTMLInputElement;
+  const dmInput = panel.querySelector('#it-dm') as HTMLInputElement;
 
-    enabledSwitch?.addEventListener('change', () => {
-      if (intervalWrap) intervalWrap.style.display = enabledSwitch.checked ? 'block' : 'none';
-    });
+    const refreshMode = () => {
+      if (modeWrap) modeWrap.style.display = enabledSwitch.checked ? 'block' : 'none';
+      const mode = (modeSelect?.value || 'interval');
+      if (intervalWrap) intervalWrap.style.display = mode === 'interval' ? 'block' : 'none';
+      if (dailyWrap) dailyWrap.style.display = mode === 'daily' ? 'block' : 'none';
+    };
+    enabledSwitch?.addEventListener('change', refreshMode);
+    modeSelect?.addEventListener('change', refreshMode);
+    refreshMode();
 
     const btnCancel = panel.querySelector('.b3-button--cancel') as HTMLButtonElement;
     const btnSave = panel.querySelector('.b3-button--primary') as HTMLButtonElement;
@@ -475,19 +521,46 @@ export class ContentAggregatorTabUI {
 
     btnSave?.addEventListener('click', async () => {
       const enabled = !!enabledSwitch?.checked;
-      const value = parseInt(valueInput?.value || '1');
-      const unit = (unitSelect?.value as 'minutes' | 'hours' | 'days');
-      if (enabled && (!value || value < 1)) { showMessage('请输入有效的时间间隔', 3000, 'error'); return; }
+      const mode = (modeSelect?.value || 'interval') as ('interval'|'daily');
 
-      // 写回 preset 并保存
       p.timerEnabled = enabled;
-      p.timerValue = enabled ? value : undefined;
-      p.timerUnit = enabled ? unit : undefined;
-      const ms = enabled ? (unit === 'minutes' ? value*60*1000 : unit === 'hours' ? value*60*60*1000 : value*24*60*60*1000) : undefined;
-      p.timerInterval = ms;
+      p.timerMode = mode;
 
-      // 复用 aggregator 的保存逻辑
+      if (!enabled) {
+        p.nextExecuteTime = undefined;
+        p.lastExecuteTime = undefined;
+      } else if (mode === 'interval') {
+        const value = parseInt(valueInput?.value || '1');
+        const unit = (unitSelect?.value as 'minutes' | 'hours' | 'days');
+        if (!value || value < 1) { showMessage('请输入有效的时间间隔', 3000, 'error'); return; }
+        const ms = unit === 'minutes' ? value*60*1000 : unit === 'hours' ? value*60*60*1000 : value*24*60*60*1000;
+        p.timerInterval = ms;
+        p.timerUnit = unit;
+        p.timerValue = value;
+        p.dailyHour = undefined;
+        p.dailyMinute = undefined;
+        p.nextExecuteTime = Date.now() + ms;
+      } else {
+        const h = Math.max(0, Math.min(23, parseInt(dhInput?.value || '0')));
+        const mm = Math.max(0, Math.min(59, parseInt(dmInput?.value || '0')));
+        p.dailyHour = h; p.dailyMinute = mm;
+        p.timerInterval = undefined;
+        // nextExecuteTime: 今天/明天的最近一次
+        const now = new Date();
+        const today = new Date(); today.setHours(h, mm, 0, 0);
+        p.nextExecuteTime = now.getTime() < today.getTime() ? today.getTime() : (()=>{ const t=new Date(); t.setDate(t.getDate()+1); t.setHours(h, mm, 0, 0); return t.getTime(); })();
+      }
+
       await (this.aggregator as any).updatePresetTimerSettings(name, p, { skipUpdatedAt: false });
+
+      // 尝试立即应用到定时器
+      try {
+        const tm = (this.aggregator as any).timerManager;
+        if (tm) {
+          if (enabled) await tm.startTimer(name, p);
+          else tm.stopTimer(name);
+        }
+      } catch {}
 
       showMessage('定时设置已更新', 3000, 'info');
       await this.refresh();
