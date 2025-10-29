@@ -120,7 +120,8 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "启用日程管理", description: "启用日程管理功能后再进行此模块的设置", key: "cal-enable", value: ctx.settings["cal-enable"] },
                 { type: "checkbox", title: "全局日程视图", description: "启用后再左上角加一个日历视图的入口", key: "cal-show-view", value: ctx.settings["cal-show-view"] },
                 { type: "select", title: "日程创建位置", description: "选择日记本", key: "cal-create-pos", value: ctx.settings["cal-create-pos"], options: notebookOptions() },
-                { type: "select", title: "日程数据库选择", description: "选择默认添加事件的数据库", key: "cal-db-id", value: ctx.settings["cal-db-id"], dynamicOptions: calendarDbOptions },
+                { type: "select", title: "日程数据库选择", description: "选择默认添加事件的数据库<br>如何绑定数据库? 点击数据库块标 - 属性 - 命名，填“日程”", key: "cal-db-id", value: ctx.settings["cal-db-id"], dynamicOptions: calendarDbOptions },
+                { type: "hint", title: "周期事件的使用", description: "点击数据库块标 - 属性 - 命名，填“周期”。相关模板请自行下载导入<a href=\"https://ld246.com/article/1760977116942/comment/1761751034348?r=stevehfut#comments\" target=\"_blank\" rel=\"noopener noreferrer\">这里</a>", key: "cal-bind-db-info", value: "" },
                 { type: "number", title: "默认持续时间(单位：小时)", description: "默认事件持续时间", key: "cal-time", value: ctx.settings["cal-time"] },
                 { type: "checkbox", title: "是否按事件时间创建日记", description: "启用后会按事件时间的日记创建日程", key: "cal-create-for-date", value: ctx.settings["cal-create-for-date"] },
             ]
