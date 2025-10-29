@@ -381,7 +381,7 @@ export class M_Aggregate {
         const menu = new Menu("topBarSQL", () => { });
         menu.addItem({
             icon: "iconSQL",
-            label: "页签模式",
+            label: "SQL页签",
             click: async () => {
                 await openTab({
                     app: (window as any).siyuan.ws.app,
@@ -392,7 +392,7 @@ export class M_Aggregate {
         });
         menu.addItem({
             icon: "iconSQL",
-            label: "弹窗模式",
+            label: "SQL弹窗",
             click: async () => {
                 const previewCols = (_settingdata["aggregate-sql-preview-columns"] || "").trim();
                 new Dialog({
@@ -531,15 +531,15 @@ export class M_Aggregate {
             menu.addSeparator();
             menu.addItem({
                 icon: "iconDatabase",
-                label: "内容聚合器",
+                label: "内容聚合弹窗",
                 click: async () => {
                     this._aggregatorBlockInstance?.runPresetPreviewFlow();
                 }
             });
             // 页签打开内容聚合器
             menu.addItem({
-                icon: "iconLayoutBottom",
-                label: "内容聚合器页签",
+                icon: "iconDatabase",
+                label: "内容聚合页签",
                 click: async () => {
                     await openTab({
                         app: (window as any).siyuan.ws.app,
