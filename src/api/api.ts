@@ -6,7 +6,7 @@
  * API 文档见 [API_zh_CN.md](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
  */
 
-import { fetchPost, fetchSyncPost, IWebSocketData, showMessage } from "siyuan";
+import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle, showMessage } from "siyuan";
 import { ISelectOption } from "@/calendar/interface";
 import { settingdata } from "..";
 import { AVManager } from "./db_pro";
@@ -374,15 +374,15 @@ export async function renderAttributeView(avid: BlockId, viewID?: string) {
         data = {
             id: avid, // avID,
             // viewID: '20241003141312-30yk3cr',//测试可以不用这个参数 //TODO：多视图的情况下需要
-            pageSize:99999,
-            page:1
+            pageSize: 99999,
+            page: 1
         }
     } else {
         data = {
             id: avid, // avID,
             viewID: viewID,
-            pageSize:99999,
-            page:1
+            pageSize: 99999,
+            page: 1
         }
     }
 
@@ -850,6 +850,26 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
     });
 }
 
+export async function updateMainBlockName(keyID: string, avID: string, name: string): Promise<any> {
+    // 构建要执行的操作（根据用户提供的请求体）
+    const queuedDoOperations: IOperation[] = [
+        {
+            action: "updateAttrViewCol",
+            id: keyID,
+            avID: avID,
+            name: name,
+            type: "block"
+        }
+    ];
+
+    try {
+        // 不要修改这一行调用
+        Protyle.prototype.transaction(queuedDoOperations, []);
+    } catch (error) {
+        console.error("updateMainBlockName transaction failed:", error);
+        throw error;
+    }
+}
 
 
 
@@ -974,7 +994,7 @@ async function processQueue() {
             );
 
             // 构建批量更新数据
-            
+
             const batchUpdates = processedUpdates
                 .filter(update => update.keyName) // 只处理有效的键名
                 .map(update => ({
@@ -1298,10 +1318,11 @@ export async function addAttributeViewKey(
     keyType: string = 'text',
     previousKeyName: string = ''
 ): Promise<void> {
-    if (keyType == 'block') {
-        showMessage('主键键不支持添加，请自行修改主键名称为：事件', -1, 'error');
-        return;
-    }
+    // if (keyType == 'block') {
+    //     showMessage('主键键不支持添加，请自行修改主键名称为：事件', -1, 'error');
+        
+    //     return;
+    // }
     return await avManager.addAttributeViewKey(avID, {
         keyName,
         keyType: keyType as any,

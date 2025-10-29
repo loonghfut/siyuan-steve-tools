@@ -23,6 +23,7 @@ import {
     setAttributeViewValue,
     ViewGroup,
 } from "./db_interface";
+import { updateMainBlockName } from "./api";
 
 export class AVManager {
     private baseURL: string = '';
@@ -143,6 +144,18 @@ export class AVManager {
         if (!key) {
             showMessage(`未找到名称为 ${keyName} 的属性键`, -1, "error");
             console.error(`未找到名称为 ${keyName} 的属性键`);
+        }
+        return key;
+    }
+
+
+    private async findMainKey(avID: string): Promise<AttributeViewKey> {
+        const keys = await this.getAttributeViewKeysWithCache(avID);
+        const key = keys.find(k => k.type === 'block');
+        if (!key) {
+            showMessage(`未找到类型为 block 的属性键`, -1, "error");
+            console.error(`未找到类型为 block 的属性键`);
+            throw new Error('未找到类型为 block 的属性键');
         }
         return key;
     }
@@ -296,6 +309,13 @@ export class AVManager {
     } = {}): Promise<void> {
         if (!avID) throw new Error('avID不能为空');
 
+        if (options.keyType === 'block') {
+            // showMessage(`修改 block 类型的键`, -1, "error");
+            const previousKey1 = await this.findMainKey(avID);
+            updateMainBlockName(previousKey1.id, avID, options.keyName);
+            return;
+        }
+
         const keyType = options.keyType || 'text';
         const validTypes = this.getKeyTypes();
         if (!validTypes.includes(keyType)) {
@@ -308,6 +328,8 @@ export class AVManager {
             const previousKey = await this.findKeyByName(avID, options.previousKeyName);
             previousKeyID = previousKey.id;
         }
+
+
 
         const params = {
             avID,
@@ -831,7 +853,7 @@ export class AVManager {
                 if (!update.keyName || !rowID) {
                     throw new Error('每个更新项必须包含keyName且需提供 rowID 或 blockID');
                 }
-                
+
                 const key = await this.findKeyByName(avID, update.keyName);
                 return {
                     keyID: key.id,
