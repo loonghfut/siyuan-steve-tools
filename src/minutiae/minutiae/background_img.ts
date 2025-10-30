@@ -19,6 +19,7 @@ export class backgroundImg extends MinutiaeImageBase {
     private resizeHandler = () => this.syncCanvasSize();
     private lastDocPath?: string;
     private currentMode: string = 'switch';
+    private lastSwitchAt: number | null = null; // ms timestamp of last auto refresh in switch mode
 
     constructor(plugin: steveTools, settingdata: any) {
         super(plugin, settingdata);
@@ -81,7 +82,7 @@ export class backgroundImg extends MinutiaeImageBase {
                 if (this.currentMode === 'startup') {
                     // register a one-time startup handler to prefer doc attrs on the next switch-protyle
                     this.startupHandler = async (e: any) => {
-                        try { await this.handleSwitchProtyle(e); } finally {
+                        try { await this.processProtyleSwitch(e, { persist: true }); } finally {
                             if (this.startupHandler) {
                                 try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch { }
                                 this.startupHandler = null;
@@ -125,7 +126,7 @@ export class backgroundImg extends MinutiaeImageBase {
      * - persist: when true (startup), if no custom background found in doc attrs, save the chosen background to the doc attrs so it won't change later.
      */
     private async processProtyleSwitch(e: any, options?: { persist?: boolean }) {
-        const persist = !!options?.persist;
+    const persist = !!options?.persist;
 
         const docPath = e?.detail?.protyle?.path;
         if (docPath) {
@@ -250,33 +251,48 @@ export class backgroundImg extends MinutiaeImageBase {
             console.warn('插入背景图控件失败', e);
         }
 
-        if (!appliedFromIal && this.currentMode === 'switch') {
-            await this.refreshBackground(docPath);
-
-            // If requested to persist (startup mode behavior), write the chosen background into the doc attrs
-            if (persist) {
-                try {
-                    const docID = e?.detail?.protyle?.background?.ial?.id;
-                    if (docID) {
-                        const curAttr = this.canvas?.style.backgroundImage || '';
-                        const m = curAttr.match(/url\((?:"|')?(.*?)(?:"|')?\)/);
-                        const chosen = m?.[1] || null;
-                        if (chosen) {
-                            try {
-                                await setBlockAttrs(docID, {
-                                    'custom-background-img': `${chosen}`,
-                                    'custom-st-bg-img': 'true'
-                                });
-                            } catch (err) {
-                                console.warn('写入文档属性失败', err);
-                            }
-                        }
-                    } else {
-                        console.warn('startup 模式下未能获取文档ID，无法持久化背景');
-                    }
-                } catch (err) {
-                    console.warn('startup 模式持久化背景失败', err);
+    if (!appliedFromIal && this.currentMode === 'switch') {
+            // switch 模式：在刷新前应用“切换防抖阈值”，真正生效
+            try {
+                const rawThresh = Number(this.settingdata["minutiae-bg-switch-threshold"] ?? 2);
+                const thresh = this.clamp(rawThresh, 0, 3600); // seconds
+                const now = Date.now();
+                if (thresh > 0 && this.lastSwitchAt && (now - this.lastSwitchAt) < thresh * 1000) {
+                    // 在阈值时间内，跳过本次刷新
+                    return;
                 }
+            } catch {
+                // 解析失败则忽略阈值，继续刷新
+            }
+            await this.refreshBackground(docPath);
+            this.lastSwitchAt = Date.now();
+
+            // switch 模式下不持久化
+        }
+        // startup 模式：若未从文档属性读取并要求持久化，则现在刷新一次并写入文档属性
+        else if (!appliedFromIal && persist) {
+            await this.refreshBackground(docPath);
+            try {
+                const docID = e?.detail?.protyle?.background?.ial?.id;
+                if (docID) {
+                    const curAttr = this.canvas?.style.backgroundImage || '';
+                    const m = curAttr.match(/url\((?:"|')?(.*?)(?:"|')?\)/);
+                    const chosen = m?.[1] || null;
+                    if (chosen) {
+                        try {
+                            await setBlockAttrs(docID, {
+                                'custom-background-img': `${chosen}`,
+                                'custom-st-bg-img': 'true'
+                            });
+                        } catch (err) {
+                            console.warn('写入文档属性失败', err);
+                        }
+                    }
+                } else {
+                    console.warn('startup 模式下未能获取文档ID，无法持久化背景');
+                }
+            } catch (err) {
+                console.warn('startup 模式持久化背景失败', err);
             }
         }
     }

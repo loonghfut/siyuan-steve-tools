@@ -15,6 +15,7 @@ export const minutiaeDefaults: Record<string, any> = {
     "minutiae-bg-blur": 6,
     "minutiae-bg-brightness": 1,
     "minutiae-bg-mode": "switch",
+    "minutiae-bg-switch-threshold": 2,
 };
 
 export const minutiaeGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -45,6 +46,7 @@ export const minutiaeGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "custom", component: "HeadimgMappingEditor", title: "文档ID背景图映射", description: "类似题头图映射：支持为每个文档指定远程URL与本地目录（目录表示随机源）。", key: "minutiae-bg-id-mapping", value: ctx.settings["minutiae-bg-id-mapping"], direction: "column" },
                 { type: "textinput", title: "默认保存目录", description: "当映射/全局地址无法推导保存目录时，下载或上传会保存到该目录（assets/<目录>），例如 background。", key: "minutiae-bg-default-save-dir", value: ctx.settings["minutiae-bg-default-save-dir"] },
                 { type: "select", title: "背景切换模式", description: "选择背景切换策略：切换文档 / 每次启动（启动时选择并可持久化）", key: "minutiae-bg-mode", value: ctx.settings["minutiae-bg-mode"], options: { switch: "切换文档时切换", startup: "每次启动时切换（首次选择后可持久化）" } },
+                { type: "slider", title: "切换防抖阈值（秒）", description: "当处于“切换文档时切换”模式时，最小间隔（秒）内不会重复请求图片，防止短时间内大量请求。设为0则不限制。", key: "minutiae-bg-switch-threshold", value: ctx.settings["minutiae-bg-switch-threshold"], slider: { min: 0, max: 300, step: 0.5 } },
                 { type: "slider", title: "透明度", description: "0.1-1（应用公式 0.99 - 0.25x 调整页面透明）", key: "minutiae-bg-opacity", value: ctx.settings["minutiae-bg-opacity"], slider: { min: 0.1, max: 1, step: 0.01 } },
                 { type: "slider", title: "模糊强度", description: "单位 px，范围 0-20。", key: "minutiae-bg-blur", value: ctx.settings["minutiae-bg-blur"], slider: { min: 0, max: 20, step: 1 } },
                 { type: "slider", title: "亮度", description: "0.5-1.5，1 为原始亮度。", key: "minutiae-bg-brightness", value: ctx.settings["minutiae-bg-brightness"], slider: { min: 0.5, max: 1.5, step: 0.05 } }
