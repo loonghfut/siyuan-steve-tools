@@ -20,10 +20,10 @@ export class M_Minutiae {
 
     }
 
-    updateSettings(settingdata: any) {
+    updateSettings(settingdata: any, options?: { skipBgRefresh?: boolean }) {
         this.settingdata = settingdata;
         void this.ensureHeadImgService();
-        void this.ensureBackgroundService();
+        void this.ensureBackgroundService(options);
     }
 
     onunload() {
@@ -49,14 +49,14 @@ export class M_Minutiae {
         }
     }
 
-    private async ensureBackgroundService() {
+    private async ensureBackgroundService(options?: { skipBgRefresh?: boolean }) {
         const enabled = !!this.settingdata?.["minutiae-bg-enable"];
         if (enabled) {
             if (!this.backgroundServ) {
                 this.backgroundServ = new backgroundImg(this.plugin, this.settingdata);
                 await this.backgroundServ.init();
             } else {
-                this.backgroundServ.updateSettingData(this.settingdata);
+                this.backgroundServ.updateSettingData(this.settingdata, options);
             }
         } else if (this.backgroundServ) {
             this.backgroundServ.destroy();

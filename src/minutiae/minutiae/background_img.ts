@@ -57,9 +57,14 @@ export class backgroundImg extends MinutiaeImageBase {
         this.active = false;
     }
 
-    override updateSettingData(settingdata: any) {
+    override updateSettingData(settingdata: any, options?: { skipBgRefresh?: boolean }) {
         super.updateSettingData(settingdata);
         if (!this.active) return;
+        // If caller requests skipping refresh (e.g. opening settings), only apply visual settings and return
+        if (options && options.skipBgRefresh) {
+            this.applyVisualSettings();
+            return;
+        }
         const prevMode = this.currentMode;
         this.currentMode = String(this.settingdata["minutiae-bg-mode"] || 'switch');
         this.applyVisualSettings();
@@ -107,8 +112,27 @@ export class backgroundImg extends MinutiaeImageBase {
             this.lastDocPath = docPath;
         }
         // Inject small UI controls into protyle for download/upload convenience
+        let appliedFromIal = false;
         try {
             const contentElement = e?.detail?.protyle?.contentElement ?? null;
+            // 优先检查文档 block attrs 中的自定义背景（custom-background-img 或 background-img）
+            try {
+                const ial = e?.detail?.protyle?.background?.ial;
+                // console.log("#####",ial);
+                if (ial) {
+                    let custom = ial['custom-background-img'] || null;
+                    if (!custom && ial['background-img']) {
+                        const extracted = this.extractUrlFromTitleImgAttr(String(ial['background-img'] || ''));
+                        custom = extracted || String(ial['background-img'] || '').trim() || null;
+                    }
+                    if (custom) {
+                        this.applyBackgroundUrl(custom);
+                        appliedFromIal = true;
+                    }
+                }
+            } catch (e2) {
+                console.warn('读取文档自定义背景属性失败', e2);
+            }
             // remove any existing bg control icons and separator we inserted previously
             try {
                 const iconsContainer: HTMLElement | null = contentElement?.querySelector?.('.protyle-icons') || document.querySelector('.protyle-icons');
@@ -162,7 +186,7 @@ export class backgroundImg extends MinutiaeImageBase {
                     if (docID) {
                         try {
                             await setBlockAttrs(docID, {
-                                'background-img': `background-image:url("${local}");`,
+                                'custom-background-img': `${local}`,
                                 'custom-st-bg-img': 'true'
                             });
                         } catch (err) {
@@ -184,18 +208,18 @@ export class backgroundImg extends MinutiaeImageBase {
                     const url = await this.quickUploadToTargetDir(docPath);
                     if (url) {
                         this.applyBackgroundUrl(url);
-                        if (docID) {
-                            try {
-                                await setBlockAttrs(docID, {
-                                    'background-img': `background-image:url("${url}");`,
-                                    'custom-st-bg-img': 'true'
-                                });
-                            } catch (err) {
-                                console.warn('写入文档属性失败', err);
+                            if (docID) {
+                                try {
+                                    await setBlockAttrs(docID, {
+                                        'custom-background-img': `${url}`,
+                                        'custom-st-bg-img': 'true'
+                                    });
+                                } catch (err) {
+                                    console.warn('写入文档属性失败', err);
+                                }
+                            } else {
+                                console.warn('未能获取文档ID，未写入 block attrs');
                             }
-                        } else {
-                            console.warn('未能获取文档ID，未写入 block attrs');
-                        }
                         showMessage('图片已上传并设置为背景图');
                     }
                 } catch (err) {
@@ -207,7 +231,9 @@ export class backgroundImg extends MinutiaeImageBase {
             console.warn('插入背景图控件失败', e);
         }
 
-        await this.refreshBackground(docPath);
+            if (!appliedFromIal) {
+                await this.refreshBackground(docPath);
+            }
     }
 
     private insertProtyleIcon(contentElement: HTMLElement | null, label: string, icon: string, onClick?: (ev: Event) => void) {
