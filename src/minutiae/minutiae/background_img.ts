@@ -30,41 +30,17 @@ export class backgroundImg extends MinutiaeImageBase {
         this.applyVisualSettings();
         // determine mode from settings
         this.currentMode = String(this.settingdata["minutiae-bg-mode"] || 'switch');
-        if (this.currentMode === 'startup') {
-            // startup: wait for the first switch-protyle event to prefer document attrs,
-            // but also fall back to a regular refresh so we have some background if no event comes.
-            // this.startupHandler = async (e: any) => {
-            //     try {
-            //         await this.handleSwitchProtyle(e);
-            //     } finally {
-            //         if (this.startupHandler) {
-            //             try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
-            //             this.startupHandler = null;
-            //         }
-            //     }
-            // };
-            // try {
-            //     this.plugin.eventBus.on("switch-protyle", this.startupHandler);
-            // } catch (err) {
-            //     console.warn('注册 startup switch-protyle 监听失败', err);
-            // }
-            // // fallback: pick/refresh a background now in case no switch-protyle event arrives
-            await this.refreshBackground();
-            this.plugin.eventBus.on("switch-protyle", this.switchHandler);
-        } else {
-            // default: switch mode
-            await this.refreshBackground();
-            this.plugin.eventBus.on("switch-protyle", this.switchHandler);
-        }
+        // await this.refreshBackground();
+        this.plugin.eventBus.on("switch-protyle", this.switchHandler);
         window.addEventListener("resize", this.resizeHandler, { passive: true });
         this.active = true;
     }
 
     destroy() {
         if (!this.active) return;
-        try { this.plugin.eventBus.off("switch-protyle", this.switchHandler); } catch {}
+        try { this.plugin.eventBus.off("switch-protyle", this.switchHandler); } catch { }
         if (this.startupHandler) {
-            try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+            try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch { }
             this.startupHandler = null;
         }
         window.removeEventListener("resize", this.resizeHandler);
@@ -94,10 +70,10 @@ export class backgroundImg extends MinutiaeImageBase {
                     this.plugin.eventBus.off("switch-protyle", this.switchHandler);
                 }
                 if (prevMode === 'startup' && this.startupHandler) {
-                    try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+                    try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch { }
                     this.startupHandler = null;
                 }
-            } catch {}
+            } catch { }
             try {
                 if (this.currentMode === 'switch') {
                     this.plugin.eventBus.on("switch-protyle", this.switchHandler);
@@ -107,14 +83,14 @@ export class backgroundImg extends MinutiaeImageBase {
                     this.startupHandler = async (e: any) => {
                         try { await this.handleSwitchProtyle(e); } finally {
                             if (this.startupHandler) {
-                                try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+                                try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch { }
                                 this.startupHandler = null;
                             }
                         }
                     };
                     try { this.plugin.eventBus.on("switch-protyle", this.startupHandler); } catch (err) { console.warn('注册 startupHandler 失败', err); }
                 }
-            } catch {}
+            } catch { }
         }
         // refresh according to mode
         if (this.currentMode === 'startup') {
@@ -185,7 +161,7 @@ export class backgroundImg extends MinutiaeImageBase {
                     const prevSep = iconsContainer.querySelector('.protyle-icon[data-type="st-minutiae-sep"]');
                     if (prevSep) prevSep.remove();
                 }
-            } catch {}
+            } catch { }
 
             // insert separator (between headimg icons and bg icons) if head icons exist
             try {
@@ -205,7 +181,7 @@ export class backgroundImg extends MinutiaeImageBase {
                         else iconsContainer.appendChild(sep);
                     }
                 }
-            } catch {}
+            } catch { }
 
             const docID = e?.detail?.protyle?.background?.ial?.id;
 
@@ -251,18 +227,18 @@ export class backgroundImg extends MinutiaeImageBase {
                     const url = await this.quickUploadToTargetDir(docPath);
                     if (url) {
                         this.applyBackgroundUrl(url);
-                            if (docID) {
-                                try {
-                                    await setBlockAttrs(docID, {
-                                        'custom-background-img': `${url}`,
-                                        'custom-st-bg-img': 'true'
-                                    });
-                                } catch (err) {
-                                    console.warn('写入文档属性失败', err);
-                                }
-                            } else {
-                                console.warn('未能获取文档ID，未写入 block attrs');
+                        if (docID) {
+                            try {
+                                await setBlockAttrs(docID, {
+                                    'custom-background-img': `${url}`,
+                                    'custom-st-bg-img': 'true'
+                                });
+                            } catch (err) {
+                                console.warn('写入文档属性失败', err);
                             }
+                        } else {
+                            console.warn('未能获取文档ID，未写入 block attrs');
+                        }
                         showMessage('图片已上传并设置为背景图');
                     }
                 } catch (err) {
