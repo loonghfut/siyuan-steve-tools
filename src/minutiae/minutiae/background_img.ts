@@ -14,6 +14,7 @@ export class backgroundImg extends MinutiaeImageBase {
     private active = false;
     private bodyOriginalOpacity: string | null = null;
     private bodyOriginalTransition: string | null = null;
+    private startupHandler: ((e: any) => void) | null = null;
     private switchHandler = (e: any) => { void this.handleSwitchProtyle(e); };
     private resizeHandler = () => this.syncCanvasSize();
     private lastDocPath?: string;
@@ -30,12 +31,26 @@ export class backgroundImg extends MinutiaeImageBase {
         // determine mode from settings
         this.currentMode = String(this.settingdata["minutiae-bg-mode"] || 'switch');
         if (this.currentMode === 'startup') {
-            // switch only at startup: pick background now
+            // startup: wait for the first switch-protyle event to prefer document attrs,
+            // but also fall back to a regular refresh so we have some background if no event comes.
+            // this.startupHandler = async (e: any) => {
+            //     try {
+            //         await this.handleSwitchProtyle(e);
+            //     } finally {
+            //         if (this.startupHandler) {
+            //             try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+            //             this.startupHandler = null;
+            //         }
+            //     }
+            // };
+            // try {
+            //     this.plugin.eventBus.on("switch-protyle", this.startupHandler);
+            // } catch (err) {
+            //     console.warn('注册 startup switch-protyle 监听失败', err);
+            // }
+            // // fallback: pick/refresh a background now in case no switch-protyle event arrives
             await this.refreshBackground();
-        } else if (this.currentMode === 'fixed') {
-            // fixed mode: use the configured background (get_pic_url will read the fixed URL)
-            const fixedUrl = await this.get_pic_url();
-            this.applyBackgroundUrl(fixedUrl);
+            this.plugin.eventBus.on("switch-protyle", this.switchHandler);
         } else {
             // default: switch mode
             await this.refreshBackground();
@@ -47,7 +62,11 @@ export class backgroundImg extends MinutiaeImageBase {
 
     destroy() {
         if (!this.active) return;
-        this.plugin.eventBus.off("switch-protyle", this.switchHandler);
+        try { this.plugin.eventBus.off("switch-protyle", this.switchHandler); } catch {}
+        if (this.startupHandler) {
+            try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+            this.startupHandler = null;
+        }
         window.removeEventListener("resize", this.resizeHandler);
         if (this.canvas && this.canvas.parentElement) {
             this.canvas.parentElement.removeChild(this.canvas);
@@ -74,20 +93,35 @@ export class backgroundImg extends MinutiaeImageBase {
                 if (prevMode === 'switch') {
                     this.plugin.eventBus.off("switch-protyle", this.switchHandler);
                 }
+                if (prevMode === 'startup' && this.startupHandler) {
+                    try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+                    this.startupHandler = null;
+                }
             } catch {}
             try {
                 if (this.currentMode === 'switch') {
                     this.plugin.eventBus.on("switch-protyle", this.switchHandler);
                 }
+                if (this.currentMode === 'startup') {
+                    // register a one-time startup handler to prefer doc attrs on the next switch-protyle
+                    this.startupHandler = async (e: any) => {
+                        try { await this.handleSwitchProtyle(e); } finally {
+                            if (this.startupHandler) {
+                                try { this.plugin.eventBus.off("switch-protyle", this.startupHandler); } catch {}
+                                this.startupHandler = null;
+                            }
+                        }
+                    };
+                    try { this.plugin.eventBus.on("switch-protyle", this.startupHandler); } catch (err) { console.warn('注册 startupHandler 失败', err); }
+                }
             } catch {}
         }
         // refresh according to mode
-        if (this.currentMode === 'fixed') {
-            void (async () => { const url = await this.get_pic_url(); this.applyBackgroundUrl(url); })();
-        } else if (this.currentMode === 'startup') {
+        if (this.currentMode === 'startup') {
             // startup mode: keep current background unless we explicitly want to re-pick now
             void this.refreshBackground();
         } else {
+            // switch mode
             void this.refreshBackground(this.lastDocPath);
         }
     }
@@ -105,8 +139,18 @@ export class backgroundImg extends MinutiaeImageBase {
     }
 
     private async handleSwitchProtyle(e: any) {
-        // Only respond to switch events when in 'switch' mode
-        if (this.currentMode !== 'switch') return;
+        // default switch handler should only run in 'switch' mode
+        await this.processProtyleSwitch(e, { persist: false });
+    }
+
+    /**
+     * Core handler for protyle switch/startup events.
+     * Options:
+     * - persist: when true (startup), if no custom background found in doc attrs, save the chosen background to the doc attrs so it won't change later.
+     */
+    private async processProtyleSwitch(e: any, options?: { persist?: boolean }) {
+        const persist = !!options?.persist;
+
         const docPath = e?.detail?.protyle?.path;
         if (docPath) {
             this.lastDocPath = docPath;
@@ -118,7 +162,6 @@ export class backgroundImg extends MinutiaeImageBase {
             // 优先检查文档 block attrs 中的自定义背景（custom-background-img 或 background-img）
             try {
                 const ial = e?.detail?.protyle?.background?.ial;
-                // console.log("#####",ial);
                 if (ial) {
                     let custom = ial['custom-background-img'] || null;
                     if (!custom && ial['background-img']) {
@@ -231,9 +274,35 @@ export class backgroundImg extends MinutiaeImageBase {
             console.warn('插入背景图控件失败', e);
         }
 
-            if (!appliedFromIal) {
-                await this.refreshBackground(docPath);
+        if (!appliedFromIal && this.currentMode === 'switch') {
+            await this.refreshBackground(docPath);
+
+            // If requested to persist (startup mode behavior), write the chosen background into the doc attrs
+            if (persist) {
+                try {
+                    const docID = e?.detail?.protyle?.background?.ial?.id;
+                    if (docID) {
+                        const curAttr = this.canvas?.style.backgroundImage || '';
+                        const m = curAttr.match(/url\((?:"|')?(.*?)(?:"|')?\)/);
+                        const chosen = m?.[1] || null;
+                        if (chosen) {
+                            try {
+                                await setBlockAttrs(docID, {
+                                    'custom-background-img': `${chosen}`,
+                                    'custom-st-bg-img': 'true'
+                                });
+                            } catch (err) {
+                                console.warn('写入文档属性失败', err);
+                            }
+                        }
+                    } else {
+                        console.warn('startup 模式下未能获取文档ID，无法持久化背景');
+                    }
+                } catch (err) {
+                    console.warn('startup 模式持久化背景失败', err);
+                }
             }
+        }
     }
 
     private insertProtyleIcon(contentElement: HTMLElement | null, label: string, icon: string, onClick?: (ev: Event) => void) {
