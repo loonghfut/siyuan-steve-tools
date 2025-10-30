@@ -50,6 +50,9 @@
         if (moduleInstances["M_lifelog"]) {
             moduleInstances["M_lifelog"].updateSettings(settings);
         }
+        if (moduleInstances["M_Minutiae"]) {
+            moduleInstances["M_Minutiae"].updateSettings(settings);
+        }
     }
 
     onMount(async () => {

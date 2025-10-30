@@ -89,4 +89,5 @@ export type ModuleClasses = {
     M_lifelog?: M_lifelog;
     M_Wps?: M_Wps;
     M_Aggregate?: M_Aggregate;
+    M_Minutiae?: M_Minutiae;
 };
