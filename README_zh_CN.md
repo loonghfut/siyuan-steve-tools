@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.20.1 (2025年10月31日)
+### v0.20.2 (2025年11月01日)
 - feat(minutiae): add background image functionality and settings (loonghfut)
 - feat(minutiae): 支持在更新设置时跳过背景刷新选项 (loonghfut)
 - feat(minutiae): 更新背景切换模式描述以支持持久化选项 (loonghfut)
@@ -53,6 +53,14 @@ win端s3同步后，docker端感知s3同步。
 - docs: 更新 v0.20.0 版本的更新日志 (loonghfut)
 - feat(minutiae): 禁止在设置更改时刷新背景以保持当前图像不变 (loonghfut)
 - feat(plugin): 更新版本号至0.20.1 (loonghfut)
+- docs: 更新 v0.20.1 版本的更新日志 (loonghfut)
+- 优化快捷键添加到日程 (loonghfut)
+- feat(calendar): 添加自动调整日历高度的功能 (loonghfut)
+- 整理部分文件 (loonghfut)
+- feat(calendar): 添加待安排事件面板及相关功能 (loonghfut)
+- style(calendar): 调整未安排事件面板的样式和布局 (loonghfut)
+- refactor(calendar): 重构待安排面板逻辑，封装为控制器并优化事件处理 (loonghfut)
+- chore(plugin): 更新版本号至0.20.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
