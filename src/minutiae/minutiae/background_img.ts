@@ -95,14 +95,8 @@ export class backgroundImg extends MinutiaeImageBase {
                 }
             } catch { }
         }
-        // refresh according to mode
-        if (this.currentMode === 'startup') {
-            // startup mode: keep current background unless we explicitly want to re-pick now
-            void this.refreshBackground();
-        } else {
-            // switch mode
-            void this.refreshBackground(this.lastDocPath);
-        }
+        // Do not refresh background on settings change to keep the current image unchanged.
+        // Only visual parameters (opacity/blur/brightness) are applied above.
     }
 
     protected override getUrlSettingKey(): string {
