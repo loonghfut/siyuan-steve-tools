@@ -212,11 +212,6 @@ export class M_calendar {
                 callback: async () => {
                     let rect = topBarElement.getBoundingClientRect();
                     this.addMenu(rect);
-                    // if (front == "browser-mobile" || front == "mobile") {
-                    //     await this.openRiChengViewDialog(true);
-                    // } else {
-                    //     await this.openRiChengView();
-                    // }
                 }
             });
         }
@@ -412,18 +407,44 @@ export class M_calendar {
             langText: "创建日程（光标所在块）",
             hotkey: "",
             editorCallback: async () => {
-                let cursorElementId = getCursorElement()?.closest('[data-type]')?.getAttribute('data-node-id');
-                let cursorElement = getCursorElement();
-                if (cursorElement?.closest('.li')) {
-                    cursorElementId = cursorElement.closest('.li').getAttribute('data-node-id');
-                    console.log("c", cursorElementId);
+                const cursorElement = getCursorElement();
+                console.log("🚧🚧🚧elemet:", cursorElement);
+
+                // 1) 优先在常规块元素上查找（含 data-type 的块容器）
+                let cursorElementId = cursorElement?.closest('[data-type][data-node-id]')?.getAttribute('data-node-id') ?? null;
+
+                // 2) 列表项特殊处理，最高优先获取 .li 的 data-node-id
+                if ( cursorElement?.closest('.li')) {
+                    cursorElementId = cursorElement.closest('.li')!.getAttribute('data-node-id');
+                    console.log("c🚧🚧🚧(li)", cursorElementId);
                 }
-                console.log("cursorElement", cursorElementId);
-                const blockId = cursorElementId
+
+                // 3) 兼容文档标题区域，例如：<div class="protyle-title ..." data-node-id="..."> ... </div>
+                if (!cursorElementId) {
+                    const titleEl = cursorElement?.closest('.protyle-title');
+                    if (titleEl) {
+                        cursorElementId = titleEl.getAttribute('data-node-id');
+                        console.log("c🚧🚧🚧(title)", cursorElementId);
+                    }
+                }
+
+                // 4) 兜底：向上寻找最近的含 data-node-id 的祖先
+                if (!cursorElementId) {
+                    const nodeEl = cursorElement?.closest('[data-node-id]');
+                    if (nodeEl) {
+                        cursorElementId = nodeEl.getAttribute('data-node-id');
+                        console.log("c🚧🚧🚧(any [data-node-id])", cursorElementId);
+                    }
+                }
+
+                console.log("cursorElementId", cursorElementId);
+                const blockId = cursorElementId;
+                console.log("🚧🚧🚧blockId", blockId);
                 if (!blockId) {
                     showMessage("请先选中一个块", 3000, "error");
                     return;
                 }
+                
                 // console.log("pro", blockId);
                 // console.log("创建日程（光标所在块）", blockId);
                 handleAddButtonClick_Independent('', { isdirect: true, directid: blockId });
