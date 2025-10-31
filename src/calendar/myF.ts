@@ -56,6 +56,111 @@ interface CalendarEventItem {
     timeZone?: string;
     extendedProps: CalendarEventExtendedProps;
 }
+export interface UnscheduledEvent {
+    blockId: string;
+    itemID: string;
+    rootid: string;
+    title: string;
+    status?: string;
+    priority?: string;
+    category?: string;
+    tags?: string[];
+    description?: string;
+    timeKeyID?: string;
+    allDayKeyID?: string;
+    statusKeyID?: string;
+    viewId?: string;
+    viewName?: string;
+}
+
+let currentUnscheduledEvents: UnscheduledEvent[] = [];
+
+export function setUnscheduledEvents(events: UnscheduledEvent[]): void {
+    currentUnscheduledEvents = events;
+}
+
+export function getUnscheduledEvents(): UnscheduledEvent[] {
+    return currentUnscheduledEvents;
+}
+
+export function findUnscheduledEvent(blockId: string, itemID?: string): UnscheduledEvent | undefined {
+    return currentUnscheduledEvents.find(event => {
+        const matchesBlock = event.blockId === blockId;
+        if (itemID) {
+            return matchesBlock && event.itemID === itemID;
+        }
+        return matchesBlock;
+    });
+}
+
+export function removeUnscheduledEvent(target: UnscheduledEvent | { blockId?: string; itemID?: string }): void {
+    if (!target) {
+        return;
+    }
+    const blockId = (target as any)?.blockId as string | undefined;
+    const itemID = (target as any)?.itemID as string | undefined;
+    currentUnscheduledEvents = currentUnscheduledEvents.filter(event => {
+        const blockMatch = blockId ? event.blockId === blockId : false;
+        const itemMatch = itemID ? event.itemID === itemID : false;
+        if (blockId && itemID) {
+            return !(blockMatch && itemMatch);
+        }
+        if (blockId) {
+            return !blockMatch;
+        }
+        if (itemID) {
+            return !itemMatch;
+        }
+        return true;
+    });
+}
+
+export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr: string, allDay: boolean): Promise<boolean> {
+    if (!event) {
+        sy.showMessage('未找到目标事件，无法安排', 3000, 'error');
+        return false;
+    }
+    if (!event.timeKeyID) {
+        sy.showMessage('未找到开始时间字段，无法安排事件', 3000, 'error');
+        return false;
+    }
+    if (!dateStr) {
+        sy.showMessage('未获取到有效的日期，无法安排事件', 3000, 'error');
+        return false;
+    }
+    const formattedDate = allDay && dateStr && !dateStr.includes('T')
+        ? `${dateStr}T00:00`
+        : dateStr;
+    try {
+        const updateTasks: Promise<any>[] = [];
+        updateTasks.push(api.updateAttrViewCell_pro(
+            event.blockId,
+            event.rootid,
+            event.timeKeyID,
+            event.itemID,
+            formattedDate,
+            'date'
+        ));
+        if (event.allDayKeyID) {
+            updateTasks.push(api.updateAttrViewCell_pro(
+                event.blockId,
+                event.rootid,
+                event.allDayKeyID,
+                event.itemID,
+                allDay,
+                'checkbox'
+            ));
+        }
+        await Promise.all(updateTasks);
+        removeUnscheduledEvent(event);
+        api.handleDidaListEvent(event.rootid, event.blockId, event.itemID);
+        return true;
+    } catch (error) {
+        console.error('安排事件时出错:', error);
+        sy.showMessage('安排事件失败，请稍后再试', 4000, 'error');
+        return false;
+    }
+}
 // ======================================================================
 
 // 统一：获取用于写入属性的目标 ID（优先 itemID，其次 blockId）
@@ -462,6 +567,7 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
 export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]): Promise<CalendarEventItem[]> {
     const events: CalendarEventItem[] = [];
     const addedEventIds = new Set<string>();
+    const unscheduledCollector: UnscheduledEvent[] = [];
     console.log("viewData:::", viewData);
     // 处理普通事件（界面展示与跳转使用块 id，数据库更新使用 itemID）
     for (const view of viewData) {
@@ -475,6 +581,27 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 
                 // 检查是否设置了开始时间
                 const hasStartTime = item['开始时间']?.start;
+                if (!hasStartTime) {
+                    if (eventBlockId) {
+                        unscheduledCollector.push({
+                            blockId: eventBlockId,
+                            itemID: eventItemId || eventBlockId,
+                            rootid: view.from.rootid,
+                            title: item['事件']?.content || '',
+                            status: item['状态']?.content || '',
+                            priority: item['优先级']?.content || '',
+                            category: item['分类']?.content || '',
+                            tags: Array.isArray(item['标签']?.content) ? item['标签'].content : [],
+                            description: item['描述']?.content || '',
+                            timeKeyID: item['开始时间']?.keyID,
+                            allDayKeyID: item['全天']?.keyID,
+                            statusKeyID: item['状态']?.keyID,
+                            viewId: view.from.viewId,
+                            viewName: view.from.name,
+                        });
+                    }
+                    continue;
+                }
                 const startDate = hasStartTime
                     ? new Date(parseInt(item['开始时间'].start))
                     : new Date(new Date().setHours(8, 0, 0, 0));
@@ -622,7 +749,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
             }
         }
     }
-
+    setUnscheduledEvents(unscheduledCollector);
     return events;
 }
 //查看事件

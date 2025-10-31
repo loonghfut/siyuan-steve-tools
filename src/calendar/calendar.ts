@@ -1,5 +1,6 @@
 import { Calendar } from '@fullcalendar/core';
-import interactionPlugin from '@fullcalendar/interaction';
+import interactionPlugin, { Draggable } from '@fullcalendar/interaction';
+import { createOrGetPlanButtonBadge, makeUnscheduledPanelDraggable, initializePanelPosition } from './function/unscheduled';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
@@ -84,6 +85,11 @@ export async function run(
     } catch (e) {
         console.warn('读取日历视图设置失败，使用默认值', e);
     }
+    const rightSegments = cright.split(',').map(segment => segment.trim()).filter(Boolean);
+    if (!rightSegments.includes('planButton')) {
+        rightSegments.push('planButton');
+    }
+    cright = rightSegments.join(',');
     // 如果有指定的S_viewID则使用，否则从配置中获取
     if (S_viewID) {
         filterViewId = [S_viewID];
@@ -107,6 +113,186 @@ export async function run(
         console.error('Calendar container not found');
         return;
     }
+
+    let unscheduledPanel: HTMLElement | null = null;
+    let unscheduledDraggable: Draggable | null = null;
+    let unscheduledPanelDragCleanup: (() => void) | null = null;
+
+    const appendUnscheduledCard = (container: HTMLElement, eventData: myF.UnscheduledEvent) => {
+        const card = document.createElement('div');
+        card.className = 'st-unscheduled-item';
+        card.dataset.blockId = eventData.blockId;
+        card.dataset.itemId = eventData.itemID || '';
+        card.dataset.rootId = eventData.rootid;
+        card.dataset.timeKey = eventData.timeKeyID || '';
+        card.dataset.allDayKey = eventData.allDayKeyID || '';
+        card.dataset.title = eventData.title || '';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'st-unscheduled-item__title';
+        titleEl.textContent = eventData.title || '未命名事件';
+        card.appendChild(titleEl);
+
+        const metaParts: string[] = [];
+        if (eventData.status) {
+            metaParts.push(eventData.status);
+        }
+        if (eventData.priority) {
+            metaParts.push(`优先级:${eventData.priority}`);
+        }
+        if (eventData.category) {
+            metaParts.push(eventData.category);
+        }
+        if (eventData.viewName) {
+            metaParts.push(eventData.viewName);
+        }
+        if (metaParts.length) {
+            const metaEl = document.createElement('div');
+            metaEl.className = 'st-unscheduled-item__meta';
+            metaEl.textContent = metaParts.join(' · ');
+            card.appendChild(metaEl);
+        }
+
+        if (eventData.tags && eventData.tags.length) {
+            const tagsEl = document.createElement('div');
+            tagsEl.className = 'st-unscheduled-item__tags';
+            eventData.tags.forEach(tag => {
+                const tagEl = document.createElement('span');
+                tagEl.textContent = tag;
+                tagsEl.appendChild(tagEl);
+            });
+            card.appendChild(tagsEl);
+        }
+
+        container.appendChild(card);
+    };
+
+    const destroyUnscheduledPanel = () => {
+        unscheduledDraggable?.destroy();
+        unscheduledDraggable = null;
+        unscheduledPanelDragCleanup?.();
+        unscheduledPanelDragCleanup = null;
+        if (unscheduledPanel) {
+            unscheduledPanel.remove();
+            unscheduledPanel = null;
+        }
+        calendarEl.classList.remove('st-calendar-with-panel', 'st-unscheduled-open');
+    };
+
+    const setupUnscheduledDraggable = (listEl: HTMLElement) => {
+        unscheduledDraggable?.destroy();
+        unscheduledDraggable = new Draggable(listEl, {
+            itemSelector: '.st-unscheduled-item',
+            eventData: (eventEl) => {
+                const element = eventEl as HTMLElement;
+                const { blockId, itemId, rootId, title } = element.dataset;
+                const displayTitle = title || element.querySelector('.st-unscheduled-item__title')?.textContent?.trim() || '未命名事件';
+                return {
+                    title: displayTitle,
+                    duration: { hours: 1 },
+                    extendedProps: {
+                        blockId,
+                        itemID: itemId,
+                        rootid: rootId,
+                        isUnscheduled: true
+                    }
+                };
+            }
+        });
+    };
+
+    const renderUnscheduledPanelContent = () => {
+        if (!unscheduledPanel) {
+            return;
+        }
+        const listEl = unscheduledPanel.querySelector('.st-unscheduled-list') as HTMLElement | null;
+        if (!listEl) {
+            return;
+        }
+        const pending = myF.getUnscheduledEvents();
+        if (!pending || pending.length === 0) {
+            destroyUnscheduledPanel();
+            return;
+        }
+        listEl.innerHTML = '';
+        pending.forEach(eventData => appendUnscheduledCard(listEl, eventData));
+        setupUnscheduledDraggable(listEl);
+    };
+
+    const ensureUnscheduledPanel = () => {
+        if (unscheduledPanel) {
+            renderUnscheduledPanelContent();
+            return;
+        }
+
+        const panel = document.createElement('div');
+        panel.className = 'st-unscheduled-panel';
+        panel.innerHTML = `
+            <div class="st-unscheduled-header">
+                <span>待安排事件</span>
+                <button class="st-unscheduled-close" aria-label="关闭">×</button>
+            </div>
+            <div class="st-unscheduled-wrapper">
+                <div class="st-unscheduled-tip">拖拽事件到日历以安排时间</div>
+                <div class="st-unscheduled-list"></div>
+            </div>
+        `;
+
+        calendarEl.classList.add('st-calendar-with-panel', 'st-unscheduled-open');
+        calendarEl.appendChild(panel);
+
+        initializePanelPosition(panel);
+
+        const closeBtn = panel.querySelector('.st-unscheduled-close');
+        closeBtn?.addEventListener('click', () => {
+            destroyUnscheduledPanel();
+        });
+
+        unscheduledPanel = panel;
+        unscheduledPanelDragCleanup = makeUnscheduledPanelDraggable(panel);
+        renderUnscheduledPanelContent();
+    };
+
+    const toggleUnscheduledPanel = () => {
+        const pending = myF.getUnscheduledEvents();
+        if (!pending || pending.length === 0) {
+            showMessage('当前没有待安排的事件', 3000, 'info');
+            destroyUnscheduledPanel();
+            return;
+        }
+        if (unscheduledPanel) {
+            destroyUnscheduledPanel();
+        } else {
+            ensureUnscheduledPanel();
+        }
+    };
+
+    // badge helper moved to function/unscheduled.ts
+
+    // Panel helpers moved to src/calendar/function/unscheduled.ts
+
+    const updatePlanButtonLabel = () => {
+        const button = calendarEl.querySelector<HTMLButtonElement>('.fc-planButton-button');
+        if (!button) {
+        // badge element managed by helper module
+            return;
+        }
+        button.textContent = '安排';
+        const count = myF.getUnscheduledEvents().length;
+        button.classList.toggle('st-plan-button--has-items', count > 0);
+    const badge = createOrGetPlanButtonBadge(button);
+        if (badge) {
+            badge.textContent = String(count);
+            badge.hidden = count === 0;
+        }
+        if (unscheduledPanel) {
+            if (count === 0) {
+                destroyUnscheduledPanel();
+            } else {
+                renderUnscheduledPanelContent();
+            }
+        }
+    };
 
     // 添加鼠标滚轮事件监听器
     calendarEl.addEventListener('wheel', (e) => {
@@ -166,6 +352,44 @@ export async function run(
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
+        },
+        droppable: true,
+        drop: async (info) => {
+            const draggedEl = info.draggedEl as HTMLElement | null;
+            if (!draggedEl) {
+                return;
+            }
+            const { blockId, itemId } = draggedEl.dataset;
+            if (!blockId) {
+                return;
+            }
+            try {
+                const targetEvent = myF.findUnscheduledEvent(blockId, itemId);
+                if (!targetEvent) {
+                    showMessage('未找到对应事件，请刷新后重试', 4000, 'error');
+                    return;
+                }
+                const scheduled = await myF.scheduleUnscheduledEvent(targetEvent, info.dateStr, info.allDay);
+                if (!scheduled) {
+                    return;
+                }
+                showMessage('已安排事件', 2000, 'info');
+                if (draggedEl.isConnected) {
+                    draggedEl.remove();
+                }
+                updatePlanButtonLabel();
+                refreshKanban();
+                setTimeout(() => calendar.refetchEvents(), 200);
+                moduleInstances['M_calendar']?.scheduleCalendarUpdate?.(1500);
+            } catch (error) {
+                console.error('安排事件失败:', error);
+                showMessage('安排事件失败，请稍后再试', 4000, 'error');
+            }
+        },
+        eventReceive: function (info) {
+            if (info.event.extendedProps?.isUnscheduled) {
+                info.event.remove();
+            }
         },
 
         // selectable: true,
@@ -499,6 +723,12 @@ export async function run(
                     );
                 },
             },
+            planButton: {
+                text: '安排',
+                click: () => {
+                    toggleUnscheduledPanel();
+                }
+            },
             // 刷新
             refreshButton: {
                 text: '🔄️',
@@ -683,6 +913,7 @@ export async function run(
                 allEvents = allEvents.concat(events);
                 // 5. 回调成功
                 successCallback(allEvents);
+                updatePlanButtonLabel();
             } catch (error) {
                 showMessage('请重新打开日历视图', -1, 'error');
                 console.error('Error fetching calendar events:', error);
@@ -911,6 +1142,7 @@ export async function run(
     console.log("thisCalendars", thisCalendars);
     OUTcalendar = calendar;
     calendar.render();
+    updatePlanButtonLabel();
     setupCalendarAutoHeight(calendarEl, calendar);
     return calendar;
 }
