@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.20.0 (2025年10月31日)
+### v0.20.1 (2025年10月31日)
 - feat(minutiae): add background image functionality and settings (loonghfut)
 - feat(minutiae): 支持在更新设置时跳过背景刷新选项 (loonghfut)
 - feat(minutiae): 更新背景切换模式描述以支持持久化选项 (loonghfut)
@@ -50,6 +50,9 @@ win端s3同步后，docker端感知s3同步。
 - feat(minutiae): 添加背景切换防抖阈值设置以优化图片请求频率 (loonghfut)
 - feat(minutiae): 在启动模式下刷新背景以优化加载体验 (loonghfut)
 - feat(plugin): 更新版本号至0.20.0 (loonghfut)
+- docs: 更新 v0.20.0 版本的更新日志 (loonghfut)
+- feat(minutiae): 禁止在设置更改时刷新背景以保持当前图像不变 (loonghfut)
+- feat(plugin): 更新版本号至0.20.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
