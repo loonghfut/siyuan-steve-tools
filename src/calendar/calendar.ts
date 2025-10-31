@@ -97,7 +97,7 @@ export async function run(
         const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
         filterViewId = configViewIds.length > 0 ? configViewIds : (viewId ? viewId.split(',') : []);
     }
-    
+
     let calendarEl: HTMLElement;
     if (id === "1") {
         // 创建悬浮容器
@@ -274,13 +274,13 @@ export async function run(
     const updatePlanButtonLabel = () => {
         const button = calendarEl.querySelector<HTMLButtonElement>('.fc-planButton-button');
         if (!button) {
-        // badge element managed by helper module
+            // badge element managed by helper module
             return;
         }
-        button.textContent = '安排';
+        // button.textContent = '安排';
         const count = myF.getUnscheduledEvents().length;
         button.classList.toggle('st-plan-button--has-items', count > 0);
-    const badge = createOrGetPlanButtonBadge(button);
+        const badge = createOrGetPlanButtonBadge(button);
         if (badge) {
             badge.textContent = String(count);
             badge.hidden = count === 0;
@@ -296,6 +296,11 @@ export async function run(
 
     // 添加鼠标滚轮事件监听器
     calendarEl.addEventListener('wheel', (e) => {
+        const target = e.target as HTMLElement | null;
+        // 如果事件发生在“待安排事件”面板上，则不触发日历缩放，允许面板内部滚动
+        if (target && target.closest('.st-unscheduled-panel')) {
+            return;
+        }
         // 判断是否按住 Ctrl 键
         if (!e.ctrlKey) {
             return;
@@ -449,7 +454,7 @@ export async function run(
                 }
             }
         },
-    select: function (_info) {//TODO: 选择处理
+        select: function (_info) {//TODO: 选择处理
             // console.log('select', info);
         },
         // 日期点击处理
@@ -590,7 +595,7 @@ export async function run(
 
         },
 
-    eventResizeStart: function (_info) {
+        eventResizeStart: function (_info) {
             // 创建半透明的时间指示器跟随鼠标
             const timeGhost = document.createElement('div');
             timeGhost.id = 'fc-time-ghost';
@@ -759,14 +764,14 @@ export async function run(
                 click: async function () {
                     try {
                         // 动态导入统计模块，避免影响主要加载性能
-                        
+
                         const events = calendar.getEvents();
-                        
+
                         if (!events || events.length === 0) {
                             showMessage('当前没有可统计的事件数据', 3000, 'info');
                             return;
                         }
-                        
+
                         await calendarStatsManager.showStatsDialog(events);
                     } catch (error) {
                         console.error('加载统计模块失败:', error);
@@ -779,7 +784,7 @@ export async function run(
         headerToolbar: {
             left: cleft,
             center: ccenter,
-            right: cright 
+            right: cright
         },
 
         // 从思源数据转换事件
@@ -991,7 +996,7 @@ export async function run(
                 colorConfig = lifelogColors[type] || lifelogColors['固定'];
             } else {
                 // 2) 如果启用了“按标签上色”并且事件包含标签，则优先使用标签颜色
-                const enableTagColor = settingdata["cal-color-by-tag"]; 
+                const enableTagColor = settingdata["cal-color-by-tag"];
                 const tags: string[] = Array.isArray(info.event.extendedProps.tags) ? info.event.extendedProps.tags : [];
                 let tagColorBg: string | null = null;
 

@@ -167,8 +167,8 @@ $priority-color-high-background: var(--b3-card-error-background);
     position: absolute;
     top: 3.2rem;
     right: 1rem;
-    width: 280px;
-    max-height: calc(100% - 4rem);
+    width: 260px;
+    max-height: min(calc(100vh - 4rem), 520px);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--b3-border-color);
@@ -183,7 +183,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 10px 14px;
     border-bottom: 1px solid var(--b3-border-color);
     font-weight: 600;
     color: var(--b3-theme-on-background);
@@ -195,7 +195,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     border: none;
     background: transparent;
     color: var(--b3-theme-on-background);
-    font-size: 18px;
+    font-size: 16px;
     cursor: pointer;
     line-height: 1;
     padding: 0 4px;
@@ -208,30 +208,38 @@ $priority-color-high-background: var(--b3-card-error-background);
 .st-unscheduled-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    height: 100%;
-    padding: 16px;
+    gap: 8px;
+    /* 占据剩余空间，并允许内部滚动区域正确计算高度 */
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 12px;
     box-sizing: border-box;
     background-color: var(--b3-theme-background);
 }
 
 .st-unscheduled-tip {
-    font-size: 0.85em;
+    font-size: 0.8em;
     color: var(--b3-theme-on-surface-light);
 }
 
 .st-unscheduled-list {
     flex: 1;
+    min-height: 0; /* 允许在 flex 布局中收缩以触发滚动 */
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    padding-right: 4px;
+    /* 提升触控与触摸板滚动体验 */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
 }
 
 .st-unscheduled-item {
     border: 1px solid var(--b3-border-color);
     border-radius: 8px;
-    padding: 12px;
+    padding: 10px;
     background-color: var(--b3-theme-surface);
     cursor: grab;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -244,14 +252,14 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .st-unscheduled-item__title {
     font-weight: 600;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     color: var(--b3-theme-on-background);
 }
 
 .st-unscheduled-item__meta {
-    font-size: 0.85em;
+    font-size: 0.8em;
     color: var(--b3-theme-on-surface-light);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .st-unscheduled-item__tags {
