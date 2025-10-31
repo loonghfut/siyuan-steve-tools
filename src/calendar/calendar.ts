@@ -41,6 +41,9 @@ export let viewId = "";
 // let ishandrefetchEvents = true;
 //用于保存原始的时间槽间隔
 let lastSavedLifelogSlotDuration: string;
+const calendarResizeHandlers = new WeakMap<HTMLElement, () => void>();
+const calendarResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
+const MIN_CALENDAR_HEIGHT = 320; // Avoid collapsing the calendar when layout space is tight.
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
 }
@@ -908,11 +911,105 @@ export async function run(
     console.log("thisCalendars", thisCalendars);
     OUTcalendar = calendar;
     calendar.render();
+    setupCalendarAutoHeight(calendarEl, calendar);
     return calendar;
 }
 
 
 
+
+// Keep the calendar height aligned with the remaining viewport real estate.
+function setupCalendarAutoHeight(calendarEl: HTMLElement, calendar: Calendar) {
+    if (typeof window === 'undefined' || !calendarEl) {
+        return;
+    }
+
+    const updateHeight = () => {
+        if (!calendarEl.isConnected) {
+            return;
+        }
+        const newHeight = computeCalendarHeight(calendarEl);
+        if (!Number.isFinite(newHeight) || newHeight <= 0) {
+            return;
+        }
+        const nextHeightValue = `${newHeight}px`;
+        if (calendarEl.style.height !== nextHeightValue) {
+            calendarEl.style.height = nextHeightValue;
+        }
+        const currentHeight = calendar.getOption('height');
+        if (typeof currentHeight !== 'number' || Math.abs(currentHeight - newHeight) > 1) {
+            calendar.setOption('height', newHeight);
+        }
+        calendar.updateSize();
+    };
+
+    const rafUpdate = () => window.requestAnimationFrame(updateHeight);
+
+    const previousHandler = calendarResizeHandlers.get(calendarEl);
+    if (previousHandler) {
+        window.removeEventListener('resize', previousHandler);
+    }
+
+    window.addEventListener('resize', rafUpdate);
+    calendarResizeHandlers.set(calendarEl, rafUpdate);
+
+    if (typeof ResizeObserver !== 'undefined') {
+        const previousObserver = calendarResizeObservers.get(calendarEl);
+        previousObserver?.disconnect();
+
+        const observer = new ResizeObserver(() => rafUpdate());
+        if (document.body) {
+            observer.observe(document.body);
+        }
+        if (calendarEl.parentElement) {
+            observer.observe(calendarEl.parentElement);
+        }
+        calendarResizeObservers.set(calendarEl, observer);
+    }
+
+    let cleaned = false;
+    const cleanup = () => {
+        if (cleaned) {
+            return;
+        }
+        cleaned = true;
+        window.removeEventListener('resize', rafUpdate);
+        const observer = calendarResizeObservers.get(calendarEl);
+        observer?.disconnect();
+        calendarResizeObservers.delete(calendarEl);
+        calendarResizeHandlers.delete(calendarEl);
+    };
+
+    const originalDestroy = calendar.destroy.bind(calendar);
+    calendar.destroy = () => {
+        cleanup();
+        originalDestroy();
+    };
+
+    calendar.on?.('datesSet', rafUpdate);
+
+    rafUpdate();
+}
+
+function computeCalendarHeight(calendarEl: HTMLElement): number {
+    if (typeof window === 'undefined') {
+        return MIN_CALENDAR_HEIGHT;
+    }
+
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    if (!viewportHeight) {
+        return MIN_CALENDAR_HEIGHT;
+    }
+
+    const rect = calendarEl.getBoundingClientRect();
+    const topOffset = Math.max(rect.top, 0);
+    const style = window.getComputedStyle(calendarEl);
+    const marginBottom = parseFloat(style.marginBottom || '0');
+    const paddingBottom = parseFloat(style.paddingBottom || '0');
+    const availableHeight = viewportHeight - topOffset - marginBottom - paddingBottom - 8;
+
+    return Math.max(Math.round(availableHeight), MIN_CALENDAR_HEIGHT);
+}
 
 function displayStatusDropZone(calendarEl: HTMLElement, info) {
     let statusDropZone = document.getElementById('status-drop-zone');
