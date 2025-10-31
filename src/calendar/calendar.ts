@@ -16,7 +16,7 @@ import { moduleInstances } from '@/index';
 import solarLunar from 'solarlunar';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
-import { createFloatingCalendar } from './createFloatingCalendar';
+import { createFloatingCalendar } from './function/createFloatingCalendar';
 import { updateAttrViewCell_pro } from '@/api/api';
 
 //审查ok
