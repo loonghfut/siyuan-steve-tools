@@ -31,7 +31,9 @@ export class backgroundImg extends MinutiaeImageBase {
         this.applyVisualSettings();
         // determine mode from settings
         this.currentMode = String(this.settingdata["minutiae-bg-mode"] || 'switch');
-        // await this.refreshBackground();
+        if (this.currentMode === 'startup') {
+            await this.refreshBackground();
+        }
         this.plugin.eventBus.on("switch-protyle", this.switchHandler);
         window.addEventListener("resize", this.resizeHandler, { passive: true });
         this.active = true;
