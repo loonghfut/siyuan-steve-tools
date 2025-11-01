@@ -63,7 +63,7 @@ export async function run(
     initialView = 'dayGridMonth',
     S_viewID = "",
     cleft = 'prev,next today viewFilter,statsButton,refreshButton',
-    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant',
+    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant,planButton',
     ccenter = 'title',
     elementca?: any,
 ) {
@@ -86,9 +86,9 @@ export async function run(
         console.warn('读取日历视图设置失败，使用默认值', e);
     }
     const rightSegments = cright.split(',').map(segment => segment.trim()).filter(Boolean);
-    if (!rightSegments.includes('planButton')) {
-        rightSegments.push('planButton');
-    }
+    // if (!rightSegments.includes('planButton')) {
+    //     rightSegments.push('planButton');
+    // }
     cright = rightSegments.join(',');
     // 如果有指定的S_viewID则使用，否则从配置中获取
     if (S_viewID) {

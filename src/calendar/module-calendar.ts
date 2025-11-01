@@ -221,7 +221,7 @@ export class M_calendar {
                 position: "RightTop",
                 size: { width: 250, height: 0 },
                 icon: "iconSTcalKanban",
-                title: "侧边看板",
+                title: "当月看板",
             },
             data: null,
             type: "cal-dock-kanban",
@@ -234,7 +234,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar = await run(id, 'kanban', '', 'title', 'viewFilter,refreshButton', '');
+                    D_calendar = await run(id, 'kanban', '', 'title', 'viewFilter,refreshButton', 'prev,next');
                     refreshKanban();
                 }, 100);
             },
