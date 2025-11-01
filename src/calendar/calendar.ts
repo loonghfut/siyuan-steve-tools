@@ -749,6 +749,65 @@ export async function run(
                 const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
                 // console.log('Fetched calendar events:', events);
                 allEvents = allEvents.concat(events);
+
+                // --- 动态调整 slotMinTime 的逻辑 ---
+                try {
+                    // 仅在 timeGrid 类型的视图中应用
+                    const currentViewType = (calendar && calendar.view && calendar.view.type) ? calendar.view.type : '';
+                    if (currentViewType && currentViewType.indexOf('timeGrid') !== -1) {
+                        // 获取用户配置的下限（作为默认下限）
+                        const userConfiguredMin = validateTimeFormat(settingdata['cal-slot-min-time'], '00:00:00');
+
+                        const toMinutes = (t: string) => {
+                            const parts = String(t).split(':').map(Number);
+                            return (parts[0] || 0) * 60 + (parts[1] || 0);
+                        };
+
+                        const currentSlotMin = calendar.getOption('slotMinTime') || userConfiguredMin;
+                        const currentSlotMinMinutes = toMinutes(String(currentSlotMin));
+
+                        // 统计当前视图范围内（info.start ~ info.end）事件的最早开始时间（分钟）
+                        let earliestMinutes = Infinity;
+                        const viewStart = info.start instanceof Date ? info.start.getTime() : new Date(info.start).getTime();
+                        const viewEnd = info.end instanceof Date ? info.end.getTime() : new Date(info.end).getTime();
+
+                        for (const ev of allEvents) {
+                            try {
+                                if (!ev || ev.allDay) continue;
+                                const s = ev.start ? new Date(ev.start).getTime() : null;
+                                if (!s) continue;
+                                if (s < viewStart || s >= viewEnd) continue; // 不在当前视图范围内
+                                const d = new Date(ev.start);
+                                const mins = d.getHours() * 60 + d.getMinutes();
+                                if (mins < earliestMinutes) earliestMinutes = mins;
+                            } catch (e) { /* 忽略单条事件解析错误 */ }
+                        }
+
+                        if (Number.isFinite(earliestMinutes) && earliestMinutes < currentSlotMinMinutes) {
+                            // 按 30 分钟取整向下扩展显示范围，避免过于精细
+                            const newMinRounded = Math.max(0, Math.floor(earliestMinutes / 30) * 30);
+                            const hh = String(Math.floor(newMinRounded / 60)).padStart(2, '0');
+                            const mm = String(newMinRounded % 60).padStart(2, '0');
+                            const newSlotMin = `${hh}:${mm}:00`;
+                            // 不要无限制覆盖用户配置 — 记录为临时调整
+                            calendar.setOption('slotMinTime', newSlotMin);
+                            // 可选：将滚动位置设为新的最早时间，便于用户看到早期事件
+                            try {
+                                const scrollTime = `${hh}:${mm}:00`;
+                                calendar.setOption('scrollTime', scrollTime);
+                            } catch (e) { /* 非致命 */ }
+                        } else {
+                            // 若没有需要扩展的事件，确保 slotMinTime 保持为用户配置（避免被之前调整永久覆盖）
+                            if (currentSlotMin !== userConfiguredMin) {
+                                // 仅在当前 calendar 实际选项被改动并且与用户设置不一致时复原
+                                calendar.setOption('slotMinTime', userConfiguredMin);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('动态调整 slotMinTime 失败:', e);
+                }
+
                 // 5. 回调成功
                 successCallback(allEvents);
                 updatePlanButtonLabel();
