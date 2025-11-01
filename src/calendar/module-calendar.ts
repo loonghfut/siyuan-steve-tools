@@ -259,7 +259,7 @@ export class M_calendar {
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
                 setTimeout(async () => {
-                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'viewFilter,refreshButton', '');
+                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'viewFilter,refreshButton,planButton', '');
                 }, 100);
             },
         });
