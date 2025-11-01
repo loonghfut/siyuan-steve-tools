@@ -661,7 +661,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                 // - 若有结束时间，则以结束时间判断是否过期；否则以开始时间判断
                 try {
                     const statusVal = (item['状态']?.content || '').trim();
-                    const isDone = statusVal === '完成';
+                    // 将“完成”与“归档”都视作已完成，避免把归档项计入待安排
+                    const isDone = statusVal === '完成' || statusVal === '归档';
                     if (!isDone && hasStartTime) {
                         const now = Date.now();
                         const endOrStart = (endDate ? endDate.getTime() : startDate.getTime());
