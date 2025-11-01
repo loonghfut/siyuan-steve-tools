@@ -323,7 +323,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
     margin: 0 auto;
     height: calc(88vh);
-    border: none;
+    border: none !important;
 }
 
 .fc .fc-multimonth-singlecol .fc-multimonth-daygrid-table,
