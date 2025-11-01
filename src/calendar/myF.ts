@@ -71,6 +71,7 @@ export interface UnscheduledEvent {
     statusKeyID?: string;
     viewId?: string;
     viewName?: string;
+    overdue?: boolean; // 新增：是否为“过期未完成”
 }
 
 let currentUnscheduledEvents: UnscheduledEvent[] = [];
@@ -598,6 +599,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                             statusKeyID: item['状态']?.keyID,
                             viewId: view.from.viewId,
                             viewName: view.from.name,
+                            overdue: false,
                         });
                     }
                     continue;
@@ -652,6 +654,42 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                         Kend: endDate,
                     }
                 });
+
+                // 新增：将“已过期且未完成”的事件也加入待安排列表
+                // 判定逻辑：
+                // - 状态不是“完成”
+                // - 若有结束时间，则以结束时间判断是否过期；否则以开始时间判断
+                try {
+                    const statusVal = (item['状态']?.content || '').trim();
+                    const isDone = statusVal === '完成';
+                    if (!isDone && hasStartTime) {
+                        const now = Date.now();
+                        const endOrStart = (endDate ? endDate.getTime() : startDate.getTime());
+                        const isOverdue = endOrStart < now;
+                        if (isOverdue) {
+                            unscheduledCollector.push({
+                                blockId: eventBlockId,
+                                itemID: eventItemId || eventBlockId,
+                                rootid: view.from.rootid,
+                                title: item['事件']?.content || '',
+                                status: statusVal,
+                                priority: item['优先级']?.content || '',
+                                category: item['分类']?.content || '',
+                                tags: Array.isArray(item['标签']?.content) ? item['标签'].content : [],
+                                description: item['描述']?.content || '',
+                                timeKeyID: item['开始时间']?.keyID,
+                                allDayKeyID: item['全天']?.keyID,
+                                statusKeyID: item['状态']?.keyID,
+                                viewId: view.from.viewId,
+                                viewName: view.from.name,
+                                overdue: true,
+                            });
+                        }
+                    }
+                } catch (e) {
+                    // 安全兜底，不影响主流程
+                    console.warn('判定过期未完成事件时出错', e);
+                }
             }
         }
     }

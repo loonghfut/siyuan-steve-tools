@@ -157,6 +157,7 @@ export type UnscheduledEventLite = {
     tags?: string[];
     timeKeyID?: string;
     allDayKeyID?: string;
+    overdue?: boolean; // 新增：是否为“过期未完成”
 };
 
 type GetPending = () => UnscheduledEventLite[];
@@ -178,13 +179,25 @@ export function createUnscheduledPanelController(
         (card as any).dataset.timeKey = ev.timeKeyID || '';
         (card as any).dataset.allDayKey = ev.allDayKeyID || '';
         (card as any).dataset.title = ev.title || '';
+        if (ev.overdue) {
+            (card as any).dataset.overdue = '1';
+            card.classList.add('st-unscheduled-item--overdue');
+        }
 
         const titleEl = document.createElement('div');
         titleEl.className = 'st-unscheduled-item__title';
         titleEl.textContent = ev.title || '未命名事件';
+        if (ev.overdue) {
+            const badge = document.createElement('span');
+            badge.className = 'st-unscheduled-item__badge st-unscheduled-item__badge--overdue';
+            badge.textContent = '过期';
+            // 提供最小化的内联样式保证可见性
+            badge.style.cssText = 'margin-left:6px; padding:0 6px; border-radius:10px; font-size:12px; line-height:18px; height:18px; display:inline-flex; align-items:center; color:#fff; background:#e53935;';
+            titleEl.appendChild(badge);
+        }
         card.appendChild(titleEl);
 
-        const metaParts: string[] = [];
+    const metaParts: string[] = [];
         if (ev.status) metaParts.push(ev.status);
         if (ev.priority) metaParts.push(`优先级:${ev.priority}`);
         if (ev.category) metaParts.push(ev.category);
