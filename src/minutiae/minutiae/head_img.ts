@@ -30,6 +30,7 @@ export class headImg extends MinutiaeImageBase {
     private async handleSwitchProtyle(e: any) {
         const docID = e?.detail?.protyle?.background?.ial?.id;
         const docPath = e?.detail?.protyle?.path;
+        const notebookInfo = this.resolveNotebookInfo(e);
         if (!docID) return;
 
         try {
@@ -131,6 +132,11 @@ export class headImg extends MinutiaeImageBase {
             return;
         }
 
+        if (this.isNotebookBlacklisted(notebookInfo, docPath)) {
+            console.log('Minutiae head image auto-set skipped due to notebook blacklist', notebookInfo);
+            return;
+        }
+
         const picUrl = await this.get_pic_url(docPath);
         if (!picUrl) {
             console.warn("Minutiae 模块没有设置图片地址");
@@ -140,6 +146,131 @@ export class headImg extends MinutiaeImageBase {
             'title-img': `background-image:url("${picUrl}");`,
             'custom-st-head-img': 'true'
         });
+    }
+
+    private getNotebookBlacklist(): Set<string> {
+        const result = new Set<string>();
+        const raw = this.settingdata?.["minutiae-headimg-notebook-blacklist"];
+        const push = (value: unknown) => {
+            if (typeof value !== 'string') return;
+            let entry = value.trim();
+            if (!entry) return;
+            if (entry.startsWith('#') || entry.startsWith('//')) return;
+            entry = entry.replace(/[\r\n]+/g, ' ').trim();
+            if (!entry) return;
+            const lowered = entry.toLowerCase();
+            if (lowered === 'true' || lowered === 'false') return;
+            result.add(entry.toLowerCase());
+        };
+
+        if (!raw) {
+            return result;
+        }
+
+        if (Array.isArray(raw)) {
+            raw.forEach(item => push(typeof item === 'string' ? item : String(item ?? '')));
+            return result;
+        }
+
+        if (typeof raw === 'object') {
+            for (const [key, val] of Object.entries(raw)) {
+                if (val === false || val === null) continue;
+                push(key);
+                if (typeof val === 'string') push(val);
+            }
+            return result;
+        }
+
+        if (typeof raw === 'string') {
+            const text = raw.trim();
+            if (!text) return result;
+            try {
+                const parsed = JSON.parse(text);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(item => push(typeof item === 'string' ? item : String(item ?? '')));
+                    return result;
+                }
+            } catch {
+                // not JSON, fall through to manual parsing
+            }
+            text
+                .split(/[\n,;]+/)
+                .map(segment => segment.trim())
+                .forEach(segment => push(segment));
+            return result;
+        }
+
+        push(String(raw));
+        return result;
+    }
+
+    private resolveNotebookInfo(event: any): { id?: string; name?: string } {
+        try {
+            const detail = event?.detail ?? {};
+            const protyle = detail?.protyle ?? {};
+            const notebook = detail?.notebook ?? protyle?.notebook ?? {};
+            const idCandidates: Array<string | null | undefined> = [
+                notebook?.id,
+                detail?.notebookId,
+                protyle?.notebookId,
+                protyle?.notebookID,
+                protyle?.model?.notebookId,
+                protyle?.block?.box,
+                protyle?.block?.notebookId,
+                detail?.block?.box,
+                detail?.doc?.box,
+            ];
+            const nameCandidates: Array<string | null | undefined> = [
+                notebook?.name,
+                detail?.notebookName,
+                protyle?.notebookName,
+                protyle?.model?.notebookName,
+            ];
+            const id = idCandidates.find(v => typeof v === 'string' && v.trim())?.trim();
+            let name = nameCandidates.find(v => typeof v === 'string' && v.trim())?.trim();
+
+            if ((!name || name === id) && id && typeof window !== 'undefined') {
+                try {
+                    const notebooks = (window as any)?.siyuan?.notebooks;
+                    if (Array.isArray(notebooks)) {
+                        const matched = notebooks.find((nb: any) => nb && typeof nb.id === 'string' && nb.id === id);
+                        if (matched && matched.name) {
+                            name = String(matched.name).trim() || name;
+                        }
+                    }
+                } catch {
+                    // ignore lookup errors
+                }
+            }
+
+            return {
+                id: id || undefined,
+                name: name || undefined,
+            };
+        } catch {
+            return {};
+        }
+    }
+
+    private isNotebookBlacklisted(info: { id?: string; name?: string }, docPath?: string | null | undefined): boolean {
+        const blacklist = this.getNotebookBlacklist();
+        if (!blacklist.size) return false;
+        const entries = Array.from(blacklist.values());
+        const matches = (candidate?: string | null) => {
+            const value = candidate?.trim().toLowerCase();
+            if (!value) return false;
+            return entries.some(entry => entry === value);
+        };
+
+        if (matches(info?.id)) return true;
+        if (matches(info?.name)) return true;
+
+        if (docPath) {
+            const firstSegment = docPath.split('/')[0]?.trim();
+            if (matches(firstSegment)) return true;
+        }
+
+        return false;
     }
 
     protected override getUrlSettingKey(): string {
