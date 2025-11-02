@@ -530,7 +530,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 return {};
             }
         });
-        console.log("extractDataFromTable🛠️🛠️ result:::", result);
+        // console.log("extractDataFromTable🛠️🛠️ result:::", result);
         return result;
     } catch (error) {
         console.error('Error in extractDataFromTable:', error);
@@ -569,7 +569,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
     const events: CalendarEventItem[] = [];
     const addedEventIds = new Set<string>();
     const unscheduledCollector: UnscheduledEvent[] = [];
-    console.log("viewData:::", viewData);
+    // console.log("viewData:::", viewData);
     // 处理普通事件（界面展示与跳转使用块 id，数据库更新使用 itemID）
     for (const view of viewData) {
         for (const item of view.data) {
@@ -988,6 +988,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         // 2025/7/5新增默认添加优先级
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select"));
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select"));
+        // 设置自定义属性
+        api.setBlockAttrs(direct.directid, { 'custom-st-event': statusMap[status] });
+
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, itemID, ismain, "checkbox"));
         // 默认设置为非全天事件
         if (allDayKeyID) {
@@ -1185,6 +1188,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
             if (status && statusKeyID && selectdata) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, itemID, selectdata, "select"));
+                // 设置自定义属性
+                api.setBlockAttrs(id, { 'custom-st-event': statusMap[status] });
             }
             if (checkboxKeyID) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, itemID, ismain, "checkbox"));
