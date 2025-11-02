@@ -7,6 +7,8 @@ import { PluginConfig } from "@/savedata";
 import { aggregatorBlock } from "./aggregator_block";
 import { ContentAggregatorTabUI } from "./ui/content-aggregator-tab";
 
+const APPLY_VISUAL_SQL_PRESET_EVENT = 'siyuan-steve-tools:apply-visual-sql-preset';
+
 // Aggregate 模块
 export class M_Aggregate {
     private plugin: steveTools;
@@ -129,8 +131,44 @@ export class M_Aggregate {
                             // console.log("[Tab] 生成的 SQL:", _sql);
                         },
                     });
+                    const applyPresetIfExists = async (presetName?: string) => {
+                        const name = (presetName || '').trim();
+                        if (!name) return;
+                        try {
+                            await conf.load();
+                            const presets = conf.get('presets') || {};
+                            const snapshot = presets[name];
+                            if (!snapshot) {
+                                console.warn('[visual-sql] preset not found:', name);
+                                return;
+                            }
+                            const cloned = JSON.parse(JSON.stringify(snapshot));
+                            cloned.currentPresetName = name;
+                            (ui as any).hydrateState?.(cloned, { applyCollapse: true });
+                            (ui as any).rebuildSql?.();
+                            requestAnimationFrame(() => ui?.resize());
+                        } catch (err) {
+                            console.error('[visual-sql] failed to apply preset', err);
+                        }
+                    };
+
                     this.data.id = id;
                     aggregate._tabInstances.set(id, ui);
+
+                    try {
+                        const initData = (this as any).data || {};
+                        if (initData && initData.presetName) {
+                            applyPresetIfExists(initData.presetName);
+                        }
+                    } catch {}
+
+                    const presetListener = (event: Event) => {
+                        const detail = (event as CustomEvent).detail || {};
+                        if (!detail?.presetName) return;
+                        applyPresetIfExists(detail.presetName);
+                    };
+                    window.addEventListener(APPLY_VISUAL_SQL_PRESET_EVENT, presetListener as EventListener);
+                    (this as any)._applyPresetListener = presetListener;
                     // 顶部 Tabbar 按钮已移除，统一在 actions 区提供“转到 ECharts”
                     // 初次渲染后按当前视口计算布局
                     requestAnimationFrame(() => ui?.resize());
@@ -142,6 +180,11 @@ export class M_Aggregate {
                     if (ui) {
                         (ui as any).destroy?.();
                         aggregate._tabInstances.delete(id);
+                    }
+                    const listener = (this as any)._applyPresetListener as EventListener | undefined;
+                    if (listener) {
+                        window.removeEventListener(APPLY_VISUAL_SQL_PRESET_EVENT, listener);
+                        delete (this as any)._applyPresetListener;
                     }
                 },
                 resize() {
@@ -160,8 +203,11 @@ export class M_Aggregate {
                     const container = document.getElementById(`visual-echarts-tab-${id}`)! as HTMLElement;
                     const conf = new PluginConfig(aggregate.plugin.name, 'aggregate-sql');
                     await conf.load();
+                    // 支持从 openTab 传入初始 SQL（例如从内容聚合器跳转而来）
+                    const initData = (this as any).data || {};
                     new VisualEchartsUI(container, {
                         persistKey: `visual-echarts-tab`,
+                        initialSQL: initData.initialSQL,
                         loadSqlPresets: () => (conf.get('presets') || {}),
                         saveSqlPresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                         loadEchartsPresets: () => (conf.get('echartsPresets') || {}),
@@ -341,7 +387,8 @@ export class M_Aggregate {
                 }
             }
         ];
-
+        // 触发一次读取以避免未使用警告（_aggregatorBlockInstance 由内容聚合器页签使用）
+        void this._aggregatorBlockInstance;
     }
 
 

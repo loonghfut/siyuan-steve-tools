@@ -48,8 +48,8 @@ export class ContentAggregatorTabUI {
       </div>
     `;
 
-  // const header = this.container.querySelector('#ca-head') as HTMLElement;
-  this.listWrap = this.container.querySelector('#ca-list') as HTMLElement;
+    // const header = this.container.querySelector('#ca-head') as HTMLElement;
+    this.listWrap = this.container.querySelector('#ca-list') as HTMLElement;
 
     const refreshBtn = this.container.querySelector('#ca-refresh') as HTMLButtonElement;
     const searchInput = this.container.querySelector('#ca-search') as HTMLInputElement;
@@ -119,26 +119,26 @@ export class ContentAggregatorTabUI {
               <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
               ${n}
             </div>
-            <div style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${preset.sql}</div>
+            <div class="ca-sql-snippet" style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" title="点击在可视化SQL编辑器中打开以修改">${preset.sql}</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
               ${preset.template ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); border-radius: var(--b3-border-radius-s);\">自定义模板</span>` : ''}
               ${preset.updatedAt ? (() => {
-                const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-                return `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface-light); color: var(--b3-theme-on-surface); border-radius: var(--b3-border-radius-s);\">最近修改: ${short}</span>`;
-              })() : ''}
+          const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+          return `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface-light); color: var(--b3-theme-on-surface); border-radius: var(--b3-border-radius-s);\">最近修改: ${short}</span>`;
+        })() : ''}
               ${preset.targetDocId ? (validity?.docValid ? `<span class=\"ca-badge-doc\" style=\"font-size:11px;padding:2px 8px;background: rgba(101,184,77,0.12); color: var(--b3-theme-success); border-radius: var(--b3-border-radius-s); cursor:pointer;\" title=\"点击打开${validity?.docType === 'notebook' ? '当日日记' : '文档'}\">${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效文档绑定</span>`) : ''}
               ${preset.targetDatabaseId ? (validity?.databaseValid ? `<span class=\"ca-badge-db\" style=\"font-size:11px;padding:2px 8px;background: rgba(70,130,180,0.12); color:#1976d2; border-radius: var(--b3-border-radius-s); cursor:pointer;\" title=\"点击打开数据库\">已绑定数据库</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效数据库绑定</span>`) : ''}
               ${(preset as any).docInsertMode ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); border:1px dashed var(--b3-border-color); border-radius: var(--b3-border-radius-s);\">插入: ${(preset as any).docInsertMode === 'prepend' ? '开头' : '末尾'}</span>` : ''}
               ${preset.timerEnabled ? (() => {
-                const nextTime = preset.nextExecuteTime ? new Date(preset.nextExecuteTime as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-                const mode = (preset as any).timerMode || 'interval';
-                const label = mode === 'daily'
-                  ? `每日 ${(String((preset as any).dailyHour ?? 0)).padStart(2,'0')}:${(String((preset as any).dailyMinute ?? 0)).padStart(2,'0')}`
-                  : ((preset as any).timerUnit && (preset as any).timerValue
-                      ? `${(preset as any).timerValue}${(preset as any).timerUnit === 'minutes' ? '分钟' : (preset as any).timerUnit === 'hours' ? '小时' : '天'}`
-                      : '未设置');
-                return `<span style=\"font-size:11px;padding:2px 8px;background: rgba(255,193,7,0.12); color:#f57c00; border-radius: var(--b3-border-radius-s);\">定时: ${label}${nextTime ? ' | 下次: ' + nextTime : ''}</span>`;
-              })() : ''}
+          const nextTime = preset.nextExecuteTime ? new Date(preset.nextExecuteTime as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+          const mode = (preset as any).timerMode || 'interval';
+          const label = mode === 'daily'
+            ? `每日 ${(String((preset as any).dailyHour ?? 0)).padStart(2, '0')}:${(String((preset as any).dailyMinute ?? 0)).padStart(2, '0')}`
+            : ((preset as any).timerUnit && (preset as any).timerValue
+              ? `${(preset as any).timerValue}${(preset as any).timerUnit === 'minutes' ? '分钟' : (preset as any).timerUnit === 'hours' ? '小时' : '天'}`
+              : '未设置');
+          return `<span style=\"font-size:11px;padding:2px 8px;background: rgba(255,193,7,0.12); color:#f57c00; border-radius: var(--b3-border-radius-s);\">定时: ${label}${nextTime ? ' | 下次: ' + nextTime : ''}</span>`;
+        })() : ''}
             </div>
           </div>
           <div style="display:flex; gap:8px; flex-shrink:0;">
@@ -153,6 +153,7 @@ export class ContentAggregatorTabUI {
       const editBtn = item.querySelector('.inline-edit');
       const timerBtn = item.querySelector('.inline-timer');
       const useBtn = item.querySelector('.inline-use');
+      const sqlSnippet = item.querySelector('.ca-sql-snippet') as HTMLElement | null;
       const panel = item.querySelector('.ca-inline-panel') as HTMLElement;
 
       editBtn?.addEventListener('click', async (e) => {
@@ -183,6 +184,26 @@ export class ContentAggregatorTabUI {
         e.stopPropagation();
         await this.aggregator.runPresetByName(n);
       });
+
+      // 点击列表中的 SQL 预览，跳转到“SQL 可视化生成器”页签并自动应用对应预设
+      if (sqlSnippet) {
+        sqlSnippet.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          try {
+            const sql = String((presets[n] as any)?.sql || '').trim();
+            if (!sql) { showMessage('无有效 SQL', 2000, 'info'); return; }
+            const pluginName = String(((this.aggregator as any)?._plugin?.name) || '');
+            await openTab({
+              app: (window as any).siyuan.ws.app,
+              custom: { icon: 'iconSQL', title: 'SQL 视图', id: pluginName + 'visual-sql', data: { id: null, presetName: n } },
+              keepCursor: false,
+            });
+            window.dispatchEvent(new CustomEvent('siyuan-steve-tools:apply-visual-sql-preset', { detail: { presetName: n } }));
+          } catch (err) {
+            showMessage('打开 SQL 编辑器失败', 3000, 'error');
+          }
+        });
+      }
 
       // 绑定点击跳转：标题优先打开文档/当日日记，否则打开数据库
       const titleEl = item.querySelector('.ca-title') as HTMLElement | null;
@@ -297,9 +318,12 @@ export class ContentAggregatorTabUI {
           </label>
           <textarea id="ie-sql" class="b3-text-field" readonly style="width:100%; height:35px; resize:vertical; font-family: var(--b3-font-family-code); font-size:13px; background: var(--b3-theme-surface-light); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); padding:8px;">${p.sql}</textarea>
           <div style="font-size:12px;color:var(--b3-theme-on-surface-light); margin-top:4px;">SQL 查询不可在此编辑,请在插件设置中修改</div>
-          <div style="margin-top:8px;">
+          <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button id="ie-preview" class="b3-button b3-button--outline" style="font-size:12px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;">
               <svg style="width:12px;height:12px;"><use xlink:href="#iconEye"></use></svg>预览查询结果
+            </button>
+            <button id="ie-open-sql-editor" class="b3-button" style="font-size:12px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;">
+              <svg style="width:12px;height:12px;"><use xlink:href="#iconSQL"></use></svg>在可视化SQL中编辑
             </button>
             <div id="ie-preview-container" style="margin-top:8px; max-height:350px; overflow-y:auto; display:none;"></div>
           </div>
@@ -365,9 +389,10 @@ export class ContentAggregatorTabUI {
     const btnCancel = panel.querySelector('.b3-button--cancel') as HTMLButtonElement;
     const btnSave = panel.querySelector('.b3-button--primary') as HTMLButtonElement;
     const btnPreview = panel.querySelector('#ie-preview') as HTMLButtonElement;
+    const btnOpenSQLEditor = panel.querySelector('#ie-open-sql-editor') as HTMLButtonElement;
     const previewContainer = panel.querySelector('#ie-preview-container') as HTMLElement;
 
-  btnCancel?.addEventListener('click', () => { panel.style.display = 'none'; panel.innerHTML = ''; delete panel.dataset.mode; });
+    btnCancel?.addEventListener('click', () => { panel.style.display = 'none'; panel.innerHTML = ''; delete panel.dataset.mode; });
 
     btnSave?.addEventListener('click', async () => {
       const tpl = (panel.querySelector('#ie-template') as HTMLTextAreaElement)?.value.trim() || '';
@@ -414,6 +439,23 @@ export class ContentAggregatorTabUI {
       (this.aggregator as any).renderResultTable(results, previewContainer);
       previewContainer.style.display = 'block';
     });
+
+    // 跳转到“SQL 可视化生成器”页签并自动应用对应预设
+    btnOpenSQLEditor?.addEventListener('click', async () => {
+      try {
+        const sql = String(p.sql || '').trim();
+        if (!sql) { showMessage('无有效 SQL', 2000, 'info'); return; }
+        const pluginName = String(((this.aggregator as any)?._plugin?.name) || '');
+        await openTab({
+          app: (window as any).siyuan.ws.app,
+          custom: { icon: 'iconSQL', title: 'SQL 视图', id: pluginName + 'visual-sql', data: { id: null, presetName: name } },
+          keepCursor: false,
+        });
+        window.dispatchEvent(new CustomEvent('siyuan-steve-tools:apply-visual-sql-preset', { detail: { presetName: name } }));
+      } catch {
+        showMessage('打开 SQL 编辑器失败', 3000, 'error');
+      }
+    });
   }
 
   private async openTimerInline(name: string, preset: PresetItem, panel: HTMLElement) {
@@ -421,14 +463,14 @@ export class ContentAggregatorTabUI {
     if (!panel) return;
 
     const currentEnabled = p.timerEnabled || false;
-    const currentMode = (p.timerMode || 'interval') as ('interval'|'daily');
+    const currentMode = (p.timerMode || 'interval') as ('interval' | 'daily');
     const currentUnit = p.timerUnit || 'hours';
     const currentValue = p.timerValue || 1;
     const currentDailyHour = Number.isFinite(p.dailyHour) ? (p.dailyHour as number) : 9;
     const currentDailyMinute = Number.isFinite(p.dailyMinute) ? (p.dailyMinute as number) : 0;
 
-  panel.style.display = 'block';
-  panel.dataset.mode = 'timer';
+    panel.style.display = 'block';
+    panel.dataset.mode = 'timer';
     panel.innerHTML = `
       <div style="display:flex; flex-direction:column; gap: 12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; padding: 12px; background: var(--b3-theme-surface); border-radius: var(--b3-border-radius); border: 1px solid var(--b3-border-color);">
@@ -494,15 +536,15 @@ export class ContentAggregatorTabUI {
       </div>
     `;
 
-  const enabledSwitch = panel.querySelector('#it-enabled') as HTMLInputElement;
-  const modeWrap = panel.querySelector('#it-mode-wrap') as HTMLElement;
-  const modeSelect = panel.querySelector('#it-mode') as HTMLSelectElement;
-  const intervalWrap = panel.querySelector('#it-interval') as HTMLElement;
-  const dailyWrap = panel.querySelector('#it-daily') as HTMLElement;
-  const valueInput = panel.querySelector('#it-value') as HTMLInputElement;
-  const unitSelect = panel.querySelector('#it-unit') as HTMLSelectElement;
-  const dhInput = panel.querySelector('#it-dh') as HTMLInputElement;
-  const dmInput = panel.querySelector('#it-dm') as HTMLInputElement;
+    const enabledSwitch = panel.querySelector('#it-enabled') as HTMLInputElement;
+    const modeWrap = panel.querySelector('#it-mode-wrap') as HTMLElement;
+    const modeSelect = panel.querySelector('#it-mode') as HTMLSelectElement;
+    const intervalWrap = panel.querySelector('#it-interval') as HTMLElement;
+    const dailyWrap = panel.querySelector('#it-daily') as HTMLElement;
+    const valueInput = panel.querySelector('#it-value') as HTMLInputElement;
+    const unitSelect = panel.querySelector('#it-unit') as HTMLSelectElement;
+    const dhInput = panel.querySelector('#it-dh') as HTMLInputElement;
+    const dmInput = panel.querySelector('#it-dm') as HTMLInputElement;
 
     const refreshMode = () => {
       if (modeWrap) modeWrap.style.display = enabledSwitch.checked ? 'block' : 'none';
@@ -517,11 +559,11 @@ export class ContentAggregatorTabUI {
     const btnCancel = panel.querySelector('.b3-button--cancel') as HTMLButtonElement;
     const btnSave = panel.querySelector('.b3-button--primary') as HTMLButtonElement;
 
-  btnCancel?.addEventListener('click', () => { panel.style.display = 'none'; panel.innerHTML = ''; delete panel.dataset.mode; });
+    btnCancel?.addEventListener('click', () => { panel.style.display = 'none'; panel.innerHTML = ''; delete panel.dataset.mode; });
 
     btnSave?.addEventListener('click', async () => {
       const enabled = !!enabledSwitch?.checked;
-      const mode = (modeSelect?.value || 'interval') as ('interval'|'daily');
+      const mode = (modeSelect?.value || 'interval') as ('interval' | 'daily');
 
       p.timerEnabled = enabled;
       p.timerMode = mode;
@@ -533,7 +575,7 @@ export class ContentAggregatorTabUI {
         const value = parseInt(valueInput?.value || '1');
         const unit = (unitSelect?.value as 'minutes' | 'hours' | 'days');
         if (!value || value < 1) { showMessage('请输入有效的时间间隔', 3000, 'error'); return; }
-        const ms = unit === 'minutes' ? value*60*1000 : unit === 'hours' ? value*60*60*1000 : value*24*60*60*1000;
+        const ms = unit === 'minutes' ? value * 60 * 1000 : unit === 'hours' ? value * 60 * 60 * 1000 : value * 24 * 60 * 60 * 1000;
         p.timerInterval = ms;
         p.timerUnit = unit;
         p.timerValue = value;
@@ -548,7 +590,7 @@ export class ContentAggregatorTabUI {
         // nextExecuteTime: 今天/明天的最近一次
         const now = new Date();
         const today = new Date(); today.setHours(h, mm, 0, 0);
-        p.nextExecuteTime = now.getTime() < today.getTime() ? today.getTime() : (()=>{ const t=new Date(); t.setDate(t.getDate()+1); t.setHours(h, mm, 0, 0); return t.getTime(); })();
+        p.nextExecuteTime = now.getTime() < today.getTime() ? today.getTime() : (() => { const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(h, mm, 0, 0); return t.getTime(); })();
       }
 
       await (this.aggregator as any).updatePresetTimerSettings(name, p, { skipUpdatedAt: false });
@@ -560,7 +602,7 @@ export class ContentAggregatorTabUI {
           if (enabled) await tm.startTimer(name, p);
           else tm.stopTimer(name);
         }
-      } catch {}
+      } catch { }
 
       showMessage('定时设置已更新', 3000, 'info');
       await this.refresh();

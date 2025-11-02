@@ -124,6 +124,7 @@ export class VisualSqlUI {
   private presetsKey?: string;
   private currentPresetName?: string;
   private currentPresetEl?: HTMLElement;
+  private lastAppliedPresetName?: string;
   private multiOutsideCloser?: (e: MouseEvent) => void;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
@@ -1892,6 +1893,7 @@ export class VisualSqlUI {
       this.advSqlFragment = s?.advSqlFragment || '';
       if (typeof s?.currentPresetName === 'string' && s.currentPresetName.trim()) {
         this.currentPresetName = s.currentPresetName.trim();
+        this.lastAppliedPresetName = this.currentPresetName;
       }
       this.updateCurrentPresetLabel();
       this.updateAllMultiSummaries();
@@ -1944,7 +1946,12 @@ export class VisualSqlUI {
       return;
     }
 
-    const nameRaw = await this.openInputModal({ title: '保存为预设', label: '名称', placeholder: '输入预设名称' });
+    const nameRaw = await this.openInputModal({
+      title: '保存为预设',
+      label: '名称',
+      placeholder: '输入预设名称',
+      defaultValue: this.currentPresetName || this.lastAppliedPresetName || ''
+    });
     const name = (nameRaw || '').trim();
     if (!name) return;
     const existingPreset = presets[name];
