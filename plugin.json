@@ -11,15 +11,15 @@
     "all"
   ],
   "displayName": {
-    "en_US": "STtools",
+    "default": "STtools",
     "zh_CN": "STtools"
   },
   "description": {
-    "en_US": "schedule management, docker sync awareness, ai sidebar",
+    "default": "schedule management, docker sync awareness, ai sidebar",
     "zh_CN": "互联日程管理（基于数据库的看板视图和日历视图）支持ics，qq邮箱日历，滴答清单双向联动, docker同步感知, ai侧边栏, 资源压缩, 白板, WPS联动, （SQL，数据库）聚合可视化, 随机题头图背景图。"
   },
   "readme": {
-    "en_US": "README.md",
+    "default": "README.md",
     "zh_CN": "README_zh_CN.md"
   },
   "funding": {
@@ -29,6 +29,9 @@
   },
   "keywords": [
     "plugin",
-    "tools"
+    "tools",
+    "schedule",
+    "calendar",
+    "sttools"
   ]
 }
