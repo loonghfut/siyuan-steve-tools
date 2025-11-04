@@ -8,7 +8,7 @@ import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
 import { extractNewAvId } from "@/api/api3";
-import { interceptFetch, setInterceptorSilenced } from "@/api/network-interceptor";
+import { interceptFetch, type InterceptorHandle } from "@/api/network-interceptor";
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
@@ -19,7 +19,7 @@ export class Dida365Service {
     private isSyncing = false; // 新增同步锁
     private creatingDidaIds: Set<string> = new Set();
     private syncDebounceTimer: NodeJS.Timeout | null = null; // 防抖计时器
-    private stopNetIntercept: (() => void) | null = null; // 取消网络拦截
+    private netInterceptorHandle: InterceptorHandle | null = null; // 独立拦截句柄
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -173,8 +173,8 @@ export class Dida365Service {
     }
 
     async syncTasksToSiyuan(): Promise<boolean> {
-        this.isSyncing = true; // 开始同步，锁定，WS 监听将跳过
-        setInterceptorSilenced(true); // 本次同步内的 /api/av/* 写入不触发拦截
+    this.isSyncing = true; // 开始同步，锁定，WS 监听将跳过
+    this.netInterceptorHandle?.setSilenced(true); // 本次同步内的 /api/av/* 写入不触发拦截（仅本监听者）
         showStatusMessage("正在同步滴答清单任务，请稍候...", 10000, "dida-sync");
         try {
             // 获取滴答清单的所有任务
@@ -283,7 +283,7 @@ export class Dida365Service {
             showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error", "dida-sync");
         } finally {
             this.isSyncing = false; // 同步结束，解锁
-            setTimeout(() => setInterceptorSilenced(false), 0);
+            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -477,7 +477,7 @@ export class Dida365Service {
      */
     private async createSiyuanTask(taskData: any): Promise<void> {
         try {
-            setInterceptorSilenced(true); // 创建流程中的数据库写入不被拦截
+            this.netInterceptorHandle?.setSilenced(true); // 创建流程中的数据库写入不被拦截
             if (!this.avId) {
                 console.error("数据库ID未设置");
                 return;
@@ -565,7 +565,7 @@ ${taskData.描述?.content || "描述：暂无"}
             console.error("创建思源任务失败:", error);
             throw error;
         } finally {
-            setTimeout(() => setInterceptorSilenced(false), 0);
+            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -574,7 +574,7 @@ ${taskData.描述?.content || "描述：暂无"}
      */
     private async updateSiyuanTask(existingTask: any, newTaskData: any): Promise<void> {
         try {
-            setInterceptorSilenced(true); // 更新流程中的数据库写入不被拦截
+            this.netInterceptorHandle?.setSilenced(true); // 更新流程中的数据库写入不被拦截
             if (!this.avId || !existingTask.事件?.id) {
                 console.error("缺少必要的ID信息");
                 return;
@@ -629,7 +629,7 @@ ${taskData.描述?.content || "描述：暂无"}
             console.error("更新思源任务失败:", error);
             throw error;
         } finally {
-            setTimeout(() => setInterceptorSilenced(false), 0);
+            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -642,7 +642,7 @@ ${taskData.描述?.content || "描述：暂无"}
         }
 
         try {
-            setInterceptorSilenced(true); // 归档批量更新不被拦截
+            this.netInterceptorHandle?.setSilenced(true); // 归档批量更新不被拦截
             if (!this.avId) {
                 console.error("数据库ID未设置，无法批量归档任务");
                 return 0;
@@ -713,7 +713,7 @@ ${taskData.描述?.content || "描述：暂无"}
             console.error("批量归档思源任务失败:", error);
             return 0;
         } finally {
-            setTimeout(() => setInterceptorSilenced(false), 0);
+            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -912,9 +912,9 @@ ${taskData.描述?.content || "描述：暂无"}
      * - 成功响应后，只针对我们关心的接口触发本地强制处理：setAttributeViewBlockAttr / batchSetAttributeViewBlockAttrs / addAttributeViewBlocks
      */
     private setupNetworkInterceptor(): void {
-        if (this.stopNetIntercept) return; // 避免重复安装
+    if (this.netInterceptorHandle) return; // 避免重复安装
 
-        this.stopNetIntercept = interceptFetch({
+    this.netInterceptorHandle = interceptFetch({
             filter: (url, method) => method === 'POST' && url.includes('/api/av/'),
             onResponse: async (ctx) => {
                 try {
@@ -1188,9 +1188,9 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 等待所有更新完成
                         if (updatePromises.length > 0) {
                             // 写回思源字段时临时关闭拦截，避免再次触发 handleSiyuanUpdate
-                            setInterceptorSilenced(true);
+                            this.netInterceptorHandle?.setSilenced(true);
                             await Promise.all(updatePromises);
-                            setTimeout(() => setInterceptorSilenced(false), 0);
+                            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
                             // 更新缓存
                             this.taskCache.set(newDidaTask.id, newDidaTask);
                             console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);

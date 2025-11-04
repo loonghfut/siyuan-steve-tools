@@ -81,7 +81,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
           const itemID: string | undefined = body?.itemID;
           const keyID: string | undefined = body?.keyID;
           const selectValue = getSelectValue(body?.value);
-          if (!itemID || !keyID || !selectValue) return;
+          if (!itemID || !keyID) return;
 
           // 确认该 keyID 是“状态”字段
           const map = await api.getAttributeViewBoundBlockIDsByItemIDs(avID, [itemID]);
@@ -90,13 +90,22 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
 
           const avDetails = await api.getAttributeViewKeys(blockId);
           let statusKeyDefinition: any;
+          let priorityKeyDefinition: any;
           if (avDetails && avDetails[0]?.keyValues) {
             const statusKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '状态');
             if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
+            const priorityKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '优先级');
+            if (priorityKeyValue) priorityKeyDefinition = priorityKeyValue.key;
           }
-          if (statusKeyDefinition && statusKeyDefinition.id === keyID) {
+          const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === keyID);
+          if (isStatus && selectValue) {
+            // 状态列：根据值设置自定义属性
             await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+            return;
           }
+          // 其他列：刷新视图
+          try { M_calendar.avButton(); } catch { }
+          try { refreshKanban(); } catch { }
           return;
         }
 
@@ -109,10 +118,9 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
           if (itemIDs.length === 0) return;
           const map = await api.getAttributeViewBoundBlockIDsByItemIDs(avID, itemIDs);
 
-          // 为每条涉及“状态”字段的更新设置自定义属性
+          // 为每条涉及“状态”字段做属性设置，其它字段统一做一次刷新
+          let refreshNeeded = false;
           for (const v of values) {
-            const selectValue = getSelectValue(v.value);
-            if (!selectValue) continue;
             const blockId = map[v.itemID];
             if (!blockId) continue;
 
@@ -122,9 +130,23 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
               const statusKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '状态');
               if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
             }
-            if (statusKeyDefinition && statusKeyDefinition.id === v.keyID) {
-              await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+            const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === v.keyID);
+            if (isStatus) {
+              const selectValue = getSelectValue(v.value);
+              if (selectValue) {
+                await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+                continue;
+              }
+              // 没有值（被清空等），无法设置映射，改为刷新
+              refreshNeeded = true;
+              continue;
             }
+            // 非状态列：标记需要刷新
+            refreshNeeded = true;
+          }
+          if (refreshNeeded) {
+            try { M_calendar.avButton(); } catch { }
+            try { refreshKanban(); } catch { }
           }
           return;
         }
