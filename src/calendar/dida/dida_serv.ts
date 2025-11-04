@@ -8,6 +8,7 @@ import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
 import { extractNewAvId } from "@/api/api3";
+import { interceptFetch, setInterceptorSilenced } from "@/api/network-interceptor";
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
@@ -18,6 +19,7 @@ export class Dida365Service {
     private isSyncing = false; // 新增同步锁
     private creatingDidaIds: Set<string> = new Set();
     private syncDebounceTimer: NodeJS.Timeout | null = null; // 防抖计时器
+    private stopNetIntercept: (() => void) | null = null; // 取消网络拦截
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -77,6 +79,7 @@ export class Dida365Service {
         await this.init_av();
         await this.getAllTasks(); // 初始化时加载滴答任务缓存
         this.setupSiyuanUpdateListener(); // 2025/7/5新增：设置思源更新监听器
+        this.setupNetworkInterceptor();    // 监听前端发起到 /api/av/* 的请求
     }
     /**
      * 获取数据库视图数据的封装方法
@@ -115,7 +118,6 @@ export class Dida365Service {
             showMessage("初始化数据库视图失败: " + (error instanceof Error ? error.message : String(error)));
         }
     }
-    private didaDock: any = null;
     private linkInterceptor: DidaLinkInterceptor;
     private createDock() {
         this.linkInterceptor = new DidaLinkInterceptor(showMessage);
@@ -127,7 +129,6 @@ export class Dida365Service {
             size: { width: 350, height: 0 },
             showMessage,
             onDockCreated: (dock) => {
-                this.didaDock = dock;
                 // 设置链接拦截器
                 this.linkInterceptor.setDock(dock);
                 console.log("滴答清单dock创建成功", dock);
@@ -172,7 +173,8 @@ export class Dida365Service {
     }
 
     async syncTasksToSiyuan(): Promise<boolean> {
-        // this.isSyncing = true; // 开始同步，锁定
+        this.isSyncing = true; // 开始同步，锁定，WS 监听将跳过
+        setInterceptorSilenced(true); // 本次同步内的 /api/av/* 写入不触发拦截
         showStatusMessage("正在同步滴答清单任务，请稍候...", 10000, "dida-sync");
         try {
             // 获取滴答清单的所有任务
@@ -281,6 +283,7 @@ export class Dida365Service {
             showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error", "dida-sync");
         } finally {
             this.isSyncing = false; // 同步结束，解锁
+            setTimeout(() => setInterceptorSilenced(false), 0);
         }
     }
 
@@ -474,6 +477,7 @@ export class Dida365Service {
      */
     private async createSiyuanTask(taskData: any): Promise<void> {
         try {
+            setInterceptorSilenced(true); // 创建流程中的数据库写入不被拦截
             if (!this.avId) {
                 console.error("数据库ID未设置");
                 return;
@@ -560,6 +564,8 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("创建思源任务失败:", error);
             throw error;
+        } finally {
+            setTimeout(() => setInterceptorSilenced(false), 0);
         }
     }
 
@@ -568,6 +574,7 @@ ${taskData.描述?.content || "描述：暂无"}
      */
     private async updateSiyuanTask(existingTask: any, newTaskData: any): Promise<void> {
         try {
+            setInterceptorSilenced(true); // 更新流程中的数据库写入不被拦截
             if (!this.avId || !existingTask.事件?.id) {
                 console.error("缺少必要的ID信息");
                 return;
@@ -621,6 +628,8 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("更新思源任务失败:", error);
             throw error;
+        } finally {
+            setTimeout(() => setInterceptorSilenced(false), 0);
         }
     }
 
@@ -633,6 +642,7 @@ ${taskData.描述?.content || "描述：暂无"}
         }
 
         try {
+            setInterceptorSilenced(true); // 归档批量更新不被拦截
             if (!this.avId) {
                 console.error("数据库ID未设置，无法批量归档任务");
                 return 0;
@@ -702,6 +712,8 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("批量归档思源任务失败:", error);
             return 0;
+        } finally {
+            setTimeout(() => setInterceptorSilenced(false), 0);
         }
     }
 
@@ -878,6 +890,8 @@ ${taskData.描述?.content || "描述：暂无"}
      * 创建日记（如果需要）
      */
     private async createDailynote(parentId: string, date: Date): Promise<string> {
+        // 标记参数已读取，避免 TS noUnusedLocals（后续若扩展日期逻辑可直接使用）
+        void date;
         // 这里需要根据您的日记创建逻辑来实现
         // 暂时使用简单的创建方式
         return (await createDailyNote(window.siyuan.ws.app.appId, parentId)).id;
@@ -892,6 +906,81 @@ ${taskData.描述?.content || "描述：暂无"}
             }
         });
     }
+
+    /**
+     * 监听前端发送的 /api/av/* 请求，补充 WebSocket 事务监听，做到“本地立即响应 + 服务器广播兜底”。
+     * - 成功响应后，只针对我们关心的接口触发本地强制处理：setAttributeViewBlockAttr / batchSetAttributeViewBlockAttrs / addAttributeViewBlocks
+     */
+    private setupNetworkInterceptor(): void {
+        if (this.stopNetIntercept) return; // 避免重复安装
+
+        this.stopNetIntercept = interceptFetch({
+            filter: (url, method) => method === 'POST' && url.includes('/api/av/'),
+            onResponse: async (ctx) => {
+                try {
+                    // 插件自身正在同步时，忽略这些回调，避免双触发
+                    if (this.isSyncing) return;
+                    if (!ctx.resOk || ctx.resStatus !== 200) return;
+                    const url = ctx.url;
+                    const body = (ctx.reqBody || {}) as any;
+
+                    // 仅关注我们关心的几个接口
+                    // 1) 单元格更新：/api/av/setAttributeViewBlockAttr
+                    if (url.includes('/api/av/setAttributeViewBlockAttr') && body?.avID && body?.itemID) {
+                        const avID: string = body.avID;
+                        const itemID: string = body.itemID;
+                        if (this.avId && avID === this.avId) {
+                            const map = await getAttributeViewBoundBlockIDsByItemIDs(avID, [itemID]);
+                            const blockId = map[itemID];
+                            if (blockId) {
+                                // 直接强制触发一次本地处理，减少等待 WS 通知的延迟
+                                this.handleSiyuanUpdate('force', blockId, itemID);
+                            }
+                        }
+                        return;
+                    }
+
+                    // 2) 批量单元格更新：/api/av/batchSetAttributeViewBlockAttrs
+                    if (url.includes('/api/av/batchSetAttributeViewBlockAttrs') && body?.avID && Array.isArray(body?.values)) {
+                        const avID: string = body.avID;
+                        const values: Array<{ itemID: string } & Record<string, any>> = body.values;
+                        if (this.avId && avID === this.avId && values.length > 0) {
+                            const itemIDs = Array.from(new Set(values.map(v => v.itemID).filter(Boolean)));
+                            if (itemIDs.length > 0) {
+                                const map = await getAttributeViewBoundBlockIDsByItemIDs(avID, itemIDs);
+                                // 只触发一次或按需多次，这里选择对每个 itemID 触发一次，保证精准
+                                for (const itemID of itemIDs) {
+                                    const blockId = map[itemID];
+                                    if (blockId) {
+                                        this.handleSiyuanUpdate('force', blockId, itemID);
+                                    }
+                                }
+                            }
+                        }
+                        return;
+                    }
+
+                    // 3) 添加块到数据库：/api/av/addAttributeViewBlocks
+                    if (url.includes('/api/av/addAttributeViewBlocks') && body?.avID && Array.isArray(body?.srcs)) {
+                        const avID: string = body.avID;
+                        const srcs: Array<{ id: string; itemID: string; isDetached?: boolean } & Record<string, any>> = body.srcs;
+                        if (this.avId && avID === this.avId && srcs.length > 0) {
+                            for (const s of srcs) {
+                                if (s.itemID && s.id && !s.isDetached) {
+                                    this.handleSiyuanUpdate('force', s.id, s.itemID);
+                                }
+                            }
+                        }
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('网络请求拦截处理失败:', err);
+                }
+            },
+        });
+    }
+
+    //（留空占位，无辅助方法）
 
     private async handleSiyuanUpdate_dalay(e) {
         setTimeout(() => {
@@ -1098,7 +1187,10 @@ ${taskData.描述?.content || "描述：暂无"}
 
                         // 等待所有更新完成
                         if (updatePromises.length > 0) {
+                            // 写回思源字段时临时关闭拦截，避免再次触发 handleSiyuanUpdate
+                            setInterceptorSilenced(true);
                             await Promise.all(updatePromises);
+                            setTimeout(() => setInterceptorSilenced(false), 0);
                             // 更新缓存
                             this.taskCache.set(newDidaTask.id, newDidaTask);
                             console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
