@@ -1618,6 +1618,12 @@ export function updataqqcalendar(info) {
                     <input type="datetime-local" id="qq-edit-end" class="b3-text-field" value="${formatDateForInput(info.event.end || new Date(info.event.start.getTime() + 60 * 60 * 1000))}">
                 </div>
                 <div class="form-item">
+                    <label>
+                        <input type="checkbox" id="qq-edit-allday" ${info.event.allDay ? 'checked' : ''}>
+                        全天
+                    </label>
+                </div>
+                <div class="form-item">
                     <label>描述</label>
                     <textarea id="qq-edit-desc" class="b3-text-field" rows="3">${info.event.extendedProps.description || ''}</textarea>
                 </div>
@@ -1637,7 +1643,8 @@ export function updataqqcalendar(info) {
         const start = new Date((document.getElementById('qq-edit-start') as HTMLInputElement).value);
         const end = new Date((document.getElementById('qq-edit-end') as HTMLInputElement).value);
         const description = (document.getElementById('qq-edit-desc') as HTMLTextAreaElement).value;
-        const allDay = (document.getElementById('qq-edit-allday') as HTMLInputElement).checked;
+        const allDayEl = document.getElementById('qq-edit-allday') as HTMLInputElement | null;
+        const allDay = allDayEl ? allDayEl.checked : !!info.event.allDay;
 
         if (!title) {
             sy.showMessage('请输入事件标题', -1, 'error');
@@ -1670,6 +1677,15 @@ export function updataqqcalendar(info) {
             sy.showMessage('更新事件失败', -1, 'error');
         }
     });
+    // 添加取消按钮事件
+    const cancelBtn = dialog.element.querySelector('#qq-edit-cancel');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dialog.destroy();
+        });
+    }
     // 添加删除按钮
     const footer = dialog.element.querySelector('.b3-dialog__action');
     if (footer) {
