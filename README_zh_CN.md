@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.20.5 (2025年11月03日)
+### v0.20.6 (2025年11月04日)
 - feat(minutiae): add background image functionality and settings (loonghfut)
 - feat(minutiae): 支持在更新设置时跳过背景刷新选项 (loonghfut)
 - feat(minutiae): 更新背景切换模式描述以支持持久化选项 (loonghfut)
@@ -78,6 +78,13 @@ win端s3同步后，docker端感知s3同步。
 - feat(settings): 添加笔记本黑名单设置，防止自动设置题头图 (loonghfut)
 - feat(settings): 添加笔记本黑名单编辑器，优化题头图设置功能 (loonghfut)
 - feat(plugin): 更新版本号至0.20.5，并在描述中添加随机题头图背景图信息 (loonghfut)
+- docs: 更新 v0.20.5 版本的更新日志 (loonghfut)
+- fix(plugin): 修正插件描述和显示名称的语言标识，添加缺失的关键词 (loonghfut)
+- 准备开始i18n (loonghfut)
+- docs(i18n): 精简插件开发中的国际化说明，移除 YAML 文件相关内容 (loonghfut)
+- feat(calendar): 修复QQ邮箱日历事件无法编辑问题 (loonghfut)
+- feat(network-interceptor): 添加轻量级 fetch 拦截器以监听 /api/av/* 请求 (loonghfut)
+- fix(plugin): 更新插件版本号至 0.20.6 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
