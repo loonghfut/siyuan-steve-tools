@@ -8,7 +8,7 @@ import { formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
 import { extractNewAvId } from "@/api/api3";
-import { interceptFetch, type InterceptorHandle } from "@/api/network-interceptor";
+import { interceptFetch, type InterceptorHandle, beginTaggedRequests, endTaggedRequests } from "@/api/network-interceptor";
 export class Dida365Service {
     private apiClient: Dida365ApiClient;
     private plugin: steveTools;
@@ -174,7 +174,6 @@ export class Dida365Service {
 
     async syncTasksToSiyuan(): Promise<boolean> {
     this.isSyncing = true; // 开始同步，锁定，WS 监听将跳过
-    this.netInterceptorHandle?.setSilenced(true); // 本次同步内的 /api/av/* 写入不触发拦截（仅本监听者）
         showStatusMessage("正在同步滴答清单任务，请稍候...", 10000, "dida-sync");
         try {
             // 获取滴答清单的所有任务
@@ -283,7 +282,6 @@ export class Dida365Service {
             showMessage("同步失败：" + (error instanceof Error ? error.message : String(error)), -1, "error", "dida-sync");
         } finally {
             this.isSyncing = false; // 同步结束，解锁
-            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -508,7 +506,6 @@ export class Dida365Service {
      */
     private async createSiyuanTask(taskData: any): Promise<void> {
         try {
-            this.netInterceptorHandle?.setSilenced(true); // 创建流程中的数据库写入不被拦截
             if (!this.avId) {
                 console.error("数据库ID未设置");
                 return;
@@ -555,13 +552,17 @@ ${taskData.描述?.content || "描述：暂无"}
             );
 
             // 添加到数据库
-            await addBlockToDatabase_pro(blockId, this.avId, itemID);
+            await this.withDidaTagged(async () => {
+                await addBlockToDatabase_pro(blockId, this.avId!, itemID);
+            });
 
             // 获取 viewValue 用于获取 keyID
             const viewValue = await this.getAvViewData("创建思源任务");
 
             // 更新各个字段
-            await this.updateTaskFields(blockId, taskData, viewValue, itemID);
+            await this.withDidaTagged(async () => {
+                await this.updateTaskFields(blockId, taskData, viewValue, itemID);
+            });
 
             // 同步更新滴答清单任务，为其添加 S 链接
             if (taskData.didaID?.content) {
@@ -595,8 +596,6 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("创建思源任务失败:", error);
             throw error;
-        } finally {
-            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -605,7 +604,6 @@ ${taskData.描述?.content || "描述：暂无"}
      */
     private async updateSiyuanTask(existingTask: any, newTaskData: any): Promise<void> {
         try {
-            this.netInterceptorHandle?.setSilenced(true); // 更新流程中的数据库写入不被拦截
             if (!this.avId || !existingTask.事件?.id) {
                 console.error("缺少必要的ID信息");
                 return;
@@ -617,7 +615,9 @@ ${taskData.描述?.content || "描述：暂无"}
             const viewValue = await this.getAvViewData("更新思源任务");
 
             // 更新各个字段
-            await this.updateTaskFields(blockId, newTaskData, viewValue, itemID, existingTask);
+            await this.withDidaTagged(async () => {
+                await this.updateTaskFields(blockId, newTaskData, viewValue, itemID, existingTask);
+            });
 
             // 更新块的自定义属性（状态）
             const statusCustomAttr = newTaskData.状态?.content === "完成" ? "done" : "todo";
@@ -659,8 +659,6 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("更新思源任务失败:", error);
             throw error;
-        } finally {
-            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -673,7 +671,6 @@ ${taskData.描述?.content || "描述：暂无"}
         }
 
         try {
-            this.netInterceptorHandle?.setSilenced(true); // 归档批量更新不被拦截
             if (!this.avId) {
                 console.error("数据库ID未设置，无法批量归档任务");
                 return 0;
@@ -731,8 +728,10 @@ ${taskData.描述?.content || "描述：暂无"}
                 );
             }
 
-            // 等待所有数据库状态更新完成
-            await Promise.all(updatePromises);
+            // 等待所有数据库状态更新完成（加 dida 标签，监听可识别并跳过）
+            await this.withDidaTagged(async () => {
+                await Promise.all(updatePromises);
+            });
 
             // 等待所有块属性更新完成
             await Promise.all(blockAttrPromises);
@@ -743,8 +742,6 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("批量归档思源任务失败:", error);
             return 0;
-        } finally {
-            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
         }
     }
 
@@ -949,6 +946,13 @@ ${taskData.描述?.content || "描述：暂无"}
             filter: (url, method) => method === 'POST' && url.includes('/api/av/'),
             onResponse: async (ctx) => {
                 try {
+                    // 若本次请求带有 dida 标签（由本模块打标），则跳过，避免自身触发
+                    const h = (ctx.headers || {}) as Record<string, string>;
+                    const tag = h['x-st-tag-dida'];
+                    const tags = h['x-st-tags'];
+                    if (tag === '1' || (typeof tags === 'string' && tags.split(',').includes('dida'))) {
+                        return;
+                    }
                     // 插件自身正在同步时，忽略这些回调，避免双触发
                     if (this.isSyncing) return;
                     if (!ctx.resOk || ctx.resStatus !== 200) return;
@@ -1247,8 +1251,10 @@ ${taskData.描述?.content || "描述：暂无"}
 
                         // 等待所有更新完成
                         if (updatePromises.length > 0) {
-                            // 不再静默网络拦截：允许 didaID/链接 回写被监听到，用于本地即时反应
-                            await Promise.all(updatePromises);
+                            // 仅在回写 didaID/链接期间为请求打上 dida 标签，让拦截器识别并跳过
+                            await this.withDidaTagged(async () => {
+                                await Promise.all(updatePromises);
+                            });
                             // 更新缓存
                             this.taskCache.set(newDidaTask.id, newDidaTask);
                             console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
@@ -1268,6 +1274,18 @@ ${taskData.描述?.content || "描述：暂无"}
             console.error("从思源同步到滴答失败:", error);
         }
     };
+
+    /**
+     * 在作用域内为所有发出的 fetch 请求打上 dida 标签，供本模块的网络监听识别并跳过。
+     */
+    private async withDidaTagged<T>(fn: () => Promise<T>): Promise<T> {
+        beginTaggedRequests('dida');
+        try {
+            return await fn();
+        } finally {
+            endTaggedRequests('dida');
+        }
+    }
     /**
      * 检测 Dida365 API Token 是否有效。
      * @returns Promise<boolean> 如果 Token 有效，返回 true；否则返回 false。

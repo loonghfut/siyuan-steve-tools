@@ -48,6 +48,17 @@ type Listener = {
 const listeners: Listener[] = [];
 let idSeq = 1;
 
+// 活跃标签：用于给本次请求打标（例如只在滴答相关写入时标记，监听方据此跳过）
+const activeTags = new Set<string>();
+
+export function beginTaggedRequests(tag: string) {
+  activeTags.add(tag);
+}
+
+export function endTaggedRequests(tag: string) {
+  activeTags.delete(tag);
+}
+
 /**
  * 兼容旧全局静音：将应用于所有监听者（不推荐，尽量使用 handle.setSilenced）
  */
@@ -65,6 +76,30 @@ export function interceptFetch(opts: InterceptOptions = {}): InterceptorHandle {
       const startAt = Date.now();
       const url = typeof input === 'string' ? input : (input as Request).url ?? String(input);
       const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+
+      // 若存在活跃标签，则将标签信息注入到请求头（不会影响服务端处理，供拦截器识别）
+      if (activeTags.size > 0) {
+        const tagHeaderMap: Record<string, string> = {};
+        for (const t of activeTags) {
+          tagHeaderMap[`x-st-tag-${t}`] = '1';
+        }
+        const tagsList = Array.from(activeTags).join(',');
+        tagHeaderMap['x-st-tags'] = tagsList;
+
+        if (init) {
+          const merged = new Headers(init.headers as any);
+          Object.entries(tagHeaderMap).forEach(([k, v]) => merged.set(k, v));
+          init.headers = merged as any;
+        } else if (input instanceof Request) {
+          // 尽量在 init 缺失时也注入（注意：不处理 body 复制以避免复杂度，常见场景下我们都有 init）
+          const merged = new Headers((input.headers as any) || {});
+          Object.entries(tagHeaderMap).forEach(([k, v]) => merged.set(k, v));
+          init = { headers: merged };
+        } else {
+          // 字符串 URL 且无 init，构造一个 headers
+          init = { headers: tagHeaderMap } as any;
+        }
+      }
 
       // 读取请求头
       const headers: Record<string, string> = {};
@@ -98,7 +133,7 @@ export function interceptFetch(opts: InterceptOptions = {}): InterceptorHandle {
         }));
       }
 
-      const res = await (originalFetch as any)(input, init);
+  const res = await (originalFetch as any)(input, init);
 
       if (!anyWants) return res;
 
