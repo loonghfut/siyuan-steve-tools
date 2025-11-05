@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.20.6 (2025年11月04日)
+### v0.20.7 (2025年11月05日)
 - feat(minutiae): add background image functionality and settings (loonghfut)
 - feat(minutiae): 支持在更新设置时跳过背景刷新选项 (loonghfut)
 - feat(minutiae): 更新背景切换模式描述以支持持久化选项 (loonghfut)
@@ -85,6 +85,13 @@ win端s3同步后，docker端感知s3同步。
 - feat(calendar): 修复QQ邮箱日历事件无法编辑问题 (loonghfut)
 - feat(network-interceptor): 添加轻量级 fetch 拦截器以监听 /api/av/* 请求 (loonghfut)
 - fix(plugin): 更新插件版本号至 0.20.6 (loonghfut)
+- docs: 更新 v0.20.6 版本的更新日志 (loonghfut)
+- 更新文案 (loonghfut)
+- feat(transaction-listener): 添加前端网络请求监听以同步状态列变动 (loonghfut)
+- refactor(network-interceptor): 更新拦截器逻辑以支持多个独立监听者并优化性能 refactor(dida-serv): 使用独立拦截句柄替代全局静音控制网络拦截 refactor(transaction-listener): 优化状态列和优先级列的属性设置逻辑 (loonghfut)
+- feat(reminders): 添加默认提醒设置，支持多种格式解析并注入任务 (loonghfut)
+- feat(dida): 添加请求标签功能以优化网络拦截处理 (loonghfut)
+- chore(plugin): 更新版本号至0.20.7 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
