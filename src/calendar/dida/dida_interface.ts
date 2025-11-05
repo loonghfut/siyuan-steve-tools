@@ -20,7 +20,7 @@ export interface Task {
     dueDate?: string; // "yyyy-MM-dd'T'HH:mm:ssZ"
     items?: ChecklistItem[];
     priority?: 0 | 1 | 3 | 5; // None:0, Low:1, Medium:3, High:5
-    reminders?: string[]; // Example : [ "TRIGGER:P0DT9H0M0S", "TRIGGER:PT0S" ]
+    reminders?: string[]; // Example : ["TRIGGER:-PT0S","TRIGGER:-PT5M","TRIGGER:-PT30M","TRIGGER:-PT60M","TRIGGER:-PT1440M"]
     repeatFlag?: string; // Example : "RRULE:FREQ=DAILY;INTERVAL=1"
     sortOrder?: number;
     startDate?: string; // "yyyy-MM-dd'T'HH:mm:ssZ"

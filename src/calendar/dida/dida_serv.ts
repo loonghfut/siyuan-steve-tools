@@ -362,6 +362,37 @@ export class Dida365Service {
     }
 
     /**
+     * 解析设置中的默认提醒，支持：
+     * - 字符串：以换行或逗号分隔；
+     * - 数组：直接使用；
+     * - 自动补全缺失的前缀（若仅提供 -PT5M 等会补上 TRIGGER:）。
+     */
+    private parseDidaReminders(input: unknown): string[] {
+        if (!input) return [];
+        let parts: string[] = [];
+        if (Array.isArray(input)) {
+            parts = input as string[];
+        } else if (typeof input === 'string') {
+            parts = input
+                .split(/\r?\n|,/) // 按行或逗号
+                .map(s => s.trim())
+                .filter(Boolean);
+        } else {
+            return [];
+        }
+        // 规范化并去重
+        const norm = (s: string) => s.startsWith('TRIGGER:') ? s : (s.startsWith('-PT') ? `TRIGGER:${s}` : s);
+        const valid = parts
+            .map(norm)
+            .filter(s => /^TRIGGER:\s*-?P(T\d+[HMS]|T?\d+[HMS].*)?/i.test(s) || /^TRIGGER:-?PT\d+[HMS](;.*)?$/i.test(s) || s.startsWith('TRIGGER:')); // 宽松校验，保留 TRIGGER 开头
+        // 去重保持顺序
+        const seen = new Set<string>();
+        const result: string[] = [];
+        for (const r of valid) { if (!seen.has(r)) { seen.add(r); result.push(r); } }
+        return result;
+    }
+
+    /**
      * 构建任务数据
      */
     private buildTaskData(didaTask: Task, existingTask?: any) {
@@ -1072,15 +1103,34 @@ ${taskData.描述?.content || "描述：暂无"}
                     const priorityMap: { [key: string]: 0 | 1 | 3 | 5 } = { "无": 0, "低": 1, "中": 3, "高": 5 };
                     updatePayload.priority = priorityMap[siyuanTask.优先级.content];
                 }
+                // 时间与提醒：当时间发生变化时，附带默认提醒
+                const newStartISO = siyuanTask.开始时间?.start ? formatDateToISO(siyuanTask.开始时间.start) : undefined;
+                const newDueISO = siyuanTask.开始时间?.end ? formatDateToISO(siyuanTask.开始时间.end) : undefined; // TODO：滴答 API 无法设置时间段，仅记录结束为 dueDate
+                const oldStartISO = cachedTask.startDate;
+                const oldDueISO = cachedTask.dueDate;
+                const timeChanged = newStartISO !== oldStartISO || newDueISO !== oldDueISO;
+
                 if (siyuanTask.开始时间) {
-                    updatePayload.startDate = siyuanTask.开始时间.start ? formatDateToISO(siyuanTask.开始时间.start) : undefined;
-                    updatePayload.dueDate = siyuanTask.开始时间.end ? formatDateToISO(siyuanTask.开始时间.end) : undefined; //TODO：滴答api无法设置时间段
+                    updatePayload.startDate = newStartISO;
+                    updatePayload.dueDate = newDueISO;
                     updatePayload.isAllDay = false;
                     updatePayload.timeZone = "Asia/Shanghai";
                 } else {
                     updatePayload.startDate = undefined;
                     updatePayload.dueDate = undefined;
                     updatePayload.timeZone = "Asia/Shanghai";
+                }
+
+                // 若时间变更且现在存在时间，则注入默认提醒（不去清空已有提醒，避免覆盖用户自定义）
+                if (timeChanged && (newStartISO || newDueISO)) {
+                    try {
+                        const defaults = this.parseDidaReminders((settingdata as any)["cal-dida-default-reminders"]);
+                        if (defaults.length) {
+                            updatePayload.reminders = defaults;
+                        }
+                    } catch {
+                        // 忽略解析失败，保持原样
+                    }
                 }
 
                 // 处理状态和标签
@@ -1148,6 +1198,16 @@ ${taskData.描述?.content || "描述：暂无"}
                         priority: siyuanTask.优先级?.content ? { "无": 0, "低": 1, "中": 3, "高": 5 }[siyuanTask.优先级.content] : 0,
                         startDate: siyuanTask.开始时间?.start ? formatDateToISO(siyuanTask.开始时间.start) : undefined,
                         dueDate: siyuanTask.开始时间?.end ? formatDateToISO(siyuanTask.开始时间.end) : undefined,
+                        // 默认提醒：从设置读取并注入
+                        reminders: (() => {
+                            try {
+                                const raw = (settingdata as any)["cal-dida-default-reminders"];
+                                const arr = this.parseDidaReminders(raw);
+                                return arr.length ? arr : undefined;
+                            } catch {
+                                return undefined;
+                            }
+                        })(),
                         // 标签处理优化：合并标签和状态标签
                         tags: [
                             ...(siyuanTask.标签?.content || []).map((item: any) => item),
@@ -1187,10 +1247,8 @@ ${taskData.描述?.content || "描述：暂无"}
 
                         // 等待所有更新完成
                         if (updatePromises.length > 0) {
-                            // 写回思源字段时临时关闭拦截，避免再次触发 handleSiyuanUpdate
-                            this.netInterceptorHandle?.setSilenced(true);
+                            // 不再静默网络拦截：允许 didaID/链接 回写被监听到，用于本地即时反应
                             await Promise.all(updatePromises);
-                            setTimeout(() => this.netInterceptorHandle?.setSilenced(false), 0);
                             // 更新缓存
                             this.taskCache.set(newDidaTask.id, newDidaTask);
                             console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);

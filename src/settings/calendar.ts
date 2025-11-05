@@ -56,6 +56,8 @@ export const calendarDefaults: Record<string, any> = {
     "cal-dida-db-id": "",
     "cal-dida-sync-mode": "auto",
     "cal-dida-sync-interval": 5,
+    // 滴答清单默认提醒（每行一条，如：TRIGGER:-PT5M）
+    "cal-dida-default-reminders": "",
     // 分享 / 云
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId": "",
@@ -217,6 +219,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "滴答清单同步数据库id", description: "对应数据库 id", key: "cal-dida-db-id", value: ctx.settings["cal-dida-db-id"] },
                 { type: "select", title: "滴答清单同步模式", description: "同步触发模式", key: "cal-dida-sync-mode", value: ctx.settings["cal-dida-sync-mode"], options: { auto: "自动同步", manual: "手动同步", all: "自动+手动" } },
                 { type: "number", title: "自动同步间隔", description: "分钟", key: "cal-dida-sync-interval", value: ctx.settings["cal-dida-sync-interval"] },
+                { type: "textarea", title: "默认提醒", description: "创建滴答任务时默认添加的提醒，每行一条；格式为 TRIGGER:ISO-8601 持续时间，如：\nTRIGGER:-PT0S（立即）\nTRIGGER:-PT5M（提前5分钟）\nTRIGGER:-PT30M（提前30分钟）\n留空则不设置提醒。", key: "cal-dida-default-reminders", value: ctx.settings["cal-dida-default-reminders"], direction: "row" },
             ]
         },
     ]
