@@ -3,88 +3,97 @@ STEVETOOLS
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/loonghfut/siyuan-steve-tools)](https://github.com/loonghfut/siyuan-steve-tools/releases)
 [![GitHub stars](https://img.shields.io/github/stars/loonghfut/siyuan-steve-tools)](https://github.com/loonghfut/siyuan-steve-tools/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/loonghfut/siyuan-steve-tools)](https://github.com/loonghfut/siyuan-steve-tools/issues)
-[![GitHub license](https://img.shields.io/github/license/loonghfut/siyuan-steve-tools)](https://github.com/loonghfut/siyuan-steve-tools/blob/main/LICENSE)
 [![GitHub all releases](https://img.shields.io/github/downloads/loonghfut/siyuan-steve-tools/total)](https://github.com/loonghfut/siyuan-steve-tools/releases)
 
-这是一个自用工具集合？那为什么做了那么多我用不到的功能？那为什么耗费那么多夜晚来开发维护用不到的功能？（反思），~~在我自己使用的同时，分享出来也希望能够帮助到有相关需求的其他人。~~  
-`<所有功能模块开源>`  
-有个人需求：有技术，自己拉源码，自己改; 没技术，自己拉源码让ai改。
+This is a personal toolkit collection. Why did I build so many features I don’t always use? Why spend countless nights maintaining features I may not need? (Reflection.) While I use it for myself, I also share it in case it helps others with similar needs.
 
-（注：由于是自用工具插件，可能会有一些不完善的地方，甚至出现数据遗失！！（因为使用了思源数据操作相关的api），请自行测试无问题的情况下再使用，若在使用过程中出现问题，请及时反馈）   
-### 若介意请勿使用。
+All modules are open-source.
 
-### 自用中....自用中....自用中....
-#### 免费使用遇到问题不用反馈，若有BUG影响到我的使用，我自然会修，过了几个版本BUG还在，麻烦自己拉源码修。  
-若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。
-为方便和打赏用户沟通，故临时建了反馈QQ群（随时可能解散），加之前请填一下[申请表](https://www.kdocs.cn/wo/sl/v1lC0R0)
+If you have technical skills, clone the repo and modify it yourself. If you don't, clone the repo and ask an AI to help modify it.
 
-#### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
-1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
-和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。     
-2. docker同步感知：    
-win端s3同步后，docker端感知s3同步。  
-3. ai网页侧边栏：    
-嵌入了一些ai的网页，方便使用。    
-4. 媒体资源压缩：  
-压缩媒体资源后再导入思源。  
-5. tldraw白板：  
-模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转  
-6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
-用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
-7. WPS联动：  
-方便在思源中使用WPS（office文件嵌入，预览、编辑、同步），多维表格数据导入，图片上传。
-8. 聚合查询：  
-可视化生成SQL语句，查询思源数据库，支持多条件筛选，排序等功能，支持结果预览和嵌入块。  
-可视化图表生成器（基于数据库，SQL查询）
+Note: Because this is a personal-use plugin, there may be imperfections and even data loss risks (it uses APIs that operate on SiYuan data). Please test carefully before using. If you encounter issues, report them.
+If you mind potential risks, please do not use it.
 
-#### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
+Currently for my own use...
 
-#### 更新日志:
+Free users: if you encounter problems, don't report them unless they affect my personal use — I’ll fix bugs that affect me. If a bug persists over several releases, please fork and fix it yourself. If you donated, you can report bugs and I'll try to prioritize them. You can also request personal features — if they're simple I might implement them.
 
+To facilitate communication with donors, I created a temporary feedback QQ group (may be dissolved anytime). Please fill in the application form before joining: https://www.kdocs.cn/wo/sl/v1lC0R0
 
-### v0.19.1 (2025年10月20日)
-- 开始优化白板： 取消与日记的关联 (loonghfut)
-- 创建块时增加一个空格 (loonghfut)
-- feat: 更新依赖项 siyuan 至 1.1.5 版本 (loonghfut)
-- 优化白板块删除处理 (loonghfut)
-- feat: 更新卡片渲染模式设置，支持静态和动态渲染选项 (loonghfut)
-- feat: 添加 Protyle 渲染完成等待逻辑，确保内容首次渲染一致性 (loonghfut)
-- feat: 添加卡片刷新功能，通过更新 nonce 触发重新挂载逻辑 (loonghfut)
-- feat: 添加“刷新所有卡片”功能，支持批量更新卡片状态 (loonghfut)
-- feat: 更新tldraw版本 (loonghfut)
-- 更新白板静态资源 (loonghfut)
-- 修复部分图标无法显示的BUG (loonghfut)
-- feat: 更新插件版本至0.19.0 增加高性能模式 Fixes #51 (loonghfut)
-- docs: 更新 v0.19.0 版本的更新日志 (loonghfut)
-- 完善tldraw相关许可 (loonghfut)
-- feat: 更新插件版本至0.19.1 (loonghfut)
+Available features (see plugin demos and tutorials at https://ld246.com/search?q=sttools):
+1. Interconnected schedule management: deeply integrates with SiYuan to provide calendar and kanban views, generate .ics calendar files for syncing with calendar apps via URL subscription (Thunderbird, Xiaomi Calendar, Apple Calendar, etc.), and basic integration with TickTick. (Demo and tutorials linked in the original README.)
+2. Docker sync awareness: Windows S3 synchronization is detected by the Docker side.
+3. AI web sidebar: embeds several AI web pages for convenient use.
+4. Media compression: compress media before importing into SiYuan.
+5. tldraw whiteboard: similar to AFFINE, tightly integrated with SiYuan. Supports embedding SiYuan blocks and link navigation.
+6. Lifelog: open-source alternative (for a better experience, consider YeGui plugin). Implemented via PR by BoysFight.
+7. WPS integration: embed, preview, edit, and sync office files in SiYuan; import spreadsheet-like data and upload images.
+8. Aggregation queries: visual SQL builder to query the SiYuan database with multiple filters and sorting, preview results and embed them as blocks; visual chart generator based on DB/SQL queries.
 
+Powered by donations and stars.
 
-更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
+Changelog:
 
-#### 感谢：
-- [wilsons](https://ld246.com/member/wilsons)：开发`生成日历文件ics功能`指导
-- [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板和开发工具包
-- [seanduo](https://github.com/seanduo)：PR
-- [BoysFight](https://github.com/BoysFight)：PR lifelog功能
-- [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
-- [空幽]()： `the first ` `the most` 打赏支持
+### v0.20.7 (2025-11-05)
+- feat(minutiae): add background image functionality and settings (loonghfut)
+- feat(minutiae): allow skipping background refresh when updating settings (loonghfut)
+- feat(minutiae): update background switch mode description to support persistent option (loonghfut)
+- optimize image switching logic (loonghfut)
+- feat(minutiae): add debounce threshold setting for background switching to optimize image request frequency (loonghfut)
+- feat(minutiae): refresh background in startup mode to improve loading experience (loonghfut)
+- feat(plugin): bump version to 0.20.0 (loonghfut)
+- docs: update changelog for v0.20.0 (loonghfut)
+- feat(minutiae): prohibit refreshing background when settings change to keep current image (loonghfut)
+- feat(plugin): bump version to 0.20.1 (loonghfut)
+- docs: update changelog for v0.20.1 (loonghfut)
+- optimize shortcut addition to schedule (loonghfut)
+- feat(calendar): add auto-adjust calendar height feature (loonghfut)
+- tidy some files (loonghfut)
+- feat(calendar): add "unscheduled events" panel and related features (loonghfut)
+- style(calendar): adjust layout and styles for unscheduled events panel (loonghfut)
+- refactor(calendar): encapsulate unscheduled panel logic into a controller and optimize event handling (loonghfut)
+- chore(plugin): bump version to 0.20.2 (loonghfut)
+- docs: update changelog for v0.20.2 (loonghfut)
+- feat(calendar): add support for "overdue incomplete" events and update related APIs and logic (loonghfut)
+- feat(calendar): consider "completed" and "archived" as done, improving event status logic (loonghfut)
+- feat(calendar): update right-side view button settings and add "This Month Board" title, optimize button list (loonghfut)
+- feat(ai): add user-customizable AI address list support and update relevant settings and logic (loonghfut)
+- feat(plugin): bump version to 0.20.3 (loonghfut)
+- docs: update changelog for v0.20.3 (loonghfut)
+- feat(calendar): dynamically adjust timeGrid view slotMinTime to improve event display range (loonghfut)
+- feat(calendar): update time grid view buttons and add planning button to improve UX (loonghfut)
+- fix(styles): forcibly set border styles to none to resolve style conflicts (loonghfut)
+- feat(plugin): bump version to 0.20.4 (loonghfut)
+- docs: update changelog for v0.20.4 (loonghfut)
+- refactor(api): comment out debug logs to clean console output; refactor(calendar): comment out debug logs to reduce noise; feat(calendar): add custom attribute settings to support event status updates (loonghfut)
+- feat(aggregate): add SQL aggregator edit functionality to improve UX (loonghfut)
+- feat(settings): add notebook blacklist to prevent automatic cover image setting (loonghfut)
+- feat(settings): add notebook blacklist editor to improve cover image settings (loonghfut)
+- feat(plugin): bump version to 0.20.5 and add random cover background info to the description (loonghfut)
+- docs: update changelog for v0.20.5 (loonghfut)
+- fix(plugin): correct plugin description and display language tags, add missing keywords (loonghfut)
+- prepare i18n (loonghfut)
+- docs(i18n): simplify i18n instructions in plugin development and remove YAML file related contents (loonghfut)
+- feat(calendar): fix QQ Mail calendar events being non-editable (loonghfut)
+- feat(network-interceptor): add lightweight fetch interceptor to listen to /api/av/* requests (loonghfut)
+- fix(plugin): bump version to 0.20.6 (loonghfut)
+- docs: update changelog for v0.20.6 (loonghfut)
+- update copy (loonghfut)
+- feat(transaction-listener): add front-end network request listener to synchronize status column changes (loonghfut)
+- refactor(network-interceptor): update interceptor logic to support multiple independent listeners and improve performance; refactor(dida-serv): use independent intercept handles instead of global mute control for network interception; refactor(transaction-listener): optimize property setting logic for status and priority columns (loonghfut)
+- feat(reminders): add default reminder settings, support multiple formats parsing and inject tasks (loonghfut)
+- feat(dida): add request tagging to optimize network interception handling (loonghfut)
+- chore(plugin): bump version to 0.20.7 (loonghfut)
 
-~~##### 收费预告：仅仅在插件介绍页感谢打赏用户是不够的，为使之前打赏的用户不虚此心，减少我的精力损耗，后续会开始收费，之前用户无论打赏多少，都可一直享受免费使用权（只需提供之前的打赏证明即可）。~~  
-~~收费项目：此插件所有功能~~   
-~~收费时间：可能明天，可能明年，可能也不会。~~  
-~~破解方式：椒盐模式，不要脸即可破解😁~~
+For more details see the commit history: https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/
 
+Thanks to:
+- wilsons: guidance on implementing .ics calendar generation
+- Frostime: plugin template and development toolkit
+- seanduo: PR contributor
+- BoysFight: PR contributor for lifelog feature
+- Achuan-2: provided kanban examples
 
-#### 说明
-- 日历视图基于fullcalendar开发，感谢fullcalendar的开发者。
-- 画板视图基于tldraw开发，感谢tldraw的开发者。
-
-#### 打赏
-如果你觉得这个项目对你有帮助，欢迎打赏，以激励我更好的维护和更新这个项目。  
-<img src="https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png" alt="图片描述" width="400" />
-
-
-#### 免责声明
-- 在介绍页面中，已提示本插件可能会有数据遗失的情况，请自行测试无问题的情况下再使用，作者不为你使用本产品所产生的任何后果负责。
-- 禁止使用本产品用于任意违法乱纪相关行为。 作者不为你使用本产品所产生的任何后果负责。
+Disclaimer:
+- This plugin may risk data loss (documented in the plugin description). Test before use. The author is not responsible for any consequences from usage.
+- Do not use this product for illegal activities. The author is not responsible for any results arising from misuse.
