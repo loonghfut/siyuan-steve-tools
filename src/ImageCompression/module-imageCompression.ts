@@ -7,6 +7,7 @@ declare const siyuan: any;
 
 export class M_imageCompression {
     private plugin: steveTools;
+    private settingdata: any;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
@@ -230,6 +231,10 @@ export class M_imageCompression {
             let totalCompressedSize = 0;
 
             showMessage(`开始处理 ${fileArray.length} 个文件...`, 3000, "info");
+            // 读取设置（带默认值）
+            const skipCompress: boolean = Boolean(this.settingdata?.["img-compress-skip"]);
+            const imageDir: string = String(this.settingdata?.["img-compress-image-dir"] || "assets/st_image").trim();
+            const videoDir: string = String(this.settingdata?.["img-compress-video-dir"] || "assets/st_video").trim();
 
             for (let i = 0; i < fileArray.length; i++) {
                 const file = fileArray[i];
@@ -238,7 +243,10 @@ export class M_imageCompression {
                 let compressedFile: File | null = null;
                 
                 // 根据文件类型选择处理方法
-                if (file.type.startsWith('image/')) {
+                if (skipCompress) {
+                    // 跳过压缩，直接使用原文件
+                    compressedFile = file;
+                } else if (file.type.startsWith('image/')) {
                     compressedFile = await this.compressImage(file);
                 } else if (file.type.startsWith('video/')) {
                     compressedFile = await this.compressVideo(file);
@@ -256,8 +264,8 @@ export class M_imageCompression {
                     try {
                         if(!this.cursorID) return showMessage("请将光标放在需要插入媒体的位置", -1, "error");
                         
-                        // 根据文件类型选择上传目录
-                        const uploadDir = file.type.startsWith('image/') ? "assets/st_image" : "assets/st_video";
+                        // 根据文件类型选择上传目录（来自设置）
+                        const uploadDir = file.type.startsWith('image/') ? imageDir : videoDir;
                         const response = await api.upload(uploadDir, [renamedFile]);
                         
                         if (response.succMap) {
@@ -297,7 +305,8 @@ export class M_imageCompression {
         input.click();
     }
 
-    init() {
+    init(settingdata?: any) {
+        this.settingdata = settingdata || {};
         this.plugin.addTopBar({
             icon: "iconImgDown",
             title: "压缩资源",
