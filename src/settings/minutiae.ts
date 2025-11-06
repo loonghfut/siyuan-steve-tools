@@ -17,6 +17,7 @@ export const minutiaeDefaults: Record<string, any> = {
     "minutiae-bg-brightness": 1,
     "minutiae-bg-mode": "switch",
     "minutiae-bg-switch-threshold": 2,
+    "minutiae-show-topbar-toggle": true,
 };
 
 export const minutiaeGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -44,6 +45,7 @@ export const minutiaeGroup = (ctx: BuildContext): SettingGroupDefinition => ({
             items: [
                 { type: "hint", title: "说明", description: "为编辑器注入独立Canvas背景，可按文档设置自定义图源，背景参数实时生效。（背景图的实现逻辑参考替换背景图片插件）", key: "minutiae-bg-info", value: "" },
                 { type: "checkbox", title: "启用随机背景图", description: "为文档注入背景图（刷新或切换文档生效）", key: "minutiae-bg-enable", value: ctx.settings["minutiae-bg-enable"] },
+                { type: "checkbox", title: "显示顶栏背景开关按钮", description: "在顶栏显示一个按钮：左键快速开/关背景；右键打开菜单快速调节透明度/模糊/亮度。", key: "minutiae-show-topbar-toggle", value: ctx.settings["minutiae-show-topbar-toggle"] },
                 { type: "textinput", title: "背景图地址", description: "设置全局默认背景图地址，可为远程链接或本地路径。", key: "minutiae-bg-url", value: ctx.settings["minutiae-bg-url"] },
                 { type: "custom", component: "HeadimgMappingEditor", title: "文档ID背景图映射", description: "类似题头图映射：支持为每个文档指定远程URL与本地目录（目录表示随机源）。", key: "minutiae-bg-id-mapping", value: ctx.settings["minutiae-bg-id-mapping"], direction: "column" },
                 { type: "textinput", title: "默认保存目录", description: "当映射/全局地址无法推导保存目录时，下载或上传会保存到该目录（assets/<目录>），例如 background。", key: "minutiae-bg-default-save-dir", value: ctx.settings["minutiae-bg-default-save-dir"] },

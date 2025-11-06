@@ -1,6 +1,6 @@
 import steveTools from "@/index";
 import { MinutiaeImageBase } from "./image_base";
-import { showMessage } from "siyuan";
+import { showMessage, Menu } from "siyuan";
 import { setBlockAttrs } from "@/api/api";
 
 interface VisualSettings {
@@ -20,6 +20,10 @@ export class backgroundImg extends MinutiaeImageBase {
     private lastDocPath?: string;
     private currentMode: string = 'switch';
     private lastSwitchAt: number | null = null; // ms timestamp of last auto refresh in switch mode
+    private topbarEl: HTMLElement | null = null;
+    private bgEnabled: boolean = true;
+    private saveTimer: number | null = null;
+    private readonly settingsFileName = 'steveTools.json';
 
     constructor(plugin: steveTools, settingdata: any) {
         super(plugin, settingdata);
@@ -29,6 +33,8 @@ export class backgroundImg extends MinutiaeImageBase {
         if (this.active) return;
         this.ensureCanvas();
         this.applyVisualSettings();
+        // 使用思源插件 API 在顶栏注册快捷开关按钮（受设置控制）
+        try { if (this.shouldShowTopbar()) this.insertTopbarToggle(); } catch (err) { console.warn('insertTopbarToggle failed', err); }
         // determine mode from settings
         this.currentMode = String(this.settingdata["minutiae-bg-mode"] || 'switch');
         if (this.currentMode === 'startup') {
@@ -47,6 +53,8 @@ export class backgroundImg extends MinutiaeImageBase {
             this.startupHandler = null;
         }
         window.removeEventListener("resize", this.resizeHandler);
+        // 移除顶栏按钮
+        try { this.removeTopbarToggle(); } catch { }
         if (this.canvas && this.canvas.parentElement) {
             this.canvas.parentElement.removeChild(this.canvas);
         }
@@ -97,6 +105,12 @@ export class backgroundImg extends MinutiaeImageBase {
         }
         // Do not refresh background on settings change to keep the current image unchanged.
         // Only visual parameters (opacity/blur/brightness) are applied above.
+        // 顶栏按钮显示设置变更处理
+        try {
+            const show = this.shouldShowTopbar();
+            if (show && !this.topbarEl) this.insertTopbarToggle();
+            if (!show && this.topbarEl) this.removeTopbarToggle();
+        } catch { }
     }
 
     protected override getUrlSettingKey(): string {
@@ -379,6 +393,204 @@ export class backgroundImg extends MinutiaeImageBase {
         this.canvas = canvas;
         this.syncCanvasSize();
         return canvas;
+    }
+
+    // 是否显示顶栏按钮（默认显示）
+    private shouldShowTopbar(): boolean {
+        try {
+            return Boolean(this.settingdata["minutiae-show-topbar-toggle"] ?? true);
+        } catch {
+            return true;
+        }
+    }
+
+    // ===== 使用 SiYuan 插件 API 的顶栏切换按钮 =====
+    private insertTopbarToggle() {
+        if (!this.plugin || typeof this.plugin.addTopBar !== 'function') return;
+        if (this.topbarEl) return;
+
+        // 简单的 SVG 图标（toggle 样式）——使用内联 svg 字符串
+        const svg = `<svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.5V7a1 1 0 10-2 0v9.5a1 1 0 102 0z"/></svg>`;
+
+        try {
+            const el = this.plugin.addTopBar({
+                icon: svg,
+                title: this.bgEnabled ? '背景: 开' : '背景: 关',
+                callback: (ev: MouseEvent) => {
+                    ev.stopPropagation();
+                    this.toggleBackground();
+                },
+                position: 'right'
+            });
+            this.topbarEl = el;
+            // 保证 tooltip/可见状态同步
+            this.updateTopbarButton();
+            // 右键菜单：快速调节透明度/模糊/亮度
+            el.addEventListener('contextmenu', (ev) => {
+                ev.preventDefault();
+                try {
+                    const menu = new Menu();
+                    // 滑块：透明度
+                    const curOpacity = Number(this.settingdata["minutiae-bg-opacity"] ?? 0.6);
+                    menu.addItem({ element: this.createSliderMenuItem('透明度', 0.1, 1, 0.01, this.clamp(curOpacity, 0.1, 1), (v) => this.setOpacity(v)) });
+                    // 滑块：模糊
+                    const curBlur = Number(this.settingdata["minutiae-bg-blur"] ?? 6);
+                    menu.addItem({ element: this.createSliderMenuItem('模糊 (px)', 0, 20, 1, this.clamp(Math.round(curBlur), 0, 20), (v) => this.setBlur(v)) });
+                    // 滑块：亮度
+                    const curBrightness = Number(this.settingdata["minutiae-bg-brightness"] ?? 1);
+                    menu.addItem({ element: this.createSliderMenuItem('亮度', 0.5, 1.5, 0.05, this.clamp(curBrightness, 0.5, 1.5), (v) => this.setBrightness(v)) });
+                    menu.addSeparator();
+                    // 其他
+                    menu.addItem({ label: '立即刷新背景', click: () => this.refreshBackground() });
+                    menu.open({ x: (ev as MouseEvent).clientX, y: (ev as MouseEvent).clientY });
+                } catch (err) {
+                    console.warn('打开右键菜单失败', err);
+                }
+            });
+        } catch (err) {
+            console.warn('addTopBar failed', err);
+        }
+    }
+
+    private removeTopbarToggle() {
+        if (!this.topbarEl) return;
+        try { this.topbarEl.remove(); } catch { }
+        this.topbarEl = null;
+    }
+
+    private toggleBackground() {
+        if (this.bgEnabled) this.disableBackground();
+        else this.enableBackground();
+        this.updateTopbarButton();
+    }
+
+    private enableBackground() {
+        this.bgEnabled = true;
+        if (!this.canvas) this.ensureCanvas();
+        if (this.canvas) {
+            this.canvas.style.display = '';
+            const settings = this.resolveVisualSettings();
+            this.applyBodyOpacity(settings.opacity);
+        }
+    }
+
+    private disableBackground() {
+        this.bgEnabled = false;
+        if (this.canvas) {
+            this.canvas.style.display = 'none';
+        }
+        this.restoreBodyStyles();
+    }
+
+    private updateTopbarButton() {
+        if (!this.topbarEl) return;
+        try {
+            // 更新 title 以便鼠标悬停显示当前状态
+            // this.topbarEl.setAttribute('title', this.bgEnabled ? '背景: 开' : '背景: 关');
+            // 也更新 aria-label
+            this.topbarEl.setAttribute('aria-label', this.bgEnabled ? '背景: 开' : '背景: 关');
+            // 如果顶栏元素包含可编辑区域，尝试在内部添加状态文本（非破坏性）
+            if (!this.topbarEl.querySelector('.st-minutiae-topbar-text')) {
+                const span = document.createElement('span');
+                span.className = 'st-minutiae-topbar-text';
+                span.style.marginLeft = '6px';
+                span.style.fontSize = '12px';
+                span.style.userSelect = 'none';
+                this.topbarEl.appendChild(span);
+            }
+            const txt = this.topbarEl.querySelector('.st-minutiae-topbar-text') as HTMLElement | null;
+            if (txt) txt.textContent = this.bgEnabled ? '开' : '关';
+        } catch { }
+    }
+
+    // 在菜单中创建一个带标签和值显示的滑块控件
+    private createSliderMenuItem(
+        label: string,
+        min: number,
+        max: number,
+        step: number,
+        value: number,
+        onInput: (v: number) => void,
+    ): HTMLElement {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'padding:8px 12px; width: 220px; box-sizing: border-box;';
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;';
+
+        const lab = document.createElement('span');
+        lab.textContent = label;
+        lab.style.cssText = 'font-size:12px; color: var(--b3-theme-on-surface, #333);';
+
+        const val = document.createElement('span');
+        val.style.cssText = 'font-size:12px; opacity:0.75; min-width:44px; text-align:right;';
+        val.textContent = String(value);
+
+        row.appendChild(lab);
+        row.appendChild(val);
+
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(value);
+        input.style.cssText = 'width:100%;';
+
+        input.addEventListener('input', () => {
+            const v = Number(input.value);
+            val.textContent = step >= 1 ? String(Math.round(v)) : v.toFixed(step < 0.1 ? 2 : 1);
+            try { onInput(v); } catch {}
+        });
+
+        wrap.appendChild(row);
+        wrap.appendChild(input);
+        return wrap;
+    }
+
+    // 快速调节方法
+    private setOpacity(value: number) {
+        const v = this.clamp(value, 0.1, 1);
+        this.settingdata["minutiae-bg-opacity"] = v;
+        this.applyVisualSettings();
+        // try { showMessage(`已设置透明度为 ${v.toFixed(2)}`); } catch {}
+        this.persistSettingsSoon();
+    }
+
+    private setBlur(value: number) {
+        const v = this.clamp(Math.round(value), 0, 20);
+        this.settingdata["minutiae-bg-blur"] = v;
+        this.applyVisualSettings();
+        // try { showMessage(`已设置模糊为 ${v}px`); } catch {}
+        this.persistSettingsSoon();
+    }
+
+    private setBrightness(value: number) {
+        const v = this.clamp(value, 0.5, 1.5);
+        this.settingdata["minutiae-bg-brightness"] = v;
+        this.applyVisualSettings();
+        // try { showMessage(`已设置亮度为 ${v.toFixed(2)}`); } catch {}
+        this.persistSettingsSoon();
+    }
+
+    private persistSettingsSoon(delay = 400) {
+        try {
+            if (this.saveTimer) {
+                window.clearTimeout(this.saveTimer);
+                this.saveTimer = null;
+            }
+            this.saveTimer = window.setTimeout(async () => {
+                try {
+                    await (this.plugin as any).saveData?.(this.settingsFileName, this.settingdata);
+                } catch (err) {
+                    console.warn('保存插件设置失败', err);
+                } finally {
+                    this.saveTimer = null;
+                }
+            }, delay);
+        } catch (err) {
+            console.warn('计划保存设置失败', err);
+        }
     }
 
     private syncCanvasSize() {
