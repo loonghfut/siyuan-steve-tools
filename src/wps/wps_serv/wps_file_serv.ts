@@ -81,13 +81,29 @@ export class WpsFileServ {
                 file_type: '',
                 file_src: ''
             } as WpsFileRecord;
-            const blockMd = this.generateWpsBlock(record);
             if (!this.cursorID) {
                 showMessage('未获取到光标位置，无法插入', 1500, 'error');
                 return;
             }
-            appendBlock('markdown', blockMd, this.cursorID);
-            showMessage('已插入链接块', 1200, 'info');
+            try {
+                if (this.settingdata?.["wps-file-insert-as-card"]) {
+                    // 直接生成卡片（与菜单“转换为卡片”一致）
+                    const cardHtml = await generateLinkCard(record.link_url, [
+                        { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${record.link_url}', '${record.link_id}');` },
+                        { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${record.link_url}');` }
+                    ]);
+                    const md = `<div>${cardHtml}</div>\n{: custom-st-wps="1" custom-wps-id="${record.link_id}" custom-wps-link="${record.link_url}" custom-wps-name="${record.name || ''}"}`;
+                    await appendBlock('markdown', md, this.cursorID);
+                    showMessage('已插入卡片', 1200, 'info');
+                } else {
+                    const blockMd = this.generateWpsBlock(record);
+                    await appendBlock('markdown', blockMd, this.cursorID);
+                    showMessage('已插入链接块', 1200, 'info');
+                }
+            } catch (err) {
+                console.error('单条插入失败', err);
+                showMessage('插入失败', 1800, 'error');
+            }
         };
         const roamingMonitorSnippet = `(()=>{try{if((window as any).__ROAMING_MONITOR_INSTALLED__)return;(window as any).__ROAMING_MONITOR_INSTALLED__=true;const TARGET='https://drive.kdocs.cn/api/v3/roaming';const log=(tag,url,body)=>{try{console.log('[RoamingAPI]',tag,url,body);}catch(_){} };const of=window.fetch; if(of){window.fetch=async (...args)=>{const r=await of(...args);try{const raw=args[0];const u=typeof raw==='string'?raw:(raw&&raw.url)||''; if(u.includes(TARGET)){r.clone().text().then(t=>log('fetch',u,t)).catch(()=>{});} }catch(_){} return r;};}const oOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,...rest){(this as any).__isRoaming= typeof u==='string' && u.includes(TARGET);return oOpen.call(this,m,u,...rest);};const oSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){if((this as any).__isRoaming){this.addEventListener('load',function(){try{log('xhr',this.responseURL,this.responseText);}catch(_){} });}return oSend.call(this,b);};}catch(e){console.error('roaming monitor inject failed',e);} })();`;
         createWebviewDock_for_wps({
@@ -316,6 +332,11 @@ export class WpsFileServ {
     }
 
     private generateWpsBlock(rec: WpsFileRecord): string {
+        // 若启用卡片插入则返回一个占位标记，真实卡片在批量模式中另行生成（批量中改为异步生成卡片集合）
+        if (this.settingdata?.["wps-file-insert-as-card"]) {
+            // 标记：在批量逻辑中检测此设置后替换为卡片 HTML
+            return `<!--CARD_MODE:${rec.link_id}:${rec.link_url}:${(rec.name || '').replace(/:/g,' ')}-->`;
+        }
         const tpl = this.getWpsTemplate();
         const md = this.renderWpsTemplate(tpl, {
             name: rec.name || rec.link_url,
@@ -515,7 +536,28 @@ ${md}
                 showMessage('无可导入项', 1600, 'info');
                 // 已统计 skipped
             } else {
-                const batchContent = toInsert.map(r => this.generateWpsBlock(r)).join('\n\n');
+                let batchContent = toInsert.map(r => this.generateWpsBlock(r)).join('\n\n');
+                if (this.settingdata?.["wps-file-insert-as-card"]) {
+                    // 批量模式：替换占位符为实际卡片 HTML（同步生成字符串）
+                    const cardPromises = toInsert.map(async rec => {
+                        try {
+                            const cardHtml = await generateLinkCard(rec.link_url, [
+                                { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${rec.link_url}', '${rec.link_id}');` },
+                                { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${rec.link_url}');` }
+                            ]);
+                            return { rec, html: `<div>${cardHtml}</div>\n{: custom-st-wps="1" custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}` };
+                        } catch (err) {
+                            console.error('生成卡片失败', err);
+                            return { rec, html: `{{{row\n[${rec.name || rec.link_url}](${rec.link_url})\n}}}\n{: custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}` };
+                        }
+                    });
+                    const cards = await Promise.all(cardPromises);
+                    // 用占位符定位替换
+                    for (const c of cards) {
+                        const placeholder = `<!--CARD_MODE:${c.rec.link_id}:${c.rec.link_url}:${(c.rec.name || '').replace(/:/g,' ')}-->`;
+                        batchContent = batchContent.replace(placeholder, c.html);
+                    }
+                }
                 try {
                     await appendBlock('markdown', batchContent, setlocationid);
                     // 标记已插入并统计
