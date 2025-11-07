@@ -41,11 +41,17 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.21.0 (2025年11月06日)
+### v0.21.1 (2025年11月07日)
 - feat(minutiae): 添加顶栏背景开关按钮设置，支持快速调节背景参数 (loonghfut)
 - feat(imageCompression): 添加图片/视频压缩设置，支持跳过压缩和自定义上传目录 (loonghfut)
 - chore(plugin): 更新版本号至0.21.0 (loonghfut)
 - docs(README_zh_CN): (loonghfut)
+- docs: 更新 v0.21.0 版本的更新日志 (loonghfut)
+- feat(wps): 添加文件插入为卡片的选项，支持单条和批量插入模式 (loonghfut)
+- fix(wps): 修改文件导入选项默认状态为不勾选 (loonghfut)
+- 修复卡片插入问题 (loonghfut)
+- feat(wps): 新增在新页签中预览 WPS 链接功能 (loonghfut)
+- chore: 更新版本号至 0.21.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
