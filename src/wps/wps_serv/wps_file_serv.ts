@@ -88,11 +88,12 @@ export class WpsFileServ {
             try {
                 if (this.settingdata?.["wps-file-insert-as-card"]) {
                     // 直接生成卡片（与菜单“转换为卡片”一致）
+                    const siyuanID = await generateSiyuanID();
                     const cardHtml = await generateLinkCard(record.link_url, [
-                        { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${record.link_url}', '${record.link_id}');` },
+                        { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${record.link_url}', '${siyuanID}');` },
                         { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${record.link_url}');` }
                     ]);
-                    const md = `<div>${cardHtml}</div>\n{: custom-st-wps="1" custom-wps-id="${record.link_id}" custom-wps-link="${record.link_url}" custom-wps-name="${record.name || ''}"}`;
+                    const md = `<div>${cardHtml}</div>\n{: id="${siyuanID}" custom-st-wps="1" custom-wps-id="${record.link_id}" custom-wps-link="${record.link_url}" custom-wps-name="${record.name || ''}"}`;
                     await appendBlock('markdown', md, this.cursorID);
                     showMessage('已插入卡片', 1200, 'info');
                 } else {
@@ -541,11 +542,12 @@ ${md}
                     // 批量模式：替换占位符为实际卡片 HTML（同步生成字符串）
                     const cardPromises = toInsert.map(async rec => {
                         try {
+                            const siyuanID = await generateSiyuanID();
                             const cardHtml = await generateLinkCard(rec.link_url, [
-                                { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${rec.link_url}', '${rec.link_id}');` },
+                                { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${rec.link_url}', '${siyuanID}');` },
                                 { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${rec.link_url}');` }
                             ]);
-                            return { rec, html: `<div>${cardHtml}</div>\n{: custom-st-wps="1" custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}` };
+                            return { rec, html: `<div>${cardHtml}</div>\n{: id="${siyuanID}" custom-st-wps="1" custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}` };
                         } catch (err) {
                             console.error('生成卡片失败', err);
                             return { rec, html: `{{{row\n[${rec.name || rec.link_url}](${rec.link_url})\n}}}\n{: custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}` };
