@@ -8,6 +8,7 @@ import * as ic from "@/icon"
 import { api } from "@frostime/siyuan-plugin-kits";
 import { confirmDialog } from "@/libs/dialog";
 import { fetchWpsFiles } from "../wps_files_api";
+import { openTab } from "siyuan";
 declare global {
     interface Window {
         wps?: any;
@@ -61,6 +62,8 @@ export class WpsFileServ {
             ChangeLinkStyle,
             ShowLinkContent,
         };
+        // 暴露一个新方法用于在新页签中预览
+        (window as any).wps.OpenPreviewTab = (url: string) => this.openPreviewTab(url);
 
 
         const handleWpsFileInsert = async (e: { webview: any; getCurrentUrl: () => string }) => {
@@ -91,7 +94,8 @@ export class WpsFileServ {
                     const siyuanID = await generateSiyuanID();
                     const cardHtml = await generateLinkCard(record.link_url, [
                         { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${record.link_url}', '${siyuanID}');` },
-                        { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${record.link_url}');` }
+                        { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${record.link_url}');` },
+                        { id: 'tab', title: '新页签预览', text: '🗔', onClick: `window.wps.OpenPreviewTab('${record.link_url}');` }
                     ]);
                     const md = `<div>${cardHtml}</div>\n{: id="${siyuanID}" custom-st-wps="1" custom-wps-id="${record.link_id}" custom-wps-link="${record.link_url}" custom-wps-name="${record.name || ''}"}`;
                     await appendBlock('markdown', md, this.cursorID);
@@ -211,9 +215,23 @@ export class WpsFileServ {
             click: async () => {
                 const cardHtml = await generateLinkCard(info.url, [
                     { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${info.url}', '${info.id}');` },
-                    { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${info.url}');` }
+                    { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${info.url}');` },
+                    { id: 'tab', title: '新页签预览', text: '🗔', onClick: `window.wps.OpenPreviewTab('${info.url}');` }
                 ]);
                 updateBlock('markdown', `<div>${cardHtml}</div>\n{: id="${info.id}"  custom-st-wps="1"}`, info.id);
+            }
+        });
+        // 新增：打开预览页签
+        detail.menu.addItem({
+            iconHTML: "",
+            label: "新页签预览",
+            click: async () => {
+                try {
+                    this.openPreviewTab(info.url, { sourceBlockId: info.id });
+                } catch (e) {
+                    console.error('打开预览页签失败', e);
+                    showMessage('打开预览页签失败', 2000, 'error');
+                }
             }
         });
     }
@@ -336,7 +354,7 @@ export class WpsFileServ {
         // 若启用卡片插入则返回一个占位标记，真实卡片在批量模式中另行生成（批量中改为异步生成卡片集合）
         if (this.settingdata?.["wps-file-insert-as-card"]) {
             // 标记：在批量逻辑中检测此设置后替换为卡片 HTML
-            return `<!--CARD_MODE:${rec.link_id}:${rec.link_url}:${(rec.name || '').replace(/:/g,' ')}-->`;
+            return `<!--CARD_MODE:${rec.link_id}:${rec.link_url}:${(rec.name || '').replace(/:/g, ' ')}-->`;
         }
         const tpl = this.getWpsTemplate();
         const md = this.renderWpsTemplate(tpl, {
@@ -350,7 +368,62 @@ export class WpsFileServ {
 ${md}
 }}}
 {: custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}
-`; 
+`;
+    }
+
+    /**
+     * 在新页签中打开 WPS 链接，仅使用 Electron <webview> 嵌入，不添加额外组件/工具栏
+     */
+    private async openPreviewTab(url: string, meta?: { sourceBlockId?: string }) {
+        if (!url) { showMessage('无效链接', 1500, 'error'); return; }
+        const tabId = ':wps-preview-' + Date.now();
+        const safeTitle = (url.split(/[?#]/)[0].split('/').pop() || '预览').slice(0, 20);
+
+        this.plugin.addTab({
+            type: tabId,
+            async init() {
+                // 清空节点，仅放置一个 webview
+                this.element.innerHTML = '';
+                let webviewEl: any;
+                try {
+                    webviewEl = document.createElement('webview') as any;
+                } catch {
+                    webviewEl = null;
+                }
+
+                if (!webviewEl || String(webviewEl.tagName).toLowerCase() !== 'webview') {
+                    // 当前环境不支持 webview
+                    const tip = document.createElement('div');
+                    tip.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--b3-theme-on-background);';
+                    tip.textContent = '当前环境不支持 webview 预览';
+                    this.element.appendChild(tip);
+                    return;
+                }
+
+                try { webviewEl.src = url; } catch { webviewEl.setAttribute('src', url); }
+                webviewEl.style.width = '100%';
+                webviewEl.style.height = '100%';
+                webviewEl.style.border = '0';
+                // 如需弹窗可开启：webviewEl.setAttribute('allowpopups', '');
+                this.element.appendChild(webviewEl);
+            },
+            async destroy() {
+                // 由 DOM 自动回收
+            }
+        });
+
+        await openTab({
+            app: (window as any).siyuan?.ws?.app,
+            custom: {
+                id: this.plugin.name + tabId,
+                title: '预览:' + safeTitle,
+                icon: 'iconSTwpsFile',
+                data: { url, sourceBlockId: meta?.sourceBlockId }
+            },
+            position: 'right',
+            keepCursor: false,
+            openNewTab: true
+        });
     }
 
     // --- UI 构建：返回一个用于 confirmDialog 的元素与回调上下文 ---
@@ -363,7 +436,7 @@ ${md}
         const topBar = document.createElement('div');
         topBar.className = 'st-wps-import-toolbar';
         topBar.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
-                topBar.innerHTML = `
+        topBar.innerHTML = `
                         <input type="text" placeholder="搜索 (名称/类型/来源/链接)" class="b3-text-field" style="flex:1;min-width:220px;" />
                         <label style="display:flex;align-items:center;gap:4px;font-size:12px;opacity:.9;">
                             <input type="checkbox" id="wps-skip-exist" />跳过已存在
@@ -545,7 +618,8 @@ ${md}
                             const siyuanID = await generateSiyuanID();
                             const cardHtml = await generateLinkCard(rec.link_url, [
                                 { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${rec.link_url}', '${siyuanID}');` },
-                                { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${rec.link_url}');` }
+                                { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${rec.link_url}');` },
+                                { id: 'tab', title: '新页签预览', text: '🗔', onClick: `window.wps.OpenPreviewTab('${rec.link_url}');` }
                             ]);
                             return { rec, html: `<div>${cardHtml}</div>\n{: id="${siyuanID}" custom-st-wps="1" custom-wps-id="${rec.link_id}" custom-wps-link="${rec.link_url}" custom-wps-name="${rec.name || ''}" custom-wps-block="true"}` };
                         } catch (err) {
@@ -556,7 +630,7 @@ ${md}
                     const cards = await Promise.all(cardPromises);
                     // 用占位符定位替换
                     for (const c of cards) {
-                        const placeholder = `<!--CARD_MODE:${c.rec.link_id}:${c.rec.link_url}:${(c.rec.name || '').replace(/:/g,' ')}-->`;
+                        const placeholder = `<!--CARD_MODE:${c.rec.link_id}:${c.rec.link_url}:${(c.rec.name || '').replace(/:/g, ' ')}-->`;
                         batchContent = batchContent.replace(placeholder, c.html);
                     }
                 }
