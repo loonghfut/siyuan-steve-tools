@@ -392,9 +392,9 @@ ${md}
             item.style.cssText = 'display:flex;gap:6px;align-items:flex-start;padding:4px 6px;border-radius:4px;cursor:pointer;border:1px solid transparent;';
             item.dataset.id = rec.link_id;
             const already = exists.has(rec.link_id);
-            // 初始 skip-exist=false，因此已存在可选但默认不勾选
+            // 修改：默认全部不选中（原逻辑为未存在自动选中）
             item.innerHTML = `
-                <input type="checkbox" ${already ? '' : 'checked'} />
+                <input type="checkbox" />
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:500;word-break:break-all;">${rec.name || rec.link_url}</div>
                     <div style="color:var(--b3-theme-on-surface-light);word-break:break-all;">${rec.link_url}</div>
