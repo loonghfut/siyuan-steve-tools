@@ -6,7 +6,7 @@ import { Dialog, showMessage } from "siyuan";
 export async function ChangeLinkStyle(url?: string, blockId?: string) {
   // showMessage(`测试中: ${url}, ${blockId}`)
   updateBlock("markdown", `<iframe src="${url}" width="600" height="700"></iframe>
-{: custom-st-wps="2"}`, blockId);
+{: custom-st-wps-iframe="1"}`, blockId);
 }
 
 export async function ShowLinkContent(url: string) {

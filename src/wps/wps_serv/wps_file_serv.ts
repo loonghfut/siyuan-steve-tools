@@ -134,6 +134,8 @@ export class WpsFileServ {
             zoom: 1,
             injectJS: ["console.log('WPS文件加载完成');" + roamingMonitorSnippet]
         });
+        // 注入 CSS 实现暗色主题反色（只在设置开启时注入）
+        this._ensureInvertStyleTag(!!this.settingdata?.["wps-webview-invert-dark"]);
 
         // this.plugin.eventBus.on("open-menu-link", this.blockIconEvent.bind(this));
         this.plugin.eventBus.on("click-blockicon", this.blockIconEvent.bind(this));
@@ -379,11 +381,14 @@ ${md}
         const tabId = ':wps-preview-' + Date.now();
         const safeTitle = (url.split(/[?#]/)[0].split('/').pop() || '预览').slice(0, 20);
 
+    // 仅用于作用域引用（当前 CSS 方案无需）
         this.plugin.addTab({
             type: tabId,
             async init() {
                 // 清空节点，仅放置一个 webview
                 this.element.innerHTML = '';
+                // 用于 CSS 选择器定位预览区域
+                this.element.classList.add('st-wps-preview-tab');
                 let webviewEl: any;
                 try {
                     webviewEl = document.createElement('webview') as any;
@@ -424,6 +429,36 @@ ${md}
             keepCursor: false,
             openNewTab: true
         });
+    }
+
+    // 仅通过 CSS 在暗色主题下反色，减少 JS 监听带来的开销
+    private _ensureInvertStyleTag(enable: boolean) {
+        const styleId = 'st-wps-invert-style';
+        const exist = document.getElementById(styleId);
+        if (!enable) {
+            if (exist) exist.remove();
+            return;
+        }
+                const css = `
+:root[data-theme-mode="dark"] .wps-file-dock-container webview,
+:root[data-theme-mode="dark"] .wps-file-dock-container iframe,
+:root[data-theme-mode="dark"] .st-wps-preview-tab webview,
+:root[data-theme-mode="dark"] .st-wps-preview-tab iframe,
+:root[data-theme-mode="dark"] [custom-st-wps-iframe="1"] webview,
+:root[data-theme-mode="dark"] [custom-st-wps-iframe="1"] iframe,
+:root[data-theme-mode="dark"] iframe[custom-st-wps-iframe="1"],
+:root[data-theme-mode="dark"] webview[custom-st-wps-iframe="1"] {
+    filter: invert(0.9) hue-rotate(180deg) !important;
+}
+`;
+        if (exist) {
+            exist.textContent = css;
+            return;
+        }
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = css;
+        document.head.appendChild(style);
     }
 
     // --- UI 构建：返回一个用于 confirmDialog 的元素与回调上下文 ---
