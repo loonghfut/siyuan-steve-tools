@@ -48,12 +48,90 @@ export class M_Aggregate {
         if (_settingdata["aggregate-enable-sql-visualizer"]) {
             const topBarElement = this.plugin.addTopBar({
                 icon: "iconSQL",
-                title: "SQL 可视化生成器",
+                title: "聚合",
                 position: "right",
                 callback: async () => {
                     const rect = topBarElement.getBoundingClientRect();
                     this.addMenu(rect, _settingdata);
                 }
+            });
+
+            // 右键（contextmenu）显示置顶的内容聚合预设快速执行菜单
+            topBarElement.addEventListener('contextmenu', async (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                if (!this._aggregatorBlockInstance) {
+                    return;
+                }
+                // 获取置顶预设
+                let pinned: Array<{ name: string; preset: any }> = [];
+                try {
+                    pinned = await this._aggregatorBlockInstance.getPinnedPresets();
+                } catch (err) {
+                    console.warn('[M_Aggregate] 获取置顶预设失败', err);
+                }
+
+                const menu = new Menu('topBarAggQuick', () => { });
+                const recentThresholdMin = this._aggregatorBlockInstance.getRecentUpdateThresholdMinutes();
+                const now = Date.now();
+                const fmtRelative = (ts?: number) => {
+                    if (!ts) return '-';
+                    const diffMs = now - ts;
+                    if (diffMs < 0) return '未来?';
+                    const diffMin = diffMs / 60000;
+                    if (diffMin < 1) return '刚刚';
+                    if (diffMin < 60) return Math.floor(diffMin) + ' 分钟前';
+                    const diffHr = diffMin / 60;
+                    if (diffHr < 24) return Math.floor(diffHr) + ' 小时前';
+                    const diffDay = diffHr / 24;
+                    return Math.floor(diffDay) + ' 天前';
+                };
+
+                if (!pinned.length) {
+                    menu.addItem({ icon: 'iconInfo', label: '无置顶预设', click: () => { } });
+                } else {
+                    pinned.forEach(({ name, preset }) => {
+                        const lastTS: number | undefined = preset.lastExecuteTime || preset.updatedAt || undefined;
+                        const rel = fmtRelative(lastTS);
+                        const isRecent = lastTS && (now - lastTS) <= recentThresholdMin * 60000;
+                        const displayLabel = `${name}  · 上次: ${rel}`;
+                        menu.addItem({
+                            icon: isRecent ? 'iconRefresh' : 'iconSQL',
+                            label: displayLabel,
+                            click: async () => {
+                                await this._aggregatorBlockInstance?.runPresetByName(name);
+                            }
+                        });
+                    });
+                }
+
+                menu.addSeparator();
+                menu.addItem({
+                    icon: 'iconDatabase',
+                    label: '打开内容聚合器页签',
+                    click: async () => {
+                        await openTab({
+                            app: (window as any).siyuan.ws.app,
+                            custom: { icon: 'iconDatabase', title: '内容聚合器', id: this.plugin.name + 'content-aggregator', data: { id: null } },
+                            keepCursor: false,
+                        });
+                    }
+                });
+                menu.addItem({
+                    icon: 'iconRefresh',
+                    label: '刷新列表',
+                    click: async () => {
+                        // 重新触发一次 contextmenu 展开
+                        const rect = topBarElement.getBoundingClientRect();
+                        // 延迟以避免当前菜单仍在关闭动画期间
+                        setTimeout(() => {
+                            const evt = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rect.right, clientY: rect.bottom });
+                            topBarElement.dispatchEvent(evt);
+                        }, 50);
+                    }
+                });
+
+                menu.open({ x: ev.clientX, y: ev.clientY, isLeft: true });
             });
 
             // 注册 SQL 可视化生成器为思源选项卡

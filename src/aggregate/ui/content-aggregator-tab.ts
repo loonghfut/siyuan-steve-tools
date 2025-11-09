@@ -11,6 +11,7 @@ export class ContentAggregatorTabUI {
   private aggregator: aggregatorBlock;
   // 预留：顶部区域（当前未使用，避免未读警告不声明）
   private listWrap!: HTMLElement;
+  private showPinnedOnly = false;
 
   constructor(container: HTMLElement, aggregator: aggregatorBlock) {
     this.container = container;
@@ -36,6 +37,9 @@ export class ContentAggregatorTabUI {
             <span style="font-weight:600;color:var(--b3-theme-on-background);">内容聚合器</span>
           </div>
           <div style="display:flex;gap:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--b3-theme-on-surface);">
+              <input id="ca-only-pinned" type="checkbox" /> 仅显示置顶
+            </label>
             <button id="ca-refresh" class="b3-button b3-button--outline" title="刷新预设列表">刷新</button>
           </div>
         </div>
@@ -53,9 +57,17 @@ export class ContentAggregatorTabUI {
 
     const refreshBtn = this.container.querySelector('#ca-refresh') as HTMLButtonElement;
     const searchInput = this.container.querySelector('#ca-search') as HTMLInputElement;
+    const onlyPinned = this.container.querySelector('#ca-only-pinned') as HTMLInputElement;
 
     refreshBtn?.addEventListener('click', () => this.refresh());
     searchInput?.addEventListener('input', () => this.renderList(searchInput.value));
+    if (onlyPinned) {
+      onlyPinned.checked = this.showPinnedOnly;
+      onlyPinned.addEventListener('change', () => {
+        this.showPinnedOnly = !!onlyPinned.checked;
+        this.renderList(searchInput?.value || '');
+      });
+    }
 
     this.renderList();
   }
@@ -76,7 +88,15 @@ export class ContentAggregatorTabUI {
     const names = sortedEntries.map(([n]) => n);
 
     const filter = filterText.toLowerCase().trim();
-    const filtered = filter ? names.filter(n => n.toLowerCase().includes(filter) || String(presets[n].sql || '').toLowerCase().includes(filter)) : names;
+    let filtered = filter ? names.filter(n => n.toLowerCase().includes(filter) || String(presets[n].sql || '').toLowerCase().includes(filter)) : names;
+
+    if (this.showPinnedOnly) {
+      const pinNameReg = /^(?:[!*★☆]|🔖|pin:|star:)/i;
+      filtered = filtered.filter(n => {
+        const p: any = presets[n];
+        return !!(p?.pinned || p?.starred || p?.favorite || p?.top || pinNameReg.test(n));
+      });
+    }
 
     if (!filtered.length) {
       listEl.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--b3-theme-on-surface-light);">${filter ? '未找到匹配的预设' : '暂无预设'}</div>`;
@@ -112,12 +132,14 @@ export class ContentAggregatorTabUI {
       const item = document.createElement('div');
       item.className = 'ca-item';
       item.style.cssText = 'padding:12px; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius);';
+      const isPinned = !!((preset as any).pinned || (preset as any).starred || (preset as any).favorite || (preset as any).top || /^(?:[!*★☆]|🔖|pin:|star:)/i.test(n));
       item.innerHTML = `
         <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
           <div style="flex:1; min-width:0;">
             <div class="ca-title" style="font-weight:500; color: var(--b3-theme-on-background); margin-bottom:6px; display:flex; gap:6px; align-items:center;">
               <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
               ${n}
+              ${isPinned ? '<span style="font-size:11px;padding:2px 6px;background:var(--b3-theme-primary);color:var(--b3-theme-on-primary);border-radius:var(--b3-border-radius-s);">置顶</span>' : ''}
             </div>
             <div class="ca-sql-snippet" style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" title="点击在可视化SQL编辑器中打开以修改">${preset.sql}</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
@@ -142,6 +164,7 @@ export class ContentAggregatorTabUI {
             </div>
           </div>
           <div style="display:flex; gap:8px; flex-shrink:0;">
+            <button class="b3-button b3-button--outline inline-pin" style="padding:6px 12px; font-size:13px; ${isPinned ? 'background: var(--b3-theme-primary-lightest); border-color: var(--b3-theme-primary); color: var(--b3-theme-primary);' : ''}" title="${isPinned ? '取消置顶' : '设为置顶'}">${isPinned ? '取消置顶' : '置顶'}</button>
             <button class="b3-button b3-button--outline inline-edit" style="padding:6px 12px; font-size:13px;">编辑</button>
             <button class="b3-button b3-button--outline inline-timer" style="padding:6px 12px; font-size:13px; ${preset.timerEnabled ? 'background: rgba(255, 193, 7, 0.12); border-color: #f57c00; color: #f57c00;' : ''}" title="${preset.timerEnabled ? '定时已启用' : '设置定时更新'}">定时</button>
             <button class="b3-button b3-button--primary inline-use" style="padding:6px 12px; font-size:13px;">使用</button>
@@ -151,7 +174,8 @@ export class ContentAggregatorTabUI {
       `;
 
       const editBtn = item.querySelector('.inline-edit');
-      const timerBtn = item.querySelector('.inline-timer');
+  const timerBtn = item.querySelector('.inline-timer');
+  const pinBtn = item.querySelector('.inline-pin');
       const useBtn = item.querySelector('.inline-use');
       const sqlSnippet = item.querySelector('.ca-sql-snippet') as HTMLElement | null;
       const panel = item.querySelector('.ca-inline-panel') as HTMLElement;
@@ -183,6 +207,18 @@ export class ContentAggregatorTabUI {
       useBtn?.addEventListener('click', async (e) => {
         e.stopPropagation();
         await this.aggregator.runPresetByName(n);
+      });
+
+      pinBtn?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try {
+          const newPinned = !isPinned;
+          await (this.aggregator as any).updatePresetPinned(n, newPinned);
+          showMessage(newPinned ? '已置顶该预设' : '已取消置顶', 2500, 'info');
+          await this.refresh();
+        } catch {
+          showMessage('更新置顶状态失败', 3000, 'error');
+        }
       });
 
       // 点击列表中的 SQL 预览，跳转到“SQL 可视化生成器”页签并自动应用对应预设

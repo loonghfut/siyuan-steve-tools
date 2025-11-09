@@ -482,171 +482,189 @@ export class aggregatorBlock {
      * 在指定容器内渲染“预设列表”的非模态版
      * 返回控制器可用于刷新或卸载
      */
-    public mountPresetList(container: HTMLElement, options?: {
-        onUse?: (payload: { name: string; preset: PresetItem }) => void;
-    }): { refresh: () => Promise<void>; unmount: () => void } {
-        let disposed = false;
+    // public mountPresetList(container: HTMLElement, options?: {
+    //     onUse?: (payload: { name: string; preset: PresetItem }) => void;
+    // }): { refresh: () => Promise<void>; unmount: () => void } {
+    //     let disposed = false;
 
-        const searchId = `st-preset-inline-search-${Date.now()}`;
-        const listId = `st-preset-inline-list-${Date.now()}`;
-        container.innerHTML = `
-            <div style="padding: 8px; display: flex; flex-direction: column; gap: 8px;">
-                <input id="${searchId}" class="b3-text-field" placeholder="搜索预设名称或 SQL..." style="
-                    width: 100%; padding: 8px 12px; border: 1px solid var(--b3-border-color); border-radius: var(--b3-border-radius);
-                    background: var(--b3-theme-surface); color: var(--b3-theme-on-background); font-size: 14px;" />
-                <div id="${listId}" style="max-height: calc(100% - 40px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
-            </div>
-        `;
+    //     const searchId = `st-preset-inline-search-${Date.now()}`;
+    //     const listId = `st-preset-inline-list-${Date.now()}`;
+    //     container.innerHTML = `
+    //         <div style="padding: 8px; display: flex; flex-direction: column; gap: 8px;">
+    //             <input id="${searchId}" class="b3-text-field" placeholder="搜索预设名称或 SQL..." style="
+    //                 width: 100%; padding: 8px 12px; border: 1px solid var(--b3-border-color); border-radius: var(--b3-border-radius);
+    //                 background: var(--b3-theme-surface); color: var(--b3-theme-on-background); font-size: 14px;" />
+    //             <div id="${listId}" style="max-height: calc(100% - 40px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+    //         </div>
+    //     `;
 
-        const searchInput = container.querySelector(`#${searchId}`) as HTMLInputElement | null;
-        const listEl = container.querySelector(`#${listId}`) as HTMLElement | null;
+    //     const searchInput = container.querySelector(`#${searchId}`) as HTMLInputElement | null;
+    //     const listEl = container.querySelector(`#${listId}`) as HTMLElement | null;
 
-        const renderPresets = async (filterText: string = '') => {
-            if (disposed) return;
-            if (!listEl) return;
-            listEl.innerHTML = '';
-            try {
-                const presets = await this.getSqlPresets();
-                const sortedEntries = Object.entries(presets).sort((a, b) => {
-                    const pa = a[1] as PresetItem; const pb = b[1] as PresetItem;
-                    const aTime = (pa.updatedAt || pa.lastExecuteTime || 0) as number;
-                    const bTime = (pb.updatedAt || pb.lastExecuteTime || 0) as number;
-                    if (aTime !== bTime) return bTime - aTime;
-                    return a[0].localeCompare(b[0], 'zh-CN');
-                });
-                const names = sortedEntries.map(([n]) => n);
-                const filter = filterText.toLowerCase().trim();
-                const filtered = filter ? names.filter(n => n.toLowerCase().includes(filter) || String(presets[n].sql || '').toLowerCase().includes(filter)) : names;
+    //     const renderPresets = async (filterText: string = '') => {
+    //         if (disposed) return;
+    //         if (!listEl) return;
+    //         listEl.innerHTML = '';
+    //         try {
+    //             const presets = await this.getSqlPresets();
+    //             const sortedEntries = Object.entries(presets).sort((a, b) => {
+    //                 const pa = a[1] as PresetItem; const pb = b[1] as PresetItem;
+    //                 const aTime = (pa.updatedAt || pa.lastExecuteTime || 0) as number;
+    //                 const bTime = (pb.updatedAt || pb.lastExecuteTime || 0) as number;
+    //                 if (aTime !== bTime) return bTime - aTime;
+    //                 return a[0].localeCompare(b[0], 'zh-CN');
+    //             });
+    //             const names = sortedEntries.map(([n]) => n);
+    //             const filter = filterText.toLowerCase().trim();
+    //             const filtered = filter ? names.filter(n => n.toLowerCase().includes(filter) || String(presets[n].sql || '').toLowerCase().includes(filter)) : names;
 
-                if (!filtered.length) {
-                    listEl.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--b3-theme-on-surface-light);">${filter ? '未找到匹配的预设' : '暂无预设'}</div>`;
-                    return;
-                }
+    //             if (!filtered.length) {
+    //                 listEl.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--b3-theme-on-surface-light);">${filter ? '未找到匹配的预设' : '暂无预设'}</div>`;
+    //                 return;
+    //             }
 
-                // 校验绑定有效性
-                const validityChecks = await Promise.all(
-                    filtered.map(async n => {
-                        const preset = presets[n];
-                        let docValid = true; let docType: 'doc' | 'notebook' | undefined;
-                        if (preset.targetDocId) {
-                            const isDoc = await this.checkDocValidity(preset.targetDocId);
-                            if (isDoc) { docValid = true; docType = 'doc'; }
-                            else {
-                                const isNb = await this.isNotebookId(preset.targetDocId);
-                                docValid = !!isNb; docType = isNb ? 'notebook' : undefined;
-                            }
-                        }
-                        let databaseValid = true;
-                        if (preset.targetDatabaseId) {
-                            try { await this.avManager.getAttributeView(preset.targetDatabaseId); }
-                            catch { databaseValid = false; }
-                        }
-                        return { name: n, docValid, docType, databaseValid };
-                    })
-                );
-                const validityMap = new Map(validityChecks.map(v => [v.name, v]));
+    //             // 校验绑定有效性
+    //             const validityChecks = await Promise.all(
+    //                 filtered.map(async n => {
+    //                     const preset = presets[n];
+    //                     let docValid = true; let docType: 'doc' | 'notebook' | undefined;
+    //                     if (preset.targetDocId) {
+    //                         const isDoc = await this.checkDocValidity(preset.targetDocId);
+    //                         if (isDoc) { docValid = true; docType = 'doc'; }
+    //                         else {
+    //                             const isNb = await this.isNotebookId(preset.targetDocId);
+    //                             docValid = !!isNb; docType = isNb ? 'notebook' : undefined;
+    //                         }
+    //                     }
+    //                     let databaseValid = true;
+    //                     if (preset.targetDatabaseId) {
+    //                         try { await this.avManager.getAttributeView(preset.targetDatabaseId); }
+    //                         catch { databaseValid = false; }
+    //                     }
+    //                     return { name: n, docValid, docType, databaseValid };
+    //                 })
+    //             );
+    //             const validityMap = new Map(validityChecks.map(v => [v.name, v]));
 
-                for (const n of filtered) {
-                    const preset = presets[n] as PresetItem;
-                    const validity = validityMap.get(n);
-                    const item = document.createElement('div');
-                    item.style.cssText = 'padding:12px; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius);';
-                    item.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
-                            <div style="flex:1; min-width:0;">
-                                <div style="font-weight:500; color: var(--b3-theme-on-background); margin-bottom:6px; display:flex; gap:6px; align-items:center;">
-                                    <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
-                                    ${n}
-                                </div>
-                                <div style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${preset.sql}</div>
-                                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
-                                    ${preset.template ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); border-radius: var(--b3-border-radius-s);\">自定义模板</span>` : ''}
-                                    ${preset.updatedAt ? (() => {
-                                        const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-                                        return `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface-light); color: var(--b3-theme-on-surface); border-radius: var(--b3-border-radius-s);\">最近修改: ${short}</span>`;
-                                    })() : ''}
-                                    ${preset.targetDocId ? (validity?.docValid ? `<span style=\"font-size:11px;padding:2px 8px;background: rgba(101,184,77,0.12); color: var(--b3-theme-success); border-radius: var(--b3-border-radius-s);\">${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效文档绑定</span>`) : ''}
-                                    ${preset.targetDatabaseId ? (validity?.databaseValid ? `<span style=\"font-size:11px;padding:2px 8px;background: rgba(70,130,180,0.12); color:#1976d2; border-radius: var(--b3-border-radius-s);\">已绑定数据库</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效数据库绑定</span>`) : ''}
-                                </div>
-                            </div>
-                            <div style="display:flex; gap:8px; flex-shrink:0;">
-                                <button class="b3-button b3-button--outline inline-edit" style="padding:6px 12px; font-size:13px;">编辑</button>
-                                <button class="b3-button b3-button--outline inline-timer" style="padding:6px 12px; font-size:13px; ${preset.timerEnabled ? 'background: rgba(255, 193, 7, 0.12); border-color: #f57c00; color: #f57c00;' : ''}" title="${preset.timerEnabled ? '定时已启用' : '设置定时更新'}">定时</button>
-                                <button class="b3-button b3-button--primary inline-use" style="padding:6px 12px; font-size:13px;">使用</button>
-                            </div>
-                        </div>
-                    `;
+    //             for (const n of filtered) {
+    //                 const preset = presets[n] as PresetItem;
+    //                 const validity = validityMap.get(n);
+    //                 const item = document.createElement('div');
+    //                 item.style.cssText = 'padding:12px; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius);';
+    //                 item.innerHTML = `
+    //                     <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+    //                         <div style="flex:1; min-width:0;">
+    //                             <div style="font-weight:500; color: var(--b3-theme-on-background); margin-bottom:6px; display:flex; gap:6px; align-items:center;">
+    //                                 <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
+    //                                 ${n}
+    //                                 ${validity ? (((preset as any).pinned || (preset as any).starred || (preset as any).favorite || (preset as any).top || /^(?:[!*★☆]|🔖|pin:|star:)/i.test(n)) ? '<span style=\"font-size:11px;padding:2px 6px;background:var(--b3-theme-primary);color:var(--b3-theme-on-primary);border-radius:var(--b3-border-radius-s);\">置顶</span>' : '') : ''}
+    //                             </div>
+    //                             <div style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${preset.sql}</div>
+    //                             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+    //                                 ${preset.template ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); border-radius: var(--b3-border-radius-s);\">自定义模板</span>` : ''}
+    //                                 ${preset.updatedAt ? (() => {
+    //                                     const short = new Date(preset.updatedAt as number).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    //                                     return `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-surface-light); color: var(--b3-theme-on-surface); border-radius: var(--b3-border-radius-s);\">最近修改: ${short}</span>`;
+    //                                 })() : ''}
+    //                                 ${preset.targetDocId ? (validity?.docValid ? `<span style=\"font-size:11px;padding:2px 8px;background: rgba(101,184,77,0.12); color: var(--b3-theme-success); border-radius: var(--b3-border-radius-s);\">${validity?.docType === 'notebook' ? '笔记本日记' : '已绑定文档'}</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效文档绑定</span>`) : ''}
+    //                                 ${preset.targetDatabaseId ? (validity?.databaseValid ? `<span style=\"font-size:11px;padding:2px 8px;background: rgba(70,130,180,0.12); color:#1976d2; border-radius: var(--b3-border-radius-s);\">已绑定数据库</span>` : `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-card-error-background); color: var(--b3-card-error-color); border-radius: var(--b3-border-radius-s);\">无效数据库绑定</span>`) : ''}
+    //                             </div>
+    //                         </div>
+    //                         <div style="display:flex; gap:8px; flex-shrink:0;">
+    //                             <button class="b3-button b3-button--outline inline-pin" style="padding:6px 12px; font-size:13px; ${((preset as any).pinned ? 'background: var(--b3-theme-primary-lightest); border-color: var(--b3-theme-primary); color: var(--b3-theme-primary);' : '')}" title="${((preset as any).pinned ? '取消置顶' : '设为置顶')}">${((preset as any).pinned ? '取消置顶' : '置顶')}</button>
+    //                             <button class="b3-button b3-button--outline inline-edit" style="padding:6px 12px; font-size:13px;">编辑1</button>
+    //                             <button class="b3-button b3-button--outline inline-timer" style="padding:6px 12px; font-size:13px; ${preset.timerEnabled ? 'background: rgba(255, 193, 7, 0.12); border-color: #f57c00; color: #f57c00;' : ''}" title="${preset.timerEnabled ? '定时已启用' : '设置定时更新'}">定时</button>
+    //                             <button class="b3-button b3-button--primary inline-use" style="padding:6px 12px; font-size:13px;">使用</button>
+    //                         </div>
+    //                     </div>
+    //                 `;
 
-                    // 绑定事件
-                    const editBtn = item.querySelector('.inline-edit');
-                    editBtn?.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        // 打开内容聚合器页签（编辑在其中进行）
-                        try {
-                            openTab({
-                                app: (window as any).siyuan.ws.app,
-                                custom: {
-                                    icon: 'iconDatabase',
-                                    title: '内容聚合器',
-                                    id: this._plugin.name + 'content-aggregator',
-                                    data: { id: null }
-                                },
-                                keepCursor: false,
-                            });
-                        } catch (err) {
-                            console.warn('打开内容聚合页签失败:', err);
-                        }
-                    });
+    //                 // 绑定事件
+    //                 const editBtn = item.querySelector('.inline-edit');
+    //                 editBtn?.addEventListener('click', (e) => {
+    //                     e.stopPropagation();
+    //                     // 打开内容聚合器页签（编辑在其中进行）
+    //                     try {
+    //                         openTab({
+    //                             app: (window as any).siyuan.ws.app,
+    //                             custom: {
+    //                                 icon: 'iconDatabase',
+    //                                 title: '内容聚合器',
+    //                                 id: this._plugin.name + 'content-aggregator',
+    //                                 data: { id: null }
+    //                             },
+    //                             keepCursor: false,
+    //                         });
+    //                     } catch (err) {
+    //                         console.warn('打开内容聚合页签失败:', err);
+    //                     }
+    //                 });
 
-                    const timerBtn = item.querySelector('.inline-timer');
-                    timerBtn?.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        // 打开内容聚合器页签（定时设置在其中进行）
-                        try {
-                            openTab({
-                                app: (window as any).siyuan.ws.app,
-                                custom: {
-                                    icon: 'iconDatabase',
-                                    title: '内容聚合器',
-                                    id: this._plugin.name + 'content-aggregator',
-                                    data: { id: null }
-                                },
-                                keepCursor: false,
-                            });
-                        } catch (err) {
-                            console.warn('打开内容聚合页签失败:', err);
-                        }
-                    });
+    //                 // 置顶按钮
+    //                 const pinBtn = item.querySelector('.inline-pin');
+    //                 pinBtn?.addEventListener('click', async (e) => {
+    //                     e.stopPropagation();
+    //                     try {
+    //                         const newPinned = !((preset as any).pinned);
+    //                         await this.updatePresetPinned(n, newPinned);
+    //                         // 本地对象更新后刷新列表
+    //                         await renderPresets(searchInput?.value || '');
+    //                         showMessage(newPinned ? '已置顶该预设' : '已取消置顶', 2500, 'info');
+    //                     } catch (err) {
+    //                         console.warn('更新置顶状态失败', err);
+    //                         showMessage('更新置顶状态失败', 3000, 'error');
+    //                     }
+    //                 });
 
-                    const useBtn = item.querySelector('.inline-use');
-                    useBtn?.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        if (options?.onUse) options.onUse({ name: n, preset });
-                        else await this.runPresetByName(n);
-                    });
+    //                 const timerBtn = item.querySelector('.inline-timer');
+    //                 timerBtn?.addEventListener('click', (e) => {
+    //                     e.stopPropagation();
+    //                     // 打开内容聚合器页签（定时设置在其中进行）
+    //                     try {
+    //                         openTab({
+    //                             app: (window as any).siyuan.ws.app,
+    //                             custom: {
+    //                                 icon: 'iconDatabase',
+    //                                 title: '内容聚合器',
+    //                                 id: this._plugin.name + 'content-aggregator',
+    //                                 data: { id: null }
+    //                             },
+    //                             keepCursor: false,
+    //                         });
+    //                     } catch (err) {
+    //                         console.warn('打开内容聚合页签失败:', err);
+    //                     }
+    //                 });
 
-                    listEl.appendChild(item);
-                }
-            } catch (e) {
-                listEl.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--b3-theme-error);">加载失败: ${e?.message || String(e)}</div>`;
-            }
-        };
+    //                 const useBtn = item.querySelector('.inline-use');
+    //                 useBtn?.addEventListener('click', async (e) => {
+    //                     e.stopPropagation();
+    //                     if (options?.onUse) options.onUse({ name: n, preset });
+    //                     else await this.runPresetByName(n);
+    //                 });
 
-        const onInput = () => renderPresets(searchInput?.value || '');
-        searchInput?.addEventListener('input', onInput);
+    //                 listEl.appendChild(item);
+    //             }
+    //         } catch (e) {
+    //             listEl.innerHTML = `<div style="text-align:center; padding: 24px; color: var(--b3-theme-error);">加载失败: ${e?.message || String(e)}</div>`;
+    //         }
+    //     };
 
-        // 首次渲染
-        renderPresets();
+    //     const onInput = () => renderPresets(searchInput?.value || '');
+    //     searchInput?.addEventListener('input', onInput);
 
-        return {
-            refresh: () => renderPresets(searchInput?.value || ''),
-            unmount: () => {
-                disposed = true;
-                searchInput?.removeEventListener('input', onInput);
-                container.innerHTML = '';
-            }
-        };
-    }
+    //     // 首次渲染
+    //     renderPresets();
+
+    //     return {
+    //         refresh: () => renderPresets(searchInput?.value || ''),
+    //         unmount: () => {
+    //             disposed = true;
+    //             searchInput?.removeEventListener('input', onInput);
+    //             container.innerHTML = '';
+    //         }
+    //     };
+    // }
 
     /**
      * showPresetEditor 已移除（弹窗形式已删除）
@@ -1529,10 +1547,52 @@ export class aggregatorBlock {
             if (!operations.length && !errors.length) {
                 showMessage('未执行任何插入操作，请检查预设配置', 4000, 'info');
             }
+
+            // 手动执行后更新 lastExecuteTime 以供右键菜单显示最近执行时间
+            try {
+                if (this.pluginConfig) {
+                    await this.pluginConfig.load();
+                    const current = this.pluginConfig.get('presets') || {};
+                    if (current[name]) {
+                        current[name].lastExecuteTime = Date.now();
+                        this.pluginConfig.set('presets', current);
+                        await this.pluginConfig.save();
+                    }
+                }
+            } catch (err) {
+                console.warn('[aggregatorBlock] 更新 lastExecuteTime 失败', err);
+            }
         } catch (e: any) {
             console.error('[aggregatorBlock] runPresetByName error', e);
             showMessage(`执行失败: ${e?.message || String(e)}`, 5000, 'error');
         }
+    }
+
+    /**
+     * 获取置顶/收藏的预设列表
+     * 置顶识别规则（任意命中即视为置顶）：
+     *  1. 预设对象存在 pinned/starred/favorite/top 字段且为 true
+     *  2. 预设名称以特殊前缀开头: ! * ★ ☆ 🔖 pin: star:
+     */
+    public async getPinnedPresets(): Promise<Array<{ name: string; preset: PresetItem }>> {
+        const all = await this.getSqlPresets();
+        const result: Array<{ name: string; preset: PresetItem }> = [];
+        const pinNameReg = /^(?:[!*★☆]|🔖|pin:|star:)/i;
+        for (const [name, preset] of Object.entries(all)) {
+            const p: any = preset;
+            const flagged = !!(p.pinned || p.starred || p.favorite || p.top || pinNameReg.test(name));
+            if (flagged) {
+                result.push({ name, preset: preset as PresetItem });
+            }
+        }
+        // 最近手动或定时执行的排在前面
+        result.sort((a, b) => {
+            const ta = (a.preset as any).lastExecuteTime || (a.preset as any).updatedAt || 0;
+            const tb = (b.preset as any).lastExecuteTime || (b.preset as any).updatedAt || 0;
+            if (ta !== tb) return tb - ta;
+            return a.name.localeCompare(b.name, 'zh-CN');
+        });
+        return result;
     }
 
     // 模板渲染函数：将 SQL 结果按模板渲染为 Markdown
@@ -1872,6 +1932,28 @@ export class aggregatorBlock {
             }
         } catch (e) {
             console.error('[aggregatorBlock] updatePresetDocInsertMode error', e);
+        }
+    }
+
+    // 更新预设的置顶状态（pinned）
+    async updatePresetPinned(presetName: string, pinned: boolean): Promise<void> {
+        try {
+            if (!this.pluginConfig) {
+                console.error('[aggregatorBlock] cannot update preset: pluginConfig not provided');
+                return;
+            }
+            const current = this.pluginConfig.get('presets') || {};
+            if (current[presetName]) {
+                current[presetName].pinned = pinned;
+                current[presetName].updatedAt = Date.now();
+                this.pluginConfig.set('presets', current);
+                await this.pluginConfig.save();
+                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的置顶状态: ${pinned}`);
+            } else {
+                console.warn('[aggregatorBlock] preset not found:', presetName);
+            }
+        } catch (e) {
+            console.error('[aggregatorBlock] updatePresetPinned error', e);
         }
     }
 }
