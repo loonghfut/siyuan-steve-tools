@@ -7,6 +7,7 @@ const versions = createShapePropsMigrationIds(
   {
     Addv: 1,
     Addcolor: 2,
+    Addscreenshot: 3,
   }
 )
 
@@ -31,6 +32,17 @@ export const slideShapeMigrations = createShapePropsMigrationSequence({
       },
       down(props) {
         delete props.color
+      },
+    },
+    {
+      id: versions.Addscreenshot,
+      up(props) {
+        if (typeof props.screenshot !== 'string') {
+          props.screenshot = ''
+        }
+      },
+      down(props) {
+        delete props.screenshot
       },
     },
   ],

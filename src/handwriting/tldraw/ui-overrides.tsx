@@ -16,7 +16,6 @@ import {
     DefaultMainMenu,
     TldrawUiMenuGroup,
     DefaultMainMenuContent,
-    TLEventMap,
     track, // 导入 track
     useRelevantStyles,
     DefaultStylePanelContent,
@@ -34,6 +33,7 @@ declare module '@tldraw/tldraw' {
 }
 import React from 'react';
 import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
+import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ICardShape } from './CardShape/card-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
@@ -123,6 +123,7 @@ const CustomStylePanel = track(() => {
     const editor = useEditor()
     const selectedShapes = useValue('selected shapes', () => editor.getSelectedShapes(), [editor])
     const styles = useRelevantStyles()
+    const [isCapturingScreenshot, setIsCapturingScreenshot] = React.useState(false)
 
     const isSingleSlideSelected = selectedShapes.length === 1 && selectedShapes[0].type === 'slide';
     const slideShape = isSingleSlideSelected ? (selectedShapes[0] as SlideShape) : null;
@@ -178,6 +179,56 @@ const CustomStylePanel = track(() => {
         },
         []
     );
+    // --- 处理截图更新 ---
+    const handleCaptureScreenshot = React.useCallback(async () => {
+        if (!slideShape || isCapturingScreenshot) return
+
+        setIsCapturingScreenshot(true)
+        try {
+            const result = await captureSlideScreenshot(editor, slideShape.id, {
+                format: 'png',
+                updateShape: true,
+            })
+            if (result) {
+                let copiedToClipboard = false
+                const blobType = result.blob.type || 'image/png'
+                try {
+                    if (navigator?.clipboard && 'write' in navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                        await navigator.clipboard.write([
+                            new ClipboardItem({
+                                [blobType]: result.blob,
+                            }),
+                        ])
+                        copiedToClipboard = true
+                    }
+                } catch (clipboardErr) {
+                    console.error('copy slide screenshot blob failed', clipboardErr)
+                }
+
+                if (!copiedToClipboard && navigator?.clipboard?.writeText) {
+                    try {
+                        await navigator.clipboard.writeText(result.dataUrl)
+                        copiedToClipboard = true
+                    } catch (textCopyErr) {
+                        console.error('copy slide screenshot data url failed', textCopyErr)
+                    }
+                }
+
+                if (copiedToClipboard) {
+                    showMessage('幻灯片截图已更新并复制到剪贴板')
+                } else {
+                    showMessage('幻灯片截图已更新，但复制到剪贴板失败', -1, 'error')
+                }
+            } else {
+                showMessage('生成幻灯片截图失败', -1, 'error')
+            }
+        } catch (error) {
+            console.error('capture slide screenshot failed', error)
+            showMessage('生成幻灯片截图失败', -1, 'error')
+        } finally {
+            setIsCapturingScreenshot(false)
+        }
+    }, [editor, slideShape, isCapturingScreenshot])
 
     const handleCopyLink = React.useCallback(async () => {
         if (slideShape && rootId !== '') { // 检查 rootId 是否已设置
@@ -229,6 +280,15 @@ const CustomStylePanel = track(() => {
                         disabled={rootId === ''} // 如果 rootId 未设置则禁用
                     >
                         复制链接
+                    </button>
+                    <button
+                        className="tlui-button"
+                        onClick={handleCaptureScreenshot}
+                        onPointerDown={stopEventPropagation}
+                        style={{ marginTop: '-8px', width: '100%' }}
+                        disabled={isCapturingScreenshot}
+                    >
+                        {isCapturingScreenshot ? '生成中…' : '更新截图'}
                     </button>
                 </div>
             )}

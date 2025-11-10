@@ -1,5 +1,4 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
 import { createRoot } from 'react-dom/client'; // 添加这个导入
 import { CardShapeTool } from './CardShape/CardShapeTool'
 import { CardShapeUtil } from './CardShape/CardShapeUtil'
@@ -7,21 +6,21 @@ import { components, uiOverrides } from './ui-overrides'
 import {
     Tldraw,
     TldrawOptions,
-    TLUiOverrides,
     defaultShapeUtils,
     TLStore,
     Editor,
-    createShapeId,
     TLShapeId,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
-import { cardShapeMigrations, initCardsWithBlockIds } from './CardShape/card-shape-migrations';
+import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
 import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
 import * as api from '@/api/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
+import { captureSlideScreenshot, CaptureSlideScreenshotOptions, CaptureSlideScreenshotResult } from './SlideShape/captureSlideScreenshot';
+import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage } from 'siyuan';
 import { settingdata } from '@/index';
@@ -42,7 +41,6 @@ export class TldrawManager {
     private id: string;
     private container: HTMLElement;
     private tldrawComponent
-    private customTools: any[] = [];
     private root: any; // 添加 root 属性
     private blockIds: string[] = [];
     private store: TLStore; // 存储 TLDraw 的数据
@@ -356,7 +354,7 @@ export class TldrawManager {
         const sessionId = Date.now().toString() + Math.random().toString(36).slice(2);
 
         // 监听本地变更并广播
-        const unlisten = this.store.listen(
+        this.store.listen(
             (update) => {
                 // 如果当前正在应用远程更改，不广播以避免循环
                 if (this.applyingRemoteChanges) return;
@@ -660,6 +658,37 @@ export class TldrawManager {
         );
 
         return cardShape?.id || null;
+    }
+
+    public async captureSlideScreenshot(slideId: TLShapeId, options: CaptureSlideScreenshotOptions = {}): Promise<CaptureSlideScreenshotResult | null> {
+        if (!this.editor) {
+            throw new Error('Editor instance not initialized');
+        }
+        const result = await captureSlideScreenshot(this.editor, slideId, options);
+        if (options.updateShape && result) {
+            await this.saveData();
+        }
+        return result;
+    }
+
+    public async captureAllSlideScreenshots(options: CaptureSlideScreenshotOptions = {}): Promise<Map<TLShapeId, CaptureSlideScreenshotResult | null>> {
+        if (!this.editor) {
+            throw new Error('Editor instance not initialized');
+        }
+        const results = new Map<TLShapeId, CaptureSlideScreenshotResult | null>();
+        const slides = getSlides(this.editor);
+        let hasUpdates = false;
+        for (const slide of slides) {
+            const result = await captureSlideScreenshot(this.editor, slide.id, options);
+            results.set(slide.id, result);
+            if (result) {
+                hasUpdates = true;
+            }
+        }
+        if (options.updateShape && hasUpdates) {
+            await this.saveData();
+        }
+        return results;
     }
 
     /**
