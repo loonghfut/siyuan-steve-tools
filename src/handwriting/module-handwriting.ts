@@ -11,6 +11,8 @@ export class M_handwriting {
     // 存储画布实例的映射表
 
     private currentid: string = "";
+    // 记录点击拦截器以便卸载时移除
+    private clickHandler?: (e: MouseEvent) => void;
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -23,93 +25,176 @@ export class M_handwriting {
                ${ic.steveTools_whiteboard}
             </symbol>  
         `);
+        // 统一处理插件 URL 的逻辑，供多处调用（事件总线或页面点击）
+        const handlePluginUrl = async (url: string) => {
+            try {
+                // 支持两种前缀：siyuan://plugins/... 或 https://plugins/...
+                if (!url || (!url.startsWith('siyuan://plugins/siyuan-steve-tools/') && !url.startsWith('https://plugins/siyuan-steve-tools/'))) {
+                    return;
+                }
+
+                // 规范化 URL：把 HTML 实体中的 &amp; 解码为 &，避免查询参数解析失败
+                let normalizedUrl = url;
+                if (normalizedUrl.includes('&amp;')) {
+                    // 多次替换，处理可能出现的 &amp;amp; 等情况
+                    while (normalizedUrl.includes('&amp;')) {
+                        normalizedUrl = normalizedUrl.replace(/&amp;/g, '&');
+                    }
+                }
+
+                // 提取查询参数部分
+                const queryString = normalizedUrl.split('?')[1];
+                if (!queryString) return;
+
+                // 解析查询参数
+                const params = new URLSearchParams(queryString);
+                const rootid = params.get('rootid');
+                const blockid = params.get('blockid');
+                const shapeid = params.get('shapeid');
+                const title = params.get('title') || "画板" + rootid;
+
+                // 如果只有 rootid（且 blockid 显式为 null），直接打开空白画板
+                if (rootid && blockid === null) {
+                    await openTab({
+                        app: this.plugin.app,
+                        custom: {
+                            id: this.plugin.name + "steveTool-whiteboard",
+                            title: title,
+                            icon: "iconSTWhiteboard",
+                            data: {
+                                text: "steveTool-whiteboard" + rootid,
+                                rootid: rootid,
+                            },
+                        },
+                        position: "right",
+                    });
+                    return;
+                }
+
+                if (!rootid || !blockid) {
+                    showMessage("缺少必要的参数");
+                    return;
+                }
+
+                // 根据解析出的参数执行相应操作
+                if (rootid && blockid) {
+                    const docblock = await api.getBlockByID(rootid);
+                    const id = await api.getBlockByID(blockid);
+                    if (!docblock) {
+                        showMessage('未找到此rootid对应的块');
+                        return;
+                    }
+                    if (docblock.id !== docblock.root_id) {
+                        showMessage('当前块不是根块，请检查');
+                        return;
+                    }
+                    if (!id) {
+                        showMessage('未找到此blockid对应的块');
+                        return;
+                    }
+
+                    const tab = await openTab({
+                        app: this.plugin.app,
+                        custom: {
+                            id: this.plugin.name + "steveTool-whiteboard",
+                            title: title,
+                            icon: "iconSTWhiteboard",
+                            data: {
+                                text: "steveTool-whiteboard" + rootid,
+                                rootid: rootid,
+                            },
+                        },
+                        position: "right",
+                    });
+                    const tldrawManager = (tab.panelElement as any).tldrawManager as TldrawManager;
+                    // 延时后再导航到指定块/形状
+                    setTimeout(() => {
+                        if (shapeid) {
+                            tldrawManager.navigateToBlockShape(blockid, shapeid as TLShapeId);
+                        } else if (blockid) {
+                            tldrawManager.navigateToBlockShape(blockid);
+                        }
+                    }, 50);
+                }
+            } catch (error) {
+                console.error('解析插件 URL 参数出错:', error);
+            }
+        };
+
+        // 监听来自思源的自定义事件（原有逻辑）
         this.plugin.eventBus.on('open-siyuan-url-plugin', async (e) => {
-            // console.log("打开思源URL插件:", e);
-            const url = e.detail.url;
-            if (url.startsWith('siyuan://plugins/siyuan-steve-tools/')) {
-                try {
-                    // 提取查询参数部分
-                    const queryString = url.split('?')[1];
-                    if (!queryString) return;
+            const url = e.detail.url as string;
+            await handlePluginUrl(url);
+        });
 
-                    // 解析查询参数
-                    const params = new URLSearchParams(queryString);
-                    const rootid = params.get('rootid');
-                    const blockid = params.get('blockid');
-                    const shapeid = params.get('shapeid');
-                    const title = params.get('title') || "画板" + rootid;
-                    // console.log('解析思源 URL 参数:', { rootid, blockid });
-                    //判断rootid和blockid是否存在
-                    if (rootid && blockid === null) {
-                        await openTab({
-                            app: this.plugin.app,
-                            custom: {
-                                id: this.plugin.name + "steveTool-whiteboard",
-                                title: title,
-                                icon: "iconSTWhiteboard",
-                                data: {
-                                    text: "steveTool-whiteboard" + rootid,
-                                    rootid: rootid,
-                                },
-                            },
-                            position: "right",
-                        });
-                        return;
-                    }
+        // 拦截以 https://plugins/siyuan-steve-tools/ 开头的链接点击并交给 handlePluginUrl 处理
+        this.clickHandler = async (e: MouseEvent) => {
+            // 仅处理左键点击且未被修饰键干预的常规点击
+            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
-                    if (!rootid || !blockid) {
-                        showMessage("缺少必要的参数");
-                        return;
-                    }
-
-                    // 这里可以根据解析出的参数执行相应操作
-                    if (rootid && blockid) {
-                        const docblock = await api.getBlockByID(rootid);
-                        const id = await api.getBlockByID(blockid);
-                        if (!docblock) {
-                            showMessage('未找到此rootid对应的块');
-                            return;
+            // 向上寻找最近的 <a> 元素
+            const path = e.composedPath ? e.composedPath() : [];
+            let anchor: HTMLAnchorElement | null = null;
+            let dataHrefEl: HTMLElement | null = null;
+            let candidateUrl: string | null = null;
+            for (const node of path as any[]) {
+                if (node instanceof HTMLAnchorElement) { anchor = node; break; }
+                if (!anchor && node instanceof HTMLElement) {
+                    const dt = node.getAttribute && node.getAttribute('data-type');
+                    if (dt === 'a') {
+                        const dh = node.getAttribute('data-href') || '';
+                        if (dh) {
+                            dataHrefEl = node;
+                            candidateUrl = dh;
+                            // 不 break，让上层如存在 <a> 优先
                         }
-                        if (docblock.id !== docblock.root_id) {
-                            showMessage('当前块不是根块，请检查');
-                            return;
-                        }
-                        if (!id) {
-                            showMessage('未找到此blockid对应的块');
-                            return;
-                        }
-
-                        const tab = await openTab({
-                            app: this.plugin.app,
-                            custom: {
-                                id: this.plugin.name + "steveTool-whiteboard",
-                                title: title,
-                                icon: "iconSTWhiteboard",
-                                data: {
-                                    text: "steveTool-whiteboard" + rootid,
-                                    rootid: rootid,
-                                },
-                            },
-                            position: "right",
-                        });
-                        const tldrawManager = (tab.panelElement as any).tldrawManager as TldrawManager;
-                        // console.log("tldrawManager", tldrawManager);
-                        // 延时500毫秒后再导航
-                        setTimeout(() => {
-                            if (shapeid) {
-                                tldrawManager.navigateToBlockShape(blockid, shapeid as TLShapeId);
-                            } else if (blockid) {
-                                tldrawManager.navigateToBlockShape(blockid);
-                            }
-                        }, 50);
                     }
-                } catch (error) {
-                    console.error('解析思源 URL 参数出错:', error);
                 }
             }
+            if (!anchor) {
+                // 兼容性退路：从事件目标向上查找
+                let el = e.target as HTMLElement | null;
+                while (el) {
+                    if (el instanceof HTMLAnchorElement) { anchor = el; break; }
+                    if (!dataHrefEl && el.getAttribute) {
+                        const dt = el.getAttribute('data-type');
+                        if (dt === 'a') {
+                            const dh = el.getAttribute('data-href') || '';
+                            if (dh) {
+                                dataHrefEl = el;
+                                candidateUrl = dh;
+                            }
+                        }
+                    }
+                    el = el.parentElement;
+                }
+            }
+            // 先取 <a href>，如无则取 data-href
+            let href = anchor ? (anchor.getAttribute('href') || '') : '';
+            if (!href && candidateUrl) href = candidateUrl;
+            if (!href) return;
+
+            // 只拦截目标前缀，避免影响其他链接
+            if (href.startsWith('https://plugins/siyuan-steve-tools/')) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    // 同样对 &amp; 进行解码，避免参数丢失
+                    let toHandle = href;
+                    if (toHandle.includes('&amp;')) {
+                        while (toHandle.includes('&amp;')) {
+                            toHandle = toHandle.replace(/&amp;/g, '&');
+                        }
+                    }
+                    await handlePluginUrl(toHandle);
+                } catch (err) {
+                    console.error('处理插件 https 链接失败:', err);
+                }
+            }
+        };
+        document.addEventListener('click', this.clickHandler, true);
 
 
-        });
         this.plugin.addTab({
             type: "steveTool-whiteboard",
             async init() {
@@ -144,7 +229,7 @@ export class M_handwriting {
         // });
     }
 
-    async onLayoutReady(settingdata) {
+    async onLayoutReady(_settingdata) {
         // 可以在这里初始化任何需要DOM加载完成后的逻辑
         this.plugin.eventBus.on('switch-protyle', (e) => {
             // console.log("切换思源块:", e);
@@ -164,7 +249,7 @@ export class M_handwriting {
         const tabId = this.plugin.name + "steveTool-whiteboard";
         const titleText = e.detail.protyle.title.editElement.textContent;
 
-        const whiteBoardTab = await openTab({
+        await openTab({
             app: this.plugin.app,
             custom: {
                 id: tabId,
@@ -246,5 +331,11 @@ export class M_handwriting {
 
         // 清空实例映射表
         tldrawInstances.clear();
+
+        // 移除链接点击拦截器
+        if (this.clickHandler) {
+            document.removeEventListener('click', this.clickHandler, true);
+            this.clickHandler = undefined;
+        }
     }
 }

@@ -11,8 +11,7 @@ import {
 	getPerfectDashProps,
 	resizeBox,
 	useValue,
-	DefaultColorStyle,
-	stopEventPropagation, // 导入 stopEventPropagation
+	DefaultColorStyle, // 导入 stopEventPropagation
 	useEditor,
 	TLDefaultColorStyle,
 	getDefaultColorTheme, // 导入 useEditor
