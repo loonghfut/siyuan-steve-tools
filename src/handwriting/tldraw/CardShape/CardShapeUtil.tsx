@@ -423,37 +423,94 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		return resizeBox(shape, info)
 	}
 
-	override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
-		// 获取当前主题颜色（考虑暗黑模式）
-		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode });
-		// 获取卡片的背景色
-		const backgroundColor = theme[shape.props.color].semi;
-		// 获取卡片的边框/文字颜色
-		const textColor = theme[shape.props.color].solid;
+		override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
+		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
+		const { w, h, color, fontSize = 16, blockId } = shape.props
+		const border = -10
+		const radius = 10
+		const strokeColor = theme[color].solid
+		const fillColor = theme[color].semi
+		let serialized = ''
 
-		// 返回一个 SVG 组合，包含背景矩形和提示文字
+		const serializeContent = () => {
+			if (typeof document === 'undefined') return ''
+			const host = document.getElementById(shape.id)
+			if (!host) return ''
+			const content = host.querySelector('[blockid]') as HTMLElement | null
+			if (!content) return ''
+			const clone = content.cloneNode(true) as HTMLElement
+
+			const inlineComputedStyles = (source: Element, target: Element) => {
+				const computed = window.getComputedStyle(source)
+				const styleText = Array.from(computed)
+					.map((prop) => `${prop}:${computed.getPropertyValue(prop)};`)
+					.join('')
+				const existing = target.getAttribute('style') || ''
+				target.setAttribute('style', `${styleText}${existing}`)
+				const sourceChildren = Array.from(source.children)
+				const targetChildren = Array.from(target.children)
+				for (let i = 0; i < sourceChildren.length; i++) {
+					const srcChild = sourceChildren[i]
+					const tgtChild = targetChildren[i]
+					if (srcChild && tgtChild) {
+						inlineComputedStyles(srcChild, tgtChild)
+					}
+				}
+			}
+
+			inlineComputedStyles(content, clone)
+			clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'))
+			clone.querySelectorAll('[data-node-id]').forEach((el) => el.removeAttribute('data-node-id'))
+			clone.querySelectorAll('[data-node-index]').forEach((el) => el.removeAttribute('data-node-index'))
+			clone.querySelectorAll('[updated]').forEach((el) => el.removeAttribute('updated'))
+			clone.querySelectorAll('[data-realwidth]').forEach((el) => el.removeAttribute('data-realwidth'))
+			clone.querySelectorAll('[data-readonly]').forEach((el) => el.removeAttribute('data-readonly'))
+			clone.querySelectorAll('*').forEach((node) => {
+				if (node instanceof HTMLElement) {
+					node.style.setProperty('scrollbar-width', 'none', 'important')
+					node.style.setProperty('ms-overflow-style', 'none', 'important')
+					node.style.setProperty('overscroll-behavior', 'contain')
+				}
+			})
+			clone.style.width = `${w - border * 2}px`
+			clone.style.height = `${h - border * 2}px`
+			clone.style.pointerEvents = 'none'
+			clone.style.overflow = 'hidden'
+			clone.style.fontSize = `${fontSize}px`
+			clone.style.boxSizing = 'border-box'
+			return clone.outerHTML
+		}
+
+		serialized = serializeContent()
+		const hideScrollbarStyle = serialized
+			? '<style xmlns="http://www.w3.org/1999/xhtml">*::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}*::-webkit-scrollbar-thumb{display:none!important;}*{scrollbar-width:none!important;}</style>'
+			: ''
+
 		return (
 			<g>
-				<rect
-					width={shape.props.w}
-					height={shape.props.h}
-					fill={backgroundColor}
-					stroke={textColor} // 使用文字颜色作为边框色
-					strokeWidth={1}
-				/>
-				<text
-					x={shape.props.w / 2} // 水平居中
-					y={shape.props.h / 2} // 垂直居中
-					textAnchor="middle" // 水平对齐方式
-					dominantBaseline="middle" // 垂直对齐方式
-					fill={textColor} // 文字颜色
-					fontSize={Math.min(shape.props.w / 10, shape.props.h / 5, 16)} // 动态调整字体大小，最大16
-					fontFamily="sans-serif"
-				>
-					要完整内容请自行截图
-				</text>
+				<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
+				{serialized ? (
+					<foreignObject x={border} y={border} width={Math.max(w - border * 2, 0)} height={Math.max(h - border * 2, 0)}>
+						<div
+							xmlns="http://www.w3.org/1999/xhtml"
+							style={{ width: '100%', height: '100%', overflow: 'hidden', fontSize: `${fontSize}px` }}
+							dangerouslySetInnerHTML={{ __html: `${hideScrollbarStyle}${serialized}` }}
+						/>
+					</foreignObject>
+				) : (
+					<text
+						x={w / 2}
+						y={h / 2}
+						fill={strokeColor}
+						fontSize={fontSize * 0.9}
+						dominantBaseline="middle"
+						textAnchor="middle"
+					>
+						{blockId ? `Block ${blockId.slice(-6)}` : 'Card'}
+					</text>
+				)}
 			</g>
-		);
+		)
 	}
 
 
