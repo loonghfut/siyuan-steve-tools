@@ -58,7 +58,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			h: 80,
 			color: 'black',
 			blockId: '',
-			fontSize: 16,
+			fontSize: 20,
 			refreshNonce: Date.now(),
 		}
 	}
@@ -155,7 +155,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (protyleHostRef.current && protyleHostRef.current.parentElement === container) {
 					try {
 						protyleHostRef.current.parentElement?.removeChild(protyleHostRef.current)
-					} catch (e) {}
+					} catch (e) { }
 				}
 				protyleHostRef.current = host
 
@@ -171,15 +171,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						title: false,
 						breadcrumbDocName: false,
 					},
-					action: ['cb-get-all','cb-get-focus'],
+					action: ['cb-get-all', 'cb-get-focus'],
 					mode: 'wysiwyg',
 					after(protyle) {
 						protyle.protyle.wysiwyg.preventKeyup = true
 						resolveReady && resolveReady()
 					},
 					click: {
-                        preventInsetEmptyBlock: true
-                    },
+						preventInsetEmptyBlock: true
+					},
 					handleEmptyContent() {
 						showMessage('块已被删除')
 						if (!disposed) {
@@ -255,8 +255,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						event.preventDefault()
 						event.stopImmediatePropagation()
 						event.stopPropagation()
-						// IE fallback
-						;(event as any).returnValue = false
+							// IE fallback
+							; (event as any).returnValue = false
 					} catch (e) {
 						// ignore
 					}
@@ -302,8 +302,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						event.preventDefault()
 						event.stopImmediatePropagation()
 						event.stopPropagation()
-						;(event as any).returnValue = false
-					} catch (e) {}
+							; (event as any).returnValue = false
+					} catch (e) { }
 				}
 
 				// Use non-passive capture listeners so we can reliably prevent default actions
@@ -313,10 +313,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				detachKeyHandler.current = () => {
 					try {
 						wys.removeEventListener('keydown', handleKeyDown, { capture: true } as EventListenerOptions)
-					} catch (e) {}
+					} catch (e) { }
 					try {
 						wys.removeEventListener('keyup', handleKeyUp, { capture: true } as EventListenerOptions)
-					} catch (e) {}
+					} catch (e) { }
 				}
 			}
 
@@ -361,7 +361,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 								host.parentElement.replaceChild(staticHost, host)
 								protyleHostRef.current = staticHost
 							}
-							try { protyleRef.current.destroy() } catch (e) {}
+							try { protyleRef.current.destroy() } catch (e) { }
 						} catch (err) {
 							console.error('销毁 Protyle 时出错', err)
 						}
@@ -381,7 +381,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				disposed = true
 				detachKeyHandler.current?.()
 				if (protyleRef.current) {
-					try { protyleRef.current.destroy() } catch {}
+					try { protyleRef.current.destroy() } catch { }
 					protyleRef.current = null
 				}
 				if (protyleHostRef.current?.parentElement) {
@@ -389,7 +389,16 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				}
 				protyleHostRef.current = null
 			}
-		}, [isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce, shape.props.fontSize])
+		}, [isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce])
+
+		useEffect(() => {
+			if (protyleRef.current?.protyle?.wysiwyg?.element) {
+				protyleRef.current.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 20}px`;
+			} else if (containerRef.current) {
+				const wys = containerRef.current.querySelector(".protyle-wysiwyg");
+				if (wys) (wys as HTMLElement).style.fontSize = `${shape.props.fontSize || 20}px`;
+			}
+		}, [shape.props.fontSize]);
 
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
