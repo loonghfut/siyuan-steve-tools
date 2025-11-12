@@ -407,7 +407,7 @@ export class TldrawManager {
         // 使用节流函数确保不会过于频繁地保存
         const throttledSave = throttle(() => {
             this.saveData();
-        }, 2000); // 2秒节流
+        }, 3000); // 3秒节流
 
         // 监听存储变化
         this.store.listen(throttledSave);
@@ -654,8 +654,9 @@ export class TldrawManager {
         if (!this.editor) return null;
 
         const shapes = this.editor.getCurrentPageShapes();
+        // console.log("查找形状", blockId, shapes);
         const cardShape = shapes.find(shape =>
-            shape.type === 'card' &&
+            (shape.type === 'card'|| shape.type === 'single-block') &&
             (shape as ICardShape).props?.blockId === blockId
         );
 
