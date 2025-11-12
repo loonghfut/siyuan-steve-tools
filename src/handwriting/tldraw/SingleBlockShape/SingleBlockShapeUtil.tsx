@@ -1,10 +1,12 @@
 import React, { ReactElement, useEffect, useRef, useState } from 'react'
 import {
 	HTMLContainer,
+	EASINGS,
 	Rectangle2d,
 	ShapeUtil,
 	SvgExportContext,
 	TLResizeInfo,
+	TLShapeId,
 	createShapeId,
 	getDefaultColorTheme,
 	resizeBox,
@@ -52,8 +54,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	getDefaultProps(): ISingleBlockShape['props'] {
 		return {
-			w: 360,
-			h: 320,
+			w: 300,
+			h: 80,
 			color: 'black',
 			blockId: '',
 			fontSize: 16,
@@ -112,11 +114,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					try {
 						pendingCreationPromise = (async () => {
 							const idid = (await api.generateSiyuanID()) as string
-							const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-							const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`
+							const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`
 							const redata = await api.appendBlock(
 								'markdown',
-								`##### [${timestamp}](${link})[🔗](${link})\n{: id="${idid}" custom-st-tldraw-single="1" }\n\n`,
+								`[🔗](${link})\n{: id="${idid}" custom-st-tldraw-single="1" }\n\n`,
 								tldrawId!
 							)
 							return redata[0].doOperations[0].id as string
@@ -150,26 +151,35 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				host.style.width = '100%'
 				host.style.height = '100%'
 				host.style.overflow = 'hidden'
+				// If there is an existing static host in the container (from previous non-edit state), remove it
+				if (protyleHostRef.current && protyleHostRef.current.parentElement === container) {
+					try {
+						protyleHostRef.current.parentElement?.removeChild(protyleHostRef.current)
+					} catch (e) {}
+				}
 				protyleHostRef.current = host
 
 				let resolveReady: (() => void) | null = null
 				const readyPromise = new Promise<void>((resolve) => (resolveReady = resolve))
 				const pt = new Protyle(window.siyuan.ws.app, host, {
 					blockId,
-					rootId: blockId,
-					defId: blockId,
+					// rootId: blockId,
+					// defId: blockId,
 					render: {
 						breadcrumb: false,
 						gutter: true,
 						title: false,
 						breadcrumbDocName: false,
 					},
-					action: ['cb-get-all', 'cb-get-focus'],
+					action: ['cb-get-all','cb-get-focus'],
 					mode: 'wysiwyg',
 					after(protyle) {
 						protyle.protyle.wysiwyg.preventKeyup = true
 						resolveReady && resolveReady()
 					},
+					click: {
+                        preventInsetEmptyBlock: true
+                    },
 					handleEmptyContent() {
 						showMessage('块已被删除')
 						if (!disposed) {
@@ -186,23 +196,74 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				await readyPromise.catch(() => undefined)
 			}
 
+			const ensureShapeVisible = (targetId: TLShapeId, retries = 3) => {
+				const attempt = (remaining: number) => {
+					const viewportBounds = editor.getViewportPageBounds()
+					const shapeBounds = editor.getShapePageBounds(targetId)
+					if (!viewportBounds || !shapeBounds) {
+						if (remaining > 0) {
+							requestAnimationFrame(() => attempt(remaining - 1))
+						}
+						return
+					}
+
+					const padding = 32
+					const visibleLeft = viewportBounds.minX + padding
+					const visibleRight = viewportBounds.maxX - padding
+					const visibleTop = viewportBounds.minY + padding
+					const visibleBottom = viewportBounds.maxY - padding
+
+					let deltaX = 0
+					let deltaY = 0
+
+					if (shapeBounds.minX < visibleLeft) {
+						deltaX = shapeBounds.minX - visibleLeft
+					} else if (shapeBounds.maxX > visibleRight) {
+						deltaX = shapeBounds.maxX - visibleRight
+					}
+
+					if (shapeBounds.minY < visibleTop) {
+						deltaY = shapeBounds.minY - visibleTop
+					} else if (shapeBounds.maxY > visibleBottom) {
+						deltaY = shapeBounds.maxY - visibleBottom
+					}
+
+					if (deltaX === 0 && deltaY === 0) return
+
+					const newCenter = {
+						x: viewportBounds.midX + deltaX,
+						y: viewportBounds.midY + deltaY,
+					}
+
+					editor.centerOnPoint(newCenter, {
+						animation: { duration: 220, easing: EASINGS.easeInOutCubic },
+					})
+				}
+
+				attempt(retries)
+			}
+
 			const registerKeyHandler = () => {
 				detachKeyHandler.current?.()
 				const wys = protyleRef.current?.protyle?.wysiwyg?.element
 				if (!isEditingState || !wys) return
 
 				const handleKeyDown = (event: KeyboardEvent) => {
-					if (event.key !== 'Enter') return
+					if (event.key !== 'Enter' || event.isComposing) return
+					if (event.shiftKey) return
 					event.preventDefault()
 					const offset = 40
+					const createBelow = event.ctrlKey || event.metaKey
 					const newId = createShapeId()
 					const defaultProps = this.getDefaultProps()
+					const nextX = createBelow ? shape.x : shape.x + shape.props.w + offset
+					const nextY = createBelow ? shape.y + shape.props.h + offset : shape.y
 					editor.createShapes([
 						{
 							id: newId,
 							type: shape.type,
-							x: shape.x + shape.props.w + offset,
-							y: shape.y,
+							x: nextX,
+							y: nextY,
 							props: {
 								...defaultProps,
 								blockId: '',
@@ -212,7 +273,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						},
 					])
 					editor.select(newId)
-					editor.setEditingShape(newId)
+                    editor.setEditingShape(newId)
+                    requestAnimationFrame(() => ensureShapeVisible(newId))
 				}
 
 				wys.addEventListener('keydown', handleKeyDown, true)
@@ -246,7 +308,28 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (isEditingState) {
 					protyleRef.current?.enable()
 				} else {
-					try { protyleRef.current?.disable() } catch {}
+					// When leaving edit mode, destroy the Protyle instance but keep a static DOM copy
+					if (protyleRef.current) {
+						try {
+							const host = protyleHostRef.current
+							if (host && host.parentElement) {
+								const staticHost = document.createElement('div')
+								staticHost.style.width = host.style.width || '100%'
+								staticHost.style.height = host.style.height || '100%'
+								staticHost.style.overflow = host.style.overflow || 'hidden'
+								// copy innerHTML so the visual content remains
+								staticHost.innerHTML = host.innerHTML
+								host.parentElement.replaceChild(staticHost, host)
+								protyleHostRef.current = staticHost
+							}
+							try { protyleRef.current.destroy() } catch (e) {}
+						} catch (err) {
+							console.error('销毁 Protyle 时出错', err)
+						}
+						protyleRef.current = null
+					} else {
+						// no protyle instance, nothing to do
+					}
 				}
 
 				applyFontSize()
