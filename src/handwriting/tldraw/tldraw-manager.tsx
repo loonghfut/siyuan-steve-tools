@@ -271,8 +271,8 @@ export class TldrawManager {
                             else {
                                 aproblock = idid as string;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
-                                await api.insertBlock("markdown", `##### [${timestamp}](${link})[🔗](${link})
-{: id="${idid}" custom-st-tldraw="1" }`, blockId)
+                                await api.insertBlock("markdown", `###### ${timestamp}[🔗](${link})
+{: id="${idid}" custom-st-tldraw="1"}`, blockId)
                             }
                             // 创建新的Card形状
                             // console.log("创建新的卡片形状",  aproblock[0].doOperations[0].id);
