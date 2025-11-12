@@ -192,7 +192,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							pendingCreationPromise = (async () => {
 								const idid = await api.generateSiyuanID() as string;
 								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-								const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
+								const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
 								const redata = await api.appendBlock("markdown", `##### [${timestamp}](${link})[🔗](${link})
 {: id="${idid}" custom-st-tldraw="1" }
 

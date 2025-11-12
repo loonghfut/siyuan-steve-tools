@@ -264,13 +264,13 @@ export class TldrawManager {
                             let aproblock: string;
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
-                                const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
                                 const content = (await api.getBlockByID(blockId)).markdown;
                                 await api.updateBlock("markdown",`${content}[🔗](${link})`, aproblock)
                             }
                             else {
                                 aproblock = idid as string;
-                                const link = `siyuan://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
                                 await api.insertBlock("markdown", `##### [${timestamp}](${link})[🔗](${link})
 {: id="${idid}" custom-st-tldraw="1" }`, blockId)
                             }
