@@ -250,10 +250,11 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 				const handleKeyDown = (event: KeyboardEvent) => {
 					if (event.key !== 'Enter' || event.isComposing) return
-					if (event.shiftKey) return
+					// 完全拦截回车：不再放行 Shift+Enter 等组合，所有回车都拦截处理
 					event.preventDefault()
 					const offset = 40
-					const createBelow = event.ctrlKey || event.metaKey
+					const createBelow = event.ctrlKey || event.metaKey // Ctrl/Cmd+Enter: 在下方创建（不变）
+					// Alt+Enter 明确为向右创建；默认（无修饰符）也向右创建（不需要额外变量）
 					const newId = createShapeId()
 					const defaultProps = this.getDefaultProps()
 					const nextX = createBelow ? shape.x : shape.x + shape.props.w + offset
@@ -273,8 +274,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						},
 					])
 					editor.select(newId)
-                    editor.setEditingShape(newId)
-                    requestAnimationFrame(() => ensureShapeVisible(newId))
+					editor.setEditingShape(newId)
+					requestAnimationFrame(() => ensureShapeVisible(newId))
 				}
 
 				wys.addEventListener('keydown', handleKeyDown, true)
@@ -350,7 +351,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				}
 				protyleHostRef.current = null
 			}
-		}, [isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce, shape.props.fontSize, shape.x, shape.y, shape.props.w])
+		}, [isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce, shape.props.fontSize])
 
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {

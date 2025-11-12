@@ -36,10 +36,16 @@ import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ICardShape } from './CardShape/card-shape-types';
+import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
 import { openTab, showMessage } from 'siyuan';
 import { settingdata } from '@/index';
 // There's a guide at the bottom of this file!
+
+type CardLikeShape = ICardShape | ISingleBlockShape;
+
+const isCardLikeShape = (shape: any): shape is CardLikeShape =>
+    shape?.type === 'card' || shape?.type === 'single-block';
 
 export const uiOverrides: TLUiOverrides = {
     tools(editor, tools) {
@@ -445,8 +451,12 @@ export const components: TLComponents = {
             'selection bounds',
             () => {
                 const selectedShapes = editor.getSelectedShapes()
-                // 只处理单个选中且为卡片类型的情况
-                if (selectedShapes.length !== 1 || selectedShapes[0].type !== 'card') {
+                if (selectedShapes.length !== 1) {
+                    return null
+                }
+
+                const selectedShape = selectedShapes[0]
+                if (!isCardLikeShape(selectedShape)) {
                     return null
                 }
 
@@ -455,7 +465,7 @@ export const components: TLComponents = {
                 if (!rotatedScreenBounds) return null
 
                 return {
-                    id: selectedShapes[0].id,
+                    id: selectedShape.id,
                     x: rotatedScreenBounds.x - screenBounds.x,
                     y: rotatedScreenBounds.y - screenBounds.y,
                     width: rotatedScreenBounds.width,
@@ -511,18 +521,20 @@ export const components: TLComponents = {
                     style={buttonStyle}
                     onClick={() => {
                         // 刷新卡片：通过刷新 nonce 触发 Card 组件的重新挂载逻辑
-                        const shape = editor.getShape(selectionInfo.id) as ICardShape
-                        if (!shape) return
+                        const shape = editor.getShape(selectionInfo.id)
+                        if (!isCardLikeShape(shape)) return
+
+                        const shapeLabel = shape.type === 'card' ? '卡片' : '块'
                         editor.updateShape({
                             id: selectionInfo.id,
-                            type: 'card',
+                            type: shape.type,
                             props: {
                                 ...shape.props,
                                 // 更新 nonce 以触发 useEffect，重建静态/实例视图
                                 refreshNonce: Date.now(),
                             },
                         })
-                        showMessage('卡片已刷新')
+                        showMessage(`${shapeLabel}已刷新`)
                     }}
                     title="刷新卡片"
                 >
@@ -532,8 +544,8 @@ export const components: TLComponents = {
                     style={buttonStyle}
                     onClick={() => {
                         // 适应内容尺寸
-                        const shape = editor.getShape(selectionInfo.id) as ICardShape;
-                        if (!shape || !shape.props.blockId) return;
+                        const shape = editor.getShape(selectionInfo.id);
+                        if (!isCardLikeShape(shape) || !shape.props.blockId) return;
 
                         // 找到与此卡片关联的容器元素
                         const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
@@ -569,8 +581,8 @@ export const components: TLComponents = {
                     style={buttonStyle}
                     onClick={() => {
                         // 放大字体
-                        const shape = editor.getShape(selectionInfo.id) as ICardShape;
-                        if (!shape) return;
+                        const shape = editor.getShape(selectionInfo.id);
+                        if (!isCardLikeShape(shape)) return;
 
                         // 获取当前字体大小
                         const currentSize = shape.props.fontSize || 16;
@@ -581,7 +593,7 @@ export const components: TLComponents = {
                         // 更新卡片属性
                         editor.updateShape({
                             id: selectionInfo.id,
-                            type: 'card',
+                            type: shape.type,
                             props: {
                                 ...shape.props,
                                 fontSize: newSize,
@@ -595,20 +607,20 @@ export const components: TLComponents = {
                 <button
                     style={buttonStyle}
                     onClick={() => {
-                        // 放大字体
-                        const shape = editor.getShape(selectionInfo.id) as ICardShape;
-                        if (!shape) return;
+                        // 减小字体
+                        const shape = editor.getShape(selectionInfo.id);
+                        if (!isCardLikeShape(shape)) return;
 
                         // 获取当前字体大小
                         const currentSize = shape.props.fontSize || 16;
 
-                        // 放大字体 (增加2px)
+                        // 减小字体 (减少2px)
                         const newSize = currentSize - 2;
 
                         // 更新卡片属性
                         editor.updateShape({
                             id: selectionInfo.id,
-                            type: 'card',
+                            type: shape.type,
                             props: {
                                 ...shape.props,
                                 fontSize: newSize,
@@ -623,12 +635,12 @@ export const components: TLComponents = {
                     style={buttonStyle}
                     onClick={async () => {
                         // 获取卡片数据并跳转到笔记
-                        const cardShape = editor.getShape(selectionInfo.id);
-                        const blockId = (cardShape as ICardShape)?.props?.blockId || "";
-                        if (!blockId) {
+                        const shape = editor.getShape(selectionInfo.id);
+                        if (!isCardLikeShape(shape) || !shape.props.blockId) {
                             console.error("未找到块ID");
                             return;
                         }
+                        const blockId = shape.props.blockId;
                         await openTab({
                             app: window.siyuan.ws.app,
                             doc: {
