@@ -54,6 +54,15 @@ export const uiOverrides: TLUiOverrides = {
                 editor.setCurrentTool('card')
             },
         }
+        tools['single-block'] = {
+            id: 'single-block',
+            icon: 'bulletList',
+            label: 'Single Block',
+            kbd: 'b',
+            onSelect: () => {
+                editor.setCurrentTool('single-block')
+            },
+        }
         tools.slide = {
             id: 'slide',
             icon: 'group',
@@ -369,11 +378,13 @@ export const components: TLComponents = {
     Toolbar: (props) => {
         const tools = useTools()
         const isCardSelected = useIsToolSelected(tools['card'])
+        const isSingleBlockSelected = useIsToolSelected(tools['single-block'])
         const isSlideSelected = useIsToolSelected(tools['slide'])
         // const isMindMapNodeSelected = useIsToolSelected(tools['mindmap-node'])
         return (
             <DefaultToolbar {...props}>
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
+                <TldrawUiMenuItem {...tools['single-block']} isSelected={isSingleBlockSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
             
                 <DefaultToolbarContent />
@@ -385,6 +396,7 @@ export const components: TLComponents = {
         return (
             <DefaultKeyboardShortcutsDialog {...props}>
                 <TldrawUiMenuItem {...tools['card']} />
+                <TldrawUiMenuItem {...tools['single-block']} />
                 <TldrawUiMenuItem {...tools['slide']} />
                 <DefaultKeyboardShortcutsDialogContent />
             </DefaultKeyboardShortcutsDialog>

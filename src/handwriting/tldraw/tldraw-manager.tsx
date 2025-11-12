@@ -2,6 +2,8 @@ import React from 'react';
 import { createRoot } from 'react-dom/client'; // 添加这个导入
 import { CardShapeTool } from './CardShape/CardShapeTool'
 import { CardShapeUtil } from './CardShape/CardShapeUtil'
+import { SingleBlockShapeTool } from './SingleBlockShape/SingleBlockShapeTool'
+import { SingleBlockShapeUtil } from './SingleBlockShape/SingleBlockShapeUtil'
 import { components, uiOverrides } from './ui-overrides'
 import {
     Tldraw,
@@ -32,8 +34,8 @@ const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SlideShapeUtil, MindMapNodeShapeUtil]
-const customTools = [CardShapeTool, SlideShapeTool, MindMapNodeTool]
+const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, MindMapNodeShapeUtil]
+const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, MindMapNodeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
