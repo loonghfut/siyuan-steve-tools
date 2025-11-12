@@ -251,10 +251,17 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				const handleKeyDown = (event: KeyboardEvent) => {
 					if (event.key !== 'Enter' || event.isComposing) return
 					// 完全拦截回车：不再放行 Shift+Enter 等组合，所有回车都拦截处理
-					event.preventDefault()
+					try {
+						event.preventDefault()
+						event.stopImmediatePropagation()
+						event.stopPropagation()
+						// IE fallback
+						;(event as any).returnValue = false
+					} catch (e) {
+						// ignore
+					}
 					const offset = 40
 					const createBelow = event.ctrlKey || event.metaKey // Ctrl/Cmd+Enter: 在下方创建（不变）
-					// Alt+Enter 明确为向右创建；默认（无修饰符）也向右创建（不需要额外变量）
 					const newId = createShapeId()
 					const defaultProps = this.getDefaultProps()
 					const nextX = createBelow ? shape.x : shape.x + shape.props.w + offset
@@ -278,8 +285,28 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					requestAnimationFrame(() => ensureShapeVisible(newId))
 				}
 
-				wys.addEventListener('keydown', handleKeyDown, true)
-				detachKeyHandler.current = () => wys.removeEventListener('keydown', handleKeyDown, true)
+				const handleKeyUp = (event: KeyboardEvent) => {
+					if (event.key !== 'Enter') return
+					try {
+						event.preventDefault()
+						event.stopImmediatePropagation()
+						event.stopPropagation()
+						;(event as any).returnValue = false
+					} catch (e) {}
+				}
+
+				// Use non-passive capture listeners so we can reliably prevent default actions
+				wys.addEventListener('keydown', handleKeyDown, { capture: true, passive: false } as AddEventListenerOptions)
+				wys.addEventListener('keyup', handleKeyUp, { capture: true, passive: false } as AddEventListenerOptions)
+
+				detachKeyHandler.current = () => {
+					try {
+						wys.removeEventListener('keydown', handleKeyDown, { capture: true } as EventListenerOptions)
+					} catch (e) {}
+					try {
+						wys.removeEventListener('keyup', handleKeyUp, { capture: true } as EventListenerOptions)
+					} catch (e) {}
+				}
 			}
 
 			const applyFontSize = () => {
