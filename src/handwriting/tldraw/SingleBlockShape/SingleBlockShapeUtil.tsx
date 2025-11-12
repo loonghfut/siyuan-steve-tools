@@ -250,7 +250,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 				const handleKeyDown = (event: KeyboardEvent) => {
 					if (event.key !== 'Enter' || event.isComposing) return
-					// 完全拦截回车：不再放行 Shift+Enter 等组合，所有回车都拦截处理
+					// 拦截所有 Enter 行为，按修饰键决定新块方向
 					try {
 						event.preventDefault()
 						event.stopImmediatePropagation()
@@ -261,11 +261,22 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						// ignore
 					}
 					const offset = 40
-					const createBelow = event.ctrlKey || event.metaKey // Ctrl/Cmd+Enter: 在下方创建（不变）
+					const width = shape.props.w
+					const height = shape.props.h
 					const newId = createShapeId()
 					const defaultProps = this.getDefaultProps()
-					const nextX = createBelow ? shape.x : shape.x + shape.props.w + offset
-					const nextY = createBelow ? shape.y + shape.props.h + offset : shape.y
+					let nextX = shape.x
+					let nextY = shape.y
+
+					if (event.altKey) {
+						nextX = shape.x - (width + offset)
+					} else if (event.shiftKey) {
+						nextY = shape.y - (height + offset)
+					} else if (event.ctrlKey || event.metaKey) {
+						nextY = shape.y + height + offset
+					} else {
+						nextX = shape.x + width + offset
+					}
 					editor.createShapes([
 						{
 							id: newId,
