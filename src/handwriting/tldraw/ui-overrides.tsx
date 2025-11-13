@@ -39,7 +39,7 @@ import { ICardShape } from './CardShape/card-shape-types';
 import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
 import { openTab, showMessage } from 'siyuan';
-import { upload, appendBlock, updateBlock } from '@/api/api'
+import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
 import { settingdata } from '@/index';
 // There's a guide at the bottom of this file!
@@ -208,6 +208,23 @@ const CustomStylePanel = track(() => {
             }
 
             const cursorId = getCursorBlockId()
+
+            // 若 slide 中保存了 blockId，则在思源中验证其是否仍然有效
+            if (targetBlockId) {
+                try {
+                    const blk = await getBlockByID(targetBlockId)
+                    if (!blk || !blk.id) {
+                        console.warn('保存的 blockId 在思源中未找到: ', targetBlockId)
+                        showMessage('幻灯片保存的块在思源中未找到，后续将作为新块插入', 3000, 'info')
+                        targetBlockId = null
+                    }
+                } catch (err) {
+                    console.warn('检查保存的 blockId 时出错', err)
+                    // 将其视为无效，允许在有光标时新建
+                    targetBlockId = null
+                }
+            }
+
             if (!targetBlockId && !cursorId) {
                 showMessage('未检测到已有截图块且未获取到光标位置，已取消操作', 3000, 'error')
                 return
