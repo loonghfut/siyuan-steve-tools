@@ -50,6 +50,9 @@ export class TldrawManager {
     private storageKey: string; // 存储键值
     // 在 TldrawManager 类中添加一个标志
     private dropHandled;
+    // 最小字段：保存 dragstart/dragend 处理函数引用
+    private _dragStartHandler: ((e: DragEvent) => void) | null = null;
+    private _dragEndHandler: (() => void) | null = null;
     private applyingRemoteChanges = false;
     private title: string;
 
@@ -179,7 +182,7 @@ export class TldrawManager {
                 data-tldraw-id={this.id}
                 data-tldraw-title={this.title}>
                 <Tldraw
-                    licenseKey="tldraw-2026-01-28/WyJzTmo2UUJDRSIsWyIqIl0sMTYsIjIwMjYtMDEtMjgiXQ.TPO1s+ITkaa0Ou5Xt1vXDVgtuRkEmOLWH+bM+P/GNjaiw0f158QNVK97eCRJTFGF9Lpv1RoaJrvGX4mV+Ioxwg" 
+                    licenseKey="tldraw-2026-01-28/WyJzTmo2UUJDRSIsWyIqIl0sMTYsIjIwMjYtMDEtMjgiXQ.TPO1s+ITkaa0Ou5Xt1vXDVgtuRkEmOLWH+bM+P/GNjaiw0f158QNVK97eCRJTFGF9Lpv1RoaJrvGX4mV+Ioxwg"
                     store={store}
                     shapeUtils={customShapeUtils}
                     tools={customTools}
@@ -242,7 +245,8 @@ export class TldrawManager {
 
                             // 解析拖拽数据
                             const blockIdo_rigin = e.dataTransfer!.types[0];
-                            // console.log('拖拽的数据类型', e);
+                            console.log('拖拽的数据类型', e);
+                            console.log('拖拽的数据类型', blockIdo_rigin);
                             // 使用正则表达式提取块ID
                             let blockId = '';
                             if (blockIdo_rigin.startsWith('application/siyuan')) {
@@ -252,11 +256,14 @@ export class TldrawManager {
                                     console.log('从数据类型中提取的块ID', blockId);
                                 }
                             }
+                            if (blockIdo_rigin.startsWith('application/siyuan-file') && (window as any).__st_dragNodeId) {
+                                blockId = (window as any).__st_dragNodeId;
+                            }
                             if (!blockId) {
                                 console.log('未能识别拖拽的块ID');
                                 return;
                             }
-
+                            console.log('识别到的块ID', blockId);
                             // 获取鼠标在画布上的位置
                             const { x, y } = editor.screenToPage({
                                 x: e.clientX,
@@ -269,9 +276,10 @@ export class TldrawManager {
                                 aproblock = blockId;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
                                 const content = (await api.getBlockByID(blockId)).markdown;
-                                await api.updateBlock("markdown",`${content}[🔗](${link})`, aproblock)
-                            }
-                            else {
+                                await api.updateBlock("markdown", `${content}[🔗](${link})`, aproblock)
+                            } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
+                                aproblock = blockId;
+                            } else {
                                 aproblock = idid as string;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
                                 await api.insertBlock("markdown", `###### ${timestamp}[🔗](${link})
@@ -296,6 +304,21 @@ export class TldrawManager {
                             // });
                             // console.log(`已在(${x}, ${y})位置创建包含块ID ${blockId} 的卡片`);
                         };
+
+                        // 注册最小 dragstart/dragend，用于捕获同页拖拽元素的 data-node-id
+                        this._dragStartHandler = (ev: DragEvent) => {
+                            const el = ev.target as HTMLElement | null;
+                            try {
+                                (window as any).__st_dragNodeId = el ? (el.dataset?.nodeId || el.getAttribute('data-node-id')) : null;
+                            } catch (err) {
+                                (window as any).__st_dragNodeId = null;
+                            }
+                        };
+                        this._dragEndHandler = () => {
+                            try { (window as any).__st_dragNodeId = null; } catch (e) { }
+                        };
+                        document.addEventListener('dragstart', this._dragStartHandler, true);
+                        document.addEventListener('dragend', this._dragEndHandler, true);
 
                         // 添加拖放事件监听器
                         container.addEventListener('drop', handleDrop);
@@ -638,6 +661,21 @@ export class TldrawManager {
         // 清空容器
         this.container.innerHTML = '';
 
+        // 移除我们注册的最小 drag 监听器并清理全局临时值
+        try {
+            if (this._dragStartHandler) {
+                document.removeEventListener('dragstart', this._dragStartHandler, true);
+                this._dragStartHandler = null;
+            }
+            if (this._dragEndHandler) {
+                document.removeEventListener('dragend', this._dragEndHandler, true);
+                this._dragEndHandler = null;
+            }
+            try { (window as any).__st_dragNodeId = null; } catch (e) { }
+        } catch (err) {
+            console.warn('移除 drag 监听器出错', err);
+        }
+
         // 销毁React根节点
         if (this.root) {
             this.root.unmount();
@@ -657,7 +695,7 @@ export class TldrawManager {
         const shapes = this.editor.getCurrentPageShapes();
         // console.log("查找形状", blockId, shapes);
         const cardShape = shapes.find(shape =>
-            (shape.type === 'card'|| shape.type === 'single-block' || shape.type === 'slide') &&
+            (shape.type === 'card' || shape.type === 'single-block' || shape.type === 'slide') &&
             (shape as ICardShape).props?.blockId === blockId
         );
 
