@@ -238,7 +238,7 @@ const CustomStylePanel = track(() => {
                     const assetPath = kernelPath.replace(/^data\//, '')
 
                     const alt = rawName || 'slide'
-                    const md = `[*](https://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${slideShape.id})![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}"}`
+                    const md = `[_](https://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${slideShape.id})![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}"}`
 
                     let fallbackFromUpdateFailure = false
 
