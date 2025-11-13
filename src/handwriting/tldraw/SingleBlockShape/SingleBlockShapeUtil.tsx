@@ -85,8 +85,22 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const detachKeyHandler = useRef<() => void>()
 		const visibilityTimerRef = useRef<number | null>(null)
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
-		const viewportMarginRef = useRef<string>('1024px 1024px 1024px 1024px')
-		const [viewportMargin, setViewportMargin] = useState(viewportMarginRef.current)
+	// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
+	const DESTROYED_MARK = '__st_destroyed__'
+	const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
+		if (!pt) return
+		const anyPt = pt as any
+		if (anyPt[DESTROYED_MARK]) return
+		try {
+			pt.destroy()
+		} catch {
+			// ignore
+		}
+		anyPt[DESTROYED_MARK] = true
+	}
+
+		// 以世界坐标的“预加载边距”来判断是否接近视口，避免 DOM 观察在复杂变换下不可靠
+		const PRELOAD_MARGIN_WORLD = 1600
 
 		const destroyRuntimeResources = useCallback(() => {
 			detachKeyHandler.current?.()
@@ -96,11 +110,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				loadHandleRef.current = null
 			}
 			if (protyleRef.current) {
-				try {
-					protyleRef.current.destroy()
-				} catch {
-					// ignore
-				}
+				safeDestroyProtyle(protyleRef.current)
 				protyleRef.current = null
 			}
 			if (protyleHostRef.current?.parentElement) {
@@ -117,72 +127,40 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			setIsEditingState(isEditing)
 		}, [isEditing])
 
-		const computeViewportMargin = useCallback(() => {
-			if (!isViewportCullingEnabled) return viewportMarginRef.current
-			const bounds = editor.getViewportPageBounds()
-			const container = editor.getContainer()
-			if (!container || !bounds) return viewportMarginRef.current
-			const rect = container.getBoundingClientRect()
-			const pageWidth = Math.max(1, bounds.maxX - bounds.minX)
-			const pageHeight = Math.max(1, bounds.maxY - bounds.minY)
-			const zoomX = rect.width > 0 ? rect.width / pageWidth : 1
-			const zoomY = rect.height > 0 ? rect.height / pageHeight : 1
-			const zoom = Math.max(zoomX, zoomY, 0.01)
-			const baseWorldMargin = 1600
-			const marginPx = Math.min(30000, Math.round(baseWorldMargin / zoom))
-			console.log('计算视口边距', { zoom, marginPx })
-			const cssMargin = `${marginPx}px ${marginPx}px ${marginPx}px ${marginPx}px`
-			return cssMargin
-		}, [editor, isViewportCullingEnabled])
-
-		const updateViewportMargin = useCallback(() => {
-			if (!isViewportCullingEnabled) return
-			const next = computeViewportMargin()
-			if (viewportMarginRef.current !== next) {
-				viewportMarginRef.current = next
-				setViewportMargin(next)
-			}
-		}, [computeViewportMargin, isViewportCullingEnabled])
-
-		useEffect(() => {
-			if (!isViewportCullingEnabled) return
-			updateViewportMargin()
-			const id = window.setInterval(updateViewportMargin, 200)
-			return () => window.clearInterval(id)
-		}, [isViewportCullingEnabled, updateViewportMargin])
-
-		useEffect(() => {
+		// 基于 tldraw 的世界坐标计算是否进入“预加载区”（视口外但在边距内）
+		const updateVisibilityManual = useCallback(() => {
 			if (!isViewportCullingEnabled) {
 				setIsInViewport(true)
 				return
 			}
-			const node = containerRef.current
-			const root = editor.getContainer()
-			if (!node || !root || typeof IntersectionObserver === 'undefined') return
-			const observer = new IntersectionObserver(
-				(entries) => {
-					const entry = entries[0]
-					if (!entry) return
-					const visible = entry.isIntersecting || entry.intersectionRatio > 0
-					if (visibilityTimerRef.current !== null) {
-						clearTimeout(visibilityTimerRef.current)
-					}
-					visibilityTimerRef.current = window.setTimeout(() => {
-						visibilityTimerRef.current = null
-						setIsInViewport((prev) => (prev === visible ? prev : visible))
-					}, 250)
-				},
-				{ root, rootMargin: viewportMargin, threshold: 0 }
-			)
-			observer.observe(node)
-			return () => {
-				observer.disconnect()
-				if (visibilityTimerRef.current !== null) {
-					clearTimeout(visibilityTimerRef.current)
-					visibilityTimerRef.current = null
-				}
+			const viewport = editor.getViewportPageBounds()
+			const shapeBounds = editor.getShapePageBounds(shape.id)
+			if (!viewport || !shapeBounds) return
+			const expanded = {
+				minX: viewport.minX - PRELOAD_MARGIN_WORLD,
+				minY: viewport.minY - PRELOAD_MARGIN_WORLD,
+				maxX: viewport.maxX + PRELOAD_MARGIN_WORLD,
+				maxY: viewport.maxY + PRELOAD_MARGIN_WORLD,
 			}
-		}, [editor, isViewportCullingEnabled, shape.id, viewportMargin])
+			const intersects =
+				expanded.minX < shapeBounds.maxX &&
+				expanded.maxX > shapeBounds.minX &&
+				expanded.minY < shapeBounds.maxY &&
+				expanded.maxY > shapeBounds.minY
+			if (visibilityTimerRef.current !== null) {
+				clearTimeout(visibilityTimerRef.current)
+			}
+			visibilityTimerRef.current = window.setTimeout(() => {
+				visibilityTimerRef.current = null
+				setIsInViewport((prev) => (prev === intersects ? prev : intersects))
+			}, 100)
+		}, [editor, isViewportCullingEnabled, shape.id])
+
+		useEffect(() => {
+			updateVisibilityManual()
+			const id = window.setInterval(updateVisibilityManual, 200)
+			return () => window.clearInterval(id)
+		}, [updateVisibilityManual])
 
 		useEffect(() => {
 			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport
@@ -297,11 +275,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						},
 					})
 					if (signal.aborted || disposed) {
-						try {
-							protyleInstance.destroy()
-						} catch {
-							// ignore
-						}
+						safeDestroyProtyle(protyleInstance)
 						return
 					}
 					protyleRef.current = protyleInstance
@@ -311,11 +285,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					}
 					await readyPromise.catch(() => undefined)
 					if (signal.aborted || disposed) {
-						try {
-							protyleInstance.destroy()
-						} catch {
-							// ignore
-						}
+						safeDestroyProtyle(protyleInstance)
 						if (protyleHostRef.current === host && host.parentElement) {
 							host.parentElement.removeChild(host)
 						}
