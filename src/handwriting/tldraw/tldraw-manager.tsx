@@ -170,6 +170,7 @@ export class TldrawManager {
         const store = this.store;
         api.setBlockAttrs(id, {
             'custom-sttools-tldraw': '1',
+            'bookmark': 'st-tldraw'
         })
         // 生成 tldraw 组件
         const tldrawComponent = (
