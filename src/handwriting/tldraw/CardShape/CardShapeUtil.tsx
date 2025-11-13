@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, ReactElement } from 'react'
-import React from 'react';
+import React, { ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import {
 	HTMLContainer,
 	Rectangle2d,
@@ -15,6 +14,7 @@ import { ICardShape } from './card-shape-types'
 import { Protyle, showMessage } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
+import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -82,6 +82,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const [isEditingState, setIsEditingState] = useState(isEditing);
+		const [isInViewport, setIsInViewport] = useState(true);
+		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
 
 
 		// 仅在编辑时创建 Protyle 实例
@@ -90,6 +92,41 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		// 非编辑态下的静态预览节点（由 Protyle contentElement 克隆而来）
 		const staticPreviewRef = useRef<HTMLElement | null>(null)
+		const visibilityTimerRef = useRef<number | null>(null)
+		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
+		const viewportMarginRef = useRef<string>('1024px 1024px 1024px 1024px')
+		const [viewportMargin, setViewportMargin] = useState(viewportMarginRef.current)
+
+		const destroyRuntimeResources = useCallback(() => {
+			if (loadHandleRef.current) {
+				loadHandleRef.current.cancel()
+				loadHandleRef.current = null
+			}
+			if (staticPreviewRef.current?.parentElement) {
+				try {
+					staticPreviewRef.current.parentElement.removeChild(staticPreviewRef.current)
+				} catch {
+					// ignore
+				}
+			}
+			staticPreviewRef.current = null
+			if (protyleRef.current) {
+				try {
+					protyleRef.current.destroy()
+				} catch {
+					// ignore
+				}
+				protyleRef.current = null
+			}
+			if (protyleHostRef.current?.parentElement) {
+				try {
+					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current)
+				} catch {
+					// ignore
+				}
+			}
+			protyleHostRef.current = null
+		}, [])
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
@@ -98,6 +135,71 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
+
+		const computeViewportMargin = useCallback(() => {
+			if (!isViewportCullingEnabled) return viewportMarginRef.current;
+			const bounds = this.editor.getViewportPageBounds();
+			const container = this.editor.getContainer();
+			if (!container || !bounds) return viewportMarginRef.current;
+			const rect = container.getBoundingClientRect();
+			const pageWidth = Math.max(1, bounds.maxX - bounds.minX);
+			const pageHeight = Math.max(1, bounds.maxY - bounds.minY);
+			const zoomX = rect.width > 0 ? rect.width / pageWidth : 1;
+			const zoomY = rect.height > 0 ? rect.height / pageHeight : 1;
+			const zoom = Math.max(zoomX, zoomY, 0.01);
+			const baseWorldMargin = 1600;
+			const marginPx = Math.min(30000, Math.round(baseWorldMargin / zoom));
+			return `${marginPx}px ${marginPx}px ${marginPx}px ${marginPx}px`;
+		}, [isViewportCullingEnabled])
+
+		const updateViewportMargin = useCallback(() => {
+			if (!isViewportCullingEnabled) return;
+			const next = computeViewportMargin();
+			if (viewportMarginRef.current !== next) {
+				viewportMarginRef.current = next;
+				setViewportMargin(next);
+			}
+		}, [computeViewportMargin, isViewportCullingEnabled])
+
+		useEffect(() => {
+			if (!isViewportCullingEnabled) return;
+			updateViewportMargin();
+			const id = window.setInterval(updateViewportMargin, 200);
+			return () => window.clearInterval(id);
+		}, [isViewportCullingEnabled, updateViewportMargin]);
+
+		useEffect(() => {
+			if (!isViewportCullingEnabled) {
+				setIsInViewport(true);
+				return;
+			}
+			const node = containerRef.current;
+			const root = this.editor.getContainer();
+			if (!node || !root || typeof IntersectionObserver === 'undefined') return;
+			const observer = new IntersectionObserver(
+				(entries) => {
+					const entry = entries[0];
+					if (!entry) return;
+					const visible = entry.isIntersecting || entry.intersectionRatio > 0;
+					if (visibilityTimerRef.current !== null) {
+						clearTimeout(visibilityTimerRef.current);
+					}
+					visibilityTimerRef.current = window.setTimeout(() => {
+						visibilityTimerRef.current = null;
+						setIsInViewport((prev) => (prev === visible ? prev : visible));
+					}, 250);
+				},
+				{ root, rootMargin: viewportMargin, threshold: 0 }
+			);
+			observer.observe(node);
+			return () => {
+				observer.disconnect();
+				if (visibilityTimerRef.current !== null) {
+					clearTimeout(visibilityTimerRef.current);
+					visibilityTimerRef.current = null;
+				}
+			};
+		}, [isViewportCullingEnabled, shape.id, viewportMargin]);
 
 		// 移除轻量预览逻辑，统一使用 Protyle 渲染
 
@@ -143,6 +245,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		}, [isEditingState, shape.props.blockId]);
 		// 仅在编辑时保留 Protyle 实例；非编辑时克隆 contentElement 作为静态预览并销毁实例
 		useEffect(() => {
+			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport;
+			if (!shouldRender) {
+				destroyRuntimeResources();
+				return;
+			}
+
 			if (!containerRef.current || !window.siyuan?.ws?.app) return;
 			const renderMode = (settingdata["card-render-mode"] || "static-dom") as "static-dom" | "live-protyle";
 
@@ -170,10 +278,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				});
 			};
 
-			const mountProtyle = async () => {
-				let blockId: string | null = containerRef.current!.getAttribute('blockid') || shape.props.blockId || null;
+			const mountProtyle = async (priority: number) => {
+				if (cancelled) return;
+				let blockId: string | null = containerRef.current?.getAttribute('blockid') || shape.props.blockId || null;
 				if (!blockId) {
-					const editorElement = containerRef.current!.closest('.tldraw__editor');
+					const editorElement = containerRef.current?.closest('.tldraw__editor');
 					const tldrawId = editorElement?.getAttribute('data-tldraw-id');
 					const title = editorElement?.getAttribute('data-tldraw-title');
 					if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
@@ -186,6 +295,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						} catch (e) {
 							console.error('等待块创建失败', e);
 						}
+						if (cancelled) return;
 					} else if (!blockId) {
 						isCreatingBlock = true;
 						try {
@@ -194,14 +304,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 								const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
 								const redata = await api.appendBlock("markdown", `###### ${timestamp}[🔗](${link})
-{: id="${idid}" custom-st-tldraw="1" }
+	{: id="${idid}" custom-st-tldraw="1" }
 
-{: custom-st-tldraw-none="1" }
-`, tldrawId!)
+	{: custom-st-tldraw-none="1" }
+	`, tldrawId!)
 								const newBlockId = redata[0].doOperations[0].id;
 								return newBlockId;
 							})();
 							blockId = await pendingCreationPromise;
+							if (cancelled) return;
 						} catch (err) {
 							console.error('创建块失败', err);
 						} finally {
@@ -209,61 +320,113 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							setTimeout(() => (pendingCreationPromise = null), 5000);
 						}
 					}
-					}
+				}
 
 				if (!blockId) {
 					showMessage('未找到块');
 					return;
 				}
 
-				// 保存到 shape.props 并到容器属性
+				if (cancelled) return;
 				this.editor.updateShape({ id: shape.id, type: shape.type, props: { ...shape.props, blockId } });
-				containerRef.current!.setAttribute('blockid', blockId);
+				containerRef.current?.setAttribute('blockid', blockId);
+				if (cancelled) return;
 
-				// 创建独立 host，并在其中初始化 Protyle，再 append 到 containerRef
-				const host = document.createElement('div');
-				host.style.width = '100%';
-				host.style.height = '100%';
-				host.style.overflow = 'hidden';
-				protyleHostRef.current = host;
-
-				let resolveReady: (() => void) | null = null;
-				const readyPromise = new Promise<void>(r => resolveReady = r);
-				const pt = new Protyle(window.siyuan.ws.app, host, {
-					blockId: blockId,
-					rootId: blockId,
-					defId: blockId,
-					render: {
-						breadcrumb: shape.props.isMain,
-						gutter: true,
-						title: shape.props.isMain,
-						breadcrumbDocName: shape.props.isMain,
-					},
-					action: ["cb-get-all", "cb-get-focus"],
-					mode: "wysiwyg",
-					after: (protyle: Protyle) => {
-						protyle.protyle.wysiwyg.preventKeyup = true;
-						resolveReady && resolveReady();
-					},
-					handleEmptyContent: () => {
-						showMessage('块已被删除');
-					},
+				loadHandleRef.current?.cancel();
+				const handle = enqueueProtyleLoad(shape.id, priority, async (signal) => {
+					if (cancelled || signal.aborted) return;
+					const currentContainer = containerRef.current;
+					if (!currentContainer) return;
+					if (staticPreviewRef.current?.parentElement === currentContainer) {
+						try {
+							currentContainer.removeChild(staticPreviewRef.current);
+						} catch {
+							// ignore
+						}
+						staticPreviewRef.current = null;
+					}
+					if (protyleHostRef.current && protyleHostRef.current.parentElement === currentContainer) {
+						try {
+							protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
+						} catch {
+							// ignore
+						}
+					}
+					if (signal.aborted || cancelled) return;
+					const host = document.createElement('div');
+					host.style.width = '100%';
+					host.style.height = '100%';
+					host.style.overflow = 'hidden';
+					protyleHostRef.current = host;
+					let resolveReady: (() => void) | null = null;
+					const readyPromise = new Promise<void>((resolve) => (resolveReady = resolve));
+					const protyleInstance = new Protyle(window.siyuan.ws.app, host, {
+						blockId,
+						rootId: blockId,
+						defId: blockId,
+						render: {
+							breadcrumb: shape.props.isMain,
+							gutter: true,
+							title: shape.props.isMain,
+							breadcrumbDocName: shape.props.isMain,
+						},
+						action: ["cb-get-all", "cb-get-focus"],
+						mode: "wysiwyg",
+						after: (protyle: Protyle) => {
+							protyle.protyle.wysiwyg.preventKeyup = true;
+							resolveReady && resolveReady();
+						},
+						handleEmptyContent: () => {
+							showMessage('块已被删除');
+						},
+					});
+					if (signal.aborted || cancelled) {
+						try {
+							protyleInstance.destroy();
+						} catch {
+							// ignore
+						}
+						return;
+					}
+					protyleRef.current = protyleInstance;
+					currentContainer.appendChild(host);
+					if (protyleInstance.protyle?.wysiwyg?.element) {
+						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
+					}
+					await readyPromise.catch(() => {});
+					if (signal.aborted || cancelled) {
+						try {
+							protyleInstance.destroy();
+						} catch {
+							// ignore
+						}
+						if (protyleHostRef.current === host && host.parentElement) {
+							host.parentElement.removeChild(host);
+						}
+						if (protyleRef.current === protyleInstance) {
+							protyleRef.current = null;
+						}
+					}
 				});
-
-				protyleRef.current = pt;
-				containerRef.current!.appendChild(host);
-				if (pt.protyle?.wysiwyg?.element) {
-					pt.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
+				loadHandleRef.current = handle;
+				try {
+					await handle.finished;
+				} catch (err) {
+					console.error('加载 Protyle 失败', err);
+				} finally {
+					if (loadHandleRef.current === handle) {
+						loadHandleRef.current = null;
+					}
 				}
-				await readyPromise.catch(() => {});
 			};
 
 			const useStaticPreviewFromProtyle = async () => {
-				if (!protyleRef.current) return;
+				if (!protyleRef.current || cancelled) return;
 				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
 				if (!ce) return;
 				// 保险起见，再等待一次渲染完成
 				await waitForProtyleRendered(protyleRef.current);
+	 			if (cancelled) return;
 				// 克隆只读 DOM
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
 					containerRef.current.removeChild(staticPreviewRef.current);
@@ -282,11 +445,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				protyleRef.current = null;
 				protyleHostRef.current = null;
 				// 挂载克隆预览
+				if (cancelled) return;
 				staticPreviewRef.current = clone;
 				if (containerRef.current) {
 					containerRef.current.appendChild(clone);
 				}
 			};
+
+			let cancelled = false;
 
 			(async () => {
 				if (isEditingState) {
@@ -296,7 +462,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 					staticPreviewRef.current = null;
 					if (!protyleRef.current) {
-						await mountProtyle();
+						await mountProtyle(0);
+						if (cancelled) return;
 					}
 					if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 						containerRef.current.appendChild(protyleHostRef.current);
@@ -308,18 +475,22 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						// 若已有 Protyle，用其生成静态预览后销毁实例；若没有且有 blockId，则临时创建->克隆->销毁
 						if (protyleRef.current) {
 							await useStaticPreviewFromProtyle();
+							if (cancelled) return;
 						} else {
 							const id = containerRef.current?.getAttribute('blockid') || shape.props.blockId;
 							if (id) {
-								await mountProtyle();
+								await mountProtyle(2);
+								if (cancelled) return;
 								if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
 								await useStaticPreviewFromProtyle();
+								if (cancelled) return;
 							}
 						}
 					} else {
 						// live-protyle：保留实例但禁用交互，并尝试刷新内容
 						if (!protyleRef.current) {
-							await mountProtyle();
+							await mountProtyle(1);
+							if (cancelled) return;
 						}
 						if (staticPreviewRef.current?.parentElement === containerRef.current) {
 							containerRef.current.removeChild(staticPreviewRef.current);
@@ -336,22 +507,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 			// 组件卸载清理
 			return () => {
-				// 卸载：清理静态预览与 Protyle/host
-				if (staticPreviewRef.current?.parentElement) {
-					staticPreviewRef.current.parentElement.removeChild(staticPreviewRef.current);
-				}
-				staticPreviewRef.current = null;
-				// 彻底销毁 Protyle，并清理 host
-				if (protyleRef.current) {
-					try { protyleRef.current.destroy(); } catch {}
-					protyleRef.current = null;
-				}
-				if (protyleHostRef.current?.parentElement) {
-					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
-				}
-				protyleHostRef.current = null;
+				cancelled = true;
+				destroyRuntimeResources();
 			};
-		}, [isEditingState, shape.id, shape.props.refreshNonce]);
+		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {

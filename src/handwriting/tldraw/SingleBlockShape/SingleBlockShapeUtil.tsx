@@ -1,4 +1,4 @@
-import React, { ReactElement, useEffect, useRef, useState } from 'react'
+import React, { ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import {
 	HTMLContainer,
 	EASINGS,
@@ -17,6 +17,7 @@ import { settingdata } from '@/index'
 import { singleBlockShapeProps } from './single-block-shape-props'
 import { singleBlockShapeMigrations } from './single-block-shape-migrations'
 import { ISingleBlockShape } from './single-block-shape-types'
+import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -76,16 +77,120 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 		const isEditing = editor.getEditingShapeId() === shape.id
 		const [isEditingState, setIsEditingState] = useState(isEditing)
+		const [isInViewport, setIsInViewport] = useState(true)
+		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const containerRef = useRef<HTMLDivElement>(null)
 		const protyleRef = useRef<Protyle | null>(null)
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		const detachKeyHandler = useRef<() => void>()
+		const visibilityTimerRef = useRef<number | null>(null)
+		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
+		const viewportMarginRef = useRef<string>('1024px 1024px 1024px 1024px')
+		const [viewportMargin, setViewportMargin] = useState(viewportMarginRef.current)
+
+		const destroyRuntimeResources = useCallback(() => {
+			detachKeyHandler.current?.()
+			detachKeyHandler.current = undefined
+			if (loadHandleRef.current) {
+				loadHandleRef.current.cancel()
+				loadHandleRef.current = null
+			}
+			if (protyleRef.current) {
+				try {
+					protyleRef.current.destroy()
+				} catch {
+					// ignore
+				}
+				protyleRef.current = null
+			}
+			if (protyleHostRef.current?.parentElement) {
+				try {
+					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current)
+				} catch {
+					// ignore
+				}
+			}
+			protyleHostRef.current = null
+		}, [])
 
 		useEffect(() => {
 			setIsEditingState(isEditing)
 		}, [isEditing])
 
+		const computeViewportMargin = useCallback(() => {
+			if (!isViewportCullingEnabled) return viewportMarginRef.current
+			const bounds = editor.getViewportPageBounds()
+			const container = editor.getContainer()
+			if (!container || !bounds) return viewportMarginRef.current
+			const rect = container.getBoundingClientRect()
+			const pageWidth = Math.max(1, bounds.maxX - bounds.minX)
+			const pageHeight = Math.max(1, bounds.maxY - bounds.minY)
+			const zoomX = rect.width > 0 ? rect.width / pageWidth : 1
+			const zoomY = rect.height > 0 ? rect.height / pageHeight : 1
+			const zoom = Math.max(zoomX, zoomY, 0.01)
+			const baseWorldMargin = 1600
+			const marginPx = Math.min(30000, Math.round(baseWorldMargin / zoom))
+			console.log('计算视口边距', { zoom, marginPx })
+			const cssMargin = `${marginPx}px ${marginPx}px ${marginPx}px ${marginPx}px`
+			return cssMargin
+		}, [editor, isViewportCullingEnabled])
+
+		const updateViewportMargin = useCallback(() => {
+			if (!isViewportCullingEnabled) return
+			const next = computeViewportMargin()
+			if (viewportMarginRef.current !== next) {
+				viewportMarginRef.current = next
+				setViewportMargin(next)
+			}
+		}, [computeViewportMargin, isViewportCullingEnabled])
+
 		useEffect(() => {
+			if (!isViewportCullingEnabled) return
+			updateViewportMargin()
+			const id = window.setInterval(updateViewportMargin, 200)
+			return () => window.clearInterval(id)
+		}, [isViewportCullingEnabled, updateViewportMargin])
+
+		useEffect(() => {
+			if (!isViewportCullingEnabled) {
+				setIsInViewport(true)
+				return
+			}
+			const node = containerRef.current
+			const root = editor.getContainer()
+			if (!node || !root || typeof IntersectionObserver === 'undefined') return
+			const observer = new IntersectionObserver(
+				(entries) => {
+					const entry = entries[0]
+					if (!entry) return
+					const visible = entry.isIntersecting || entry.intersectionRatio > 0
+					if (visibilityTimerRef.current !== null) {
+						clearTimeout(visibilityTimerRef.current)
+					}
+					visibilityTimerRef.current = window.setTimeout(() => {
+						visibilityTimerRef.current = null
+						setIsInViewport((prev) => (prev === visible ? prev : visible))
+					}, 250)
+				},
+				{ root, rootMargin: viewportMargin, threshold: 0 }
+			)
+			observer.observe(node)
+			return () => {
+				observer.disconnect()
+				if (visibilityTimerRef.current !== null) {
+					clearTimeout(visibilityTimerRef.current)
+					visibilityTimerRef.current = null
+				}
+			}
+		}, [editor, isViewportCullingEnabled, shape.id, viewportMargin])
+
+		useEffect(() => {
+			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport
+			if (!shouldRender) {
+				destroyRuntimeResources()
+				return
+			}
+
 			const container = containerRef.current
 			if (!container || !window.siyuan?.ws?.app) return
 
@@ -145,55 +250,90 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				return blockId
 			}
 
-			const mountProtyle = async (blockId: string) => {
+			const mountProtyle = async (blockId: string, priority: number) => {
 				if (disposed) return
-				const host = document.createElement('div')
-				host.style.width = '100%'
-				host.style.height = '100%'
-				host.style.overflow = 'hidden'
-				// If there is an existing static host in the container (from previous non-edit state), remove it
-				if (protyleHostRef.current && protyleHostRef.current.parentElement === container) {
-					try {
-						protyleHostRef.current.parentElement?.removeChild(protyleHostRef.current)
-					} catch (e) { }
-				}
-				protyleHostRef.current = host
-
-				let resolveReady: (() => void) | null = null
-				const readyPromise = new Promise<void>((resolve) => (resolveReady = resolve))
-				const pt = new Protyle(window.siyuan.ws.app, host, {
-					blockId,
-					// rootId: blockId,
-					// defId: blockId,
-					render: {
-						breadcrumb: false,
-						gutter: true,
-						title: false,
-						breadcrumbDocName: false,
-					},
-					action: ['cb-get-all', 'cb-get-focus'],
-					mode: 'wysiwyg',
-					after(protyle) {
-						protyle.protyle.wysiwyg.preventKeyup = true
-						resolveReady && resolveReady()
-					},
-					click: {
-						preventInsetEmptyBlock: true
-					},
-					handleEmptyContent() {
-						showMessage('块已被删除')
-						if (!disposed) {
-							editor.deleteShape(shape.id)
+				loadHandleRef.current?.cancel()
+				const handle = enqueueProtyleLoad(shape.id, priority, async (signal) => {
+					if (disposed || signal.aborted) return
+					const currentContainer = containerRef.current
+					if (!currentContainer) return
+					if (protyleHostRef.current && protyleHostRef.current.parentElement === currentContainer) {
+						try {
+							protyleHostRef.current.parentElement.removeChild(protyleHostRef.current)
+						} catch {
+							// ignore
 						}
-					},
+					}
+					if (signal.aborted || disposed) return
+					const host = document.createElement('div')
+					host.style.width = '100%'
+					host.style.height = '100%'
+					host.style.overflow = 'hidden'
+					protyleHostRef.current = host
+					let resolveReady: (() => void) | null = null
+					const readyPromise = new Promise<void>((resolve) => (resolveReady = resolve))
+					const protyleInstance = new Protyle(window.siyuan.ws.app, host, {
+						blockId,
+						render: {
+							breadcrumb: false,
+							gutter: true,
+							title: false,
+							breadcrumbDocName: false,
+						},
+						action: ['cb-get-all', 'cb-get-focus'],
+						mode: 'wysiwyg',
+						after(protyle) {
+							protyle.protyle.wysiwyg.preventKeyup = true
+							resolveReady && resolveReady()
+						},
+						click: {
+							preventInsetEmptyBlock: true,
+						},
+						handleEmptyContent() {
+							showMessage('块已被删除')
+							if (!disposed && !signal.aborted) {
+								editor.deleteShape(shape.id)
+							}
+						},
+					})
+					if (signal.aborted || disposed) {
+						try {
+							protyleInstance.destroy()
+						} catch {
+							// ignore
+						}
+						return
+					}
+					protyleRef.current = protyleInstance
+					currentContainer.appendChild(host)
+					if (protyleInstance.protyle?.wysiwyg?.element) {
+						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`
+					}
+					await readyPromise.catch(() => undefined)
+					if (signal.aborted || disposed) {
+						try {
+							protyleInstance.destroy()
+						} catch {
+							// ignore
+						}
+						if (protyleHostRef.current === host && host.parentElement) {
+							host.parentElement.removeChild(host)
+						}
+						if (protyleRef.current === protyleInstance) {
+							protyleRef.current = null
+						}
+					}
 				})
-
-				protyleRef.current = pt
-				container.appendChild(host)
-				if (pt.protyle?.wysiwyg?.element) {
-					pt.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`
+				loadHandleRef.current = handle
+				try {
+					await handle.finished
+				} catch (err) {
+					console.error('加载 Protyle 失败', err)
+				} finally {
+					if (loadHandleRef.current === handle) {
+						loadHandleRef.current = null
+					}
 				}
-				await readyPromise.catch(() => undefined)
 			}
 
 			const ensureShapeVisible = (targetId: TLShapeId, retries = 3) => {
@@ -330,9 +470,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			const setup = async () => {
 				const blockId = await ensureBlockId()
 				if (!blockId || disposed) return
+				const loadPriority = isEditingState ? 0 : 1
 
 				if (!protyleRef.current) {
-					await mountProtyle(blockId)
+					await mountProtyle(blockId, loadPriority)
 				} else if (protyleRef.current?.protyle?.block?.parent?.id !== blockId) {
 					try {
 						protyleRef.current?.destroy()
@@ -341,7 +482,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					}
 					protyleRef.current = null
 					protyleHostRef.current?.remove()
-					await mountProtyle(blockId)
+					await mountProtyle(blockId, loadPriority)
 				}
 
 				if (isEditingState) {
@@ -379,17 +520,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 			return () => {
 				disposed = true
-				detachKeyHandler.current?.()
-				if (protyleRef.current) {
-					try { protyleRef.current.destroy() } catch { }
-					protyleRef.current = null
-				}
-				if (protyleHostRef.current?.parentElement) {
-					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current)
-				}
-				protyleHostRef.current = null
+				destroyRuntimeResources()
 			}
-		}, [isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce])
+		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce])
 
 		useEffect(() => {
 			if (protyleRef.current?.protyle?.wysiwyg?.element) {
