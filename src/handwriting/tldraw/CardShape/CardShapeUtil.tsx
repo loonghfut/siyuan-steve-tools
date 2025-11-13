@@ -279,11 +279,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								const idid = await api.generateSiyuanID() as string;
 								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 								const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
-								const redata = await api.appendBlock("markdown", `###### ${timestamp}[🔗](${link})
-	{: id="${idid}" custom-st-tldraw="1" }
-
-	{: custom-st-tldraw-none="1" }
-	`, tldrawId!)
+								const content =
+									'###### ' + timestamp + '[🔗](' + link + ')' +
+									'\n' +
+									'{: id="' + idid + '" custom-st-tldraw="1" }' +
+									'\n\n' +
+									'{: custom-st-tldraw-none="1" }' +
+									'\n';
+								const redata = await api.appendBlock("markdown", content, tldrawId!);
 								const newBlockId = redata[0].doOperations[0].id;
 								return newBlockId;
 							})();

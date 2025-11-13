@@ -59,7 +59,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			h: 80,
 			color: 'black',
 			blockId: '',
-			fontSize: 20,
+			fontSize: 22,
 			refreshNonce: Date.now(),
 		}
 	}

@@ -352,7 +352,7 @@ function CustomQuickActions() {
                     icon="arrow-cycle"
                     label="刷新所有卡片"
                     onSelect={() => {
-                        const shapes = editor.getCurrentPageShapes().filter(s => s.type === 'card') as ICardShape[]
+                        const shapes = editor.getCurrentPageShapes().filter(isCardLikeShape) as CardLikeShape[]
                         if (shapes.length === 0) {
                             showMessage('当前画布无卡片')
                             return
