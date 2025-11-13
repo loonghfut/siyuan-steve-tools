@@ -39,6 +39,8 @@ import { ICardShape } from './CardShape/card-shape-types';
 import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
 import { openTab, showMessage } from 'siyuan';
+import { upload, appendBlock, updateBlock } from '@/api/api'
+import { getCursorBlockId } from '@/api/api2'
 import { settingdata } from '@/index';
 // There's a guide at the bottom of this file!
 
@@ -123,11 +125,11 @@ export const uiOverrides: TLUiOverrides = {
             },
             'zoom-in': {
                 ...actions['zoom-in'], // Keep default behavior
-                kbd: '', 
+                kbd: '',
             },
             'zoom-out': {
                 ...actions['zoom-out'], // Keep default behavior
-                kbd: '', 
+                kbd: '',
             },
             // 'toggle-grid': { ...actions['toggle-grid'], kbd: '' },
         }
@@ -200,39 +202,93 @@ const CustomStylePanel = track(() => {
 
         setIsCapturingScreenshot(true)
         try {
+            let targetBlockId: string | null = (slideShape.props.blockId ?? '').trim()
+            if (!targetBlockId) {
+                targetBlockId = null
+            }
+
+            const cursorId = getCursorBlockId()
+            if (!targetBlockId && !cursorId) {
+                showMessage('未检测到已有截图块且未获取到光标位置，已取消操作', 3000, 'error')
+                return
+            }
+
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
                 updateShape: true,
             })
             if (result) {
-                let copiedToClipboard = false
-                const blobType = result.blob.type || 'image/png'
                 try {
-                    if (navigator?.clipboard && 'write' in navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-                        await navigator.clipboard.write([
-                            new ClipboardItem({
-                                [blobType]: result.blob,
-                            }),
-                        ])
-                        copiedToClipboard = true
-                    }
-                } catch (clipboardErr) {
-                    console.error('copy slide screenshot blob failed', clipboardErr)
-                }
+                    const now = new Date()
+                    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+                    const rawName = slideShape?.props?.name || 'slide'
+                    const safeName = String(rawName).replace(/[^\w\u4e00-\u9fa5-]+/g, '_')
+                    const ext = result.format === 'svg' ? 'svg' : 'png'
+                    const fileName = `slide_${safeName}_${ts}.${ext}`
+                    const blobType = result.blob.type || 'image/png'
+                    const file = new File([result.blob], fileName, { type: blobType })
+                    const uploadDir = 'assets/st_slides'
 
-                if (!copiedToClipboard && navigator?.clipboard?.writeText) {
-                    try {
-                        await navigator.clipboard.writeText(result.dataUrl)
-                        copiedToClipboard = true
-                    } catch (textCopyErr) {
-                        console.error('copy slide screenshot data url failed', textCopyErr)
+                    const upRes = await upload(uploadDir, [file])
+                    const succMap = (upRes as any)?.succMap || {}
+                    const kernelPath: string | undefined = succMap[fileName]
+                    if (!kernelPath) {
+                        throw new Error('upload screenshot failed: no succMap path')
                     }
-                }
+                    const assetPath = kernelPath.replace(/^data\//, '')
 
-                if (copiedToClipboard) {
-                    showMessage('幻灯片截图已更新并复制到剪贴板')
-                } else {
-                    showMessage('幻灯片截图已更新，但复制到剪贴板失败', -1, 'error')
+                    const alt = rawName || 'slide'
+                    const md = `[*](https://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${slideShape.id})![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}"}`
+
+                    let fallbackFromUpdateFailure = false
+
+                    if (targetBlockId) {
+                        try {
+                            await updateBlock('markdown', md, targetBlockId)
+                            editor.updateShape({
+                                id: slideShape.id,
+                                type: 'slide',
+                                props: { blockId: targetBlockId },
+                            })
+                            showMessage('已更新之前插入的幻灯片截图')
+                            return
+                        } catch (updateErr) {
+                            console.error('更新现有幻灯片截图块失败', updateErr)
+                            if (!cursorId) {
+                                showMessage('更新截图块失败，且未检测到光标位置可新建截图', 4000, 'error')
+                                return
+                            }
+                            fallbackFromUpdateFailure = true
+                            targetBlockId = null
+                        }
+                    }
+
+                    if (!targetBlockId) {
+                        if (!cursorId) {
+                            showMessage('未检测到光标位置，已取消插入新的截图', 3000, 'error')
+                            return
+                        }
+
+                        const appendRes = await appendBlock('markdown', md, cursorId)
+                        const newBlockId = appendRes?.[0]?.doOperations?.[0]?.id as string | undefined
+                        if (typeof newBlockId === 'string' && newBlockId) {
+                            editor.updateShape({
+                                id: slideShape.id,
+                                type: 'slide',
+                                props: { blockId: newBlockId },
+                            })
+                        } else {
+                            console.warn('无法获取新建幻灯片截图块的 ID', appendRes)
+                        }
+                        showMessage(
+                            fallbackFromUpdateFailure
+                                ? '原块更新失败，已在光标位置插入新的幻灯片截图'
+                                : '已将幻灯片截图插入到当前光标位置'
+                        )
+                    }
+                } catch (insErr) {
+                    console.error('insert slide screenshot to Siyuan failed', insErr)
+                    showMessage('已更新截图，但插入到思源失败', 4000, 'error')
                 }
             } else {
                 showMessage('生成幻灯片截图失败', -1, 'error')
@@ -244,6 +300,34 @@ const CustomStylePanel = track(() => {
             setIsCapturingScreenshot(false)
         }
     }, [editor, slideShape, isCapturingScreenshot])
+
+    const handleOpenSlideBlock = React.useCallback(async () => {
+        if (!slideShape) {
+            return
+        }
+
+        const blockId = slideShape.props.blockId
+        if (!blockId) {
+            showMessage('幻灯片暂未绑定思源块', 3000, 'error')
+            return
+        }
+
+        try {
+            await openTab({
+                app: window.siyuan.ws.app,
+                doc: {
+                    id: blockId,
+                    action: ['cb-get-hl', 'cb-get-focus'],
+                    zoomIn: true,
+                },
+                position: 'right',
+                keepCursor: false,
+            })
+        } catch (err) {
+            console.error('打开幻灯片关联的思源块失败', err)
+            showMessage('打开关联的思源块失败', 4000, 'error')
+        }
+    }, [slideShape])
 
     const handleCopyLink = React.useCallback(async () => {
         if (slideShape && rootId !== '') { // 检查 rootId 是否已设置
@@ -295,6 +379,15 @@ const CustomStylePanel = track(() => {
                         disabled={rootId === ''} // 如果 rootId 未设置则禁用
                     >
                         复制链接
+                    </button>
+                    <button
+                        className="tlui-button"
+                        onClick={handleOpenSlideBlock}
+                        onPointerDown={stopEventPropagation}
+                        style={{ marginTop: '-8px', width: '100%' }}
+                        disabled={!slideShape.props.blockId}
+                    >
+                        跳转到笔记
                     </button>
                     <button
                         className="tlui-button"
@@ -392,7 +485,7 @@ export const components: TLComponents = {
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
                 <TldrawUiMenuItem {...tools['single-block']} isSelected={isSingleBlockSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
-            
+
                 <DefaultToolbarContent />
             </DefaultToolbar>
         )

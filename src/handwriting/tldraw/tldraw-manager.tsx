@@ -656,7 +656,7 @@ export class TldrawManager {
         const shapes = this.editor.getCurrentPageShapes();
         // console.log("查找形状", blockId, shapes);
         const cardShape = shapes.find(shape =>
-            (shape.type === 'card'|| shape.type === 'single-block') &&
+            (shape.type === 'card'|| shape.type === 'single-block' || shape.type === 'slide') &&
             (shape as ICardShape).props?.blockId === blockId
         );
 

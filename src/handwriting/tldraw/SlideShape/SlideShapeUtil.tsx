@@ -27,6 +27,7 @@ export type SlideShape = TLBaseShape<
 		version?: number // 添加 version 属性定义
 		color: TLDefaultColorStyle
 		screenshot?: string
+		blockId?: string
 	}
 >
 
@@ -39,6 +40,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		version: T.optional(T.number), // 添加 version 属性定义
 		color: DefaultColorStyle, // 添加 color 属性定义
 		screenshot: T.optional(T.string),
+		blockId: T.optional(T.string),
 	}
 	static override migrations = slideShapeMigrations
 
