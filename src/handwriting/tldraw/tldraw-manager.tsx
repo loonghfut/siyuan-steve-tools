@@ -287,18 +287,34 @@ export class TldrawManager {
                             }
                             // 创建新的Card形状
                             // console.log("创建新的卡片形状",  aproblock[0].doOperations[0].id);
-                            editor.createShape({
-                                type: 'card',
-                                x: x, // 默认宽度的一半，使形状中心在鼠标位置
-                                y: y, // 默认高度的一半
-                                props: {
-                                    w: 300,
-                                    h: 300,
-                                    color: 'black',
-                                    showMask: true,
-                                    blockId: aproblock,
-                                },
-                            });
+                            if (blockIdo_rigin.startsWith('application/siyuan-file')) {
+                                editor.createShape({
+                                    type: 'card',
+                                    x: x, // 默认宽度的一半，使形状中心在鼠标位置
+                                    y: y, // 默认高度的一半
+                                    props: {
+                                        w: 600,
+                                        h: 900,
+                                        color: 'black',
+                                        showMask: true,
+                                        blockId: aproblock,
+                                        isMain: true,
+                                    },
+                                });
+                            } else {
+                                editor.createShape({
+                                    type: 'card',
+                                    x: x, // 默认宽度的一半，使形状中心在鼠标位置
+                                    y: y, // 默认高度的一半
+                                    props: {
+                                        w: 300,
+                                        h: 300,
+                                        color: 'black',
+                                        showMask: true,
+                                        blockId: aproblock,
+                                    },
+                                });
+                            }
                             // api.setBlockAttrs(blockId, {
                             //     'custom-st-tldraw': '1',
                             // });
