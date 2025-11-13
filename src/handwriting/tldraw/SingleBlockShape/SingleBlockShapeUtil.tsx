@@ -222,7 +222,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`
 							const redata = await api.appendBlock(
 								'markdown',
-								`[🔗](${link})\n{: id="${idid}" custom-st-tldraw-single="1" }\n\n`,
+								`[*](${link})\n{: id="${idid}" custom-st-tldraw-single="1" }\n\n`,
 								tldrawId!
 							)
 							return redata[0].doOperations[0].id as string
