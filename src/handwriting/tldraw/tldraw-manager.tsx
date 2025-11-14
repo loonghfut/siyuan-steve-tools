@@ -279,6 +279,7 @@ export class TldrawManager {
                                 await api.updateBlock("markdown", `${content}[🔗](${link})`, aproblock)
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
+                                await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
                             } else {
                                 aproblock = idid as string;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
@@ -326,12 +327,15 @@ export class TldrawManager {
                             const el = ev.target as HTMLElement | null;
                             try {
                                 (window as any).__st_dragNodeId = el ? (el.dataset?.nodeId || el.getAttribute('data-node-id')) : null;
+                                (window as any).__st_dragName = el ? (el.dataset?.name || el.getAttribute('data-name')) : null;
                             } catch (err) {
                                 (window as any).__st_dragNodeId = null;
+                                (window as any).__st_dragName = null;
                             }
                         };
                         this._dragEndHandler = () => {
                             try { (window as any).__st_dragNodeId = null; } catch (e) { }
+                            try { (window as any).__st_dragName = null; } catch (e) { }
                         };
                         document.addEventListener('dragstart', this._dragStartHandler, true);
                         document.addEventListener('dragend', this._dragEndHandler, true);
