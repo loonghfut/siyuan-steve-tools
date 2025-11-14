@@ -293,8 +293,8 @@ export class TldrawManager {
                                     x: x, // 默认宽度的一半，使形状中心在鼠标位置
                                     y: y, // 默认高度的一半
                                     props: {
-                                        w: 600,
-                                        h: 900,
+                                        w: 500,
+                                        h: 700,
                                         color: 'black',
                                         showMask: true,
                                         blockId: aproblock,

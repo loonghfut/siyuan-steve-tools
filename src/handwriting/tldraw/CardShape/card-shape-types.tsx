@@ -14,5 +14,6 @@ export type ICardShape = TLBaseShape<
 		isMain?: boolean // 添加是否为主卡片属性
 		version?: number // 添加 vision 属性
 		refreshNonce?: number // 添加 refreshNonce 属性
+		isCollapsed?: boolean // 添加折叠状态属性
 	}
 >

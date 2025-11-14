@@ -64,6 +64,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			fontSize: 16, // 默认字体大小
 			isMain: false, // 是否为主卡片
 			refreshNonce: Date.now(), // 用于之后强制刷新
+			isCollapsed: false, // 默认不折叠
 			// version: 1, // 版本号
 		}
 	}
@@ -84,6 +85,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		const [isInViewport, setIsInViewport] = useState(true);
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
+		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
+		const isCollapsed = shape.props.isCollapsed || false;
 
 
 		// 仅在编辑时创建 Protyle 实例
@@ -141,6 +144,28 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
+
+		// 折叠状态下获取块的 markdown 内容并截取前10个字
+		useEffect(() => {
+			if (isCollapsed && shape.props.blockId) {
+				api.getBlockByID(shape.props.blockId).then((res) => {
+					if (res && res.content) {
+						// 移除 markdown 标记和链接，只保留纯文本
+						const plainText = res.content
+							.replace(/\[🔗\]\([^)]+\)/g, '') // 移除链接
+							.replace(/^#+\s+/gm, '') // 移除标题标记
+							.replace(/\{:[^}]+\}/g, '') // 移除属性
+							.trim();
+						const preview = plainText.slice(0, 10) + (plainText.length > 10 ? '...' : '');
+						setCollapsedText(preview || '空块');
+					} else {
+						setCollapsedText('空块');
+					}
+				}).catch(() => {
+					setCollapsedText('加载失败');
+				});
+			}
+		}, [isCollapsed, shape.props.blockId]);
 
 		// 基于世界坐标的“预加载区”检测，避免 IntersectionObserver 在复杂场景下失效
 		const updateVisibilityManual = useCallback(() => {
@@ -221,6 +246,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		}, [isEditingState, shape.props.blockId]);
 		// 仅在编辑时保留 Protyle 实例；非编辑时克隆 contentElement 作为静态预览并销毁实例
 		useEffect(() => {
+			// 折叠状态下不渲染 Protyle
+			if (isCollapsed && !isEditingState) {
+				destroyRuntimeResources();
+				return;
+			}
+			
 			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport;
 			if (!shouldRender) {
 				destroyRuntimeResources();
@@ -481,7 +512,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				cancelled = true;
 				destroyRuntimeResources();
 			};
-		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce]);
+		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, isCollapsed]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
@@ -537,7 +568,23 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						// borderRadius: 'inherit', // 继承父元素的圆角
 					}}
 				>
-					{/* 非编辑态下也使用 Protyle host 进行渲染，无需额外占位 */}
+					{/* 折叠状态下显示预览文本，否则渲染 Protyle */}
+					{isCollapsed && !isEditingState ? (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.w / 6, shape.props.h / 2)}px`,
+							padding: '8px',
+							wordBreak: 'break-all',
+							color: theme[shape.props.color].solid,
+							textAlign: 'center',
+						}}>
+							{collapsedText}
+						</div>
+					) : null}
 				</div>
 			</HTMLContainer >
 		)

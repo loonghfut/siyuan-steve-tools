@@ -651,41 +651,33 @@ export const components: TLComponents = {
                     🔄
                 </button>
                 <button
-                    style={buttonStyle}
-                    onClick={() => {
-                        // 适应内容尺寸
-                        const shape = editor.getShape(selectionInfo.id);
-                        if (!isCardLikeShape(shape) || !shape.props.blockId) return;
-
-                        // 找到与此卡片关联的容器元素
-                        const cardElement = document.querySelector(`[data-shape-id="${selectionInfo.id}"]`);
-                        if (!cardElement) return;
-
-                        // 找到Protyle内容元素
-                        const contentElement = cardElement.querySelector(".protyle-wysiwyg");
-                        if (!contentElement) return;
-
-                        // 获取内容的实际尺寸
-                        const contentRect = contentElement.getBoundingClientRect();
-
-                        // 适当增加边距，确保内容完全显示
-                        const newWidth = Math.max(contentRect.width + 40, 200);
-                        const newHeight = Math.max(contentRect.height + 40, 100);
-
-                        // 更新卡片尺寸
-                        editor.updateShape({
-                            id: shape.id,
-                            type: shape.type,
-                            props: {
-                                ...shape.props,
-                                w: newWidth,
-                                h: newHeight,
-                            },
-                        });
+                    style={{
+                        ...buttonStyle,
+                        // 仅对 card 类型显示，其他类型隐藏
+                        display: editor.getShape(selectionInfo.id)?.type === 'card' ? undefined : 'none',
                     }}
-                    title="适应内容尺寸"
+                    onClick={() => {
+                        const shape = editor.getShape(selectionInfo.id)
+                        if (!shape || shape.type !== 'card') return
+
+                        const card = shape as ICardShape
+                        const collapsed = !!card.props?.isCollapsed
+                        editor.updateShape({
+                            id: card.id,
+                            type: 'card',
+                            props: {
+                                ...card.props,
+                                isCollapsed: !collapsed,
+                            },
+                        })
+                    }}
+                    title={
+                        ((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed)
+                            ? '展开卡片'
+                            : '折叠卡片'
+                    }
                 >
-                    📏
+                    {((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed) ? '▶' : '▼'}
                 </button>
                 <button
                     style={buttonStyle}
