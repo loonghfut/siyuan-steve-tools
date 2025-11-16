@@ -66,7 +66,7 @@ export class M_handwriting {
                                 rootid: rootid,
                             },
                         },
-                        position: "right",
+                        // position: "right",
                     });
                     return;
                 }

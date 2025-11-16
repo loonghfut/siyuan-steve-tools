@@ -747,10 +747,10 @@ export const components: TLComponents = {
                             app: window.siyuan.ws.app,
                             doc: {
                                 id: blockId,
-                                action: ["cb-get-hl", "cb-get-focus"],
-                                zoomIn: true,
+                                action: ["cb-get-hl"],
+                                // zoomIn: true,
                             },
-                            position: "right",
+                            // position: "",
                             keepCursor: false,
                         });
                     }}
