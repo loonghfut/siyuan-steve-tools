@@ -605,12 +605,12 @@ export const components: TLComponents = {
         }
 
         return (
-            <div
+                <div
                 style={{
                     position: 'absolute',
                     top: 0,
                     left: 0,
-                    transform: `translate(${selectionInfo.x + selectionInfo.width / 2 - 115}px, ${selectionInfo.y - 40}px)`,
+                    transform: `translate(${selectionInfo.x + selectionInfo.width / 2 - 115}px, ${selectionInfo.y - 40 + Math.sin(selectionInfo.rotation) * Math.abs(selectionInfo.width)}px)`,
                     display: 'flex',
                     pointerEvents: 'all',
                     zIndex: 1
