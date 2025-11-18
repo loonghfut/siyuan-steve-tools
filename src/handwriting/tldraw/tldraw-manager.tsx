@@ -272,11 +272,15 @@ export class TldrawManager {
                             const idid = await api.generateSiyuanID();
                             const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
                             let aproblock: string;
+                            const content = (await api.getBlockByID(blockId)).markdown;
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
-                                const content = (await api.getBlockByID(blockId)).markdown;
                                 await api.updateBlock("markdown", `${content}[🔗](${link})`, aproblock)
+                            } else if (blockIdo_rigin.includes('paragraph')) {
+                                aproblock = blockId;
+                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                await api.updateBlock("markdown", `${content}[*](${link})`, aproblock)
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
@@ -300,6 +304,18 @@ export class TldrawManager {
                                         showMask: true,
                                         blockId: aproblock,
                                         isMain: true,
+                                    },
+                                });
+                            } else if (blockIdo_rigin.includes('paragraph')) {
+                                editor.createShape({
+                                    type: 'single-block',
+                                    x: x, // 默认宽度的一半，使形状中心在鼠标位置
+                                    y: y, // 默认高度的一半
+                                    props: {
+                                        w: 300,
+                                        h: 100,
+                                        color: 'black',
+                                        blockId: aproblock,
                                     },
                                 });
                             } else {
