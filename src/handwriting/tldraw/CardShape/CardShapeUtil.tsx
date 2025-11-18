@@ -85,6 +85,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		const [isInViewport, setIsInViewport] = useState(true);
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
+		const tldrawHeaderImage = settingdata['tldraw-header-image'] !== false;
 		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
 		const isCollapsed = shape.props.isCollapsed || false;
 
@@ -95,15 +96,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		// 非编辑态下的静态预览节点（由 Protyle contentElement 克隆而来）
 		const staticPreviewRef = useRef<HTMLElement | null>(null)
-	// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
-	const DESTROYED_MARK = '__st_destroyed__'
-	const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
-		if (!pt) return
-		const anyPt = pt as any
-		if (anyPt[DESTROYED_MARK]) return
-		try { pt.destroy() } catch {}
-		anyPt[DESTROYED_MARK] = true
-	}
+		// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
+		const DESTROYED_MARK = '__st_destroyed__'
+		const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
+			if (!pt) return
+			const anyPt = pt as any
+			if (anyPt[DESTROYED_MARK]) return
+			try { pt.destroy() } catch { }
+			anyPt[DESTROYED_MARK] = true
+		}
 		const visibilityTimerRef = useRef<number | null>(null)
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
 
@@ -251,7 +252,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				destroyRuntimeResources();
 				return;
 			}
-			
+
 			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport;
 			if (!shouldRender) {
 				destroyRuntimeResources();
@@ -281,7 +282,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 					});
 					obs.observe(ce, { childList: true, subtree: true });
-					setTimeout(() => { try { obs.disconnect(); } catch {} finish(); }, timeout);
+					setTimeout(() => { try { obs.disconnect(); } catch { } finish(); }, timeout);
 				});
 			};
 
@@ -375,6 +376,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						rootId: blockId,
 						defId: blockId,
 						render: {
+							background: (shape.props.showMask && tldrawHeaderImage),
 							breadcrumb: shape.props.isMain,
 							gutter: true,
 							title: shape.props.isMain,
@@ -399,7 +401,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (protyleInstance.protyle?.wysiwyg?.element) {
 						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
 					}
-					await readyPromise.catch(() => {});
+					await readyPromise.catch(() => { });
 					if (signal.aborted || cancelled) {
 						safeDestroyProtyle(protyleInstance)
 						if (protyleHostRef.current === host && host.parentElement) {
@@ -428,7 +430,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (!ce) return;
 				// 保险起见，再等待一次渲染完成
 				await waitForProtyleRendered(protyleRef.current);
-	 			if (cancelled) return;
+				if (cancelled) return;
 				// 克隆只读 DOM
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
 					containerRef.current.removeChild(staticPreviewRef.current);
@@ -443,7 +445,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
 				}
 				// 销毁 Protyle 实例
-				try { safeDestroyProtyle(protyleRef.current); } catch {}
+				try { safeDestroyProtyle(protyleRef.current); } catch { }
 				protyleRef.current = null;
 				protyleHostRef.current = null;
 				// 挂载克隆预览
@@ -470,7 +472,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 						containerRef.current.appendChild(protyleHostRef.current);
 					}
-					try { protyleRef.current?.enable(); } catch {}
+					try { protyleRef.current?.enable(); } catch { }
 				} else {
 					// 非编辑
 					if (renderMode === 'static-dom') {
@@ -501,8 +503,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 							containerRef.current.appendChild(protyleHostRef.current);
 						}
-						try { protyleRef.current?.disable(); } catch {}
-						try { protyleRef.current?.reload(false); } catch {}
+						try { protyleRef.current?.disable(); } catch { }
+						try { protyleRef.current?.reload(false); } catch { }
 					}
 				}
 			})()
@@ -600,7 +602,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		return resizeBox(shape, info)
 	}
 
-		override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
+	override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
 		const { w, h, color, fontSize = 16, blockId } = shape.props
 		const border = -10
