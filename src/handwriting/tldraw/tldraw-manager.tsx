@@ -279,8 +279,12 @@ export class TldrawManager {
                                 await api.updateBlock("markdown", `${content}[🔗](${link})`, aproblock)
                             } else if (blockIdo_rigin.includes('paragraph')) {
                                 aproblock = blockId;
-                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
-                                await api.updateBlock("markdown", `${content}[*](${link})`, aproblock)
+                                //要检测是否已经有此链接，避免重复添加
+                                if (content.includes(`https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}`)) {
+                                } else {
+                                    const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                    await api.updateBlock("markdown", `${content}[*](${link})`, aproblock)
+                                }
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
@@ -359,34 +363,16 @@ export class TldrawManager {
                         // 添加拖放事件监听器
                         container.addEventListener('drop', handleDrop);
 
-                        // 删除组件块逻辑
+                        // 删除组件块逻辑 — 将不同类型的 Shape 分开处理
                         editor.sideEffects.registerAfterDeleteHandler('shape', async (shape) => {
-                            // Check if shape is a card shape type
-                            if (shape.type !== 'card') return;
-
-                            const cardShape = shape as ICardShape;
-                            const blockId = cardShape.props?.blockId;
-                            if (!blockId) return;
-
-                            // 获取所有页面上的所有形状
-                            const allShapes = editor.store.query.records('shape').get();
-                            // 检查所有页面上是否还存在引用相同 blockId 的卡片
-                            const remainingCardsWithSameBlockId = allShapes
-                                .filter(s => s.type === 'card' && (s as ICardShape).props?.blockId === blockId);
-
-                            // 只有当没有其他卡片引用此 blockId 时，才更新块属性
-                            if (remainingCardsWithSameBlockId.length === 0) {
-                                if (await api.getBlockByID(blockId)) {
-                                    if (settingdata['SyncDelete']) {
-                                        api.deleteBlock(blockId)
-                                    } else {
-                                        api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' })
-                                            .then(() => console.log(`Block attribute updated for ${blockId} as it's no longer referenced.`))
-                                            .catch(err => console.error('Failed to update block attributes:', err));
-                                    }
-                                }
+                            // Only handle the shape types we care about
+                            if (shape.type === 'card') {
+                                await this.handleCardShapeDeletion(editor, shape as ICardShape);
+                            } else if (shape.type === 'single-block') {
+                                await this.handleSingleBlockDeletion(editor, shape as ICardShape);
                             } else {
-                                console.log(`Block attribute for ${blockId} not updated as other cards still reference it.`);
+                                // Ignore other shape types
+                                return;
                             }
                         });
 
@@ -736,6 +722,95 @@ export class TldrawManager {
         );
 
         return cardShape?.id || null;
+    }
+
+    /**
+     * Helper: find the number of remaining shapes referencing a blockId for specified types
+     */
+    private countRemainingShapesReferencingBlock(editor: Editor, blockId: string, types: string[]): number {
+        const allShapes = editor.store.query.records('shape').get();
+        return allShapes.filter(s => types.includes(s.type) && (s as ICardShape).props?.blockId === blockId).length;
+    }
+
+    /**
+     * 当 card 类型形状被删除后，调用该函数处理块的清理逻辑。
+     * 扩展点：在这里添加任何 card 相关的自定义逻辑。
+     */
+    private async handleCardShapeDeletion(editor: Editor, shape: ICardShape) {
+        try {
+            const blockId = shape.props?.blockId;
+            if (!blockId) return;
+
+            // 只检查其他 card 类型是否仍然引用同一 blockId
+            const remainingCardsCount = this.countRemainingShapesReferencingBlock(editor, blockId, ['card']);
+            if (remainingCardsCount === 0) {
+                // 如果没有其他 card 引用，可执行删除或更新属性
+                if (await api.getBlockByID(blockId)) {
+                    if (settingdata['SyncDelete']) {
+                        // SyncDelete=true 的情况：删除块
+                        await api.deleteBlock(blockId);
+                        console.log(`Deleted block ${blockId} because no other cards reference it.`);
+                    } else {
+                        // 否则只重置属性，保留块
+                        await api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' });
+                        console.log(`Block attribute updated for ${blockId} as no other cards reference it.`);
+                    }
+                }
+            } else {
+                console.log(`Card deletion: ${remainingCardsCount} remaining card(s) reference block ${blockId}; skipping block update.`);
+            }
+        } catch (err) {
+            console.error('handleCardShapeDeletion error', err);
+        }
+    }
+
+    /**
+     * 当 single-block 类型形状被删除后，调用该函数处理块的清理逻辑。
+     * 扩展点：在这里添加任何 single-block 特有的自定义逻辑（例如不同的属性或行为）。
+     */
+    private async handleSingleBlockDeletion(editor: Editor, shape: ICardShape) {
+        try {
+            const blockId = shape.props?.blockId;
+            if (!blockId) return;
+
+            // 只检查其他 single-block 是否仍然引用同一 blockId
+            const remainingSingleBlockCount = this.countRemainingShapesReferencingBlock(editor, blockId, ['single-block']);
+            if (remainingSingleBlockCount === 0) {
+                const block = await api.getBlockByID(blockId);
+                if (block) {
+                    // single-block 删除行为：默认与 card 保持一致。
+                    if (settingdata['SyncDelete']) {
+                        await api.deleteBlock(blockId);
+                        console.log(`Deleted block ${blockId} because no other single-blocks reference it.`);
+                    } else {
+                        // console.log("%%%",block.markdown);
+                        // 只删除指向当前画板(this.id) 与该块(blockId) 的[*](...)链接
+                        // 使用 URL 解析以便在 query 中精确匹配 rootid 与 blockid（支持 title 等额外参数）
+                        const replacedMarkdown = block.markdown.replace(/\[\*\]\((https:\/\/plugins\/siyuan-steve-tools\/\?[^)]+)\)/g, (match, url) => {
+                            try {
+                                const params = new URL(url).searchParams;
+                                if (params.get('rootid') === this.id && params.get('blockid') === blockId) {
+                                    return ''; // 匹配则删除该链接
+                                }
+                            } catch (err) {
+                                // 若 URL 解析失败则 fallback：仅当包含 rootid 与 blockid 字符串时才删除
+                                if (url.includes(`rootid=${this.id}`) && url.includes(`blockid=${blockId}`)) {
+                                    return '';
+                                }
+                            }
+                            return match; // 不匹配则保留原链接
+                        });
+                        if (replacedMarkdown !== block.markdown) {
+                            await api.updateBlock("markdown", replacedMarkdown, blockId);
+                        }
+                    }
+                }
+            } else {
+                console.log(`Single-block deletion: ${remainingSingleBlockCount} remaining single-block(s) reference block ${blockId}; skipping block update.`);
+            }
+        } catch (err) {
+            console.error('handleSingleBlockDeletion error', err);
+        }
     }
 
     public async captureSlideScreenshot(slideId: TLShapeId, options: CaptureSlideScreenshotOptions = {}): Promise<CaptureSlideScreenshotResult | null> {
