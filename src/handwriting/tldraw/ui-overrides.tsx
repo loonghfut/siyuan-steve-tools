@@ -758,6 +758,36 @@ export const components: TLComponents = {
                 >
                     🔗
                 </button>
+                <button
+                    style={{
+                        ...buttonStyle,
+                        // 仅对 single-block 类型显示
+                        display: editor.getShape(selectionInfo.id)?.type === 'single-block' ? undefined : 'none',
+                    }}
+                    onClick={async () => {
+                        //获取块的md内容
+                        // const blockmd = await getBlockByID((editor.getShape(selectionInfo.id) as ISingleBlockShape).props.blockId);
+                        // const mdContent = blockmd?.markdown || '';
+                        // console.log('块的MD内容:', mdContent);
+                        // //要减去[*](url)这一部分
+                        // const mdContentMatch = mdContent.match(/\]\((.*?)\)([\s\S]*)/);
+                        // const actualContent = mdContentMatch ? mdContentMatch[2].trim() : mdContent;
+                        // console.log('实际内容:', actualContent);
+                        // //根据字符数来更新宽度
+                        // const approxWidth = Math.min(Math.max(actualContent.length * 8, 200), 800); // 每个字符大约8px，最小200px，最大800px
+                        editor.updateShape({
+                            id: selectionInfo.id,
+                            type: 'single-block',
+                            props: {
+                                ...((editor.getShape(selectionInfo.id) as ISingleBlockShape).props),
+                                h: 50,
+                            },
+                        });
+                    }}  
+                    title="还原高度"
+                >
+                    🪟
+                </button>
             </div>
         )
     },
