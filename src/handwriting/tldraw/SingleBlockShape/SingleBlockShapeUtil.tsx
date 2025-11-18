@@ -56,7 +56,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	getDefaultProps(): ISingleBlockShape['props'] {
 		return {
 			w: 300,
-			h: 80,
+			h: 50,
 			color: 'black',
 			blockId: '',
 			fontSize: 22,

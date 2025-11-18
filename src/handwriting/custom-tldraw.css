@@ -26,31 +26,34 @@
   .protyle-gutters {
     /* top: 50px !important; */
     /* left: 8px !important; */
-    display: none ;
+    display: none;
   }
-  .protyle-content {
-    overflow: none;
+
+  /* .protyle-content {
+    overflow: auto;
     flex: 1;
     scrollbar-gutter: stable;
-  }
+  } */
+
   .protyle-toolbar {
     top: 0 !important;
     left: 0 !important;
   }
-  .protyle-title{
+
+  .protyle-title {
     margin: 15px 26px 0px !important;
-  } 
+  }
 
+  .protyle-wysiwyg {
+    position: relative;
+    padding: 0px 0px 0px 8px !important;
+  }
 }
 
-/* 确保包含块使用相对定位 */
-.tldraw__editor .protyle-wysiwyg {
-  position: relative;
-  padding: 12px !important;
-}
+
 
 [custom-st-tldraw="1"] {
-  background-color: #398ecd57 ;
+  background-color: #398ecd57;
   color: #f9f9f985 !important;
 }
 
@@ -95,7 +98,7 @@
   width: 100%;
   user-select: all;
   text-rendering: optimizeLegibility;
-  -webkit-user-select: auto!important;
+  -webkit-user-select: auto !important;
 }
 
 
@@ -103,11 +106,16 @@
 
 .slides-panel {
   /* ... 其他现有样式 ... */
-  max-height: 400px; /* 设置一个最大高度，例如 400px */
-  overflow-y: auto; /* 当内容超出最大高度时显示垂直滚动条 */
-  max-width: 120px; /* 设置最大宽度，例如 320px */
-  word-break: break-all; /* 长单词或URL换行 */
-  white-space: normal; /* 允许文本换行 */
+  max-height: 400px;
+  /* 设置一个最大高度，例如 400px */
+  overflow-y: auto;
+  /* 当内容超出最大高度时显示垂直滚动条 */
+  max-width: 120px;
+  /* 设置最大宽度，例如 320px */
+  word-break: break-all;
+  /* 长单词或URL换行 */
+  white-space: normal;
+  /* 允许文本换行 */
   /* 根据主题设置背景色 */
   background-color: var(--color-low);
 }
@@ -116,18 +124,22 @@
 
 /* 如果 'scroll-light' 类没有定义滚动条样式，你可以添加类似下面的规则 (适用于 Webkit 浏览器) */
 .slides-panel::-webkit-scrollbar {
-  width: 6px; /* 滚动条宽度 */
+  width: 6px;
+  /* 滚动条宽度 */
 }
 
 .slides-panel::-webkit-scrollbar-thumb {
-  background-color: var(--color-muted-1); /* 滚动条滑块颜色 */
-  border-radius: 3px; /* 滚动条滑块圆角 */
+  background-color: var(--color-muted-1);
+  /* 滚动条滑块颜色 */
+  border-radius: 3px;
+  /* 滚动条滑块圆角 */
 }
 
 .slides-panel::-webkit-scrollbar-track {
-  background-color: transparent; /* 滚动条轨道背景色 */
+  background-color: transparent;
+  /* 滚动条轨道背景色 */
 }
 
-.tlui-layout{
+.tlui-layout {
   z-index: 1 !important;
 }

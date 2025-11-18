@@ -317,7 +317,7 @@ export class TldrawManager {
                                     y: y, // 默认高度的一半
                                     props: {
                                         w: 300,
-                                        h: 100,
+                                        h: 50,
                                         color: 'black',
                                         blockId: aproblock,
                                     },
