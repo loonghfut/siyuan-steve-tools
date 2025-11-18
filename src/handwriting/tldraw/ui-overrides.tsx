@@ -334,10 +334,10 @@ const CustomStylePanel = track(() => {
                 app: window.siyuan.ws.app,
                 doc: {
                     id: blockId,
-                    action: ['cb-get-hl', 'cb-get-focus'],
+                    action: ['cb-get-hl'],
                     zoomIn: true,
                 },
-                position: 'right',
+                // position: 'right',
                 keepCursor: false,
             })
         } catch (err) {
@@ -437,7 +437,7 @@ function CustomQuickActions() {
                         doc: {
                             id: rootId,
                         },
-                        position: "right",
+                        // position: "right",
                     });
                 }} />
             </div>
