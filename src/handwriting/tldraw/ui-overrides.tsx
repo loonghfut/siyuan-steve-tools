@@ -143,7 +143,21 @@ export const uiOverrides: TLUiOverrides = {
                 selectAdjacentShape(editor, 'down')
             },
         }
-
+        nextActions['edit-selected-shape'] = {
+            id: 'edit-selected-shape',
+            label: '编辑选中图形',
+            kbd: 'enter',
+            onSelect() {
+                if (editor.getEditingShapeId()) {
+                    return
+                }
+                const shapes = editor.getSelectedShapes()
+                if (shapes.length !== 1) {
+                    return
+                }
+                editor.setEditingShape(shapes[0].id)
+            },
+        }
         return nextActions
     },
 }
