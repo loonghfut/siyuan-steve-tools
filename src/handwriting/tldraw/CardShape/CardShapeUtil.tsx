@@ -746,8 +746,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					else sourceEl.removeAttribute('srcset')
 				}
 			})
-			clone.style.width = `${w - border * 2}px`
-			clone.style.height = `${h - border * 2}px`
+			clone.style.width = `${Math.max(w - border * 2, 1)}px`
+			clone.style.height = `${Math.max(h - border * 2, 1)}px`
 			clone.style.pointerEvents = 'none'
 			clone.style.overflow = 'hidden'
 			clone.style.fontSize = `${fontSize}px`
@@ -764,7 +764,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			<g>
 				<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
 				{serialized ? (
-					<foreignObject x={border} y={border} width={Math.max(w - border * 2, 0)} height={Math.max(h - border * 2, 0)}>
+					<foreignObject x={border} y={border} width={Math.max(w - border * 2, 1)} height={Math.max(h - border * 2, 1)}>
 						<div
 							xmlns="http://www.w3.org/1999/xhtml"
 							style={{ width: '100%', height: '100%', overflow: 'hidden', fontSize: `${fontSize}px` }}

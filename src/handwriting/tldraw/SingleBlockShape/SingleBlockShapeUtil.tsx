@@ -85,19 +85,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const detachKeyHandler = useRef<() => void>()
 		const visibilityTimerRef = useRef<number | null>(null)
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
-	// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
-	const DESTROYED_MARK = '__st_destroyed__'
-	const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
-		if (!pt) return
-		const anyPt = pt as any
-		if (anyPt[DESTROYED_MARK]) return
-		try {
-			pt.destroy()
-		} catch {
-			// ignore
+		// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
+		const DESTROYED_MARK = '__st_destroyed__'
+		const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
+			if (!pt) return
+			const anyPt = pt as any
+			if (anyPt[DESTROYED_MARK]) return
+			try {
+				pt.destroy()
+			} catch {
+				// ignore
+			}
+			anyPt[DESTROYED_MARK] = true
 		}
-		anyPt[DESTROYED_MARK] = true
-	}
 
 		// 以世界坐标的“预加载边距”来判断是否接近视口，避免 DOM 观察在复杂变换下不可靠
 		const PRELOAD_MARGIN_WORLD = 1600
@@ -576,6 +576,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const fillColor = theme[color].semi
 		let serialized = ''
 
+		// Clamp inner dimensions to avoid negative <foreignObject> size during export
+		const innerW = Math.max(w - border * 2, 1)
+		const innerH = Math.max(h - border * 2, 1)
+
 		const binaryToBase64 = (binary: string) => {
 			let base64 = ''
 			const chunkSize = 0x6000
@@ -713,8 +717,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					else sourceEl.removeAttribute('srcset')
 				}
 			})
-			clone.style.width = `${w - border * 2}px`
-			clone.style.height = `${h - border * 2}px`
+			clone.style.width = `${Math.max(innerW, 1)}px`
+			clone.style.height = `${Math.max(innerH, 1)}px`
 			clone.style.pointerEvents = 'none'
 			clone.style.overflow = 'hidden'
 			clone.style.fontSize = `${fontSize}px`
@@ -723,17 +727,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		}
 
 		serialized = serializeContent()
+		const containerAttrSelector = `[data-sb-id="${shape.id}"]`
 		const hideScrollbarStyle = serialized
-			? '<style xmlns="http://www.w3.org/1999/xhtml">*::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}*::-webkit-scrollbar-thumb{display:none!important;}*{scrollbar-width:none!important;}</style>'
+			? `<style xmlns="http://www.w3.org/1999/xhtml">${containerAttrSelector} *::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}${containerAttrSelector} *::-webkit-scrollbar-thumb{display:none!important;}${containerAttrSelector} *{scrollbar-width:none!important;}${containerAttrSelector} .protyle-wysiwyg{position:relative;padding:0 0 0 8px!important;}</style>`
 			: ''
 
 		return (
 			<g>
 				<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
 				{serialized ? (
-					<foreignObject x={border} y={border} width={Math.max(w - border * 2, 0)} height={Math.max(h - border * 2, 0)}>
+					<foreignObject x={border} y={border} width={Math.max(innerW, 1)} height={Math.max(innerH, 1)}>
 						<div
 							xmlns="http://www.w3.org/1999/xhtml"
+							data-sb-id={shape.id}
 							style={{ width: '100%', height: '100%', overflow: 'hidden', fontSize: `${fontSize}px` }}
 							dangerouslySetInnerHTML={{ __html: `${hideScrollbarStyle}${serialized}` }}
 						/>
