@@ -108,41 +108,29 @@ export const uiOverrides: TLUiOverrides = {
             nextActions['zoom-out'] = { ...nextActions['zoom-out'], kbd: '' }
         }
 
-        nextActions['select-shape-left'] = {
-            id: 'select-shape-left',
-            label: '选择左侧图形',
-            kbd: 'left',
-            onSelect() {
-                selectAdjacentShape(editor, 'left')
-            },
+        const focusSelection = () => {
+            if (editor.getSelectedShapeIds().length > 0) {
+                editor.zoomToSelection({ animation: { duration: 200 } })
+            }
         }
 
-        nextActions['select-shape-right'] = {
-            id: 'select-shape-right',
-            label: '选择右侧图形',
-            kbd: 'right',
-            onSelect() {
-                selectAdjacentShape(editor, 'right')
-            },
-        }
-
-        nextActions['select-shape-up'] = {
-            id: 'select-shape-up',
-            label: '选择上方图形',
-            kbd: 'up',
-            onSelect() {
-                selectAdjacentShape(editor, 'up')
-            },
-        }
-
-        nextActions['select-shape-down'] = {
-            id: 'select-shape-down',
-            label: '选择下方图形',
-            kbd: 'down',
-            onSelect() {
-                selectAdjacentShape(editor, 'down')
-            },
-        }
+        ;[
+            { id: 'select-shape-left', label: '选择左侧图形', kbd: 'left', direction: 'left' as const },
+            { id: 'select-shape-right', label: '选择右侧图形', kbd: 'right', direction: 'right' as const },
+            { id: 'select-shape-up', label: '选择上方图形', kbd: 'up', direction: 'up' as const },
+            { id: 'select-shape-down', label: '选择下方图形', kbd: 'down', direction: 'down' as const },
+        ].forEach(({ id, label, kbd, direction }) => {
+            nextActions[id] = {
+                id,
+                label,
+                kbd,
+                onSelect() {
+                    selectAdjacentShape(editor, direction)
+                    // Keep the newly selected shape centered for quick navigation
+                    focusSelection()
+                },
+            }
+        })
         nextActions['edit-selected-shape'] = {
             id: 'edit-selected-shape',
             label: '编辑选中图形',
