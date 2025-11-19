@@ -233,6 +233,7 @@ const CustomStylePanel = track(() => {
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
                 updateShape: true,
+                background: true,
             })
             if (result) {
                 try {
@@ -391,7 +392,6 @@ const CustomStylePanel = track(() => {
                     <button
                         className="tlui-button" // 使用 tldraw 风格的按钮类名 (可能需要调整)
                         onClick={handleCopyLink}
-                        onPointerDown={stopEventPropagation} // 阻止事件冒泡
                         style={{ marginTop: '-8px', width: '100%' }} // 添加边距并充满宽度
                         disabled={rootId === ''} // 如果 rootId 未设置则禁用
                     >
@@ -400,7 +400,6 @@ const CustomStylePanel = track(() => {
                     <button
                         className="tlui-button"
                         onClick={handleOpenSlideBlock}
-                        onPointerDown={stopEventPropagation}
                         style={{ marginTop: '-8px', width: '100%' }}
                         disabled={!slideShape.props.blockId}
                     >
@@ -409,7 +408,6 @@ const CustomStylePanel = track(() => {
                     <button
                         className="tlui-button"
                         onClick={handleCaptureScreenshot}
-                        onPointerDown={stopEventPropagation}
                         style={{ marginTop: '-8px', width: '100%' }}
                         disabled={isCapturingScreenshot}
                     >
