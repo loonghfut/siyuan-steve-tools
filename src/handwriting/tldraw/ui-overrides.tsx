@@ -6,7 +6,6 @@ import {
     TLComponents,
     TLUiOverrides,
     TldrawUiMenuItem,
-    computed,
     useIsToolSelected,
     useTools,
     useEditor,
@@ -22,6 +21,7 @@ import {
     DefaultQuickActions,
     DefaultQuickActionsContent, // 导入 useRelevantStyles
 } from '@tldraw/tldraw'
+import { selectAdjacentShape } from './utils/selectAdjacentShape'
 
 // Extend the TLEventMap interface to include custom events
 declare module '@tldraw/tldraw' {
@@ -32,7 +32,6 @@ declare module '@tldraw/tldraw' {
     }
 }
 import React from 'react';
-import { $currentSlide, getSlides, moveToSlide } from './SlideShape/useSlides';
 import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ICardShape } from './CardShape/card-shape-types';
@@ -48,6 +47,7 @@ type CardLikeShape = ICardShape | ISingleBlockShape;
 
 const isCardLikeShape = (shape: any): shape is CardLikeShape =>
     shape?.type === 'card' || shape?.type === 'single-block';
+
 
 export const uiOverrides: TLUiOverrides = {
     tools(editor, tools) {
@@ -90,49 +90,61 @@ export const uiOverrides: TLUiOverrides = {
         return tools
     },
     actions(editor, actions) {
-        const $slides = computed('slides', () => getSlides(editor))
-        return {
-            ...actions,
-            'next-slide': {
-                id: 'next-slide',
-                label: 'Next slide',
-                kbd: 'right',
-                onSelect() {
-                    const slides = $slides.get()
-                    const currentSlide = $currentSlide.get()
-                    const index = slides.findIndex((s) => s.id === currentSlide?.id)
-                    const nextSlide = slides[index + 1] ?? currentSlide ?? slides[0]
-                    if (nextSlide) {
-                        editor.stopCameraAnimation()
-                        moveToSlide(editor, nextSlide)
-                    }
-                },
-            },
-            'previous-slide': {
-                id: 'previous-slide',
-                label: 'Previous slide',
-                kbd: 'left',
-                onSelect() {
-                    const slides = $slides.get()
-                    const currentSlide = $currentSlide.get()
-                    const index = slides.findIndex((s) => s.id === currentSlide?.id)
-                    const previousSlide = slides[index - 1] ?? currentSlide ?? slides[slides.length - 1]
-                    if (previousSlide) {
-                        editor.stopCameraAnimation()
-                        moveToSlide(editor, previousSlide)
-                    }
-                },
-            },
-            'zoom-in': {
-                ...actions['zoom-in'], // Keep default behavior
-                kbd: '',
-            },
-            'zoom-out': {
-                ...actions['zoom-out'], // Keep default behavior
-                kbd: '',
-            },
-            // 'toggle-grid': { ...actions['toggle-grid'], kbd: '' },
+        const nextActions: typeof actions = { ...actions };
+        const nudgeActionIds = ['nudge-left', 'nudge-right', 'nudge-up', 'nudge-down'] as const;
+
+        nudgeActionIds.forEach((id) => {
+            const action = nextActions[id]
+            if (action) {
+                nextActions[id] = { ...action, kbd: '' }
+            }
+        })
+
+        if (nextActions['zoom-in']) {
+            nextActions['zoom-in'] = { ...nextActions['zoom-in'], kbd: '' }
         }
+
+        if (nextActions['zoom-out']) {
+            nextActions['zoom-out'] = { ...nextActions['zoom-out'], kbd: '' }
+        }
+
+        nextActions['select-shape-left'] = {
+            id: 'select-shape-left',
+            label: '选择左侧图形',
+            kbd: 'left',
+            onSelect() {
+                selectAdjacentShape(editor, 'left')
+            },
+        }
+
+        nextActions['select-shape-right'] = {
+            id: 'select-shape-right',
+            label: '选择右侧图形',
+            kbd: 'right',
+            onSelect() {
+                selectAdjacentShape(editor, 'right')
+            },
+        }
+
+        nextActions['select-shape-up'] = {
+            id: 'select-shape-up',
+            label: '选择上方图形',
+            kbd: 'up',
+            onSelect() {
+                selectAdjacentShape(editor, 'up')
+            },
+        }
+
+        nextActions['select-shape-down'] = {
+            id: 'select-shape-down',
+            label: '选择下方图形',
+            kbd: 'down',
+            onSelect() {
+                selectAdjacentShape(editor, 'down')
+            },
+        }
+
+        return nextActions
     },
 }
 

@@ -359,7 +359,24 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (!isEditingState || !wys) return
 
 				const handleKeyDown = (event: KeyboardEvent) => {
-					if (event.key !== 'Enter' || event.isComposing) return
+					if (event.isComposing) return
+					// 处理 Escape：退出编辑模式
+					if (event.key === 'Escape') {
+						try {
+							event.preventDefault()
+							event.stopImmediatePropagation()
+							event.stopPropagation()
+							// ; (event as any).returnValue = false
+						} catch (e) {
+							// ignore
+						}
+						editor.setEditingShape(undefined)
+						editor.select(shape.id)
+						return
+					}
+
+					// 仅对 Enter 做原有处理
+					if (event.key !== 'Enter') return
 					// 拦截所有 Enter 行为，按修饰键决定新块方向
 					try {
 						event.preventDefault()
@@ -407,7 +424,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				}
 
 				const handleKeyUp = (event: KeyboardEvent) => {
-					if (event.key !== 'Enter') return
+					if (event.key !== 'Enter' && event.key !== 'Escape') return
 					try {
 						event.preventDefault()
 						event.stopImmediatePropagation()
