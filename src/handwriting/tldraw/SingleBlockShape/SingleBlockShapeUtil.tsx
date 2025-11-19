@@ -34,7 +34,7 @@ const SingleBlockSizes = new EditorAtom('single-block sizes', (editor) => {
 	return map
 })
 const BORDER_PX = 3 // 与样式、SVG 导出保持一致
-const MIN_HEIGHT = 28
+const MIN_HEIGHT = 50
 
 export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	static override type = 'single-block' as const
