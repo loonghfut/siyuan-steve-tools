@@ -484,5 +484,9 @@
 	"vscode.file-open.backup-saved": "备份已保存",
 	"vscode.file-open.desc": "该文件是用较早版本的tldraw创建的。您是否愿意将其更新为新版本？",
 	"vscode.file-open.dont-show-again": "不再询问",
-	"vscode.file-open.open": "继续"
+	"vscode.file-open.open": "继续",
+	"style-panel.card-render-mode": "渲染方式",
+	"card-render-mode-style.inherit": "继承",
+	"card-render-mode-style.static-dom": "静态 DOM",
+	"card-render-mode-style.live-protyle": "实时 Protyle"
 }

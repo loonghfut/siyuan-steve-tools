@@ -18,6 +18,7 @@ import {
     track, // 导入 track
     useRelevantStyles,
     DefaultStylePanelContent,
+    StylePanelDropdownPicker,
     DefaultQuickActions,
     DefaultQuickActionsContent, // 导入 useRelevantStyles
 } from '@tldraw/tldraw'
@@ -32,15 +33,15 @@ declare module '@tldraw/tldraw' {
     }
 }
 import React from 'react';
+import { CardRenderMode, ICardShape } from './CardShape/card-shape-types'
+import { settingdata } from '@/index'
 import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
-import { ICardShape } from './CardShape/card-shape-types';
 import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
 import { openTab, showMessage } from 'siyuan';
 import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
-import { settingdata } from '@/index';
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
@@ -158,6 +159,20 @@ const CustomStylePanel = track(() => {
 
     const isSingleSlideSelected = selectedShapes.length === 1 && selectedShapes[0].type === 'slide';
     const slideShape = isSingleSlideSelected ? (selectedShapes[0] as SlideShape) : null;
+    const selectedCardShapes = React.useMemo(
+        () => selectedShapes.filter((shape): shape is ICardShape => shape.type === 'card'),
+        [selectedShapes]
+    );
+    const hasCardSelection = selectedCardShapes.length > 0;
+    const cardRenderModeValue = React.useMemo<CardRenderMode | 'mixed'>(() => {
+        if (!hasCardSelection) {
+            return 'inherit';
+        }
+        const modes = selectedCardShapes.map((shape) => shape.props.renderMode ?? 'inherit');
+        const [firstMode] = modes;
+        return modes.every((mode) => mode === firstMode) ? firstMode : 'mixed';
+    }, [hasCardSelection, selectedCardShapes]);
+    
 
     // --- 获取 rootId ---
 
@@ -427,6 +442,42 @@ const CustomStylePanel = track(() => {
                     >
                         {isCapturingScreenshot ? '生成中…' : '更新截图'}
                     </button>
+                </div>
+            )}
+            {hasCardSelection && (
+                <div className="tlui-style-panel__section">
+                    <StylePanelDropdownPicker
+                        label={"渲染方式"}
+                        type="menu"
+                        id="card-render-mode"
+                        uiType="card-render-mode"
+                        stylePanelType="card-render-mode"
+                        // style is not used by our custom onValueChange, but the component requires it in signature
+                        style={{ id: 'card-render-mode' } as any}
+                        items={[
+                            { value: 'inherit', icon: 'mixed' },
+                            { value: 'static-dom', icon: 'pack' },
+                            { value: 'live-protyle', icon: 'warning-triangle' },
+                        ]}
+                        value={
+                            cardRenderModeValue === 'mixed'
+                                ? { type: 'mixed' as const }
+                                : { type: 'shared' as const, value: cardRenderModeValue }
+                        }
+                        onValueChange={(_style, nextMode: any) => {
+                            if (!selectedCardShapes.length) return;
+                            const nextModeStr = nextMode as CardRenderMode;
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedCardShapes.map((shape) => ({
+                                        id: shape.id,
+                                        type: 'card',
+                                        props: { ...shape.props, renderMode: nextModeStr },
+                                    }))
+                                );
+                            });
+                        }}
+                    />
                 </div>
             )}
         </DefaultStylePanel>

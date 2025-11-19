@@ -10,7 +10,7 @@ import {
 } from '@tldraw/tldraw'
 import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
-import { ICardShape } from './card-shape-types'
+import { CardRenderMode, ICardShape } from './card-shape-types'
 import { Protyle, showMessage } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
@@ -65,6 +65,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			isMain: false, // 是否为主卡片
 			refreshNonce: Date.now(), // 用于之后强制刷新
 			isCollapsed: false, // 默认不折叠
+			renderMode: 'inherit' as CardRenderMode, // 卡片单独渲染模式: inherit | static-dom | live-protyle
 			// version: 1, // 版本号
 		}
 	}
@@ -260,7 +261,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			}
 
 			if (!containerRef.current || !window.siyuan?.ws?.app) return;
-			const renderMode = (settingdata["card-render-mode"] || "static-dom") as "static-dom" | "live-protyle";
+			const globalRenderMode: Exclude<CardRenderMode, 'inherit'> = settingdata["card-render-mode"] === 'live-protyle'
+				? 'live-protyle'
+				: 'static-dom';
+			const requestedRenderMode: CardRenderMode = shape.props.renderMode ?? 'inherit';
+			const effectiveRenderMode: Exclude<CardRenderMode, 'inherit'> = requestedRenderMode === 'inherit'
+				? globalRenderMode
+				: requestedRenderMode;
 
 			// 等待 Protyle 完成首次内容渲染（尽量接近编辑态样式）
 			const waitForProtyleRendered = async (pt: Protyle, timeout = 800) => {
@@ -475,7 +482,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					try { protyleRef.current?.enable(); } catch { }
 				} else {
 					// 非编辑
-					if (renderMode === 'static-dom') {
+					if (effectiveRenderMode === 'static-dom') {
 						// 若已有 Protyle，用其生成静态预览后销毁实例；若没有且有 blockId，则临时创建->克隆->销毁
 						if (protyleRef.current) {
 							await useStaticPreviewFromProtyle();
@@ -514,7 +521,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				cancelled = true;
 				destroyRuntimeResources();
 			};
-		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, isCollapsed]);
+		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, isCollapsed, shape.props.renderMode]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {

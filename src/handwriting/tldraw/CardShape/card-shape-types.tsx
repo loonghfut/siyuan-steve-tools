@@ -1,5 +1,7 @@
 import { TLBaseShape, TLDefaultColorStyle } from '@tldraw/tldraw'
 
+export type CardRenderMode = string //'inherit' | 'static-dom' | 'live-protyle'
+
 // A type for our custom card shape
 export type ICardShape = TLBaseShape<
 	'card',
@@ -15,5 +17,6 @@ export type ICardShape = TLBaseShape<
 		version?: number // 添加 vision 属性
 		refreshNonce?: number // 添加 refreshNonce 属性
 		isCollapsed?: boolean // 添加折叠状态属性
+		renderMode?: string// 每块渲染模式优先级高于全局  'inherit' | 'static-dom' | 'live-protyle'
 	}
 >

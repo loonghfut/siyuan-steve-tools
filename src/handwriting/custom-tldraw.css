@@ -76,7 +76,7 @@
   background-color: var(--color-panel);
 }
 
-.tlui-input {
+input.tlui-input {
   background: none;
   margin-top: -3px;
   position: relative;
@@ -100,6 +100,56 @@
   text-rendering: optimizeLegibility;
   -webkit-user-select: auto !important;
 }
+
+/* select.tlui-input {
+  min-height: 32px;
+  padding: 4px 36px 4px 10px;
+  border: 1px solid var(--color-divider, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+  background-color: var(--color-panel, rgba(255,255,255,0.02));
+  color: var(--color-text-1, inherit);
+  line-height: 1.4;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  -webkit-appearance: none; 
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px 16px;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+} */
+
+/* 聚焦态 */
+/* select.tlui-input:focus {
+  outline: none;
+  border-color: var(--color-primary, #3d8aff);
+  box-shadow: 0 0 0 4px rgba(61, 138, 255, 0.12);
+} */
+
+/* 禁用态 */
+/* select.tlui-input:disabled {
+  opacity: 0.6;
+  cursor: default;
+} */
+
+/* 下拉项样式：现代浏览器多数支持样式但存在差异，主要为更好视觉 */
+/* select.tlui-input option {
+  padding: 8px 12px;
+  background: var(--color-panel, #fff);
+  color: var(--color-text-1, #111);
+} */
+
+/* 移除 IE/Edge 的下拉箭头（如果需要） */
+/* select.tlui-input::-ms-expand {
+  display: none;
+} */
+
+/* 小屏或更紧凑场景下的微调 */
+/* @media (max-width: 520px) {
+  select.tlui-input { padding-right: 32px; }
+} */
 
 
 
