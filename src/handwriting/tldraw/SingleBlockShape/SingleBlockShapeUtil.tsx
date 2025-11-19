@@ -1,4 +1,4 @@
-import React, { ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import React, { ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
 	HTMLContainer,
 	EASINGS,
@@ -10,6 +10,8 @@ import {
 	createShapeId,
 	getDefaultColorTheme,
 	resizeBox,
+    AtomMap,
+    EditorAtom,
 } from '@tldraw/tldraw'
 import { Protyle, showMessage } from 'siyuan'
 import * as api from '@/api/api'
@@ -21,6 +23,18 @@ import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
+
+// ===== DOM 尺寸测量（仅影响高度）=====
+// 用 EditorAtom 存储每个 shape 的测量尺寸，保证 getGeometry 响应式更新
+const SingleBlockSizes = new EditorAtom('single-block sizes', (editor) => {
+	const map = new AtomMap<TLShapeId, { width: number; height: number }>('single-block sizes')
+	editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
+		map.delete(shape.id)
+	})
+	return map
+})
+const BORDER_PX = 3 // 与样式、SVG 导出保持一致
+const MIN_HEIGHT = 28
 
 export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	static override type = 'single-block' as const
@@ -65,9 +79,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	}
 
 	getGeometry(shape: ISingleBlockShape) {
+		const size = SingleBlockSizes.get(this.editor).get(shape.id)
 		return new Rectangle2d({
 			width: shape.props.w,
-			height: shape.props.h,
+			height: size?.height ?? shape.props.h,
 			isFilled: true,
 		})
 	}
@@ -85,6 +100,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const detachKeyHandler = useRef<() => void>()
 		const visibilityTimerRef = useRef<number | null>(null)
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
+		const resizeObsRef = useRef<ResizeObserver | null>(null)
+		const mutationObsRef = useRef<MutationObserver | null>(null)
+		const imgListenersRef = useRef<Array<() => void>>([])
 		// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
 		const DESTROYED_MARK = '__st_destroyed__'
 		const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
@@ -102,9 +120,21 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// 以世界坐标的“预加载边距”来判断是否接近视口，避免 DOM 观察在复杂变换下不可靠
 		const PRELOAD_MARGIN_WORLD = 1600
 
+		const disconnectObservers = () => {
+			try { resizeObsRef.current?.disconnect() } catch { }
+			resizeObsRef.current = null
+			try { mutationObsRef.current?.disconnect() } catch { }
+			mutationObsRef.current = null
+			for (const off of imgListenersRef.current) {
+				try { off() } catch { }
+			}
+			imgListenersRef.current = []
+		}
+
 		const destroyRuntimeResources = useCallback(() => {
 			detachKeyHandler.current?.()
 			detachKeyHandler.current = undefined
+			disconnectObservers()
 			if (loadHandleRef.current) {
 				loadHandleRef.current.cancel()
 				loadHandleRef.current = null
@@ -126,6 +156,31 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		useEffect(() => {
 			setIsEditingState(isEditing)
 		}, [isEditing])
+
+		// 计算并写入 DOM 尺寸（以内容高度为准，宽度沿用 props.w）
+		const updateDomSize = useCallback(() => {
+			// 优先测量 Protyle 的内容区域
+			let target: HTMLElement | null = null
+			if (protyleHostRef.current) {
+				target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
+			}
+			if (!target && containerRef.current) target = containerRef.current
+			if (!target) return
+
+			const contentH = Math.ceil((target as HTMLElement).scrollHeight || (target as HTMLElement).offsetHeight || 0)
+			const nextHeight = Math.max(contentH + BORDER_PX * 2, MIN_HEIGHT)
+			const nextWidth = Math.max(shape.props.w, 1)
+			SingleBlockSizes.update(editor, (map) => {
+				const existing = map.get(shape.id)
+				if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
+				return map.set(shape.id, { width: nextWidth, height: nextHeight })
+			})
+		}, [editor, shape.id, shape.props.w])
+
+		// 在渲染和字体变化后尽快测量一次
+		useLayoutEffect(() => {
+			updateDomSize()
+		})
 
 		// 基于 tldraw 的世界坐标计算是否进入“预加载区”（视口外但在边距内）
 		const updateVisibilityManual = useCallback(() => {
@@ -228,6 +283,32 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				return blockId
 			}
 
+			const setupObservers = () => {
+				disconnectObservers()
+				let target: HTMLElement | null = null
+				if (protyleHostRef.current) {
+					target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
+				}
+				if (!target) return
+				try {
+					resizeObsRef.current = new ResizeObserver(() => updateDomSize())
+					resizeObsRef.current.observe(target)
+				} catch { }
+				try {
+					mutationObsRef.current = new MutationObserver(() => updateDomSize())
+					mutationObsRef.current.observe(target, { subtree: true, childList: true, attributes: true, characterData: true })
+				} catch { }
+				// 图片等资源加载后尺寸变化
+				imgListenersRef.current = []
+				target.querySelectorAll('img').forEach((img) => {
+					const handler = () => updateDomSize()
+					img.addEventListener('load', handler)
+					imgListenersRef.current.push(() => img.removeEventListener('load', handler))
+				})
+				// 初始测量
+				updateDomSize()
+			}
+
 			const mountProtyle = async (blockId: string, priority: number) => {
 				if (disposed) return
 				loadHandleRef.current?.cancel()
@@ -284,6 +365,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`
 					}
 					await readyPromise.catch(() => undefined)
+					// 初始化观察与尺寸写入
+					setupObservers()
 					if (signal.aborted || disposed) {
 						safeDestroyProtyle(protyleInstance)
 						if (protyleHostRef.current === host && host.parentElement) {
@@ -494,6 +577,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							console.error('销毁 Protyle 时出错', err)
 						}
 						protyleRef.current = null
+						// 静态 DOM 也需要尺寸监听
+						setupObservers()
 					} else {
 						// no protyle instance, nothing to do
 					}
@@ -518,6 +603,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				const wys = containerRef.current.querySelector(".protyle-wysiwyg");
 				if (wys) (wys as HTMLElement).style.fontSize = `${shape.props.fontSize || 20}px`;
 			}
+			// 字号变化可能导致高度变化
+			updateDomSize()
 		}, [shape.props.fontSize]);
 
 		const handleDoubleClick = (e: React.MouseEvent) => {
@@ -551,7 +638,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
-					border: `3px solid ${theme[shape.props.color].solid}`,
+					border: `${BORDER_PX}px solid ${theme[shape.props.color].solid}`,
 					borderRadius: '10px',
 				}}
 				onDoubleClick={handleDoubleClick}
@@ -577,7 +664,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	}
 
 	indicator(shape: ISingleBlockShape) {
-		return <rect width={shape.props.w} height={shape.props.h} />
+		const { width, height } = this.editor.getShapeGeometry(shape).bounds
+		return <rect width={width} height={height} />
 	}
 
 	override onResize(shape: ISingleBlockShape, info: TLResizeInfo<ISingleBlockShape>) {
@@ -586,12 +674,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	override toSvg(shape: ISingleBlockShape, ctx: SvgExportContext): ReactElement | null {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		const { w, h, color, fontSize = 16, blockId } = shape.props
-		const border = 3
+		const { w, h: hProp, color, fontSize = 16, blockId } = shape.props
+		const border = BORDER_PX
 		const radius = 10
 		const strokeColor = theme[color].solid
 		const fillColor = theme[color].semi
 		let serialized = ''
+
+		const size = SingleBlockSizes.get(this.editor).get(shape.id)
+		const h = size?.height ?? hProp
 
 		// Clamp inner dimensions to avoid negative <foreignObject> size during export
 		const innerW = Math.max(w - border * 2, 1)
