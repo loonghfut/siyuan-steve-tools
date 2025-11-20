@@ -9,5 +9,7 @@ export type ISingleBlockShape = TLBaseShape<
 		blockId: string
 		fontSize?: number
 		refreshNonce?: number
+		/** 是否在按 Enter 创建新形状时自动与其建立连接（箭头） */
+		connectOnEnter?: boolean
 	}
 >

@@ -8,4 +8,5 @@ export const singleBlockShapeProps: RecordProps<ISingleBlockShape> = {
 	blockId: T.string,
 	fontSize: T.optional(T.number),
 	refreshNonce: T.optional(T.number),
+	connectOnEnter: T.optional(T.boolean),
 }

@@ -172,6 +172,19 @@ const CustomStylePanel = track(() => {
         const [firstMode] = modes;
         return modes.every((mode) => mode === firstMode) ? firstMode : 'mixed';
     }, [hasCardSelection, selectedCardShapes]);
+
+    // --- Single Block: connectOnEnter 开关 ---
+    const selectedSingleBlockShapes = React.useMemo(
+        () => selectedShapes.filter((s): s is ISingleBlockShape => s.type === 'single-block'),
+        [selectedShapes]
+    )
+    const hasSingleBlockSelection = selectedSingleBlockShapes.length > 0
+    const connectOnEnterState = React.useMemo<boolean | 'mixed'>(() => {
+        if (!hasSingleBlockSelection) return false
+        const values = selectedSingleBlockShapes.map(s => s.props.connectOnEnter !== false) // 未定义视为 true
+        const first = values[0]
+        return values.every(v => v === first) ? first : 'mixed'
+    }, [hasSingleBlockSelection, selectedSingleBlockShapes])
     
 
     // --- 获取 rootId ---
@@ -478,6 +491,31 @@ const CustomStylePanel = track(() => {
                             });
                         }}
                     />
+                </div>
+            )}
+            {hasSingleBlockSelection && (
+                <div className="tlui-style-panel__section">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                            type="checkbox"
+                            checked={connectOnEnterState === 'mixed' ? false : connectOnEnterState}
+                            ref={el => { if (el && connectOnEnterState === 'mixed') el.indeterminate = true }}
+                            onChange={(e) => {
+                                const next = e.target.checked
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedSingleBlockShapes.map(s => ({
+                                            id: s.id,
+                                            type: 'single-block',
+                                            props: { ...s.props, connectOnEnter: next }
+                                        }))
+                                    )
+                                })
+                            }}
+                            title="开启后按 Enter 新建的块会自动用箭头连接"
+                        />
+                        <span>回车新建时连接</span>
+                    </label>
                 </div>
             )}
         </DefaultStylePanel>
@@ -813,7 +851,7 @@ export const components: TLComponents = {
                                 action: ["cb-get-hl"],
                                 // zoomIn: true,
                             },
-                            // position: "",
+                            position: "right",
                             keepCursor: false,
                         });
                     }}
