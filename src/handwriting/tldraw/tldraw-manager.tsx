@@ -26,16 +26,14 @@ import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage } from 'siyuan';
 import { settingdata } from '@/index';
-import { MindMapNodeShapeUtil } from './MindMap/MindMapNodeShapeUtil';
-import { MindMapNodeTool } from './MindMap/MindMapNodeTool';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, MindMapNodeShapeUtil]
-const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, MindMapNodeTool]
+const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil]
+const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
