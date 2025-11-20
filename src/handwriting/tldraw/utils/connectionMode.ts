@@ -13,11 +13,11 @@ const isConnectableShape = (shape: any): shape is ConnectableShape => {
 // 检查两个形状之间是否已经存在连接
 const hasExistingConnection = (editor: Editor, sourceId: TLShapeId, targetId: TLShapeId): boolean => {
     const arrows = editor.getCurrentPageShapes().filter(shape => shape.type === 'arrow')
-    
+
     for (const arrow of arrows) {
         const bindings = editor.getBindingsFromShape(arrow, 'arrow')
         const boundShapeIds = bindings.map(b => b.toId)
-        
+
         // 检查是否存在从 sourceId 到 targetId 的连接(任意方向)
         if (
             (boundShapeIds.includes(sourceId) && boundShapeIds.includes(targetId)) ||
@@ -26,7 +26,7 @@ const hasExistingConnection = (editor: Editor, sourceId: TLShapeId, targetId: TL
             return true
         }
     }
-    
+
     return false
 }
 
@@ -46,7 +46,7 @@ export class ConnectionModeManager {
     // 启用连接模式
     enableConnectionMode(editor: Editor): boolean {
         const shapes = editor.getSelectedShapes().filter(isConnectableShape)
-        
+
         if (shapes.length < 1) {
             showMessage('请先选择至少一个卡片或块', 3000, 'info')
             return false
@@ -55,18 +55,18 @@ export class ConnectionModeManager {
         this.pendingShapeIds = shapes.map(s => s.id)
         this.isActive = true
         this.editor = editor
-        
+
         showMessage(`已记录 ${shapes.length} 个形状，请点击目标形状建立连接`, 4000, 'info')
-        
+
         // 取消选择，方便用户点击其他形状
         editor.setSelectedShapes([])
-        
+
         // 开始监听选择变化
         this.startListening()
-        
+
         // 通知状态变化
         this.onStateChange?.(true)
-        
+
         return true
     }
 
@@ -87,7 +87,7 @@ export class ConnectionModeManager {
     // 开始监听选择变化
     private startListening() {
         if (!this.editor) return
-        
+
         this.lastSelectionIds = ''
         this.checkInterval = window.setInterval(() => {
             this.checkSelection()
@@ -109,7 +109,8 @@ export class ConnectionModeManager {
         const currentIds = this.editor.getSelectedShapeIds().join(',')
         if (currentIds !== this.lastSelectionIds) {
             this.lastSelectionIds = currentIds
-            this.handleShapeSelection()
+            this.handleShapeSelection();
+            this.disableConnectionMode();
         }
     }
 
@@ -121,7 +122,7 @@ export class ConnectionModeManager {
         if (currentSelected.length !== 1) return
 
         const targetShape = currentSelected[0]
-        
+
         // 只处理可连接的形状类型
         if (!isConnectableShape(targetShape)) {
             showMessage('只能连接到卡片或块', 2000, 'info')
@@ -168,7 +169,7 @@ export class ConnectionModeManager {
         })
 
         // 完成连接后退出连接模式
-        this.disableConnectionMode()
+        // this.disableConnectionMode()
 
         // 显示结果信息
         if (createdCount > 0 && skippedCount > 0) {
