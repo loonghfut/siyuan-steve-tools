@@ -553,7 +553,6 @@ const CustomStylePanel = track(() => {
                         style={{ 
                             marginTop: '-8px', 
                             width: '100%',
-                            backgroundColor: connectionMode ? '#3d8aff' : undefined,
                             color: connectionMode ? 'white' : undefined
                         }}
                         disabled={connectionMode}
