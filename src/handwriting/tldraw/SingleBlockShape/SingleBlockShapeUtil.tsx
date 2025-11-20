@@ -12,6 +12,9 @@ import {
 	resizeBox,
     AtomMap,
     EditorAtom,
+	TLArrowBinding,
+	TLArrowShape,
+	Vec,
 } from '@tldraw/tldraw'
 import { Protyle, showMessage } from 'siyuan'
 import * as api from '@/api/api'
@@ -502,63 +505,94 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							},
 						},
 					])
-					// 如果开启连接功能，尝试创建一条箭头指向新形状
+					// 如果开启连接功能，创建一条绑定的箭头指向新形状
 					if (shape.props.connectOnEnter !== false) {
 						try {
-							const fromBounds = editor.getShapePageBounds(shape.id)
-							const toBounds = editor.getShapePageBounds(newId)
-							if (fromBounds && toBounds) {
-								// 计算矩形边界上的附着点（从中心指向对方中心）
-								const centerA = { x: fromBounds.midX, y: fromBounds.midY }
-								const centerB = { x: toBounds.midX, y: toBounds.midY }
-								const computeAttachPoint = (bounds: { minX: number; minY: number; maxX: number; maxY: number; midX: number; midY: number }, from: { x: number; y: number }, to: { x: number; y: number }) => {
-									const dx = to.x - from.x
-									const dy = to.y - from.y
-									const candidates: Array<{ t: number; x: number; y: number }> = []
-									if (dx !== 0) {
-										const tLeft = (bounds.minX - from.x) / dx
-										const yLeft = from.y + tLeft * dy
-										if (tLeft > 0 && tLeft <= 1 && yLeft >= bounds.minY - 0.1 && yLeft <= bounds.maxY + 0.1) candidates.push({ t: tLeft, x: bounds.minX, y: yLeft })
-										const tRight = (bounds.maxX - from.x) / dx
-										const yRight = from.y + tRight * dy
-										if (tRight > 0 && tRight <= 1 && yRight >= bounds.minY - 0.1 && yRight <= bounds.maxY + 0.1) candidates.push({ t: tRight, x: bounds.maxX, y: yRight })
-									}
-									if (dy !== 0) {
-										const tTop = (bounds.minY - from.y) / dy
-										const xTop = from.x + tTop * dx
-										if (tTop > 0 && tTop <= 1 && xTop >= bounds.minX - 0.1 && xTop <= bounds.maxX + 0.1) candidates.push({ t: tTop, x: xTop, y: bounds.minY })
-										const tBottom = (bounds.maxY - from.y) / dy
-										const xBottom = from.x + tBottom * dx
-										if (tBottom > 0 && tBottom <= 1 && xBottom >= bounds.minX - 0.1 && xBottom <= bounds.maxX + 0.1) candidates.push({ t: tBottom, x: xBottom, y: bounds.maxY })
-									}
-									if (!candidates.length) return from // fallback to center
-									candidates.sort((a, b) => a.t - b.t)
-									return { x: candidates[0].x, y: candidates[0].y }
-								}
-								const startAbs = computeAttachPoint(fromBounds, centerA, centerB)
-								const endAbs = computeAttachPoint(toBounds, centerB, centerA)
-								const minX = Math.min(startAbs.x, endAbs.x)
-								const minY = Math.min(startAbs.y, endAbs.y)
-								const arrowId = createShapeId()
-								editor.createShapes([
-									{
-										id: arrowId,
-										type: 'arrow',
-										x: minX,
-										y: minY,
-										props: {
-											color: shape.props.color,
-											start: { x: startAbs.x - minX, y: startAbs.y - minY },
-											end: { x: endAbs.x - minX, y: endAbs.y - minY },
-											arrowheadStart: 'none',
-											arrowheadEnd: 'arrow',
-											bend: 0,
-											dash: 'draw',
-											size: 'm',
-										},
-									} as any,
-								])
+							const startShapePageBounds = editor.getShapePageBounds(shape.id)
+							const endShapePageBounds = editor.getShapePageBounds(newId)
+							if (!startShapePageBounds || !endShapePageBounds) {
+								throw new Error('无法获取形状边界')
 							}
+
+							const startShapePageRotation = editor.getShapePageTransform(shape.id).rotation()
+							const endShapePageRotation = editor.getShapePageTransform(newId).rotation()
+
+							// 默认使用中心点作为归一化锚点
+							const startNormalizedAnchor = { x: 0.5, y: 0.5 }
+							const endNormalizedAnchor = { x: 0.5, y: 0.5 }
+
+							const startTerminalNormalizedPosition = Vec.From(startNormalizedAnchor)
+							const endTerminalNormalizedPosition = Vec.From(endNormalizedAnchor)
+
+							// 计算页面空间中的终端位置
+							const startTerminalPagePosition = Vec.Add(
+								startShapePageBounds.point,
+								Vec.MulV(
+									startShapePageBounds.size,
+									Vec.Rot(startTerminalNormalizedPosition, startShapePageRotation)
+								)
+							)
+							const endTerminalPagePosition = Vec.Add(
+								endShapePageBounds.point,
+								Vec.MulV(
+									endShapePageBounds.size,
+									Vec.Rot(endTerminalNormalizedPosition, endShapePageRotation)
+								)
+							)
+
+							// 箭头位置为两个终端位置的最小值
+							const arrowPointInParentSpace = Vec.Min(startTerminalPagePosition, endTerminalPagePosition)
+
+							const arrowId = createShapeId()
+							editor.run(() => {
+								// 创建箭头形状
+								editor.createShape<TLArrowShape>({
+									id: arrowId,
+									type: 'arrow',
+									x: arrowPointInParentSpace.x,
+									y: arrowPointInParentSpace.y,
+									props: {
+										color: shape.props.color,
+										// start 和 end 是相对于箭头位置的本地坐标
+										start: {
+											x: startTerminalPagePosition.x - arrowPointInParentSpace.x,
+											y: startTerminalPagePosition.y - arrowPointInParentSpace.y,
+										},
+										end: {
+											x: endTerminalPagePosition.x - arrowPointInParentSpace.x,
+											y: endTerminalPagePosition.y - arrowPointInParentSpace.y,
+										},
+										arrowheadStart: 'none',
+										arrowheadEnd: 'arrow',
+									},
+								})
+
+								// 创建绑定，使箭头依附于形状
+								editor.createBindings<TLArrowBinding>([
+									{
+										fromId: arrowId,
+										toId: shape.id,
+										type: 'arrow',
+										props: {
+											terminal: 'start',
+											normalizedAnchor: startNormalizedAnchor,
+											isExact: false,
+											isPrecise: false,
+										},
+									},
+									{
+										fromId: arrowId,
+										toId: newId,
+										type: 'arrow',
+										props: {
+											terminal: 'end',
+											normalizedAnchor: endNormalizedAnchor,
+											isExact: false,
+											isPrecise: false,
+										},
+									},
+								])
+							})
 						} catch (err) {
 							console.warn('connectOnEnter arrow creation failed', err)
 						}
