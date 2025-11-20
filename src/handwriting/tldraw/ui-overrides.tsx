@@ -495,8 +495,9 @@ const CustomStylePanel = track(() => {
             )}
             {hasSingleBlockSelection && (
                 <div className="tlui-style-panel__section">
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <label className="single-block-toggle">
                         <input
+                            className="single-block-checkbox"
                             type="checkbox"
                             checked={connectOnEnterState === 'mixed' ? false : connectOnEnterState}
                             ref={el => { if (el && connectOnEnterState === 'mixed') el.indeterminate = true }}
@@ -513,8 +514,9 @@ const CustomStylePanel = track(() => {
                                 })
                             }}
                             title="开启后按 Enter 新建的块会自动用箭头连接"
+                            aria-checked={connectOnEnterState === 'mixed' ? 'mixed' : (connectOnEnterState ? 'true' : 'false')}
                         />
-                        <span>回车新建时连接</span>
+                        <span className="single-block-label">回车新建时连接</span>
                     </label>
                 </div>
             )}

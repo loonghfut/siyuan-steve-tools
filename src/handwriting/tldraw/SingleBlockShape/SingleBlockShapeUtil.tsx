@@ -78,7 +78,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			blockId: '',
 			fontSize: 22,
 			refreshNonce: Date.now(),
-			connectOnEnter: true,
+			connectOnEnter: false,
 		}
 	}
 
@@ -502,6 +502,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 								blockId: '',
 								color: shape.props.color,
 								fontSize: shape.props.fontSize,
+								connectOnEnter: shape.props.connectOnEnter,
 							},
 						},
 					])
