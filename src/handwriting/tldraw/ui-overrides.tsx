@@ -6,6 +6,7 @@ import {
     TLComponents,
     TLUiOverrides,
     TldrawUiMenuItem,
+    TldrawUiButton,
     useIsToolSelected,
     useTools,
     useEditor,
@@ -23,6 +24,7 @@ import {
     DefaultQuickActionsContent, // 导入 useRelevantStyles
 } from '@tldraw/tldraw'
 import { selectAdjacentShape } from './utils/selectAdjacentShape'
+import { ConnectionModeManager } from './utils/connectionMode'
 
 // Extend the TLEventMap interface to include custom events
 declare module '@tldraw/tldraw' {
@@ -151,11 +153,15 @@ export const uiOverrides: TLUiOverrides = {
     },
 }
 
+// 连接模式管理器实例
+let connectionManager: ConnectionModeManager | null = null
+
 const CustomStylePanel = track(() => {
     const editor = useEditor()
     const selectedShapes = useValue('selected shapes', () => editor.getSelectedShapes(), [editor])
     const styles = useRelevantStyles()
     const [isCapturingScreenshot, setIsCapturingScreenshot] = React.useState(false)
+    const [connectionMode, setConnectionMode] = React.useState(false)
 
     const isSingleSlideSelected = selectedShapes.length === 1 && selectedShapes[0].type === 'slide';
     const slideShape = isSingleSlideSelected ? (selectedShapes[0] as SlideShape) : null;
@@ -413,6 +419,25 @@ const CustomStylePanel = track(() => {
         }
     }, [editor, slideShape, rootId]); // 添加依赖项
 
+    // 初始化连接模式管理器
+    React.useEffect(() => {
+        if (!connectionManager) {
+            connectionManager = new ConnectionModeManager((isActive) => {
+                setConnectionMode(isActive)
+            })
+        }
+        return () => {
+            connectionManager?.cleanup()
+        }
+    }, [])
+
+    // 启用连接模式
+    const handleEnableConnectionMode = React.useCallback(() => {
+        if (connectionManager) {
+            connectionManager.enableConnectionMode(editor)
+        }
+    }, [editor])
+
 
     return (
         <DefaultStylePanel>
@@ -431,30 +456,30 @@ const CustomStylePanel = track(() => {
                         onPointerDown={stopEventPropagation}
                         spellCheck={false}
                     />
-                    <button
-                        className="tlui-button" // 使用 tldraw 风格的按钮类名 (可能需要调整)
+                    <TldrawUiButton
+                        type="normal"
                         onClick={handleCopyLink}
-                        style={{ marginTop: '-8px', width: '100%' }} // 添加边距并充满宽度
-                        disabled={rootId === ''} // 如果 rootId 未设置则禁用
+                        style={{ marginTop: '-8px', width: '100%' }}
+                        disabled={rootId === ''}
                     >
                         复制链接
-                    </button>
-                    <button
-                        className="tlui-button"
+                    </TldrawUiButton>
+                    <TldrawUiButton
+                        type="normal"
                         onClick={handleOpenSlideBlock}
                         style={{ marginTop: '-8px', width: '100%' }}
                         disabled={!slideShape.props.blockId}
                     >
                         跳转到笔记
-                    </button>
-                    <button
-                        className="tlui-button"
+                    </TldrawUiButton>
+                    <TldrawUiButton
+                        type="normal"
                         onClick={handleCaptureScreenshot}
                         style={{ marginTop: '-8px', width: '100%' }}
                         disabled={isCapturingScreenshot}
                     >
                         {isCapturingScreenshot ? '生成中…' : '更新截图'}
-                    </button>
+                    </TldrawUiButton>
                 </div>
             )}
             {hasCardSelection && (
@@ -495,29 +520,46 @@ const CustomStylePanel = track(() => {
             )}
             {hasSingleBlockSelection && (
                 <div className="tlui-style-panel__section">
-                    <label className="single-block-toggle">
-                        <input
-                            className="single-block-checkbox"
-                            type="checkbox"
-                            checked={connectOnEnterState === 'mixed' ? false : connectOnEnterState}
-                            ref={el => { if (el && connectOnEnterState === 'mixed') el.indeterminate = true }}
-                            onChange={(e) => {
-                                const next = e.target.checked
-                                editor.run(() => {
-                                    editor.updateShapes(
-                                        selectedSingleBlockShapes.map(s => ({
-                                            id: s.id,
-                                            type: 'single-block',
-                                            props: { ...s.props, connectOnEnter: next }
-                                        }))
-                                    )
-                                })
-                            }}
-                            title="开启后按 Enter 新建的块会自动用箭头连接"
-                            aria-checked={connectOnEnterState === 'mixed' ? 'mixed' : (connectOnEnterState ? 'true' : 'false')}
-                        />
-                        <span className="single-block-label">回车新建时连接</span>
-                    </label>
+                    <TldrawUiButton
+                        type="normal"
+                        onClick={() => {
+                            const next = connectOnEnterState === 'mixed' ? true : !connectOnEnterState
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedSingleBlockShapes.map(s => ({
+                                        id: s.id,
+                                        type: 'single-block',
+                                        props: { ...s.props, connectOnEnter: next }
+                                    }))
+                                )
+                            })
+                        }}
+                        style={{ 
+                            marginTop: '-8px', 
+                            width: '100%',
+                            color: connectOnEnterState ? 'white' : undefined
+                        }}
+                        title="开启后按 Enter 新建的块会自动用箭头连接"
+                    >
+                        {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
+                    </TldrawUiButton>
+                </div>
+            )}
+            {selectedShapes.length > 0 && (
+                <div className="tlui-style-panel__section">
+                    <TldrawUiButton
+                        type="normal"
+                        onClick={handleEnableConnectionMode}
+                        style={{ 
+                            marginTop: '-8px', 
+                            width: '100%',
+                            backgroundColor: connectionMode ? '#3d8aff' : undefined,
+                            color: connectionMode ? 'white' : undefined
+                        }}
+                        disabled={connectionMode}
+                    >
+                        {connectionMode ? '连接模式已启用...' : '连接到其他形状'}
+                    </TldrawUiButton>
                 </div>
             )}
         </DefaultStylePanel>
