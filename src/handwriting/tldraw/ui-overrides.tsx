@@ -519,7 +519,7 @@ const CustomStylePanel = track(() => {
                     />
                 </div>
             )}
-            {selectedShapes.length > 0 && (
+            {(hasSingleBlockSelection || hasCardSelection) && (
                 <div className="tlui-style-panel__section">
                     <TldrawUiButton
                         type="normal"
@@ -534,7 +534,7 @@ const CustomStylePanel = track(() => {
                     </TldrawUiButton>
                 </div>
             )}
-                      {hasSingleBlockSelection && (
+            {hasSingleBlockSelection && (
                 <div className="tlui-style-panel__section">
                     <TldrawUiButton
                         type="normal"
