@@ -149,6 +149,7 @@ export class ConnectionModeManager {
         const colorToUse = targetShape.props?.color || 'black'
         let createdCount = 0
         let skippedCount = 0
+        const createdArrowIds: TLShapeId[] = []
 
         this.editor.run(() => {
             this.pendingShapeIds.forEach(sourceId => {
@@ -162,14 +163,21 @@ export class ConnectionModeManager {
                 }
 
                 // 创建箭头连接
-                if (this.createArrowBinding(sourceShape, targetShape, colorToUse)) {
+                const arrowId = this.createArrowBinding(sourceShape, targetShape, colorToUse)
+                if (arrowId) {
                     createdCount++
+                    createdArrowIds.push(arrowId)
                 }
             })
         })
 
         // 完成连接后退出连接模式
         // this.disableConnectionMode()
+
+        // 选中刚刚创建的所有箭头
+        if (createdArrowIds.length > 0) {
+            this.editor.setSelectedShapes(createdArrowIds as any)
+        }
 
         // 显示结果信息
         if (createdCount > 0 && skippedCount > 0) {
@@ -183,14 +191,14 @@ export class ConnectionModeManager {
         }
     }
 
-    // 创建单个箭头绑定
-    private createArrowBinding(sourceShape: any, targetShape: ConnectableShape, color: string): boolean {
-        if (!this.editor) return false
+    // 创建单个箭头绑定，返回创建的箭头ID，失败返回 null
+    private createArrowBinding(sourceShape: any, targetShape: ConnectableShape, color: string): TLShapeId | null {
+        if (!this.editor) return null
 
         try {
             const sourceBounds = this.editor.getShapePageBounds(sourceShape)
             const targetBounds = this.editor.getShapePageBounds(targetShape)
-            if (!sourceBounds || !targetBounds) return false
+            if (!sourceBounds || !targetBounds) return null
 
             const sourceRotation = this.editor.getShapePageTransform(sourceShape).rotation()
             const targetRotation = this.editor.getShapePageTransform(targetShape).rotation()
@@ -264,10 +272,10 @@ export class ConnectionModeManager {
                 },
             ])
 
-            return true
+            return arrowId
         } catch (error) {
             console.error('创建箭头连接失败', error)
-            return false
+            return null
         }
     }
 
