@@ -335,7 +335,16 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					protyleHostRef.current = host
 					let resolveReady: (() => void) | null = null
 					const readyPromise = new Promise<void>((resolve) => (resolveReady = resolve))
-					const protyleInstance = new Protyle(window.siyuan.ws.app, host, {
+					// 防止 Protyle 无法正常触发 `after` 导致永远等待，增加超时与异常保护
+					let readyTimeoutId: number | null = null
+					const READY_TIMEOUT_MS = 1000
+					const timeoutPromise = new Promise<void>((resolve) => {
+						readyTimeoutId = window.setTimeout(resolve, READY_TIMEOUT_MS)
+					})
+					const readyWithTimeout = Promise.race([readyPromise, timeoutPromise])
+					let protyleInstance: Protyle | null = null
+					try {
+						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
 						blockId,
 						render: {
 							breadcrumb: false,
@@ -359,6 +368,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							}
 						},
 					})
+					} catch (err) {
+						console.error('Protyle 构造失败', err)
+						// 若构造失败，确保不会阻塞队列并清理宿主
+						if (host.parentElement) {
+							try { host.parentElement.removeChild(host) } catch {}
+						}
+						return
+					}
+
 					if (signal.aborted || disposed) {
 						safeDestroyProtyle(protyleInstance)
 						return
@@ -368,7 +386,12 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					if (protyleInstance.protyle?.wysiwyg?.element) {
 						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`
 					}
-					await readyPromise.catch(() => undefined)
+					// 等待 Protyle 就绪，但有超时保护，避免死等导致加载队列阻塞
+					await readyWithTimeout.catch(() => undefined)
+					if (readyTimeoutId) {
+						clearTimeout(readyTimeoutId)
+						readyTimeoutId = null
+					}
 					// 初始化观察与尺寸写入
 					setupObservers()
 					if (signal.aborted || disposed) {

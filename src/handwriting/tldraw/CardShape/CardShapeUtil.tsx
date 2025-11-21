@@ -378,7 +378,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					protyleHostRef.current = host;
 					let resolveReady: (() => void) | null = null;
 					const readyPromise = new Promise<void>((resolve) => (resolveReady = resolve));
-					const protyleInstance = new Protyle(window.siyuan.ws.app, host, {
+					// 防止 Protyle 无法正常触发 `after` 导致永远等待，增加超时与异常保护
+					let readyTimeoutId: number | null = null;
+					const READY_TIMEOUT_MS = 1000;
+					const timeoutPromise = new Promise<void>((resolve) => {
+						readyTimeoutId = window.setTimeout(resolve, READY_TIMEOUT_MS);
+					});
+					const readyWithTimeout = Promise.race([readyPromise, timeoutPromise]);
+					let protyleInstance: Protyle | null = null;
+					try {
+						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
 						blockId,
 						rootId: blockId,
 						defId: blockId,
@@ -399,6 +408,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							showMessage('块已被删除');
 						},
 					});
+					} catch (err) {
+						console.error('Protyle 构造失败', err);
+						if (host.parentElement) {
+							try { host.parentElement.removeChild(host); } catch {}
+						}
+						return;
+					}
 					if (signal.aborted || cancelled) {
 						safeDestroyProtyle(protyleInstance)
 						return;
@@ -408,7 +424,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (protyleInstance.protyle?.wysiwyg?.element) {
 						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`;
 					}
-					await readyPromise.catch(() => { });
+					// 等待 Protyle 就绪，但带超时保护，避免长时间阻塞加载队列
+					await readyWithTimeout.catch(() => { });
+					if (readyTimeoutId) {
+						clearTimeout(readyTimeoutId);
+						readyTimeoutId = null;
+					}
 					if (signal.aborted || cancelled) {
 						safeDestroyProtyle(protyleInstance)
 						if (protyleHostRef.current === host && host.parentElement) {
