@@ -41,13 +41,13 @@ const getConnectedSingleBlocks = (editor: Editor, centerId: TLShapeId): ISingleB
         const arrowheadTarget: 'start' | 'end' = arrowShape.props?.arrowheadStart === 'arrow' ? 'start' : 'end'
         const arrowheadSource: 'start' | 'end' = arrowheadTarget === 'start' ? 'end' : 'start'
 
-        const targetBinding = bindings.find(b => b.props?.terminal === arrowheadTarget)
-        if (!targetBinding || targetBinding.toId !== centerId) return
-
         const sourceBinding = bindings.find(b => b.props?.terminal === arrowheadSource)
-        if (!sourceBinding || sourceBinding.toId === centerId) return
+        if (!sourceBinding || sourceBinding.toId !== centerId) return
 
-        addIfSingleBlock(sourceBinding.toId)
+        const targetBinding = bindings.find(b => b.props?.terminal === arrowheadTarget)
+        if (!targetBinding || targetBinding.toId === centerId) return
+
+        addIfSingleBlock(targetBinding.toId)
     })
 
     return result
