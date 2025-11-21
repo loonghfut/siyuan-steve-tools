@@ -25,6 +25,7 @@ import {
 } from '@tldraw/tldraw'
 import { selectAdjacentShape } from './utils/selectAdjacentShape'
 import { ConnectionModeManager } from './utils/connectionMode'
+import { arrangeConnectedSingleBlocks } from './utils/arrangeSingleBlocks'
 
 // Extend the TLEventMap interface to include custom events
 declare module '@tldraw/tldraw' {
@@ -117,23 +118,23 @@ export const uiOverrides: TLUiOverrides = {
             }
         }
 
-        ;[
-            { id: 'select-shape-left', label: '选择左侧图形', kbd: 'left', direction: 'left' as const },
-            { id: 'select-shape-right', label: '选择右侧图形', kbd: 'right', direction: 'right' as const },
-            { id: 'select-shape-up', label: '选择上方图形', kbd: 'up', direction: 'up' as const },
-            { id: 'select-shape-down', label: '选择下方图形', kbd: 'down', direction: 'down' as const },
-        ].forEach(({ id, label, kbd, direction }) => {
-            nextActions[id] = {
-                id,
-                label,
-                kbd,
-                onSelect() {
-                    selectAdjacentShape(editor, direction)
-                    // Keep the newly selected shape centered for quick navigation
-                    focusSelection()
-                },
-            }
-        })
+            ;[
+                { id: 'select-shape-left', label: '选择左侧图形', kbd: 'left', direction: 'left' as const },
+                { id: 'select-shape-right', label: '选择右侧图形', kbd: 'right', direction: 'right' as const },
+                { id: 'select-shape-up', label: '选择上方图形', kbd: 'up', direction: 'up' as const },
+                { id: 'select-shape-down', label: '选择下方图形', kbd: 'down', direction: 'down' as const },
+            ].forEach(({ id, label, kbd, direction }) => {
+                nextActions[id] = {
+                    id,
+                    label,
+                    kbd,
+                    onSelect() {
+                        selectAdjacentShape(editor, direction)
+                        // Keep the newly selected shape centered for quick navigation
+                        focusSelection()
+                    },
+                }
+            })
         nextActions['edit-selected-shape'] = {
             id: 'edit-selected-shape',
             label: '编辑选中图形',
@@ -191,7 +192,7 @@ const CustomStylePanel = track(() => {
         const first = values[0]
         return values.every(v => v === first) ? first : 'mixed'
     }, [hasSingleBlockSelection, selectedSingleBlockShapes])
-    
+
 
     // --- 获取 rootId ---
 
@@ -518,7 +519,22 @@ const CustomStylePanel = track(() => {
                     />
                 </div>
             )}
-            {hasSingleBlockSelection && (
+            {selectedShapes.length > 0 && (
+                <div className="tlui-style-panel__section">
+                    <TldrawUiButton
+                        type="normal"
+                        onClick={handleEnableConnectionMode}
+                        style={{
+                            width: '100%',
+                            color: connectionMode ? 'white' : undefined
+                        }}
+                        disabled={connectionMode}
+                    >
+                        {connectionMode ? '连接模式已启用...' : '连接到其他形状'}
+                    </TldrawUiButton>
+                </div>
+            )}
+                      {hasSingleBlockSelection && (
                 <div className="tlui-style-panel__section">
                     <TldrawUiButton
                         type="normal"
@@ -534,8 +550,8 @@ const CustomStylePanel = track(() => {
                                 )
                             })
                         }}
-                        style={{ 
-                            marginTop: '-8px', 
+                        style={{
+                            marginTop: '-8px',
                             width: '100%',
                             color: connectOnEnterState ? 'white' : undefined
                         }}
@@ -543,22 +559,40 @@ const CustomStylePanel = track(() => {
                     >
                         {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
                     </TldrawUiButton>
-                </div>
-            )}
-            {selectedShapes.length > 0 && (
-                <div className="tlui-style-panel__section">
-                    <TldrawUiButton
-                        type="normal"
-                        onClick={handleEnableConnectionMode}
-                        style={{ 
-                            marginTop: '-8px', 
-                            width: '100%',
-                            color: connectionMode ? 'white' : undefined
-                        }}
-                        disabled={connectionMode}
-                    >
-                        {connectionMode ? '连接模式已启用...' : '连接到其他形状'}
-                    </TldrawUiButton>
+                    <div style={{ display: 'flex', marginTop: '4px', gap: '4px' }}>
+                        <TldrawUiButton
+                            type="normal"
+                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            onClick={() => arrangeConnectedSingleBlocks(editor, 'up')}
+                            title="将相连块排列到上方"
+                        >
+                            ↑
+                        </TldrawUiButton>
+                        <TldrawUiButton
+                            type="normal"
+                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            onClick={() => arrangeConnectedSingleBlocks(editor, 'down')}
+                            title="将相连块排列到下方"
+                        >
+                            ↓
+                        </TldrawUiButton>
+                        <TldrawUiButton
+                            type="normal"
+                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            onClick={() => arrangeConnectedSingleBlocks(editor, 'left')}
+                            title="将相连块排列到左侧"
+                        >
+                            ←
+                        </TldrawUiButton>
+                        <TldrawUiButton
+                            type="normal"
+                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            onClick={() => arrangeConnectedSingleBlocks(editor, 'right')}
+                            title="将相连块排列到右侧"
+                        >
+                            →
+                        </TldrawUiButton>
+                    </div>
                 </div>
             )}
         </DefaultStylePanel>
@@ -749,7 +783,7 @@ export const components: TLComponents = {
         }
 
         return (
-                <div
+            <div
                 style={{
                     position: 'absolute',
                     top: 0,
