@@ -176,7 +176,8 @@ export class ConnectionModeManager {
 
         // 选中刚刚创建的所有箭头
         if (createdArrowIds.length > 0) {
-            this.editor.setSelectedShapes(createdArrowIds as any)
+            this.editor.setSelectedShapes(createdArrowIds)
+            this.editor.sendToBack(createdArrowIds)
         }
 
         // 显示结果信息
@@ -242,8 +243,8 @@ export class ConnectionModeManager {
                         x: endTerminalPagePosition.x - arrowPointInParentSpace.x,
                         y: endTerminalPagePosition.y - arrowPointInParentSpace.y,
                     },
-                    arrowheadStart: 'none',
-                    arrowheadEnd: 'arrow',
+                    arrowheadStart: 'arrow',
+                    arrowheadEnd: 'none',
                 },
             })
 
