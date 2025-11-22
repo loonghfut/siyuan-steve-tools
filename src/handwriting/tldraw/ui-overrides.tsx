@@ -26,6 +26,8 @@ import {
 import { selectAdjacentShape } from './utils/selectAdjacentShape'
 import { ConnectionModeManager } from './utils/connectionMode'
 import { arrangeConnectedSingleBlocks } from './utils/arrangeSingleBlocks'
+// helper functions for making connected single-blocks
+import { armAddConnectedSingleBlock, isArmed as isAddPending } from './utils/pendingConnectedSingleBlock'
 
 // Extend the TLEventMap interface to include custom events
 declare module '@tldraw/tldraw' {
@@ -550,19 +552,19 @@ const CustomStylePanel = track(() => {
                                 )
                             })
                         }}
-                        style={{
-                            marginTop: '-8px',
-                            width: '100%',
-                            color: connectOnEnterState ? 'white' : undefined
-                        }}
+                        // style={{
+                        //     marginTop: '-8px',
+                        //     width: '100%',
+                        //     color: connectOnEnterState ? 'white' : undefined
+                        // }}
                         title="开启后按 Enter 新建的块会自动用箭头连接"
                     >
                         {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
                     </TldrawUiButton>
-                    <div style={{ display: 'flex', marginTop: '4px', gap: '4px' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
                             onClick={() => arrangeConnectedSingleBlocks(editor, 'up')}
                             title="将相连块排列到上方"
                         >
@@ -570,7 +572,7 @@ const CustomStylePanel = track(() => {
                         </TldrawUiButton>
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
                             onClick={() => arrangeConnectedSingleBlocks(editor, 'down')}
                             title="将相连块排列到下方"
                         >
@@ -578,7 +580,7 @@ const CustomStylePanel = track(() => {
                         </TldrawUiButton>
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
                             onClick={() => arrangeConnectedSingleBlocks(editor, 'left')}
                             title="将相连块排列到左侧"
                         >
@@ -586,7 +588,7 @@ const CustomStylePanel = track(() => {
                         </TldrawUiButton>
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0', padding: '0 6px' }}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
                             onClick={() => arrangeConnectedSingleBlocks(editor, 'right')}
                             title="将相连块排列到右侧"
                         >
@@ -767,6 +769,7 @@ export const components: TLComponents = {
         if (!selectionInfo) return null
 
         // 卡片按钮样式
+        const isSingleBlockSelection = editor.getShape(selectionInfo.id)?.type === 'single-block'
         const buttonStyle = {
             width: '32px',
             height: '32px',
@@ -911,6 +914,21 @@ export const components: TLComponents = {
                 >
                     A-
                 </button>
+                {isSingleBlockSelection && (
+                    <button
+                        style={{
+                            ...buttonStyle,
+                            background: isAddPending(editor, selectionInfo.id)
+                                ? 'var(--b3-accent-background)' : buttonStyle.background,
+                            boxShadow: isAddPending(editor, selectionInfo.id)
+                                ? '0 0 0 3px rgba(0, 128, 255, 0.12)' : buttonStyle.boxShadow,
+                        }}
+                        onClick={() => armAddConnectedSingleBlock(editor, selectionInfo.id)}
+                        title="点击后将在你下一次点击的位置创建关联单块（按住 Ctrl 点击可连续放置；Esc 取消）"
+                    >
+                        ➕
+                    </button>
+                )}
                 <button
                     style={buttonStyle}
                     onClick={async () => {

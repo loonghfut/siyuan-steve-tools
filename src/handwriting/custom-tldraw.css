@@ -102,7 +102,10 @@ input.tlui-input {
 }
 
 
-
+.tlui-style-panel__section:has(.tlui-slider__container:last-child):not(:nth-last-child(-n+1 of.tlui-style-panel__section:not(:empty)))
+ {
+    margin-bottom: 0px;
+}
 
 .slides-panel {
   /* ... 其他现有样式 ... */
