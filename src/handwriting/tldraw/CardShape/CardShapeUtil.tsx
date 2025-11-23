@@ -622,18 +622,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							width: '100%',
 							height: '100%',
 							display: 'flex',
-							flexDirection: 'column',
 							alignItems: 'center',
 							justifyContent: 'center',
-							fontSize: `${Math.min(shape.props.fontSize, 18)}px`,
+							fontSize: `${Math.min(shape.props.w / 6, shape.props.h / 2)}px`,
+							padding: '8px',
+							wordBreak: 'break-all',
 							color: theme[shape.props.color].solid,
-							gap: '4px',
-							padding: '4px',
-							opacity: 0.7,
 							textAlign: 'center',
+							opacity: 0.4, 
 						}}>
-							<div style={{fontWeight: 600}}>预览延迟加载</div>
-							<div style={{fontSize: '12px'}}>靠近中心或进入编辑后加载</div>
+							预览延迟加载
 						</div>
 					)}
 				</div>
