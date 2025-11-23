@@ -137,6 +137,7 @@ export const createConnectedSingleBlockAt = (
                 w: width,
                 h: height,
                 color: anchorBlock.props.color ?? 'black',
+                isNewlyCreated: true,
                 blockId: '',
             },
         })

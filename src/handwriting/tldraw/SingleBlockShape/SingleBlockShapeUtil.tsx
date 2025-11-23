@@ -221,15 +221,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 				// 如果该形状刚创建（isNewlyCreated === true），且当前并非处于编辑态，则不在此时创建块。
 				// 我们将把 isNewlyCreated 置为 false，等待用户进入编辑态时再触发创建（保持与 card 行为一致）。
-				if (shape.props.isNewlyCreated && !isEditingState) {
+				// 如果是新创建的 shape，则只有在进入编辑态时才把 isNewlyCreated 置为 false 并继续执行
+				if (shape.props.isNewlyCreated) {
+					// 未进入编辑态则直接跳过创建流程
+					if (!isEditingState) {
+						return null
+					}
+					// 在编辑态时标记为已处理（isNewlyCreated = false），之后才继续创建块
 					try {
 						editor.updateShape({ id: shape.id, type: shape.type, props: { ...shape.props, isNewlyCreated: false } })
 					} catch (err) {
 						// ignore
 					}
-					return null
 				}
-
 				const editorElement = container.closest('.tldraw__editor')
 				const tldrawId = editorElement?.getAttribute('data-tldraw-id')
 				const title = editorElement?.getAttribute('data-tldraw-title')
