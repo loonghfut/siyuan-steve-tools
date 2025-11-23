@@ -195,6 +195,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (wys) (wys as HTMLElement).style.fontSize = `${shape.props.fontSize || 16}px`;
 			}
 		}, [shape.props.fontSize]);
+		// NOTE: previously we experimented with creating a Siyuan block immediately on shape creation
+		// (isNewlyCreated === true). That led to behavior where a block would be created before the
+		// user actually edited the shape. To maintain the original UX and keep parity with
+		// `single-block` shapes, we intentionally do NOT create blocks at shape creation time.
+		// Block creation continues to occur during mount/edit workflows (e.g. mountProtyle) as before.
 		// 非编辑态下做一次存在性检查，避免频繁 API 调用
 		useEffect(() => {
 			const container = containerRef.current;
@@ -592,6 +597,23 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							textAlign: 'center',
 						}}>
 							{collapsedText}
+						</div>
+					)}
+					{shape.props.isNewlyCreated && !shape.props.blockId && !isEditingState && (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.fontSize || 16, 20)}px`,
+							padding: '16px',
+							color: theme[shape.props.color].solid,
+							opacity: 0.6,
+							textAlign: 'center',
+							userSelect: 'none',
+						}}>
+							双击编辑以创建笔记块
 						</div>
 					)}
 					{/* 预览被限制（canLoad=false 且非编辑 && 未折叠）显示占位 */}
