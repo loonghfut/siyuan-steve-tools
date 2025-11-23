@@ -10,8 +10,8 @@ import {
 	createShapeId,
 	getDefaultColorTheme,
 	resizeBox,
-    AtomMap,
-    EditorAtom,
+	AtomMap,
+	EditorAtom,
 	TLArrowBinding,
 	TLArrowShape,
 	Vec,
@@ -76,6 +76,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			h: 50,
 			color: 'black',
 			blockId: '',
+			// 初始创建时标记为 true，用于后续在用户进入编辑时再创建实际的思源块
+			isNewlyCreated: true,
 			fontSize: 22,
 			refreshNonce: Date.now(),
 			connectOnEnter: false,
@@ -237,6 +239,17 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				let blockId = shape.props.blockId || container.getAttribute('blockid') || null
 				if (blockId) return blockId
 
+				// 如果该形状刚创建（isNewlyCreated === true），且当前并非处于编辑态，则不在此时创建块。
+				// 我们将把 isNewlyCreated 置为 false，等待用户进入编辑态时再触发创建（保持与 card 行为一致）。
+				if (shape.props.isNewlyCreated && !isEditingState) {
+					try {
+						editor.updateShape({ id: shape.id, type: shape.type, props: { ...shape.props, isNewlyCreated: false } })
+					} catch (err) {
+						// ignore
+					}
+					return null
+				}
+
 				const editorElement = container.closest('.tldraw__editor')
 				const tldrawId = editorElement?.getAttribute('data-tldraw-id')
 				const title = editorElement?.getAttribute('data-tldraw-title')
@@ -345,34 +358,34 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					let protyleInstance: Protyle | null = null
 					try {
 						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
-						blockId,
-						render: {
-							breadcrumb: false,
-							gutter: true,
-							title: false,
-							breadcrumbDocName: false,
-						},
-						action: ['cb-get-all', 'cb-get-focus'],
-						mode: 'wysiwyg',
-						after(protyle) {
-							protyle.protyle.wysiwyg.preventKeyup = true
-							resolveReady && resolveReady()
-						},
-						click: {
-							preventInsetEmptyBlock: true,
-						},
-						handleEmptyContent() {
-							showMessage('块已被删除')
-							if (!disposed && !signal.aborted) {
-								editor.deleteShape(shape.id)
-							}
-						},
-					})
+							blockId,
+							render: {
+								breadcrumb: false,
+								gutter: true,
+								title: false,
+								breadcrumbDocName: false,
+							},
+							action: ['cb-get-all', 'cb-get-focus'],
+							mode: 'wysiwyg',
+							after(protyle) {
+								protyle.protyle.wysiwyg.preventKeyup = true
+								resolveReady && resolveReady()
+							},
+							click: {
+								preventInsetEmptyBlock: true,
+							},
+							handleEmptyContent() {
+								showMessage('块已被删除')
+								if (!disposed && !signal.aborted) {
+									editor.deleteShape(shape.id)
+								}
+							},
+						})
 					} catch (err) {
 						console.error('Protyle 构造失败', err)
 						// 若构造失败，确保不会阻塞队列并清理宿主
 						if (host.parentElement) {
-							try { host.parentElement.removeChild(host) } catch {}
+							try { host.parentElement.removeChild(host) } catch { }
 						}
 						return
 					}
