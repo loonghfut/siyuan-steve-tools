@@ -668,12 +668,23 @@ function CustomQuickActions() {
         </DefaultQuickActions>
     )
 }
-
+// function CustomBackground() {
+//     return (
+//         <rect
+//             x={0}
+//             y={0}
+//             width="100%"
+//             height="100%"
+//             fill="var(--b3-theme-background)"  // 这里设置背景色
+//         />
+//     )
+// }
 
 export const components: TLComponents = {
     HelperButtons: SlidesPanel,
     QuickActions: CustomQuickActions,
     StylePanel: CustomStylePanel,
+    // Background: CustomBackground,
     // Minimap: null,
     Toolbar: (props) => {
         const tools = useTools()

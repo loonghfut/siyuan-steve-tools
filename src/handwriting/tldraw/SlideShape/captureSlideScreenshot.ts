@@ -105,7 +105,7 @@ export async function captureSlideScreenshot(
 			dataUrl = await blobToDataUrl(blob)
 		}
 	} else {
-		const backgroundColor = background ? getDefaultBackground(editor) : 'transparent'
+		const backgroundColor = background ? 'var(--b3-theme-background)' : 'transparent'
 		if (format === 'svg') {
 			const svg = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="background:${backgroundColor}"/>`
 			blob = new Blob([svg], { type: 'image/svg+xml' })

@@ -102,9 +102,8 @@ input.tlui-input {
 }
 
 
-.tlui-style-panel__section:has(.tlui-slider__container:last-child):not(:nth-last-child(-n+1 of.tlui-style-panel__section:not(:empty)))
- {
-    margin-bottom: 0px;
+.tlui-style-panel__section:has(.tlui-slider__container:last-child):not(:nth-last-child(-n+1 of.tlui-style-panel__section:not(:empty))) {
+  margin-bottom: 0px;
 }
 
 .slides-panel {
@@ -156,9 +155,11 @@ input.tlui-input {
   border-radius: 6px;
   transition: background-color 0.12s ease, transform 0.08s ease;
 }
+
 .tlui-style-panel__section .single-block-toggle:hover {
   background-color: rgba(0, 0, 0, 0.03);
 }
+
 .single-block-checkbox {
   width: 13px;
   height: 13px;
@@ -169,6 +170,7 @@ input.tlui-input {
   border-radius: 4px;
   flex: none;
 }
+
 .single-block-label {
   font-size: 13px;
   user-select: none;
@@ -179,4 +181,30 @@ input.tlui-input {
   .tlui-style-panel__section .single-block-toggle:hover {
     background-color: rgba(255, 255, 255, 0.02);
   }
+}
+
+.tl-background {
+  background: var(--b3-theme-background);
+}
+
+/* .tlui-main-toolbar__tools {
+  background: var(--b3-theme-surface)
+} */
+
+.tlui-main-toolbar__tools,
+.tlui-navigation-panel:before,
+.tlui-menu-zone,
+.tlui-menu,
+.tlui-popover__content,
+.tlui-style-panel__wrapper {
+  background-color: var(--b3-theme-surface);
+  box-shadow:0px 0px 2px hsl(0, 0%, 0%, 16%), 0px 2px 3px hsl(0, 0%, 0%, 24%), 0px 2px 6px hsl(0, 0%, 0%, .1), inset 0px 0px 0px 1px var(--b3-theme-surface);
+  border-bottom: none;
+  border-right: none;
+  border-top: none;
+  border-right: none;
+}
+
+:root {
+  --tl-color-panel-contrast: var(--b3-theme-surface) !important; /* 改成半透明黑色 */
 }
