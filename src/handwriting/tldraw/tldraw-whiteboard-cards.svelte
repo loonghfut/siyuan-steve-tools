@@ -139,13 +139,13 @@
         }
     }
 
-    // 搜索框失焦处理
+    // 搜索框失焦处理：失去焦点时自动隐藏并清空输入（延迟以兼容点击其它控件）
     function handleSearchBlur() {
-        // 延迟隐藏，避免点击搜索框内部时立即隐藏
+        // 延迟隐藏，避免点击搜索框内部或切换到其它控件时被误判
         setTimeout(() => {
-            if (searchQuery.trim() === '') {
-                showSearch = false;
-            }
+            // 无论是否有内容，都在失焦后隐藏并清空查询，保持与 toggleSearch 行为一致
+            searchQuery = '';
+            showSearch = false;
         }, 150);
     }
 
@@ -303,11 +303,12 @@
         <span class="fn__flex-1"></span>
         <span class="fn__space"></span>
         {#if showSearch}
-            <input class="b3-text-field search__label fn__size200" 
-                   placeholder="搜索ID/标题/文件名..." 
-                   bind:value={searchQuery}
-                   bind:this={searchInputRef}
-                   on:blur={handleSearchBlur} />
+                 <input class="b3-text-field search__label fn__size200" 
+                     placeholder="搜索ID/标题/文件名..." 
+                     bind:value={searchQuery}
+                     bind:this={searchInputRef}
+                     on:blur={handleSearchBlur}
+                     on:keydown={(e)=>{ if(e.key === 'Escape') { searchQuery = ''; showSearch = false; } }} />
             <span class="fn__space"></span>
         {/if}
         <span data-type="search" 
@@ -411,7 +412,7 @@
 .whiteboard-card-view .block__icons {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  /* padding: 4px 8px; */
   background: var(--b3-theme-background);
   border-bottom: 1px solid var(--b3-border-color);
   user-select: none;
