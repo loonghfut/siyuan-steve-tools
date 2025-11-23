@@ -2,6 +2,8 @@ import * as ic from "@/icon"
 import { openTab, Plugin, showMessage, Tab } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
+// 替换为新的卡片视图组件
+import TldrawWhiteboardCards from './tldraw/tldraw-whiteboard-cards.svelte';
 import { addWhiteboardButton } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
@@ -11,6 +13,8 @@ export class M_handwriting {
     // 存储画布实例的映射表
 
     private currentid: string = "";
+    // svelte dock component instance
+    private dockComponent: any | null = null;
     // 记录点击拦截器以便卸载时移除
     private clickHandler?: (e: MouseEvent) => void;
 
@@ -227,6 +231,70 @@ export class M_handwriting {
         //         this.openWhiteBoard();
         //     }
         // });
+        const self = this;
+        this.plugin.addDock({
+            config: {
+                position: "RightTop",
+                size: { width: 250, height: 0 },
+                icon: "iconSTWhiteboard",
+                title: "白板列表",
+            },
+            data: null,
+            type: "steveTool-whiteboard",
+            resize: async () => {
+
+            },
+            update() {
+                try {
+                    const existing = (this as any).__svelteComponent;
+                    if (!existing) {
+                        // Ensure a clean container
+                        this.element.innerHTML = '';
+                        const root = document.createElement('div');
+                        root.className = 'steve-handwriting-dock-root';
+                        root.style.width = '100%';
+                        root.style.height = '100%';
+                        this.element.appendChild(root);
+                        // @ts-ignore
+                        self.dockComponent = new TldrawWhiteboardCards({ target: root, props: { plugin: self.plugin } });
+                        (this as any).__svelteComponent = self.dockComponent;
+                    }
+                } catch (err) {
+                    console.error('更新白板列表 dock 时出错:', err);
+                }
+            },
+            init: async (dock) => {
+                try {
+                    // 清理旧内容并挂载组件
+                    dock.element.innerHTML = '';
+                    const root = document.createElement('div');
+                    root.className = 'steve-handwriting-dock-root';
+                    root.style.width = '100%';
+                    root.style.height = '100%';
+                    dock.element.appendChild(root);
+                    // @ts-ignore
+                    self.dockComponent = new TldrawWhiteboardCards({ target: root, props: { plugin: self.plugin } });
+                    (dock as any).__svelteComponent = self.dockComponent;
+                } catch (err) {
+                    console.error('挂载白板列表组件到 dock 出错:', err);
+                }
+            },
+            destroy() {
+                try {
+                    const s = self.dockComponent || (this as any).__svelteComponent;
+                    if (s && typeof s.$destroy === 'function') {
+                        s.$destroy();
+                    }
+                } catch (e) { /* ignore */ }
+                try {
+                    // 清除 dock DOM
+                    if (this.element) {
+                        try { this.element.innerHTML = ''; } catch (e) { /* ignore */ }
+                    }
+                } catch (e) { /* ignore */ }
+            },
+        });
+
     }
 
     async onLayoutReady(_settingdata) {
@@ -337,5 +405,12 @@ export class M_handwriting {
             document.removeEventListener('click', this.clickHandler, true);
             this.clickHandler = undefined;
         }
+        // 销毁 dock 上的 svelte 组件（如果存在）
+        try {
+            if (this.dockComponent && typeof this.dockComponent.$destroy === 'function') {
+                this.dockComponent.$destroy();
+                this.dockComponent = null;
+            }
+        } catch (e) { /* ignore */ }
     }
 }
