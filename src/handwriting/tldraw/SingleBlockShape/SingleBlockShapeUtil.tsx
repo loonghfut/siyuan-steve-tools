@@ -785,7 +785,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							textAlign: 'center',
 							padding: '4px'
 						}}>
-							预览延迟加载
+							双击加载内容
 						</div>
 					)}
 				</div>

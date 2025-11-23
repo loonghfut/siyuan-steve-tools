@@ -631,7 +631,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							textAlign: 'center',
 							opacity: 0.4, 
 						}}>
-							预览延迟加载
+							双击加载内容
 						</div>
 					)}
 				</div>
