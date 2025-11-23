@@ -91,7 +91,7 @@ export class TldrawManager {
             root.innerHTML = `
                 <div style="padding: 20px; color: red; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                     <p>加载画板数据失败，请检查控制台获取更多信息。</p>
-                    <p style="color: orange; margin-top: 10px;">您可以强制创建一个新的空白画板，但这将导致无法加载的数据丢失。</p>
+                    <p style="color: orange; margin-top: 10px;">您可以强制创建一个新的空白画板，但这将导致无法加载的数据丢失！！！。</p>
                     <button id="force-load-tldraw-${this.id}" style="margin-top: 15px; padding: 8px 15px; cursor: pointer;">强制创建新画板</button>
                 </div>
             `;
@@ -99,11 +99,51 @@ export class TldrawManager {
             // 为按钮添加事件监听器
             const forceLoadButton = root.querySelector(`#force-load-tldraw-${this.id}`);
             if (forceLoadButton) {
-                forceLoadButton.addEventListener('click', () => {
-                    // 清空错误信息
+                // 点击“强制创建新画板”时，先尝试备份原始数据再创建新画板
+                forceLoadButton.addEventListener('click', async () => {
+                    // 提示开始备份
+                    // showMessage('正在备份原始数据到回收站...', 3000, 'info');
+
+                    // 优先尝试使用当前 store 的快照备份
+                    try {
+                        const fname = await this.backupToTrash('强制创建前备份');
+                        // 向用户显示备份文件名，方便查找与恢复
+                        showMessage('备份已保存到回收站: ' + fname, 3000, 'info');
+                    } catch (err) {
+                        // 如果快照备份失败，回退到读取并备份原始文件内容（如果存在）
+                        try {
+                            const raw = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
+                            if (raw) {
+                                const trashFileName = `${this.storageKey}-forced-backup-${Date.now()}.json`;
+                                await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([raw], { type: 'application/json' }));
+                                showMessage('备份已保存到回收站: ' + trashFileName, 3000, 'info');
+                                } else {
+                                showMessage('未找到原始存储文件，未进行文件级备份', 3000, 'info');
+                            }
+                        } catch (err2) {
+                            console.error('强制创建前备份失败', err2);
+
+                            // 当两次备份方式都失败时，弹出二次确认，交由用户选择继续或取消
+                            try {
+                                const userConfirmed = window.confirm('尝试自动备份原始数据失败。是否仍旧强制创建新的空白画板？\n\n选择「确定」将强制创建，并可能导致原始数据无法恢复。选择「取消」将保留错误提示，您可以稍后尝试手动备份或联系开发者。');
+                                if (!userConfirmed) {
+                                    // 用户选择取消：不创建新画板，仅通知
+                                    showMessage('已取消强制创建，原始数据未被删除。', 5000, 'info');
+                                    return; // 中止后续流程
+                                } else {
+                                    showMessage('用户确认强制创建：将创建新的空白画板。', 3000, 'info');
+                                }
+                            } catch (confirmErr) {
+                                // 如果在某些环境下 window.confirm 不可用，继续创建并告警
+                                console.warn('无法弹出确认框，继续强制创建', confirmErr);
+                                return;
+                            }
+                        }
+                    }
+
+                    // 清空错误信息并渲染一个新的 Tldraw 实例
                     root.innerHTML = '';
-                    // 渲染一个新的 Tldraw 实例
-                    showMessage("正在创建新的空白画板...", 3000, "info");
+                    showMessage('正在创建新的空白画板...', 3000, 'info');
                     this.renderTldraw(root);
                 });
             }
@@ -216,7 +256,10 @@ export class TldrawManager {
                             }
                             );
                         });
+                        editor.on('sttools:rollbackData', () => {
 
+                          
+                        });
                         editor.updateInstanceState({ isGridMode: isGridMode });
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
                         // this.editor.navigateToDeepLink();
@@ -420,7 +463,7 @@ export class TldrawManager {
             // 忽略自己发出的事件
             // console.log("收到远程TLDraw更改:", event.data);
             if (event.data.source === sessionId) {
-                console.log("忽略自己发出的事件AAAA:", event.data.source, sessionId);
+                // console.log("忽略自己发出的事件AAAA:", event.data.source, sessionId);
                 return;
             }
 
