@@ -537,65 +537,69 @@ const CustomStylePanel = track(() => {
                 </div>
             )}
             {hasSingleBlockSelection && (
-                <div className="tlui-style-panel__section">
-                    <TldrawUiButton
-                        type="normal"
-                        onClick={() => {
-                            const next = connectOnEnterState === 'mixed' ? true : !connectOnEnterState
-                            editor.run(() => {
-                                editor.updateShapes(
-                                    selectedSingleBlockShapes.map(s => ({
-                                        id: s.id,
-                                        type: 'single-block',
-                                        props: { ...s.props, connectOnEnter: next }
-                                    }))
-                                )
-                            })
-                        }}
-                        // style={{
-                        //     marginTop: '-8px',
-                        //     width: '100%',
-                        //     color: connectOnEnterState ? 'white' : undefined
-                        // }}
-                        title="开启后按 Enter 新建的块会自动用箭头连接"
-                    >
-                        {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
-                    </TldrawUiButton>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                <>
+                    <div className="tlui-style-panel__section">
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0' }}
-                            onClick={() => arrangeConnectedSingleBlocks(editor, 'up')}
-                            title="将相连块排列到上方"
+                            onClick={() => {
+                                const next = connectOnEnterState === 'mixed' ? true : !connectOnEnterState
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedSingleBlockShapes.map(s => ({
+                                            id: s.id,
+                                            type: 'single-block',
+                                            props: { ...s.props, connectOnEnter: next }
+                                        }))
+                                    )
+                                })
+                            }}
+                            // style={{
+                            //     marginTop: '-8px',
+                            //     width: '100%',
+                            //     color: connectOnEnterState ? 'white' : undefined
+                            // }}
+                            title="开启后按 Enter 新建的块会自动用箭头连接"
                         >
-                            ↑
-                        </TldrawUiButton>
-                        <TldrawUiButton
-                            type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0' }}
-                            onClick={() => arrangeConnectedSingleBlocks(editor, 'down')}
-                            title="将相连块排列到下方"
-                        >
-                            ↓
-                        </TldrawUiButton>
-                        <TldrawUiButton
-                            type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0' }}
-                            onClick={() => arrangeConnectedSingleBlocks(editor, 'left')}
-                            title="将相连块排列到左侧"
-                        >
-                            ←
-                        </TldrawUiButton>
-                        <TldrawUiButton
-                            type="normal"
-                            style={{ flex: '1 1 0', minWidth: '0' }}
-                            onClick={() => arrangeConnectedSingleBlocks(editor, 'right')}
-                            title="将相连块排列到右侧"
-                        >
-                            →
+                            {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
                         </TldrawUiButton>
                     </div>
-                </div>
+                    <div className="tlui-style-panel__section">
+                        <div style={{ display: 'flex', gap: '0px' }}>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: '1 1 0', minWidth: '0' }}
+                                onClick={() => arrangeConnectedSingleBlocks(editor, 'up')}
+                                title="将相连块排列到上方"
+                            >
+                                ↑
+                            </TldrawUiButton>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: '1 1 0', minWidth: '0' }}
+                                onClick={() => arrangeConnectedSingleBlocks(editor, 'down')}
+                                title="将相连块排列到下方"
+                            >
+                                ↓
+                            </TldrawUiButton>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: '1 1 0', minWidth: '0' }}
+                                onClick={() => arrangeConnectedSingleBlocks(editor, 'left')}
+                                title="将相连块排列到左侧"
+                            >
+                                ←
+                            </TldrawUiButton>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: '1 1 0', minWidth: '0' }}
+                                onClick={() => arrangeConnectedSingleBlocks(editor, 'right')}
+                                title="将相连块排列到右侧"
+                            >
+                                →
+                            </TldrawUiButton>
+                        </div>
+                    </div>
+                </>
             )}
         </DefaultStylePanel>
     );
@@ -926,7 +930,7 @@ export const components: TLComponents = {
                         onClick={() => armAddConnectedSingleBlock(editor, selectionInfo.id)}
                         title="点击后将在你下一次点击的位置创建关联单块（按住 Ctrl 点击可连续放置；Esc 取消）"
                     >
-                        ➕
+                        ❇️
                     </button>
                 )}
                 <button
