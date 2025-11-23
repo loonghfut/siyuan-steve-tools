@@ -30,6 +30,24 @@
     let filteredGroups: DrawingGroup[] = [];
     let loading = true;
     let refreshInterval: number;
+    interface PreviewMeta {
+        loading: boolean;
+        data?: {
+            shapeCount: number;
+            pageCount: number;
+            pageNames: string[];
+            shapeSamples: string[];
+            pagePreviews?: Array<{
+                id?: string;
+                name?: string;
+                shapes: Array<{ id?: string; type?: string; x: number; y: number; w: number; h: number }>
+            }>;
+        };
+        error?: string;
+        open: boolean;
+    }
+
+    let previewStates: Record<string, PreviewMeta> = {};
 
     // 加载备份文件列表
     async function loadBackups() {
@@ -153,6 +171,157 @@
         // Match IDs like 20250308145324-1pyvr3u
         const match = filename.match(/tldraw-data-([\d]+-[a-zA-Z0-9]+)(?:-|\.)/);
         return match ? match[1] : '未知画板';
+    }
+
+    function updatePreviewState(path: string, state: Partial<PreviewMeta>) {
+        previewStates = {
+            ...previewStates,
+            [path]: {
+                loading: false,
+                data: state.data ?? previewStates[path]?.data,
+                error: state.error ?? previewStates[path]?.error,
+                open: state.open ?? previewStates[path]?.open ?? false,
+                ...state
+            }
+        };
+    }
+
+    // helper to compute bounds of shapes array
+    function computeBounds(shapes: Array<{ x: number; y: number; w: number; h: number }>) {
+        if (!shapes || shapes.length === 0) return { minX: 0, minY: 0, maxX: 300, maxY: 200, width: 300, height: 200 };
+        let minX = Number.POSITIVE_INFINITY;
+        let minY = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
+        for (const s of shapes) {
+            const left = (typeof s.x === 'number' ? s.x : 0) - (s.w || 0) / 2;
+            const top = (typeof s.y === 'number' ? s.y : 0) - (s.h || 0) / 2;
+            minX = Math.min(minX, left);
+            minY = Math.min(minY, top);
+            maxX = Math.max(maxX, left + (s.w || 0));
+            maxY = Math.max(maxY, top + (s.h || 0));
+        }
+        // fallback if degenerate
+        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return { minX: 0, minY: 0, maxX: 300, maxY: 200, width: 300, height: 200 };
+        const width = Math.max(maxX - minX, 1);
+        const height = Math.max(maxY - minY, 1);
+        return { minX, minY, maxX, maxY, width, height };
+    }
+
+    // scale shape into a 300x200 box with padding
+    function scaleShape(shape: { x: number; y: number; w: number; h: number }, shapes: any[]) {
+        const bounds = computeBounds(shapes as any);
+        const viewW = 300 - 8; // padding
+        const viewH = 200 - 8;
+        const pad = 4;
+        const sx = viewW / bounds.width;
+        const sy = viewH / bounds.height;
+        const sScale = Math.min(sx, sy);
+        const tx = -bounds.minX * sScale + pad;
+        const ty = -bounds.minY * sScale + pad;
+        // shapes use center-based x/y in tldraw; transform to top-left for display
+        const cx = shape.x || 0;
+        const cy = shape.y || 0;
+        const w = shape.w || 100;
+        const h = shape.h || 60;
+        const left = cx - w / 2;
+        const top = cy - h / 2;
+        return {
+            x: left * sScale + tx,
+            y: top * sScale + ty,
+            w: Math.max(w * sScale, 1),
+            h: Math.max(h * sScale, 1)
+        };
+    }
+
+    async function togglePreview(path: string) {
+        const current = previewStates[path];
+        if (current?.open) {
+            updatePreviewState(path, { open: false });
+            return;
+        }
+
+        updatePreviewState(path, { loading: true, open: true, error: undefined });
+
+        try {
+            const raw = await api.getFile(path);
+            if (!raw) {
+                throw new Error('备份文件为空');
+            }
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            const doc = parsed?.document ?? parsed;
+
+            // collect pages
+            let pageEntries: any[] = [];
+            if (doc?.pages && typeof doc.pages === 'object') {
+                pageEntries = Object.values(doc.pages);
+            } else if (Array.isArray(doc?.pageStates)) {
+                pageEntries = doc.pageStates;
+            } else if (doc?.store && typeof doc.store === 'object') {
+                pageEntries = Object.entries(doc.store).filter(([k]) => typeof k === 'string' && k.startsWith('page:')).map(([, v]) => v);
+            } else if (doc?.session && Array.isArray(doc.session.pageStates)) {
+                pageEntries = doc.session.pageStates;
+            }
+
+            // collect shapes
+            let shapeEntries: Array<[string, any]> = [];
+            if (doc?.shapes && typeof doc.shapes === 'object') {
+                shapeEntries = Object.entries(doc.shapes);
+            } else if (doc?.store && typeof doc.store === 'object') {
+                shapeEntries = Object.entries(doc.store).filter(([k, v]) => {
+                    if (typeof k === 'string' && k.startsWith('shape:')) return true;
+                    const vv: any = v;
+                    return !!(vv && (vv.type === 'shape' || vv.typeName === 'shape' || typeof vv.type === 'string'));
+                });
+            }
+
+            const pageNames = pageEntries.slice(0, 3).map((page: any) => page?.name || page?.title || page?.id || 'Page');
+            const shapeSamples = shapeEntries.slice(0, 3).map(([id, shape]) => {
+                const type = (shape && (shape.type || shape.typeName)) || (typeof id === 'string' ? id.split(':')[0] : 'shape');
+                const label = shape?.props?.name || shape?.props?.text || shape?.props?.label || shape?.name || '';
+                return `${type}${label ? ` (${label})` : ''}`;
+            });
+
+            const shapeCount = shapeEntries.length || pageEntries.reduce<number>((sum, page: any) => sum + (Array.isArray(page?.shapes) ? page.shapes.length : 0), 0);
+
+            // Try to use datamanager's getBackupPreview for richer data when available.
+            // We already computed shape/page arrays above, but to avoid re-implementing grouping here
+            // we can call the helper function (if exists). However, still build pagePreviews locally
+            // in case datamanager hasn't provided that info in older versions.
+
+            // Build small pagePreviews (if present in the parsed doc via `store` layout we parsed earlier)
+            const pagePreviews = [];
+            // When doc.store layout exists we can reconstruct shape objects with x,y,w,h
+            // Gather shape map
+            const shapeMap = new Map<string, any>();
+            shapeEntries.forEach(([id, shape]) => shapeMap.set(typeof id === 'string' ? id : shape?.id, shape));
+
+            const pageList = (pageEntries.length ? pageEntries : [{ id: 'page:page', name: 'Page 1' }]);
+            for (const p of pageList) {
+                const pid = p?.id ?? p?.pageId ?? 'page:page';
+                const shapesHere = [];
+                for (const [sid, s] of shapeMap.entries()) {
+                    try {
+                        const parent = s?.parentId ?? s?.parent ?? null;
+                        if (!parent || parent === pid || parent === 'page:page') {
+                            const px = typeof s?.x === 'number' ? s.x : (s?.props?.x ?? 0);
+                            const py = typeof s?.y === 'number' ? s.y : (s?.props?.y ?? 0);
+                            const w = Number(s?.props?.w ?? s?.props?.width ?? s?.width ?? 0) || 0;
+                            const h = Number(s?.props?.h ?? s?.props?.height ?? s?.height ?? 0) || 0;
+                            shapesHere.push({ id: sid, type: s?.type || s?.typeName || sid?.split(':')?.[0] || 'shape', x: px, y: py, w: w > 0 ? w : 100, h: h > 0 ? h : 60 });
+                        }
+                    } catch(e) {
+                        // ignore
+                    }
+                }
+                pagePreviews.push({ id: pid, name: p?.name || p?.title || pid, shapes: shapesHere });
+            }
+
+            updatePreviewState(path, { loading: false, data: { shapeCount, pageCount: pageEntries.length, pageNames, shapeSamples, pagePreviews } });
+        } catch (error) {
+            console.error('加载备份预览失败', error);
+            updatePreviewState(path, { loading: false, error: (error as Error).message || '预览失败' });
+        }
     }
 
     // 下载备份文件
@@ -294,6 +463,12 @@
                                         >
                                             下载
                                         </button>
+                                        <button
+                                            class="b3-button b3-button--outline"
+                                            on:click={() => togglePreview(file.path)}
+                                        >
+                                            {previewStates[file.path]?.open ? '隐藏预览' : '预览'}
+                                        </button>
                                         <button 
                                             class="b3-button b3-button--outline b3-button--error" 
                                             on:click={() => deleteBackup(file.path, file.name)}
@@ -302,6 +477,53 @@
                                         </button>
                                     </td>
                                 </tr>
+                                {#if previewStates[file.path]?.open}
+                                    <tr class="preview-row">
+                                        <td colspan="2">
+                                            {#if previewStates[file.path].loading}
+                                                <div class="preview-loading">加载中...</div>
+                                            {:else if previewStates[file.path].error}
+                                                <div class="preview-error">{previewStates[file.path].error}</div>
+                                            {:else}
+                                                <div class="preview-grid">
+                                                    <div>
+                                                        <strong>页数</strong>: {previewStates[file.path].data?.pageCount ?? 0}
+                                                    </div>
+                                                    <div>
+                                                        <strong>形状数量</strong>: {previewStates[file.path].data?.shapeCount ?? 0}
+                                                    </div>
+                                                    <div>
+                                                        <strong>页面</strong>: {previewStates[file.path].data?.pageNames.join(', ') || '无'}
+                                                    </div>
+                                                    <div>
+                                                        <strong>示例形状</strong>: {previewStates[file.path].data?.shapeSamples.join(', ') || '无'}
+                                                    </div>
+
+                                                    {#if previewStates[file.path].data?.pagePreviews?.length}
+                                                        <div class="thumbnails">
+                                                            {#each previewStates[file.path].data.pagePreviews as page, i}
+                                                                <div class="thumbnail-card">
+                                                                    <div class="thumbnail-title">{page.name || `Page ${i+1}`}</div>
+                                                                    <svg viewBox="0 0 300 200" class="thumbnail-svg" preserveAspectRatio="xMidYMid meet">
+                                                                        {#if page.shapes && page.shapes.length}
+                                                                            {#each page.shapes as s}
+                                                                                <rect x={scaleShape(s, page.shapes).x} y={scaleShape(s, page.shapes).y} width={scaleShape(s, page.shapes).w} height={scaleShape(s, page.shapes).h} rx="3" ry="3" fill="rgba(20,120,220,0.08)" stroke="rgba(20,120,220,0.6)" stroke-width="1" />
+                                                                            {/each}
+                                                                            <!-- page border -->
+                                                                            <rect x="0.5" y="0.5" width="299" height="199" fill="none" stroke="rgba(0,0,0,0.06)"/>
+                                                                        {:else}
+                                                                            <rect x="20" y="20" width="260" height="160" fill="rgba(0,0,0,0.02)" stroke="rgba(0,0,0,0.03)" />
+                                                                        {/if}
+                                                                    </svg>
+                                                                </div>
+                                                            {/each}
+                                                        </div>
+                                                    {/if}
+                                                </div>
+                                            {/if}
+                                        </td>
+                                    </tr>
+                                {/if}
                             {/each}
                         </tbody>
                     </table>
@@ -402,6 +624,59 @@
     .backup-actions {
         display: flex;
         gap: 8px;
+    }
+
+    .preview-row {
+        background: var(--b3-theme-surface);
+    }
+
+    .preview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        padding: 8px 0;
+        font-size: 0.88em;
+    }
+
+    .thumbnails {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+    }
+
+    .thumbnail-card {
+        width: 180px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        background: var(--b3-theme-surface-light);
+        padding: 6px;
+        border-radius: 6px;
+        border: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .thumbnail-title {
+        font-size: 0.8em;
+        color: var(--b3-theme-on-surface-light);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .thumbnail-svg {
+        width: 100%;
+        height: 120px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.01), rgba(0,0,0,0.02));
+        border-radius: 4px;
+    }
+
+    .preview-loading,
+    .preview-error {
+        padding: 8px 0;
+        color: var(--b3-theme-on-surface-light);
+        font-size: 0.9em;
+
     }
     
     .loading-indicator, .empty-state {
