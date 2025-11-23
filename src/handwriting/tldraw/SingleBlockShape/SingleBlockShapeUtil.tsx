@@ -23,6 +23,7 @@ import { singleBlockShapeProps } from './single-block-shape-props'
 import { singleBlockShapeMigrations } from './single-block-shape-migrations'
 import { ISingleBlockShape } from './single-block-shape-types'
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
+import { shapeLoadManager } from '../shape-load-manager'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -97,12 +98,13 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const isEditing = editor.getEditingShapeId() === shape.id
 		const [isEditingState, setIsEditingState] = useState(isEditing)
 		const [isInViewport, setIsInViewport] = useState(true)
+		const [canLoad, setCanLoad] = useState(true)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const containerRef = useRef<HTMLDivElement>(null)
 		const protyleRef = useRef<Protyle | null>(null)
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		const detachKeyHandler = useRef<() => void>()
-		const visibilityTimerRef = useRef<number | null>(null)
+		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
 		const resizeObsRef = useRef<ResizeObserver | null>(null)
 		const mutationObsRef = useRef<MutationObserver | null>(null)
@@ -121,8 +123,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			anyPt[DESTROYED_MARK] = true
 		}
 
-		// 以世界坐标的“预加载边距”来判断是否接近视口，避免 DOM 观察在复杂变换下不可靠
-		const PRELOAD_MARGIN_WORLD = 1600
 
 		const disconnectObservers = () => {
 			try { resizeObsRef.current?.disconnect() } catch { }
@@ -186,43 +186,23 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			updateDomSize()
 		})
 
-		// 基于 tldraw 的世界坐标计算是否进入“预加载区”（视口外但在边距内）
-		const updateVisibilityManual = useCallback(() => {
-			if (!isViewportCullingEnabled) {
-				setIsInViewport(true)
-				return
-			}
-			const viewport = editor.getViewportPageBounds()
-			const shapeBounds = editor.getShapePageBounds(shape.id)
-			if (!viewport || !shapeBounds) return
-			const expanded = {
-				minX: viewport.minX - PRELOAD_MARGIN_WORLD,
-				minY: viewport.minY - PRELOAD_MARGIN_WORLD,
-				maxX: viewport.maxX + PRELOAD_MARGIN_WORLD,
-				maxY: viewport.maxY + PRELOAD_MARGIN_WORLD,
-			}
-			const intersects =
-				expanded.minX < shapeBounds.maxX &&
-				expanded.maxX > shapeBounds.minX &&
-				expanded.minY < shapeBounds.maxY &&
-				expanded.maxY > shapeBounds.minY
-			if (visibilityTimerRef.current !== null) {
-				clearTimeout(visibilityTimerRef.current)
-			}
-			visibilityTimerRef.current = window.setTimeout(() => {
-				visibilityTimerRef.current = null
-				setIsInViewport((prev) => (prev === intersects ? prev : intersects))
-			}, 100)
-		}, [editor, isViewportCullingEnabled, shape.id])
+
 
 		useEffect(() => {
-			updateVisibilityManual()
-			const id = window.setInterval(updateVisibilityManual, 200)
-			return () => window.clearInterval(id)
-		}, [updateVisibilityManual])
+			shapeLoadManager.attachEditor(editor as any)
+			const unregister = shapeLoadManager.register(
+				shape.id,
+				() => ({ editing: isEditingState }),
+				(allowed, meta) => {
+					setCanLoad(allowed)
+					setIsInViewport(meta.inViewport)
+				}
+			)
+			return unregister
+		}, [isEditingState, shape.id])
 
 		useEffect(() => {
-			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport
+			const shouldRender = !isViewportCullingEnabled || isEditingState || (isInViewport && canLoad)
 			if (!shouldRender) {
 				destroyRuntimeResources()
 				return
@@ -714,7 +694,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				disposed = true
 				destroyRuntimeResources()
 			}
-		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce])
+		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, canLoad])
 
 		useEffect(() => {
 			if (protyleRef.current?.protyle?.wysiwyg?.element) {
@@ -778,7 +758,24 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						contain: 'strict',
 						padding: '0px',
 					}}
-				/>
+				>
+					{!isEditingState && !canLoad && (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.fontSize, 18)}px`,
+							color: theme[shape.props.color].solid,
+							opacity: 0.7,
+							textAlign: 'center',
+							padding: '4px'
+						}}>
+							预览延迟加载
+						</div>
+					)}
+				</div>
 			</HTMLContainer>
 		)
 	}

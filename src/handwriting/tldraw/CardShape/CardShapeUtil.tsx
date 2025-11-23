@@ -15,6 +15,7 @@ import { Protyle, showMessage } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
+import { shapeLoadManager } from '../shape-load-manager'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -85,6 +86,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		const [isInViewport, setIsInViewport] = useState(true);
+		const [canLoad, setCanLoad] = useState(true); // gating heavy render by global manager
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
 		const tldrawHeaderImage = settingdata['tldraw-header-image'] !== false;
 		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
@@ -106,11 +108,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			try { pt.destroy() } catch { }
 			anyPt[DESTROYED_MARK] = true
 		}
-		const visibilityTimerRef = useRef<number | null>(null)
+		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
-
-		// 以世界坐标的预加载边距，规避 DOM 观察在缩放/平移变换下的不稳定
-		const PRELOAD_MARGIN_WORLD = 1600
 
 		const destroyRuntimeResources = useCallback(() => {
 			if (loadHandleRef.current) {
@@ -169,40 +168,21 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			}
 		}, [isCollapsed, shape.props.blockId]);
 
-		// 基于世界坐标的“预加载区”检测，避免 IntersectionObserver 在复杂场景下失效
-		const updateVisibilityManual = useCallback(() => {
-			if (!isViewportCullingEnabled) {
-				setIsInViewport(true)
-				return
-			}
-			const viewport = this.editor.getViewportPageBounds()
-			const shapeBounds = this.editor.getShapePageBounds(shape.id)
-			if (!viewport || !shapeBounds) return
-			const expanded = {
-				minX: viewport.minX - PRELOAD_MARGIN_WORLD,
-				minY: viewport.minY - PRELOAD_MARGIN_WORLD,
-				maxX: viewport.maxX + PRELOAD_MARGIN_WORLD,
-				maxY: viewport.maxY + PRELOAD_MARGIN_WORLD,
-			}
-			const intersects =
-				expanded.minX < shapeBounds.maxX &&
-				expanded.maxX > shapeBounds.minX &&
-				expanded.minY < shapeBounds.maxY &&
-				expanded.maxY > shapeBounds.minY
-			if (visibilityTimerRef.current !== null) {
-				clearTimeout(visibilityTimerRef.current)
-			}
-			visibilityTimerRef.current = window.setTimeout(() => {
-				visibilityTimerRef.current = null
-				setIsInViewport((prev) => (prev === intersects ? prev : intersects))
-			}, 100)
-		}, [isViewportCullingEnabled, shape.id])
 
+
+		// register with global shape load manager (drives visibility + load admission)
 		useEffect(() => {
-			updateVisibilityManual()
-			const id = window.setInterval(updateVisibilityManual, 200)
-			return () => window.clearInterval(id)
-		}, [updateVisibilityManual])
+			shapeLoadManager.attachEditor(this.editor as any)
+			const unregister = shapeLoadManager.register(
+				shape.id,
+				() => ({ editing: isEditingState }),
+				(allowed, meta) => {
+					setCanLoad(allowed)
+					setIsInViewport(meta.inViewport)
+				}
+			)
+			return unregister
+		}, [isEditingState, shape.id])
 
 		// 移除轻量预览逻辑，统一使用 Protyle 渲染
 
@@ -254,7 +234,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				return;
 			}
 
-			const shouldRender = !isViewportCullingEnabled || isEditingState || isInViewport;
+			const shouldRender = !isViewportCullingEnabled || isEditingState || (isInViewport && canLoad);
 			if (!shouldRender) {
 				destroyRuntimeResources();
 				return;
@@ -542,7 +522,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				cancelled = true;
 				destroyRuntimeResources();
 			};
-		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, isCollapsed, shape.props.renderMode]);
+		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, isCollapsed, shape.props.renderMode, canLoad]);
 		// 处理双击事件进入编辑模式
 		const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
@@ -593,13 +573,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						overflow: 'hidden',
 						pointerEvents: isEditingState ? 'all' : 'none',
 						touchAction: isEditingState ? 'auto' : 'none',
-						contain: 'strict', // 强力隔离
-						padding: '0px', // 为内容添加最小边距
-						// borderRadius: 'inherit', // 继承父元素的圆角
+						contain: 'strict',
+						padding: '0px',
 					}}
 				>
-					{/* 折叠状态下显示预览文本，否则渲染 Protyle */}
-					{isCollapsed && !isEditingState ? (
+					{/* 折叠状态 */}
+					{isCollapsed && !isEditingState && (
 						<div style={{
 							width: '100%',
 							height: '100%',
@@ -614,7 +593,27 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}}>
 							{collapsedText}
 						</div>
-					) : null}
+					)}
+					{/* 预览被限制（canLoad=false 且非编辑 && 未折叠）显示占位 */}
+					{!isEditingState && !isCollapsed && !canLoad && (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							flexDirection: 'column',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.fontSize, 18)}px`,
+							color: theme[shape.props.color].solid,
+							gap: '4px',
+							padding: '4px',
+							opacity: 0.7,
+							textAlign: 'center',
+						}}>
+							<div style={{fontWeight: 600}}>预览延迟加载</div>
+							<div style={{fontSize: '12px'}}>靠近中心或进入编辑后加载</div>
+						</div>
+					)}
 				</div>
 			</HTMLContainer >
 		)
