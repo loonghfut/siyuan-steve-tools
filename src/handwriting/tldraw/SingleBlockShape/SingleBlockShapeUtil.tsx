@@ -16,7 +16,7 @@ import {
 	TLArrowShape,
 	Vec,
 } from '@tldraw/tldraw'
-import { Protyle, showMessage } from 'siyuan'
+import { Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
 import { settingdata } from '@/index'
 import { singleBlockShapeProps } from './single-block-shape-props'
@@ -337,6 +337,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					const readyWithTimeout = Promise.race([readyPromise, timeoutPromise])
 					let protyleInstance: Protyle | null = null
 					try {
+						const actions = ['cb-get-all', ...(isEditingState ? ['cb-get-focus'] : [])] as TProtyleAction[]
 						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
 							blockId,
 							render: {
@@ -345,7 +346,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 								title: false,
 								breadcrumbDocName: false,
 							},
-							action: ['cb-get-all', 'cb-get-focus'],
+							action: actions,
 							mode: 'wysiwyg',
 							after(protyle) {
 								protyle.protyle.wysiwyg.preventKeyup = true

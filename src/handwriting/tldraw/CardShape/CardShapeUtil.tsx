@@ -11,7 +11,7 @@ import {
 import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
 import { CardRenderMode, ICardShape } from './card-shape-types'
-import { Protyle, showMessage } from 'siyuan';
+import { Protyle, showMessage, TProtyleAction } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
@@ -372,6 +372,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					const readyWithTimeout = Promise.race([readyPromise, timeoutPromise]);
 					let protyleInstance: Protyle | null = null;
 					try {
+						const actions = ['cb-get-all', ...(isEditingState ? ['cb-get-focus'] : [])] as TProtyleAction[]
 						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
 						blockId,
 						rootId: blockId,
@@ -383,7 +384,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							title: shape.props.isMain,
 							breadcrumbDocName: shape.props.isMain,
 						},
-						action: ["cb-get-all", "cb-get-focus"],
+						action: actions,
 						mode: "wysiwyg",
 						after: (protyle: Protyle) => {
 							protyle.protyle.wysiwyg.preventKeyup = true;
