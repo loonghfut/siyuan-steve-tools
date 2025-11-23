@@ -4,6 +4,10 @@
     import { showMessage } from 'siyuan';
     import * as api from '@/api/api';
 
+    // 接收初始画板ID（用于在打开面板时自动过滤到当前画板）
+    export let initialDrawingId: string | null = null;
+    // initialTitle 目前不需要显式传入
+
     // 添加搜索关键词
     let searchQuery: string = '';
     
@@ -46,6 +50,12 @@
             await groupBackupsByDrawingId();
             // 初始显示所有分组
             filteredGroups = [...drawingGroups];
+
+            // 如果传入 initialDrawingId，则自动过滤聚焦到该画板
+            if (initialDrawingId) {
+                searchQuery = initialDrawingId;
+                filteredGroups = drawingGroups.filter(g => g.drawingId === initialDrawingId);
+            }
         } catch (error) {
             console.error('加载备份列表失败:', error);
             showMessage('加载备份列表失败');

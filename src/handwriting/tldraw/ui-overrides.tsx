@@ -35,6 +35,7 @@ declare module '@tldraw/tldraw' {
         'sttools:importData': () => void
         'sttools:backupData': () => void
         'sttools:exportData': () => void
+        'sttools:rollbackData': () => void
     }
 }
 import React from 'react';
@@ -725,6 +726,14 @@ export const components: TLComponents = {
                         readonlyOk
                         onSelect={() => {
                             editor.emit('sttools:backupData');
+                        }}
+                    />
+                    <TldrawUiMenuItem
+                        id="rollbackData"
+                        label="回滚数据"
+                        readonlyOk
+                        onSelect={() => {
+                            editor.emit('sttools:rollbackData');
                         }}
                     />
                     <TldrawUiMenuItem

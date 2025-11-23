@@ -24,7 +24,8 @@ import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 import { captureSlideScreenshot, CaptureSlideScreenshotOptions, CaptureSlideScreenshotResult } from './SlideShape/captureSlideScreenshot';
 import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
-import { showMessage } from 'siyuan';
+import { showMessage, Dialog } from 'siyuan';
+import TldrawBackupManager from './tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
@@ -257,8 +258,29 @@ export class TldrawManager {
                             );
                         });
                         editor.on('sttools:rollbackData', () => {
+                            try {
+                                const dialog = new Dialog({
+                                    title: `画板备份回滚 - ${this.title}`,
+                                    content: `<div id="TldrawBackupManager" style="height: 520px"></div>`,
+                                    width: '900px',
+                                    destroyCallback: () => {
+                                        try { panel.$destroy(); } catch (e) { /* ignore */ }
+                                    }
+                                });
 
-                          
+                                // Mount the Svelte backup manager and pass the current drawing id so it auto-filters
+                                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                                // @ts-ignore
+                                const panel = new TldrawBackupManager({
+                                    target: dialog.element.querySelector('#TldrawBackupManager'),
+                                    props: {
+                                        initialDrawingId: this.id,
+                                    }
+                                });
+                            } catch (err) {
+                                console.error('打开备份管理面板失败', err);
+                                showMessage('打开备份管理面板失败，请检查控制台', 5000, 'error');
+                            }
                         });
                         editor.updateInstanceState({ isGridMode: isGridMode });
                         // editor.user.updateUserPreferences({ animationSpeed: 0 });
