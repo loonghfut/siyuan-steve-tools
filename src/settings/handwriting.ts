@@ -9,7 +9,8 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-viewport-culling": true,
     // card 渲染模式：static-dom（非编辑仅保留 Protyle 元素，无实例），live-protyle（非编辑保留 Protyle 实例，禁用交互）
     "card-render-mode": "static-dom",
-    "tldraw-header-image": true
+    "tldraw-header-image": true,
+    "tldraw-max-active-shapes": 40,
 };
 
 export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -26,6 +27,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 "static-dom": "性能优先：非编辑为 Protyle 元素（无实例）",
                 "live-protyle": "一致性优先：非编辑保留 Protyle 实例（禁用交互）"
             } },
+            { type: "number", title: "最大激活形状数", description: "限制同时激活的形状数量以节省资源", key: "tldraw-max-active-shapes", value: ctx.settings["tldraw-max-active-shapes"] },
             { type: "checkbox", title: "文档块是否渲染题头图", description: "启用文档块题头图渲染", key: "tldraw-header-image", value: ctx.settings["tldraw-header-image"] },
         ]},
         { name: "备份管理", items: [ { type: "custom", title: "画板备份管理", description: "管理画板备份", key: "tldraw-backup-manager", value: "", component: "TldrawBackupManager" } ] },
