@@ -243,8 +243,8 @@ export class ConnectionModeManager {
                         x: endTerminalPagePosition.x - arrowPointInParentSpace.x,
                         y: endTerminalPagePosition.y - arrowPointInParentSpace.y,
                     },
-                    arrowheadStart: 'arrow',
-                    arrowheadEnd: 'none',
+                    arrowheadStart: 'none',
+                    arrowheadEnd: 'arrow',
                 },
             })
 
