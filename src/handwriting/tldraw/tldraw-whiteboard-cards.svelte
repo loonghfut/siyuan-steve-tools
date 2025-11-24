@@ -28,7 +28,15 @@
     let searchInputRef: HTMLInputElement; // 搜索框引用
     // 新增：动态增量加载相关状态
     interface DirEntry { name: string; isDir: boolean; mtime?: number }
-    let allFileEntries: DirEntry[] = []; // 全部文件条目列表（仅文件元数据）
+    interface FileMeta extends DirEntry {
+        id?: string;
+        blkInfo?: any;
+        docBlkInfo?: any;
+        title?: string;
+        exists?: boolean;
+        mtimeNum?: number; // derived from blk.updated/created or doc
+    }
+    let allFileEntries: FileMeta[] = []; // 全部文件条目列表（扩展的元数据）
     let nextIndex = 0; // 下一个批次的起始索引
     const BATCH_SIZE = 40; // 每批加载的卡片数量
     let loadingList = false; // 正在加载文件列表
@@ -37,6 +45,7 @@
     let autoLoadingAll = false; // 搜索时自动加载全部
     let sentinel: HTMLDivElement; // 触底哨兵元素
     let cardsGridEl: HTMLDivElement; // 网格容器引用（用于滚动检测）
+    let prevSortKey = sortKey;
 
     // 原逻辑拆成两阶段：读取文件列表 + 分批构造卡片
     async function loadWhiteboards() {
@@ -45,7 +54,9 @@
         loadingList = true;
         try {
             const files: any[] = await api.readDir('/data/storage/petal/sttools/');
-            allFileEntries = files.filter(f => !f.isDir && f.name.startsWith('tldraw-data-') && f.name.endsWith('.json'));
+            allFileEntries = files.filter(f => !f.isDir && f.name.startsWith('tldraw-data-') && f.name.endsWith('.json')) as FileMeta[];
+            // attach id parsed from filename
+            allFileEntries = allFileEntries.map(f => ({ ...f, id: extractDrawingId(f.name) }));
             nextIndex = 0;
             if (allFileEntries.length === 0) {
                 allCards = [];
@@ -53,7 +64,11 @@
                 allLoaded = true;
                 return;
             }
-            // 初始加载第一批
+            // 预取所有文件的块元数据（用于排序顺序），有限并发
+            await fetchAllMetas(8);
+            // 根据当前排序规则对 allFileEntries 排序
+            sortAllFileEntries();
+            // 初始加载第一批（按排序后的顺序）
             await loadNextBatch();
         } catch (e) {
             console.error('加载白板列表失败:', e);
@@ -62,6 +77,97 @@
             loadingList = false;
             loading = false;
         }
+    }
+
+    // 并发抓取元数据（blkInfo/docBlkInfo）以便排序
+    async function fetchAllMetas(concurrency = 6) {
+        if (!allFileEntries || allFileEntries.length === 0) return;
+        loadingList = true;
+        let i = 0;
+        const total = allFileEntries.length;
+        const workers: Promise<void>[] = [];
+        for (let w = 0; w < concurrency; w++) {
+            workers.push((async () => {
+                while (i < total) {
+                    const idx = i++;
+                    const f = allFileEntries[idx];
+                    try {
+                        const id = f.id;
+                        f.exists = false;
+                        f.title = '未知白板';
+                        f.blkInfo = null;
+                        f.docBlkInfo = null;
+                        if (id && id !== '未知画板') {
+                            try {
+                                const blk = await api.getBlockByID(id);
+                                if (blk) {
+                                    f.exists = true;
+                                    f.blkInfo = blk;
+                                    if (blk.root_id) {
+                                        try {
+                                            const docBlk = await api.getBlockByID(blk.root_id);
+                                            if (docBlk) {
+                                                f.docBlkInfo = docBlk;
+                                                f.title = docBlk.content || f.title;
+                                            }
+                                        } catch { /* ignore */ }
+                                    }
+                                } else {
+                                    f.exists = false;
+                                    f.title = '无关联块';
+                                }
+                            } catch {
+                                f.exists = false;
+                                f.title = '无关联块';
+                            }
+                        } else {
+                            f.title = 'ID无法解析';
+                        }
+
+                        // compute mtimeNum from blk/doc
+                        const parseSyTimestamp = (ts: string | undefined | null) => {
+                            if (!ts || typeof ts !== 'string') return 0;
+                            const m2 = ts.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+                            if (!m2) return 0;
+                            const [_, y, mo, d, hh, mm, ss] = m2 as string[];
+                            const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh), Number(mm), Number(ss));
+                            return date.getTime();
+                        };
+
+                        let blkUpdated = f.blkInfo && typeof f.blkInfo.updated === 'string' ? parseSyTimestamp(f.blkInfo.updated) : 0;
+                        let docUpdated = f.docBlkInfo && typeof f.docBlkInfo.updated === 'string' ? parseSyTimestamp(f.docBlkInfo.updated) : 0;
+                        let blkCreated = f.blkInfo && typeof f.blkInfo.created === 'string' ? parseSyTimestamp(f.blkInfo.created) : 0;
+                        let docCreated = f.docBlkInfo && typeof f.docBlkInfo.created === 'string' ? parseSyTimestamp(f.docBlkInfo.created) : 0;
+
+                        if (blkUpdated > 0) f.mtimeNum = blkUpdated;
+                        else if (docUpdated > 0) f.mtimeNum = docUpdated;
+                        else if (blkCreated > 0) f.mtimeNum = blkCreated;
+                        else if (docCreated > 0) f.mtimeNum = docCreated;
+                        else f.mtimeNum = 0;
+                    } catch (e) {
+                        console.warn('fetch meta fail', f.name, e);
+                        // continue
+                    }
+                }
+            })());
+        }
+        await Promise.all(workers);
+        loadingList = false;
+    }
+
+    function sortAllFileEntries() {
+        if (!allFileEntries || allFileEntries.length === 0) return;
+        const order = sortKey;
+        allFileEntries.sort((a,b) => {
+            switch (order) {
+                case 'mtime-desc': return (b.mtimeNum || 0) - (a.mtimeNum || 0);
+                case 'mtime-asc': return (a.mtimeNum || 0) - (b.mtimeNum || 0);
+                case 'title': return (a.title || '').localeCompare(b.title || '');
+                case 'id': return (a.id || '').localeCompare(b.id || '');
+                case 'exists': return Number(b.exists ? 1 : 0) - Number(a.exists ? 1 : 0);
+            }
+            return 0;
+        });
     }
 
     function resetState() {
@@ -75,43 +181,24 @@
         autoLoadingAll = false;
     }
 
-    // 构造单个文件的卡片元数据（延迟）
-    async function buildCardMeta(f: DirEntry): Promise<WhiteboardCard> {
-        const id = extractDrawingId(f.name);
-        let exists = false;
-        let title = '未知白板';
-        if (id !== '未知画板') {
-            try {
-                const blk = await api.getBlockByID(id);
-                if (blk) {
-                    exists = true;
-                    if (blk.root_id) {
-                        try {
-                            const docBlk = await api.getBlockByID(blk.root_id);
-                            title = docBlk?.content || title;
-                        } catch { /* ignore */ }
-                    }
-                } else {
-                    exists = false;
-                    title = '无关联块';
-                }
-            } catch {
-                exists = false;
-                title = '无关联块';
-            }
-        } else {
-            title = 'ID无法解析';
-        }
+    // 构造单个文件的卡片元数据（使用已预取的 metas，避免重复网络请求）
+    function buildCardMeta(f: FileMeta): WhiteboardCard {
+        // use precomputed fields if available
+        const id = f.id || extractDrawingId(f.name);
+        const exists = !!f.exists;
+        const title = f.title || '未知白板';
+        const mtimeNum = f.mtimeNum || 0;
+
         return {
             id,
             fileName: f.name,
             path: `/data/storage/petal/sttools/${f.name}`,
             title,
             exists,
-            mtime: f.mtime || 0,
+            mtime: mtimeNum,
             loadingPreview: false,
             shapes: [],
-        };
+        } as WhiteboardCard;
     }
 
     async function loadNextBatch() {
@@ -119,7 +206,8 @@
         loadingBatch = true;
         try {
             const slice = allFileEntries.slice(nextIndex, nextIndex + BATCH_SIZE);
-            const metas = await Promise.all(slice.map(buildCardMeta));
+            // buildCardMeta is synchronous now (uses pre-fetched meta)
+            const metas = slice.map(buildCardMeta);
             allCards = [...allCards, ...metas];
             nextIndex += slice.length;
             if (nextIndex >= allFileEntries.length) {
@@ -132,6 +220,28 @@
         } finally {
             loadingBatch = false;
         }
+    }
+
+    // 当 sortKey 变化时，按照排序重排元数据并重置批次加载顺序
+    $: if (allFileEntries.length > 0 && prevSortKey !== sortKey) {
+        prevSortKey = sortKey;
+        (async () => {
+            sortAllFileEntries();
+            // reset batch loading so subsequent batches follow new order
+            allCards = [];
+            filteredCards = [];
+            nextIndex = 0;
+            allLoaded = false;
+            // load first batch under new order
+            await loadNextBatch();
+        })();
+    }
+
+    function formatTime(ms: number | undefined) {
+        if (!ms || !Number.isFinite(ms) || ms <= 0) return '';
+        try {
+            return new Date(ms).toLocaleString();
+        } catch { return '' }
     }
 
     // 滚动检测作为 IntersectionObserver 的补充（某些嵌套滚动环境下 IO 可能不触发）
@@ -351,8 +461,14 @@
             }, { root: null, rootMargin: '320px 0px 320px 0px', threshold: 0.05 });
         }
         (node as any).__card = card;
-        observer.observe(node);
+        // always try to observe even if previously observed — IntersectionObserver.observe is idempotent
+        try { observer.observe(node); } catch { /* ignore */ }
         return {
+            // update is called when the action parameter changes (e.g. card object updated/element reused)
+            update(newCard: WhiteboardCard) {
+                (node as any).__card = newCard;
+                try { observer.observe(node); } catch { /* ignore */ }
+            },
             destroy() {
                 try { observer.unobserve(node); } catch { /* ignore */ }
             }
@@ -383,7 +499,11 @@
         <div class="block__logo">
             <svg class="block__logoicon"><use xlink:href="#iconSTWhiteboard"></use></svg>白板卡片
         </div>
-        <span class="counter" title="已加载卡片/总文件">{filteredCards.length}/{allFileEntries.length || 0}</span>
+        <span class="stcounter" title="已加载卡片/总文件">{filteredCards.length}/{allFileEntries.length || 0}</span>
+        {#if loadingList}
+            <span class="fn__space"></span>
+            <span class="meta-loading">读取元数据…</span>
+        {/if}
         <span class="fn__flex-1"></span>
         <span class="fn__space"></span>
         {#if showSearch}
@@ -475,6 +595,9 @@
                         </div>
                         <div class="id-line" title={card.id}>{card.id}</div>
                         <div class="file-line" title={card.fileName}>{card.fileName}</div>
+                        {#if card.mtime}
+                            <div class="mtime-line" title={new Date(card.mtime).toISOString()}>{formatTime(card.mtime)}</div>
+                        {/if}
                     </div>
                     <!-- 移除操作按钮，整卡点击打开 -->
                 </div>
@@ -535,7 +658,7 @@
   fill: currentColor;
 }
 
-.whiteboard-card-view .counter {
+.whiteboard-card-view .stcounter {
   /* background-color: var(--b3-theme-surface-lighter); */
   color: var(--b3-theme-on-surface);
   /* padding: 2px 8px; */
@@ -667,6 +790,17 @@
 }
 .id-line { font-family: var(--b3-font-family-code, monospace); }
 .file-line { opacity: .6; }
+
+.mtime-line {
+    font-size: 0.66rem;
+    color: var(--b3-theme-secondary);
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.meta-loading { font-size: 0.72rem; color: var(--b3-theme-secondary); }
 
 /* 徽章 */
 .badge {
