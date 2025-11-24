@@ -175,6 +175,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			shapeLoadManager.attachEditor(this.editor as any)
 			const unregister = shapeLoadManager.register(
 				shape.id,
+				this.editor as any,
 				() => ({ editing: isEditingState }),
 				(allowed, meta) => {
 					setCanLoad(allowed)

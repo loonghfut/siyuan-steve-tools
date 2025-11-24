@@ -194,6 +194,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			shapeLoadManager.attachEditor(editor as any)
 			const unregister = shapeLoadManager.register(
 				shape.id,
+				editor as any,
 				() => ({ editing: isEditingState }),
 				(allowed, meta) => {
 					setCanLoad(allowed)

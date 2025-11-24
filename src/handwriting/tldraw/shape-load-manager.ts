@@ -1,5 +1,6 @@
 /*
 Global ShapeLoadManager
+Supports multiple tldraw instances, each shape registers with its own editor.
 Limits the number of simultaneously 'active / heavy' loaded shapes (mounting Protyle etc.)
 Prioritization rules (sorted ascending by score):
  1. Editing shapes always allowed (score forced to -Infinity)
@@ -8,12 +9,13 @@ Prioritization rules (sorted ascending by score):
 Optional: future extension for renderMode / collapsed state.
 
 API:
-  register(shapeId: string, metaProvider: () => ShapeLoadMeta, onPermissionChange: (allowed: boolean) => void): () => void
+  register(shapeId: string, editor: Editor, metaProvider: () => ShapeLoadMeta, onPermissionChange: (allowed: boolean, meta: ComputedMeta) => void): () => void
   isAllowed(shapeId: string): boolean
 Configuration:
   maxActive from settingdata['tldraw-max-active-shapes'] or default 40
 Internals:
-  Recomputes every RECOMPUTE_MS (300ms) or on demand.
+  Recomputes every 500ms or on demand.
+  Each shape uses its own editor's viewport for visibility calculation.
 */
 
 import { settingdata } from '@/index'
@@ -30,6 +32,7 @@ interface ComputedMeta {
 
 interface RegisteredShape {
   id: TLShapeId
+  editor: Editor
   metaProvider: () => ShapeLoadMeta
   onChange: (allowed: boolean, meta: ComputedMeta) => void
   lastAllowed: boolean
@@ -38,26 +41,27 @@ interface RegisteredShape {
 
 class ShapeLoadManager {
   private shapes: Map<TLShapeId, RegisteredShape> = new Map()
-  private editor: Editor | null = null
+  private editors: Set<Editor> = new Set()
   private rafId: number | null = null
-  private lastViewport: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   private lastRecomputeAt = 0
   private PRELOAD_MARGIN_WORLD = 1600
 
   attachEditor(editor: Editor) {
-    this.editor = editor
+    this.editors.add(editor)
     this.ensureLoop()
   }
 
-  register(shapeId: TLShapeId, metaProvider: () => ShapeLoadMeta, onPermissionChange: (allowed: boolean, meta: ComputedMeta) => void) {
+  register(shapeId: TLShapeId, editor: Editor, metaProvider: () => ShapeLoadMeta, onPermissionChange: (allowed: boolean, meta: ComputedMeta) => void) {
     const existing = this.shapes.get(shapeId)
     if (existing) {
+      existing.editor = editor
       existing.metaProvider = metaProvider
       existing.onChange = onPermissionChange
       return () => this.unregister(shapeId)
     }
     const entry: RegisteredShape = {
       id: shapeId,
+      editor,
       metaProvider,
       onChange: onPermissionChange,
       lastAllowed: false,
@@ -103,28 +107,16 @@ class ShapeLoadManager {
   }
 
   private maybeRecompute() {
-    if (!this.editor) return
-    const vp = this.editor.getViewportPageBounds()
     const now = performance.now()
     const since = now - this.lastRecomputeAt
-    const changed = !this.lastViewport || !vp ||
-      vp.minX !== this.lastViewport.minX ||
-      vp.minY !== this.lastViewport.minY ||
-      vp.maxX !== this.lastViewport.maxX ||
-      vp.maxY !== this.lastViewport.maxY
-    if (changed || since >= 500) {
+    if (since >= 500) {
       this.recompute()
     }
   }
 
   private recompute() {
-    if (!this.editor) return
     const now = performance.now()
     this.lastRecomputeAt = now
-    const viewport = this.editor.getViewportPageBounds()
-    if (viewport) {
-      this.lastViewport = { minX: viewport.minX, minY: viewport.minY, maxX: viewport.maxX, maxY: viewport.maxY }
-    }
 
     const maxActive = Math.max(1, Number(settingdata['tldraw-max-active-shapes']) || 40)
 
@@ -132,12 +124,12 @@ class ShapeLoadManager {
     for (const s of this.shapes.values()) {
       let provided: ShapeLoadMeta = { editing: false }
       try { provided = s.metaProvider() } catch { /* ignore */ }
-      // compute visibility & distance globally
+      // compute visibility & distance using the shape's own editor
       let distance = Infinity
       let inViewport = false
       try {
-        const vp = viewport
-        const b = this.editor.getShapePageBounds(s.id)
+        const vp = s.editor?.getViewportPageBounds()
+        const b = s.editor?.getShapePageBounds(s.id)
         if (vp && b) {
           const expanded = {
             minX: vp.minX - this.PRELOAD_MARGIN_WORLD,
@@ -157,7 +149,7 @@ class ShapeLoadManager {
         sortable.push({ id: s.id, score: -Infinity, editing: true, meta: cmeta })
       } else {
         let score = distance
-        if (!inViewport) score += 1000
+        if (!inViewport) score += 1000000
         sortable.push({ id: s.id, score, editing: false, meta: cmeta })
       }
     }
