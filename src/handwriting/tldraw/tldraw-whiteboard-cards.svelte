@@ -386,7 +386,7 @@
         <span class="fn__flex-1"></span>
         <span class="fn__space"></span>
         {#if showSearch}
-                 <input class="b3-text-field search__label fn__size200" 
+                 <input class="b3-text-field search__label" 
                      placeholder="搜索ID/标题/文件名..." 
                      bind:value={searchQuery}
                      bind:this={searchInputRef}
@@ -722,7 +722,7 @@
   .meta { padding: 0.5rem 0.6rem 0.6rem; }
   .doc-title { font-size: 0.78rem; }
   .id-line, .file-line { font-size: 0.68rem; }
-  .whiteboard-card-view .search__label { min-width: 140px; }
+  .whiteboard-card-view .search__label { min-width: 100px; }
 }
 
 /* 深色模式微调 */
