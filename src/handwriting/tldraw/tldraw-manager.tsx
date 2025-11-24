@@ -240,7 +240,6 @@ export class TldrawManager {
                                 showMessage('导入数据失败');
                             });
                         });
-
                         editor.on('sttools:exportData', () => {
                             this.backupData().catch(err => {
                                 console.error('备份数据失败:', err);

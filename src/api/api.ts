@@ -1320,7 +1320,7 @@ export async function addAttributeViewKey(
 ): Promise<void> {
     // if (keyType == 'block') {
     //     showMessage('主键键不支持添加，请自行修改主键名称为：事件', -1, 'error');
-        
+
     //     return;
     // }
     return await avManager.addAttributeViewKey(avID, {
@@ -1361,3 +1361,11 @@ export async function getTag(sort: number = 0): Promise<TagItem[]> {
     return request(url, { sort });
 }
 
+export async function getDocOutline(blockId: string, preview = false): Promise<IResGetDocOutline> {
+    const data = {
+        id: blockId,
+        preview: preview
+    }
+    const url = '/api/outline/getDocOutline';
+    return request(url, data);
+}
