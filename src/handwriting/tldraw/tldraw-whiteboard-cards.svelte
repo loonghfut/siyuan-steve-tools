@@ -198,9 +198,8 @@
     // 切换搜索框显示
     function toggleSearch() {
         showSearch = !showSearch;
-        if (!showSearch) {
-            searchQuery = ''; // 隐藏时清空搜索
-        } else {
+        // 切换到隐藏时不清空查询，保留筛选；用户可按 Esc 或使用清除按钮主动清空
+        if (showSearch) {
             // 显示后聚焦输入框
             setTimeout(() => searchInputRef?.focus(), 10);
         }
@@ -210,8 +209,10 @@
     function handleSearchBlur() {
         // 延迟隐藏，避免点击搜索框内部或切换到其它控件时被误判
         setTimeout(() => {
-            // 无论是否有内容，都在失焦后隐藏并清空查询，保持与 toggleSearch 行为一致
-            searchQuery = '';
+            // 如果查询为空，则保持清空状态；如果有查询则隐藏输入但保留筛选
+            if (!searchQuery || !searchQuery.trim()) {
+                searchQuery = '';
+            }
             showSearch = false;
         }, 150);
     }
@@ -394,10 +395,10 @@
                      on:keydown={(e)=>{ if(e.key === 'Escape') { searchQuery = ''; showSearch = false; } }} />
             <span class="fn__space"></span>
         {/if}
-        <span data-type="search" 
+          <span data-type="search" 
               class="block__icon b3-tooltips b3-tooltips__sw"
               class:block__icon--active={showSearch}
-              aria-label="筛选"
+              aria-label={searchQuery && searchQuery.trim() ? `筛选：${searchQuery}` : '筛选'}
               role="button"
               tabindex="0"
               on:click={toggleSearch}
