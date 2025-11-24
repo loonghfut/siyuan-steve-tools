@@ -21,7 +21,7 @@
     let allCards: WhiteboardCard[] = [];
     let filteredCards: WhiteboardCard[] = [];
     let searchQuery: string = '';
-    let showOnlyValid = false; // true: 仅显示存在的块
+    let showOnlyValid = true; // true: 仅显示存在的块 (默认开启)
     let showSearch = false; // 控制搜索框显示
     let loading = true;
     let sortKey: string = 'mtime-desc'; // 默认按修改时间降序
@@ -380,7 +380,7 @@
 <div class="whiteboard-card-view">
     <div class="block__icons">
         <div class="block__logo">
-            <svg class="block__logoicon"><use xlink:href="#iconSTWhiteboard"></use></svg>白板卡片视图
+            <svg class="block__logoicon"><use xlink:href="#iconSTWhiteboard"></use></svg>白板卡片
         </div>
         <span class="counter" title="已加载卡片/总文件">{filteredCards.length}/{allFileEntries.length || 0}</span>
         <span class="fn__flex-1"></span>
@@ -521,10 +521,10 @@
 .whiteboard-card-view .block__logo {
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  /* padding: 0 8px; */
   color: var(--b3-theme-on-background);
   font-size: 14px;
-  line-height: 20px;
+  /* line-height: 20px; */
 }
 
 .whiteboard-card-view .block__logoicon {
@@ -535,12 +535,12 @@
 }
 
 .whiteboard-card-view .counter {
-  background-color: var(--b3-theme-surface-lighter);
+  /* background-color: var(--b3-theme-surface-lighter); */
   color: var(--b3-theme-on-surface);
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  margin-left: 8px;
+  /* padding: 2px 8px; */
+  /* border-radius: 10px; */
+  font-size: 10px;
+  /* margin-left: 8px; */
 }
 
 .whiteboard-card-view .search__label {
@@ -562,11 +562,6 @@
   background-color: var(--b3-list-hover);
 }
 
-.whiteboard-card-view .block__icon svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-}
 
 .whiteboard-card-view .block__icon--active {
   color: var(--b3-theme-primary);
