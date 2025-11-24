@@ -26,65 +26,132 @@
     let loading = true;
     let sortKey: string = 'mtime-desc'; // 默认按修改时间降序
     let searchInputRef: HTMLInputElement; // 搜索框引用
+    // 新增：动态增量加载相关状态
+    interface DirEntry { name: string; isDir: boolean; mtime?: number }
+    let allFileEntries: DirEntry[] = []; // 全部文件条目列表（仅文件元数据）
+    let nextIndex = 0; // 下一个批次的起始索引
+    const BATCH_SIZE = 40; // 每批加载的卡片数量
+    let loadingList = false; // 正在加载文件列表
+    let loadingBatch = false; // 正在加载一批卡片
+    let allLoaded = false; // 是否所有文件都已转换为卡片
+    let autoLoadingAll = false; // 搜索时自动加载全部
+    let sentinel: HTMLDivElement; // 触底哨兵元素
+    let cardsGridEl: HTMLDivElement; // 网格容器引用（用于滚动检测）
 
-    // 加载文件列表并初步生成卡片元数据
+    // 原逻辑拆成两阶段：读取文件列表 + 分批构造卡片
     async function loadWhiteboards() {
+        resetState();
         loading = true;
-        allCards = [];
-        filteredCards = [];
+        loadingList = true;
         try {
-            const files = await api.readDir('/data/storage/petal/sttools/');
-            const dataFiles = files.filter(f => !f.isDir && f.name.startsWith('tldraw-data-') && f.name.endsWith('.json'));
-            if (dataFiles.length === 0) {
+            const files: any[] = await api.readDir('/data/storage/petal/sttools/');
+            allFileEntries = files.filter(f => !f.isDir && f.name.startsWith('tldraw-data-') && f.name.endsWith('.json'));
+            nextIndex = 0;
+            if (allFileEntries.length === 0) {
                 allCards = [];
                 applyFilters();
+                allLoaded = true;
                 return;
             }
-            // 生成初步卡片数据
-            allCards = await Promise.all(dataFiles.map(async f => {
-                const id = extractDrawingId(f.name);
-                let exists = false;
-                let title = '未知白板';
-                if (id !== '未知画板') {
-                    try {
-                        const blk = await api.getBlockByID(id);
-                        if (blk) {
-                            exists = true;
-                            if (blk.root_id) {
-                                try {
-                                    const docBlk = await api.getBlockByID(blk.root_id);
-                                    title = docBlk?.content || title;
-                                } catch { /* ignore */ }
-                            }
-                        } else {
-                            exists = false;
-                            title = '无关联块';
-                        }
-                    } catch {
-                        exists = false;
-                        title = '无关联块';
-                    }
-                } else {
-                    title = 'ID无法解析';
-                }
-                return {
-                    id,
-                    fileName: f.name,
-                    path: `/data/storage/petal/sttools/${f.name}`,
-                    title,
-                    exists,
-                    mtime: (f as any).mtime || 0,
-                    loadingPreview: false,
-                    shapes: [],
-                } as WhiteboardCard;
-            }));
-            applyFilters();
+            // 初始加载第一批
+            await loadNextBatch();
         } catch (e) {
             console.error('加载白板列表失败:', e);
             showMessage('加载白板列表失败', 4000, 'error');
         } finally {
+            loadingList = false;
             loading = false;
         }
+    }
+
+    function resetState() {
+        allCards = [];
+        filteredCards = [];
+        allFileEntries = [];
+        nextIndex = 0;
+        loadingList = false;
+        loadingBatch = false;
+        allLoaded = false;
+        autoLoadingAll = false;
+    }
+
+    // 构造单个文件的卡片元数据（延迟）
+    async function buildCardMeta(f: DirEntry): Promise<WhiteboardCard> {
+        const id = extractDrawingId(f.name);
+        let exists = false;
+        let title = '未知白板';
+        if (id !== '未知画板') {
+            try {
+                const blk = await api.getBlockByID(id);
+                if (blk) {
+                    exists = true;
+                    if (blk.root_id) {
+                        try {
+                            const docBlk = await api.getBlockByID(blk.root_id);
+                            title = docBlk?.content || title;
+                        } catch { /* ignore */ }
+                    }
+                } else {
+                    exists = false;
+                    title = '无关联块';
+                }
+            } catch {
+                exists = false;
+                title = '无关联块';
+            }
+        } else {
+            title = 'ID无法解析';
+        }
+        return {
+            id,
+            fileName: f.name,
+            path: `/data/storage/petal/sttools/${f.name}`,
+            title,
+            exists,
+            mtime: f.mtime || 0,
+            loadingPreview: false,
+            shapes: [],
+        };
+    }
+
+    async function loadNextBatch() {
+        if (loadingBatch || allLoaded) return;
+        loadingBatch = true;
+        try {
+            const slice = allFileEntries.slice(nextIndex, nextIndex + BATCH_SIZE);
+            const metas = await Promise.all(slice.map(buildCardMeta));
+            allCards = [...allCards, ...metas];
+            nextIndex += slice.length;
+            if (nextIndex >= allFileEntries.length) {
+                allLoaded = true;
+            }
+            applyFilters();
+        } catch (e) {
+            console.error('批次加载失败:', e);
+            showMessage('批次加载失败', 3000, 'error');
+        } finally {
+            loadingBatch = false;
+        }
+    }
+
+    // 滚动检测作为 IntersectionObserver 的补充（某些嵌套滚动环境下 IO 可能不触发）
+    function handleGridScroll() {
+        if (!cardsGridEl || loadingBatch || allLoaded) return;
+        const nearBottom = cardsGridEl.scrollTop + cardsGridEl.clientHeight >= cardsGridEl.scrollHeight - 160; // 160px 预加载阈值
+        if (nearBottom) loadNextBatch();
+    }
+
+    // 搜索时自动加载全部（避免未加载条目漏检）
+    $: if (searchQuery.trim() && !allLoaded && !autoLoadingAll) {
+        autoLoadingAll = true;
+        // 递归批量加载直到全部完成
+        (async () => {
+            while (!allLoaded) {
+                await loadNextBatch();
+                // 小延迟避免 UI 卡顿
+                await new Promise(r => setTimeout(r, 10));
+            }
+        })();
     }
 
     function extractDrawingId(filename: string): string {
@@ -292,6 +359,22 @@
     }
 
     onMount(() => { loadWhiteboards(); });
+
+    // 触底哨兵观察器：滚动至底部自动加载下一批
+    let batchObserver: IntersectionObserver;
+    function initBatchObserver() {
+        if (batchObserver || !sentinel) return;
+        batchObserver = new IntersectionObserver(entries => {
+            for (const entry of entries) {
+                if (entry.isIntersecting) {
+                    loadNextBatch();
+                }
+            }
+        }, { root: null, rootMargin: '200px 0px 200px 0px', threshold: 0.01 });
+        batchObserver.observe(sentinel);
+    }
+
+    $: initBatchObserver();
 </script>
 
 <div class="whiteboard-card-view">
@@ -299,7 +382,7 @@
         <div class="block__logo">
             <svg class="block__logoicon"><use xlink:href="#iconSTWhiteboard"></use></svg>白板卡片视图
         </div>
-        <span class="counter">{filteredCards.length}</span>
+        <span class="counter" title="已加载卡片/总文件">{filteredCards.length}/{allFileEntries.length || 0}</span>
         <span class="fn__flex-1"></span>
         <span class="fn__space"></span>
         {#if showSearch}
@@ -359,7 +442,7 @@
     {:else if filteredCards.length === 0}
         <div class="empty">暂无匹配白板</div>
     {:else}
-        <div class="cards-grid">
+        <div class="cards-grid" bind:this={cardsGridEl} on:scroll={handleGridScroll}>
             {#each filteredCards as card (card.path)}
                  <div class="card" role="button" tabindex="0"
                      on:click={() => openWhiteboard(card)}
@@ -395,6 +478,22 @@
                     <!-- 移除操作按钮，整卡点击打开 -->
                 </div>
             {/each}
+            <!-- 触底哨兵，用于自动加载下一批 -->
+            {#if !allLoaded}
+                <div class="load-sentinel" bind:this={sentinel}>
+                    {#if loadingBatch}
+                        <span class="loading-batch">加载更多...</span>
+                    {:else}
+                        <span class="loading-batch" role="button" tabindex="0" aria-label="手动加载更多"
+                              on:click={loadNextBatch}
+                              on:keydown={(e)=>{ if(e.key==='Enter') loadNextBatch(); }}>
+                            滚动或点击加载更多 ({allCards.length}/{allFileEntries.length})
+                        </span>
+                    {/if}
+                </div>
+            {:else}
+                <div class="load-sentinel done">已全部加载 ({allCards.length})</div>
+            {/if}
         </div>
     {/if}
 </div>
@@ -599,6 +698,18 @@
   text-align: center;
 }
 .empty { opacity: .7; }
+
+/* 触底哨兵 */
+.load-sentinel {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 0.75rem 0.5rem 1.5rem;
+    font-size: 0.7rem;
+    color: var(--b3-theme-secondary);
+    opacity: .8;
+}
+.load-sentinel.done { opacity: .5; }
+.loading-batch { animation: fadePulse 1.6s infinite; }
 
 /* 小屏适配 */
 @media (max-width: 900px) {
