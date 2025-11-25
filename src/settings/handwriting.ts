@@ -7,6 +7,8 @@ export const handwritingDefaults: Record<string, any> = {
     "copyLinkTitle": true,
     "SyncDelete": false,
     "tldraw-viewport-culling": true,
+    // 工具栏方向：vertical | horizontal
+    "tldraw-toolbar-orientation": "vertical",
     // card 渲染模式：static-dom（非编辑仅保留 Protyle 元素，无实例），live-protyle（非编辑保留 Protyle 实例，禁用交互）
     "card-render-mode": "static-dom",
     "tldraw-header-image": true,
@@ -23,6 +25,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
             { type: "checkbox", title: "复制链接标题", description: "复制链接时包含标题", key: "copyLinkTitle", value: ctx.settings["copyLinkTitle"] },
             { type: "checkbox", title: "同步删除(不建议启用)", description: "删除画板块时同步删除笔记块", key: "SyncDelete", value: ctx.settings["SyncDelete"] },
             { type: "checkbox", title: "仅加载视野内形状", description: "启用后 tldraw 仅在视区内加载形状以节省资源", key: "tldraw-viewport-culling", value: ctx.settings["tldraw-viewport-culling"] },
+            { type: "select", title: "工具栏方向", description: "选择工具栏是垂直显示还是水平显示", key: "tldraw-toolbar-orientation", value: ctx.settings["tldraw-toolbar-orientation"], options: { "vertical": "垂直", "horizontal": "水平" } },
             { type: "select", title: "Card 渲染模式", description: "选择非编辑状态如何渲染 Card：性能优先或一致性优先", key: "card-render-mode", value: ctx.settings["card-render-mode"], options: {
                 "static-dom": "性能优先：非编辑为 Protyle 元素（无实例）",
                 "live-protyle": "一致性优先：非编辑保留 Protyle 实例（禁用交互）"

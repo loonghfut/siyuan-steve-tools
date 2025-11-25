@@ -693,8 +693,11 @@ export const components: TLComponents = {
         const isSingleBlockSelected = useIsToolSelected(tools['single-block'])
         const isSlideSelected = useIsToolSelected(tools['slide'])
         // const isMindMapNodeSelected = useIsToolSelected(tools['mindmap-node'])
+        // Allow the user to configure whether the toolbar is horizontal or vertical
+        const toolbarOrientation = (settingdata?.['tldraw-toolbar-orientation'] as 'vertical' | 'horizontal') || 'vertical'
+
         return (
-            <DefaultToolbar {...props}>
+            <DefaultToolbar {...props} orientation={toolbarOrientation}>
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
                 <TldrawUiMenuItem {...tools['single-block']} isSelected={isSingleBlockSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
