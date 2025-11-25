@@ -379,7 +379,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						rootId: blockId,
 						defId: blockId,
 						render: {
-							background: (shape.props.showMask && tldrawHeaderImage),
+							background: (shape.props.isMain && tldrawHeaderImage),
 							breadcrumb: shape.props.isMain,
 							gutter: true,
 							title: shape.props.isMain,
