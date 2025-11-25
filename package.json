@@ -6,7 +6,7 @@
   "repository": "",
   "homepage": "",
   "author": "steve",
-  "license": "MIT",
+  "license": "",
   "scripts": {
     "predev": "node --no-warnings ./scripts/handle_private_stats.js",
     "prebuild": "node --no-warnings ./scripts/handle_private_stats.js",
@@ -20,8 +20,8 @@
     "update-version": "node --no-warnings ./scripts/update_version.js",
     "update-changelog": "node --no-warnings ./scripts/update_changelog.js",
     "r": "bash ./my/release.sh",
-  "clean-stats": "node --no-warnings ./scripts/handle_private_stats.js --cleanup",
-  "create-module": "node --no-warnings ./scripts/create_module.js"
+    "clean-stats": "node --no-warnings ./scripts/handle_private_stats.js --cleanup",
+    "create-module": "node --no-warnings ./scripts/create_module.js"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.0",
@@ -58,8 +58,8 @@
     "@jsplumb/common": "^5.13.7",
     "@jsplumb/core": "^5.13.7",
     "@leafer-in/viewport": "^1.4.2",
-    "@tldraw/assets": "^4.1.1",
-    "@tldraw/tldraw": "^4.1.1",
+    "@tldraw/assets": "4.1.1",
+    "@tldraw/tldraw": "4.1.1",
     "@types/sortablejs": "^1.15.8",
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
