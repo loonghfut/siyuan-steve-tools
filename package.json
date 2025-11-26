@@ -62,6 +62,7 @@
     "@tldraw/tldraw": "4.1.1",
     "@types/sortablejs": "^1.15.8",
     "browser-image-compression": "^2.0.2",
+    "codemirror": "^6.0.2",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
     "drawflow": "^0.0.60",

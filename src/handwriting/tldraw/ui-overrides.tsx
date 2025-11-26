@@ -13,7 +13,6 @@ import {
     useValue,
     DefaultStylePanel,
     DefaultMainMenu,
-    TldrawUiMenuGroup,
     DefaultMainMenuContent,
     track, // 导入 track
     useRelevantStyles,
@@ -22,6 +21,7 @@ import {
     DefaultQuickActions,
     DefaultQuickActionsContent,
     TldrawUiMenuSubmenu, // 导入 useRelevantStyles
+    TLShapeId,
 } from '@tldraw/tldraw'
 import { selectAdjacentShape } from './utils/selectAdjacentShape'
 import { ConnectionModeManager } from './utils/connectionMode'
@@ -37,6 +37,8 @@ declare module '@tldraw/tldraw' {
         'sttools:exportData': () => void
         'sttools:rollbackData': () => void
         'sttools:pruneAssets': () => void
+        'sttools:editJsShape': (shapeId?: TLShapeId) => void
+        'sttools:rerunJsShape': (shapeId?: TLShapeId) => void
     }
 }
 import React from 'react';
@@ -46,6 +48,7 @@ import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
+import { IJsShape } from './JsShape/js-shape-types';
 import { openTab, showMessage, confirm as syConfirm } from 'siyuan';
 import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
@@ -55,6 +58,11 @@ type CardLikeShape = ICardShape | ISingleBlockShape;
 
 const isCardLikeShape = (shape: any): shape is CardLikeShape =>
     shape?.type === 'card' || shape?.type === 'single-block';
+
+type OverlayShape = CardLikeShape | IJsShape;
+
+const isOverlayShape = (shape: any): shape is OverlayShape =>
+	isCardLikeShape(shape) || shape?.type === 'js-shape';
 
 
 export const uiOverrides: TLUiOverrides = {
@@ -85,6 +93,13 @@ export const uiOverrides: TLUiOverrides = {
             label: 'Slide',
             kbd: 's',
             onSelect: () => editor.setCurrentTool('slide'),
+        }
+        tools['js-shape'] = {
+            id: 'js-shape',
+            icon: 'code',
+            label: 'JS Shape',
+            kbd: 'j',
+            onSelect: () => editor.setCurrentTool('js-shape'),
         }
         tools['mindmap-node'] = {
             id: 'mindmap-node',
@@ -196,6 +211,18 @@ const CustomStylePanel = track(() => {
         const first = values[0]
         return values.every(v => v === first) ? first : 'mixed'
     }, [hasSingleBlockSelection, selectedSingleBlockShapes])
+
+    const selectedJsShapes = React.useMemo(
+        () => selectedShapes.filter((shape): shape is IJsShape => shape.type === 'js-shape'),
+        [selectedShapes]
+    )
+    const hasJsSelection = selectedJsShapes.length > 0
+    const jsInteractiveState = React.useMemo<boolean | 'mixed'>(() => {
+        if (!hasJsSelection) return false
+        const values = selectedJsShapes.map(shape => shape.props.interactive === true)
+        const first = values[0]
+        return values.every(v => v === first) ? first : 'mixed'
+    }, [hasJsSelection, selectedJsShapes])
 
 
     // --- 获取 rootId ---
@@ -602,6 +629,30 @@ const CustomStylePanel = track(() => {
                     </div>
                 </>
             )}
+            {hasJsSelection && (
+                <div className="tlui-style-panel__section" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {/* 自动运行功能已移除 - 脚本通过保存或手动重新执行运行 */}
+                    <TldrawUiButton
+                        type="normal"
+                        style={{ flex: '1 1 0', minWidth: '0' }}
+                        title="开启后，渲染出的 DOM 可直接响应点击/拖拽等交互"
+                        onClick={() => {
+                            const next = jsInteractiveState === 'mixed' ? true : !jsInteractiveState
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedJsShapes.map(shape => ({
+                                        id: shape.id,
+                                        type: 'js-shape',
+                                        props: { ...shape.props, interactive: next },
+                                    }))
+                                )
+                            })
+                        }}
+                    >
+                        {jsInteractiveState === 'mixed' ? '⚬ 允许交互' : jsInteractiveState ? '✓ 允许交互' : '允许交互'}
+                    </TldrawUiButton>
+                </div>
+            )}
         </DefaultStylePanel>
     );
 });
@@ -692,6 +743,7 @@ export const components: TLComponents = {
         const isCardSelected = useIsToolSelected(tools['card'])
         const isSingleBlockSelected = useIsToolSelected(tools['single-block'])
         const isSlideSelected = useIsToolSelected(tools['slide'])
+        const isJsShapeSelected = useIsToolSelected(tools['js-shape'])
         // const isMindMapNodeSelected = useIsToolSelected(tools['mindmap-node'])
         // Allow the user to configure whether the toolbar is horizontal or vertical
         const toolbarOrientation = (settingdata?.['tldraw-toolbar-orientation'] as 'vertical' | 'horizontal') || 'vertical'
@@ -701,6 +753,7 @@ export const components: TLComponents = {
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
                 <TldrawUiMenuItem {...tools['single-block']} isSelected={isSingleBlockSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
+                <TldrawUiMenuItem {...tools['js-shape']} isSelected={isJsShapeSelected} />
 
                 <DefaultToolbarContent />
             </DefaultToolbar>
@@ -713,6 +766,7 @@ export const components: TLComponents = {
                 <TldrawUiMenuItem {...tools['card']} />
                 <TldrawUiMenuItem {...tools['single-block']} />
                 <TldrawUiMenuItem {...tools['slide']} />
+                <TldrawUiMenuItem {...tools['js-shape']} />
                 <DefaultKeyboardShortcutsDialogContent />
             </DefaultKeyboardShortcutsDialog>
         )
@@ -799,7 +853,7 @@ export const components: TLComponents = {
                 }
 
                 const selectedShape = selectedShapes[0]
-                if (!isCardLikeShape(selectedShape)) {
+                if (!isOverlayShape(selectedShape)) {
                     return null
                 }
 
@@ -821,8 +875,16 @@ export const components: TLComponents = {
 
         if (!selectionInfo) return null
 
-        // 卡片按钮样式
-        const isSingleBlockSelection = editor.getShape(selectionInfo.id)?.type === 'single-block'
+        const selectedShape = editor.getShape(selectionInfo.id)
+        if (!selectedShape || !isOverlayShape(selectedShape)) {
+            return null
+        }
+
+        const isSingleBlockSelection = selectedShape.type === 'single-block'
+        const isCardOrBlock = isCardLikeShape(selectedShape)
+        const isJsShapeSelection = selectedShape.type === 'js-shape'
+        const selectedJsShape = isJsShapeSelection ? (selectedShape as IJsShape) : null
+
         const buttonStyle = {
             width: '32px',
             height: '32px',
@@ -850,162 +912,195 @@ export const components: TLComponents = {
                     zIndex: 1
                 }}
             >
-                <button
-                    style={buttonStyle}
-                    onClick={() => {
-                        // 编辑卡片内容
-                        editor.setEditingShape(selectionInfo.id)
-                    }}
-                    title="编辑内容"
-                >
-                    ✏️
-                </button>
-                <button
-                    style={buttonStyle}
-                    onClick={() => {
-                        // 刷新卡片：通过刷新 nonce 触发 Card 组件的重新挂载逻辑
-                        const shape = editor.getShape(selectionInfo.id)
-                        if (!isCardLikeShape(shape)) return
+                {isCardOrBlock && (
+                    <>
+                        <button
+                            style={buttonStyle}
+                            onClick={() => {
+                                editor.setEditingShape(selectionInfo.id)
+                            }}
+                            title="编辑内容"
+                        >
+                            ✏️
+                        </button>
+                        <button
+                            style={buttonStyle}
+                            onClick={() => {
+                                const shape = editor.getShape(selectionInfo.id)
+                                if (!isCardLikeShape(shape)) return
 
-                        const shapeLabel = shape.type === 'card' ? '卡片' : '块'
-                        editor.updateShape({
-                            id: selectionInfo.id,
-                            type: shape.type,
-                            props: {
-                                ...shape.props,
-                                // 更新 nonce 以触发 useEffect，重建静态/实例视图
-                                refreshNonce: Date.now(),
-                            },
-                        })
-                        showMessage(`${shapeLabel}已刷新`)
-                    }}
-                    title="刷新卡片"
-                >
-                    🔄
-                </button>
-                <button
-                    style={{
-                        ...buttonStyle,
-                        // 仅对 card 类型显示，其他类型隐藏
-                        display: editor.getShape(selectionInfo.id)?.type === 'card' ? undefined : 'none',
-                    }}
-                    onClick={() => {
-                        const shape = editor.getShape(selectionInfo.id)
-                        if (!shape || shape.type !== 'card') return
+                                const shapeLabel = shape.type === 'card' ? '卡片' : '块'
+                                editor.updateShape({
+                                    id: selectionInfo.id,
+                                    type: shape.type,
+                                    props: {
+                                        ...shape.props,
+                                        refreshNonce: Date.now(),
+                                    },
+                                })
+                                showMessage(`${shapeLabel}已刷新`)
+                            }}
+                            title="刷新卡片"
+                        >
+                            🔄
+                        </button>
+                        <button
+                            style={{
+                                ...buttonStyle,
+                                display: selectedShape.type === 'card' ? undefined : 'none',
+                            }}
+                            onClick={() => {
+                                const shape = editor.getShape(selectionInfo.id)
+                                if (!shape || shape.type !== 'card') return
 
-                        const card = shape as ICardShape
-                        const collapsed = !!card.props?.isCollapsed
-                        editor.updateShape({
-                            id: card.id,
-                            type: 'card',
-                            props: {
-                                ...card.props,
-                                isCollapsed: !collapsed,
-                            },
-                        })
-                    }}
-                    title={
-                        ((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed)
-                            ? '展开卡片'
-                            : '折叠卡片'
-                    }
-                >
-                    {((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed) ? '▶' : '▼'}
-                </button>
-                <button
-                    style={buttonStyle}
-                    onClick={() => {
-                        // 放大字体
-                        const shape = editor.getShape(selectionInfo.id);
-                        if (!isCardLikeShape(shape)) return;
+                                const card = shape as ICardShape
+                                const collapsed = !!card.props?.isCollapsed
+                                editor.updateShape({
+                                    id: card.id,
+                                    type: 'card',
+                                    props: {
+                                        ...card.props,
+                                        isCollapsed: !collapsed,
+                                    },
+                                })
+                            }}
+                            title={
+                                ((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed)
+                                    ? '展开卡片'
+                                    : '折叠卡片'
+                            }
+                        >
+                            {((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed) ? '▶' : '▼'}
+                        </button>
+                        <button
+                            style={buttonStyle}
+                            onClick={() => {
+                                const shape = editor.getShape(selectionInfo.id)
+                                if (!isCardLikeShape(shape)) return
 
-                        // 获取当前字体大小
-                        const currentSize = shape.props.fontSize || 16;
+                                const currentSize = shape.props.fontSize || 16
+                                const newSize = currentSize + 2
+                                editor.updateShape({
+                                    id: selectionInfo.id,
+                                    type: shape.type,
+                                    props: {
+                                        ...shape.props,
+                                        fontSize: newSize,
+                                    },
+                                })
+                            }}
+                            title="放大字体"
+                        >
+                            A+
+                        </button>
+                        <button
+                            style={buttonStyle}
+                            onClick={() => {
+                                const shape = editor.getShape(selectionInfo.id)
+                                if (!isCardLikeShape(shape)) return
 
-                        // 放大字体 (增加2px)
-                        const newSize = currentSize + 2;
-
-                        // 更新卡片属性
-                        editor.updateShape({
-                            id: selectionInfo.id,
-                            type: shape.type,
-                            props: {
-                                ...shape.props,
-                                fontSize: newSize,
-                            },
-                        });
-                    }}
-                    title="放大字体"
-                >
-                    A+
-                </button>
-                <button
-                    style={buttonStyle}
-                    onClick={() => {
-                        // 减小字体
-                        const shape = editor.getShape(selectionInfo.id);
-                        if (!isCardLikeShape(shape)) return;
-
-                        // 获取当前字体大小
-                        const currentSize = shape.props.fontSize || 16;
-
-                        // 减小字体 (减少2px)
-                        const newSize = currentSize - 2;
-
-                        // 更新卡片属性
-                        editor.updateShape({
-                            id: selectionInfo.id,
-                            type: shape.type,
-                            props: {
-                                ...shape.props,
-                                fontSize: newSize,
-                            },
-                        });
-                    }}
-                    title="减小字体"
-                >
-                    A-
-                </button>
-                {isSingleBlockSelection && (
-                    <button
-                        style={{
-                            ...buttonStyle,
-                            background: isAddPending(editor, selectionInfo.id)
-                                ? 'var(--b3-accent-background)' : buttonStyle.background,
-                            boxShadow: isAddPending(editor, selectionInfo.id)
-                                ? '0 0 0 3px rgba(0, 128, 255, 0.12)' : buttonStyle.boxShadow,
-                        }}
-                        onClick={() => armAddConnectedSingleBlock(editor, selectionInfo.id)}
-                        title="点击后将在你下一次点击的位置创建关联单块（按住 Ctrl 点击可连续放置；Esc 取消）"
-                    >
-                        ❇️
-                    </button>
+                                const currentSize = shape.props.fontSize || 16
+                                const newSize = currentSize - 2
+                                editor.updateShape({
+                                    id: selectionInfo.id,
+                                    type: shape.type,
+                                    props: {
+                                        ...shape.props,
+                                        fontSize: newSize,
+                                    },
+                                })
+                            }}
+                            title="减小字体"
+                        >
+                            A-
+                        </button>
+                        {isSingleBlockSelection && (
+                            <button
+                                style={{
+                                    ...buttonStyle,
+                                    background: isAddPending(editor, selectionInfo.id)
+                                        ? 'var(--b3-accent-background)' : buttonStyle.background,
+                                    boxShadow: isAddPending(editor, selectionInfo.id)
+                                        ? '0 0 0 3px rgba(0, 128, 255, 0.12)' : buttonStyle.boxShadow,
+                                }}
+                                onClick={() => armAddConnectedSingleBlock(editor, selectionInfo.id)}
+                                title="点击后将在你下一次点击的位置创建关联单块（按住 Ctrl 点击可连续放置；Esc 取消）"
+                            >
+                                ❇️
+                            </button>
+                        )}
+                        <button
+                            style={buttonStyle}
+                            onClick={async () => {
+                                const shape = editor.getShape(selectionInfo.id)
+                                if (!isCardLikeShape(shape) || !shape.props.blockId) {
+                                    console.error('未找到块ID')
+                                    return
+                                }
+                                const blockId = shape.props.blockId
+                                await openTab({
+                                    app: window.siyuan.ws.app,
+                                    doc: {
+                                        id: blockId,
+                                        action: ['cb-get-hl'],
+                                    },
+                                    position: 'right',
+                                    keepCursor: false,
+                                })
+                            }}
+                            title="跳转到笔记"
+                        >
+                            🔗
+                        </button>
+                    </>
                 )}
-                <button
-                    style={buttonStyle}
-                    onClick={async () => {
-                        // 获取卡片数据并跳转到笔记
-                        const shape = editor.getShape(selectionInfo.id);
-                        if (!isCardLikeShape(shape) || !shape.props.blockId) {
-                            console.error("未找到块ID");
-                            return;
-                        }
-                        const blockId = shape.props.blockId;
-                        await openTab({
-                            app: window.siyuan.ws.app,
-                            doc: {
-                                id: blockId,
-                                action: ["cb-get-hl"],
-                                // zoomIn: true,
-                            },
-                            position: "right",
-                            keepCursor: false,
-                        });
-                    }}
-                    title="跳转到笔记"
-                >
-                    🔗
-                </button>
+                {isJsShapeSelection && (
+                    <>
+                        <button
+                            style={buttonStyle}
+                            onClick={() => editor.emit('sttools:editJsShape', selectionInfo.id)}
+                            title="打开脚本编辑器"
+                        >
+                            {'</>'}
+                        </button>
+                        <button
+                            style={buttonStyle}
+                            onClick={() => {
+                                editor.emit('sttools:rerunJsShape', selectionInfo.id)
+                                showMessage('脚本已重新执行')
+                            }}
+                            title="手动重新执行脚本"
+                        >
+                            ⚡
+                        </button>
+                        <button
+                            style={{
+                                ...buttonStyle,
+                                background: selectedJsShape?.props.interactive === true
+                                    ? 'rgba(59,130,246,0.15)'
+                                    : buttonStyle.background,
+                            }}
+                            onClick={() => {
+                                const shape = editor.getShape(selectionInfo.id)
+                                if (!shape || shape.type !== 'js-shape') return
+                                const jsShape = shape as IJsShape
+                                editor.updateShape({
+                                    id: jsShape.id,
+                                    type: 'js-shape',
+                                    props: {
+                                        ...jsShape.props,
+                                        interactive: !(jsShape.props.interactive === true),
+                                    },
+                                })
+                            }}
+                            title={(selectedJsShape?.props.interactive === true)
+                                ? '禁用 DOM 交互 (恢复画布拖拽)'
+                                : '允许 DOM 交互'}
+                        >
+                            🖱️
+                        </button>
+                    </>
+                )}
             </div>
         )
     },

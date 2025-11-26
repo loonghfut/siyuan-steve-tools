@@ -27,14 +27,16 @@ import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage, Dialog } from 'siyuan';
 import TldrawBackupManager from './tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
+import { JsShapeUtil } from './JsShape/JsShapeUtil';
+import { JsShapeTool } from './JsShape/JsShapeTool';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil]
-const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool]
+const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil]
+const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
