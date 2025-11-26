@@ -11,7 +11,6 @@ import {
     useTools,
     useEditor,
     useValue,
-    stopEventPropagation,
     DefaultStylePanel,
     DefaultMainMenu,
     TldrawUiMenuGroup,
@@ -21,7 +20,8 @@ import {
     DefaultStylePanelContent,
     StylePanelDropdownPicker,
     DefaultQuickActions,
-    DefaultQuickActionsContent, // 导入 useRelevantStyles
+    DefaultQuickActionsContent,
+    TldrawUiMenuSubmenu, // 导入 useRelevantStyles
 } from '@tldraw/tldraw'
 import { selectAdjacentShape } from './utils/selectAdjacentShape'
 import { ConnectionModeManager } from './utils/connectionMode'
@@ -36,6 +36,7 @@ declare module '@tldraw/tldraw' {
         'sttools:backupData': () => void
         'sttools:exportData': () => void
         'sttools:rollbackData': () => void
+        'sttools:pruneAssets': () => void
     }
 }
 import React from 'react';
@@ -45,7 +46,7 @@ import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { SlideShape } from './SlideShape/SlideShapeUtil';
-import { openTab, showMessage } from 'siyuan';
+import { openTab, showMessage, confirm as syConfirm } from 'siyuan';
 import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
 // There's a guide at the bottom of this file!
@@ -457,7 +458,6 @@ const CustomStylePanel = track(() => {
                         onChange={handleNameChange}
                         onBlur={handleNameBlur}
                         onKeyDown={handleKeyDown}
-                        onPointerDown={stopEventPropagation}
                         spellCheck={false}
                     />
                     <TldrawUiButton
@@ -722,7 +722,7 @@ export const components: TLComponents = {
         return (
             <DefaultMainMenu>
                 <DefaultMainMenuContent />
-                <TldrawUiMenuGroup id="sttools">
+                <TldrawUiMenuSubmenu id="sttools" label="更多" >
                     <TldrawUiMenuItem
                         id="backupData"
                         label="备份数据"
@@ -755,7 +755,33 @@ export const components: TLComponents = {
                             editor.emit('sttools:exportData');
                         }}
                     />
-                </TldrawUiMenuGroup>
+                    <TldrawUiMenuItem
+                        id="pruneAssets"
+                        label="清理未使用资源"
+                        readonlyOk
+                        onSelect={() => {
+                            try {
+                                // Prefer Siyuan plugin's confirm, fall back to window.confirm if unavailable
+                                const title = '清理未使用资源';
+                                const text = '确定要清理未被任何形状引用的 asset 吗？此操作会删除这些 asset 的 store 记录（不可撤销）。';
+                                if (typeof syConfirm === 'function') {
+                                    syConfirm(title, text, () => {
+                                        editor.emit('sttools:pruneAssets');
+                                        showMessage('开始清理未使用资源');
+                                    }, () => { /* cancel callback, do nothing */ });
+                                } else {
+                                    const confirmed = window.confirm(text);
+                                    if (!confirmed) return;
+                                    editor.emit('sttools:pruneAssets');
+                                    showMessage('开始清理未使用资源');
+                                }
+                            } catch (err) {
+                                console.error('emit pruneAssets failed', err);
+                                showMessage('请求清理未使用资源失败', 4000, 'error');
+                            }
+                        }}
+                    />
+                </TldrawUiMenuSubmenu>
             </DefaultMainMenu>
         )
     },
@@ -823,7 +849,6 @@ export const components: TLComponents = {
                     pointerEvents: 'all',
                     zIndex: 1
                 }}
-                onPointerDown={stopEventPropagation}
             >
                 <button
                     style={buttonStyle}

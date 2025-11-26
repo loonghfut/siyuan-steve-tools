@@ -80,6 +80,7 @@ export class TldrawManager {
         try {
             // 加载之前保存的数据
             await this.loadData();
+            // 原先每次初始化自动清理未被任何 shape 引用的 asset，改为手动触发以避免在初始化时误删
             // 只有在加载成功后才渲染
             console.log("加载数据成功，开始渲染Tldraw");
             this.renderTldraw(root);
@@ -148,6 +149,70 @@ export class TldrawManager {
                     this.renderTldraw(root);
                 });
             }
+        }
+    }
+
+    /**
+     * 在 store 中查找未被任何 shape 引用的 asset 并删除它们。
+     * 这是一个防止积累无用资源的简单扫描器，会遍历 shape 的 props 并
+     * 将出现的 asset id 标记为被引用。仅删除未被引用的 asset 记录。
+     */
+    private async pruneUnusedAssets(): Promise<void> {
+        if (!this.store) return;
+
+        try {
+            const assets = this.store.query.records('asset').get();
+            if (!assets || assets.length === 0) return;
+
+            const assetIds = assets.map((a: any) => String(a.id));
+            const referenced = new Set<string>();
+
+            const shapes = this.store.query.records('shape').get() || [];
+
+            const scanValue = (val: any) => {
+                if (val == null) return;
+                if (typeof val === 'string') {
+                    // 仅当字符串恰好等于 asset id 时标记（避免误判）
+                    const s = val as string;
+                    if (assetIds.includes(s)) referenced.add(s);
+                    return;
+                }
+                if (Array.isArray(val)) {
+                    for (const item of val) scanValue(item);
+                    return;
+                }
+                if (typeof val === 'object') {
+                    for (const k of Object.keys(val)) {
+                        scanValue(val[k]);
+                    }
+                }
+            };
+
+            for (const shape of shapes) {
+                // 检查常见的 asset 引用字段
+                try {
+                    // shape.props 里可能嵌套 asset 引用
+                    scanValue((shape as any).props);
+                    // 有些 shape 可能还在其他位置引用 asset（例如截图等）
+                    scanValue((shape as any).screenshot);
+                    scanValue((shape as any).src);
+                } catch { /* ignore */ }
+            }
+
+            const unused = assetIds.filter(id => !referenced.has(id));
+            if (unused.length > 0) {
+                console.log(`Pruning ${unused.length} unused asset(s) from TLStore`, unused);
+                try {
+                    // 类型系统方面，强制转换为 any[] 以便调用 remove
+                    this.store.remove(unused as any);
+                    // 保存更改
+                    try { await this.saveData(); } catch { /* ignore save failure */ }
+                } catch (err) {
+                    console.error('删除未使用 asset 失败：', err);
+                }
+            }
+        } catch (err) {
+            console.warn('pruneUnusedAssets encountered error', err);
         }
     }
 
@@ -255,6 +320,15 @@ export class TldrawManager {
                                 showMessage('备份数据失败');
                             }
                             );
+                        });
+                        editor.on('sttools:pruneAssets', async () => {
+                            try {
+                                await this.pruneUnusedAssets();
+                                showMessage('未使用资源检查并清理完成');
+                            } catch (err) {
+                                console.error('清理未使用资源失败', err);
+                                showMessage('清理未使用资源失败，请查看控制台', 5000, 'error');
+                            }
                         });
                         editor.on('sttools:rollbackData', () => {
                             try {
@@ -874,6 +948,84 @@ export class TldrawManager {
             console.error('handleSingleBlockDeletion error', err);
         }
     }
+
+    /**
+     * 当任意 shape 删除后，检查它引用的 asset 是否还被其他 shape 引用，若没有则删除 asset
+     */
+    // private async handleShapeAssetDeletion(shape: any) {
+    //     if (!this.store) return;
+    //     try {
+    //         const assets = this.store.query.records('asset').get() || [];
+    //         if (!assets || assets.length === 0) return;
+    //         const assetIdSet = new Set<string>(assets.map((a: any) => String(a.id)));
+
+    //         const collected = new Set<string>();
+    //         const scan = (val: any) => {
+    //             if (val == null) return;
+    //             if (typeof val === 'string') {
+    //                 const s = val as string;
+    //                 if (assetIdSet.has(s)) collected.add(s);
+    //                 return;
+    //             }
+    //             if (Array.isArray(val)) {
+    //                 for (const item of val) scan(item);
+    //                 return;
+    //             }
+    //             if (typeof val === 'object') {
+    //                 for (const k of Object.keys(val)) scan(val[k]);
+    //             }
+    //         };
+
+    //         // 扫描被删除的 shape
+    //         scan(shape.props);
+    //         scan((shape as any).screenshot);
+    //         scan((shape as any).src);
+
+    //         if (collected.size === 0) return;
+
+    //         // 查询当前 store 中 shape 的资产引用（排除被删除的这个 shape）
+    //         const shapes = this.store.query.records('shape').get() || [];
+    //         for (const aid of Array.from(collected)) {
+    //             let used = false;
+    //             for (const s of shapes) {
+    //                 // s.id 是删除后的 shape id 可能已经不存在在记录中，但保守处理：若 s.id === shape.id，则跳过
+    //                 if (s.id === shape.id) continue;
+    //                 const found = new Set<string>();
+    //                 const scan2 = (val: any) => {
+    //                     if (val == null) return;
+    //                     if (typeof val === 'string') {
+    //                         if (String(val) === aid) found.add(aid);
+    //                         return;
+    //                     }
+    //                     if (Array.isArray(val)) {
+    //                         for (const item of val) scan2(item);
+    //                         return;
+    //                     }
+    //                     if (typeof val === 'object') {
+    //                         for (const k of Object.keys(val)) scan2(val[k]);
+    //                     }
+    //                 };
+    //                 scan2((s as any).props);
+    //                 scan2((s as any).screenshot);
+    //                 scan2((s as any).src);
+    //                 if (found.has(aid)) {
+    //                     used = true;
+    //                     break;
+    //                 }
+    //             }
+    //             if (!used) {
+    //                 try {
+    //                     console.log(`Removing unreferenced asset ${aid} after deleting shape ${shape.id}`);
+    //                     this.store.remove([aid] as any);
+    //                 } catch (err) {
+    //                     console.warn('Failed to remove asset after shape deletion', aid, err);
+    //                 }
+    //             }
+    //         }
+    //     } catch (err) {
+    //         console.warn('handleShapeAssetDeletion error', err);
+    //     }
+    // }
 
     public async captureSlideScreenshot(slideId: TLShapeId, options: CaptureSlideScreenshotOptions = {}): Promise<CaptureSlideScreenshotResult | null> {
         if (!this.editor) {
