@@ -7,12 +7,13 @@ import { keymap } from '@codemirror/view'
 import { indentWithTab, defaultKeymap } from '@codemirror/commands'
 import { autocompletion, closeBrackets } from '@codemirror/autocomplete'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { HighlightStyle, tags as t } from '@codemirror/highlight'
 
 interface CodeEditorProps {
 	value: string
 	onChange?: (value: string) => void
 	onSave?: () => void
-	theme?: 'light' | 'dark'
+	theme?: 'light' | 'dark' | 'high-contrast'
 	height?: string
 }
 
@@ -29,7 +30,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 	useEffect(() => {
 		if (!editorRef.current) return
 
-		const extensions = [
+		const extensions: any[] = [
 			basicSetup,
 			javascript({ jsx: false, typescript: false }),
 			autocompletion(),
@@ -103,9 +104,32 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 			}),
 		]
 
-		// 添加深色主题
+		// 高对比度模式：自定义高对比度高亮与主题
+		const highContrastHighlight = HighlightStyle.define([
+			{ tag: t.keyword, color: '#ffcc00', fontWeight: '700' }, // 黄金色
+			{ tag: [t.name, t.variableName], color: '#ffffff' },
+			{ tag: [t.string, t.character, t.special(t.string)], color: '#00ff7f' }, // 亮绿色
+			{ tag: [t.number, t.bool, t.null], color: '#ff7b00' }, // 橙色
+			{ tag: t.comment, color: '#9aa4b2', fontStyle: 'italic' },
+			{ tag: [t.function(t.variableName)], color: '#59c2ff' }, // 亮蓝
+			{ tag: t.operator, color: '#ffd7ff' },
+			{ tag: t.punctuation, color: '#ffffff' },
+		])
+
 		if (theme === 'dark') {
 			extensions.push(oneDark)
+		} else if (theme === 'high-contrast') {
+			// 强制使用黑色背景与高对比度配色
+			extensions.push(
+				// TS type mismatch on some versions; ensure highlight style is accepted
+				syntaxHighlighting(highContrastHighlight as any),
+				EditorView.theme({
+					'&': { backgroundColor: '#000', color: '#fff' },
+					'.cm-scroller': { backgroundColor: '#000' },
+					'.cm-gutters': { backgroundColor: '#000', color: '#fff' },
+					'.cm-line': { color: '#fff' },
+				})
+			)
 		}
 
 		// 添加保存快捷键
