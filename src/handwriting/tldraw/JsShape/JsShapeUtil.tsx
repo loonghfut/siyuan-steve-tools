@@ -9,9 +9,11 @@ import {
 	resizeBox,
 } from '@tldraw/tldraw'
 import { showMessage, Dialog } from 'siyuan'
+import { createRoot } from 'react-dom/client'
 import { IJsShape } from './js-shape-types'
 import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
+import { CodeEditor } from './CodeEditor'
 
 const DEFAULT_SCRIPT = `const { dom, shape, state, setState } = api
 
@@ -273,85 +275,326 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			const existingDialog = dialogRef.current
 			const latestShape = (this.editor.getShape(shape.id) as IJsShape | undefined) ?? shapeRef.current
 			const latestProps = latestShape.props
-			const ensureTextareaSync = (textarea: HTMLTextAreaElement | null) => {
-				if (textarea) {
-					textarea.value = scriptRef.current ?? ''
-					textarea.focus()
-				}
-			}
+			
 			if (existingDialog) {
-				ensureTextareaSync(existingDialog.element?.querySelector('textarea') as HTMLTextAreaElement | null)
+				// 如果对话框已存在，聚焦即可
 				return
 			}
 
+			let currentCode = scriptRef.current ?? ''
+			let editorRoot: ReturnType<typeof createRoot> | null = null
 			const cleanupListeners: Array<() => void> = []
+			
 			const dialog = new Dialog({
-				title: 'JS 形状脚本编辑器',
+				title: '📝 JavaScript 脚本编辑器',
 				content: `
 <style>
-	.st-js-editor{display:flex;flex-direction:column;height:100%;gap:12px;font-size:13px;color:var(--b3-theme-on-background);}
-	.st-js-editor__body{display:flex;flex:1 1 auto;gap:12px;min-height:0;}
-	.st-js-editor__workspace{flex:2 1 0;display:flex;flex-direction:column;border:1px solid var(--b3-border-color);border-radius:8px;background:var(--b3-theme-surface);}
-	.st-js-editor__workspace header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--b3-border-color);font-size:12px;}
-	.st-js-editor__textarea{flex:1 1 auto;width:100%;border:none;outline:none;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--b3-theme-background);color:var(--b3-theme-on-background);resize:none;min-height:160px;}
-	.st-js-editor__toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-	.st-js-editor__chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:var(--b3-theme-background);border:1px solid var(--b3-border-color);}
-	.st-js-editor__aside{flex:1 1 0;min-width:220px;border:1px solid var(--b3-border-color);border-radius:8px;padding:12px;overflow:auto;background:var(--b3-theme-background);}
-	.st-js-editor__aside h4{margin:0 0 8px;font-size:13px;color:var(--b3-theme-on-surface);}
-	.st-js-editor__aside dl{margin:0;display:flex;flex-direction:column;gap:10px;}
-	.st-js-editor__aside dt{font-weight:600;}
-	.st-js-editor__aside dd{margin:4px 0 0;opacity:0.85;line-height:1.4;}
-	.st-js-editor__actions{display:flex;gap:8px;flex-wrap:wrap;}
-	.st-js-editor__hint{font-size:12px;opacity:0.8;}
+	.st-js-editor {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		gap: 16px;
+		font-size: 13px;
+		color: var(--b3-theme-on-background);
+		padding: 4px;
+	}
+	
+	.st-js-editor__body {
+		display: flex;
+		flex: 1 1 auto;
+		gap: 16px;
+		min-height: 0;
+	}
+	
+	.st-js-editor__workspace {
+		flex: 2 1 0;
+		display: flex;
+		flex-direction: column;
+		border: 1px solid var(--b3-border-color);
+		border-radius: 12px;
+		background: var(--b3-theme-surface);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+		overflow: hidden;
+	}
+	
+	.st-js-editor__workspace header {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+		align-items: center;
+		justify-content: space-between;
+		padding: 12px 16px;
+		background: linear-gradient(to bottom, var(--b3-theme-surface), var(--b3-theme-background));
+		border-bottom: 1px solid var(--b3-border-color);
+		font-size: 12px;
+	}
+	
+	.st-js-editor__editor-container {
+		flex: 1 1 auto;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		overflow: hidden;
+		background: var(--b3-theme-background);
+	}
+	
+	.st-js-editor__toolbar {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+	
+	.st-js-editor__chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 6px 12px;
+		border-radius: 6px;
+		background: var(--b3-theme-background);
+		border: 1px solid var(--b3-border-color);
+		font-size: 12px;
+		font-weight: 500;
+		transition: all 0.2s ease;
+		cursor: pointer;
+		user-select: none;
+	}
+	
+	.st-js-editor__chip:hover {
+		background: var(--b3-theme-surface);
+		border-color: var(--b3-theme-primary);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+	}
+	
+	.st-js-editor__chip input[type="checkbox"] {
+		margin: 0;
+		cursor: pointer;
+	}
+	
+	.st-js-editor__chip input[type="checkbox"]:checked {
+		accent-color: var(--b3-theme-primary);
+	}
+	
+	.st-js-editor__aside {
+		flex: 1 1 0;
+		min-width: 260px;
+		max-width: 320px;
+		border: 1px solid var(--b3-border-color);
+		border-radius: 12px;
+		padding: 16px;
+		overflow: auto;
+		background: var(--b3-theme-surface);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	}
+	
+	.st-js-editor__aside h4 {
+		margin: 0 0 12px;
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--b3-theme-on-surface);
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	
+	.st-js-editor__aside h4::before {
+		content: "📚";
+		font-size: 16px;
+	}
+	
+	.st-js-editor__aside dl {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	
+	.st-js-editor__aside dt {
+		font-weight: 600;
+		font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+		color: var(--b3-theme-primary);
+		font-size: 12px;
+		background: var(--b3-theme-background);
+		padding: 4px 8px;
+		border-radius: 4px;
+		display: inline-block;
+		width: fit-content;
+	}
+	
+	.st-js-editor__aside dd {
+		margin: 6px 0 0;
+		opacity: 0.85;
+		line-height: 1.6;
+		font-size: 12px;
+	}
+	
+	.st-js-editor__actions {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	
+	.st-js-editor__actions .b3-button {
+		font-size: 12px;
+		font-weight: 500;
+		padding: 6px 14px;
+		border-radius: 6px;
+		transition: all 0.2s ease;
+	}
+	
+	.st-js-editor__actions .b3-button:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+	}
+	
+	.st-js-editor__actions .b3-button:active {
+		transform: translateY(0);
+	}
+	
+	.st-js-editor__hint {
+		font-size: 12px;
+		opacity: 0.7;
+		line-height: 1.5;
+		padding: 8px 12px;
+		background: var(--b3-theme-surface);
+		border-radius: 8px;
+		border-left: 3px solid var(--b3-theme-primary-lighter);
+	}
+	
+	.st-js-editor__hint::before {
+		content: "💡 ";
+	}
+	
+	/* 滚动条美化 */
+	.st-js-editor__aside::-webkit-scrollbar {
+		width: 6px;
+	}
+	
+	.st-js-editor__aside::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	
+	.st-js-editor__aside::-webkit-scrollbar-thumb {
+		background: var(--b3-border-color);
+		border-radius: 3px;
+	}
+	
+	.st-js-editor__aside::-webkit-scrollbar-thumb:hover {
+		background: var(--b3-theme-primary-lighter);
+	}
 </style>
 <div class="st-js-editor">
 	<div class="st-js-editor__body">
 		<section class="st-js-editor__workspace">
 			<header>
 				<div class="st-js-editor__toolbar">
-					<label class="st-js-editor__chip"><input type="checkbox" data-setting="interactive"/> 允许交互</label>
+					<label class="st-js-editor__chip" title="启用后允许与脚本生成的 UI 交互">
+						<input type="checkbox" data-setting="interactive"/>
+						<span>允许交互</span>
+					</label>
 				</div>
 				<div class="st-js-editor__actions">
-					<button class="b3-button" data-action="save">保存并运行</button>
-					<button class="b3-button b3-button--outline" data-action="restore">恢复示例</button>
-					<button class="b3-button b3-button--ghost" data-action="close">关闭</button>
+					<button class="b3-button b3-button--primary" data-action="save" title="Ctrl+S">
+						<span>💾 保存并运行</span>
+					</button>
+					<button class="b3-button b3-button--outline" data-action="restore" title="恢复为默认示例脚本">
+						<span>🔄 恢复示例</span>
+					</button>
+					<button class="b3-button b3-button--text" data-action="close">
+						<span>✕ 关闭</span>
+					</button>
 				</div>
 			</header>
-			<textarea class="st-js-editor__textarea" spellcheck="false"></textarea>
+			<div class="st-js-editor__editor-container" data-editor-mount></div>
 		</section>
 		<aside class="st-js-editor__aside">
 			<h4>API 参考</h4>
 			<dl>
-				<dt>dom</dt><dd>挂载容器，直接操作其内部 DOM。默认阻止画布拖拽，若需要可在事件中调用 event.stopPropagation()。</dd>
-				<dt>shape</dt><dd>当前 TL 形状数据，可读取 props（宽高、颜色、脚本配置等）。</dd>
-				<dt>state / setState(next)</dt><dd>保存本地状态。setState 支持函数与部分更新，更新后会自动重跑脚本。</dd>
-				<dt>invalidate()</dt><dd>手动请求重新执行脚本（例如异步结果返回后）。</dd>
-				<dt>editor</dt><dd>TL Editor 实例，可用于定位、选择其他形状（慎用 mutating API）。</dd>
-				<dt>signal</dt><dd>AbortSignal，当脚本被重新运行或形状销毁时自动触发，适合清理异步任务。</dd>
-				<dt>console / fetch</dt><dd>浏览器原生 console 与 fetch。</dd>
-				<dt>requestAnimationFrame / cancelAnimationFrame</dt><dd>封装后的 RAF，脚本结束或被刷新时会统一清理。</dd>
+				<dt>dom</dt>
+				<dd>挂载容器，可直接操作其内部 DOM。默认阻止画布拖拽，若需响应事件可调用 <code>event.stopPropagation()</code>。</dd>
+				
+				<dt>shape</dt>
+				<dd>当前 TLDraw 形状数据对象，包含 props（宽高、颜色、脚本配置等）属性。</dd>
+				
+				<dt>state / setState</dt>
+				<dd>本地状态管理。<code>setState(next)</code> 支持函数式更新，触发后自动重新执行脚本。</dd>
+				
+				<dt>invalidate()</dt>
+				<dd>手动请求重新执行脚本，适用于异步操作完成后需要更新 UI 的场景。</dd>
+				
+				<dt>editor</dt>
+				<dd>TLDraw Editor 实例，可用于操作画布、选择其他形状（慎用可变 API）。</dd>
+				
+				<dt>signal</dt>
+				<dd>AbortSignal 对象，脚本重跑或形状销毁时自动触发，用于清理异步任务。</dd>
+				
+				<dt>console / fetch</dt>
+				<dd>浏览器原生 API，可用于调试输出和网络请求。</dd>
+				
+				<dt>requestAnimationFrame</dt>
+				<dd>封装的动画帧请求函数，脚本结束时自动清理，避免内存泄漏。</dd>
 			</dl>
-			<p class="st-js-editor__hint">更完整示例见 docs/js-shape-api.md，或在脚本中打印 api 查看可用字段。</p>
+			<p class="st-js-editor__hint" style="margin-top: 16px; font-size: 11px;">
+				更多示例和详细文档请参考 <strong>docs/js-shape-api.md</strong>
+			</p>
 		</aside>
 	</div>
-	<div class="st-js-editor__hint">提示：若需要 DOM 元素响应点击且不触发画布拖拽，请在事件中手动调用 event.stopPropagation()。</div>
+	<div class="st-js-editor__hint">
+		DOM 元素默认阻止画布拖拽。若需响应交互，请在事件处理中调用 <code>event.stopPropagation()</code>。使用 <strong>Ctrl+S</strong> 快速保存并运行脚本。
+	</div>
 </div>`,
-				width: '820px',
-				height: '560px',
+				width: '1100px',
+				height: '680px',
 				destroyCallback: () => {
 					cleanupListeners.forEach((dispose) => dispose())
+					if (editorRoot) {
+						editorRoot.unmount()
+						editorRoot = null
+					}
 					dialogRef.current = null
 				},
 			})
 			dialogRef.current = dialog
 
-			const textarea = dialog.element.querySelector('textarea') as HTMLTextAreaElement | null
-			ensureTextareaSync(textarea)
+			// 挂载 CodeMirror 编辑器
+			const editorContainer = dialog.element.querySelector('[data-editor-mount]')
+			if (editorContainer) {
+				editorRoot = createRoot(editorContainer)
+				editorRoot.render(
+					<CodeEditor
+						value={currentCode}
+						onChange={(newValue) => {
+							currentCode = newValue
+						}}
+						onSave={() => {
+							persistScript(currentCode)
+						}}
+						theme={document.body.classList.contains('body--light') ? 'light' : 'dark'}
+						height="100%"
+					/>
+				)
+			}
 
-			const saveHandler = () => persistScript(textarea?.value ?? '')
+			const saveHandler = () => persistScript(currentCode)
 			const restoreHandler = () => {
-				if (textarea) textarea.value = DEFAULT_SCRIPT
+				currentCode = DEFAULT_SCRIPT
 				persistScript(DEFAULT_SCRIPT)
+				// 重新渲染编辑器以显示默认脚本
+				if (editorRoot && editorContainer) {
+					editorRoot.render(
+						<CodeEditor
+							value={currentCode}
+							onChange={(newValue) => {
+								currentCode = newValue
+							}}
+							onSave={() => {
+								persistScript(currentCode)
+							}}
+							theme={document.body.classList.contains('body--light') ? 'light' : 'dark'}
+							height="100%"
+						/>
+					)
+				}
 			}
 			const closeHandler = () => dialog.destroy()
 
@@ -366,7 +609,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			bind('[data-action="restore"]', () => restoreHandler())
 			bind('[data-action="close"]', () => closeHandler())
 
-			// autoRun control removed; scripts are run on save or manual rerun
+			// 删除了 keyHandler，因为 CodeEditor 内部已经处理了 Ctrl+S
 
 			const interactiveToggle = dialog.element.querySelector('[data-setting="interactive"]') as HTMLInputElement | null
 			if (interactiveToggle) {
@@ -382,15 +625,6 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				interactiveToggle.addEventListener('change', handler)
 				cleanupListeners.push(() => interactiveToggle.removeEventListener('change', handler))
 			}
-
-			const keyHandler = (event: KeyboardEvent) => {
-				if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-					event.preventDefault()
-					saveHandler()
-				}
-			}
-			dialog.element.addEventListener('keydown', keyHandler)
-			cleanupListeners.push(() => dialog.element.removeEventListener('keydown', keyHandler))
 		}, [persistScript, requestRun, shape.id])
 
 		useEffect(() => {
