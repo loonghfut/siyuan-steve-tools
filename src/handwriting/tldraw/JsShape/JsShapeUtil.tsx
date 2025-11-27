@@ -13,7 +13,7 @@ import { createRoot } from 'react-dom/client'
 import { IJsShape } from './js-shape-types'
 import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
-import { CodeEditor } from './CodeEditor'
+import { CodeEditor, CodeEditorRef } from './CodeEditor'
 
 const DEFAULT_SCRIPT = `const { dom, shape, state, setState } = api
 
@@ -283,6 +283,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 			let currentCode = scriptRef.current ?? ''
 			let editorRoot: ReturnType<typeof createRoot> | null = null
+			const editorRef = { current: null as CodeEditorRef | null }
 			const cleanupListeners: Array<() => void> = []
 			
 			const dialog = new Dialog({
@@ -359,13 +360,6 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 		cursor: pointer;
 		user-select: none;
 	}
-
-	.st-js-editor__chip--active{
-		background: var(--b3-theme-primary);
-		color: var(--b3-theme-on-primary);
-		border-color: var(--b3-theme-primary);
-		box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-	}
 	
 	.st-js-editor__chip:hover {
 		background: var(--b3-theme-surface);
@@ -380,6 +374,43 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 	
 	.st-js-editor__chip input[type="checkbox"]:checked {
 		accent-color: var(--b3-theme-primary);
+	}
+	
+	.st-js-editor__tool-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 6px;
+		background: var(--b3-theme-background);
+		border: 1px solid var(--b3-border-color);
+		cursor: pointer;
+		transition: all 0.2s ease;
+		font-size: 16px;
+	}
+	
+	.st-js-editor__tool-btn:hover {
+		background: var(--b3-theme-surface);
+		border-color: var(--b3-theme-primary);
+		transform: translateY(-1px);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+	
+	.st-js-editor__tool-btn:active {
+		transform: translateY(0);
+	}
+	
+	.st-js-editor__tool-btn svg {
+		width: 18px;
+		height: 18px;
+		fill: var(--b3-theme-on-background);
+		opacity: 0.75;
+		transition: opacity 0.2s ease;
+	}
+	
+	.st-js-editor__tool-btn:hover svg {
+		opacity: 1;
 	}
 	
 	.st-js-editor__aside {
@@ -499,10 +530,19 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 						<input type="checkbox" data-setting="interactive"/>
 						<span>允许交互</span>
 					</label>
-					<div class="st-js-editor__theme-switch" style="display:inline-flex;gap:6px;margin-left:8px;">
-						<button class="st-js-editor__chip" data-theme="light" title="浅色主题">🌞 浅色</button>
-						<button class="st-js-editor__chip" data-theme="dark" title="深色主题">🌙 深色</button>
-						<button class="st-js-editor__chip" data-theme="high-contrast" title="高对比度主题">⚫ 高对比度</button>
+					<div style="display: flex; gap: 6px; margin-left: 8px;">
+						<button class="st-js-editor__tool-btn" data-tool="search" title="搜索 (Ctrl+F)">
+							<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+						</button>
+						<button class="st-js-editor__tool-btn" data-tool="format" title="格式化代码 (Shift+Alt+F)">
+							<svg viewBox="0 0 24 24"><path d="M3 3v18h18V3H3zm16 16H5V5h14v14zM11 7h2v2h-2V7zm0 4h2v6h-2v-6z"/></svg>
+						</button>
+						<button class="st-js-editor__tool-btn" data-tool="undo" title="撤销 (Ctrl+Z)">
+							<svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+						</button>
+						<button class="st-js-editor__tool-btn" data-tool="redo" title="重做 (Ctrl+Y)">
+							<svg viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+						</button>
 					</div>
 				</div>
 				<div class="st-js-editor__actions">
@@ -570,13 +610,11 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 			// 挂载 CodeMirror 编辑器
 			const editorContainer = dialog.element.querySelector('[data-editor-mount]')
-			let currentTheme = (localStorage.getItem('js-shape-editor-theme') as 'light' | 'dark' | 'high-contrast' | null) || (document.body.classList.contains('body--light') ? 'light' : 'dark')
-
-			const renderEditor = () => {
-				if (!editorContainer) return
-				if (!editorRoot) editorRoot = createRoot(editorContainer)
+			if (editorContainer) {
+				editorRoot = createRoot(editorContainer)
 				editorRoot.render(
 					<CodeEditor
+						ref={editorRef}
 						value={currentCode}
 						onChange={(newValue) => {
 							currentCode = newValue
@@ -584,13 +622,11 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 						onSave={() => {
 							persistScript(currentCode)
 						}}
-						theme={currentTheme ?? 'light'}
+						theme={document.body.classList.contains('body--light') ? 'light' : 'dark'}
 						height="100%"
 					/>
 				)
 			}
-
-			renderEditor()
 
 			const saveHandler = () => persistScript(currentCode)
 			const restoreHandler = () => {
@@ -600,6 +636,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				if (editorRoot && editorContainer) {
 					editorRoot.render(
 						<CodeEditor
+							ref={editorRef}
 							value={currentCode}
 							onChange={(newValue) => {
 								currentCode = newValue
@@ -625,30 +662,12 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			bind('[data-action="save"]', () => saveHandler())
 			bind('[data-action="restore"]', () => restoreHandler())
 			bind('[data-action="close"]', () => closeHandler())
-
-			// theme switcher click handling
-			const switchTheme = (themeValue: string) => {
-				currentTheme = themeValue as any
-				localStorage.setItem('js-shape-editor-theme', currentTheme)
-				renderEditor()
-				// update UI active state
-				dialog.element.querySelectorAll('[data-theme]').forEach((el) => {
-					const btn = el as HTMLElement
-					if (btn.getAttribute('data-theme') === currentTheme) btn.classList.add('st-js-editor__chip--active')
-					else btn.classList.remove('st-js-editor__chip--active')
-				})
-			}
-
-			bind('[data-theme="light"]', () => switchTheme('light'))
-			bind('[data-theme="dark"]', () => switchTheme('dark'))
-			bind('[data-theme="high-contrast"]', () => switchTheme('high-contrast'))
-
-			// ensure initial active state for theme buttons
-			dialog.element.querySelectorAll('[data-theme]').forEach((el) => {
-				const btn = el as HTMLElement
-				if (btn.getAttribute('data-theme') === currentTheme) btn.classList.add('st-js-editor__chip--active')
-				else btn.classList.remove('st-js-editor__chip--active')
-			})
+			
+			// 绑定工具按钮
+			bind('[data-tool="search"]', () => editorRef.current?.openSearch())
+			bind('[data-tool="format"]', () => editorRef.current?.formatCode())
+			bind('[data-tool="undo"]', () => editorRef.current?.undo())
+			bind('[data-tool="redo"]', () => editorRef.current?.redo())
 
 			// 删除了 keyHandler，因为 CodeEditor 内部已经处理了 Ctrl+S
 

@@ -67,6 +67,7 @@
     "@jsplumb/common": "^5.13.7",
     "@jsplumb/core": "^5.13.7",
     "@leafer-in/viewport": "^1.4.2",
+    "@lezer/highlight": "^1.2.3",
     "@tldraw/assets": "4.1.1",
     "@tldraw/tldraw": "4.1.1",
     "@types/sortablejs": "^1.15.8",
