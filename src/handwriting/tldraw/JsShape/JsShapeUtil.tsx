@@ -152,8 +152,8 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 		const persistScript = useCallback((nextScript: string) => {
 			scriptRef.current = nextScript
 			this.editor.updateShape({ id: shape.id, type: shape.type, props: { ...shapeRef.current.props, script: nextScript } })
-			showMessage('脚本已保存并运行')
-			runScript(nextScript)
+			showMessage('脚本已保存')
+			// runScript(nextScript)
 		}, [runScript, shape.id, shape.type])
 
 		const openScriptEditor = useCallback(() => {

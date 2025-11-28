@@ -51,7 +51,7 @@ export function createEditorDialogContent(): string {
 	.st-js-editor {
 		display: flex;
 		flex-direction: column;
-		height: 100%;
+		height: 98%;
 		gap: 16px;
 		font-size: 13px;
 		color: var(--b3-theme-on-background);
@@ -301,10 +301,10 @@ export function createEditorDialogContent(): string {
 				</div>
 				<div class="st-js-editor__actions">
 					<button class="b3-button b3-button--primary" data-action="save" title="Ctrl+S">
-						<span>💾 保存并运行</span>
+						<span>💾 保存</span>
 					</button>
 					<button class="b3-button b3-button--outline" data-action="restore" title="恢复为默认示例脚本">
-						<span>🔄 恢复示例</span>
+						<span>🔄 重置</span>
 					</button>
 					<button class="b3-button b3-button--text" data-action="close">
 						<span>✕ 关闭</span>
@@ -317,16 +317,31 @@ export function createEditorDialogContent(): string {
 			<h4>API 参考</h4>
 			<dl>
 				<dt>dom</dt>
-				<dd>脚本 UI 的挂载容器。若需响应交互，请在事件中调用 <code>event.stopPropagation()</code> 以避免影响画布拖拽/选择。</dd>
+				<dd>
+					当前 JS 形状内部的根 DOM 容器（<code>HTMLDivElement</code>）。
+					你可以通过 <code>dom.innerHTML = '&lt;div&gt;...&lt;/div&gt;'</code> 渲染自定义 UI，并在其下挂载事件。
+					如需响应点击 / 拖拽等交互，请在事件中调用 <code>event.stopPropagation()</code>，以避免影响画布拖拽与选择。
+				</dd>
 				<dt>getData()</dt>
-				<dd>读取已保存的 JSON 数据（解析自 <code>props.data</code>）。</dd>
+				<dd>
+					从当前形状的 <code>props.data</code> 中读取已保存的 JSON 数据，并返回解析后的对象；若没有数据或解析失败则返回 <code>null</code>。
+					通常用法：<code>const state = getData() || {}</code>，用于恢复上一次运行时保存的状态。
+				</dd>
 				<dt>saveData(data)</dt>
-				<dd>将任意 JSON 对象合并保存到形状 <code>props.data</code>。</dd>
+				<dd>
+					将任意 JSON 数据写入当前形状的 <code>props.data</code>，并与已有对象进行浅合并：
+					<code>{ ...old, ...data }</code>。
+					这意味着你可以多次调用 <code>saveData</code> 增量更新，例如：
+					<code>saveData({ count: 1 })</code>、<code>saveData({ text: 'hello' })</code>，最终会合并保存。
+				</dd>
 				<dt>clearData()</dt>
-				<dd>清空已保存数据（重置为 <code>{}</code>）。</dd>
+				<dd>
+					清空当前形状已保存的数据，将 <code>props.data</code> 重置为 <code>{}</code>。
+					通常用于「重置」功能，例如清空计数器或配置。
+				</dd>
 			</dl>
 			<p class="st-js-editor__hint" style="margin-top: 16px; font-size: 11px;">
-				更多示例和详细文档请参考 <strong>docs/js-shape-api.md</strong>
+				运行逻辑：每次保存/重新运行脚本时，系统会先清空 <code>dom</code>，然后重新执行脚本；若脚本返回一个函数，该函数会在下次运行前或形状销毁时被调用，用于清理定时器、全局事件等。
 			</p>
 		</aside>
 	</div>
