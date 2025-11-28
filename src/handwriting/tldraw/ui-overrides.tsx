@@ -62,7 +62,7 @@ const isCardLikeShape = (shape: any): shape is CardLikeShape =>
 type OverlayShape = CardLikeShape | IJsShape;
 
 const isOverlayShape = (shape: any): shape is OverlayShape =>
-	isCardLikeShape(shape) || shape?.type === 'js-shape';
+    isCardLikeShape(shape) || shape?.type === 'js-shape';
 
 
 export const uiOverrides: TLUiOverrides = {
@@ -753,9 +753,8 @@ export const components: TLComponents = {
                 <TldrawUiMenuItem {...tools['card']} isSelected={isCardSelected} />
                 <TldrawUiMenuItem {...tools['single-block']} isSelected={isSingleBlockSelected} />
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
-                <TldrawUiMenuItem {...tools['js-shape']} isSelected={isJsShapeSelected} />
-
                 <DefaultToolbarContent />
+                <TldrawUiMenuItem {...tools['js-shape']} isSelected={isJsShapeSelected} />
             </DefaultToolbar>
         )
     },
