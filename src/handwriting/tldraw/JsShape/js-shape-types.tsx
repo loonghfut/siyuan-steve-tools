@@ -17,5 +17,9 @@ export type IJsShape = TLBaseShape<
 		 * 默认 false（以避免影响画布选择/拖拽）。
 		 */
 		interactive?: boolean
+		/**
+		 * 自定义数据，供脚本持久化保存（JSON 字符串）。
+		 */
+		data?: string
 	}
 >

@@ -9,4 +9,6 @@ export const jsShapeProps: RecordProps<IJsShape> = {
 	// Deprecated: autoRun is no longer used, preserved for compatibility
 	autoRun: T.optional(T.boolean),
 	interactive: T.optional(T.boolean),
+	// Arbitrary user data saved by scripts (JSON string)
+	data: T.optional(T.string),
 }

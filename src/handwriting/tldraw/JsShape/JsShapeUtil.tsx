@@ -15,54 +15,30 @@ import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
 import { CodeEditor, CodeEditorRef } from './CodeEditor'
 
-const DEFAULT_SCRIPT = `const { dom, shape, state, setState } = api
+const DEFAULT_SCRIPT = `const { dom, saveData, getData } = api
 
-// 初始化状态（第一次运行时设置），注意：我们不在这里 return，以便在首个运行期也能绑定事件
-if (state.clicks == null) {
-	setState({ clicks: 0 })
-}
-
+// 渲染最简 UI
 dom.innerHTML = /* html */ \`
-<style>
-	#wrap {
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
-		padding: 12px;
-		line-height: 1.5;
-	}
-</style>
-<div id="wrap">
-	<h3 style="margin: 0 0 8px;">🔧 自定义 JS 形状</h3>
-	<p style="margin: 0;">当前尺寸：\${Math.round(shape.props.w)} × \${Math.round(shape.props.h)}</p>
-	<p style="margin: 12px 0 0;">按钮被点击了 \${state.clicks} 次。</p>
-	<button id="inc">+1</button>
+<div style="padding:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;line-height:1.6;">
+	<h3 style="margin:0 0 8px;">🔧 极简 JS 形状</h3>
+	<p style="margin:0 0 12px;">提供 <code>dom</code>、<code>getData()</code> 与 <code>saveData(data)</code>。</p>
+	<div id="out" style="margin:0 0 8px;color:#334155;"></div>
+	<button id="save">保存时间戳</button>
 </div>
 \`
 
-// 绑定事件：使用 pointerdown 并 stopPropagation 避免触发画布拖拽
-const _bind = () => {
-	const btn = dom.querySelector('#inc')
-	if (!btn) return
-	btn.addEventListener('pointerdown', (e) => {
-		e.stopPropagation()
-		console.log('js-shape pointerdown')
-		setState(prev => ({ ...prev, clicks: (prev.clicks ?? 0) + 1 }))
-	})
-	// 兼容 click 事件
-	btn.addEventListener('click', (e) => {
-		e.stopPropagation()
-		console.log('js-shape click')
-		setState(prev => ({ ...prev, clicks: (prev.clicks ?? 0) + 1 }))
-	})
-}
-_bind()
-// 在 DOM 变化时也尝试重新绑定（防止脚本中异步更新覆盖 DOM）
-const mutationObserver = new MutationObserver(() => _bind())
-mutationObserver.observe(dom, { childList: true, subtree: true })
-// 返回清理函数，框架将在重新执行或销毁时调用
-return () => {
-	mutationObserver.disconnect()
-}
-// 若脚本不是模块式返回（旧示例），cleanup 也会在下一次 run 时被覆盖并执行
+// 绑定事件：阻止事件冒泡，避免影响画布拖拽/选择
+const out = dom.querySelector('#out')
+const btn = dom.querySelector('#save')
+const curr = getData() || {}
+if (out) out.textContent = '当前保存的数据：' + JSON.stringify(curr)
+btn?.addEventListener('pointerdown', (e) => {
+	e.stopPropagation()
+	// 将任意 JSON 数据保存到形状 props.data
+	const value = { lastSavedAt: Date.now() }
+	saveData(value)
+	if (out) out.textContent = '当前保存的数据：' + JSON.stringify(getData() || {})
+})
 `
 
 const PLACEHOLDER_HTML = `
@@ -73,16 +49,8 @@ const PLACEHOLDER_HTML = `
 
 type ScriptRunnerEnv = {
 	dom: HTMLDivElement
-	shape: IJsShape
-	state: any
-	setState: (next: any) => void
-	invalidate: () => void
-	editor: ShapeUtil<IJsShape>['editor']
-	signal: AbortSignal
-	console: Console
-	fetch: typeof fetch
-	requestAnimationFrame: typeof requestAnimationFrame
-	cancelAnimationFrame: typeof cancelAnimationFrame
+	saveData: (data: any) => void
+	getData: () => any
 }
 
 export class JsShapeUtil extends ShapeUtil<IJsShape> {
@@ -132,17 +100,12 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 	component(shape: IJsShape) {
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
-		const [runToken, setRunToken] = useState(0)
 		const [runtimeError, setRuntimeError] = useState<string | null>(null)
 		const runtimeRef = useRef<HTMLDivElement>(null)
-		const abortRef = useRef<AbortController | null>(null)
 		const cleanupRef = useRef<(() => void) | null>(null)
-		const rafIdsRef = useRef<Set<number>>(new Set())
-		const stateRef = useRef<any>({})
 		const scriptRef = useRef(shape.props.script)
 		const shapeRef = useRef(shape)
 		const dialogRef = useRef<Dialog | null>(null)
-		// Auto-run is deprecated. Scripts will be executed when saved, or when user manually requests rerun.
 		const interactiveEnabled = shape.props.interactive === true
 
 		useEffect(() => {
@@ -151,130 +114,83 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 		useEffect(() => {
 			scriptRef.current = shape.props.script
+			// 脚本变化时立即运行
+			runScript(shape.props.script ?? '')
 		}, [shape.props.script])
 
-		const requestRun = useCallback(() => {
-			setRunToken((token) => token + 1)
-		}, [])
-
-		// no automatic run on prop change; scripts are executed on save or manual rerun
+		// 简化：不再提供 requestRun / 本地状态
 
 		useEffect(() => {
 			return () => {
 				cleanupRef.current?.()
 				cleanupRef.current = null
-				abortRef.current?.abort()
-				abortRef.current = null
-				rafIdsRef.current.forEach((id) => cancelAnimationFrame(id))
-				rafIdsRef.current.clear()
 			}
 		}, [])
 
-		const applySetState = useCallback(
-			(nextState: any) => {
-				const prev = stateRef.current
-				let resolved = typeof nextState === 'function' ? nextState(prev) : nextState
-				if (resolved === undefined) return
-				if (resolved && typeof resolved === 'object' && !Array.isArray(resolved) && typeof prev === 'object' && prev !== null) {
-					resolved = { ...prev, ...resolved }
-				}
-				stateRef.current = resolved
-				requestRun()
-			},
-			[requestRun]
-		)
+		// 移除本地状态管理
 
-		const runScript = useCallback(
-			(source: string) => {
-				const currentShape = shapeRef.current
-				if (!currentShape) return
-				const host = runtimeRef.current
-				if (!host) return
+		const runScript = useCallback((source: string) => {
+			const currentShape = shapeRef.current
+			const host = runtimeRef.current
+			if (!currentShape || !host) return
 
-				abortRef.current?.abort()
-				abortRef.current = new AbortController()
-				cleanupRef.current?.()
-				cleanupRef.current = null
-				rafIdsRef.current.forEach((id) => cancelAnimationFrame(id))
-				rafIdsRef.current.clear()
-				host.replaceChildren()
+			host.replaceChildren()
 
-				const trimmed = source?.trim()
-				if (!trimmed) {
-					host.innerHTML = PLACEHOLDER_HTML
-					setRuntimeError(null)
-					return
-				}
+			const trimmed = source?.trim()
+			if (!trimmed) {
+				host.innerHTML = PLACEHOLDER_HTML
+				setRuntimeError(null)
+				return
+			}
 
-				const env: ScriptRunnerEnv = {
-					dom: host,
-					shape: currentShape,
-					state: stateRef.current,
-					setState: applySetState,
-					invalidate: requestRun,
-					editor: this.editor,
-					signal: abortRef.current.signal,
-					console,
-					fetch,
-					requestAnimationFrame: (cb) => {
-						const id = requestAnimationFrame(cb)
-						rafIdsRef.current.add(id)
-						return id
-					},
-					cancelAnimationFrame: (id) => {
-						rafIdsRef.current.delete(id)
-						cancelAnimationFrame(id)
-					},
-				}
-
+			const saveData = (data: any) => {
+				const latestShape = (this.editor.getShape(currentShape.id) as IJsShape | undefined) ?? currentShape
+				let prevObj: any = {}
 				try {
-					const fn = new Function('api', `'use strict'\n${trimmed}`)
-					const result = fn(env)
-					const assignCleanup = (value: any) => {
-						if (typeof value === 'function') {
-							cleanupRef.current = value
-						}
-					}
-					if (result && typeof (result as Promise<unknown>).then === 'function') {
-						;(result as Promise<any>)
-							.then(assignCleanup)
-							.catch((err) => {
-								console.error(err)
-								setRuntimeError(err instanceof Error ? err.message : String(err))
-							})
-					} else {
-						assignCleanup(result)
-					}
-					setRuntimeError(null)
-				} catch (err: any) {
-					setRuntimeError(err?.message ?? String(err))
+					prevObj = latestShape?.props.data ? JSON.parse(latestShape.props.data) : {}
+				} catch {}
+				const nextObj = typeof data === 'function' ? data(prevObj) : data
+				const mergedObj = prevObj && typeof prevObj === 'object' && nextObj && typeof nextObj === 'object' ? { ...prevObj, ...nextObj } : nextObj
+				let dataStr = ''
+				try {
+					dataStr = JSON.stringify(mergedObj)
+				} catch {}
+				this.editor.updateShape({ id: latestShape.id, type: latestShape.type, props: { ...latestShape.props, data: dataStr } })
+			}
+
+			const getData = () => {
+				const latestShape = (this.editor.getShape(currentShape.id) as IJsShape | undefined) ?? currentShape
+				try {
+					return latestShape?.props.data ? JSON.parse(latestShape.props.data) : null
+				} catch {
+					return null
 				}
-			},
-			[applySetState, requestRun]
-		)
+			}
 
-		useEffect(() => {
-			runScript(scriptRef.current ?? '')
-		}, [runToken, runScript])
+			const env: ScriptRunnerEnv = { dom: host, saveData, getData }
 
-		const persistScript = useCallback(
-			(nextScript: string) => {
-				scriptRef.current = nextScript
-				this.editor.updateShape({
-					id: shape.id,
-					type: shape.type,
-					props: { ...shapeRef.current.props, script: nextScript },
-				})
-				showMessage('脚本已保存并运行')
-				requestRun()
-			},
-			[requestRun, shape.id, shape.type]
-		)
+			try {
+				const fn = new Function('api', `'use strict'\n${trimmed}`)
+				const result = fn(env)
+				if (typeof result === 'function') {
+					cleanupRef.current = result
+				}
+				setRuntimeError(null)
+			} catch (err: any) {
+				setRuntimeError(err?.message ?? String(err))
+			}
+		}, [])
+
+		const persistScript = useCallback((nextScript: string) => {
+			scriptRef.current = nextScript
+			this.editor.updateShape({ id: shape.id, type: shape.type, props: { ...shapeRef.current.props, script: nextScript } })
+			showMessage('脚本已保存并运行')
+			runScript(nextScript)
+		}, [runScript, shape.id, shape.type])
 
 		const openScriptEditor = useCallback(() => {
 			const existingDialog = dialogRef.current
-			const latestShape = (this.editor.getShape(shape.id) as IJsShape | undefined) ?? shapeRef.current
-			const latestProps = latestShape.props
+			// const latestShape = (this.editor.getShape(shape.id) as IJsShape | undefined) ?? shapeRef.current
 			
 			if (existingDialog) {
 				// 如果对话框已存在，聚焦即可
@@ -526,11 +442,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 		<section class="st-js-editor__workspace">
 			<header>
 				<div class="st-js-editor__toolbar">
-					<label class="st-js-editor__chip" title="启用后允许与脚本生成的 UI 交互">
-						<input type="checkbox" data-setting="interactive"/>
-						<span>允许交互</span>
-					</label>
-					<div style="display: flex; gap: 6px; margin-left: 8px;">
+					<div style="display: flex; gap: 6px;">
 						<button class="st-js-editor__tool-btn" data-tool="search" title="搜索 (Ctrl+F)">
 							<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
 						</button>
@@ -563,28 +475,11 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			<h4>API 参考</h4>
 			<dl>
 				<dt>dom</dt>
-				<dd>挂载容器，可直接操作其内部 DOM。默认阻止画布拖拽，若需响应事件可调用 <code>event.stopPropagation()</code>。</dd>
-				
-				<dt>shape</dt>
-				<dd>当前 TLDraw 形状数据对象，包含 props（宽高、颜色、脚本配置等）属性。</dd>
-				
-				<dt>state / setState</dt>
-				<dd>本地状态管理。<code>setState(next)</code> 支持函数式更新，触发后自动重新执行脚本。</dd>
-				
-				<dt>invalidate()</dt>
-				<dd>手动请求重新执行脚本，适用于异步操作完成后需要更新 UI 的场景。</dd>
-				
-				<dt>editor</dt>
-				<dd>TLDraw Editor 实例，可用于操作画布、选择其他形状（慎用可变 API）。</dd>
-				
-				<dt>signal</dt>
-				<dd>AbortSignal 对象，脚本重跑或形状销毁时自动触发，用于清理异步任务。</dd>
-				
-				<dt>console / fetch</dt>
-				<dd>浏览器原生 API，可用于调试输出和网络请求。</dd>
-				
-				<dt>requestAnimationFrame</dt>
-				<dd>封装的动画帧请求函数，脚本结束时自动清理，避免内存泄漏。</dd>
+				<dd>脚本 UI 的挂载容器。若需响应交互，请在事件中调用 <code>event.stopPropagation()</code> 以避免影响画布拖拽/选择。</dd>
+				<dt>getData()</dt>
+				<dd>读取已保存的 JSON 数据（解析自 <code>props.data</code>）。</dd>
+				<dt>saveData(data)</dt>
+				<dd>将任意 JSON 对象合并保存到形状 <code>props.data</code>。</dd>
 			</dl>
 			<p class="st-js-editor__hint" style="margin-top: 16px; font-size: 11px;">
 				更多示例和详细文档请参考 <strong>docs/js-shape-api.md</strong>
@@ -671,21 +566,8 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 			// 删除了 keyHandler，因为 CodeEditor 内部已经处理了 Ctrl+S
 
-			const interactiveToggle = dialog.element.querySelector('[data-setting="interactive"]') as HTMLInputElement | null
-			if (interactiveToggle) {
-				interactiveToggle.checked = latestProps.interactive === true
-				const handler = (event: Event) => {
-					const target = event.currentTarget as HTMLInputElement
-					this.editor.updateShape({
-						id: latestShape.id,
-						type: latestShape.type,
-						props: { ...((this.editor.getShape(latestShape.id) as IJsShape)?.props ?? latestProps), interactive: target.checked },
-					})
-				}
-				interactiveToggle.addEventListener('change', handler)
-				cleanupListeners.push(() => interactiveToggle.removeEventListener('change', handler))
-			}
-		}, [persistScript, requestRun, shape.id])
+			// 移除交互开关
+		}, [persistScript, shape.id])
 
 		useEffect(() => {
 			const off = this.editor.on('sttools:editJsShape', (targetId?: string) => {
@@ -693,17 +575,21 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 					openScriptEditor()
 				}
 			})
-			return off
+			return typeof off === 'function' ? off : () => {
+				try { (off as any)?.dispose?.() } catch {}
+			}
 		}, [openScriptEditor, shape.id])
 
 		useEffect(() => {
 			const off = this.editor.on('sttools:rerunJsShape', (targetId?: string) => {
 				if (!targetId || targetId === shape.id) {
-					requestRun()
+					runScript(scriptRef.current ?? '')
 				}
 			})
-			return off
-		}, [requestRun, shape.id])
+			return typeof off === 'function' ? off : () => {
+				try { (off as any)?.dispose?.() } catch {}
+			}
+		}, [runScript, shape.id])
 
 		return (
 			<HTMLContainer
