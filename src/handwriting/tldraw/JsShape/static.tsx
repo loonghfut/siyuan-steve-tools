@@ -1,10 +1,10 @@
-export const DEFAULT_SCRIPT = `const { dom, saveData, getData, clearData } = api
+export const DEFAULT_SCRIPT = `const { dom, saveData, getData, clearData, shape } = api
 
 // 渲染最简 UI
 dom.innerHTML = /* html */ \`
 <div style="padding:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;line-height:1.6;">
 	<h3 style="margin:0 0 8px;">🔧 极简 JS 形状</h3>
-	<p style="margin:0 0 12px;">提供 <code>dom</code>、<code>getData()</code> 与 <code>saveData(data)</code>。</p>
+	<p style="margin:0 0 12px;">提供 <code>dom</code>、<code>getData()</code>、<code>saveData(data)</code>、<code>clearData()</code> 以及 <code>shape</code>（当前形状快照，包含 <code>width</code> 与 <code>height</code>）。</p>
 	<div id="out" style="margin:0 8px 8px;color:#334155;"></div>
 	<div style="display:flex;gap:8px;">
 		<button id="save">保存时间戳</button>
@@ -18,6 +18,12 @@ const out = dom.querySelector('#out')
 const btn = dom.querySelector('#save')
 const btnClear = dom.querySelector('#clear')
 const curr = getData() || {}
+// 形状基本信息（只读快照）
+console.log('当前形状信息', shape)
+// 显示宽高
+if (out && shape) {
+	out.textContent = 'shape: ' + shape.id + ' - ' + shape.type + ' (' + shape.width + 'x' + shape.height + ')'
+}
 const keys = curr && typeof curr === 'object' ? Object.keys(curr) : []
 if (out) out.textContent = '当前保存的数据键：' + (keys.length ? keys.join(', ') : '(空)')
 btn?.addEventListener('pointerdown', (e) => {
@@ -44,6 +50,13 @@ export type ScriptRunnerEnv = {
 	saveData: (data: any) => void
 	getData: () => any
 	clearData: () => void
+	shape: {
+		id: string
+		type: string
+		props: any
+		width: number
+		height: number
+	}
 }
 export function createEditorDialogContent(): string {
 	return `
@@ -338,6 +351,11 @@ export function createEditorDialogContent(): string {
 				<dd>
 					清空当前形状已保存的数据，将 <code>props.data</code> 重置为 <code>{}</code>。
 					通常用于「重置」功能，例如清空计数器或配置。
+				</dd>
+				<dt>shape</dt>
+				<dd>
+					当前形状的只读快照：包含 <code>id</code>、<code>type</code>、<code>props</code>、以及 <code>width</code> 与 <code>height</code>（运行脚本时的静态拷贝）。
+					如果需要修改脚本状态请使用 <code>saveData()</code> 持久化；不要直接尝试修改 <code>shape.props</code>，该对象不会被自动写回。
 				</dd>
 			</dl>
 			<p class="st-js-editor__hint" style="margin-top: 16px; font-size: 11px;">

@@ -205,7 +205,20 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				this.editor.updateShape({ id: latestShape.id, type: latestShape.type, props: { ...latestShape.props, data: '{}' } })
 			}
 
-			const env: ScriptRunnerEnv = { dom: host, saveData, getData, clearData }
+			const latestShape = (this.editor.getShape(currentShape.id) as IJsShape | undefined) ?? currentShape
+			const env: ScriptRunnerEnv = { 
+				dom: host, 
+				saveData, 
+				getData, 
+				clearData, 
+				shape: { 
+					id: latestShape.id, 
+					type: latestShape.type, 
+					props: latestShape.props,
+					width: latestShape.props?.w ?? 0,
+					height: latestShape.props?.h ?? 0,
+				}
+			}
 
 			try {
 				const fn = new Function('api', `'use strict'\n${trimmed}`)
