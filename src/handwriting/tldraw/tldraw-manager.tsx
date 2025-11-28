@@ -56,6 +56,7 @@ export class TldrawManager {
     private _dragEndHandler: (() => void) | null = null;
     private applyingRemoteChanges = false;
     private title: string;
+    private themeObserver: MutationObserver | null = null;
 
     constructor(id: string, container: HTMLElement, blockIds?: string[], title?: string) {
         this.id = id;
@@ -298,6 +299,8 @@ export class TldrawManager {
                     components={components}
                     onMount={(editor) => {
                         this.editor = editor;
+                        this.applyThemeToEditor();
+                        this.setupThemeObserver();
                         // 设置自动保存功能
                         this.setupAutosave();
                         this.setupRealtimeSync(editor);
@@ -597,6 +600,31 @@ export class TldrawManager {
         this.store.listen(throttledSave);
     }
 
+    private applyThemeToEditor() {
+        if (!this.editor) return;
+        const isDark = isDarkTheme();
+        try {
+            this.editor.user.updateUserPreferences({ colorScheme: isDark ? 'dark' : 'light' });
+        } catch (err) {
+            console.warn('更新 tldraw 主题偏好失败', err);
+        }
+    }
+
+    private setupThemeObserver() {
+        if (this.themeObserver) return;
+        const target = document.documentElement;
+        if (!target) return;
+        this.themeObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme-mode') {
+                    this.applyThemeToEditor();
+                    break;
+                }
+            }
+        });
+        this.themeObserver.observe(target, { attributes: true, attributeFilter: ['data-theme-mode'] });
+    }
+
     /**
      * 获取tldraw实例
      */
@@ -834,6 +862,11 @@ export class TldrawManager {
             try { (window as any).__st_dragNodeId = null; } catch (e) { }
         } catch (err) {
             console.warn('移除 drag 监听器出错', err);
+        }
+
+        if (this.themeObserver) {
+            this.themeObserver.disconnect();
+            this.themeObserver = null;
         }
 
         // 销毁React根节点
