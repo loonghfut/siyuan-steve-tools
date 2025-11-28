@@ -104,7 +104,8 @@ export async function run(
         const Fcalendar = createFloatingCalendar(calendarEl);
         calendarEl = Fcalendar.element;
     } else if (id === "2") {//日历内插入视图逻辑
-        calendarEl = elementca.getElementById(`calendar-2`);
+        console.log(elementca)
+        calendarEl = elementca;
     }
     else {
         calendarEl = document.getElementById(`calendar-${id}`)!;

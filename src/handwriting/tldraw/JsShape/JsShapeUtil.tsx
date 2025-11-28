@@ -15,29 +15,41 @@ import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
 import { CodeEditor, CodeEditorRef } from './CodeEditor'
 
-const DEFAULT_SCRIPT = `const { dom, saveData, getData } = api
+const DEFAULT_SCRIPT = `const { dom, saveData, getData, clearData } = api
 
 // 渲染最简 UI
 dom.innerHTML = /* html */ \`
 <div style="padding:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;line-height:1.6;">
 	<h3 style="margin:0 0 8px;">🔧 极简 JS 形状</h3>
 	<p style="margin:0 0 12px;">提供 <code>dom</code>、<code>getData()</code> 与 <code>saveData(data)</code>。</p>
-	<div id="out" style="margin:0 0 8px;color:#334155;"></div>
-	<button id="save">保存时间戳</button>
+	<div id="out" style="margin:0 8px 8px;color:#334155;"></div>
+	<div style="display:flex;gap:8px;">
+		<button id="save">保存时间戳</button>
+		<button id="clear">清空已保存数据</button>
+	</div>
 </div>
 \`
 
 // 绑定事件：阻止事件冒泡，避免影响画布拖拽/选择
 const out = dom.querySelector('#out')
 const btn = dom.querySelector('#save')
+const btnClear = dom.querySelector('#clear')
 const curr = getData() || {}
-if (out) out.textContent = '当前保存的数据：' + JSON.stringify(curr)
+const keys = curr && typeof curr === 'object' ? Object.keys(curr) : []
+if (out) out.textContent = '当前保存的数据键：' + (keys.length ? keys.join(', ') : '(空)')
 btn?.addEventListener('pointerdown', (e) => {
 	e.stopPropagation()
 	// 将任意 JSON 数据保存到形状 props.data
 	const value = { lastSavedAt: Date.now() }
 	saveData(value)
-	if (out) out.textContent = '当前保存的数据：' + JSON.stringify(getData() || {})
+	const next = getData() || {}
+	const nextKeys = next && typeof next === 'object' ? Object.keys(next) : []
+	if (out) out.textContent = '当前保存的数据键：' + (nextKeys.length ? nextKeys.join(', ') : '(空)')
+})
+btnClear?.addEventListener('pointerdown', (e) => {
+	e.stopPropagation()
+	clearData()
+	if (out) out.textContent = '当前保存的数据键：(空)'
 })
 `
 
@@ -51,6 +63,7 @@ type ScriptRunnerEnv = {
 	dom: HTMLDivElement
 	saveData: (data: any) => void
 	getData: () => any
+	clearData: () => void
 }
 
 export class JsShapeUtil extends ShapeUtil<IJsShape> {
@@ -167,7 +180,12 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				}
 			}
 
-			const env: ScriptRunnerEnv = { dom: host, saveData, getData }
+			const clearData = () => {
+				const latestShape = (this.editor.getShape(currentShape.id) as IJsShape | undefined) ?? currentShape
+				this.editor.updateShape({ id: latestShape.id, type: latestShape.type, props: { ...latestShape.props, data: '{}' } })
+			}
+
+			const env: ScriptRunnerEnv = { dom: host, saveData, getData, clearData }
 
 			try {
 				const fn = new Function('api', `'use strict'\n${trimmed}`)
@@ -480,6 +498,8 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				<dd>读取已保存的 JSON 数据（解析自 <code>props.data</code>）。</dd>
 				<dt>saveData(data)</dt>
 				<dd>将任意 JSON 对象合并保存到形状 <code>props.data</code>。</dd>
+				<dt>clearData()</dt>
+				<dd>清空已保存数据（重置为 <code>{}</code>）。</dd>
 			</dl>
 			<p class="st-js-editor__hint" style="margin-top: 16px; font-size: 11px;">
 				更多示例和详细文档请参考 <strong>docs/js-shape-api.md</strong>
