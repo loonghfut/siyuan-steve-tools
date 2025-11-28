@@ -221,8 +221,9 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			}
 
 			try {
-				const fn = new Function('api', `'use strict'\n${trimmed}`)
-				const result = fn(env)
+				// 新增：同时把 env 作为 alias 注入，方便用户使用 `env` 或 `api` 来访问运行时环境
+				const fn = new Function('api', 'env', `'use strict'\n${trimmed}`)
+				const result = fn(env, env)
 				if (typeof result === 'function') {
 					cleanupRef.current = result
 				}
@@ -271,10 +272,30 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 			// 挂载 CodeMirror 编辑器
 			const editorContainer = dialog.element.querySelector('[data-editor-mount]')
+			let extraCompletions: Array<any> = []
 			if (editorContainer) {
 				editorRoot = createRoot(editorContainer)
+				extraCompletions = [
+					{ label: `shape.props.w`, type: 'property', detail: String(shape.props.w) },
+					{ label: `shape.props.h`, type: 'property', detail: String(shape.props.h) },
+					{ label: `shape.props.color`, type: 'property', detail: String(shape.props.color) },
+				]
+						// 将 shape.props.data (JSON 字符串) 中的键也注入为补全项，便于用户在脚本中直接访问，如 `api.shape.props.data.foo`
+						try {
+							if (shape.props?.data) {
+								const parsedData = typeof shape.props.data === 'string' ? JSON.parse(shape.props.data) : shape.props.data
+								if (parsedData && typeof parsedData === 'object') {
+									for (const k of Object.keys(parsedData)) {
+										extraCompletions.push({ label: `shape.props.data.${k}`, type: 'property', detail: String(typeof parsedData[k]), info: String(parsedData[k]) })
+									}
+								}
+							}
+						} catch (err) {
+							// ignore parse errors
+						}
 				editorRoot.render(
 					<CodeEditor
+						extraCompletions={extraCompletions}
 						ref={editorRef}
 						value={currentCode}
 						onChange={(newValue) => {
@@ -296,7 +317,8 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				// 重新渲染编辑器以显示默认脚本
 				if (editorRoot && editorContainer) {
 					editorRoot.render(
-						<CodeEditor
+								<CodeEditor
+									extraCompletions={extraCompletions}
 							ref={editorRef}
 							value={currentCode}
 							onChange={(newValue) => {

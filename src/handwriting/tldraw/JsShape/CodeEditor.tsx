@@ -5,7 +5,8 @@ import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
 import { indentWithTab, defaultKeymap, undo, redo, indentSelection } from '@codemirror/commands'
-import { autocompletion, closeBrackets } from '@codemirror/autocomplete'
+import { autocompletion, closeBrackets, completeFromList, snippetCompletion } from '@codemirror/autocomplete'
+import type { CompletionSource } from '@codemirror/autocomplete'
 import { openSearchPanel, closeSearchPanel } from '@codemirror/search'
 
 interface CodeEditorProps {
@@ -14,6 +15,7 @@ interface CodeEditorProps {
 	onSave?: () => void
 	theme?: 'light' | 'dark'
 	height?: string
+	extraCompletions?: Array<any>
 }
 
 export interface CodeEditorRef {
@@ -24,12 +26,13 @@ export interface CodeEditorRef {
 	redo: () => void
 }
 
-export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
+export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({ 
 	value,
 	onChange,
 	onSave,
 	theme = 'light',
 	height = '100%',
+	extraCompletions = [],
 }, ref) => {
 	const editorRef = useRef<HTMLDivElement>(null)
 	const viewRef = useRef<EditorView | null>(null)
@@ -65,10 +68,79 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 	useEffect(() => {
 		if (!editorRef.current) return
 
+		const myCompletions = [
+			// top-level environment variables
+			{ label: 'api', type: 'variable', detail: 'Script runtime environment (alias for env)', info: 'api' },
+			{ label: 'env', type: 'variable', detail: 'Script runtime environment', info: 'env' },
+			{ label: 'api', type: 'variable', detail: 'Script runtime environment (alias for env)', info: 'api' },
+			{ label: 'env', type: 'variable', detail: 'Script runtime environment', info: 'env' },
+			// helpful snippets
+			snippetCompletion('for (let ${1:i} = 0; ${1} < ${2:len}; ${1}++) {\n\t$0\n}', { label: 'for-loop', type: 'keyword', detail: 'for loop' }),
+			snippetCompletion('console.log(${1:obj})', { label: 'console.log', type: 'keyword', detail: 'console.log' }),
+			// Common shape props (externally injected) — merge via extraCompletions
+			// merge external completions (if any)
+			...extraCompletions,
+		]
+
+		// child properties under api/env
+		let scriptFields = [
+			{ label: 'dom', type: 'variable', detail: 'HTMLElement', info: 'Root DOM element' },
+			{ label: 'saveData', type: 'function', detail: 'saveData(obj)', info: 'Merge and save shape data' },
+			{ label: 'getData', type: 'function', detail: 'getData()', info: 'Get shape data (JSON)' },
+			{ label: 'clearData', type: 'function', detail: 'clearData()', info: 'Clear shape data' },
+			{ label: 'shape', type: 'variable', detail: 'shape', info: 'Current shape metadata' },
+		]
+
+		let shapeFields = [
+			{ label: 'props.w', type: 'property', detail: 'width', info: 'shape.props.w' },
+			{ label: 'props.h', type: 'property', detail: 'height', info: 'shape.props.h' },
+			{ label: 'props.color', type: 'property', detail: 'color', info: 'shape.props.color' },
+			{ label: 'id', type: 'property', detail: 'id', info: 'shape.id' },
+			{ label: 'type', type: 'property', detail: 'type', info: 'shape.type' },
+		]
+
+		// inject extra completions into correct context groups
+		let dataFields: Array<any> = []
+		try {
+			const extrasForShape = (extraCompletions || [])
+				.filter((it: any) => typeof it.label === 'string' && it.label.startsWith('shape.'))
+				.map((it: any) => ({ ...it, label: String((it.label as string).slice('shape.'.length)) }))
+			if (extrasForShape.length) {
+				shapeFields = [...shapeFields, ...extrasForShape]
+			}
+			// compute dataFields under shape.props.data.*
+			dataFields = extrasForShape
+				.filter((it: any) => typeof it.label === 'string' && it.label.startsWith('props.data.'))
+				.map((it: any) => ({ ...it, label: String((it.label as string).slice('props.data.'.length)) }))
+		} catch (e) {}
+
+		const apiEnvCompletionSource: CompletionSource = (context) => {
+			// match longer sequences like `api.shape.props.data.`
+			const m = context.matchBefore(/(?:api|env)(?:\.[\w$]+)*\.?/)
+			if (!m) return null
+			const text = m.text
+			const dotIndex = text.lastIndexOf('.')
+			const from = m.from + dotIndex + 1
+			// if user typed `api.shape.` or `env.shape.` provide nested shape fields
+			if (/\b(?:api|env)\.shape\.props\.data\./.test(text)) {
+				// suggest keys inside shape.props.data
+				const innerDotIndex = text.lastIndexOf('.')
+				const innerFrom = m.from + innerDotIndex + 1
+				return { from: innerFrom, options: dataFields, validFor: /^\w*$/ }
+			}
+			if (/\b(?:api|env)\.shape\./.test(text)) {
+				const innerDotIndex = text.lastIndexOf('.')
+				const innerFrom = m.from + innerDotIndex + 1
+				return { from: innerFrom, options: shapeFields, validFor: /^\w*$/ }
+			}
+			return { from, options: scriptFields, validFor: /^\w*$/ }
+		}
+
 		const extensions = [
 			basicSetup,
 			javascript({ jsx: false, typescript: false }),
-			autocompletion(),
+			// enable default autocompletion plus our custom provider
+			autocompletion({ override: [apiEnvCompletionSource, completeFromList(myCompletions as any)] }),
 			closeBrackets(),
 			oneDark,
 			keymap.of([...defaultKeymap, indentWithTab]),
