@@ -6,6 +6,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
 import { indentWithTab, defaultKeymap, undo, redo, indentSelection } from '@codemirror/commands'
 import { autocompletion, closeBrackets, completeFromList, snippetCompletion } from '@codemirror/autocomplete'
+import { linter, Diagnostic } from '@codemirror/lint'
 import type { CompletionSource } from '@codemirror/autocomplete'
 import { openSearchPanel, closeSearchPanel } from '@codemirror/search'
 
@@ -24,6 +25,8 @@ export interface CodeEditorRef {
 	formatCode: () => void
 	undo: () => void
 	redo: () => void
+	setDiagnostics?: (diags: Diagnostic[]) => void
+	setDiagnosticsFromLineCol?: (line: number, col: number, message: string) => void
 }
 
 export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({ 
@@ -36,6 +39,8 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 }, ref) => {
 	const editorRef = useRef<HTMLDivElement>(null)
 	const viewRef = useRef<EditorView | null>(null)
+	// external diagnostics shared between host and editor
+	let externalDiagnostics: Diagnostic[] = []
 
 	useImperativeHandle(ref, () => ({
 		openSearch: () => {
@@ -62,6 +67,24 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 			if (viewRef.current) {
 				redo({ state: viewRef.current.state, dispatch: viewRef.current.dispatch })
 			}
+		},
+		setDiagnostics: (diags: Diagnostic[]) => {
+			if (viewRef.current) {
+				externalDiagnostics = diags
+				// request a measure to encourage re-linting
+				try { viewRef.current.requestMeasure() } catch {}
+			}
+		},
+		setDiagnosticsFromLineCol: (line: number, col: number, message: string) => {
+			if (!viewRef.current) return
+			const doc = viewRef.current.state.doc
+			const safeLine = Math.max(1, Math.floor(line))
+			const safeCol = Math.max(1, Math.floor(col))
+			const lineInfo = doc.line(safeLine)
+			const from = Math.max(lineInfo.from + safeCol - 1, lineInfo.from)
+			const to = Math.min(from + 1, lineInfo.to)
+			externalDiagnostics = [{ from, to, severity: 'error', message, source: 'Runtime' }]
+			try { viewRef.current.requestMeasure() } catch {}
 		},
 	}))
 
@@ -99,6 +122,30 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 			{ label: 'type', type: 'property', detail: 'type', info: 'shape.type' },
 		]
 
+		let domFields = [
+			{ label: 'innerHTML', type: 'property', detail: 'string', info: 'element.innerHTML' },
+			{ label: 'textContent', type: 'property', detail: 'string', info: 'element.textContent' },
+			{ label: 'appendChild', type: 'function', detail: 'appendChild(node)', info: 'Append a child node' },
+			{ label: 'removeChild', type: 'function', detail: 'removeChild(node)', info: 'Remove a child node' },
+			{ label: 'querySelector', type: 'function', detail: 'querySelector(selector)', info: 'Find first matching element' },
+			{ label: 'querySelectorAll', type: 'function', detail: 'querySelectorAll(selector)', info: 'Find all matching elements' },
+			{ label: 'createElement', type: 'function', detail: 'createElement(tag)', info: 'Create a new element (document.createElement)' },
+			{ label: 'addEventListener', type: 'function', detail: 'addEventListener(type, handler)', info: 'Add event listener' },
+			{ label: 'removeEventListener', type: 'function', detail: 'removeEventListener(type, handler)', info: 'Remove event listener' },
+			{ label: 'classList', type: 'property', detail: 'DOMTokenList', info: 'element.classList' },
+			{ label: 'style', type: 'property', detail: 'CSSStyleDeclaration', info: 'element.style' },
+			{ label: 'setAttribute', type: 'function', detail: 'setAttribute(name, value)', info: 'Set attribute' },
+			{ label: 'getAttribute', type: 'function', detail: 'getAttribute(name)', info: 'Get attribute' },
+			{ label: 'dataset', type: 'property', detail: 'DOMStringMap', info: 'data-* attributes' },
+			{ label: 'children', type: 'property', detail: 'HTMLCollection', info: 'Child elements' },
+			{ label: 'parentElement', type: 'property', detail: 'Element | null', info: 'Parent element' },
+			{ label: 'append', type: 'function', detail: 'append(...nodesOrStrings)', info: 'Append nodes or strings' },
+			{ label: 'prepend', type: 'function', detail: 'prepend(...nodesOrStrings)', info: 'Prepend nodes or strings' },
+			{ label: 'replaceChildren', type: 'function', detail: 'replaceChildren(...nodesOrStrings)', info: 'Replace children' },
+			{ label: 'cloneNode', type: 'function', detail: 'cloneNode(deep)', info: 'Clone node' },
+			{ label: 'dispatchEvent', type: 'function', detail: 'dispatchEvent(event)', info: 'Dispatch event' },
+		]
+
 		// inject extra completions into correct context groups
 		let dataFields: Array<any> = []
 		try {
@@ -112,7 +159,51 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 			dataFields = extrasForShape
 				.filter((it: any) => typeof it.label === 'string' && it.label.startsWith('props.data.'))
 				.map((it: any) => ({ ...it, label: String((it.label as string).slice('props.data.'.length)) }))
+			// also parse any completions provided for dom.* into domFields
+			const extrasForDom = (extraCompletions || [])
+				.filter((it: any) => typeof it.label === 'string' && it.label.startsWith('dom.'))
+				.map((it: any) => ({ ...it, label: String((it.label as string).slice('dom.'.length)) }))
+			if (extrasForDom.length) {
+				domFields = [...domFields, ...extrasForDom]
+			}
 		} catch (e) {}
+
+		// JS syntax linter — try to parse code with Function to catch syntax errors
+		const syntaxLinter = linter((view) => {
+			const code = view.state.doc.toString()
+			try {
+				// Passing param names only to parse, not execute
+				// eslint-disable-next-line no-new-func
+				new Function('api', 'env', `'use strict'\n${code}`)
+				return []
+			} catch (err: any) {
+				const message = err?.message || String(err)
+				// try to extract line/col from message like '(1:10)' or 'Line 1:10'
+				let line = 1
+				let col = 1
+				const match = message.match(/\((\d+):(\d+)\)/) || message.match(/Line (\d+):(\d+)/)
+				if (match) {
+					line = Number(match[1])
+					col = Number(match[2])
+				}
+				const doc = view.state.doc
+				const lineInfo = doc.line(line)
+				const from = Math.max(lineInfo.from + col - 1, lineInfo.from)
+				const to = Math.min(from + 1, lineInfo.to)
+				const d: Diagnostic = {
+					from,
+					to,
+					severity: 'error',
+					message,
+					source: 'Syntax',
+				}
+				return [d]
+			}
+		})
+
+		// external diagnostics (e.g. runtime errors) can be set by the host
+		// (value stored in outer-scope `externalDiagnostics`)
+		const externalLinter = linter(() => externalDiagnostics)
 
 		const apiEnvCompletionSource: CompletionSource = (context) => {
 			// match longer sequences like `api.shape.props.data.`
@@ -121,17 +212,26 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 			const text = m.text
 			const dotIndex = text.lastIndexOf('.')
 			const from = m.from + dotIndex + 1
-			// if user typed `api.shape.` or `env.shape.` provide nested shape fields
+			// if user typed `api.shape.props.data.` provide nested data fields
 			if (/\b(?:api|env)\.shape\.props\.data\./.test(text)) {
 				// suggest keys inside shape.props.data
 				const innerDotIndex = text.lastIndexOf('.')
 				const innerFrom = m.from + innerDotIndex + 1
 				return { from: innerFrom, options: dataFields, validFor: /^\w*$/ }
 			}
+
+            
+			// if user typed `api.shape.` provide nested shape fields
 			if (/\b(?:api|env)\.shape\./.test(text)) {
 				const innerDotIndex = text.lastIndexOf('.')
 				const innerFrom = m.from + innerDotIndex + 1
 				return { from: innerFrom, options: shapeFields, validFor: /^\w*$/ }
+			}
+			// if user typed `api.dom.` or `env.dom.` provide dom fields
+			if (/\b(?:api|env)\.dom\./.test(text)) {
+				const innerDotIndex = text.lastIndexOf('.')
+				const innerFrom = m.from + innerDotIndex + 1
+				return { from: innerFrom, options: domFields, validFor: /^\w*$/ }
 			}
 			return { from, options: scriptFields, validFor: /^\w*$/ }
 		}
@@ -141,6 +241,10 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 			javascript({ jsx: false, typescript: false }),
 			// enable default autocompletion plus our custom provider
 			autocompletion({ override: [apiEnvCompletionSource, completeFromList(myCompletions as any)] }),
+			// add syntax linter
+			syntaxLinter,
+			// add external diagnostic linter (for runtime errors passed from host)
+			externalLinter,
 			closeBrackets(),
 			oneDark,
 			keymap.of([...defaultKeymap, indentWithTab]),

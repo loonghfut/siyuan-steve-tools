@@ -69,6 +69,8 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 		const scriptRef = useRef(shape.props.script)
 		const shapeRef = useRef(shape)
 		const dialogRef = useRef<Dialog | null>(null)
+		// ref for the CodeEditor to allow annotating runtime errors
+		const codeEditorRef = useRef<CodeEditorRef | null>(null)
 		const interactiveEnabled = shape.props.interactive === true
 
 		useEffect(() => {
@@ -228,8 +230,25 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 					cleanupRef.current = result
 				}
 				setRuntimeError(null)
+				// clear editor diagnostics
+				try { codeEditorRef.current?.setDiagnostics?.([]) } catch (e) {}
 			} catch (err: any) {
-				setRuntimeError(err?.message ?? String(err))
+				const msg = err?.message ?? String(err)
+				setRuntimeError(msg)
+				// try to parse line/col from stack or message to annotate editor
+				try {
+					const stack = err?.stack || msg || ''
+					const match = stack.match(/:(\d+):(\d+)/) || stack.match(/\((\d+):(\d+)\)/) || stack.match(/Line (\d+):(\d+)/)
+					if (match) {
+						const rawLine = Number(match[1]) || 1
+						const rawCol = Number(match[2]) || 1
+						const adjLine = Math.max(1, rawLine - 1) // adjust for wrapper ('use strict') line offset
+						codeEditorRef.current?.setDiagnosticsFromLineCol?.(adjLine, rawCol, msg)
+					} else {
+						// fallback: show at top
+						codeEditorRef.current?.setDiagnostics?.([{ from: 0, to: 0, severity: 'error', message: msg, source: 'Runtime' }])
+					}
+				} catch (e) {}
 			}
 		}, [])
 
@@ -251,7 +270,6 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 			let currentCode = scriptRef.current ?? ''
 			let editorRoot: ReturnType<typeof createRoot> | null = null
-			const editorRef = { current: null as CodeEditorRef | null }
 			const cleanupListeners: Array<() => void> = []
 			
 			const dialog = new Dialog({
@@ -296,7 +314,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				editorRoot.render(
 					<CodeEditor
 						extraCompletions={extraCompletions}
-						ref={editorRef}
+						ref={codeEditorRef as any}
 						value={currentCode}
 						onChange={(newValue) => {
 							currentCode = newValue
@@ -316,10 +334,10 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 				persistScript(DEFAULT_SCRIPT)
 				// 重新渲染编辑器以显示默认脚本
 				if (editorRoot && editorContainer) {
-					editorRoot.render(
+							editorRoot.render(
 								<CodeEditor
 									extraCompletions={extraCompletions}
-							ref={editorRef}
+									ref={codeEditorRef as any}
 							value={currentCode}
 							onChange={(newValue) => {
 								currentCode = newValue
@@ -347,10 +365,10 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			bind('[data-action="close"]', () => closeHandler())
 			
 			// 绑定工具按钮
-			bind('[data-tool="search"]', () => editorRef.current?.openSearch())
-			bind('[data-tool="format"]', () => editorRef.current?.formatCode())
-			bind('[data-tool="undo"]', () => editorRef.current?.undo())
-			bind('[data-tool="redo"]', () => editorRef.current?.redo())
+			bind('[data-tool="search"]', () => codeEditorRef.current?.openSearch())
+			bind('[data-tool="format"]', () => codeEditorRef.current?.formatCode())
+			bind('[data-tool="undo"]', () => codeEditorRef.current?.undo())
+			bind('[data-tool="redo"]', () => codeEditorRef.current?.redo())
 
 			// 删除了 keyHandler，因为 CodeEditor 内部已经处理了 Ctrl+S
 
