@@ -90,7 +90,77 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			}
 		}, [])
 
-		// 移除本地状态管理
+		// 为运行容器添加 click 兼容：在某些环境中原生 click 可能不触发
+		useEffect(() => {
+			const host = runtimeRef.current
+			if (!host || !interactiveEnabled) return
+
+			// 仅针对左键 / 主指针进行 click 合成
+			const MOVE_THRESHOLD = 8
+			let lastNativeClickAt = 0
+			let lastSynthClickAt = 0
+			const ptrState = new Map<number, { startX: number; startY: number; startedInHost: boolean }>()
+
+			const isInsideHost = (el: EventTarget | null) => {
+				return el instanceof Node && host.contains(el)
+			}
+
+			const onPointerDown = (e: PointerEvent) => {
+				// 使用捕获阶段，尽量早地记录
+				if (e.button !== 0) return
+				const startedInHost = isInsideHost(e.target)
+				if (!startedInHost) return
+				ptrState.set(e.pointerId, { startX: e.clientX, startY: e.clientY, startedInHost })
+			}
+
+			const onPointerUp = (e: PointerEvent) => {
+				const st = ptrState.get(e.pointerId)
+				if (!st) return
+				ptrState.delete(e.pointerId)
+				// 已有原生 click，避免重复
+				const now = Date.now()
+				if (now - lastNativeClickAt < 300 || now - lastSynthClickAt < 120) return
+
+				const dx = e.clientX - st.startX
+				const dy = e.clientY - st.startY
+				const moved = Math.hypot(dx, dy) > MOVE_THRESHOLD
+				if (moved) return
+
+				// up 时命中 host 内部的元素
+				const el = document.elementFromPoint(e.clientX, e.clientY)
+				if (!el || !isInsideHost(el)) return
+
+				try {
+					const synthetic = new MouseEvent('click', {
+						bubbles: true,
+						cancelable: true,
+						view: window,
+						clientX: e.clientX,
+						clientY: e.clientY,
+						button: 0,
+					})
+					el.dispatchEvent(synthetic)
+					lastSynthClickAt = Date.now()
+				} catch {}
+			}
+
+			const onClickCapture = (e: MouseEvent) => {
+				// 记录原生 click 发生时间，用于抑制重复的合成 click
+				if (isInsideHost(e.target)) {
+					lastNativeClickAt = Date.now()
+				}
+			}
+
+			document.addEventListener('pointerdown', onPointerDown, true)
+			document.addEventListener('pointerup', onPointerUp, true)
+			host.addEventListener('click', onClickCapture, true)
+
+			return () => {
+				document.removeEventListener('pointerdown', onPointerDown, true)
+				document.removeEventListener('pointerup', onPointerUp, true)
+				host.removeEventListener('click', onClickCapture, true)
+			}
+		}, [interactiveEnabled])
 
 		const runScript = useCallback((source: string) => {
 			const currentShape = shapeRef.current
