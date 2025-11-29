@@ -562,24 +562,26 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 		}, [persistScript, shape.id])
 
 		useEffect(() => {
-			const off = this.editor.on('sttools:editJsShape', (targetId?: string) => {
+			const handler = (targetId?: string) => {
 				if (!targetId || targetId === shape.id) {
 					openScriptEditor()
 				}
-			})
-			return typeof off === 'function' ? off : () => {
-				try { (off as any)?.dispose?.() } catch {}
+			}
+			this.editor.on('sttools:editJsShape', handler)
+			return () => {
+				this.editor.off('sttools:editJsShape', handler)
 			}
 		}, [openScriptEditor, shape.id])
 
 		useEffect(() => {
-			const off = this.editor.on('sttools:rerunJsShape', (targetId?: string) => {
+			const handler = (targetId?: string) => {
 				if (!targetId || targetId === shape.id) {
 					runScript(scriptRef.current ?? '')
 				}
-			})
-			return typeof off === 'function' ? off : () => {
-				try { (off as any)?.dispose?.() } catch {}
+			}
+			this.editor.on('sttools:rerunJsShape', handler)
+			return () => {
+				this.editor.off('sttools:rerunJsShape', handler)
 			}
 		}, [runScript, shape.id])
 
