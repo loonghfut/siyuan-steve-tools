@@ -10,6 +10,7 @@ import {
 } from '@tldraw/tldraw'
 import { showMessage, Dialog } from 'siyuan'
 import { createRoot } from 'react-dom/client'
+import { settingdata } from '@/index'
 import { IJsShape } from './js-shape-types'
 import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
@@ -50,6 +51,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			// Deprecated: autoRun is not triggered by default; run scripts manually via dialog or rerun.
 			autoRun: false,
 			interactive: true,
+			restrictDom: true,
 		}
 	}
 
@@ -71,6 +73,12 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 		const dialogRef = useRef<Dialog | null>(null)
 		// ref for the CodeEditor to allow annotating runtime errors
 		const codeEditorRef = useRef<CodeEditorRef | null>(null)
+		// Confirm-run state: implement a 5s confirmation window after saving & running new script
+		const confirmedScriptRef = useRef<string>(shape.props.script ?? '')
+		const pendingScriptRef = useRef<string | null>(null)
+		const confirmTimeoutRef = useRef<number | null>(null)
+		const confirmIntervalRef = useRef<number | null>(null)
+		const confirmDialogRef = useRef<Dialog | null>(null)
 		const interactiveEnabled = shape.props.interactive === true
 
 		useEffect(() => {
@@ -79,7 +87,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 		useEffect(() => {
 			scriptRef.current = shape.props.script
-			// 脚本变化时立即运行
+			// 脚本变化时立即运行（用于展示待确认的新脚本或回退后的旧脚本）
 			runScript(shape.props.script ?? '')
 		}, [shape.props.script])
 
@@ -89,7 +97,103 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			return () => {
 				cleanupRef.current?.()
 				cleanupRef.current = null
+				// clear confirm timers on unmount
+				if (confirmTimeoutRef.current !== null) {
+					clearTimeout(confirmTimeoutRef.current)
+					confirmTimeoutRef.current = null
+				}
+				if (confirmIntervalRef.current !== null) {
+					clearInterval(confirmIntervalRef.current)
+					confirmIntervalRef.current = null
+				}
+				try { confirmDialogRef.current?.destroy?.() } catch {}
+				confirmDialogRef.current = null
 			}
+		}, [])
+
+		const clearConfirmTimers = useCallback(() => {
+			if (confirmTimeoutRef.current !== null) {
+				clearTimeout(confirmTimeoutRef.current)
+				confirmTimeoutRef.current = null
+			}
+			if (confirmIntervalRef.current !== null) {
+				clearInterval(confirmIntervalRef.current)
+				confirmIntervalRef.current = null
+			}
+		}, [])
+
+		const startConfirmWindow = useCallback((newScript: string) => {
+			pendingScriptRef.current = newScript
+			clearConfirmTimers()
+			// Build confirm dialog UI with countdown
+			const dlg = new Dialog({
+				title: '请确认运行脚本',
+				content: `
+					<div style="padding:8px;display:flex;flex-direction:column;gap:8px;">
+						<div>脚本已保存并暂时应用，5 秒内确认以生效，否则将自动撤回。</div>
+						<div style="display:flex;gap:8px;align-items:center;">
+							<span data-countdown>5</span>
+							<button data-ok style="padding:4px 10px;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:6px;cursor:pointer;">确认</button>
+							<button data-cancel style="padding:4px 10px;border:1px solid #ef4444;background:#ef4444;color:#fff;border-radius:6px;cursor:pointer;">撤回</button>
+						</div>
+					</div>
+				`,
+				width: '420px',
+				height: 'auto',
+				destroyCallback: () => {
+					clearConfirmTimers()
+					confirmDialogRef.current = null
+				},
+			})
+			confirmDialogRef.current = dlg
+			const el = dlg.element
+			const countdownEl = el.querySelector('[data-countdown]') as HTMLElement | null
+			const okBtn = el.querySelector('[data-ok]') as HTMLElement | null
+			const cancelBtn = el.querySelector('[data-cancel]') as HTMLElement | null
+
+			let secLeft = 5
+			if (countdownEl) countdownEl.textContent = String(secLeft)
+			confirmIntervalRef.current = window.setInterval(() => {
+				secLeft = Math.max(0, secLeft - 1)
+				if (countdownEl) countdownEl.textContent = String(secLeft)
+			}, 1000)
+			confirmTimeoutRef.current = window.setTimeout(() => {
+				cancelPending()
+				try { confirmDialogRef.current?.destroy?.() } catch {}
+				confirmDialogRef.current = null
+			}, 5000)
+
+			okBtn?.addEventListener('click', () => {
+				confirmPending()
+				try { confirmDialogRef.current?.destroy?.() } catch {}
+				confirmDialogRef.current = null
+			})
+			cancelBtn?.addEventListener('click', () => {
+				cancelPending()
+				try { confirmDialogRef.current?.destroy?.() } catch {}
+				confirmDialogRef.current = null
+			})
+		}, [])
+
+		const confirmPending = useCallback(() => {
+			// user confirms within window -> keep new script as confirmed
+			clearConfirmTimers()
+			if (pendingScriptRef.current != null) {
+				confirmedScriptRef.current = pendingScriptRef.current
+				pendingScriptRef.current = null
+			}
+			showMessage('已确认：脚本将继续运行')
+		}, [])
+
+		const cancelPending = useCallback(() => {
+			// revert to last confirmed script
+			clearConfirmTimers()
+			const prev = confirmedScriptRef.current ?? ''
+			pendingScriptRef.current = null
+			try {
+				this.editor.updateShape({ id: shapeRef.current.id, type: shapeRef.current.type, props: { ...shapeRef.current.props, script: prev } })
+			} catch {}
+			showMessage('已撤回未确认的脚本')
 		}, [])
 
 		// 为运行容器添加 click 兼容：在某些环境中原生 click 可能不触发
@@ -169,6 +273,13 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			const host = runtimeRef.current
 			if (!currentShape || !host) return
 
+			// 检查全局禁用开关
+			if (settingdata?.['js-shape-disable-execution'] === true) {
+				host.innerHTML = '<div style="padding:16px;color:#ef4444;text-align:center;">脚本执行已全局禁用，请在插件设置中开启。</div>'
+				setRuntimeError('全局禁用：管理员已关闭 JS 形状脚本执行功能')
+				return
+			}
+
 			host.replaceChildren()
 
 			const trimmed = source?.trim()
@@ -208,8 +319,30 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			}
 
 			const latestShape = (this.editor.getShape(currentShape.id) as IJsShape | undefined) ?? currentShape
+			const restrictSandbox: boolean = ((latestShape as any)?.props?.restrictDom !== false)
+
+			// Build a restricted document facade that only operates within host
+			const cssEscape = (id: string) => {
+				try { return (window as any).CSS?.escape ? (window as any).CSS.escape(id) : id.replace(/[^a-zA-Z0-9_-]/g, s => `\\${s}`) } catch { return id }
+			}
+			const fakeDocument = {
+				createElement: (tag: string) => host.ownerDocument.createElement(tag),
+				createTextNode: (text: string) => host.ownerDocument.createTextNode(text),
+				createDocumentFragment: () => host.ownerDocument.createDocumentFragment(),
+				querySelector: (sel: string) => host.querySelector(sel),
+				querySelectorAll: (sel: string) => host.querySelectorAll(sel),
+				getElementById: (id: string) => host.querySelector(`#${cssEscape(String(id))}`),
+				// explicitly block access to global DOM
+				get body() { return undefined as any },
+				get documentElement() { return undefined as any },
+				addEventListener: undefined as any,
+				removeEventListener: undefined as any,
+			} as unknown as Document
+
+			const safeDom = host as HTMLDivElement
+
 			const env: ScriptRunnerEnv = { 
-				dom: host, 
+				dom: safeDom, 
 				saveData, 
 				getData, 
 				clearData, 
@@ -223,18 +356,37 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			}
 
 			try {
-				// 新增：同时把 env 作为 alias 注入，方便用户使用 `env` 或 `api` 来访问运行时环境
-				const fn = new Function('api', 'env', `'use strict'\n${trimmed}`)
-				const result = fn(env, env)
-				if (typeof result === 'function') {
-					cleanupRef.current = result
+				if (restrictSandbox) {
+					// Restrict by variable name: remap only `document` to scoped __doc
+					const guard = `const document=__doc;`;
+					const fn = new Function('api', 'env', '__doc', `'use strict'\n${guard}\n${trimmed}`)
+					const result = fn(env, env, fakeDocument as unknown as Document)
+					if (typeof result === 'function') {
+						cleanupRef.current = result
+					}
+				} else {
+					// Unrestricted mode (legacy behavior)
+					const fn = new Function('api', 'env', `'use strict'\n${trimmed}`)
+					const result = fn(env, env)
+					if (typeof result === 'function') {
+						cleanupRef.current = result
+					}
 				}
 				setRuntimeError(null)
 				// clear editor diagnostics
 				try { codeEditorRef.current?.setDiagnostics?.([]) } catch (e) {}
 			} catch (err: any) {
 				const msg = err?.message ?? String(err)
-				setRuntimeError(msg)
+				// Only treat direct `document` access (not via api.dom) as sandbox violation
+				let isSandboxBlock = false
+				if (restrictSandbox && err && err.name === 'ReferenceError') {
+					// Match exact pattern: "document is not defined"
+					const lower = msg.toLowerCase().trim()
+					if (lower === 'document is not defined' || lower.startsWith('document is not defined')) {
+						isSandboxBlock = true
+					}
+				}
+				setRuntimeError((isSandboxBlock ? '安全限制阻止访问 document（请使用 api.dom）：' : '脚本错误：') + msg)
 				// try to parse line/col from stack or message to annotate editor
 				try {
 					const stack = err?.stack || msg || ''
@@ -254,10 +406,11 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 
 		const persistScript = useCallback((nextScript: string) => {
 			scriptRef.current = nextScript
+			// 更新 shape 脚本（触发展示新脚本的运行）
 			this.editor.updateShape({ id: shape.id, type: shape.type, props: { ...shapeRef.current.props, script: nextScript } })
-			showMessage('脚本已保存')
-			// runScript(nextScript)
-		}, [runScript, shape.id, shape.type])
+			// 开启 5 秒确认窗口（弹窗）；逾期或取消将回退到 confirmedScriptRef
+			startConfirmWindow(nextScript)
+		}, [startConfirmWindow, shape.id, shape.type])
 
 		const openScriptEditor = useCallback(() => {
 			const existingDialog = dialogRef.current
@@ -327,6 +480,39 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 					/>
 				)
 			}
+
+			// Inject a toggle UI next to the Save button in the dialog
+			try {
+				const saveBtn = dialog.element.querySelector('[data-action="save"]') as HTMLElement | null
+				if (saveBtn) {
+					// Use Siyuan's button style to keep UI consistent
+					const html = '<button class="b3-button" data-restrict-toggle style="margin-left:8px;" title="限制脚本仅访问容器 DOM">DOM 限制：<span data-restrict-state></span></button>'
+					saveBtn.insertAdjacentHTML('afterend', html)
+					const btn = saveBtn.parentElement?.querySelector('[data-restrict-toggle]') as HTMLButtonElement | null
+					const stateSpan = saveBtn.parentElement?.querySelector('[data-restrict-state]') as HTMLElement | null
+					if (btn && stateSpan) {
+						// initialize from current shape props
+						const restrictDom = (shapeRef.current?.props as any)?.restrictDom
+						const setVisual = (enabled: boolean) => {
+							stateSpan.textContent = enabled ? '开' : '关'
+							btn.classList.toggle('b3-button--primary', enabled)
+						}
+						setVisual(restrictDom !== false)
+						const handler = () => {
+							// Compute toggled value based on current
+							const current = (shapeRef.current?.props as any)?.restrictDom
+							const toggled = !(current !== false) // default true -> toggled false; false -> toggled true
+							try {
+								this.editor.updateShape({ id: shapeRef.current.id, type: shapeRef.current.type, props: { ...shapeRef.current.props, restrictDom: toggled } })
+								setVisual(toggled)
+								showMessage(toggled ? '已开启 DOM 访问限制' : '已关闭 DOM 访问限制')
+							} catch {}
+						}
+						btn.addEventListener('click', handler)
+						cleanupListeners.push(() => btn.removeEventListener('click', handler))
+					}
+				}
+			} catch {}
 
 			const saveHandler = () => persistScript(currentCode)
 			const restoreHandler = () => {
