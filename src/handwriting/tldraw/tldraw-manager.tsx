@@ -119,8 +119,10 @@ export class TldrawManager {
                         try {
                             const raw = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
                             if (raw) {
+                                // api.getFile 可能返回解析后的对象或字符串，确保写入的是字符串
+                                const content = typeof raw === 'string' ? raw : JSON.stringify(raw);
                                 const trashFileName = `${this.storageKey}-forced-backup-${Date.now()}.json`;
-                                await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([raw], { type: 'application/json' }));
+                                await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([content], { type: 'application/json' }));
                                 showMessage('备份已保存到回收站: ' + trashFileName, 3000, 'info');
                                 } else {
                                 showMessage('未找到原始存储文件，未进行文件级备份', 3000, 'info');
@@ -819,9 +821,12 @@ export class TldrawManager {
                     // Get the data content before removal
                     const dataContent = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
 
+                    // 确保写入的是字符串（api.getFile 可能返回对象）
+                    const contentToSave = typeof dataContent === 'string' ? dataContent : JSON.stringify(dataContent);
+
                     // Move to trash with timestamp
                     const trashFileName = `${this.storageKey}-${Date.now()}.json`;
-                    await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([dataContent], { type: 'application/json' }));
+                    await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([contentToSave], { type: 'application/json' }));
 
                     // Remove original file
                     await api.removeFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
