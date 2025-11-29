@@ -630,11 +630,9 @@ const CustomStylePanel = track(() => {
                 </>
             )}
             {hasJsSelection && (
-                <div className="tlui-style-panel__section" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {/* 自动运行功能已移除 - 脚本通过保存或手动重新执行运行 */}
+                <div className="tlui-style-panel__section" >
                     <TldrawUiButton
                         type="normal"
-                        style={{ flex: '1 1 0', minWidth: '0' }}
                         title="开启后，渲染出的 DOM 可直接响应点击/拖拽等交互"
                         onClick={() => {
                             const next = jsInteractiveState === 'mixed' ? true : !jsInteractiveState
