@@ -665,7 +665,7 @@ function CustomQuickActions() {
         <DefaultQuickActions>
             <DefaultQuickActionsContent />
             <div>
-                <TldrawUiMenuItem id="heading" icon="heading" label="打开文档" onSelect={() => {
+                <TldrawUiMenuItem id="heading" icon="external-link" label="打开文档" onSelect={() => {
                     openTab({
                         app: window.siyuan.ws.app,
                         doc: {
@@ -676,7 +676,7 @@ function CustomQuickActions() {
                 }} />
             </div>
             <div>
-                <TldrawUiMenuItem id="external-link" icon="external-link" label="复制白板链接" onSelect={() => {
+                <TldrawUiMenuItem id="external-link" icon="heading" label="复制白板链接" onSelect={() => {
                     let url: string;
                     if (settingdata['copyLinkTitle']) {
                         url = `[画板:${title}](https://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title})`;
