@@ -227,94 +227,241 @@ export class M_imageCompression {
             if (!files) return;
 
             const fileArray = Array.from(files);
-            let totalSize = 0;
-            let totalCompressedSize = 0;
-
-            showMessage(`开始处理 ${fileArray.length} 个文件...`, 3000, "info");
             // 读取设置（带默认值）
             const skipCompress: boolean = Boolean(this.settingdata?.["img-compress-skip"]);
-            const imageDir: string = String(this.settingdata?.["img-compress-image-dir"] || "assets/st_image").trim();
-            const videoDir: string = String(this.settingdata?.["img-compress-video-dir"] || "assets/st_video").trim();
+            await this.processFiles(fileArray, skipCompress);
+        };
+        input.click();
+    }
 
-            for (let i = 0; i < fileArray.length; i++) {
-                const file = fileArray[i];
-                showMessage(`正在处理第 ${i + 1}/${fileArray.length} 个文件...`, -1, "info",'st-file');
+    // 处理文件数组（用于文件选择和剪切板）
+    private async processFiles(fileArray: File[], skipCompressSetting: boolean = false) {
+        let totalSize = 0;
+        let totalCompressedSize = 0;
 
-                let compressedFile: File | null = null;
-                
-                // 根据文件类型选择处理方法
-                if (skipCompress) {
-                    // 跳过压缩，直接使用原文件
-                    compressedFile = file;
-                } else if (file.type.startsWith('image/')) {
-                    compressedFile = await this.compressImage(file);
-                } else if (file.type.startsWith('video/')) {
-                    compressedFile = await this.compressVideo(file);
-                }
+        showMessage(`开始处理 ${fileArray.length} 个文件...`, 3000, "info");
+        // 读取设置（带默认值）
+        const imageDir: string = String(this.settingdata?.["img-compress-image-dir"] || "assets/st_image").trim();
+        const videoDir: string = String(this.settingdata?.["img-compress-video-dir"] || "assets/st_video").trim();
 
-                if (compressedFile) {
-                    totalSize += file.size;
-                    totalCompressedSize += compressedFile.size;
+        for (let i = 0; i < fileArray.length; i++) {
+            const file = fileArray[i];
+            showMessage(`正在处理第 ${i + 1}/${fileArray.length} 个文件...`, -1, "info",'st-file');
 
-                    // 创建带有 "st_" 前缀的新文件
-                    const renamedFile = new File([compressedFile], `st_${file.name.replace(/\.[^/.]+$/, "")}.${compressedFile.type.split('/')[1]}`, {
-                        type: compressedFile.type
-                    });
+            let compressedFile: File | null = null;
 
-                    try {
-                        if(!this.cursorID) return showMessage("请将光标放在需要插入媒体的位置", -1, "error");
-                        
-                        // 根据文件类型选择上传目录（来自设置）
-                        const uploadDir = file.type.startsWith('image/') ? imageDir : videoDir;
-                        const response = await api.upload(uploadDir, [renamedFile]);
-                        
-                        if (response.succMap) {
-                            // console.log('上传成功:', response.succMap);
-                            let mediaId = response.succMap[renamedFile.name].replace("data/", "");
-                            
-                            // 根据媒体类型选择插入方式
-                            if (file.type.startsWith('image/')) {
-                                await this.insertMedia(mediaId, false);
-                            } else {
-                                await this.insertMedia(mediaId, true);
-                            }
-                        } else {
-                            showMessage(`第 ${i + 1} 个文件上传失败`, -1, "error",'st-file');
-                        }
-                    } catch (error) {
-                        console.error('上传失败:', error);
-                        showMessage(`第 ${i + 1} 个文件上传失败`, -1, "error",'st-file');
-                    }
-                }
+            // 根据文件类型选择处理方法
+            if (skipCompressSetting) {
+                // 跳过压缩，直接使用原文件
+                compressedFile = file;
+            } else if (file.type.startsWith('image/')) {
+                compressedFile = await this.compressImage(file);
+            } else if (file.type.startsWith('video/')) {
+                compressedFile = await this.compressVideo(file);
             }
 
-            // 计算并显示压缩效果总结
-            const originalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
-            const compressedSizeMB = (totalCompressedSize / 1024 / 1024).toFixed(2);
-            const compressionRatio = ((1 - totalCompressedSize / totalSize) * 100).toFixed(1);
+            if (compressedFile) {
+                totalSize += file.size;
+                totalCompressedSize += compressedFile.size;
 
-            showMessage(`
+                // 创建带有 "st_" 前缀的新文件
+                const renamedFile = new File([compressedFile], `st_${file.name.replace(/\.[^/.]+$/, "")}.${compressedFile.type.split('/')[1]}`, {
+                    type: compressedFile.type
+                });
+
+                try {
+                    if(!this.cursorID) return showMessage("请将光标放在需要插入媒体的位置", -1, "error");
+
+                    // 根据文件类型选择上传目录（来自设置）
+                    const uploadDir = file.type.startsWith('image/') ? imageDir : videoDir;
+                    const response = await api.upload(uploadDir, [renamedFile]);
+
+                    if (response.succMap) {
+                        // console.log('上传成功:', response.succMap);
+                        let mediaId = response.succMap[renamedFile.name].replace("data/", "");
+
+                        // 根据媒体类型选择插入方式
+                        if (file.type.startsWith('image/')) {
+                            await this.insertMedia(mediaId, false);
+                        } else {
+                            await this.insertMedia(mediaId, true);
+                        }
+                    } else {
+                        showMessage(`第 ${i + 1} 个文件上传失败`, -1, "error",'st-file');
+                    }
+                } catch (error) {
+                    console.error('上传失败:', error);
+                    showMessage(`第 ${i + 1} 个文件上传失败`, -1, "error",'st-file');
+                }
+            }
+        }
+
+        // 计算并显示压缩效果总结
+        const originalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
+        const compressedSizeMB = (totalCompressedSize / 1024 / 1024).toFixed(2);
+        const compressionRatio = ((1 - totalCompressedSize / totalSize) * 100).toFixed(1);
+
+        showMessage(`
                 压缩完成！
                 处理文件：${fileArray.length} 个
                 原始大小：${originalSizeMB} MB
                 压缩后：${compressedSizeMB} MB
                 压缩率：${compressionRatio}%
             `.replace(/\s+/g, ' '), 6000, "info",'st-file');
-            showMessage('',1,'info','st-video');
+        showMessage('',1,'info','st-video');
+    }
+
+    // 从剪切板读取图片并插入（支持压缩或原图）
+    private async pasteFromClipboard(forceSkipCompress: boolean = false) {
+        if (!this.cursorID) return showMessage("请将光标放在需要插入媒体的位置", -1, "error");
+
+        const skipCompressSetting: boolean = Boolean(this.settingdata?.["img-compress-skip"]);
+        const skipCompress = forceSkipCompress || skipCompressSetting;
+
+        // 首先尝试使用异步剪切板API
+        try {
+            if (navigator.clipboard && (navigator.clipboard as any).read) {
+                const items = await (navigator.clipboard as any).read();
+                const files: File[] = [];
+                for (const item of items) {
+                    for (const type of item.types) {
+                        if (type.startsWith('image/')) {
+                            try {
+                                const blob = await item.getType(type);
+                                const ext = type.split('/')[1] || 'png';
+                                const file = new File([blob], `clipboard_${Date.now()}.${ext}`, { type: type });
+                                files.push(file);
+                            } catch (e) {
+                                console.warn('无法获取剪切板项类型:', type, e);
+                            }
+                        }
+                    }
+                }
+
+                if (files.length === 0) {
+                    return showMessage('剪切板中没有可识别的图片', 3000, 'info');
+                }
+
+                await this.processFiles(files, skipCompress);
+                return;
+            }
+        } catch (e) {
+            console.warn('navigator.clipboard.read 不可用或失败，回退到 paste 事件', e);
+        }
+
+        // 回退方案：使用一次性 paste 事件捕获（需要用户在弹出后按 Ctrl+V）
+        const pasteArea = document.createElement('textarea');
+        pasteArea.style.position = 'fixed';
+        pasteArea.style.left = '-9999px';
+        pasteArea.style.width = '1px';
+        pasteArea.style.height = '1px';
+        document.body.appendChild(pasteArea);
+        pasteArea.focus();
+
+        showMessage('请在此时按 Ctrl+V 将图片粘贴到剪贴板（10秒超时）', 5000, 'info');
+
+        const timeout = setTimeout(() => {
+            cleanup();
+            showMessage('粘贴超时，已取消', 3000, 'error');
+        }, 10000);
+
+        const onPaste = async (e: ClipboardEvent) => {
+            e.preventDefault();
+            const items = (e.clipboardData && e.clipboardData.items) ? e.clipboardData.items : [];
+            const files: File[] = [];
+            for (let i = 0; i < items.length; i++) {
+                const it = items[i];
+                if (it.kind === 'file' && it.type.startsWith('image/')) {
+                    const f = it.getAsFile();
+                    if (f) files.push(f);
+                } else if (it.kind === 'string' && it.type === 'text/html') {
+                    // 有些环境会以 html 形式包含图片 URL，尝试解析 data URL
+                    try {
+                        const html = await new Promise<string>((res) => it.getAsString(res));
+                        const match = html && html.match(/src=\"(data:image\/[^"]+)\"/i);
+                        if (match) {
+                            const dataUrl = match[1];
+                            const blob = dataURLtoBlob(dataUrl);
+                            const ext = blob.type.split('/')[1] || 'png';
+                            files.push(new File([blob], `clipboard_${Date.now()}.${ext}`, { type: blob.type }));
+                        }
+                    } catch (err) {
+                        // ignore
+                    }
+                }
+            }
+
+            if (files.length === 0) {
+                cleanup();
+                showMessage('未检测到图片粘贴', 3000, 'info');
+                return;
+            }
+
+            await this.processFiles(files, skipCompress);
+            cleanup();
         };
-        input.click();
+
+        const cleanup = () => {
+            clearTimeout(timeout);
+            window.removeEventListener('paste', onPaste as any);
+            try { pasteArea.remove(); } catch (e) {}
+        };
+
+        window.addEventListener('paste', onPaste as any);
+
+        function dataURLtoBlob(dataurl: string) {
+            const arr = dataurl.split(',');
+            const mimeMatch = arr[0].match(/:(.*?);/);
+            const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], { type: mime });
+        }
     }
 
     init(settingdata?: any) {
         this.settingdata = settingdata || {};
-        this.plugin.addTopBar({
+        // 可选的粘贴按钮：是否显示由设置控制
+        const showPaste = this.settingdata?.['img-compress-show-paste'] !== false; // 默认显示
+        // const showPasteRaw = this.settingdata?.['img-compress-show-paste-raw'] !== false; // 默认显示
+        const showCompressTopBar = this.settingdata?.['img-compress-show-topbar'] !== false; // 默认显示
+        if (showCompressTopBar) {
+            this.plugin.addTopBar({
             icon: "iconImgDown",
             title: "压缩资源",
             position: "right",
             callback: () => {
                 this.openFileDialog();
             }
-        });
+            });
+        }
+
+
+        if (showPaste) {
+            this.plugin.addTopBar({
+                icon: "iconPaste",
+                title: "粘贴并压缩",
+                position: "right",
+                callback: () => {
+                    this.pasteFromClipboard(false);
+                }
+            });
+        }
+
+        // if (showPasteRaw) {
+        //     this.plugin.addTopBar({
+        //         icon: "iconPasteRaw",
+        //         title: "粘贴原图",
+        //         position: "right",
+        //         callback: () => {
+        //             this.pasteFromClipboard(true);
+        //         }
+        //     });
+        // }
     }
 
     // 插入媒体到编辑器
@@ -371,4 +518,3 @@ export class M_imageCompression {
         });
     }
 }
-

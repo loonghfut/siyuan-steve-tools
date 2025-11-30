@@ -7,6 +7,8 @@ export const imageCompressionDefaults: Record<string, any> = {
     // 图片/视频上传目录（相对 data/ 目录）
     "img-compress-image-dir": "assets/st_image",
     "img-compress-video-dir": "assets/st_video",
+    "img-compress-show-paste": true,
+    'img-compress-show-topbar': true,
 };
 
 // 资源压缩（图片/视频压缩）设置分组
@@ -21,6 +23,20 @@ export function imageCompressionGroup(ctx: BuildContext): SettingGroupDefinition
                 description: "启用资源压缩功能后再进行下面的设置",
                 key: "img-compress-enable",
                 value: ctx.settings["img-compress-enable"],
+            },
+            {
+                type: "checkbox",
+                title: "显示顶栏按钮",
+                description: "是否在顶栏显示资源压缩按钮",
+                key: "img-compress-show-topbar",
+                value: ctx.settings["img-compress-show-topbar"],
+            },
+            {
+                type: "checkbox",
+                title: "显示粘贴按钮",
+                description: "识别剪切板的图片并插入文档",
+                key: "img-compress-show-paste",
+                value: ctx.settings["img-compress-show-paste"],
             },
             {
                 type: "checkbox",
