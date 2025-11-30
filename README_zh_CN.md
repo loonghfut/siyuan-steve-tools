@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.24.0 (2025年11月29日)
+### v0.24.1 (2025年11月30日)
 - fix: 修复 CardShapeUtil 中背景渲染逻辑，确保仅在主形状时显示遮罩 (loonghfut)
 - feat: 添加工具栏方向设置，支持垂直或水平显示 (loonghfut)
 - fix: 移除 package.json 中的许可证信息，并更新 tldraw 相关依赖版本 (loonghfut)
@@ -68,6 +68,10 @@ win端s3同步后，docker端感知s3同步。
 - fix: 确保备份和删除操作中处理的内容为字符串格式，避免潜在的类型错误 (loonghfut)
 - fix: 更新菜单项图标以更好地反映功能，改善用户体验 (loonghfut)
 - fix: 更新版本号至 0.24.0，以保持一致性 (loonghfut)
+- docs: 更新 v0.24.0 版本的更新日志 (loonghfut)
+- feat: 添加设置选项以控制顶栏和粘贴按钮的显示 (loonghfut)
+- feat: 添加归档事件识别功能，更新统计逻辑以支持多种状态文本 (loonghfut)
+- fix: 更新版本号至 0.24.1，以保持一致性 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
