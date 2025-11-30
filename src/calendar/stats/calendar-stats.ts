@@ -95,7 +95,8 @@ export class CalendarDataStats {
             },
             includeSources: ['siyuan', 'qqcalendar', 'icsSubscription', 'lifelog'],
             includeRecurring: true,
-            includeArchived: false,
+            // 默认包含归档事件以便统计中能识别归档计数
+            includeArchived: true,
         };
         
         const finalConfig = { ...defaultConfig, ...config };
@@ -169,8 +170,9 @@ export class CalendarDataStats {
                 return false;
             }
             
-            // 归档事件过滤
-            if (!config.includeArchived && event.extendedProps?.status === '归档') {
+            // 归档事件过滤（支持中文/英文变体）
+            const statusVal = event.extendedProps?.status;
+            if (!config.includeArchived && statusVal && this.isArchivedStatus(statusVal)) {
                 return false;
             }
             
@@ -183,18 +185,13 @@ export class CalendarDataStats {
      */
     private calculateEventStats(events: any[], stats: CalendarStatsData): void {
         for (const event of events) {
-            const status = event.extendedProps?.status || '未设置';
-            
-            switch (status) {
-                case '完成':
-                    stats.completedEvents++;
-                    break;
-                case '归档':
-                    stats.archivedEvents++;
-                    break;
-                default:
-                    stats.pendingEvents++;
-                    break;
+            const status = event.extendedProps?.status || '';
+            if (this.isCompletedStatus(status)) {
+                stats.completedEvents++;
+            } else if (this.isArchivedStatus(status)) {
+                stats.archivedEvents++;
+            } else {
+                stats.pendingEvents++;
             }
             
             if (event.extendedProps?.isRecurring) {
@@ -243,7 +240,7 @@ export class CalendarDataStats {
             stats.eventsByPriority[priority] = (stats.eventsByPriority[priority] || 0) + 1;
             
             // 状态统计
-            const status = event.extendedProps?.status || '未设置';
+            const status = event.extendedProps?.status || '';
             stats.eventsByStatus[status] = (stats.eventsByStatus[status] || 0) + 1;
             
             // 来源统计
@@ -255,9 +252,9 @@ export class CalendarDataStats {
             stats.eventsByCategory[category] = (stats.eventsByCategory[category] || 0) + 1;
 
             // 分类完成/归档计数
-            if (status === '完成') {
+            if (this.isCompletedStatus(status)) {
                 stats.completedByCategory[category] = (stats.completedByCategory[category] || 0) + 1;
-            } else if (status === '归档') {
+            } else if (this.isArchivedStatus(status)) {
                 stats.archivedByCategory[category] = (stats.archivedByCategory[category] || 0) + 1;
             }
 
@@ -268,18 +265,18 @@ export class CalendarDataStats {
             if (tags.length === 0) {
                 // 没有标签的事件归到“无标签”
                 stats.eventsByTag['无标签'] = (stats.eventsByTag['无标签'] || 0) + 1;
-                if (status === '完成') {
+                if (this.isCompletedStatus(status)) {
                     stats.completedByTag['无标签'] = (stats.completedByTag['无标签'] || 0) + 1;
-                } else if (status === '归档') {
+                } else if (this.isArchivedStatus(status)) {
                     stats.archivedByTag['无标签'] = (stats.archivedByTag['无标签'] || 0) + 1;
                 }
             } else {
                 for (const tag of tags) {
                     const name = tag || '无标签';
                     stats.eventsByTag[name] = (stats.eventsByTag[name] || 0) + 1;
-                    if (status === '完成') {
+                    if (this.isCompletedStatus(status)) {
                         stats.completedByTag[name] = (stats.completedByTag[name] || 0) + 1;
-                    } else if (status === '归档') {
+                    } else if (this.isArchivedStatus(status)) {
                         stats.archivedByTag[name] = (stats.archivedByTag[name] || 0) + 1;
                     }
                 }
@@ -337,6 +334,24 @@ export class CalendarDataStats {
         stats.completionRate = totalActionableEvents > 0 
             ? (stats.completedEvents / totalActionableEvents) * 100 
             : 0;
+    }
+
+    /**
+     * 规范化状态文本并判断是否为“归档”状态
+     */
+    public isArchivedStatus(status: string | undefined | null): boolean {
+        if (!status) return false;
+        const s = String(status).trim().toLowerCase();
+        return s.includes('归档') || s.includes('已归档') || s.includes('archive') || s.includes('archiv') || s.includes('archived');
+    }
+
+    /**
+     * 规范化状态文本并判断是否为“完成”状态
+     */
+    public isCompletedStatus(status: string | undefined | null): boolean {
+        if (!status) return false;
+        const s = String(status).trim().toLowerCase();
+        return s.includes('完成') || s.includes('已完成') || s === 'done' || s === 'completed' || s.includes('完成中');
     }
     
     /**

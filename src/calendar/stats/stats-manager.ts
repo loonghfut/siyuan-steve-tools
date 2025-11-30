@@ -385,8 +385,8 @@ export class CalendarStatsManager {
             return { total: 0, completed: 0, pending: 0, completionRate: 0 };
         }
 
-        const completed = events.filter(e => e.extendedProps?.status === '完成').length;
-        const pending = events.filter(e => e.extendedProps?.status !== '完成' && e.extendedProps?.status !== '归档').length;
+        const completed = events.filter(e => calendarStats.isCompletedStatus(e.extendedProps?.status)).length;
+        const pending = events.filter(e => !calendarStats.isCompletedStatus(e.extendedProps?.status) && !calendarStats.isArchivedStatus(e.extendedProps?.status)).length;
         const completionRate = (completed + pending) > 0 ? (completed / (completed + pending)) * 100 : 0;
 
         return {
