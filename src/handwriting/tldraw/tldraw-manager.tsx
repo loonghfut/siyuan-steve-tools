@@ -29,6 +29,7 @@ import TldrawBackupManager from './tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
 import { JsShapeUtil } from './JsShape/JsShapeUtil';
 import { JsShapeTool } from './JsShape/JsShapeTool';
+import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
@@ -372,6 +373,10 @@ export class TldrawManager {
                                 startY: 50,
                             });
                         }
+
+                        // 设置双击画布创建 single-block 的处理器
+                        setupDoubleClickHandler(editor);
+
                         // 添加全局拖放事件监听
                         const container = editor.getContainer();
 
