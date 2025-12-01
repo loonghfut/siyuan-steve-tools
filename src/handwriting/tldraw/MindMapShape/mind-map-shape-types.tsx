@@ -134,3 +134,68 @@ export function toggleNodeCollapse(root: MindMapNode, nodeId: string): boolean {
     }
     return false
 }
+
+// 移动节点到新的父节点下
+export function moveNodeToParent(root: MindMapNode, nodeId: string, newParentId: string, insertIndex?: number): boolean {
+    // 不能移动根节点
+    if (root.id === nodeId) return false
+    
+    // 不能移动到自己或自己的子节点下
+    const nodeToMove = findNodeById(root, nodeId)
+    if (!nodeToMove) return false
+    
+    // 检查 newParentId 是否是 nodeId 的子节点
+    const isDescendant = (parent: MindMapNode, targetId: string): boolean => {
+        if (parent.id === targetId) return true
+        for (const child of parent.children) {
+            if (isDescendant(child, targetId)) return true
+        }
+        return false
+    }
+    if (isDescendant(nodeToMove, newParentId)) return false
+    
+    // 从原父节点中删除
+    const oldParent = findParentNode(root, nodeId)
+    if (!oldParent) return false
+    
+    const oldIndex = oldParent.children.findIndex(c => c.id === nodeId)
+    if (oldIndex === -1) return false
+    
+    // 移除节点
+    const [removedNode] = oldParent.children.splice(oldIndex, 1)
+    
+    // 添加到新父节点
+    const newParent = findNodeById(root, newParentId)
+    if (!newParent) {
+        // 恢复原状
+        oldParent.children.splice(oldIndex, 0, removedNode)
+        return false
+    }
+    
+    // 如果指定了插入位置
+    if (typeof insertIndex === 'number' && insertIndex >= 0) {
+        newParent.children.splice(Math.min(insertIndex, newParent.children.length), 0, removedNode)
+    } else {
+        newParent.children.push(removedNode)
+    }
+    
+    // 确保新父节点展开
+    newParent.collapsed = false
+    
+    return true
+}
+
+// 在同一父节点下重新排序节点
+export function reorderNode(root: MindMapNode, nodeId: string, newIndex: number): boolean {
+    const parent = findParentNode(root, nodeId)
+    if (!parent) return false
+    
+    const oldIndex = parent.children.findIndex(c => c.id === nodeId)
+    if (oldIndex === -1) return false
+    
+    const [node] = parent.children.splice(oldIndex, 1)
+    const targetIndex = Math.max(0, Math.min(newIndex, parent.children.length))
+    parent.children.splice(targetIndex, 0, node)
+    
+    return true
+}

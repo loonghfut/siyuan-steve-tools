@@ -22,6 +22,8 @@ import {
     addSiblingNode,
     updateNodeText,
     toggleNodeCollapse,
+    moveNodeToParent,
+    reorderNode,
 } from './mind-map-shape-types'
 
 // ===== DOM 尺寸测量 =====
@@ -151,6 +153,12 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
         const [editText, setEditText] = useState('')
         const inputRef = useRef<HTMLInputElement>(null)
+        
+        // 拖拽状态
+        const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
+        const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+        const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'child' | null>(null)
+        const dragStartPos = useRef<{ x: number; y: number } | null>(null)
 
         const {
             rootNode,
@@ -369,6 +377,96 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             setEditText('')
         }, [editingNodeId, editText, rootNode, updateShape])
 
+        // 拖拽开始
+        const handleDragStart = useCallback((nodeId: string, e: React.PointerEvent) => {
+            // 根节点不可拖拽
+            if (nodeId === rootNode.id) return
+            
+            e.stopPropagation()
+            dragStartPos.current = { x: e.clientX, y: e.clientY }
+            setDraggingNodeId(nodeId)
+        }, [rootNode.id])
+
+        // 拖拽移动 - 计算放置目标
+        const handleDragMove = useCallback((targetNodeId: string, e: React.PointerEvent) => {
+            if (!draggingNodeId || draggingNodeId === targetNodeId) return
+            
+            // 不能拖到自己的子节点上
+            const draggingNode = findNodeById(rootNode, draggingNodeId)
+            if (draggingNode) {
+                // 检查 targetNodeId 是否在 draggingNode 的子树中
+                const checkIsChild = (node: MindMapNode, targetId: string): boolean => {
+                    if (node.id === targetId) return true
+                    for (const child of node.children) {
+                        if (checkIsChild(child, targetId)) return true
+                    }
+                    return false
+                }
+                if (checkIsChild(draggingNode, targetNodeId)) return
+            }
+            
+            e.stopPropagation()
+            setDropTargetId(targetNodeId)
+            
+            // 计算放置位置：上1/3为before，中1/3为child，下1/3为after
+            const rect = (e.target as Element).getBoundingClientRect()
+            const relativeY = e.clientY - rect.top
+            const third = rect.height / 3
+            
+            if (relativeY < third) {
+                setDropPosition('before')
+            } else if (relativeY > third * 2) {
+                setDropPosition('after')
+            } else {
+                setDropPosition('child')
+            }
+        }, [draggingNodeId, rootNode])
+
+        // 拖拽结束
+        const handleDragEnd = useCallback(() => {
+            if (draggingNodeId && dropTargetId && dropPosition) {
+                const newRoot = deepCloneRootNode(rootNode)
+                
+                if (dropPosition === 'child') {
+                    // 移动为目标节点的子节点
+                    moveNodeToParent(newRoot, draggingNodeId, dropTargetId)
+                } else {
+                    // 移动为目标节点的兄弟节点
+                    const targetParent = findParentNode(newRoot, dropTargetId)
+                    if (targetParent) {
+                        // 找到目标节点在父节点中的索引
+                        const targetIndex = targetParent.children.findIndex(c => c.id === dropTargetId)
+                        if (targetIndex !== -1) {
+                            const insertIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1
+                            // 先移动到父节点
+                            moveNodeToParent(newRoot, draggingNodeId, targetParent.id)
+                            // 再调整顺序
+                            reorderNode(newRoot, draggingNodeId, insertIndex)
+                        }
+                    } else if (dropTargetId === rootNode.id) {
+                        // 放到根节点上
+                        moveNodeToParent(newRoot, draggingNodeId, rootNode.id)
+                    }
+                }
+                
+                updateShape(newRoot, draggingNodeId)
+            }
+            
+            // 重置拖拽状态
+            setDraggingNodeId(null)
+            setDropTargetId(null)
+            setDropPosition(null)
+            dragStartPos.current = null
+        }, [draggingNodeId, dropTargetId, dropPosition, rootNode, updateShape])
+
+        // 取消拖拽
+        const handleDragCancel = useCallback(() => {
+            setDraggingNodeId(null)
+            setDropTargetId(null)
+            setDropPosition(null)
+            dragStartPos.current = null
+        }, [])
+
         // 键盘事件处理
         const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
             if (!isEditing || !selectedNodeId) return
@@ -468,6 +566,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             const isSelected = node.id === selectedNodeId
             const isCurrentEditing = node.id === editingNodeId
             const hasChildren = node.children.length > 0
+            const isDragging = node.id === draggingNodeId
+            const isDropTarget = node.id === dropTargetId
 
             // 获取节点颜色
             let bgColor = isRoot ? colors.rootBg : colors.nodeBg
@@ -483,6 +583,47 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             // 自定义节点颜色
             if (node.color) {
                 bgColor = node.color
+            }
+
+            // 拖拽时的样式
+            if (isDragging) {
+                bgColor = 'rgba(128, 128, 128, 0.5)'
+            }
+
+            // 放置目标的高亮
+            let dropIndicator = null
+            if (isDropTarget && dropPosition) {
+                const indicatorColor = '#4A90D9'
+                if (dropPosition === 'child') {
+                    // 作为子节点 - 高亮整个节点
+                    borderColor = indicatorColor
+                } else if (dropPosition === 'before') {
+                    // 在节点之前 - 显示上方线条
+                    dropIndicator = (
+                        <line
+                            x1={0}
+                            y1={-4}
+                            x2={width}
+                            y2={-4}
+                            stroke={indicatorColor}
+                            strokeWidth={3}
+                            strokeLinecap="round"
+                        />
+                    )
+                } else if (dropPosition === 'after') {
+                    // 在节点之后 - 显示下方线条
+                    dropIndicator = (
+                        <line
+                            x1={0}
+                            y1={height + 4}
+                            x2={width}
+                            y2={height + 4}
+                            stroke={indicatorColor}
+                            strokeWidth={3}
+                            strokeLinecap="round"
+                        />
+                    )
+                }
             }
 
             return (
@@ -509,17 +650,46 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         onPointerDown={(e) => {
                             // 只在节点上阻止事件冒泡，允许形状拖动
                             e.stopPropagation()
+                            // 开始拖拽
+                            handleDragStart(node.id, e)
                         }}
-                        style={{ cursor: 'pointer', pointerEvents: 'all' }}
+                        onPointerMove={(e) => {
+                            // 拖拽移动时计算放置目标
+                            if (draggingNodeId) {
+                                handleDragMove(node.id, e)
+                            }
+                        }}
+                        onPointerUp={(e) => {
+                            // 拖拽结束
+                            if (draggingNodeId) {
+                                e.stopPropagation()
+                                handleDragEnd()
+                            }
+                        }}
+                        onPointerLeave={() => {
+                            // 离开节点时清除放置目标
+                            if (dropTargetId === node.id) {
+                                setDropTargetId(null)
+                                setDropPosition(null)
+                            }
+                        }}
+                        style={{ 
+                            cursor: isDragging ? 'grabbing' : 'grab', 
+                            pointerEvents: 'all',
+                            opacity: isDragging ? 0.6 : 1,
+                        }}
                     >
+                        {/* 放置指示器 */}
+                        {dropIndicator}
+                        
                         <rect
                             width={width}
                             height={height}
                             rx={isRoot ? height / 2 : 4}
                             ry={isRoot ? height / 2 : 4}
                             fill={bgColor}
-                            stroke={borderColor}
-                            strokeWidth={isSelected ? 3 : 1}
+                            stroke={isDropTarget && dropPosition === 'child' ? '#4A90D9' : borderColor}
+                            strokeWidth={isSelected || (isDropTarget && dropPosition === 'child') ? 3 : 1}
                         />
                         
                         {/* 节点文本或输入框 */}
@@ -616,13 +786,19 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                     tabIndex={0}
                     onKeyDown={handleKeyDown}
                     onClick={handleContainerClick}
+                    onPointerUp={() => {
+                        // 在空白区域释放时取消拖拽
+                        if (draggingNodeId) {
+                            handleDragCancel()
+                        }
+                    }}
                     style={{
                         width: '100%',
                         height: '100%',
                         backgroundColor: 'transparent',
                         borderRadius: 8,
                         overflow: 'hidden',
-                        outline: selectedNodeId ? '2px solid #4A90D9' : 'none',
+                        // outline: selectedNodeId ? '2px solid #4A90D9' : 'none',
                         position: 'relative',
                     }}
                 >
