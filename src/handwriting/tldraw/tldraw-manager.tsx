@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'; // 添加这个导入
 import { CardShapeTool } from './CardShape/CardShapeTool'
 import { CardShapeUtil } from './CardShape/CardShapeUtil'
 import { SingleBlockShapeTool } from './SingleBlockShape/SingleBlockShapeTool'
-import { SingleBlockShapeUtil } from './SingleBlockShape/SingleBlockShapeUtil'
+import { SingleBlockShapeUtil, SingleBlockBindingUtil } from './SingleBlockShape/SingleBlockShapeUtil'
 import { components, uiOverrides } from './ui-overrides'
 import {
     Tldraw,
@@ -12,6 +12,7 @@ import {
     TLStore,
     Editor,
     TLShapeId,
+    defaultBindingUtils,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
@@ -37,6 +38,7 @@ const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 // [1]
 const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil]
+const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil]
 const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
@@ -67,6 +69,7 @@ export class TldrawManager {
         this.storageKey = `tldraw-data-${this.id}`;
         this.store = createTLStore({
             shapeUtils: customShapeUtils,
+            bindingUtils: customBindingUtils,
         });
 
         // 初始化tldraw
@@ -295,6 +298,7 @@ export class TldrawManager {
                     licenseKey="tldraw-2026-01-28/WyJzTmo2UUJDRSIsWyIqIl0sMTYsIjIwMjYtMDEtMjgiXQ.TPO1s+ITkaa0Ou5Xt1vXDVgtuRkEmOLWH+bM+P/GNjaiw0f158QNVK97eCRJTFGF9Lpv1RoaJrvGX4mV+Ioxwg"
                     store={store}
                     shapeUtils={customShapeUtils}
+                    bindingUtils={customBindingUtils}
                     tools={customTools}
                     overrides={uiOverrides}
                     options={this.options}

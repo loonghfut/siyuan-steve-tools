@@ -15,6 +15,14 @@ import {
 	TLArrowBinding,
 	TLArrowShape,
 	Vec,
+	BindingUtil,
+	TLBaseBinding,
+	BindingOnShapeChangeOptions,
+	BindingOnShapeDeleteOptions,
+	Box,
+	invLerp,
+	lerp,
+	VecModel,
 } from '@tldraw/tldraw'
 import { Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
@@ -51,6 +59,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	override hideRotateHandle(): boolean {
 		return false
+	}
+
+	override canBind() {
+		return true
 	}
 
 	override canResize(): boolean {
@@ -808,6 +820,40 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		return resizeBox(shape, info)
 	}
 
+	override onTranslateStart(shape: ISingleBlockShape) {
+		const bindings = this.editor.getBindingsFromShape(shape, 'single-block')
+		this.editor.deleteBindings(bindings)
+	}
+
+	override onTranslateEnd(_initial: ISingleBlockShape, currentShape: ISingleBlockShape) {
+		const pageAnchor = this.editor.getShapePageTransform(currentShape).applyToPoint({ x: 0, y: 0 })
+		const target = this.editor.getShapeAtPoint(pageAnchor, {
+			hitInside: true,
+			filter: (shape) =>
+				shape.id !== currentShape.id &&
+				this.editor.canBindShapes({ fromShape: currentShape, toShape: shape, binding: 'single-block' }),
+		})
+
+		if (!target) return
+
+		const targetBounds = Box.ZeroFix(this.editor.getShapeGeometry(target)!.bounds)
+		const pointInTargetSpace = this.editor.getPointInShapeSpace(target, pageAnchor)
+
+		const anchor = {
+			x: invLerp(targetBounds.minX, targetBounds.maxX, pointInTargetSpace.x),
+			y: invLerp(targetBounds.minY, targetBounds.maxY, pointInTargetSpace.y),
+		}
+
+		this.editor.createBinding({
+			type: 'single-block',
+			fromId: currentShape.id,
+			toId: target.id,
+			props: {
+				anchor,
+			},
+		})
+	}
+
 	override toSvg(shape: ISingleBlockShape, ctx: SvgExportContext): ReactElement | null {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
 		const { w, h: hProp, color, fontSize = 16, blockId } = shape.props
@@ -995,5 +1041,56 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				)}
 			</g>
 		)
+	}
+}
+
+// ===== Single Block Binding =====
+type SingleBlockBinding = TLBaseBinding<
+	'single-block',
+	{
+		anchor: VecModel
+	}
+>
+
+export class SingleBlockBindingUtil extends BindingUtil<SingleBlockBinding> {
+	static override type = 'single-block' as const
+
+	override getDefaultProps() {
+		return {
+			anchor: { x: 0.5, y: 0.5 },
+		}
+	}
+
+	// 当绑定的目标形状发生变化时，更新 single-block 的位置
+	override onAfterChangeToShape({
+		binding,
+		shapeAfter,
+	}: BindingOnShapeChangeOptions<SingleBlockBinding>): void {
+		const singleBlock = this.editor.getShape<ISingleBlockShape>(binding.fromId)
+		if (!singleBlock) return
+
+		const shapeBounds = this.editor.getShapeGeometry(shapeAfter)!.bounds
+		const shapeAnchor = {
+			x: lerp(shapeBounds.minX, shapeBounds.maxX, binding.props.anchor.x),
+			y: lerp(shapeBounds.minY, shapeBounds.maxY, binding.props.anchor.y),
+		}
+		const pageAnchor = this.editor.getShapePageTransform(shapeAfter).applyToPoint(shapeAnchor)
+
+		const singleBlockParentAnchor = this.editor
+			.getShapeParentTransform(singleBlock)
+			.invert()
+			.applyToPoint(pageAnchor)
+
+		this.editor.updateShape({
+			id: singleBlock.id,
+			type: 'single-block',
+			x: singleBlockParentAnchor.x,
+			y: singleBlockParentAnchor.y,
+		})
+	}
+
+	// 当绑定的目标形状被删除时，删除 single-block
+	override onBeforeDeleteToShape({ binding }: BindingOnShapeDeleteOptions<SingleBlockBinding>): void {
+		this.editor.deleteShape(binding.fromId)
 	}
 }
