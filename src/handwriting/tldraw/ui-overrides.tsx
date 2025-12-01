@@ -101,14 +101,12 @@ export const uiOverrides: TLUiOverrides = {
             kbd: 'j',
             onSelect: () => editor.setCurrentTool('js-shape'),
         }
-        tools['mindmap-node'] = {
-            id: 'mindmap-node',
-            icon: 'activity', // 你可以选择一个更合适的图标
-            label: 'MindMap Node',
-            kbd: 'm', // 设置键盘快捷键
-            onSelect: () => {
-                editor.setCurrentTool('mindmap-node')
-            },
+        tools['mind-map'] = {
+            id: 'mind-map',
+            icon: 'tool-line',
+            label: 'Mind Map',
+            kbd: 'm',
+            onSelect: () => editor.setCurrentTool('mind-map'),
         }
         return tools
     },
@@ -742,8 +740,7 @@ export const components: TLComponents = {
         const isSingleBlockSelected = useIsToolSelected(tools['single-block'])
         const isSlideSelected = useIsToolSelected(tools['slide'])
         const isJsShapeSelected = useIsToolSelected(tools['js-shape'])
-        // const isMindMapNodeSelected = useIsToolSelected(tools['mindmap-node'])
-        // Allow the user to configure whether the toolbar is horizontal or vertical
+        const isMindMapSelected = useIsToolSelected(tools['mind-map'])
         const toolbarOrientation = (settingdata?.['tldraw-toolbar-orientation'] as 'vertical' | 'horizontal') || 'vertical'
 
         return (
@@ -753,6 +750,7 @@ export const components: TLComponents = {
                 <TldrawUiMenuItem {...tools['slide']} isSelected={isSlideSelected} />
                 <DefaultToolbarContent />
                 <TldrawUiMenuItem {...tools['js-shape']} isSelected={isJsShapeSelected} />
+                <TldrawUiMenuItem {...tools['mind-map']} isSelected={isMindMapSelected} />
             </DefaultToolbar>
         )
     },
@@ -764,6 +762,7 @@ export const components: TLComponents = {
                 <TldrawUiMenuItem {...tools['single-block']} />
                 <TldrawUiMenuItem {...tools['slide']} />
                 <TldrawUiMenuItem {...tools['js-shape']} />
+                <TldrawUiMenuItem {...tools['mind-map']} />
                 <DefaultKeyboardShortcutsDialogContent />
             </DefaultKeyboardShortcutsDialog>
         )

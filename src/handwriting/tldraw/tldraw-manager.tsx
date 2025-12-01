@@ -30,6 +30,8 @@ import TldrawBackupManager from './tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
 import { JsShapeUtil } from './JsShape/JsShapeUtil';
 import { JsShapeTool } from './JsShape/JsShapeTool';
+import { MindMapShapeUtil } from './MindMapShape/MindMapShapeUtil';
+import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
@@ -38,9 +40,9 @@ const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil]
+const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil]
 const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil]
-const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool]
+const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
