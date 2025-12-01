@@ -31,6 +31,7 @@ import { settingdata } from '@/index';
 import { JsShapeUtil } from './JsShape/JsShapeUtil';
 import { JsShapeTool } from './JsShape/JsShapeTool';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
+import { allEmbeds } from './utils/custom-embeds';
 const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
 
 
@@ -304,6 +305,7 @@ export class TldrawManager {
                     options={this.options}
                     inferDarkMode={isDarkTheme()}
                     components={components}
+                    embeds={allEmbeds}
                     onMount={(editor) => {
                         this.editor = editor;
                         this.applyThemeToEditor();
