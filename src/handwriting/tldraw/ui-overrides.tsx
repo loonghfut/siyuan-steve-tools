@@ -762,6 +762,45 @@ const CustomStylePanel = track(() => {
                     />
                 </div>
             )}
+            {hasMindMapSelection && (
+                <div className="tlui-style-panel__section">
+                    <StylePanelDropdownPicker
+                        label={"导图方向"}
+                        type="menu"
+                        id="mind-map-direction"
+                        uiType="mind-map-direction"
+                        stylePanelType="mind-map-direction"
+                        style={{ id: 'mind-map-direction' } as any}
+                        items={[
+                            { value: 'right', icon: 'arrow-right' },
+                            { value: 'left', icon: 'arrow-left' },
+                            { value: 'down', icon: 'arrow-down' },
+                            { value: 'up', icon: 'arrow-up' },
+                        ]}
+                        value={(() => {
+                            if (!selectedMindMapShapes.length) return { type: 'shared', value: 'right' };
+                            const directions = selectedMindMapShapes.map(shape => shape.props.direction || 'right');
+                            const first = directions[0];
+                            return directions.every(d => d === first)
+                                ? { type: 'shared', value: first }
+                                : { type: 'mixed' };
+                        })()}
+                        onValueChange={(_style, nextDirection: any) => {
+                            if (!selectedMindMapShapes.length) return;
+                            const nextDirectionStr = nextDirection as string;
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedMindMapShapes.map((shape) => ({
+                                        id: shape.id,
+                                        type: 'mind-map',
+                                        props: { ...shape.props, direction: nextDirectionStr },
+                                    }))
+                                );
+                            });
+                        }}
+                    />
+                </div>
+            )}
         </DefaultStylePanel>
     );
 });

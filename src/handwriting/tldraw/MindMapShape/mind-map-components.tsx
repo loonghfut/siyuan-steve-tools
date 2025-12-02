@@ -1,7 +1,7 @@
 // ===== 思维导图 UI 组件 =====
 
 import React from 'react'
-import { NodeLayout } from './mind-map-layout'
+import { NodeLayout, LayoutDirection } from './mind-map-layout'
 import { getContrastTextColor, truncateText } from './mind-map-utils'
 import {
     NODE_COLORS,
@@ -22,6 +22,8 @@ export interface NodeRenderProps {
     fontSize: number
     lineWidth: number
     horizontalGap: number
+    verticalGap: number
+    direction: LayoutDirection
     selectedNodeId?: string
     editingNodeId: string | null
     editText: string
@@ -150,6 +152,8 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     fontSize,
     lineWidth,
     horizontalGap,
+    verticalGap,
+    direction,
     selectedNodeId,
     editingNodeId,
     editText,
@@ -251,16 +255,49 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     const maxWidth = isRoot ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
     const displayText = truncateText(node.text, displayFontSize, displayFontWeight, maxWidth)
 
+    // 根据方向计算连接线路径
+    const getConnectionPath = (childLayout: NodeLayout) => {
+        const cx = childLayout.x
+        const cy = childLayout.y
+        const cw = childLayout.width
+        const ch = childLayout.height
+
+        switch (direction) {
+            case 'left':
+                // 父节点左边中心 -> 子节点右边中心
+                return `M ${x - width / 2} ${y} 
+                        C ${x - width / 2 - horizontalGap / 2} ${y},
+                          ${cx + cw / 2 + horizontalGap / 2} ${cy},
+                          ${cx + cw / 2} ${cy}`
+            case 'down':
+                // 父节点下边中心 -> 子节点上边中心
+                return `M ${x} ${y + height / 2} 
+                        C ${x} ${y + height / 2 + verticalGap / 2},
+                          ${cx} ${cy - ch / 2 - verticalGap / 2},
+                          ${cx} ${cy - ch / 2}`
+            case 'up':
+                // 父节点上边中心 -> 子节点下边中心
+                return `M ${x} ${y - height / 2} 
+                        C ${x} ${y - height / 2 - verticalGap / 2},
+                          ${cx} ${cy + ch / 2 + verticalGap / 2},
+                          ${cx} ${cy + ch / 2}`
+            case 'right':
+            default:
+                // 父节点右边中心 -> 子节点左边中心
+                return `M ${x + width / 2} ${y} 
+                        C ${x + width / 2 + horizontalGap / 2} ${y},
+                          ${cx - cw / 2 - horizontalGap / 2} ${cy},
+                          ${cx - cw / 2} ${cy}`
+        }
+    }
+
     return (
         <React.Fragment key={node.id}>
-            {/* 渲染连接线 - 从节点右边中心到子节点左边中心 */}
+            {/* 渲染连接线 */}
             {layout.children.map((childLayout) => (
                 <path
                     key={`line-${node.id}-${childLayout.node.id}`}
-                    d={`M ${x + width / 2} ${y} 
-                        C ${x + width / 2 + horizontalGap / 2} ${y},
-                          ${childLayout.x - childLayout.width / 2 - horizontalGap / 2} ${childLayout.y},
-                          ${childLayout.x - childLayout.width / 2} ${childLayout.y}`}
+                    d={getConnectionPath(childLayout)}
                     fill="none"
                     stroke={colors.lineColor}
                     strokeWidth={lineWidth}
@@ -409,7 +446,20 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                 {/* 折叠/展开按钮 - 有子节点时显示，悬浮或已折叠时可见 */}
                 {hasChildren && (isHovered || node.collapsed || isSelected) && (
                     <g
-                        transform={`translate(${width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE / 2}, ${height / 2})`}
+                        transform={(() => {
+                            const btnOffset = COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE / 2
+                            switch (direction) {
+                                case 'left':
+                                    return `translate(${-btnOffset}, ${height / 2})`
+                                case 'down':
+                                    return `translate(${width / 2}, ${height + btnOffset})`
+                                case 'up':
+                                    return `translate(${width / 2}, ${-btnOffset})`
+                                case 'right':
+                                default:
+                                    return `translate(${width + btnOffset}, ${height / 2})`
+                            }
+                        })()}
                         onClick={(e) => onToggleCollapse(node.id, e)}
                         onPointerDown={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', pointerEvents: 'all' }}
@@ -437,6 +487,8 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     fontSize={fontSize}
                     lineWidth={lineWidth}
                     horizontalGap={horizontalGap}
+                    verticalGap={verticalGap}
+                    direction={direction}
                     selectedNodeId={selectedNodeId}
                     editingNodeId={editingNodeId}
                     editText={editText}

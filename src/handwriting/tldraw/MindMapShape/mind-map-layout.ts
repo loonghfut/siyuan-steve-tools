@@ -4,6 +4,9 @@ import { MindMapNode } from './mind-map-shape-types'
 import { calculateNodeWidth } from './mind-map-utils'
 import { PADDING, MIN_WIDTH, MIN_HEIGHT } from './mind-map-constants'
 
+// 布局方向类型
+export type LayoutDirection = 'right' | 'left' | 'up' | 'down'
+
 // 节点布局信息
 export interface NodeLayout {
     node: MindMapNode
@@ -37,26 +40,34 @@ export interface FullLayoutInfo {
     offsetY: number
     // 根节点在内容区域中的位置（用于锚点定位）
     rootAnchor: { x: number; y: number }
+    // 布局方向
+    direction: LayoutDirection
 }
 
 /**
- * 获取子树高度
+ * 获取子树尺寸（横向布局时为高度，纵向布局时为宽度）
  */
-export const getSubtreeHeight = (layout: NodeLayout, gap: number): number => {
+export const getSubtreeSize = (layout: NodeLayout, gap: number, isHorizontal: boolean): number => {
     if (layout.children.length === 0 || layout.node.collapsed) {
-        return layout.height
+        return isHorizontal ? layout.height : layout.width
     }
-    let totalHeight = 0
+    let totalSize = 0
     for (const child of layout.children) {
-        totalHeight += getSubtreeHeight(child, gap) + gap
+        totalSize += getSubtreeSize(child, gap, isHorizontal) + gap
     }
-    return Math.max(layout.height, totalHeight - gap)
+    const nodeSize = isHorizontal ? layout.height : layout.width
+    return Math.max(nodeSize, totalSize - gap)
+}
+
+// 保留旧的函数名以保持兼容性
+export const getSubtreeHeight = (layout: NodeLayout, gap: number): number => {
+    return getSubtreeSize(layout, gap, true)
 }
 
 /**
- * 更新子节点位置
+ * 更新子节点位置 - 向右布局
  */
-export const updateChildPositions = (
+export const updateChildPositionsRight = (
     layout: NodeLayout, 
     hGap: number, 
     vGap: number
@@ -65,29 +76,126 @@ export const updateChildPositions = (
 
     let totalChildHeight = 0
     for (const child of layout.children) {
-        totalChildHeight += getSubtreeHeight(child, vGap) + vGap
+        totalChildHeight += getSubtreeSize(child, vGap, true) + vGap
     }
     totalChildHeight -= vGap
 
     let currentY = layout.y - totalChildHeight / 2
-
-    // 父节点的右边缘位置
     const parentRightEdge = layout.x + layout.width / 2
 
     for (const childLayout of layout.children) {
-        const subtreeHeight = getSubtreeHeight(childLayout, vGap)
-        // 子节点的中心 X = 父节点右边缘 + 间距 + 子节点宽度的一半
+        const subtreeHeight = getSubtreeSize(childLayout, vGap, true)
         childLayout.x = parentRightEdge + hGap + childLayout.width / 2
         childLayout.y = currentY + subtreeHeight / 2
-        updateChildPositions(childLayout, hGap, vGap)
+        updateChildPositionsRight(childLayout, hGap, vGap)
         currentY += subtreeHeight + vGap
     }
 }
 
 /**
- * 计算节点布局 - 返回布局树和边界信息
+ * 更新子节点位置 - 向左布局
  */
-export const calculateLayoutWithBounds = (
+export const updateChildPositionsLeft = (
+    layout: NodeLayout, 
+    hGap: number, 
+    vGap: number
+): void => {
+    if (layout.children.length === 0) return
+
+    let totalChildHeight = 0
+    for (const child of layout.children) {
+        totalChildHeight += getSubtreeSize(child, vGap, true) + vGap
+    }
+    totalChildHeight -= vGap
+
+    let currentY = layout.y - totalChildHeight / 2
+    const parentLeftEdge = layout.x - layout.width / 2
+
+    for (const childLayout of layout.children) {
+        const subtreeHeight = getSubtreeSize(childLayout, vGap, true)
+        childLayout.x = parentLeftEdge - hGap - childLayout.width / 2
+        childLayout.y = currentY + subtreeHeight / 2
+        updateChildPositionsLeft(childLayout, hGap, vGap)
+        currentY += subtreeHeight + vGap
+    }
+}
+
+/**
+ * 更新子节点位置 - 向下布局
+ */
+export const updateChildPositionsDown = (
+    layout: NodeLayout, 
+    hGap: number, 
+    vGap: number
+): void => {
+    if (layout.children.length === 0) return
+
+    let totalChildWidth = 0
+    for (const child of layout.children) {
+        totalChildWidth += getSubtreeSize(child, hGap, false) + hGap
+    }
+    totalChildWidth -= hGap
+
+    let currentX = layout.x - totalChildWidth / 2
+    const parentBottomEdge = layout.y + layout.height / 2
+
+    for (const childLayout of layout.children) {
+        const subtreeWidth = getSubtreeSize(childLayout, hGap, false)
+        childLayout.x = currentX + subtreeWidth / 2
+        childLayout.y = parentBottomEdge + vGap + childLayout.height / 2
+        updateChildPositionsDown(childLayout, hGap, vGap)
+        currentX += subtreeWidth + hGap
+    }
+}
+
+/**
+ * 更新子节点位置 - 向上布局
+ */
+export const updateChildPositionsUp = (
+    layout: NodeLayout, 
+    hGap: number, 
+    vGap: number
+): void => {
+    if (layout.children.length === 0) return
+
+    let totalChildWidth = 0
+    for (const child of layout.children) {
+        totalChildWidth += getSubtreeSize(child, hGap, false) + hGap
+    }
+    totalChildWidth -= hGap
+
+    let currentX = layout.x - totalChildWidth / 2
+    const parentTopEdge = layout.y - layout.height / 2
+
+    for (const childLayout of layout.children) {
+        const subtreeWidth = getSubtreeSize(childLayout, hGap, false)
+        childLayout.x = currentX + subtreeWidth / 2
+        childLayout.y = parentTopEdge - vGap - childLayout.height / 2
+        updateChildPositionsUp(childLayout, hGap, vGap)
+        currentX += subtreeWidth + hGap
+    }
+}
+
+// 保留旧的函数名以保持兼容性
+export const updateChildPositions = updateChildPositionsRight
+
+/**
+ * 根据方向选择更新子节点位置的函数
+ */
+const getUpdateChildPositionsFunc = (direction: LayoutDirection) => {
+    switch (direction) {
+        case 'left': return updateChildPositionsLeft
+        case 'up': return updateChildPositionsUp
+        case 'down': return updateChildPositionsDown
+        case 'right':
+        default: return updateChildPositionsRight
+    }
+}
+
+/**
+ * 计算节点布局（带方向）- 返回布局树和边界信息
+ */
+export const calculateLayoutWithBoundsDirectional = (
     node: MindMapNode,
     x: number,
     y: number,
@@ -95,9 +203,9 @@ export const calculateLayoutWithBounds = (
     nodeHeight: number,
     fontSize: number,
     horizontalGap: number,
-    verticalGap: number
+    verticalGap: number,
+    direction: LayoutDirection
 ): LayoutResult => {
-    // 动态计算节点宽度
     const dynamicWidth = calculateNodeWidth(node.text, level, fontSize)
     const layout: NodeLayout = {
         node,
@@ -119,45 +227,67 @@ export const calculateLayoutWithBounds = (
         return { layout, bounds }
     }
 
-    // 计算所有子节点的总高度
+    const isHorizontal = direction === 'left' || direction === 'right'
     const childLayouts: NodeLayout[] = []
-    let totalChildHeight = 0
+    let totalChildSize = 0
+    const gap = isHorizontal ? verticalGap : horizontalGap
 
     for (const child of node.children) {
-        const childResult = calculateLayoutWithBounds(
+        const childResult = calculateLayoutWithBoundsDirectional(
             child, 0, 0, level + 1,
-            nodeHeight, fontSize, horizontalGap, verticalGap
+            nodeHeight, fontSize, horizontalGap, verticalGap, direction
         )
         childLayouts.push(childResult.layout)
-        totalChildHeight += getSubtreeHeight(childResult.layout, verticalGap)
+        totalChildSize += getSubtreeSize(childResult.layout, gap, isHorizontal)
     }
 
-    // 减去最后一个节点后的间距
     if (childLayouts.length > 0) {
-        totalChildHeight -= verticalGap
+        totalChildSize += gap * (childLayouts.length - 1)
     }
 
-    // 计算子节点的起始 y 位置（居中对齐）
-    let currentY = y - totalChildHeight / 2
+    const updateFunc = getUpdateChildPositionsFunc(direction)
 
-    // 父节点的右边缘位置
-    const parentRightEdge = x + layout.width / 2
+    if (isHorizontal) {
+        // 水平布局 (left/right)
+        let currentY = y - totalChildSize / 2
+        const parentEdge = direction === 'right' 
+            ? x + layout.width / 2 
+            : x - layout.width / 2
 
-    for (const childLayout of childLayouts) {
-        const subtreeHeight = getSubtreeHeight(childLayout, verticalGap)
-        
-        // 设置子节点的实际位置
-        childLayout.x = parentRightEdge + horizontalGap + childLayout.width / 2
-        childLayout.y = currentY + subtreeHeight / 2
-        
-        // 递归更新子节点的子节点位置
-        updateChildPositions(childLayout, horizontalGap, verticalGap)
-        
-        layout.children.push(childLayout)
-        currentY += subtreeHeight + verticalGap
+        for (const childLayout of childLayouts) {
+            const subtreeHeight = getSubtreeSize(childLayout, verticalGap, true)
+            if (direction === 'right') {
+                childLayout.x = parentEdge + horizontalGap + childLayout.width / 2
+            } else {
+                childLayout.x = parentEdge - horizontalGap - childLayout.width / 2
+            }
+            childLayout.y = currentY + subtreeHeight / 2
+            updateFunc(childLayout, horizontalGap, verticalGap)
+            layout.children.push(childLayout)
+            currentY += subtreeHeight + verticalGap
+        }
+    } else {
+        // 垂直布局 (up/down)
+        let currentX = x - totalChildSize / 2
+        const parentEdge = direction === 'down'
+            ? y + layout.height / 2
+            : y - layout.height / 2
+
+        for (const childLayout of childLayouts) {
+            const subtreeWidth = getSubtreeSize(childLayout, horizontalGap, false)
+            childLayout.x = currentX + subtreeWidth / 2
+            if (direction === 'down') {
+                childLayout.y = parentEdge + verticalGap + childLayout.height / 2
+            } else {
+                childLayout.y = parentEdge - verticalGap - childLayout.height / 2
+            }
+            updateFunc(childLayout, horizontalGap, verticalGap)
+            layout.children.push(childLayout)
+            currentX += subtreeWidth + horizontalGap
+        }
     }
 
-    // 递归计算所有子节点的边界
+    // 收集边界
     const collectBounds = (l: NodeLayout) => {
         bounds.minX = Math.min(bounds.minX, l.x - l.width / 2)
         bounds.maxX = Math.max(bounds.maxX, l.x + l.width / 2)
@@ -175,6 +305,24 @@ export const calculateLayoutWithBounds = (
 }
 
 /**
+ * 计算节点布局 - 返回布局树和边界信息（向右布局，保持兼容性）
+ */
+export const calculateLayoutWithBounds = (
+    node: MindMapNode,
+    x: number,
+    y: number,
+    level: number,
+    nodeHeight: number,
+    fontSize: number,
+    horizontalGap: number,
+    verticalGap: number
+): LayoutResult => {
+    return calculateLayoutWithBoundsDirectional(
+        node, x, y, level, nodeHeight, fontSize, horizontalGap, verticalGap, 'right'
+    )
+}
+
+/**
  * 计算完整的思维导图布局
  * 以根节点为锚点进行布局，返回根节点在内容区域中的位置
  */
@@ -183,12 +331,13 @@ export const calculateFullLayout = (
     nodeHeight: number,
     fontSize: number,
     horizontalGap: number,
-    verticalGap: number
+    verticalGap: number,
+    direction: LayoutDirection = 'right'
 ): FullLayoutInfo => {
     // 以原点(0,0)作为根节点中心进行布局计算，获取边界
-    const { bounds: tempBounds } = calculateLayoutWithBounds(
+    const { bounds: tempBounds } = calculateLayoutWithBoundsDirectional(
         rootNode, 0, 0, 0,
-        nodeHeight, fontSize, horizontalGap, verticalGap
+        nodeHeight, fontSize, horizontalGap, verticalGap, direction
     )
 
     // 计算内容区域大小（加上边距）
@@ -196,14 +345,13 @@ export const calculateFullLayout = (
     const contentHeight = Math.max(tempBounds.maxY - tempBounds.minY + PADDING * 2, MIN_HEIGHT)
 
     // 计算根节点在内容区域中的位置
-    // 根节点中心相对于内容区域左上角的偏移
-    const rootAnchorX = PADDING - tempBounds.minX  // 根节点 X 在内容区域中的位置
-    const rootAnchorY = PADDING - tempBounds.minY  // 根节点 Y 在内容区域中的位置
+    const rootAnchorX = PADDING - tempBounds.minX
+    const rootAnchorY = PADDING - tempBounds.minY
 
     // 重新计算布局，将根节点放在正确的位置
-    const { layout: layoutTree } = calculateLayoutWithBounds(
+    const { layout: layoutTree } = calculateLayoutWithBoundsDirectional(
         rootNode, rootAnchorX, rootAnchorY, 0,
-        nodeHeight, fontSize, horizontalGap, verticalGap
+        nodeHeight, fontSize, horizontalGap, verticalGap, direction
     )
 
     return {
@@ -212,7 +360,7 @@ export const calculateFullLayout = (
         contentHeight,
         offsetX: 0,
         offsetY: 0,
-        // 根节点锚点位置（相对于内容区域左上角）
         rootAnchor: { x: rootAnchorX, y: rootAnchorY },
+        direction,
     }
 }

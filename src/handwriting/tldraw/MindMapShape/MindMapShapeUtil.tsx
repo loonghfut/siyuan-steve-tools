@@ -121,6 +121,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             lineWidth,
             theme: themeName,
             selectedNodeId,
+            direction,
         } = shape.props
 
         // 更新形状
@@ -176,13 +177,15 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
 
         const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
 
-        // 计算布局
+        // 计算布局（传入方向参数）
+        const layoutDirection = (direction || 'right') as 'right' | 'left' | 'up' | 'down'
         const { layoutTree, contentWidth, contentHeight, offsetX, offsetY, rootAnchor } = calculateFullLayout(
             rootNode,
             nodeHeight,
             fontSize,
             horizontalGap,
-            verticalGap
+            verticalGap,
+            layoutDirection
         )
 
         // 更新 DOM 尺寸并调整 shape 位置以保持根节点稳定
@@ -346,6 +349,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 fontSize={fontSize}
                                 lineWidth={lineWidth}
                                 horizontalGap={horizontalGap}
+                                verticalGap={verticalGap}
+                                direction={layoutDirection}
                                 selectedNodeId={selectedNodeId}
                                 editingNodeId={editingNodeId}
                                 editText={editText}
