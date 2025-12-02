@@ -4,6 +4,9 @@ import { MindMapNode } from './mind-map-shape-types'
 import { calculateNodeWidth } from './mind-map-utils'
 import { PADDING, MIN_WIDTH, MIN_HEIGHT } from './mind-map-constants'
 
+// 当方向为 up/down 时，额外增加的父子间垂直间距（像素）
+const EXTRA_VERTICAL_GAP = 18
+
 // 布局方向类型
 export type LayoutDirection = 'right' | 'left' | 'up' | 'down'
 
@@ -247,6 +250,10 @@ export const calculateLayoutWithBoundsDirectional = (
 
     const updateFunc = getUpdateChildPositionsFunc(direction)
 
+    // 当为垂直布局时（up/down），增加父子之间的垂直间距
+    const isVerticalLayout = !isHorizontal
+    const vGapUsed = isVerticalLayout ? verticalGap + EXTRA_VERTICAL_GAP : verticalGap
+
     if (isHorizontal) {
         // 水平布局 (left/right)
         let currentY = y - totalChildSize / 2
@@ -277,11 +284,12 @@ export const calculateLayoutWithBoundsDirectional = (
             const subtreeWidth = getSubtreeSize(childLayout, horizontalGap, false)
             childLayout.x = currentX + subtreeWidth / 2
             if (direction === 'down') {
-                childLayout.y = parentEdge + verticalGap + childLayout.height / 2
+                childLayout.y = parentEdge + vGapUsed + childLayout.height / 2
             } else {
-                childLayout.y = parentEdge - verticalGap - childLayout.height / 2
+                childLayout.y = parentEdge - vGapUsed - childLayout.height / 2
             }
-            updateFunc(childLayout, horizontalGap, verticalGap)
+            // 传递调整后的 vGap 给递归布局函数，以保持一致的间距
+            updateFunc(childLayout, horizontalGap, vGapUsed)
             layout.children.push(childLayout)
             currentX += subtreeWidth + horizontalGap
         }
