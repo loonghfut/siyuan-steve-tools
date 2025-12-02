@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+﻿import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
     HTMLContainer,
     Rectangle2d,
@@ -15,17 +15,18 @@ import {
     IMindMapShape,
     MindMapNode,
     createMindMapNode,
-    findNodeById,
-    findParentNode,
-    deleteNodeById,
-    addChildNode,
-    addSiblingNode,
-    updateNodeText,
-    updateNodeColor,
-    toggleNodeCollapse,
-    moveNodeToParent,
-    reorderNode,
 } from './mind-map-shape-types'
+import { ThemeName } from './mind-map-constants'
+import { calculateFullLayout } from './mind-map-layout'
+import { MindMapNodeRenderer, ColorPicker } from './mind-map-components'
+import {
+    deepCloneRootNode,
+    useDragHandlers,
+    useEditHandlers,
+    useColorPicker,
+    useKeyboardHandlers,
+    useNodeSelection,
+} from './mind-map-hooks'
 
 // ===== DOM 尺寸测量 =====
 // 用 EditorAtom 存储每个 shape 的测量尺寸，保证 getGeometry 响应式更新
@@ -36,100 +37,6 @@ const MindMapSizes = new EditorAtom('mind-map sizes', (editor) => {
     })
     return map
 })
-
-const PADDING = 20 // 内边距
-const MIN_WIDTH = 1
-const MIN_HEIGHT = 1
-const MIN_NODE_WIDTH = 60 // 节点最小宽度
-const MAX_NODE_WIDTH = 300 // 节点最大宽度
-const NODE_PADDING_H = 24 // 节点水平内边距（左右各12px）
-const COLLAPSE_BUTTON_SIZE = 16 // 折叠按钮大小
-const COLLAPSE_BUTTON_GAP = 4 // 折叠按钮与节点的间距
-
-// 节点颜色预设
-const NODE_COLORS = [
-    '#4A90D9', '#52C41A', '#FA8C16', '#722ED1', 
-    '#EB2F96', '#13C2C2', '#F5222D', '#FAAD14',
-    '#2F54EB', '#A0D911', '#FA541C', '#1890FF',
-    '#ffffff', '#f5f5f5', '#d9d9d9', '#333333',
-]
-
-// 计算颜色亮度，用于决定文本颜色
-const getLuminance = (hexColor: string): number => {
-    const hex = hexColor.replace('#', '')
-    const r = parseInt(hex.substr(0, 2), 16) / 255
-    const g = parseInt(hex.substr(2, 2), 16) / 255
-    const b = parseInt(hex.substr(4, 2), 16) / 255
-    // 使用相对亮度公式
-    const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
-}
-
-// 根据背景色获取合适的文本颜色
-const getContrastTextColor = (bgColor: string): string => {
-    try {
-        const luminance = getLuminance(bgColor)
-        return luminance > 0.5 ? '#333333' : '#ffffff'
-    } catch {
-        return '#333333'
-    }
-}
-
-// 测量文本宽度的辅助函数
-const measureTextWidth = (text: string, fontSize: number, fontWeight: string = 'normal'): number => {
-    // 使用 canvas 测量文本宽度
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return text.length * fontSize * 0.6 // fallback
-    ctx.font = `${fontWeight} ${fontSize}px sans-serif`
-    return ctx.measureText(text).width
-}
-
-// 节点布局信息
-interface NodeLayout {
-    node: MindMapNode
-    x: number
-    y: number
-    width: number
-    height: number
-    children: NodeLayout[]
-}
-
-// 主题颜色配置
-const THEMES = {
-    default: {
-        rootBg: '#4A90D9',
-        rootText: '#ffffff',
-        nodeBg: '#ffffff',
-        nodeText: '#333333',
-        nodeBorder: '#cccccc',
-        lineColor: '#888888',
-        selectedBorder: '#4A90D9',
-    },
-    colorful: {
-        rootBg: '#FF6B6B',
-        rootText: '#ffffff',
-        nodeBg: '#FFF3E0',
-        nodeText: '#333333',
-        nodeBorder: '#FFB74D',
-        lineColor: '#FF9800',
-        selectedBorder: '#E91E63',
-    },
-    minimal: {
-        rootBg: '#333333',
-        rootText: '#ffffff',
-        nodeBg: '#f5f5f5',
-        nodeText: '#333333',
-        nodeBorder: '#e0e0e0',
-        lineColor: '#999999',
-        selectedBorder: '#333333',
-    },
-}
-
-// 颜色数组用于不同层级
-const LEVEL_COLORS = [
-    '#4A90D9', '#52C41A', '#FA8C16', '#722ED1', '#EB2F96', '#13C2C2', '#F5222D'
-]
 
 export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
     static override type = 'mind-map' as const
@@ -191,201 +98,89 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
 
     component(shape: IMindMapShape) {
         const editor = this.editor
-        // 思维导图始终保持可编辑状态，无需进入编辑模式
-        const isEditing = true
         const containerRef = useRef<HTMLDivElement>(null)
         const svgRef = useRef<SVGSVGElement>(null)
-        const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
-        const [editText, setEditText] = useState('')
         const inputRef = useRef<HTMLInputElement>(null)
-        
-        // 拖拽状态
-        const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
-        const [dropTargetId, setDropTargetId] = useState<string | null>(null)
-        const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'child' | null>(null)
-        const dragStartPos = useRef<{ x: number; y: number } | null>(null)
-
-        // 颜色选择器状态
-        const [colorPickerNodeId, setColorPickerNodeId] = useState<string | null>(null)
-        const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null)
 
         const {
             rootNode,
             horizontalGap,
             verticalGap,
-            // nodeWidth, // 现在使用动态计算的宽度
             nodeHeight,
             fontSize,
             lineWidth,
-            // direction, // 保留以便将来支持多方向布局
             theme: themeName,
             selectedNodeId,
         } = shape.props
 
-        const colors = THEMES[themeName as keyof typeof THEMES] || THEMES.default
+        // 更新形状
+        const updateShape = useCallback((newRootNode: MindMapNode, newSelectedId?: string) => {
+            editor.updateShape<IMindMapShape>({
+                id: shape.id,
+                type: 'mind-map',
+                props: {
+                    ...shape.props,
+                    rootNode: newRootNode,
+                    selectedNodeId: newSelectedId,
+                },
+            })
+        }, [editor, shape.id, shape.props])
 
-        // 获取子树高度
-        const getSubtreeHeight = useCallback((layout: NodeLayout, gap: number): number => {
-            if (layout.children.length === 0 || layout.node.collapsed) {
-                return layout.height
-            }
-            let totalHeight = 0
-            for (const child of layout.children) {
-                totalHeight += getSubtreeHeight(child, gap) + gap
-            }
-            return Math.max(layout.height, totalHeight - gap)
-        }, [])
+        // 使用自定义 hooks
+        const {
+            draggingNodeId,
+            dropTargetId,
+            dropPosition,
+            handleDragStart,
+            handleDragMove,
+            handleDragEnd,
+            handleDragCancel,
+            clearDropTarget,
+        } = useDragHandlers(rootNode, updateShape)
 
-        // 更新子节点位置
-        const updateChildPositions = useCallback((layout: NodeLayout, hGap: number, vGap: number) => {
-            if (layout.children.length === 0) return
+        const {
+            editingNodeId,
+            editText,
+            setEditText,
+            handleDoubleClick,
+            handleFinishEdit,
+            handleCancelEdit,
+            setEditingNodeId,
+        } = useEditHandlers(rootNode, updateShape)
 
-            let totalChildHeight = 0
-            for (const child of layout.children) {
-                totalChildHeight += getSubtreeHeight(child, vGap) + vGap
-            }
-            totalChildHeight -= vGap
+        const {
+            colorPickerNodeId,
+            colorPickerPos,
+            handleContextMenu,
+            handleColorChange,
+            closeColorPicker,
+        } = useColorPicker(rootNode, updateShape)
 
-            let currentY = layout.y - totalChildHeight / 2
+        const { handleKeyDown } = useKeyboardHandlers(
+            rootNode,
+            selectedNodeId,
+            updateShape,
+            setEditingNodeId,
+            setEditText
+        )
 
-            // 父节点的右边缘位置
-            const parentRightEdge = layout.x + layout.width / 2
+        const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
 
-            for (const childLayout of layout.children) {
-                const subtreeHeight = getSubtreeHeight(childLayout, vGap)
-                // 子节点的中心 X = 父节点右边缘 + 间距 + 子节点宽度的一半
-                childLayout.x = parentRightEdge + hGap + childLayout.width / 2
-                childLayout.y = currentY + subtreeHeight / 2
-                updateChildPositions(childLayout, hGap, vGap)
-                currentY += subtreeHeight + vGap
-            }
-        }, [getSubtreeHeight])
-
-        // 根据文本计算节点宽度
-        const calculateNodeWidth = useCallback((text: string, level: number): number => {
-            const fs = level === 0 ? fontSize * 1.2 : fontSize
-            const fw = level === 0 ? 'bold' : 'normal'
-            const textWidth = measureTextWidth(text, fs, fw)
-            // 添加水平内边距，并限制在最小/最大宽度范围内
-            const calculatedWidth = textWidth + NODE_PADDING_H
-            const minW = level === 0 ? MIN_NODE_WIDTH * 1.2 : MIN_NODE_WIDTH
-            const maxW = level === 0 ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
-            return Math.max(minW, Math.min(maxW, calculatedWidth))
-        }, [fontSize])
-
-        // 计算节点布局 - 返回布局树和边界信息
-        const calculateLayoutWithBounds = useCallback((
-            node: MindMapNode,
-            x: number,
-            y: number,
-            level: number = 0
-        ): { layout: NodeLayout; bounds: { minX: number; maxX: number; minY: number; maxY: number } } => {
-            // 动态计算节点宽度
-            const dynamicWidth = calculateNodeWidth(node.text, level)
-            const layout: NodeLayout = {
-                node,
-                x,
-                y,
-                width: dynamicWidth,
-                height: level === 0 ? nodeHeight * 1.2 : nodeHeight,
-                children: [],
-            }
-
-            let bounds = {
-                minX: x - layout.width / 2,
-                maxX: x + layout.width / 2,
-                minY: y - layout.height / 2,
-                maxY: y + layout.height / 2,
-            }
-
-            if (node.collapsed || node.children.length === 0) {
-                return { layout, bounds }
-            }
-
-            // 计算所有子节点的总高度
-            const childLayouts: NodeLayout[] = []
-            let totalChildHeight = 0
-
-            for (const child of node.children) {
-                const childResult = calculateLayoutWithBounds(child, 0, 0, level + 1)
-                childLayouts.push(childResult.layout)
-                totalChildHeight += getSubtreeHeight(childResult.layout, verticalGap)
-            }
-
-            // 减去最后一个节点后的间距
-            if (childLayouts.length > 0) {
-                totalChildHeight -= verticalGap
-            }
-
-            // 计算子节点的起始 y 位置（居中对齐）
-            let currentY = y - totalChildHeight / 2
-
-            // 父节点的右边缘位置
-            const parentRightEdge = x + layout.width / 2
-
-            for (let i = 0; i < childLayouts.length; i++) {
-                const childLayout = childLayouts[i]
-                const subtreeHeight = getSubtreeHeight(childLayout, verticalGap)
-                
-                // 设置子节点的实际位置
-                // 子节点的中心 X = 父节点右边缘 + 间距 + 子节点宽度的一半
-                childLayout.x = parentRightEdge + horizontalGap + childLayout.width / 2
-                childLayout.y = currentY + subtreeHeight / 2
-                
-                // 递归更新子节点的子节点位置
-                updateChildPositions(childLayout, horizontalGap, verticalGap)
-                
-                layout.children.push(childLayout)
-                currentY += subtreeHeight + verticalGap
-            }
-
-            // 递归计算所有子节点的边界
-            const collectBounds = (l: NodeLayout) => {
-                bounds.minX = Math.min(bounds.minX, l.x - l.width / 2)
-                bounds.maxX = Math.max(bounds.maxX, l.x + l.width / 2)
-                bounds.minY = Math.min(bounds.minY, l.y - l.height / 2)
-                bounds.maxY = Math.max(bounds.maxY, l.y + l.height / 2)
-                for (const child of l.children) {
-                    collectBounds(child)
-                }
-            }
-            for (const child of layout.children) {
-                collectBounds(child)
-            }
-
-            return { layout, bounds }
-        }, [calculateNodeWidth, nodeHeight, horizontalGap, verticalGap, getSubtreeHeight, updateChildPositions])
-
-        // 第一次计算布局获取边界，使用临时位置
-        const rootNodeWidth = calculateNodeWidth(rootNode.text, 0)
-        const tempRootX = PADDING + rootNodeWidth / 2
-        const tempRootY = 0 // 临时 Y 位置，后续会调整
-        const { bounds: tempBounds } = calculateLayoutWithBounds(rootNode, tempRootX, tempRootY, 0)
-
-        // 计算实际需要的尺寸
-        const rawHeight = tempBounds.maxY - tempBounds.minY
-        const rawWidth = tempBounds.maxX - tempBounds.minX
-        const contentWidth = Math.max(rawWidth + PADDING * 2, MIN_WIDTH)
-        const contentHeight = Math.max(rawHeight + PADDING * 2, MIN_HEIGHT)
-
-        // 重新计算布局，让根节点位于内容区域的垂直中心
-        const finalRootX = PADDING + rootNodeWidth / 2
-        const finalRootY = contentHeight / 2
-        const { layout: layoutTree, bounds } = calculateLayoutWithBounds(rootNode, finalRootX, finalRootY, 0)
-
-        // 计算偏移量，确保所有节点都在可视区域内
-        const offsetX = 0 // X 已经正确定位
-        const offsetY = PADDING - bounds.minY // 调整 Y 偏移确保顶部有 padding
+        // 计算布局
+        const { layoutTree, contentWidth, contentHeight, offsetX, offsetY } = calculateFullLayout(
+            rootNode,
+            nodeHeight,
+            fontSize,
+            horizontalGap,
+            verticalGap
+        )
 
         // 更新 DOM 尺寸到 AtomMap
         const updateDomSize = useCallback(() => {
-            const nextWidth = Math.max(contentWidth, MIN_WIDTH)
-            const nextHeight = Math.max(contentHeight, MIN_HEIGHT)
-            
             MindMapSizes.update(editor, (map) => {
                 const existing = map.get(shape.id)
-                if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
-                return map.set(shape.id, { width: nextWidth, height: nextHeight })
+                if (existing && existing.height === contentHeight && existing.width === contentWidth) return map
+                return map.set(shape.id, { width: contentWidth, height: contentHeight })
             })
         }, [editor, shape.id, contentWidth, contentHeight])
 
@@ -399,243 +194,6 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             updateDomSize()
         }, [rootNode, updateDomSize])
 
-        // 深拷贝根节点
-        const deepCloneRootNode = (node: MindMapNode): MindMapNode => {
-            return {
-                ...node,
-                children: node.children.map(deepCloneRootNode),
-            }
-        }
-
-        // 更新形状
-        const updateShape = useCallback((newRootNode: MindMapNode, newSelectedId?: string) => {
-            editor.updateShape<IMindMapShape>({
-                id: shape.id,
-                type: 'mind-map',
-                props: {
-                    ...shape.props,
-                    rootNode: newRootNode,
-                    selectedNodeId: newSelectedId,
-                },
-            })
-        }, [shape.id, shape.props])
-
-        // 选择节点
-        const handleSelectNode = useCallback((nodeId: string, e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            
-            const newRoot = deepCloneRootNode(rootNode)
-            updateShape(newRoot, nodeId)
-        }, [rootNode, updateShape])
-
-        // 双击编辑节点
-        const handleDoubleClick = useCallback((nodeId: string, text: string, e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            
-            setEditingNodeId(nodeId)
-            setEditText(text)
-        }, [])
-
-        // 右键打开颜色选择器
-        const handleContextMenu = useCallback((nodeId: string, nodeX: number, nodeY: number, nodeWidth: number, nodeHeight: number, e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            
-            // 先选中节点
-            const newRoot = deepCloneRootNode(rootNode)
-            updateShape(newRoot, nodeId)
-            
-            // 设置颜色选择器位置：使用节点在SVG中的坐标（节点右下角）
-            setColorPickerNodeId(nodeId)
-            setColorPickerPos({ x: nodeX + nodeWidth / 2 + 8, y: nodeY - nodeHeight / 2 })
-        }, [rootNode, updateShape])
-
-        // 更新节点颜色
-        const handleColorChange = useCallback((color: string | undefined) => {
-            if (colorPickerNodeId) {
-                const newRoot = deepCloneRootNode(rootNode)
-                updateNodeColor(newRoot, colorPickerNodeId, color)
-                updateShape(newRoot, colorPickerNodeId)
-            }
-            setColorPickerNodeId(null)
-            setColorPickerPos(null)
-        }, [colorPickerNodeId, rootNode, updateShape])
-
-        // 关闭颜色选择器
-        const closeColorPicker = useCallback(() => {
-            setColorPickerNodeId(null)
-            setColorPickerPos(null)
-        }, [])
-
-        // 完成编辑
-        const handleFinishEdit = useCallback(() => {
-            if (editingNodeId && editText.trim()) {
-                const newRoot = deepCloneRootNode(rootNode)
-                updateNodeText(newRoot, editingNodeId, editText.trim())
-                updateShape(newRoot, editingNodeId)
-            }
-            setEditingNodeId(null)
-            setEditText('')
-        }, [editingNodeId, editText, rootNode, updateShape])
-
-        // 拖拽开始
-        const handleDragStart = useCallback((nodeId: string, e: React.PointerEvent) => {
-            // 根节点不可拖拽
-            if (nodeId === rootNode.id) return
-            
-            e.stopPropagation()
-            dragStartPos.current = { x: e.clientX, y: e.clientY }
-            setDraggingNodeId(nodeId)
-        }, [rootNode.id])
-
-        // 拖拽移动 - 计算放置目标
-        const handleDragMove = useCallback((targetNodeId: string, e: React.PointerEvent) => {
-            if (!draggingNodeId || draggingNodeId === targetNodeId) return
-            
-            // 不能拖到自己的子节点上
-            const draggingNode = findNodeById(rootNode, draggingNodeId)
-            if (draggingNode) {
-                // 检查 targetNodeId 是否在 draggingNode 的子树中
-                const checkIsChild = (node: MindMapNode, targetId: string): boolean => {
-                    if (node.id === targetId) return true
-                    for (const child of node.children) {
-                        if (checkIsChild(child, targetId)) return true
-                    }
-                    return false
-                }
-                if (checkIsChild(draggingNode, targetNodeId)) return
-            }
-            
-            e.stopPropagation()
-            setDropTargetId(targetNodeId)
-            
-            // 计算放置位置：上1/3为before，中1/3为child，下1/3为after
-            const rect = (e.target as Element).getBoundingClientRect()
-            const relativeY = e.clientY - rect.top
-            const third = rect.height / 3
-            
-            if (relativeY < third) {
-                setDropPosition('before')
-            } else if (relativeY > third * 2) {
-                setDropPosition('after')
-            } else {
-                setDropPosition('child')
-            }
-        }, [draggingNodeId, rootNode])
-
-        // 拖拽结束
-        const handleDragEnd = useCallback(() => {
-            if (draggingNodeId && dropTargetId && dropPosition) {
-                const newRoot = deepCloneRootNode(rootNode)
-                
-                if (dropPosition === 'child') {
-                    // 移动为目标节点的子节点
-                    moveNodeToParent(newRoot, draggingNodeId, dropTargetId)
-                } else {
-                    // 移动为目标节点的兄弟节点
-                    const targetParent = findParentNode(newRoot, dropTargetId)
-                    if (targetParent) {
-                        // 找到目标节点在父节点中的索引
-                        const targetIndex = targetParent.children.findIndex(c => c.id === dropTargetId)
-                        if (targetIndex !== -1) {
-                            const insertIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1
-                            // 先移动到父节点
-                            moveNodeToParent(newRoot, draggingNodeId, targetParent.id)
-                            // 再调整顺序
-                            reorderNode(newRoot, draggingNodeId, insertIndex)
-                        }
-                    } else if (dropTargetId === rootNode.id) {
-                        // 放到根节点上
-                        moveNodeToParent(newRoot, draggingNodeId, rootNode.id)
-                    }
-                }
-                
-                updateShape(newRoot, draggingNodeId)
-            }
-            
-            // 重置拖拽状态
-            setDraggingNodeId(null)
-            setDropTargetId(null)
-            setDropPosition(null)
-            dragStartPos.current = null
-        }, [draggingNodeId, dropTargetId, dropPosition, rootNode, updateShape])
-
-        // 取消拖拽
-        const handleDragCancel = useCallback(() => {
-            setDraggingNodeId(null)
-            setDropTargetId(null)
-            setDropPosition(null)
-            dragStartPos.current = null
-        }, [])
-
-        // 键盘事件处理
-        const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-            if (!isEditing || !selectedNodeId) return
-            
-            e.stopPropagation()
-            
-            const newRoot = deepCloneRootNode(rootNode)
-            
-            switch (e.key) {
-                case 'Tab': {
-                    // 添加子节点
-                    e.preventDefault()
-                    const newNode = createMindMapNode('新节点')
-                    addChildNode(newRoot, selectedNodeId, newNode)
-                    // 展开父节点
-                    const parentNode = findNodeById(newRoot, selectedNodeId)
-                    if (parentNode) parentNode.collapsed = false
-                    updateShape(newRoot, newNode.id)
-                    break
-                }
-                case 'Enter': {
-                    // 添加兄弟节点
-                    e.preventDefault()
-                    if (selectedNodeId === rootNode.id) {
-                        // 根节点不能添加兄弟
-                        const newNode = createMindMapNode('新节点')
-                        addChildNode(newRoot, selectedNodeId, newNode)
-                        updateShape(newRoot, newNode.id)
-                    } else {
-                        const newNode = createMindMapNode('新节点')
-                        addSiblingNode(newRoot, selectedNodeId, newNode)
-                        updateShape(newRoot, newNode.id)
-                    }
-                    break
-                }
-                case 'Delete':
-                case 'Backspace': {
-                    // 删除节点
-                    if (selectedNodeId !== rootNode.id) {
-                        e.preventDefault()
-                        const parent = findParentNode(newRoot, selectedNodeId)
-                        deleteNodeById(newRoot, selectedNodeId)
-                        updateShape(newRoot, parent?.id)
-                    }
-                    break
-                }
-                case ' ': {
-                    // 折叠/展开
-                    e.preventDefault()
-                    toggleNodeCollapse(newRoot, selectedNodeId)
-                    updateShape(newRoot, selectedNodeId)
-                    break
-                }
-                case 'F2': {
-                    // 编辑节点
-                    e.preventDefault()
-                    const node = findNodeById(rootNode, selectedNodeId)
-                    if (node) {
-                        setEditingNodeId(selectedNodeId)
-                        setEditText(node.text)
-                    }
-                    break
-                }
-            }
-        }, [isEditing, selectedNodeId, rootNode, updateShape])
-
         // 聚焦输入框
         useEffect(() => {
             if (editingNodeId && inputRef.current) {
@@ -646,254 +204,27 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
 
         // 编辑模式时自动聚焦容器以接收键盘事件
         useEffect(() => {
-            if (isEditing && containerRef.current && !editingNodeId) {
+            if (containerRef.current && !editingNodeId) {
                 containerRef.current.focus()
             }
-        }, [isEditing, editingNodeId])
+        }, [editingNodeId])
 
         // 点击空白区域时清除选中
         const handleContainerClick = useCallback((e: React.MouseEvent) => {
-            // 只有当点击的是容器本身（不是节点）时才清除选中
             if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg') {
-                if (isEditing && selectedNodeId) {
+                if (selectedNodeId) {
                     const newRoot = deepCloneRootNode(rootNode)
                     updateShape(newRoot, undefined)
                 }
             }
-        }, [isEditing, selectedNodeId, rootNode, updateShape])
+        }, [selectedNodeId, rootNode, updateShape])
 
-        // 渲染节点
-        const renderNode = (layout: NodeLayout, level: number = 0): React.ReactNode => {
-            const { node, x, y, width, height } = layout
-            const isRoot = level === 0
-            const isSelected = node.id === selectedNodeId
-            const isCurrentEditing = node.id === editingNodeId
-            const hasChildren = node.children.length > 0
-            const isDragging = node.id === draggingNodeId
-            const isDropTarget = node.id === dropTargetId
-
-            // 获取节点颜色
-            let bgColor = isRoot ? colors.rootBg : colors.nodeBg
-            let textColor = isRoot ? colors.rootText : colors.nodeText
-            let borderColor = isSelected ? colors.selectedBorder : colors.nodeBorder
-
-            // colorful 主题使用层级颜色
-            if (themeName === 'colorful' && !isRoot) {
-                const colorIndex = (level - 1) % LEVEL_COLORS.length
-                borderColor = isSelected ? colors.selectedBorder : LEVEL_COLORS[colorIndex]
-            }
-
-            // 自定义节点颜色 - 同时更新文本颜色以保证对比度
-            if (node.color) {
-                bgColor = node.color
-                textColor = getContrastTextColor(node.color)
-            }
-
-            // 拖拽时的样式
-            if (isDragging) {
-                bgColor = 'rgba(128, 128, 128, 0.5)'
-            }
-
-            // 放置目标的高亮
-            let dropIndicator = null
-            if (isDropTarget && dropPosition) {
-                const indicatorColor = '#4A90D9'
-                if (dropPosition === 'child') {
-                    // 作为子节点 - 高亮整个节点
-                    borderColor = indicatorColor
-                } else if (dropPosition === 'before') {
-                    // 在节点之前 - 显示上方线条
-                    dropIndicator = (
-                        <line
-                            x1={0}
-                            y1={-4}
-                            x2={width}
-                            y2={-4}
-                            stroke={indicatorColor}
-                            strokeWidth={3}
-                            strokeLinecap="round"
-                        />
-                    )
-                } else if (dropPosition === 'after') {
-                    // 在节点之后 - 显示下方线条
-                    dropIndicator = (
-                        <line
-                            x1={0}
-                            y1={height + 4}
-                            x2={width}
-                            y2={height + 4}
-                            stroke={indicatorColor}
-                            strokeWidth={3}
-                            strokeLinecap="round"
-                        />
-                    )
-                }
-            }
-
-            return (
-                <React.Fragment key={node.id}>
-                    {/* 渲染连接线 - 从节点右边中心到子节点左边中心 */}
-                    {layout.children.map((childLayout) => (
-                        <path
-                            key={`line-${node.id}-${childLayout.node.id}`}
-                            d={`M ${x + width / 2} ${y} 
-                                C ${x + width / 2 + horizontalGap / 2} ${y},
-                                  ${childLayout.x - childLayout.width / 2 - horizontalGap / 2} ${childLayout.y},
-                                  ${childLayout.x - childLayout.width / 2} ${childLayout.y}`}
-                            fill="none"
-                            stroke={colors.lineColor}
-                            strokeWidth={lineWidth}
-                        />
-                    ))}
-
-                    {/* 渲染节点 */}
-                    <g
-                        transform={`translate(${x - width / 2}, ${y - height / 2})`}
-                        onClick={(e) => handleSelectNode(node.id, e)}
-                        onDoubleClick={(e) => handleDoubleClick(node.id, node.text, e)}
-                        onContextMenu={(e) => handleContextMenu(node.id, x, y, width, height, e)}
-                        onPointerDown={(e) => {
-                            // 只在节点上阻止事件冒泡，允许形状拖动
-                            e.stopPropagation()
-                            // 开始拖拽
-                            handleDragStart(node.id, e)
-                        }}
-                        onPointerMove={(e) => {
-                            // 拖拽移动时计算放置目标
-                            if (draggingNodeId) {
-                                handleDragMove(node.id, e)
-                            }
-                        }}
-                        onPointerUp={(e) => {
-                            // 拖拽结束
-                            if (draggingNodeId) {
-                                e.stopPropagation()
-                                handleDragEnd()
-                            }
-                        }}
-                        onPointerLeave={() => {
-                            // 离开节点时清除放置目标
-                            if (dropTargetId === node.id) {
-                                setDropTargetId(null)
-                                setDropPosition(null)
-                            }
-                        }}
-                        style={{ 
-                            cursor: isDragging ? 'grabbing' : 'grab', 
-                            pointerEvents: 'all',
-                            opacity: isDragging ? 0.6 : 1,
-                        }}
-                    >
-                        {/* 放置指示器 */}
-                        {dropIndicator}
-                        
-                        <rect
-                            width={width}
-                            height={height}
-                            rx={isRoot ? height / 2 : 4}
-                            ry={isRoot ? height / 2 : 4}
-                            fill={bgColor}
-                            stroke={isDropTarget && dropPosition === 'child' ? '#4A90D9' : borderColor}
-                            strokeWidth={isSelected || (isDropTarget && dropPosition === 'child') ? 3 : 1}
-                        />
-                        
-                        {/* 节点文本或输入框 */}
-                        {isCurrentEditing ? (
-                            <foreignObject x={4} y={4} width={width - 8} height={height - 8}>
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    value={editText}
-                                    onChange={(e) => setEditText(e.target.value)}
-                                    onBlur={handleFinishEdit}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            handleFinishEdit()
-                                        } else if (e.key === 'Escape') {
-                                            setEditingNodeId(null)
-                                            setEditText('')
-                                        }
-                                        e.stopPropagation()
-                                    }}
-                                    style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        border: 'none',
-                                        outline: 'none',
-                                        background: 'transparent',
-                                        fontSize: `${fontSize}px`,
-                                        textAlign: 'center',
-                                        color: textColor,
-                                    }}
-                                />
-                            </foreignObject>
-                        ) : (
-                            <text
-                                x={width / 2}
-                                y={height / 2}
-                                textAnchor="middle"
-                                dominantBaseline="central"
-                                fill={textColor}
-                                fontSize={isRoot ? fontSize * 1.2 : fontSize}
-                                fontWeight={isRoot ? 'bold' : 'normal'}
-                                style={{ pointerEvents: 'none', userSelect: 'none' }}
-                            >
-                                {/* 如果文本过长超过最大宽度，则截断显示 */}
-                                {(() => {
-                                    const fs = isRoot ? fontSize * 1.2 : fontSize
-                                    const fw = isRoot ? 'bold' : 'normal'
-                                    const maxW = isRoot ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
-                                    const textWidth = measureTextWidth(node.text, fs, fw)
-                                    if (textWidth + NODE_PADDING_H > maxW) {
-                                        // 计算可显示的字符数
-                                        const availableWidth = maxW - NODE_PADDING_H - measureTextWidth('...', fs, fw)
-                                        let displayText = ''
-                                        for (let i = 0; i < node.text.length; i++) {
-                                            const testText = node.text.slice(0, i + 1)
-                                            if (measureTextWidth(testText, fs, fw) > availableWidth) break
-                                            displayText = testText
-                                        }
-                                        return displayText + '...'
-                                    }
-                                    return node.text
-                                })()}
-                            </text>
-                        )}
-
-                        {/* 折叠/展开按钮 - 有子节点时显示，移到节点外部右侧 */}
-                        {hasChildren && (
-                            <g
-                                transform={`translate(${width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE / 2}, ${height / 2})`}
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    e.preventDefault()
-                                    const newRoot = deepCloneRootNode(rootNode)
-                                    toggleNodeCollapse(newRoot, node.id)
-                                    updateShape(newRoot, selectedNodeId)
-                                }}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                style={{ cursor: 'pointer', pointerEvents: 'all' }}
-                            >
-                                <circle r={COLLAPSE_BUTTON_SIZE / 2} fill={colors.nodeBg} stroke={colors.nodeBorder} />
-                                <text
-                                    textAnchor="middle"
-                                    dominantBaseline="central"
-                                    fontSize={12}
-                                    fill={colors.nodeText}
-                                >
-                                    {node.collapsed ? '+' : '−'}
-                                </text>
-                            </g>
-                        )}
-                    </g>
-
-                    {/* 递归渲染子节点 */}
-                    {!node.collapsed && layout.children.map((childLayout) => 
-                        renderNode(childLayout, level + 1)
-                    )}
-                </React.Fragment>
-            )
-        }
+        // 处理折叠按钮点击
+        const handleToggleCollapseClick = useCallback((nodeId: string, e: React.MouseEvent) => {
+            e.stopPropagation()
+            e.preventDefault()
+            handleToggleCollapse(nodeId, selectedNodeId)
+        }, [handleToggleCollapse, selectedNodeId])
 
         return (
             <HTMLContainer
@@ -910,13 +241,11 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                     onKeyDown={handleKeyDown}
                     onClick={(e) => {
                         handleContainerClick(e)
-                        // 点击空白处关闭颜色选择器
                         if (colorPickerNodeId) {
                             closeColorPicker()
                         }
                     }}
                     onPointerUp={() => {
-                        // 在空白区域释放时取消拖拽
                         if (draggingNodeId) {
                             handleDragCancel()
                         }
@@ -927,7 +256,6 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         backgroundColor: 'transparent',
                         borderRadius: 8,
                         overflow: 'hidden',
-                        // outline: selectedNodeId ? '2px solid #4A90D9' : 'none',
                         position: 'relative',
                     }}
                 >
@@ -937,68 +265,45 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         height={contentHeight}
                         style={{ display: 'block', pointerEvents: 'none' }}
                     >
-                        {/* 渲染整个思维导图 - 使用计算出的偏移量 */}
                         <g transform={`translate(${offsetX}, ${offsetY})`}>
-                            {renderNode(layoutTree, 0)}
+                            <MindMapNodeRenderer
+                                layout={layoutTree}
+                                level={0}
+                                themeName={themeName as ThemeName}
+                                fontSize={fontSize}
+                                lineWidth={lineWidth}
+                                horizontalGap={horizontalGap}
+                                selectedNodeId={selectedNodeId}
+                                editingNodeId={editingNodeId}
+                                editText={editText}
+                                draggingNodeId={draggingNodeId}
+                                dropTargetId={dropTargetId}
+                                dropPosition={dropPosition}
+                                inputRef={inputRef}
+                                onSelectNode={handleSelectNode}
+                                onDoubleClick={handleDoubleClick}
+                                onContextMenu={handleContextMenu}
+                                onDragStart={handleDragStart}
+                                onDragMove={handleDragMove}
+                                onDragEnd={handleDragEnd}
+                                onDropTargetLeave={clearDropTarget}
+                                onToggleCollapse={handleToggleCollapseClick}
+                                onEditTextChange={setEditText}
+                                onFinishEdit={handleFinishEdit}
+                                onCancelEdit={handleCancelEdit}
+                            />
                         </g>
                     </svg>
                     
-                    {/* 颜色选择器弹窗 - 使用absolute定位，相对于容器 */}
+                    {/* 颜色选择器弹窗 */}
                     {colorPickerNodeId && colorPickerPos && (
-                        <div
-                            style={{
-                                position: 'absolute',
-                                left: colorPickerPos.x + offsetX,
-                                top: colorPickerPos.y + offsetY,
-                                backgroundColor: '#fff',
-                                border: '1px solid #d9d9d9',
-                                borderRadius: 8,
-                                padding: 8,
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                zIndex: 1000,
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(4, 24px)',
-                                gap: 4,
-                                pointerEvents: 'all',
+                        <ColorPicker
+                            position={{
+                                x: colorPickerPos.x + offsetX,
+                                y: colorPickerPos.y + offsetY,
                             }}
-                            onClick={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                        >
-                            {NODE_COLORS.map((color) => (
-                                <div
-                                    key={color}
-                                    onClick={() => handleColorChange(color)}
-                                    style={{
-                                        width: 24,
-                                        height: 24,
-                                        backgroundColor: color,
-                                        border: '1px solid #d9d9d9',
-                                        borderRadius: 4,
-                                        cursor: 'pointer',
-                                    }}
-                                />
-                            ))}
-                            {/* 重置颜色按钮 */}
-                            <div
-                                onClick={() => handleColorChange(undefined)}
-                                style={{
-                                    width: 24,
-                                    height: 24,
-                                    backgroundColor: '#fff',
-                                    border: '1px solid #d9d9d9',
-                                    borderRadius: 4,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 14,
-                                    color: '#999',
-                                }}
-                                title="重置颜色"
-                            >
-                                ✕
-                            </div>
-                        </div>
+                            onColorChange={handleColorChange}
+                        />
                     )}
                 </div>
             </HTMLContainer>
