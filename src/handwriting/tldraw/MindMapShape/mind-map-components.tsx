@@ -49,6 +49,7 @@ export interface ColorPickerProps {
     position: { x: number; y: number }
     containerWidth: number
     onColorChange: (color: string | undefined) => void
+    onClose?: () => void
 }
 
 // ===== 颜色选择器组件 =====
@@ -60,13 +61,22 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     position,
     containerWidth,
     onColorChange,
+    onClose,
 }) => {
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    React.useEffect(() => {
+        // 自动聚焦以便能够监听失焦事件
+        if (containerRef.current) containerRef.current.focus()
+    }, [])
     // 计算是否需要向左偏移以避免超出容器
     const shouldAlignLeft = position.x + COLOR_PICKER_WIDTH > containerWidth - 10
     const adjustedX = shouldAlignLeft ? position.x - COLOR_PICKER_WIDTH - 8 : position.x + 8
     
     return (
         <div
+            ref={containerRef}
+            tabIndex={0}
+            onBlur={() => { onClose && onClose() }}
             style={{
                 position: 'absolute',
                 left: adjustedX,

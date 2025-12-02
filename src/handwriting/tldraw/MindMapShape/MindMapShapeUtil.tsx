@@ -382,6 +382,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             }}
                             containerWidth={contentWidth}
                             onColorChange={handleColorChange}
+                            onClose={closeColorPicker}
                         />
                     )}
                 </div>
