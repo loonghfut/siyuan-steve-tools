@@ -37,8 +37,8 @@ const MindMapSizes = new EditorAtom('mind-map sizes', (editor) => {
 })
 
 const PADDING = 20 // 内边距
-const MIN_WIDTH = 300
-const MIN_HEIGHT = 200
+const MIN_WIDTH = 1
+const MIN_HEIGHT = 1
 
 // 节点布局信息
 interface NodeLayout {
@@ -100,7 +100,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
     }
 
     override canEdit() {
-        return true
+        return false
     }
 
     getDefaultProps(): IMindMapShape['props'] {
@@ -813,25 +813,6 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             {renderNode(layoutTree, 0)}
                         </g>
                     </svg>
-
-                    {/* 编辑模式下的操作提示 */}
-                    {isEditing && (
-                        <div
-                            style={{
-                                position: 'absolute',
-                                bottom: 8,
-                                left: 8,
-                                fontSize: 12,
-                                color: '#888',
-                                background: 'rgba(255,255,255,0.9)',
-                                padding: '4px 8px',
-                                borderRadius: 4,
-                                pointerEvents: 'none',
-                            }}
-                        >
-                            Tab: 添加子节点 | Enter: 添加兄弟节点 | Delete: 删除 | 空格: 折叠/展开 | F2/双击: 编辑
-                        </div>
-                    )}
                 </div>
             </HTMLContainer>
         )
