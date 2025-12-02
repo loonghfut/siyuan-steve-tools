@@ -8,7 +8,6 @@ import {
     THEMES,
     ThemeName,
     MAX_NODE_WIDTH,
-    COLLAPSE_BUTTON_SIZE,
     COLLAPSE_BUTTON_GAP,
     NodeStyle,
 } from './mind-map-constants'
@@ -265,6 +264,9 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     const maxWidth = isRoot ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
     const displayText = truncateText(node.text, displayFontSize, displayFontWeight, maxWidth)
 
+    // 折叠按钮尺寸根据字体大小动态调整，保证可点击性
+    const btnSize = Math.max(12, Math.round(fontSize * 1.0))
+
     // 根据方向计算连接线路径
     const getConnectionPath = (childLayout: NodeLayout) => {
         const cx = childLayout.x
@@ -351,13 +353,13 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                 {/* 扩展的悬浮检测区域 - 包含折叠按钮区域（根据方向调整） */}
                 {hasChildren && (
                     <rect
-                        x={direction === 'left' ? -(COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4) : 0}
-                        y={direction === 'up' ? -(COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4) : 0}
+                        x={direction === 'left' ? -(COLLAPSE_BUTTON_GAP + btnSize + 4) : 0}
+                        y={direction === 'up' ? -(COLLAPSE_BUTTON_GAP + btnSize + 4) : 0}
                         width={direction === 'left' || direction === 'right' 
-                            ? width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4 
+                            ? width + COLLAPSE_BUTTON_GAP + btnSize + 4 
                             : width}
                         height={direction === 'up' || direction === 'down' 
-                            ? height + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4 
+                            ? height + COLLAPSE_BUTTON_GAP + btnSize + 4 
                             : height}
                         fill="transparent"
                         stroke="none"
@@ -461,7 +463,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                 {hasChildren && (isHovered || node.collapsed || isSelected) && (
                     <g
                         transform={(() => {
-                            const btnOffset = COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE / 2
+                            const btnOffset = COLLAPSE_BUTTON_GAP + btnSize / 2
                             switch (direction) {
                                 case 'left':
                                     return `translate(${-btnOffset}, ${height / 2})`
@@ -478,7 +480,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                         onPointerDown={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', pointerEvents: 'all' }}
                     >
-                        <circle r={COLLAPSE_BUTTON_SIZE / 2} fill={colors.nodeBg === 'transparent' ? 'var(--b3-theme-background, #ffffff)' : colors.nodeBg} stroke={colors.nodeBorder === 'transparent' ? 'var(--b3-border-color, #cccccc)' : colors.nodeBorder} />
+                        <circle r={btnSize / 2} fill={colors.nodeBg === 'transparent' ? 'var(--b3-theme-background, #ffffff)' : colors.nodeBg} stroke={colors.nodeBorder === 'transparent' ? 'var(--b3-border-color, #cccccc)' : colors.nodeBorder} />
                         <text
                             textAnchor="middle"
                             dominantBaseline="central"
