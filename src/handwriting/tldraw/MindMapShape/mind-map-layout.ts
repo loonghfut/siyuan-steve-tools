@@ -35,6 +35,8 @@ export interface FullLayoutInfo {
     contentHeight: number
     offsetX: number
     offsetY: number
+    // 根节点在内容区域中的位置（用于锚点定位）
+    rootAnchor: { x: number; y: number }
 }
 
 /**
@@ -174,6 +176,7 @@ export const calculateLayoutWithBounds = (
 
 /**
  * 计算完整的思维导图布局
+ * 以根节点为锚点进行布局，返回根节点在内容区域中的位置
  */
 export const calculateFullLayout = (
     rootNode: MindMapNode,
@@ -182,39 +185,34 @@ export const calculateFullLayout = (
     horizontalGap: number,
     verticalGap: number
 ): FullLayoutInfo => {
-    // 第一次计算布局获取边界，使用临时位置
-    const rootNodeWidth = calculateNodeWidth(rootNode.text, 0, fontSize)
-    const tempRootX = PADDING + rootNodeWidth / 2
-    const tempRootY = 0 // 临时 Y 位置，后续会调整
-    
+    // 以原点(0,0)作为根节点中心进行布局计算，获取边界
     const { bounds: tempBounds } = calculateLayoutWithBounds(
-        rootNode, tempRootX, tempRootY, 0,
+        rootNode, 0, 0, 0,
         nodeHeight, fontSize, horizontalGap, verticalGap
     )
 
-    // 计算实际需要的尺寸
-    const rawHeight = tempBounds.maxY - tempBounds.minY
-    const rawWidth = tempBounds.maxX - tempBounds.minX
-    const contentWidth = Math.max(rawWidth + PADDING * 2, MIN_WIDTH)
-    const contentHeight = Math.max(rawHeight + PADDING * 2, MIN_HEIGHT)
+    // 计算内容区域大小（加上边距）
+    const contentWidth = Math.max(tempBounds.maxX - tempBounds.minX + PADDING * 2, MIN_WIDTH)
+    const contentHeight = Math.max(tempBounds.maxY - tempBounds.minY + PADDING * 2, MIN_HEIGHT)
 
-    // 重新计算布局，让根节点位于内容区域的垂直中心
-    const finalRootX = PADDING + rootNodeWidth / 2
-    const finalRootY = contentHeight / 2
-    const { layout: layoutTree, bounds } = calculateLayoutWithBounds(
-        rootNode, finalRootX, finalRootY, 0,
+    // 计算根节点在内容区域中的位置
+    // 根节点中心相对于内容区域左上角的偏移
+    const rootAnchorX = PADDING - tempBounds.minX  // 根节点 X 在内容区域中的位置
+    const rootAnchorY = PADDING - tempBounds.minY  // 根节点 Y 在内容区域中的位置
+
+    // 重新计算布局，将根节点放在正确的位置
+    const { layout: layoutTree } = calculateLayoutWithBounds(
+        rootNode, rootAnchorX, rootAnchorY, 0,
         nodeHeight, fontSize, horizontalGap, verticalGap
     )
-
-    // 计算偏移量，确保所有节点都在可视区域内
-    const offsetX = 0 // X 已经正确定位
-    const offsetY = PADDING - bounds.minY // 调整 Y 偏移确保顶部有 padding
 
     return {
         layoutTree,
         contentWidth,
         contentHeight,
-        offsetX,
-        offsetY,
+        offsetX: 0,
+        offsetY: 0,
+        // 根节点锚点位置（相对于内容区域左上角）
+        rootAnchor: { x: rootAnchorX, y: rootAnchorY },
     }
 }

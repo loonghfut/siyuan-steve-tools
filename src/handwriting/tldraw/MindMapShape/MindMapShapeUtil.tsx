@@ -38,6 +38,15 @@ const MindMapSizes = new EditorAtom('mind-map sizes', (editor) => {
     return map
 })
 
+// 存储每个 shape 的根节点锚点位置，用于保持根节点位置稳定
+const MindMapRootAnchors = new EditorAtom('mind-map root-anchors', (editor) => {
+    const map = new AtomMap<TLShapeId, { x: number; y: number }>('mind-map root-anchors')
+    editor.sideEffects.registerAfterDeleteHandler('shape', (shape) => {
+        map.delete(shape.id)
+    })
+    return map
+})
+
 export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
     static override type = 'mind-map' as const
     static override props = mindMapShapeProps
@@ -167,7 +176,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
 
         // 计算布局
-        const { layoutTree, contentWidth, contentHeight, offsetX, offsetY } = calculateFullLayout(
+        const { layoutTree, contentWidth, contentHeight, offsetX, offsetY, rootAnchor } = calculateFullLayout(
             rootNode,
             nodeHeight,
             fontSize,
@@ -175,24 +184,49 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             verticalGap
         )
 
-        // 更新 DOM 尺寸到 AtomMap
-        const updateDomSize = useCallback(() => {
+        // 更新 DOM 尺寸并调整 shape 位置以保持根节点稳定
+        const updateDomSizeAndPosition = useCallback(() => {
+            const prevAnchor = MindMapRootAnchors.get(editor).get(shape.id)
+            
+            // 更新尺寸
             MindMapSizes.update(editor, (map) => {
                 const existing = map.get(shape.id)
                 if (existing && existing.height === contentHeight && existing.width === contentWidth) return map
                 return map.set(shape.id, { width: contentWidth, height: contentHeight })
             })
-        }, [editor, shape.id, contentWidth, contentHeight])
+
+            // 更新锚点
+            MindMapRootAnchors.update(editor, (map) => {
+                return map.set(shape.id, rootAnchor)
+            })
+
+            // 如果有之前的锚点位置，计算位置偏移并调整 shape 位置
+            if (prevAnchor && (prevAnchor.x !== rootAnchor.x || prevAnchor.y !== rootAnchor.y)) {
+                const deltaX = rootAnchor.x - prevAnchor.x
+                const deltaY = rootAnchor.y - prevAnchor.y
+                
+                // 调整 shape 位置以补偿锚点偏移，保持根节点在画布上的绝对位置不变
+                const currentShape = editor.getShape<IMindMapShape>(shape.id)
+                if (currentShape) {
+                    editor.updateShape<IMindMapShape>({
+                        id: shape.id,
+                        type: 'mind-map',
+                        x: currentShape.x - deltaX,
+                        y: currentShape.y - deltaY,
+                    })
+                }
+            }
+        }, [editor, shape.id, contentWidth, contentHeight, rootAnchor])
 
         // 在渲染后更新尺寸
         useLayoutEffect(() => {
-            updateDomSize()
-        }, [updateDomSize])
+            updateDomSizeAndPosition()
+        }, [updateDomSizeAndPosition])
 
         // 当 rootNode 变化时重新计算尺寸
         useEffect(() => {
-            updateDomSize()
-        }, [rootNode, updateDomSize])
+            updateDomSizeAndPosition()
+        }, [rootNode, updateDomSizeAndPosition])
 
         // 聚焦输入框
         useEffect(() => {
