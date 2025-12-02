@@ -96,7 +96,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
     }
 
     override canResize(_shape: IMindMapShape) {
-        return true
+        return false
     }
 
     override canEdit() {
