@@ -485,8 +485,8 @@ const CustomStylePanel = track(() => {
 
     return (
         <DefaultStylePanel>
-            {/* 渲染默认的样式控件 */}
-            <DefaultStylePanelContent styles={styles} />
+            {/* 如果选中了思维导图（mind-map），我们不加载 DefaultStylePanelContent */}
+            {!hasMindMapSelection && <DefaultStylePanelContent styles={styles} />}
 
             {isSingleSlideSelected && slideShape && (
                 <div className="tlui-style-panel__section"> {/* 移除 styles={styles}，因为父级已经处理 */}
