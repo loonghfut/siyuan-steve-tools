@@ -8,6 +8,7 @@ import {
     AtomMap,
     EditorAtom,
     TLShapeId,
+    useValue,
 } from '@tldraw/tldraw'
 import { mindMapShapeMigrations } from './mind-map-shape-migrations'
 import { mindMapShapeProps } from './mind-map-shape-props'
@@ -61,7 +62,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
     }
 
     override canEdit() {
-        return false
+        return true
     }
 
     getDefaultProps(): IMindMapShape['props'] {
@@ -243,9 +244,34 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             }
         }, [editingNodeId])
 
+        // 监听 tldraw 编辑状态，退出编辑模式时清除选中
+        const isEditingThisShape = useValue(
+            'is editing this shape',
+            () => editor.getEditingShapeId() === shape.id,
+            [editor, shape.id]
+        )
+        
+        // 监听当前形状是否被选中
+        const isThisShapeSelected = useValue(
+            'is this shape selected',
+            () => editor.getSelectedShapeIds().includes(shape.id),
+            [editor, shape.id]
+        )
+        
+        useEffect(() => {
+            // 当退出编辑模式或形状不再被选中时，清除节点选中
+            if ((!isEditingThisShape || !isThisShapeSelected) && selectedNodeId) {
+                const newRoot = deepCloneRootNode(rootNode)
+                updateShape(newRoot, undefined)
+            }
+        }, [isEditingThisShape, isThisShapeSelected])
+
         // 点击空白区域时清除选中
         const handleContainerClick = useCallback((e: React.MouseEvent) => {
-            if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg') {
+            const target = e.target as HTMLElement | SVGElement
+            const tagName = target.tagName.toLowerCase()
+            // 点击的是容器、SVG 或透明背景 rect 时取消选中
+            if (e.target === e.currentTarget || tagName === 'svg' || (tagName === 'rect' && target.getAttribute('fill') === 'transparent')) {
                 if (selectedNodeId) {
                     const newRoot = deepCloneRootNode(rootNode)
                     updateShape(newRoot, undefined)
@@ -297,8 +323,16 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         ref={svgRef}
                         width={contentWidth}
                         height={contentHeight}
-                        style={{ display: 'block', pointerEvents: 'none' }}
+                        style={{ display: 'block' }}
+                        onClick={handleContainerClick}
                     >
+                        {/* 透明背景，用于捕获空白区域的点击事件 */}
+                        <rect
+                            width={contentWidth}
+                            height={contentHeight}
+                            fill="transparent"
+                            style={{ pointerEvents: 'all' }}
+                        />
                         <g transform={`translate(${offsetX}, ${offsetY})`}>
                             <MindMapNodeRenderer
                                 layout={layoutTree}

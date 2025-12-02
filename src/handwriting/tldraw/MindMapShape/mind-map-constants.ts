@@ -28,6 +28,7 @@ export const THEMES = {
         nodeBorder: '#cccccc',
         lineColor: '#888888',
         selectedBorder: '#4A90D9',
+        nodeStyle: 'box' as const, // 'box' | 'underline' | 'none'
     },
     colorful: {
         rootBg: '#FF6B6B',
@@ -37,6 +38,7 @@ export const THEMES = {
         nodeBorder: '#FFB74D',
         lineColor: '#FF9800',
         selectedBorder: '#E91E63',
+        nodeStyle: 'box' as const,
     },
     minimal: {
         rootBg: '#333333',
@@ -46,11 +48,63 @@ export const THEMES = {
         nodeBorder: '#e0e0e0',
         lineColor: '#999999',
         selectedBorder: '#333333',
+        nodeStyle: 'box' as const,
+    },
+    underline: {
+        rootBg: '#4A90D9',
+        rootText: '#ffffff',
+        nodeBg: 'transparent',
+        nodeText: 'var(--b3-theme-on-background, #333333)',
+        nodeBorder: '#4A90D9',
+        lineColor: '#4A90D9',
+        selectedBorder: '#FF6B6B',
+        nodeStyle: 'underline' as const,
+    },
+    noBorder: {
+        rootBg: '#4A90D9',
+        rootText: '#ffffff',
+        nodeBg: 'transparent',
+        nodeText: 'var(--b3-theme-on-background, #333333)',
+        nodeBorder: 'transparent',
+        lineColor: 'var(--b3-theme-on-surface, #888888)',
+        selectedBorder: '#4A90D9',
+        nodeStyle: 'none' as const,
+    },
+    wireframe: {
+        rootBg: 'transparent',
+        rootText: 'var(--b3-theme-on-background, #333333)',
+        nodeBg: 'transparent',
+        nodeText: 'var(--b3-theme-on-background, #333333)',
+        nodeBorder: 'var(--b3-theme-on-background, #333333)',
+        lineColor: 'var(--b3-theme-on-background, #333333)',
+        selectedBorder: '#4A90D9',
+        nodeStyle: 'box' as const,
+    },
+    ocean: {
+        rootBg: '#0077B6',
+        rootText: '#ffffff',
+        nodeBg: '#CAF0F8',
+        nodeText: '#03045E',
+        nodeBorder: '#90E0EF',
+        lineColor: '#00B4D8',
+        selectedBorder: '#0077B6',
+        nodeStyle: 'box' as const,
+    },
+    forest: {
+        rootBg: '#2D6A4F',
+        rootText: '#ffffff',
+        nodeBg: '#D8F3DC',
+        nodeText: '#1B4332',
+        nodeBorder: '#95D5B2',
+        lineColor: '#40916C',
+        selectedBorder: '#2D6A4F',
+        nodeStyle: 'box' as const,
     },
 } as const
 
 export type ThemeName = keyof typeof THEMES
 export type ThemeColors = typeof THEMES[ThemeName]
+export type NodeStyle = 'box' | 'underline' | 'none'
 
 // 颜色数组用于不同层级
 export const LEVEL_COLORS = [

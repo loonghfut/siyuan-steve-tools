@@ -11,6 +11,7 @@ import {
     MAX_NODE_WIDTH,
     COLLAPSE_BUTTON_SIZE,
     COLLAPSE_BUTTON_GAP,
+    NodeStyle,
 } from './mind-map-constants'
 
 // ===== 类型定义 =====
@@ -167,8 +168,12 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     const hasChildren = node.children.length > 0
     const isDragging = node.id === draggingNodeId
     const isDropTarget = node.id === dropTargetId
+    
+    // 悬浮状态 - 用于控制折叠按钮的显示
+    const [isHovered, setIsHovered] = React.useState(false)
 
     const colors = THEMES[themeName] || THEMES.default
+    const nodeStyle: NodeStyle = colors.nodeStyle || 'box'
 
     // 获取节点颜色
     let bgColor = isRoot ? colors.rootBg : colors.nodeBg
@@ -276,24 +281,74 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                         onDropTargetLeave(node.id)
                     }
                 }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
                 style={{ 
                     cursor: isDragging ? 'grabbing' : 'grab', 
                     pointerEvents: 'all',
                     opacity: isDragging ? 0.6 : 1,
                 }}
             >
+                {/* 扩展的悬浮检测区域 - 包含折叠按钮区域 */}
+                {hasChildren && (
+                    <rect
+                        x={0}
+                        y={0}
+                        width={width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4}
+                        height={height}
+                        fill="transparent"
+                        stroke="none"
+                        style={{ pointerEvents: 'all' }}
+                    />
+                )}
+                
                 {/* 放置指示器 */}
                 {dropIndicator}
                 
-                <rect
-                    width={width}
-                    height={height}
-                    rx={isRoot ? height / 2 : 4}
-                    ry={isRoot ? height / 2 : 4}
-                    fill={bgColor}
-                    stroke={isDropTarget && dropPosition === 'child' ? '#4A90D9' : borderColor}
-                    strokeWidth={isSelected || (isDropTarget && dropPosition === 'child') ? 3 : 1}
-                />
+                {/* 根据 nodeStyle 渲染不同样式的节点 */}
+                {nodeStyle === 'underline' && !isRoot ? (
+                    // 下划线样式：只有底部边框 + 透明点击区域
+                    <>
+                        {/* 透明点击区域 */}
+                        <rect
+                            width={width}
+                            height={height}
+                            fill="transparent"
+                            stroke="none"
+                        />
+                        <line
+                            x1={0}
+                            y1={height}
+                            x2={width}
+                            y2={height}
+                            stroke={isSelected ? colors.selectedBorder : borderColor}
+                            strokeWidth={isSelected ? 3 : 2}
+                        />
+                    </>
+                ) : nodeStyle === 'none' && !isRoot ? (
+                    // 无边框样式：透明点击区域（选中时显示虚线边框）
+                    <rect
+                        width={width}
+                        height={height}
+                        rx={4}
+                        ry={4}
+                        fill="transparent"
+                        stroke={isSelected ? colors.selectedBorder : 'transparent'}
+                        strokeWidth={isSelected ? 2 : 0}
+                        strokeDasharray={isSelected ? '4 2' : 'none'}
+                    />
+                ) : (
+                    // 默认 box 样式
+                    <rect
+                        width={width}
+                        height={height}
+                        rx={isRoot ? height / 2 : 4}
+                        ry={isRoot ? height / 2 : 4}
+                        fill={bgColor}
+                        stroke={isDropTarget && dropPosition === 'child' ? '#4A90D9' : borderColor}
+                        strokeWidth={isSelected || (isDropTarget && dropPosition === 'child') ? 3 : 1}
+                    />
+                )}
                 
                 {/* 节点文本或输入框 */}
                 {isCurrentEditing ? (
@@ -339,15 +394,15 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     </text>
                 )}
 
-                {/* 折叠/展开按钮 - 有子节点时显示，移到节点外部右侧 */}
-                {hasChildren && (
+                {/* 折叠/展开按钮 - 有子节点时显示，悬浮或已折叠时可见 */}
+                {hasChildren && (isHovered || node.collapsed || isSelected) && (
                     <g
                         transform={`translate(${width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE / 2}, ${height / 2})`}
                         onClick={(e) => onToggleCollapse(node.id, e)}
                         onPointerDown={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', pointerEvents: 'all' }}
                     >
-                        <circle r={COLLAPSE_BUTTON_SIZE / 2} fill={colors.nodeBg} stroke={colors.nodeBorder} />
+                        <circle r={COLLAPSE_BUTTON_SIZE / 2} fill={colors.nodeBg === 'transparent' ? 'var(--b3-theme-background, #ffffff)' : colors.nodeBg} stroke={colors.nodeBorder === 'transparent' ? 'var(--b3-border-color, #cccccc)' : colors.nodeBorder} />
                         <text
                             textAnchor="middle"
                             dominantBaseline="central"

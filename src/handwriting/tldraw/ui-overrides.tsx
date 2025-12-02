@@ -52,6 +52,8 @@ import { IJsShape } from './JsShape/js-shape-types';
 import { openTab, showMessage, confirm as syConfirm } from 'siyuan';
 import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
+import { IMindMapShape } from './MindMapShape/mind-map-shape-types'
+import { ThemeName } from './MindMapShape/mind-map-constants'
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
@@ -222,6 +224,18 @@ const CustomStylePanel = track(() => {
         return values.every(v => v === first) ? first : 'mixed'
     }, [hasJsSelection, selectedJsShapes])
 
+    // --- Mind Map: 主题选择 ---
+    const selectedMindMapShapes = React.useMemo(
+        () => selectedShapes.filter((shape): shape is IMindMapShape => shape.type === 'mind-map'),
+        [selectedShapes]
+    )
+    const hasMindMapSelection = selectedMindMapShapes.length > 0
+    const mindMapThemeValue = React.useMemo<ThemeName | 'mixed'>(() => {
+        if (!hasMindMapSelection) return 'default'
+        const themes = selectedMindMapShapes.map(shape => (shape.props.theme || 'default') as ThemeName)
+        const first = themes[0]
+        return themes.every(t => t === first) ? first : 'mixed'
+    }, [hasMindMapSelection, selectedMindMapShapes])
 
     // --- 获取 rootId ---
 
@@ -647,6 +661,46 @@ const CustomStylePanel = track(() => {
                     >
                         {jsInteractiveState === 'mixed' ? '⚬ 允许交互' : jsInteractiveState ? '✓ 允许交互' : '允许交互'}
                     </TldrawUiButton>
+                </div>
+            )}
+            {hasMindMapSelection && (
+                <div className="tlui-style-panel__section">
+                    <StylePanelDropdownPicker
+                        label={"思维导图主题"}
+                        type="menu"
+                        id="mind-map-theme"
+                        uiType="mind-map-theme"
+                        stylePanelType="mind-map-theme"
+                        style={{ id: 'mind-map-theme' } as any}
+                        items={[
+                            { value: 'default', icon: 'color' },
+                            { value: 'colorful', icon: 'blob' },
+                            { value: 'minimal', icon: 'tool-line' },
+                            { value: 'underline', icon: 'minus' },
+                            { value: 'noBorder', icon: 'broken' },
+                            { value: 'wireframe', icon: 'geo-rectangle' },
+                            { value: 'ocean', icon: 'geo-cloud' },
+                            { value: 'forest', icon: 'geo-triangle' },
+                        ]}
+                        value={
+                            mindMapThemeValue === 'mixed'
+                                ? { type: 'mixed' as const }
+                                : { type: 'shared' as const, value: mindMapThemeValue }
+                        }
+                        onValueChange={(_style, nextTheme: any) => {
+                            if (!selectedMindMapShapes.length) return;
+                            const nextThemeStr = nextTheme as ThemeName;
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedMindMapShapes.map((shape) => ({
+                                        id: shape.id,
+                                        type: 'mind-map',
+                                        props: { ...shape.props, theme: nextThemeStr },
+                                    }))
+                                );
+                            });
+                        }}
+                    />
                 </div>
             )}
         </DefaultStylePanel>
