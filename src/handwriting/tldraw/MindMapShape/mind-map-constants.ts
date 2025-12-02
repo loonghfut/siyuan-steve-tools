@@ -45,9 +45,9 @@ export const THEMES = {
         rootText: '#ffffff',
         nodeBg: 'transparent',
         nodeText: 'var(--b3-theme-on-background, #333333)',
-        nodeBorder: '#4A90D9',
-        lineColor: '#4A90D9',
-        selectedBorder: '#FF6B6B',
+        nodeBorder: '#cccccc',
+        lineColor: '#888888',
+        selectedBorder: '#4A90D9',
         nodeStyle: 'underline' as const,
     },
 } as const
