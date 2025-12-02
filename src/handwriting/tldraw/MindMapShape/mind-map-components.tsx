@@ -46,20 +46,29 @@ export interface NodeRenderProps {
 
 export interface ColorPickerProps {
     position: { x: number; y: number }
+    containerWidth: number
     onColorChange: (color: string | undefined) => void
 }
 
 // ===== 颜色选择器组件 =====
 
+// 颜色选择器的宽度：4列 * 24px + 3个间隙 * 4px + padding 16px = 124px
+const COLOR_PICKER_WIDTH = 124
+
 export const ColorPicker: React.FC<ColorPickerProps> = ({
     position,
+    containerWidth,
     onColorChange,
 }) => {
+    // 计算是否需要向左偏移以避免超出容器
+    const shouldAlignLeft = position.x + COLOR_PICKER_WIDTH > containerWidth - 10
+    const adjustedX = shouldAlignLeft ? position.x - COLOR_PICKER_WIDTH - 8 : position.x + 8
+    
     return (
         <div
             style={{
                 position: 'absolute',
-                left: position.x,
+                left: adjustedX,
                 top: position.y,
                 backgroundColor: '#fff',
                 border: '1px solid #d9d9d9',

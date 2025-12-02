@@ -324,7 +324,12 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         width={contentWidth}
                         height={contentHeight}
                         style={{ display: 'block' }}
-                        onClick={handleContainerClick}
+                        onClick={(e) => {
+                            handleContainerClick(e)
+                            if (colorPickerNodeId) {
+                                closeColorPicker()
+                            }
+                        }}
                     >
                         {/* 透明背景，用于捕获空白区域的点击事件 */}
                         <rect
@@ -370,6 +375,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 x: colorPickerPos.x + offsetX,
                                 y: colorPickerPos.y + offsetY,
                             }}
+                            containerWidth={contentWidth}
                             onColorChange={handleColorChange}
                         />
                     )}

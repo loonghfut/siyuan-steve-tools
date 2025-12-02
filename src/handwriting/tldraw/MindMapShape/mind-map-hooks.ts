@@ -202,13 +202,13 @@ export const useColorPicker = (
     updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void
 ) => {
     const [colorPickerNodeId, setColorPickerNodeId] = useState<string | null>(null)
-    const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null)
+    const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number; alignRight?: boolean } | null>(null)
 
     const handleContextMenu = useCallback((
         nodeId: string, 
         nodeX: number, 
         nodeY: number, 
-        nodeWidth: number, 
+        _nodeWidth: number, 
         nodeHeight: number, 
         e: React.MouseEvent
     ) => {
@@ -219,9 +219,13 @@ export const useColorPicker = (
         const newRoot = deepCloneRootNode(rootNode)
         updateShape(newRoot, nodeId)
         
-        // 设置颜色选择器位置
+        // 设置颜色选择器位置，传入节点右边缘位置用于判断是否需要左对齐
         setColorPickerNodeId(nodeId)
-        setColorPickerPos({ x: nodeX + nodeWidth / 2 + 8, y: nodeY - nodeHeight / 2 })
+        setColorPickerPos({ 
+            x: nodeX, 
+            y: nodeY - nodeHeight / 2,
+            alignRight: false // 默认右侧显示，会在渲染时根据边界调整
+        })
     }, [rootNode, updateShape])
 
     const handleColorChange = useCallback((color: string | undefined) => {
