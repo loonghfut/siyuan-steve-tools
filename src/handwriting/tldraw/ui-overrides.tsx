@@ -237,6 +237,13 @@ const CustomStylePanel = track(() => {
         return themes.every(t => t === first) ? first : 'mixed'
     }, [hasMindMapSelection, selectedMindMapShapes])
 
+    const mindMapFontSizeValue = React.useMemo<number | 'mixed'>(() => {
+        if (!hasMindMapSelection) return 14
+        const fontSizes = selectedMindMapShapes.map(shape => shape.props.fontSize || 14)
+        const first = fontSizes[0]
+        return fontSizes.every(fs => fs === first) ? first : 'mixed'
+    }, [hasMindMapSelection, selectedMindMapShapes])
+
     // --- 获取 rootId ---
 
     const container = editor.getContainer();
@@ -661,6 +668,63 @@ const CustomStylePanel = track(() => {
                     >
                         {jsInteractiveState === 'mixed' ? '⚬ 允许交互' : jsInteractiveState ? '✓ 允许交互' : '允许交互'}
                     </TldrawUiButton>
+                </div>
+            )}
+            {hasMindMapSelection && (
+                <div className="tlui-style-panel__section">
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px'
+                    }}>
+
+                        <div style={{
+                            display: 'flex',
+                            gap: '4px',
+                            flexWrap: 'wrap'
+                        }}>
+                            {[12, 14, 16, 18, 20, 24].map(size => (
+                                <TldrawUiButton
+                                    key={size}
+                                    type={mindMapFontSizeValue === size ? 'primary' : 'normal'}
+                                    style={{ 
+                                        flex: '1 1 auto',
+                                        minWidth: '32px',
+                                        fontSize: '12px'
+                                    }}
+                                    onClick={() => {
+                                        if (!selectedMindMapShapes.length) return;
+                                        // 以14为基准，nodeWidth/nodeHeight/lineWidth按比例缩放
+                                        const baseFontSize = 14;
+                                        const baseNodeWidth = 120;
+                                        const baseNodeHeight = 40;
+                                        const baseLineWidth = 2;
+                                        const scale = size / baseFontSize;
+                                        const nodeWidth = Math.round(baseNodeWidth * scale);
+                                        const nodeHeight = Math.round(baseNodeHeight * scale);
+                                        const lineWidth = +(baseLineWidth * scale).toFixed(2);
+                                        editor.run(() => {
+                                            editor.updateShapes(
+                                                selectedMindMapShapes.map((shape) => ({
+                                                    id: shape.id,
+                                                    type: 'mind-map',
+                                                    props: {
+                                                        ...shape.props,
+                                                        fontSize: size,
+                                                        nodeWidth,
+                                                        nodeHeight,
+                                                        lineWidth,
+                                                    },
+                                                }))
+                                            );
+                                        });
+                                    }}
+                                >
+                                    {size}
+                                </TldrawUiButton>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
             {hasMindMapSelection && (

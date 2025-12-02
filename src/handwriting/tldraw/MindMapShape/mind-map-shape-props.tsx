@@ -2,13 +2,13 @@ import { DefaultColorStyle, RecordProps, T } from '@tldraw/tldraw'
 import { IMindMapShape, MindMapNode } from './mind-map-shape-types'
 
 // 思维导图节点验证器
-const mindMapNodeValidator: T.Validator<MindMapNode> = T.object({
-    id: T.string,
-    text: T.string,
-    children: T.arrayOf(T.any), // 递归类型，使用 any
-    collapsed: T.optional(T.boolean),
-    color: T.optional(T.string),
-})
+// const mindMapNodeValidator: T.Validator<MindMapNode> = T.object({
+//     id: T.string,
+//     text: T.string,
+//     children: T.arrayOf(T.any), // 递归类型，使用 any
+//     collapsed: T.optional(T.boolean),
+//     color: T.optional(T.string),
+// })
 
 // 思维导图形状属性验证
 export const mindMapShapeProps: RecordProps<IMindMapShape> = {
