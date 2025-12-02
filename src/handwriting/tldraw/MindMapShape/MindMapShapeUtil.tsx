@@ -39,6 +39,19 @@ const MindMapSizes = new EditorAtom('mind-map sizes', (editor) => {
 const PADDING = 20 // 内边距
 const MIN_WIDTH = 1
 const MIN_HEIGHT = 1
+const MIN_NODE_WIDTH = 60 // 节点最小宽度
+const MAX_NODE_WIDTH = 300 // 节点最大宽度
+const NODE_PADDING_H = 24 // 节点水平内边距（左右各12px）
+
+// 测量文本宽度的辅助函数
+const measureTextWidth = (text: string, fontSize: number, fontWeight: string = 'normal'): number => {
+    // 使用 canvas 测量文本宽度
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return text.length * fontSize * 0.6 // fallback
+    ctx.font = `${fontWeight} ${fontSize}px sans-serif`
+    return ctx.measureText(text).width
+}
 
 // 节点布局信息
 interface NodeLayout {
@@ -164,7 +177,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             rootNode,
             horizontalGap,
             verticalGap,
-            nodeWidth,
+            // nodeWidth, // 现在使用动态计算的宽度
             nodeHeight,
             fontSize,
             lineWidth,
@@ -199,14 +212,30 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
 
             let currentY = layout.y - totalChildHeight / 2
 
+            // 父节点的右边缘位置
+            const parentRightEdge = layout.x + layout.width / 2
+
             for (const childLayout of layout.children) {
                 const subtreeHeight = getSubtreeHeight(childLayout, vGap)
-                childLayout.x = layout.x + layout.width + hGap
+                // 子节点的中心 X = 父节点右边缘 + 间距 + 子节点宽度的一半
+                childLayout.x = parentRightEdge + hGap + childLayout.width / 2
                 childLayout.y = currentY + subtreeHeight / 2
                 updateChildPositions(childLayout, hGap, vGap)
                 currentY += subtreeHeight + vGap
             }
         }, [getSubtreeHeight])
+
+        // 根据文本计算节点宽度
+        const calculateNodeWidth = useCallback((text: string, level: number): number => {
+            const fs = level === 0 ? fontSize * 1.2 : fontSize
+            const fw = level === 0 ? 'bold' : 'normal'
+            const textWidth = measureTextWidth(text, fs, fw)
+            // 添加水平内边距，并限制在最小/最大宽度范围内
+            const calculatedWidth = textWidth + NODE_PADDING_H
+            const minW = level === 0 ? MIN_NODE_WIDTH * 1.2 : MIN_NODE_WIDTH
+            const maxW = level === 0 ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
+            return Math.max(minW, Math.min(maxW, calculatedWidth))
+        }, [fontSize])
 
         // 计算节点布局 - 返回布局树和边界信息
         const calculateLayoutWithBounds = useCallback((
@@ -215,11 +244,13 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             y: number,
             level: number = 0
         ): { layout: NodeLayout; bounds: { minX: number; maxX: number; minY: number; maxY: number } } => {
+            // 动态计算节点宽度
+            const dynamicWidth = calculateNodeWidth(node.text, level)
             const layout: NodeLayout = {
                 node,
                 x,
                 y,
-                width: level === 0 ? nodeWidth * 1.2 : nodeWidth,
+                width: dynamicWidth,
                 height: level === 0 ? nodeHeight * 1.2 : nodeHeight,
                 children: [],
             }
@@ -253,12 +284,16 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             // 计算子节点的起始 y 位置（居中对齐）
             let currentY = y - totalChildHeight / 2
 
+            // 父节点的右边缘位置
+            const parentRightEdge = x + layout.width / 2
+
             for (let i = 0; i < childLayouts.length; i++) {
                 const childLayout = childLayouts[i]
                 const subtreeHeight = getSubtreeHeight(childLayout, verticalGap)
                 
                 // 设置子节点的实际位置
-                childLayout.x = x + layout.width + horizontalGap
+                // 子节点的中心 X = 父节点右边缘 + 间距 + 子节点宽度的一半
+                childLayout.x = parentRightEdge + horizontalGap + childLayout.width / 2
                 childLayout.y = currentY + subtreeHeight / 2
                 
                 // 递归更新子节点的子节点位置
@@ -283,10 +318,11 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             }
 
             return { layout, bounds }
-        }, [nodeWidth, nodeHeight, horizontalGap, verticalGap, getSubtreeHeight, updateChildPositions])
+        }, [calculateNodeWidth, nodeHeight, horizontalGap, verticalGap, getSubtreeHeight, updateChildPositions])
 
         // 第一次计算布局获取边界，使用临时位置
-        const tempRootX = PADDING + nodeWidth * 0.6
+        const rootNodeWidth = calculateNodeWidth(rootNode.text, 0)
+        const tempRootX = PADDING + rootNodeWidth / 2
         const tempRootY = 0 // 临时 Y 位置，后续会调整
         const { bounds: tempBounds } = calculateLayoutWithBounds(rootNode, tempRootX, tempRootY, 0)
 
@@ -297,7 +333,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         const contentHeight = Math.max(rawHeight + PADDING * 2, MIN_HEIGHT)
 
         // 重新计算布局，让根节点位于内容区域的垂直中心
-        const finalRootX = PADDING + nodeWidth * 0.6
+        const finalRootX = PADDING + rootNodeWidth / 2
         const finalRootY = contentHeight / 2
         const { layout: layoutTree, bounds } = calculateLayoutWithBounds(rootNode, finalRootX, finalRootY, 0)
 
@@ -733,7 +769,25 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 fontWeight={isRoot ? 'bold' : 'normal'}
                                 style={{ pointerEvents: 'none', userSelect: 'none' }}
                             >
-                                {node.text.length > 10 ? node.text.slice(0, 10) + '...' : node.text}
+                                {/* 如果文本过长超过最大宽度，则截断显示 */}
+                                {(() => {
+                                    const fs = isRoot ? fontSize * 1.2 : fontSize
+                                    const fw = isRoot ? 'bold' : 'normal'
+                                    const maxW = isRoot ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
+                                    const textWidth = measureTextWidth(node.text, fs, fw)
+                                    if (textWidth + NODE_PADDING_H > maxW) {
+                                        // 计算可显示的字符数
+                                        const availableWidth = maxW - NODE_PADDING_H - measureTextWidth('...', fs, fw)
+                                        let displayText = ''
+                                        for (let i = 0; i < node.text.length; i++) {
+                                            const testText = node.text.slice(0, i + 1)
+                                            if (measureTextWidth(testText, fs, fw) > availableWidth) break
+                                            displayText = testText
+                                        }
+                                        return displayText + '...'
+                                    }
+                                    return node.text
+                                })()}
                             </text>
                         )}
 
