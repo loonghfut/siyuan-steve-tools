@@ -338,13 +338,17 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     opacity: isDragging ? 0.6 : 1,
                 }}
             >
-                {/* 扩展的悬浮检测区域 - 包含折叠按钮区域 */}
+                {/* 扩展的悬浮检测区域 - 包含折叠按钮区域（根据方向调整） */}
                 {hasChildren && (
                     <rect
-                        x={0}
-                        y={0}
-                        width={width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4}
-                        height={height}
+                        x={direction === 'left' ? -(COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4) : 0}
+                        y={direction === 'up' ? -(COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4) : 0}
+                        width={direction === 'left' || direction === 'right' 
+                            ? width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4 
+                            : width}
+                        height={direction === 'up' || direction === 'down' 
+                            ? height + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE + 4 
+                            : height}
                         fill="transparent"
                         stroke="none"
                         style={{ pointerEvents: 'all' }}
