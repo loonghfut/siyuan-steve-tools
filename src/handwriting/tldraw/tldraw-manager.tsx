@@ -131,7 +131,7 @@ export class TldrawManager {
                                 const trashFileName = `${this.storageKey}-forced-backup-${Date.now()}.json`;
                                 await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([content], { type: 'application/json' }));
                                 showMessage('备份已保存到回收站: ' + trashFileName, 3000, 'info');
-                                } else {
+                            } else {
                                 showMessage('未找到原始存储文件，未进行文件级备份', 3000, 'info');
                             }
                         } catch (err2) {
@@ -383,8 +383,9 @@ export class TldrawManager {
                         }
 
                         // 设置双击画布创建 single-block 的处理器
-                        setupDoubleClickHandler(editor);
-
+                        if (settingdata['enableDoubleClickCreateSingleBlock'] !== false) {
+                            setupDoubleClickHandler(editor);
+                        }
                         // 添加全局拖放事件监听
                         const container = editor.getContainer();
 
