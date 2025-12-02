@@ -674,13 +674,8 @@ const CustomStylePanel = track(() => {
                         style={{ id: 'mind-map-theme' } as any}
                         items={[
                             { value: 'default', icon: 'color' },
-                            { value: 'colorful', icon: 'blob' },
-                            { value: 'minimal', icon: 'tool-line' },
-                            { value: 'underline', icon: 'minus' },
                             { value: 'noBorder', icon: 'broken' },
-                            { value: 'wireframe', icon: 'geo-rectangle' },
-                            { value: 'ocean', icon: 'geo-cloud' },
-                            { value: 'forest', icon: 'geo-triangle' },
+                            { value: 'underline', icon: 'minus' },
                         ]}
                         value={
                             mindMapThemeValue === 'mixed'

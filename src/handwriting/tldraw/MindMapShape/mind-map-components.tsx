@@ -6,7 +6,6 @@ import { getContrastTextColor, truncateText } from './mind-map-utils'
 import {
     NODE_COLORS,
     THEMES,
-    LEVEL_COLORS,
     ThemeName,
     MAX_NODE_WIDTH,
     COLLAPSE_BUTTON_SIZE,
@@ -189,19 +188,23 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     let textColor = isRoot ? colors.rootText : colors.nodeText
     let borderColor = isSelected ? colors.selectedBorder : colors.nodeBorder
 
-    // colorful 主题使用层级颜色
-    if (themeName === 'colorful' && !isRoot) {
-        const colorIndex = (level - 1) % LEVEL_COLORS.length
-        borderColor = isSelected ? colors.selectedBorder : LEVEL_COLORS[colorIndex]
-    }
-
     // 自定义节点颜色
     if (node.color === 'none') {
         bgColor = 'transparent'
         textColor = 'var(--b3-theme-on-background)'
     } else if (node.color) {
-        bgColor = node.color
-        textColor = getContrastTextColor(node.color)
+        // 对于无边框主题，颜色应用到文字；对于下划线主题，颜色应用到下划线；其他主题应用到背景
+        if (nodeStyle === 'none') {
+            bgColor = 'transparent'
+            textColor = node.color
+        } else if (nodeStyle === 'underline') {
+            bgColor = 'transparent'
+            borderColor = node.color
+            textColor = colors.nodeText
+        } else {
+            bgColor = node.color
+            textColor = getContrastTextColor(node.color)
+        }
     }
 
     // 拖拽时的样式
