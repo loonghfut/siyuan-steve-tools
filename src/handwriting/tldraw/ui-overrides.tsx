@@ -764,41 +764,96 @@ const CustomStylePanel = track(() => {
             )}
             {hasMindMapSelection && (
                 <div className="tlui-style-panel__section">
-                    <StylePanelDropdownPicker
-                        label={"导图方向"}
-                        type="menu"
-                        id="mind-map-direction"
-                        uiType="mind-map-direction"
-                        stylePanelType="mind-map-direction"
-                        style={{ id: 'mind-map-direction' } as any}
-                        items={[
-                            { value: 'right', icon: 'arrow-right' },
-                            { value: 'left', icon: 'arrow-left' },
-                            { value: 'down', icon: 'arrow-down' },
-                            { value: 'up', icon: 'arrow-up' },
-                        ]}
-                        value={(() => {
-                            if (!selectedMindMapShapes.length) return { type: 'shared', value: 'right' };
-                            const directions = selectedMindMapShapes.map(shape => shape.props.direction || 'right');
-                            const first = directions[0];
-                            return directions.every(d => d === first)
-                                ? { type: 'shared', value: first }
-                                : { type: 'mixed' };
-                        })()}
-                        onValueChange={(_style, nextDirection: any) => {
-                            if (!selectedMindMapShapes.length) return;
-                            const nextDirectionStr = nextDirection as string;
-                            editor.run(() => {
-                                editor.updateShapes(
-                                    selectedMindMapShapes.map((shape) => ({
-                                        id: shape.id,
-                                        type: 'mind-map',
-                                        props: { ...shape.props, direction: nextDirectionStr },
-                                    }))
-                                );
-                            });
-                        }}
-                    />
+                    <div style={{ display: 'flex', gap: '0px' }}>
+                        <TldrawUiButton
+                            type={(() => {
+                                const v = selectedMindMapShapes.length ? selectedMindMapShapes[0].props.direction : 'right';
+                                return v === 'up' ? 'primary' : 'normal';
+                            })()}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
+                            onClick={() => {
+                                if (!selectedMindMapShapes.length) return;
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedMindMapShapes.map((shape) => ({
+                                            id: shape.id,
+                                            type: 'mind-map',
+                                            props: { ...shape.props, direction: 'up' },
+                                        }))
+                                    );
+                                });
+                            }}
+                            title="将导图排列到上方"
+                        >
+                            ↑
+                        </TldrawUiButton>
+                        <TldrawUiButton
+                            type={(() => {
+                                const v = selectedMindMapShapes.length ? selectedMindMapShapes[0].props.direction : 'right';
+                                return v === 'down' ? 'primary' : 'normal';
+                            })()}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
+                            onClick={() => {
+                                if (!selectedMindMapShapes.length) return;
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedMindMapShapes.map((shape) => ({
+                                            id: shape.id,
+                                            type: 'mind-map',
+                                            props: { ...shape.props, direction: 'down' },
+                                        }))
+                                    );
+                                });
+                            }}
+                            title="将导图排列到下方"
+                        >
+                            ↓
+                        </TldrawUiButton>
+                        <TldrawUiButton
+                            type={(() => {
+                                const v = selectedMindMapShapes.length ? selectedMindMapShapes[0].props.direction : 'right';
+                                return v === 'left' ? 'primary' : 'normal';
+                            })()}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
+                            onClick={() => {
+                                if (!selectedMindMapShapes.length) return;
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedMindMapShapes.map((shape) => ({
+                                            id: shape.id,
+                                            type: 'mind-map',
+                                            props: { ...shape.props, direction: 'left' },
+                                        }))
+                                    );
+                                });
+                            }}
+                            title="将导图排列到左侧"
+                        >
+                            ←
+                        </TldrawUiButton>
+                        <TldrawUiButton
+                            type={(() => {
+                                const v = selectedMindMapShapes.length ? selectedMindMapShapes[0].props.direction : 'right';
+                                return v === 'right' ? 'primary' : 'normal';
+                            })()}
+                            style={{ flex: '1 1 0', minWidth: '0' }}
+                            onClick={() => {
+                                if (!selectedMindMapShapes.length) return;
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedMindMapShapes.map((shape) => ({
+                                            id: shape.id,
+                                            type: 'mind-map',
+                                            props: { ...shape.props, direction: 'right' },
+                                        }))
+                                    );
+                                });
+                            }}
+                            title="将导图排列到右侧"
+                        >
+                            →
+                        </TldrawUiButton>
+                    </div>
                 </div>
             )}
         </DefaultStylePanel>
