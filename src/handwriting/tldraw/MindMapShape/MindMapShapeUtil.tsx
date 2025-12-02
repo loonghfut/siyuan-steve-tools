@@ -21,6 +21,7 @@ import {
     addChildNode,
     addSiblingNode,
     updateNodeText,
+    updateNodeColor,
     toggleNodeCollapse,
     moveNodeToParent,
     reorderNode,
@@ -42,6 +43,37 @@ const MIN_HEIGHT = 1
 const MIN_NODE_WIDTH = 60 // 节点最小宽度
 const MAX_NODE_WIDTH = 300 // 节点最大宽度
 const NODE_PADDING_H = 24 // 节点水平内边距（左右各12px）
+const COLLAPSE_BUTTON_SIZE = 16 // 折叠按钮大小
+const COLLAPSE_BUTTON_GAP = 4 // 折叠按钮与节点的间距
+
+// 节点颜色预设
+const NODE_COLORS = [
+    '#4A90D9', '#52C41A', '#FA8C16', '#722ED1', 
+    '#EB2F96', '#13C2C2', '#F5222D', '#FAAD14',
+    '#2F54EB', '#A0D911', '#FA541C', '#1890FF',
+    '#ffffff', '#f5f5f5', '#d9d9d9', '#333333',
+]
+
+// 计算颜色亮度，用于决定文本颜色
+const getLuminance = (hexColor: string): number => {
+    const hex = hexColor.replace('#', '')
+    const r = parseInt(hex.substr(0, 2), 16) / 255
+    const g = parseInt(hex.substr(2, 2), 16) / 255
+    const b = parseInt(hex.substr(4, 2), 16) / 255
+    // 使用相对亮度公式
+    const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+}
+
+// 根据背景色获取合适的文本颜色
+const getContrastTextColor = (bgColor: string): string => {
+    try {
+        const luminance = getLuminance(bgColor)
+        return luminance > 0.5 ? '#333333' : '#ffffff'
+    } catch {
+        return '#333333'
+    }
+}
 
 // 测量文本宽度的辅助函数
 const measureTextWidth = (text: string, fontSize: number, fontWeight: string = 'normal'): number => {
@@ -172,6 +204,10 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         const [dropTargetId, setDropTargetId] = useState<string | null>(null)
         const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'child' | null>(null)
         const dragStartPos = useRef<{ x: number; y: number } | null>(null)
+
+        // 颜色选择器状态
+        const [colorPickerNodeId, setColorPickerNodeId] = useState<string | null>(null)
+        const [colorPickerPos, setColorPickerPos] = useState<{ x: number; y: number } | null>(null)
 
         const {
             rootNode,
@@ -402,6 +438,37 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             setEditText(text)
         }, [])
 
+        // 右键打开颜色选择器
+        const handleContextMenu = useCallback((nodeId: string, nodeX: number, nodeY: number, nodeWidth: number, nodeHeight: number, e: React.MouseEvent) => {
+            e.stopPropagation()
+            e.preventDefault()
+            
+            // 先选中节点
+            const newRoot = deepCloneRootNode(rootNode)
+            updateShape(newRoot, nodeId)
+            
+            // 设置颜色选择器位置：使用节点在SVG中的坐标（节点右下角）
+            setColorPickerNodeId(nodeId)
+            setColorPickerPos({ x: nodeX + nodeWidth / 2 + 8, y: nodeY - nodeHeight / 2 })
+        }, [rootNode, updateShape])
+
+        // 更新节点颜色
+        const handleColorChange = useCallback((color: string | undefined) => {
+            if (colorPickerNodeId) {
+                const newRoot = deepCloneRootNode(rootNode)
+                updateNodeColor(newRoot, colorPickerNodeId, color)
+                updateShape(newRoot, colorPickerNodeId)
+            }
+            setColorPickerNodeId(null)
+            setColorPickerPos(null)
+        }, [colorPickerNodeId, rootNode, updateShape])
+
+        // 关闭颜色选择器
+        const closeColorPicker = useCallback(() => {
+            setColorPickerNodeId(null)
+            setColorPickerPos(null)
+        }, [])
+
         // 完成编辑
         const handleFinishEdit = useCallback(() => {
             if (editingNodeId && editText.trim()) {
@@ -616,9 +683,10 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                 borderColor = isSelected ? colors.selectedBorder : LEVEL_COLORS[colorIndex]
             }
 
-            // 自定义节点颜色
+            // 自定义节点颜色 - 同时更新文本颜色以保证对比度
             if (node.color) {
                 bgColor = node.color
+                textColor = getContrastTextColor(node.color)
             }
 
             // 拖拽时的样式
@@ -683,6 +751,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         transform={`translate(${x - width / 2}, ${y - height / 2})`}
                         onClick={(e) => handleSelectNode(node.id, e)}
                         onDoubleClick={(e) => handleDoubleClick(node.id, node.text, e)}
+                        onContextMenu={(e) => handleContextMenu(node.id, x, y, width, height, e)}
                         onPointerDown={(e) => {
                             // 只在节点上阻止事件冒泡，允许形状拖动
                             e.stopPropagation()
@@ -791,10 +860,10 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             </text>
                         )}
 
-                        {/* 折叠/展开按钮 - 有子节点时显示 */}
+                        {/* 折叠/展开按钮 - 有子节点时显示，移到节点外部右侧 */}
                         {hasChildren && (
                             <g
-                                transform={`translate(${width - 8}, ${height / 2})`}
+                                transform={`translate(${width + COLLAPSE_BUTTON_GAP + COLLAPSE_BUTTON_SIZE / 2}, ${height / 2})`}
                                 onClick={(e) => {
                                     e.stopPropagation()
                                     e.preventDefault()
@@ -805,7 +874,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 onPointerDown={(e) => e.stopPropagation()}
                                 style={{ cursor: 'pointer', pointerEvents: 'all' }}
                             >
-                                <circle r={8} fill={colors.nodeBg} stroke={colors.nodeBorder} />
+                                <circle r={COLLAPSE_BUTTON_SIZE / 2} fill={colors.nodeBg} stroke={colors.nodeBorder} />
                                 <text
                                     textAnchor="middle"
                                     dominantBaseline="central"
@@ -839,7 +908,13 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                     ref={containerRef}
                     tabIndex={0}
                     onKeyDown={handleKeyDown}
-                    onClick={handleContainerClick}
+                    onClick={(e) => {
+                        handleContainerClick(e)
+                        // 点击空白处关闭颜色选择器
+                        if (colorPickerNodeId) {
+                            closeColorPicker()
+                        }
+                    }}
                     onPointerUp={() => {
                         // 在空白区域释放时取消拖拽
                         if (draggingNodeId) {
@@ -867,6 +942,64 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             {renderNode(layoutTree, 0)}
                         </g>
                     </svg>
+                    
+                    {/* 颜色选择器弹窗 - 使用absolute定位，相对于容器 */}
+                    {colorPickerNodeId && colorPickerPos && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                left: colorPickerPos.x + offsetX,
+                                top: colorPickerPos.y + offsetY,
+                                backgroundColor: '#fff',
+                                border: '1px solid #d9d9d9',
+                                borderRadius: 8,
+                                padding: 8,
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                zIndex: 1000,
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(4, 24px)',
+                                gap: 4,
+                                pointerEvents: 'all',
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            {NODE_COLORS.map((color) => (
+                                <div
+                                    key={color}
+                                    onClick={() => handleColorChange(color)}
+                                    style={{
+                                        width: 24,
+                                        height: 24,
+                                        backgroundColor: color,
+                                        border: '1px solid #d9d9d9',
+                                        borderRadius: 4,
+                                        cursor: 'pointer',
+                                    }}
+                                />
+                            ))}
+                            {/* 重置颜色按钮 */}
+                            <div
+                                onClick={() => handleColorChange(undefined)}
+                                style={{
+                                    width: 24,
+                                    height: 24,
+                                    backgroundColor: '#fff',
+                                    border: '1px solid #d9d9d9',
+                                    borderRadius: 4,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 14,
+                                    color: '#999',
+                                }}
+                                title="重置颜色"
+                            >
+                                ✕
+                            </div>
+                        </div>
+                    )}
                 </div>
             </HTMLContainer>
         )

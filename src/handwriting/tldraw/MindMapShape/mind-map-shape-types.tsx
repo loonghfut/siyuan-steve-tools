@@ -125,6 +125,16 @@ export function updateNodeText(root: MindMapNode, nodeId: string, text: string):
     return false
 }
 
+// 更新节点颜色
+export function updateNodeColor(root: MindMapNode, nodeId: string, color: string | undefined): boolean {
+    const node = findNodeById(root, nodeId)
+    if (node) {
+        node.color = color
+        return true
+    }
+    return false
+}
+
 // 切换节点折叠状态
 export function toggleNodeCollapse(root: MindMapNode, nodeId: string): boolean {
     const node = findNodeById(root, nodeId)
