@@ -26,4 +26,6 @@ export const mindMapShapeProps: RecordProps<IMindMapShape> = {
     theme: T.string,
     selectedNodeId: T.optional(T.string),
     version: T.optional(T.number),
+    blockId: T.optional(T.string),
+    refreshNonce: T.optional(T.number),
 }

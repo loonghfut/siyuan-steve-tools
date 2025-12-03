@@ -34,6 +34,10 @@ export type IMindMapShape = TLBaseShape<
         selectedNodeId?: string
         // 版本号
         version?: number
+        // 绑定的思源块ID（绑定后从思源块获取md内容渲染，不可编辑）
+        blockId?: string
+        // 用于触发刷新的时间戳
+        refreshNonce?: number
     }
 >
 

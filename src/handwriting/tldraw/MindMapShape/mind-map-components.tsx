@@ -30,14 +30,15 @@ export interface NodeRenderProps {
     dropTargetId: string | null
     dropPosition: 'before' | 'after' | 'child' | null
     inputRef: React.RefObject<HTMLInputElement>
+    isLinkedMode?: boolean  // 绑定思源块模式
     // 事件处理
-    onSelectNode: (nodeId: string, e: React.MouseEvent) => void
-    onDoubleClick: (nodeId: string, text: string, e: React.MouseEvent) => void
-    onContextMenu: (nodeId: string, nodeX: number, nodeY: number, nodeWidth: number, nodeHeight: number, e: React.MouseEvent) => void
-    onDragStart: (nodeId: string, e: React.PointerEvent) => void
-    onDragMove: (nodeId: string, e: React.PointerEvent) => void
-    onDragEnd: () => void
-    onDropTargetLeave: (nodeId: string) => void
+    onSelectNode?: (nodeId: string, e: React.MouseEvent) => void
+    onDoubleClick?: (nodeId: string, text: string, e: React.MouseEvent) => void
+    onContextMenu?: (nodeId: string, nodeX: number, nodeY: number, nodeWidth: number, nodeHeight: number, e: React.MouseEvent) => void
+    onDragStart?: (nodeId: string, e: React.PointerEvent) => void
+    onDragMove?: (nodeId: string, e: React.PointerEvent) => void
+    onDragEnd?: () => void
+    onDropTargetLeave?: (nodeId: string) => void
     onToggleCollapse: (nodeId: string, e: React.MouseEvent) => void
     onEditTextChange: (text: string) => void
     onFinishEdit: () => void
@@ -468,6 +469,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     dropTargetId,
     dropPosition,
     inputRef,
+    isLinkedMode,
     onSelectNode,
     onDoubleClick,
     onContextMenu,
@@ -609,7 +611,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     key={`line-${node.id}-${childLayout.node.id}`}
                     d={getConnectionPath(childLayout)}
                     fill="none"
-                    stroke={colors.lineColor}
+                    stroke={isLinkedMode ? '#3b82f6' : colors.lineColor}
                     strokeWidth={lineWidth}
                 />
             ))}
@@ -810,6 +812,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     dropTargetId={dropTargetId}
                     dropPosition={dropPosition}
                     inputRef={inputRef}
+                    isLinkedMode={isLinkedMode}
                     onSelectNode={onSelectNode}
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}

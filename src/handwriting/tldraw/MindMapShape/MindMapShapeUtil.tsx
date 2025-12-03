@@ -29,6 +29,9 @@ import {
     useKeyboardHandlers,
     useNodeSelection,
 } from './mind-map-hooks'
+import { parseMarkdownToMindMap } from './mind-map-markdown'
+import { getBlockMarkdown } from '@/api/api'
+import { showMessage } from 'siyuan'
 
 // ===== DOM 尺寸测量 =====
 // 用 EditorAtom 存储每个 shape 的测量尺寸，保证 getGeometry 响应式更新
@@ -62,8 +65,9 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         return false
     }
 
-    override canEdit() {
-        return true
+    override canEdit(shape: IMindMapShape) {
+        // 绑定了思源块时不允许编辑
+        return !shape.props.blockId
     }
 
     getDefaultProps(): IMindMapShape['props'] {
@@ -91,6 +95,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             theme: 'default',
             selectedNodeId: undefined,
             version: 1,
+            blockId: undefined,
+            refreshNonce: undefined,
         }
     }
 
@@ -123,7 +129,16 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             theme: themeName,
             selectedNodeId,
             direction,
+            blockId,
+            refreshNonce,
         } = shape.props
+
+        // 是否为绑定思源块的模式（绑定后不可编辑）
+        const isLinkedMode = !!blockId
+        
+        // 加载状态
+        const [isLoading, setIsLoading] = useState(false)
+        const [loadError, setLoadError] = useState<string | null>(null)
 
         // 更新形状
         const updateShape = useCallback((newRootNode: MindMapNode, newSelectedId?: string) => {
@@ -282,6 +297,48 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             updateDomSizeAndPosition()
         }, [rootNode, updateDomSizeAndPosition])
 
+        // 绑定思源块时，从块获取 markdown 并渲染
+        useEffect(() => {
+            if (!isLinkedMode || !blockId) return
+
+            let cancelled = false
+            setIsLoading(true)
+            setLoadError(null)
+
+            getBlockMarkdown(blockId)
+                .then((res) => {
+                    if (cancelled) return
+                    const kramdown = res || ''
+                    if (!kramdown.trim()) {
+                        setLoadError('块内容为空')
+                        return
+                    }
+                    const newRootNode = parseMarkdownToMindMap(kramdown)
+                    // 不要触发 updateShape，因为这里只是绑定后的刷新
+                    editor.updateShape<IMindMapShape>({
+                        id: shape.id,
+                        type: 'mind-map',
+                        props: {
+                            ...shape.props,
+                            rootNode: newRootNode,
+                        },
+                    })
+                })
+                .catch((err) => {
+                    if (cancelled) return
+                    console.error('获取思源块内容失败', err)
+                    setLoadError('获取块内容失败')
+                    showMessage('获取思源块内容失败', 3000, 'error')
+                })
+                .finally(() => {
+                    if (!cancelled) setIsLoading(false)
+                })
+
+            return () => {
+                cancelled = true
+            }
+        }, [blockId, refreshNonce, isLinkedMode])
+
         // 聚焦输入框
         useEffect(() => {
             if (editingNodeId && inputRef.current) {
@@ -351,7 +408,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                 <div
                     ref={containerRef}
                     tabIndex={0}
-                    onKeyDown={handleKeyDown}
+                    onKeyDown={isLinkedMode ? undefined : handleKeyDown}
                     onClick={(e) => {
                         handleContainerClick(e)
                         if (menuState.nodeId) {
@@ -372,6 +429,24 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         position: 'relative',
                     }}
                 >
+                    {/* 加载/错误状态提示 */}
+                    {isLinkedMode && (isLoading || loadError) && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                padding: '4px 8px',
+                                borderRadius: 4,
+                                background: loadError ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)',
+                                color: loadError ? '#ef4444' : '#3b82f6',
+                                fontSize: 12,
+                                zIndex: 10,
+                            }}
+                        >
+                            {isLoading ? '加载中...' : loadError}
+                        </div>
+                    )}
                     <svg
                         ref={svgRef}
                         width={contentWidth}
@@ -401,20 +476,21 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 horizontalGap={horizontalGap}
                                 verticalGap={verticalGap}
                                 direction={layoutDirection}
-                                selectedNodeId={selectedNodeId}
-                                editingNodeId={editingNodeId}
+                                selectedNodeId={isLinkedMode ? undefined : selectedNodeId}
+                                editingNodeId={isLinkedMode ? undefined : editingNodeId}
                                 editText={editText}
-                                draggingNodeId={draggingNodeId}
-                                dropTargetId={dropTargetId}
+                                draggingNodeId={isLinkedMode ? undefined : draggingNodeId}
+                                dropTargetId={isLinkedMode ? undefined : dropTargetId}
                                 dropPosition={dropPosition}
                                 inputRef={inputRef}
-                                onSelectNode={handleSelectNode}
-                                onDoubleClick={handleDoubleClick}
-                                onContextMenu={openContextMenu}
-                                onDragStart={handleDragStart}
-                                onDragMove={handleDragMove}
-                                onDragEnd={handleDragEnd}
-                                onDropTargetLeave={clearDropTarget}
+                                isLinkedMode={isLinkedMode}
+                                onSelectNode={isLinkedMode ? undefined : handleSelectNode}
+                                onDoubleClick={isLinkedMode ? undefined : handleDoubleClick}
+                                onContextMenu={isLinkedMode ? undefined : openContextMenu}
+                                onDragStart={isLinkedMode ? undefined : handleDragStart}
+                                onDragMove={isLinkedMode ? undefined : handleDragMove}
+                                onDragEnd={isLinkedMode ? undefined : handleDragEnd}
+                                onDropTargetLeave={isLinkedMode ? undefined : clearDropTarget}
                                 onToggleCollapse={handleToggleCollapseClick}
                                 onEditTextChange={setEditText}
                                 onFinishEdit={handleFinishEdit}
@@ -423,8 +499,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         </g>
                     </svg>
                     
-                    {/* 上下文菜单弹窗 */}
-                    {menuState.nodeId && menuState.position && !showColorPicker && (
+                    {/* 上下文菜单弹窗 - 绑定模式下不显示 */}
+                    {!isLinkedMode && menuState.nodeId && menuState.position && !showColorPicker && (
                         <ContextMenu
                             position={{
                                 x: menuState.position.x + offsetX,
@@ -447,8 +523,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         />
                     )}
 
-                    {/* 颜色选择器弹窗 */}
-                    {menuState.nodeId && menuState.position && showColorPicker && (
+                    {/* 颜色选择器弹窗 - 绑定模式下不显示 */}
+                    {!isLinkedMode && menuState.nodeId && menuState.position && showColorPicker && (
                         <ColorPicker
                             position={{
                                 x: menuState.position.x + offsetX,
