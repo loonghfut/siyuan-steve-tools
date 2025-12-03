@@ -152,6 +152,114 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     )
 }
 
+// ===== 确认对话框组件 =====
+
+export interface ConfirmDialogProps {
+    message: string
+    onConfirm: () => void
+    onCancel: () => void
+}
+
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+    message,
+    onConfirm,
+    onCancel,
+}) => {
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    
+    React.useEffect(() => {
+        if (containerRef.current) containerRef.current.focus()
+    }, [])
+    
+    return (
+        <div
+            style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1100,
+                pointerEvents: 'all',
+            }}
+            onClick={(e) => {
+                e.stopPropagation()
+                onCancel()
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+        >
+            <div
+                ref={containerRef}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault()
+                        onConfirm()
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        onCancel()
+                    }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                    backgroundColor: '#fff',
+                    borderRadius: 8,
+                    padding: 20,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                    minWidth: 280,
+                    maxWidth: 400,
+                }}
+            >
+                <div style={{ 
+                    marginBottom: 16, 
+                    fontSize: 14, 
+                    color: '#333',
+                    lineHeight: 1.5,
+                }}>
+                    ⚠️ {message}
+                </div>
+                <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'flex-end', 
+                    gap: 8 
+                }}>
+                    <button
+                        onClick={onCancel}
+                        style={{
+                            padding: '6px 16px',
+                            border: '1px solid #d9d9d9',
+                            borderRadius: 4,
+                            backgroundColor: '#fff',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                        }}
+                    >
+                        取消
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        style={{
+                            padding: '6px 16px',
+                            border: 'none',
+                            borderRadius: 4,
+                            backgroundColor: '#1890ff',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                        }}
+                    >
+                        确定
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ===== 右键上下文菜单组件 =====
 
 export interface ContextMenuProps {
@@ -169,6 +277,8 @@ export interface ContextMenuProps {
     onExportMarkdownList: () => void
     onOpenColorPicker: () => void
     onClose: () => void
+    // 用于显示确认对话框
+    showConfirm?: (message: string, onConfirm: () => void) => void
 }
 
 const CONTEXT_MENU_WIDTH = 160
@@ -189,6 +299,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     onExportMarkdownList,
     onOpenColorPicker,
     onClose,
+    showConfirm,
 }) => {
     const containerRef = React.useRef<HTMLDivElement | null>(null)
     
@@ -197,17 +308,28 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }, [])
     
     // 计算菜单位置，避免超出容器
-    const menuItems = isRootNode ? 7 : 8 // 根节点没有"删除"和"添加兄弟节点"
-    const menuHeight = menuItems * CONTEXT_MENU_ITEM_HEIGHT + 16
+    // 菜单项数量：根节点少2项（删除和添加兄弟节点），加上2条分隔线
+    const menuItems = isRootNode ? 7 : 8
+    const separatorCount = isRootNode ? 1 : 2
+    const menuHeight = menuItems * CONTEXT_MENU_ITEM_HEIGHT + separatorCount * 9 + 8 // 8是padding
     
     let adjustedX = position.x + 8
     let adjustedY = position.y
     
+    // 水平方向：优先右侧，不够则左侧，都不够则贴左边
     if (adjustedX + CONTEXT_MENU_WIDTH > containerWidth - 10) {
         adjustedX = position.x - CONTEXT_MENU_WIDTH - 8
     }
+    if (adjustedX < 5) {
+        adjustedX = 5
+    }
+    
+    // 垂直方向：优先下方，不够则上方，都不够则贴顶部
     if (adjustedY + menuHeight > containerHeight - 10) {
-        adjustedY = containerHeight - menuHeight - 10
+        adjustedY = position.y - menuHeight
+    }
+    if (adjustedY < 5) {
+        adjustedY = 5
     }
     
     const menuItemStyle: React.CSSProperties = {
@@ -300,7 +422,19 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             <MenuItem onClick={onOpenColorPicker} icon="🎨" closeOnClick={false}>节点颜色</MenuItem>
             <div style={{ height: 1, backgroundColor: '#e8e8e8', margin: '4px 0' }} />
             <MenuItem onClick={onPasteMarkdown} icon="📋" shortcut="Ctrl+V">粘贴 Markdown</MenuItem>
-            <MenuItem onClick={onPasteMarkdownReplace} icon="📥" shortcut="Ctrl+Shift+V">替换为 Markdown</MenuItem>
+            <MenuItem 
+                onClick={() => {
+                    if (showConfirm) {
+                        showConfirm('此操作将替换整个思维导图，是否继续？', onPasteMarkdownReplace)
+                    } else {
+                        onPasteMarkdownReplace()
+                    }
+                }} 
+                icon="📥" 
+                shortcut="Ctrl+Shift+V"
+            >
+                替换为 Markdown
+            </MenuItem>
             <MenuItem onClick={onExportMarkdown} icon="📤">导出为标题格式</MenuItem>
             <MenuItem onClick={onExportMarkdownList} icon="📝">导出为列表格式</MenuItem>
             {!isRootNode && (

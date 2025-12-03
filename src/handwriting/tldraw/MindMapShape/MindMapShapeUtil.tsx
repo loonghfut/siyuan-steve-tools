@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+﻿import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
     HTMLContainer,
     Rectangle2d,
@@ -20,7 +20,7 @@ import {
 } from './mind-map-shape-types'
 import { ThemeName } from './mind-map-constants'
 import { calculateFullLayout } from './mind-map-layout'
-import { MindMapNodeRenderer, ColorPicker, ContextMenu } from './mind-map-components'
+import { MindMapNodeRenderer, ColorPicker, ContextMenu, ConfirmDialog } from './mind-map-components'
 import {
     deepCloneRootNode,
     useDragHandlers,
@@ -199,6 +199,22 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         )
 
         const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
+
+        // 确认对话框状态
+        const [confirmDialog, setConfirmDialog] = useState<{
+            message: string
+            onConfirm: () => void
+        } | null>(null)
+
+        // 显示确认对话框的函数
+        const showConfirm = useCallback((message: string, onConfirm: () => void) => {
+            setConfirmDialog({ message, onConfirm })
+        }, [])
+
+        // 关闭确认对话框
+        const closeConfirmDialog = useCallback(() => {
+            setConfirmDialog(null)
+        }, [])
 
         // 编辑节点的处理函数（从上下文菜单调用）
         const handleEditFromMenu = useCallback(() => {
@@ -427,6 +443,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             onExportMarkdownList={handleExportMarkdownList}
                             onOpenColorPicker={handleOpenColorPicker}
                             onClose={closeContextMenu}
+                            showConfirm={showConfirm}
                         />
                     )}
 
@@ -440,6 +457,19 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             containerWidth={contentWidth}
                             onColorChange={handleColorChange}
                             onClose={closeContextMenu}
+                        />
+                    )}
+
+                    {/* 确认对话框 */}
+                    {confirmDialog && (
+                        <ConfirmDialog
+                            message={confirmDialog.message}
+                            onConfirm={() => {
+                                confirmDialog.onConfirm()
+                                closeConfirmDialog()
+                                closeContextMenu()
+                            }}
+                            onCancel={closeConfirmDialog}
                         />
                     )}
                 </div>
