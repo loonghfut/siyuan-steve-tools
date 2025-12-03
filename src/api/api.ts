@@ -287,6 +287,10 @@ export async function getBlockKramdown(id: BlockId): Promise<IResGetBlockKramdow
     return request(url, data);
 }
 
+export async function getBlockMarkdown(id: BlockId) {
+    const res = await getBlockByID(id);
+    return res.markdown;
+}
 
 export async function getChildBlocks(id: BlockId): Promise<IResGetChildBlock[]> {
     let data = {
