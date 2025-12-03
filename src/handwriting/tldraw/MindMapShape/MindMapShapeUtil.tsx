@@ -368,7 +368,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         height: '100%',
                         backgroundColor: 'transparent',
                         borderRadius: 8,
-                        overflow: 'hidden',
+                        overflow: 'visible', // 允许菜单溢出容器边界
                         position: 'relative',
                     }}
                 >

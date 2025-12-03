@@ -307,29 +307,32 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         if (containerRef.current) containerRef.current.focus()
     }, [])
     
-    // 计算菜单位置，避免超出容器
+    // 计算菜单位置，避免超出容器（但允许溢出，使用 overflow: visible）
     // 菜单项数量：根节点少2项（删除和添加兄弟节点），加上2条分隔线
     const menuItems = isRootNode ? 7 : 8
     const separatorCount = isRootNode ? 1 : 2
     const menuHeight = menuItems * CONTEXT_MENU_ITEM_HEIGHT + separatorCount * 9 + 8 // 8是padding
     
+    // 简单的位置计算：优先右下方显示
     let adjustedX = position.x + 8
     let adjustedY = position.y
     
-    // 水平方向：优先右侧，不够则左侧，都不够则贴左边
-    if (adjustedX + CONTEXT_MENU_WIDTH > containerWidth - 10) {
+    // 如果右侧空间不足，则显示在左侧
+    if (adjustedX + CONTEXT_MENU_WIDTH > containerWidth) {
         adjustedX = position.x - CONTEXT_MENU_WIDTH - 8
-    }
-    if (adjustedX < 5) {
-        adjustedX = 5
+        // 确保不会完全超出左边界
+        if (adjustedX < -CONTEXT_MENU_WIDTH + 50) {
+            adjustedX = position.x + 8 // 还是显示在右侧
+        }
     }
     
-    // 垂直方向：优先下方，不够则上方，都不够则贴顶部
-    if (adjustedY + menuHeight > containerHeight - 10) {
+    // 如果下方空间不足，则显示在上方
+    if (adjustedY + menuHeight > containerHeight) {
         adjustedY = position.y - menuHeight
-    }
-    if (adjustedY < 5) {
-        adjustedY = 5
+        // 确保不会完全超出上边界
+        if (adjustedY < -menuHeight + 50) {
+            adjustedY = position.y // 还是显示在下方
+        }
     }
     
     const menuItemStyle: React.CSSProperties = {
