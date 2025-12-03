@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.25.0 (2025年12月03日)
+### v0.25.1 (2025年12月03日)
 - feat: 添加双击画布创建 single-block 的功能 (loonghfut)
 - feat: 添加 SingleBlockBindingUtil 以支持单块形状的绑定功能 (loonghfut)
 - feat: 添加自定义嵌入功能，支持 B站视频嵌入 (loonghfut)
@@ -75,6 +75,12 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加自定义图标映射，集成新图标到工具栏 删除tools.text (loonghfut)
 - fix: 修正自定义图标映射中的文件名错误 (loonghfut)
 - chore: 更新版本号至0.25.0 (loonghfut)
+- docs: 更新 v0.25.0 版本的更新日志 (loonghfut)
+- feat(手写): 添加精确箭头模式配置 (loonghfut)
+- feat(api): 添加获取区块 Markdown 内容的接口 (loonghfut)
+- feat(mind-map): 支持思源块绑定功能并实现内容同步 (loonghfut)
+- refactor(mind-map): 优化 Markdown 导出相关代码和日志提示 (loonghfut)
+- chore: 更新版本号至 0.25.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
