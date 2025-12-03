@@ -15,6 +15,7 @@ import {
     moveNodeToParent,
     reorderNode,
 } from './mind-map-shape-types'
+import { parseMarkdownToMindMap } from './mind-map-markdown'
 
 // ===== 类型定义 =====
 
@@ -252,6 +253,171 @@ export const useColorPicker = (
     }
 }
 
+// ===== 上下文菜单 Hook =====
+
+export interface ContextMenuState {
+    nodeId: string | null
+    position: { x: number; y: number } | null
+    isRootNode: boolean
+}
+
+export const useContextMenu = (
+    rootNode: MindMapNode,
+    updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void,
+    replaceRootNode?: (newRootNode: MindMapNode) => void
+) => {
+    const [menuState, setMenuState] = useState<ContextMenuState>({
+        nodeId: null,
+        position: null,
+        isRootNode: false,
+    })
+    const [showColorPicker, setShowColorPicker] = useState(false)
+
+    const openContextMenu = useCallback((
+        nodeId: string, 
+        nodeX: number, 
+        nodeY: number, 
+        _nodeWidth: number, 
+        nodeHeight: number, 
+        e: React.MouseEvent
+    ) => {
+        e.stopPropagation()
+        e.preventDefault()
+        
+        // 先选中节点
+        const newRoot = deepCloneRootNode(rootNode)
+        updateShape(newRoot, nodeId)
+        
+        setMenuState({
+            nodeId,
+            position: { x: nodeX, y: nodeY - nodeHeight / 2 },
+            isRootNode: nodeId === rootNode.id,
+        })
+        setShowColorPicker(false)
+    }, [rootNode, updateShape])
+
+    const closeContextMenu = useCallback(() => {
+        setMenuState({ nodeId: null, position: null, isRootNode: false })
+        setShowColorPicker(false)
+    }, [])
+
+    const handleAddChild = useCallback(() => {
+        if (menuState.nodeId) {
+            const newRoot = deepCloneRootNode(rootNode)
+            const newNode = createMindMapNode('新节点')
+            addChildNode(newRoot, menuState.nodeId, newNode)
+            const parentNode = findNodeById(newRoot, menuState.nodeId)
+            if (parentNode) parentNode.collapsed = false
+            updateShape(newRoot, newNode.id)
+        }
+    }, [menuState.nodeId, rootNode, updateShape])
+
+    const handleAddSibling = useCallback(() => {
+        if (menuState.nodeId && !menuState.isRootNode) {
+            const newRoot = deepCloneRootNode(rootNode)
+            const newNode = createMindMapNode('新节点')
+            addSiblingNode(newRoot, menuState.nodeId, newNode)
+            updateShape(newRoot, newNode.id)
+        }
+    }, [menuState.nodeId, menuState.isRootNode, rootNode, updateShape])
+
+    const handleDelete = useCallback(() => {
+        if (menuState.nodeId && !menuState.isRootNode) {
+            const newRoot = deepCloneRootNode(rootNode)
+            const parent = findParentNode(newRoot, menuState.nodeId)
+            deleteNodeById(newRoot, menuState.nodeId)
+            updateShape(newRoot, parent?.id)
+        }
+    }, [menuState.nodeId, menuState.isRootNode, rootNode, updateShape])
+
+    const handlePasteMarkdown = useCallback(async () => {
+        try {
+            const text = await navigator.clipboard.readText()
+            if (text && text.trim()) {
+                const parsedNode = parseMarkdownToMindMap(text)
+                const newRoot = deepCloneRootNode(rootNode)
+                const targetId = menuState.nodeId || rootNode.id
+                
+                if (parsedNode.children.length === 0) {
+                    const newNode = createMindMapNode(parsedNode.text)
+                    addChildNode(newRoot, targetId, newNode)
+                    updateShape(newRoot, newNode.id)
+                } else {
+                    for (const child of parsedNode.children) {
+                        addChildNode(newRoot, targetId, child)
+                    }
+                    const targetNode = findNodeById(newRoot, targetId)
+                    if (targetNode) targetNode.collapsed = false
+                    updateShape(newRoot, targetId)
+                }
+            }
+        } catch (err) {
+            console.error('读取剪贴板失败:', err)
+        }
+    }, [menuState.nodeId, rootNode, updateShape])
+
+    const handlePasteMarkdownReplace = useCallback(async () => {
+        try {
+            const text = await navigator.clipboard.readText()
+            if (text && text.trim()) {
+                const newRoot = parseMarkdownToMindMap(text)
+                if (replaceRootNode) {
+                    replaceRootNode(newRoot)
+                } else {
+                    updateShape(newRoot, newRoot.id)
+                }
+            }
+        } catch (err) {
+            console.error('读取剪贴板失败:', err)
+        }
+    }, [replaceRootNode, updateShape])
+
+    const handleExportMarkdown = useCallback(async () => {
+        const { exportMindMapToMarkdown } = await import('./mind-map-markdown')
+        const targetNode = menuState.nodeId 
+            ? findNodeById(rootNode, menuState.nodeId) 
+            : rootNode
+        if (targetNode) {
+            const markdown = exportMindMapToMarkdown(targetNode)
+            try {
+                await navigator.clipboard.writeText(markdown)
+                // 可以添加提示
+                console.log('已复制 Markdown 到剪贴板')
+            } catch (err) {
+                console.error('复制到剪贴板失败:', err)
+            }
+        }
+    }, [menuState.nodeId, rootNode])
+
+    const handleOpenColorPicker = useCallback(() => {
+        setShowColorPicker(true)
+    }, [])
+
+    const handleColorChange = useCallback((color: string | undefined) => {
+        if (menuState.nodeId) {
+            const newRoot = deepCloneRootNode(rootNode)
+            updateNodeColor(newRoot, menuState.nodeId, color)
+            updateShape(newRoot, menuState.nodeId)
+        }
+        closeContextMenu()
+    }, [menuState.nodeId, rootNode, updateShape, closeContextMenu])
+
+    return {
+        menuState,
+        showColorPicker,
+        openContextMenu,
+        closeContextMenu,
+        handleAddChild,
+        handleAddSibling,
+        handleDelete,
+        handlePasteMarkdown,
+        handlePasteMarkdownReplace,
+        handleExportMarkdown,
+        handleOpenColorPicker,
+        handleColorChange,
+    }
+}
+
 // ===== 键盘事件 Hook =====
 
 export const useKeyboardHandlers = (
@@ -259,9 +425,72 @@ export const useKeyboardHandlers = (
     selectedNodeId: string | undefined,
     updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void,
     setEditingNodeId: (id: string | null) => void,
-    setEditText: (text: string) => void
+    setEditText: (text: string) => void,
+    replaceRootNode?: (newRootNode: MindMapNode) => void
 ) => {
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        // Ctrl+Shift+V: 从 Markdown 粘贴并替换整个思维导图
+        if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+            e.preventDefault()
+            e.stopPropagation()
+            
+            navigator.clipboard.readText().then(text => {
+                if (text && text.trim()) {
+                    try {
+                        const newRoot = parseMarkdownToMindMap(text)
+                        if (replaceRootNode) {
+                            replaceRootNode(newRoot)
+                        } else {
+                            updateShape(newRoot, newRoot.id)
+                        }
+                    } catch (error) {
+                        console.error('解析 Markdown 失败:', error)
+                    }
+                }
+            }).catch(err => {
+                console.error('读取剪贴板失败:', err)
+            })
+            return
+        }
+
+        // Ctrl+V: 粘贴 Markdown 作为选中节点的子节点
+        if (e.ctrlKey && !e.shiftKey && e.key === 'v') {
+            e.preventDefault()
+            e.stopPropagation()
+            
+            navigator.clipboard.readText().then(text => {
+                if (text && text.trim()) {
+                    try {
+                        const parsedNode = parseMarkdownToMindMap(text)
+                        const newRoot = deepCloneRootNode(rootNode)
+                        const targetId = selectedNodeId || rootNode.id
+                        
+                        // 将解析出的节点添加到选中节点（或根节点）下
+                        // 如果解析结果只有根节点文本没有子节点，则直接添加一个节点
+                        if (parsedNode.children.length === 0) {
+                            const newNode = createMindMapNode(parsedNode.text)
+                            addChildNode(newRoot, targetId, newNode)
+                            updateShape(newRoot, newNode.id)
+                        } else {
+                            // 将解析结果的所有子节点添加到目标节点下
+                            for (const child of parsedNode.children) {
+                                addChildNode(newRoot, targetId, child)
+                            }
+                            // 确保父节点展开
+                            const targetNode = findNodeById(newRoot, targetId)
+                            if (targetNode) targetNode.collapsed = false
+                            updateShape(newRoot, targetId)
+                        }
+                    } catch (error) {
+                        console.error('解析 Markdown 失败:', error)
+                    }
+                }
+            }).catch(err => {
+                console.error('读取剪贴板失败:', err)
+            })
+            return
+        }
+
         if (!selectedNodeId) return
         
         e.stopPropagation()
@@ -317,7 +546,7 @@ export const useKeyboardHandlers = (
                 break
             }
         }
-    }, [selectedNodeId, rootNode, updateShape, setEditingNodeId, setEditText])
+    }, [selectedNodeId, rootNode, updateShape, setEditingNodeId, setEditText, replaceRootNode])
 
     return { handleKeyDown }
 }

@@ -16,15 +16,16 @@ import {
     IMindMapShape,
     MindMapNode,
     createMindMapNode,
+    findNodeById,
 } from './mind-map-shape-types'
 import { ThemeName } from './mind-map-constants'
 import { calculateFullLayout } from './mind-map-layout'
-import { MindMapNodeRenderer, ColorPicker } from './mind-map-components'
+import { MindMapNodeRenderer, ColorPicker, ContextMenu } from './mind-map-components'
 import {
     deepCloneRootNode,
     useDragHandlers,
     useEditHandlers,
-    useColorPicker,
+    useContextMenu,
     useKeyboardHandlers,
     useNodeSelection,
 } from './mind-map-hooks'
@@ -159,23 +160,55 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             setEditingNodeId,
         } = useEditHandlers(rootNode, updateShape)
 
+        // 替换整个思维导图根节点的函数
+        const replaceRootNode = useCallback((newRootNode: MindMapNode) => {
+            editor.updateShape<IMindMapShape>({
+                id: shape.id,
+                type: 'mind-map',
+                props: {
+                    ...shape.props,
+                    rootNode: newRootNode,
+                    selectedNodeId: newRootNode.id,
+                },
+            })
+        }, [editor, shape.id, shape.props])
+
         const {
-            colorPickerNodeId,
-            colorPickerPos,
-            handleContextMenu,
+            menuState,
+            showColorPicker,
+            openContextMenu,
+            closeContextMenu,
+            handleAddChild,
+            handleAddSibling,
+            handleDelete,
+            handlePasteMarkdown,
+            handlePasteMarkdownReplace,
+            handleExportMarkdown,
+            handleOpenColorPicker,
             handleColorChange,
-            closeColorPicker,
-        } = useColorPicker(rootNode, updateShape)
+        } = useContextMenu(rootNode, updateShape, replaceRootNode)
 
         const { handleKeyDown } = useKeyboardHandlers(
             rootNode,
             selectedNodeId,
             updateShape,
             setEditingNodeId,
-            setEditText
+            setEditText,
+            replaceRootNode
         )
 
         const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
+
+        // 编辑节点的处理函数（从上下文菜单调用）
+        const handleEditFromMenu = useCallback(() => {
+            if (menuState.nodeId) {
+                const node = findNodeById(rootNode, menuState.nodeId)
+                if (node) {
+                    setEditingNodeId(menuState.nodeId)
+                    setEditText(node.text)
+                }
+            }
+        }, [menuState.nodeId, rootNode, setEditingNodeId, setEditText])
 
         // 计算布局（传入方向参数）
         const layoutDirection = (direction || 'right') as 'right' | 'left' | 'up' | 'down'
@@ -304,8 +337,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                     onKeyDown={handleKeyDown}
                     onClick={(e) => {
                         handleContainerClick(e)
-                        if (colorPickerNodeId) {
-                            closeColorPicker()
+                        if (menuState.nodeId) {
+                            closeContextMenu()
                         }
                     }}
                     onPointerUp={() => {
@@ -329,8 +362,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         style={{ display: 'block' }}
                         onClick={(e) => {
                             handleContainerClick(e)
-                            if (colorPickerNodeId) {
-                                closeColorPicker()
+                            if (menuState.nodeId) {
+                                closeContextMenu()
                             }
                         }}
                     >
@@ -360,7 +393,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 inputRef={inputRef}
                                 onSelectNode={handleSelectNode}
                                 onDoubleClick={handleDoubleClick}
-                                onContextMenu={handleContextMenu}
+                                onContextMenu={openContextMenu}
                                 onDragStart={handleDragStart}
                                 onDragMove={handleDragMove}
                                 onDragEnd={handleDragEnd}
@@ -373,16 +406,38 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         </g>
                     </svg>
                     
+                    {/* 上下文菜单弹窗 */}
+                    {menuState.nodeId && menuState.position && !showColorPicker && (
+                        <ContextMenu
+                            position={{
+                                x: menuState.position.x + offsetX,
+                                y: menuState.position.y + offsetY,
+                            }}
+                            containerWidth={contentWidth}
+                            containerHeight={contentHeight}
+                            isRootNode={menuState.isRootNode}
+                            onAddChild={handleAddChild}
+                            onAddSibling={handleAddSibling}
+                            onDelete={handleDelete}
+                            onEdit={handleEditFromMenu}
+                            onPasteMarkdown={handlePasteMarkdown}
+                            onPasteMarkdownReplace={handlePasteMarkdownReplace}
+                            onExportMarkdown={handleExportMarkdown}
+                            onOpenColorPicker={handleOpenColorPicker}
+                            onClose={closeContextMenu}
+                        />
+                    )}
+
                     {/* 颜色选择器弹窗 */}
-                    {colorPickerNodeId && colorPickerPos && (
+                    {menuState.nodeId && menuState.position && showColorPicker && (
                         <ColorPicker
                             position={{
-                                x: colorPickerPos.x + offsetX,
-                                y: colorPickerPos.y + offsetY,
+                                x: menuState.position.x + offsetX,
+                                y: menuState.position.y + offsetY,
                             }}
                             containerWidth={contentWidth}
                             onColorChange={handleColorChange}
-                            onClose={closeColorPicker}
+                            onClose={closeContextMenu}
                         />
                     )}
                 </div>

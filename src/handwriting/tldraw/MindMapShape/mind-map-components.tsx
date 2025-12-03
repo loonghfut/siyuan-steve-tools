@@ -152,6 +152,161 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     )
 }
 
+// ===== 右键上下文菜单组件 =====
+
+export interface ContextMenuProps {
+    position: { x: number; y: number }
+    containerWidth: number
+    containerHeight: number
+    isRootNode: boolean
+    onAddChild: () => void
+    onAddSibling: () => void
+    onDelete: () => void
+    onEdit: () => void
+    onPasteMarkdown: () => void
+    onPasteMarkdownReplace: () => void
+    onExportMarkdown: () => void
+    onOpenColorPicker: () => void
+    onClose: () => void
+}
+
+const CONTEXT_MENU_WIDTH = 160
+const CONTEXT_MENU_ITEM_HEIGHT = 32
+
+export const ContextMenu: React.FC<ContextMenuProps> = ({
+    position,
+    containerWidth,
+    containerHeight,
+    isRootNode,
+    onAddChild,
+    onAddSibling,
+    onDelete,
+    onEdit,
+    onPasteMarkdown,
+    onPasteMarkdownReplace,
+    onExportMarkdown,
+    onOpenColorPicker,
+    onClose,
+}) => {
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    
+    React.useEffect(() => {
+        if (containerRef.current) containerRef.current.focus()
+    }, [])
+    
+    // 计算菜单位置，避免超出容器
+    const menuItems = isRootNode ? 6 : 7 // 根节点没有"删除"和"添加兄弟节点"
+    const menuHeight = menuItems * CONTEXT_MENU_ITEM_HEIGHT + 16
+    
+    let adjustedX = position.x + 8
+    let adjustedY = position.y
+    
+    if (adjustedX + CONTEXT_MENU_WIDTH > containerWidth - 10) {
+        adjustedX = position.x - CONTEXT_MENU_WIDTH - 8
+    }
+    if (adjustedY + menuHeight > containerHeight - 10) {
+        adjustedY = containerHeight - menuHeight - 10
+    }
+    
+    const menuItemStyle: React.CSSProperties = {
+        padding: '6px 12px',
+        cursor: 'pointer',
+        fontSize: 13,
+        color: '#333',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        borderRadius: 4,
+    }
+    
+    const menuItemHoverStyle = {
+        backgroundColor: '#f0f0f0',
+    }
+    
+    const MenuItem: React.FC<{
+        onClick: () => void
+        icon?: string
+        children: React.ReactNode
+        disabled?: boolean
+        shortcut?: string
+    }> = ({ onClick, icon, children, disabled, shortcut }) => {
+        const [isHovered, setIsHovered] = React.useState(false)
+        
+        return (
+            <div
+                onClick={() => {
+                    if (!disabled) {
+                        onClick()
+                        onClose()
+                    }
+                }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                style={{
+                    ...menuItemStyle,
+                    ...(isHovered && !disabled ? menuItemHoverStyle : {}),
+                    opacity: disabled ? 0.5 : 1,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    justifyContent: 'space-between',
+                }}
+            >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {icon && <span>{icon}</span>}
+                    {children}
+                </span>
+                {shortcut && (
+                    <span style={{ fontSize: 11, color: '#999' }}>{shortcut}</span>
+                )}
+            </div>
+        )
+    }
+    
+    return (
+        <div
+            ref={containerRef}
+            tabIndex={0}
+            onBlur={(e) => {
+                // 检查是否点击了菜单内的元素
+                if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+                    onClose()
+                }
+            }}
+            style={{
+                position: 'absolute',
+                left: adjustedX,
+                top: adjustedY,
+                backgroundColor: '#fff',
+                border: '1px solid #d9d9d9',
+                borderRadius: 8,
+                padding: 4,
+                boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                zIndex: 1000,
+                minWidth: CONTEXT_MENU_WIDTH,
+                pointerEvents: 'all',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+        >
+            <MenuItem onClick={onEdit} icon="✏️" shortcut="F2">编辑节点</MenuItem>
+            <MenuItem onClick={onAddChild} icon="➕" shortcut="Tab">添加子节点</MenuItem>
+            {!isRootNode && (
+                <MenuItem onClick={onAddSibling} icon="↔️" shortcut="Enter">添加兄弟节点</MenuItem>
+            )}
+            <MenuItem onClick={onOpenColorPicker} icon="🎨">节点颜色</MenuItem>
+            <div style={{ height: 1, backgroundColor: '#e8e8e8', margin: '4px 0' }} />
+            <MenuItem onClick={onPasteMarkdown} icon="📋" shortcut="Ctrl+V">粘贴 Markdown</MenuItem>
+            <MenuItem onClick={onPasteMarkdownReplace} icon="📥" shortcut="Ctrl+Shift+V">替换为 Markdown</MenuItem>
+            <MenuItem onClick={onExportMarkdown} icon="📤">导出 Markdown</MenuItem>
+            {!isRootNode && (
+                <>
+                    <div style={{ height: 1, backgroundColor: '#e8e8e8', margin: '4px 0' }} />
+                    <MenuItem onClick={onDelete} icon="🗑️" shortcut="Del">删除节点</MenuItem>
+                </>
+            )}
+        </div>
+    )
+}
+
 // ===== 节点渲染组件 =====
 
 export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
