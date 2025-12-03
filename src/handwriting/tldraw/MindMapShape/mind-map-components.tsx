@@ -166,6 +166,7 @@ export interface ContextMenuProps {
     onPasteMarkdown: () => void
     onPasteMarkdownReplace: () => void
     onExportMarkdown: () => void
+    onExportMarkdownList: () => void
     onOpenColorPicker: () => void
     onClose: () => void
 }
@@ -185,6 +186,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     onPasteMarkdown,
     onPasteMarkdownReplace,
     onExportMarkdown,
+    onExportMarkdownList,
     onOpenColorPicker,
     onClose,
 }) => {
@@ -195,7 +197,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     }, [])
     
     // 计算菜单位置，避免超出容器
-    const menuItems = isRootNode ? 6 : 7 // 根节点没有"删除"和"添加兄弟节点"
+    const menuItems = isRootNode ? 7 : 8 // 根节点没有"删除"和"添加兄弟节点"
     const menuHeight = menuItems * CONTEXT_MENU_ITEM_HEIGHT + 16
     
     let adjustedX = position.x + 8
@@ -229,7 +231,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         children: React.ReactNode
         disabled?: boolean
         shortcut?: string
-    }> = ({ onClick, icon, children, disabled, shortcut }) => {
+        closeOnClick?: boolean  // 是否在点击后关闭菜单，默认 true
+    }> = ({ onClick, icon, children, disabled, shortcut, closeOnClick = true }) => {
         const [isHovered, setIsHovered] = React.useState(false)
         
         return (
@@ -237,7 +240,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 onClick={() => {
                     if (!disabled) {
                         onClick()
-                        onClose()
+                        if (closeOnClick) {
+                            onClose()
+                        }
                     }
                 }}
                 onMouseEnter={() => setIsHovered(true)}
@@ -292,11 +297,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             {!isRootNode && (
                 <MenuItem onClick={onAddSibling} icon="↔️" shortcut="Enter">添加兄弟节点</MenuItem>
             )}
-            <MenuItem onClick={onOpenColorPicker} icon="🎨">节点颜色</MenuItem>
+            <MenuItem onClick={onOpenColorPicker} icon="🎨" closeOnClick={false}>节点颜色</MenuItem>
             <div style={{ height: 1, backgroundColor: '#e8e8e8', margin: '4px 0' }} />
             <MenuItem onClick={onPasteMarkdown} icon="📋" shortcut="Ctrl+V">粘贴 Markdown</MenuItem>
             <MenuItem onClick={onPasteMarkdownReplace} icon="📥" shortcut="Ctrl+Shift+V">替换为 Markdown</MenuItem>
-            <MenuItem onClick={onExportMarkdown} icon="📤">导出 Markdown</MenuItem>
+            <MenuItem onClick={onExportMarkdown} icon="📤">导出为标题格式</MenuItem>
+            <MenuItem onClick={onExportMarkdownList} icon="📝">导出为列表格式</MenuItem>
             {!isRootNode && (
                 <>
                     <div style={{ height: 1, backgroundColor: '#e8e8e8', margin: '4px 0' }} />

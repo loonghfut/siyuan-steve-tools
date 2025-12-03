@@ -184,6 +184,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             handlePasteMarkdown,
             handlePasteMarkdownReplace,
             handleExportMarkdown,
+            handleExportMarkdownList,
             handleOpenColorPicker,
             handleColorChange,
         } = useContextMenu(rootNode, updateShape, replaceRootNode)
@@ -423,6 +424,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                             onPasteMarkdown={handlePasteMarkdown}
                             onPasteMarkdownReplace={handlePasteMarkdownReplace}
                             onExportMarkdown={handleExportMarkdown}
+                            onExportMarkdownList={handleExportMarkdownList}
                             onOpenColorPicker={handleOpenColorPicker}
                             onClose={closeContextMenu}
                         />

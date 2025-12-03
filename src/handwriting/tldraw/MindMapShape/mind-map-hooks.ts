@@ -382,7 +382,23 @@ export const useContextMenu = (
             try {
                 await navigator.clipboard.writeText(markdown)
                 // 可以添加提示
-                console.log('已复制 Markdown 到剪贴板')
+                console.log('已复制 Markdown 到剪贴板（标题格式）')
+            } catch (err) {
+                console.error('复制到剪贴板失败:', err)
+            }
+        }
+    }, [menuState.nodeId, rootNode])
+
+    const handleExportMarkdownList = useCallback(async () => {
+        const { exportMindMapToMarkdown } = await import('./mind-map-markdown')
+        const targetNode = menuState.nodeId 
+            ? findNodeById(rootNode, menuState.nodeId) 
+            : rootNode
+        if (targetNode) {
+            const markdown = exportMindMapToMarkdown(targetNode, false) // 使用列表格式
+            try {
+                await navigator.clipboard.writeText(markdown)
+                console.log('已复制 Markdown 到剪贴板（列表格式）')
             } catch (err) {
                 console.error('复制到剪贴板失败:', err)
             }
@@ -413,6 +429,7 @@ export const useContextMenu = (
         handlePasteMarkdown,
         handlePasteMarkdownReplace,
         handleExportMarkdown,
+        handleExportMarkdownList,
         handleOpenColorPicker,
         handleColorChange,
     }
