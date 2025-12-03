@@ -18,7 +18,7 @@ import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
 import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
-import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
+import { createTLStore, getSnapshot, loadSnapshot, throttle, TldrawUiIcon } from '@tldraw/tldraw';
 import * as api from '@/api/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
@@ -35,7 +35,17 @@ import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
-const assetUrls = getAssetUrls({ baseUrl: 'plugins/siyuan-steve-tools/asset/' })
+const assetUrls = getAssetUrls({
+    baseUrl: 'plugins/siyuan-steve-tools/asset/',
+})
+
+// 为返回的 assetUrls 添加自定义图标映射（运行时赋值以避免类型定义冲突）
+try {
+    assetUrls.icons['mindmap'] = 'plugins/siyuan-steve-tools/asset/icons/custom/mindmap.svg';
+    assetUrls.icons['iconParagraph'] = 'plugins/siyuan-steve-tools/asset/icons/custom/icon-paragraph.svg';
+} catch (err) {
+    console.warn('无法在 assetUrls 上添加 custom-icon 映射', err);
+}
 
 
 // There's a guide at the bottom of this file!

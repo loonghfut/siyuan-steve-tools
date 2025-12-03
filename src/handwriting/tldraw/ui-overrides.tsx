@@ -82,7 +82,7 @@ export const uiOverrides: TLUiOverrides = {
         }
         tools['single-block'] = {
             id: 'single-block',
-            icon: 'bulletList',
+            icon: 'iconParagraph',
             label: 'Single Block',
             kbd: 'b',
             onSelect: () => {
@@ -105,11 +105,13 @@ export const uiOverrides: TLUiOverrides = {
         }
         tools['mind-map'] = {
             id: 'mind-map',
-            icon: 'tool-line',
+            icon: 'mindmap',
             label: 'Mind Map',
             kbd: 'm',
             onSelect: () => editor.setCurrentTool('mind-map'),
         }
+        // 删除文本工具
+        delete tools.text
         return tools
     },
     actions(editor, actions) {
@@ -687,7 +689,7 @@ const CustomStylePanel = track(() => {
                                 <TldrawUiButton
                                     key={size}
                                     type={mindMapFontSizeValue === size ? 'primary' : 'normal'}
-                                    style={{ 
+                                    style={{
                                         flex: '1 1 auto',
                                         minWidth: '32px',
                                         fontSize: '12px'
