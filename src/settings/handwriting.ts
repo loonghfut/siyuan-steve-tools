@@ -16,6 +16,8 @@ export const handwritingDefaults: Record<string, any> = {
     // 全局禁止 JS 块执行脚本
     "js-shape-disable-execution": false,
     "enableDoubleClickCreateSingleBlock": true,
+    // 精确箭头模式
+    "tldraw-exact-arrow-mode": true,
 };
 
 export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -37,6 +39,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
             { type: "number", title: "最大激活形状数", description: "限制同时激活的形状数量以节省资源", key: "tldraw-max-active-shapes", value: ctx.settings["tldraw-max-active-shapes"] },
             { type: "checkbox", title: "文档块是否渲染题头图", description: "启用文档块题头图渲染", key: "tldraw-header-image", value: ctx.settings["tldraw-header-image"] },
             { type: "checkbox", title: "全局禁止 JS 块执行脚本", description: "启用后所有 JS 形状将不执行脚本代码（安全模式）", key: "js-shape-disable-execution", value: ctx.settings["js-shape-disable-execution"] },
+            { type: "checkbox", title: "启用精确箭头模式", description: "启用后绘制箭头时将使用精确模式", key: "tldraw-exact-arrow-mode", value: ctx.settings["tldraw-exact-arrow-mode"] },
         ]},
         { name: "备份管理", items: [ { type: "custom", title: "画板备份管理", description: "管理画板备份", key: "tldraw-backup-manager", value: "", component: "TldrawBackupManager" } ] },
         { name: "引用管理", items: [ { type: "custom", title: "画板引用管理", description: "管理未引用画板", key: "tldraw-reference-manager", value: "", component: "TldrawReferenceManager" } ] },

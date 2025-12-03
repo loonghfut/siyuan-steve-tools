@@ -13,12 +13,13 @@ import {
     Editor,
     TLShapeId,
     defaultBindingUtils,
+    ArrowShapeUtil,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
 import { getAssetUrls } from '@tldraw/assets/selfHosted'
 import { initCardsWithBlockIds } from './CardShape/card-shape-migrations';
-import { createTLStore, getSnapshot, loadSnapshot, throttle, TldrawUiIcon } from '@tldraw/tldraw';
+import { createTLStore, getSnapshot, loadSnapshot, throttle } from '@tldraw/tldraw';
 import * as api from '@/api/api';
 import { SlideShapeUtil } from './SlideShape/SlideShapeUtil';
 import { SlideShapeTool } from './SlideShape/SlideShapeTool';
@@ -51,7 +52,13 @@ try {
 // There's a guide at the bottom of this file!
 
 // [1]
-const customShapeUtils = [...defaultShapeUtils, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil]
+// 配置精准箭头功能
+const configuredArrowShapeUtil = ArrowShapeUtil.configure({
+    shouldBeExact: (editor, isPrecise) => settingdata['tldraw-exact-arrow-mode'] && isPrecise,
+})
+// 从默认形状工具中过滤掉原始的ArrowShapeUtil，避免重复定义
+const filteredDefaultShapeUtils = defaultShapeUtils.filter(util => util.type !== 'arrow')
+const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil]
 const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil]
 const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool]
 /**
