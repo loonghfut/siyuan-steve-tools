@@ -15,7 +15,7 @@ import {
     moveNodeToParent,
     reorderNode,
 } from './mind-map-shape-types'
-import { parseMarkdownToMindMap } from './mind-map-markdown'
+import { parseMarkdownToMindMap, exportMindMapToMarkdown } from './mind-map-markdown'
 
 // ===== 类型定义 =====
 
@@ -373,7 +373,6 @@ export const useContextMenu = (
     }, [replaceRootNode, updateShape])
 
     const handleExportMarkdown = useCallback(async () => {
-        const { exportMindMapToMarkdown } = await import('./mind-map-markdown')
         const targetNode = menuState.nodeId 
             ? findNodeById(rootNode, menuState.nodeId) 
             : rootNode
@@ -382,7 +381,7 @@ export const useContextMenu = (
             try {
                 await navigator.clipboard.writeText(markdown)
                 // 可以添加提示
-                console.log('已复制 Markdown 到剪贴板（标题格式）')
+                console.log('已复制 Markdown 到剪贴板(标题格式)')
             } catch (err) {
                 console.error('复制到剪贴板失败:', err)
             }
@@ -390,7 +389,6 @@ export const useContextMenu = (
     }, [menuState.nodeId, rootNode])
 
     const handleExportMarkdownList = useCallback(async () => {
-        const { exportMindMapToMarkdown } = await import('./mind-map-markdown')
         const targetNode = menuState.nodeId 
             ? findNodeById(rootNode, menuState.nodeId) 
             : rootNode
@@ -398,7 +396,7 @@ export const useContextMenu = (
             const markdown = exportMindMapToMarkdown(targetNode, false) // 使用列表格式
             try {
                 await navigator.clipboard.writeText(markdown)
-                console.log('已复制 Markdown 到剪贴板（列表格式）')
+                console.log('已复制 Markdown 到剪贴板(列表格式)')
             } catch (err) {
                 console.error('复制到剪贴板失败:', err)
             }
