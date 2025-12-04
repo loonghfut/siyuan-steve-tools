@@ -9,6 +9,7 @@ import {
     stopEventPropagation,
     TldrawUiButton,
 } from '@tldraw/tldraw';
+import { api } from '@frostime/siyuan-plugin-kits';
 import {
     ShapeLibraryItem,
     loadShapeLibrary,
@@ -35,6 +36,10 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const panelRef = useRef<HTMLDivElement | null>(null);
+    const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+    const draggingRef = useRef(false);
+    const dragStartRef = useRef({ startX: 0, startY: 0, origLeft: 0, origTop: 0 });
 
     // 加载素材库
     const loadItems = useCallback(async () => {
@@ -53,8 +58,109 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
     useEffect(() => {
         if (isOpen) {
             loadItems();
+            // 初始化位置（如果尚未设置），使用插件存储的文件
+            (async () => {
+                try {
+                    if (!pos) {
+                        const PANEL_POS_PATH = '/data/storage/petal/sttools/shape-library-panel.json';
+                        const data = await api.getFile(PANEL_POS_PATH);
+                        if (data) {
+                            let parsed: any = data;
+                            if (typeof data === 'string') parsed = JSON.parse(data);
+                            if (parsed && typeof parsed.left === 'number' && typeof parsed.top === 'number') {
+                                setPos({ left: parsed.left, top: parsed.top });
+                                return;
+                            }
+                        }
+
+                        // 默认位置：计算左边距使其避开原先的 right 面板
+                        const width = 280;
+                        const right = 320;
+                        const left = Math.max(12, window.innerWidth - right - width);
+                        setPos({ left, top: 60 });
+                    }
+                } catch (err) {
+                    setPos({ left: 40, top: 60 });
+                }
+            })();
         }
     }, [isOpen, loadItems]);
+
+    // 拖拽相关处理
+    const stopDragging = useCallback(() => {
+        draggingRef.current = false;
+        // 保存位置到插件存储（异步）
+        (async () => {
+            if (pos) {
+                try {
+                    const PANEL_POS_PATH = '/data/storage/petal/sttools/shape-library-panel.json';
+                    const jsonData = JSON.stringify(pos, null, 2);
+                    const blob = new Blob([jsonData], { type: 'application/json' });
+                    await api.putFile(PANEL_POS_PATH, false, blob);
+                } catch (e) {
+                    console.warn('保存素材库面板位置失败:', e);
+                }
+            }
+        })();
+        window.removeEventListener('mousemove', onMouseMove as any, true);
+        window.removeEventListener('mouseup', onMouseUp as any, true);
+        window.removeEventListener('touchmove', onTouchMove as any, true);
+        window.removeEventListener('touchend', onTouchEnd as any, true);
+    }, [pos]);
+
+    const onMouseMove = useCallback((ev: MouseEvent) => {
+        if (!draggingRef.current) return;
+        const clientX = ev.clientX;
+        const clientY = ev.clientY;
+        const dx = clientX - dragStartRef.current.startX;
+        const dy = clientY - dragStartRef.current.startY;
+        setPos({ left: Math.max(8, dragStartRef.current.origLeft + dx), top: Math.max(8, dragStartRef.current.origTop + dy) });
+    }, []);
+
+    const onMouseUp = useCallback(() => {
+        stopDragging();
+    }, [stopDragging]);
+
+    const onTouchMove = useCallback((ev: TouchEvent) => {
+        if (!draggingRef.current) return;
+        const t = ev.touches[0];
+        const clientX = t.clientX;
+        const clientY = t.clientY;
+        const dx = clientX - dragStartRef.current.startX;
+        const dy = clientY - dragStartRef.current.startY;
+        setPos({ left: Math.max(8, dragStartRef.current.origLeft + dx), top: Math.max(8, dragStartRef.current.origTop + dy) });
+    }, []);
+
+    const onTouchEnd = useCallback(() => {
+        stopDragging();
+    }, [stopDragging]);
+
+    const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        draggingRef.current = true;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origLeft = pos?.left ?? 40;
+        const origTop = pos?.top ?? 60;
+        dragStartRef.current = { startX, startY, origLeft, origTop };
+        window.addEventListener('mousemove', onMouseMove as any, true);
+        window.addEventListener('mouseup', onMouseUp as any, true);
+    }, [pos, onMouseMove, onMouseUp]);
+
+    const handleHeaderTouchStart = useCallback((e: React.TouchEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        draggingRef.current = true;
+        const t = e.touches[0];
+        const startX = t.clientX;
+        const startY = t.clientY;
+        const origLeft = pos?.left ?? 40;
+        const origTop = pos?.top ?? 60;
+        dragStartRef.current = { startX, startY, origLeft, origTop };
+        window.addEventListener('touchmove', onTouchMove as any, true);
+        window.addEventListener('touchend', onTouchEnd as any, true);
+    }, [pos, onTouchMove, onTouchEnd]);
 
     // 删除素材
     const handleDelete = useCallback(async (itemId: string, itemName: string) => {
@@ -136,17 +242,12 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
 
     return (
         <div
+            ref={panelRef}
             className="shape-library-panel"
-            onPointerDown={stopEventPropagation}
-            onPointerUp={stopEventPropagation}
-            onClick={stopEventPropagation}
-            onMouseDown={stopEventPropagation}
-            onMouseUp={stopEventPropagation}
-            onWheel={stopEventPropagation}
             style={{
                 position: 'fixed',
-                top: '60px',
-                right: '320px',
+                top: pos ? `${pos.top}px` : '60px',
+                left: pos ? `${pos.left}px` : undefined,
                 width: '280px',
                 maxHeight: 'calc(100vh - 120px)',
                 backgroundColor: 'var(--b3-theme-surface)',
@@ -161,13 +262,17 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
             }}
         >
             {/* 头部 */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderBottom: '1px solid var(--b3-border-color)',
-            }}>
+            <div
+                onMouseDown={handleHeaderMouseDown}
+                onTouchStart={handleHeaderTouchStart}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--b3-border-color)',
+                    cursor: 'grab',
+                }}>
                 <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--b3-theme-on-background)' }}>素材库</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                     <TldrawUiButton
