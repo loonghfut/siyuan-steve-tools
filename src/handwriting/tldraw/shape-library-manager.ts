@@ -166,8 +166,14 @@ export async function addShapesToLibrary(
         const library = await loadShapeLibrary();
         library.items.unshift(item); // 添加到开头
         await saveShapeLibrary(library);
-
         showMessage(`已添加 ${selectedShapes.length} 个形状到素材库`);
+
+        // 通知外部（UI）素材库已更新，便于面板刷新
+        try {
+            window.dispatchEvent(new CustomEvent('shapeLibrary:updated', { detail: { id: item.id } }));
+        } catch (e) {
+            // ignore if environment doesn't support window events
+        }
         return item;
     } catch (err) {
         console.error('添加素材失败:', err);

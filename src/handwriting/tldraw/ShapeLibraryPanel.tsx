@@ -6,7 +6,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     track,
     useEditor,
-    stopEventPropagation,
     TldrawUiButton,
 } from '@tldraw/tldraw';
 import { api } from '@frostime/siyuan-plugin-kits';
@@ -37,6 +36,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
     const [editingName, setEditingName] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const panelRef = useRef<HTMLDivElement | null>(null);
+    const [showMore, setShowMore] = useState(false);
     const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
     const draggingRef = useRef(false);
     const dragStartRef = useRef({ startX: 0, startY: 0, origLeft: 0, origTop: 0 });
@@ -85,6 +85,35 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
             })();
         }
     }, [isOpen, loadItems]);
+
+    // 当外部（例如右键“加入素材库”）触发素材库更新事件时刷新列表
+    useEffect(() => {
+        const handler = () => {
+            if (isOpen) loadItems();
+        };
+        window.addEventListener('shapeLibrary:updated', handler as EventListener);
+        return () => window.removeEventListener('shapeLibrary:updated', handler as EventListener);
+    }, [isOpen, loadItems]);
+
+    // 点击面板外部或按 Esc 隐藏更多菜单
+    useEffect(() => {
+        const handleDocClick = (e: MouseEvent) => {
+            const el = panelRef.current as HTMLElement | null;
+            if (!el) return;
+            if (showMore && e.target && !el.contains(e.target as Node)) {
+                setShowMore(false);
+            }
+        };
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setShowMore(false);
+        };
+        document.addEventListener('click', handleDocClick, true);
+        document.addEventListener('keydown', handleKey, true);
+        return () => {
+            document.removeEventListener('click', handleDocClick, true);
+            document.removeEventListener('keydown', handleKey, true);
+        };
+    }, [showMore]);
 
     // 拖拽相关处理
     const stopDragging = useCallback(() => {
@@ -274,35 +303,83 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                     cursor: 'grab',
                 }}>
                 <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--b3-theme-on-background)' }}>素材库</span>
-                <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
                     <TldrawUiButton
                         type="icon"
-                        title="导入"
-                        onClick={handleImport}
+                        title="更多"
+                        onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            setShowMore(v => !v);
+                        }}
                     >
-                        📥
-                    </TldrawUiButton>
-                    <TldrawUiButton
-                        type="icon"
-                        title="导出"
-                        onClick={handleExport}
-                    >
-                        📤
-                    </TldrawUiButton>
-                    <TldrawUiButton
-                        type="icon"
-                        title="刷新"
-                        onClick={loadItems}
-                    >
-                        🔄
+                        ⋯
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="icon"
                         title="关闭"
-                        onClick={onClose}
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); onClose(); }}
                     >
                         ✕
                     </TldrawUiButton>
+                    {showMore && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '36px',
+                                width: '140px',
+                                backgroundColor: 'var(--b3-theme-surface)',
+                                border: '1px solid var(--b3-border-color)',
+                                borderRadius: '6px',
+                                boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+                                zIndex: 100000,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                padding: '6px',
+                                pointerEvents: 'auto',
+                            }}
+                            onClick={(e) => { e.stopPropagation(); }}
+                        >
+                            <button
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); handleImport(); }}
+                                style={{
+                                    padding: '6px 8px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                📥 导入
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); handleExport(); }}
+                                style={{
+                                    padding: '6px 8px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                📤 导出
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); loadItems(); }}
+                                style={{
+                                    padding: '6px 8px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                🔄 刷新
+                            </button>
+                            {/* 关闭按钮已移到标题栏，保留其余菜单项 */}
+                        </div>
+                    )}
                 </div>
             </div>
 
