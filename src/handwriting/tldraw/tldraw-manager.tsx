@@ -36,7 +36,7 @@ import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
-import { setupShapeLibraryDropHandler } from './ShapeLibraryPanel';
+import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
 const assetUrls = getAssetUrls({
     baseUrl: 'plugins/siyuan-steve-tools/asset/',
 })

@@ -62,8 +62,8 @@ import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
 import { IMindMapShape } from './MindMapShape/mind-map-shape-types'
 import { ThemeName } from './MindMapShape/mind-map-constants'
-import { addShapesToLibrary } from './shape-library-manager'
-import { ShapeLibraryPanel, setupShapeLibraryDropHandler } from './ShapeLibraryPanel'
+import { addShapesToLibrary } from './shapelibrary/shape-library-manager'
+import { ShapeLibraryPanel, setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel'
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
