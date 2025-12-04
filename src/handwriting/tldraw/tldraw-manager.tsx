@@ -36,6 +36,7 @@ import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
+import { setupShapeLibraryDropHandler } from './ShapeLibraryPanel';
 const assetUrls = getAssetUrls({
     baseUrl: 'plugins/siyuan-steve-tools/asset/',
 })
@@ -404,6 +405,10 @@ export class TldrawManager {
                         if (settingdata['enableDoubleClickCreateSingleBlock'] !== false) {
                             setupDoubleClickHandler(editor);
                         }
+                        
+                        // 设置素材库拖放处理程序
+                        setupShapeLibraryDropHandler(editor);
+                        
                         // 添加全局拖放事件监听
                         const container = editor.getContainer();
 
