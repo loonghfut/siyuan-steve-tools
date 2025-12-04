@@ -38,6 +38,12 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [showMore, setShowMore] = useState(false);
     const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    // 分页/懒加载相关
+    const PAGE_SIZE = 20;
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const contentRef = useRef<HTMLDivElement | null>(null);
     const draggingRef = useRef(false);
     const dragStartRef = useRef({ startX: 0, startY: 0, origLeft: 0, origTop: 0 });
 
@@ -94,6 +100,23 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
         window.addEventListener('shapeLibrary:updated', handler as EventListener);
         return () => window.removeEventListener('shapeLibrary:updated', handler as EventListener);
     }, [isOpen, loadItems]);
+
+    // 监听位置重置事件，重置面板位置
+    useEffect(() => {
+        const handler = (e: Event | any) => {
+            const detail = e?.detail as { left?: number; top?: number } | undefined;
+            if (detail && typeof detail.left === 'number' && typeof detail.top === 'number') {
+                setPos({ left: detail.left, top: detail.top });
+            } else {
+                const width = 280;
+                const right = 320;
+                const left = Math.max(12, window.innerWidth - right - width);
+                setPos({ left, top: 60 });
+            }
+        };
+        window.addEventListener('shapeLibrary:posReset', handler as EventListener);
+        return () => window.removeEventListener('shapeLibrary:posReset', handler as EventListener);
+    }, []);
 
     // 点击面板外部或按 Esc 隐藏更多菜单
     useEffect(() => {
@@ -267,6 +290,38 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
         }
     }, [loadItems]);
 
+    // 当 items 或搜索关键字变更时重置可见项数
+    useEffect(() => {
+        setVisibleCount(PAGE_SIZE);
+    }, [items, searchQuery]);
+
+    // 计算过滤后的列表（根据搜索关键字）
+    const q = searchQuery.trim().toLowerCase();
+    const filteredItems = q ? (items || []).filter(item => item.name.toLowerCase().includes(q)) : items;
+    const visibleItems = (filteredItems || []).slice(0, visibleCount);
+
+    // 懒加载：触发加载更多动作
+    const loadMore = useCallback(() => {
+        if (isLoadingMore) return;
+        if (visibleCount >= (filteredItems ? filteredItems.length : 0)) return;
+        setIsLoadingMore(true);
+        setTimeout(() => {
+            setVisibleCount(prev => Math.min(prev + PAGE_SIZE, (filteredItems ? filteredItems.length : 0)));
+            setIsLoadingMore(false);
+        }, 150);
+    }, [isLoadingMore, visibleCount, filteredItems]);
+
+    const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        if (!el) return;
+        const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (remaining < 120) {
+            loadMore();
+        }
+    }, [loadMore]);
+
+    // （已在上方计算 filteredItems）
+
     if (!isOpen) return null;
 
     return (
@@ -298,11 +353,54 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '12px 16px',
+                    padding: '8px 12px',
                     borderBottom: '1px solid var(--b3-border-color)',
                     cursor: 'grab',
                 }}>
-                <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--b3-theme-on-background)' }}>素材库</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight:800, fontSize: '14px', color: 'var(--b3-theme-on-background)' }}>素材库</span>
+                    {/* 搜索框（放在标题后面） */}
+                    <div style={{ position: 'relative' }}>
+                        <input
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onMouseDown={(e) => { e.stopPropagation(); }}
+                            onTouchStart={(e) => { e.stopPropagation(); }}
+                            placeholder="搜索素材"
+                            title="搜索素材"
+                            style={{
+                                height: '28px',
+                                width: '120px',
+                                padding: '4px 28px 4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--b3-border-color)',
+                                backgroundColor: 'var(--b3-theme-surface)',
+                                color: 'var(--b3-theme-on-background)',
+                                fontSize: '12px',
+                                outline: 'none',
+                            }}
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSearchQuery(''); }}
+                                title="清除搜索"
+                                style={{
+                                    position: 'absolute',
+                                    right: '6px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    color: 'var(--b3-theme-on-surface-light)',
+                                    fontSize: '12px',
+                                }}
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+                </div>
                 <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
                     <TldrawUiButton
                         type="icon"
@@ -393,7 +491,10 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
             />
 
             {/* 内容区 */}
-            <div style={{
+            <div
+                ref={contentRef}
+                onScroll={handleScroll}
+                style={{
                 flex: 1,
                 overflowY: 'auto',
                 padding: '8px',
@@ -419,9 +520,22 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                             选中形状后右键 → 加入素材库
                         </span>
                     </div>
+                ) : (filteredItems.length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '20px',
+                        color: 'var(--b3-theme-on-surface-light)',
+                        fontSize: '13px',
+                    }}>
+                        未找到匹配的素材
+                        <br />
+                        <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                            尝试更改搜索关键词
+                        </span>
+                    </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {items.map(item => (
+                        {visibleItems.map(item => (
                             <ShapeLibraryItemCard
                                 key={item.id}
                                 item={item}
@@ -436,8 +550,27 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                                 onClickAdd={handleClickAdd}
                             />
                         ))}
+                        {/* 结果计数与加载更多 */}
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', paddingTop: '6px' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--b3-theme-on-surface-light)' }}>{visibleItems.length} / {(filteredItems ? filteredItems.length : 0)} 条</span>
+                            {visibleItems.length < (filteredItems ? filteredItems.length : 0) && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); loadMore(); }}
+                                    style={{
+                                        padding: '4px 8px',
+                                        fontSize: '12px',
+                                        borderRadius: '4px',
+                                        border: '1px solid var(--b3-border-color)',
+                                        background: 'var(--b3-theme-surface)',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {isLoadingMore ? '加载中...' : '加载更多'}
+                                </button>
+                            )}
+                        </div>
                     </div>
-                )}
+                ))}
             </div>
 
             {/* 底部提示 */}

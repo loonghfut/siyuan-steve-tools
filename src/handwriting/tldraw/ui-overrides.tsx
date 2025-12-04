@@ -62,8 +62,8 @@ import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
 import { IMindMapShape } from './MindMapShape/mind-map-shape-types'
 import { ThemeName } from './MindMapShape/mind-map-constants'
-import { addShapesToLibrary } from './shapelibrary/shape-library-manager'
-import { ShapeLibraryPanel, setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel'
+import { addShapesToLibrary, resetShapeLibraryPanelPosition } from './shapelibrary/shape-library-manager'
+import { ShapeLibraryPanel } from './shapelibrary/ShapeLibraryPanel'
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
@@ -1134,14 +1134,21 @@ function CustomQuickActions() {
                 />
             </div>
             <div>
-                <TldrawUiMenuItem
-                    id="shape-library"
-                    icon="bookmark"
-                    label="素材库"
-                    onSelect={() => {
-                        toggleShapeLibrary()
+                <div
+                    onMouseDown={(e: any) => {
+                        if (e?.detail === 2) {
+                            try { e.stopPropagation(); e.preventDefault(); } catch (err) {}
+                            resetShapeLibraryPanelPosition();
+                        }
                     }}
-                />
+                >
+                    <TldrawUiMenuItem
+                        id="shape-library"
+                        icon="bookmark"
+                        label="素材库"
+                        onSelect={() => { toggleShapeLibrary() }}
+                    />
+                </div>
             </div>
         </DefaultQuickActions>
     )

@@ -456,3 +456,25 @@ export async function importLibrary(file: File, merge: boolean = true): Promise<
         showMessage('导入素材库失败，请检查文件格式', 3000, 'error');
     }
 }
+
+/**
+ * 重置素材库面板位置到默认值（并保存到插件存储）
+ */
+export async function resetShapeLibraryPanelPosition(): Promise<void> {
+    try {
+        const PANEL_POS_PATH = '/data/storage/petal/sttools/shape-library-panel.json';
+        const defaultPos = { left: 40, top: 60 };
+        const jsonData = JSON.stringify(defaultPos, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        await api.putFile(PANEL_POS_PATH, false, blob);
+        try {
+            window.dispatchEvent(new CustomEvent('shapeLibrary:posReset', { detail: defaultPos }));
+        } catch (e) {
+            // ignore
+        }
+        showMessage('素材库面板位置已重置');
+    } catch (err) {
+        console.warn('重置素材库面板位置失败', err);
+        showMessage('重置面板位置失败', 3000, 'error');
+    }
+}
