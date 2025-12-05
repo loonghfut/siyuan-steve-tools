@@ -51,6 +51,8 @@ win端s3同步后，docker端感知s3同步。
 - feat(shape-library): 添加缩略图生成功能，支持在素材库中显示形状缩略图 (loonghfut)
 - fix(shape-library): 调整素材库面板宽度，从340px修改为285px (loonghfut)
 - fix(shape-library): 修改缩略图生成背景设置为true，确保生成的图片有背景 fix(ui-overrides): 更新字体大小选项，从[12, 14, 16, 18, 20, 24]修改为[16, 18, 20, 24, 28, 32] (loonghfut)
+- docs: 更新 v0.26.0 版本的更新日志 (loonghfut)
+- fix(plugin): 更新版本号至0.26.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
