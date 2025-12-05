@@ -352,7 +352,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                 position: 'fixed',
                 top: pos ? `${pos.top}px` : '60px',
                 left: pos ? `${pos.left}px` : undefined,
-                width: '340px',
+                width: '285px',
                 maxHeight: 'calc(100vh - 120px)',
                 backgroundColor: 'var(--b3-theme-surface)',
                 border: '1px solid var(--b3-border-color)',
