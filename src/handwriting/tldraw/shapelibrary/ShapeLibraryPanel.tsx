@@ -160,6 +160,26 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
         window.removeEventListener('touchend', onTouchEnd as any, true);
     }, [pos]);
 
+    // 阻止面板滚动冒泡到画布（防止画布随面板滚动）
+    const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+    }, []);
+    const handleWheelCapture = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+        // 在捕获阶段停止传播，防止 canvas 在捕获阶段接收到事件
+        e.stopPropagation();
+    }, []);
+
+    const handleContentTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+        // 仅阻止冒泡，允许默认滚动行为在当前容器内执行
+        e.stopPropagation();
+    }, []);
+    const handleTouchStartCapture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+    }, []);
+    const handleTouchMoveCapture = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+    }, []);
+
     const onMouseMove = useCallback((ev: MouseEvent) => {
         if (!draggingRef.current) return;
         const clientX = ev.clientX;
@@ -325,9 +345,9 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
     if (!isOpen) return null;
 
     return (
-        <div
-            ref={panelRef}
-            className="shape-library-panel"
+            <div
+                ref={panelRef}
+                className="shape-library-panel"
             style={{
                 position: 'fixed',
                 top: pos ? `${pos.top}px` : '60px',
@@ -343,7 +363,12 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                 flexDirection: 'column',
                 overflow: 'hidden',
                 pointerEvents: 'auto',
+                // 阻止滚动链到父容器
+                overscrollBehavior: 'contain',
             }}
+                onWheelCapture={handleWheelCapture}
+                onTouchStartCapture={handleTouchStartCapture}
+                onTouchMoveCapture={handleTouchMoveCapture}
         >
             {/* 头部 */}
             <div
@@ -494,10 +519,15 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
             <div
                 ref={contentRef}
                 onScroll={handleScroll}
+                onWheel={handleWheel}
+                onTouchMove={handleContentTouchMove}
+                onTouchStart={(e) => { e.stopPropagation(); }}
                 style={{
                 flex: 1,
                 overflowY: 'auto',
                 padding: '8px',
+                // 阻止滚动链（现代浏览器）
+                overscrollBehavior: 'contain',
             }}>
                 {loading ? (
                     <div style={{
