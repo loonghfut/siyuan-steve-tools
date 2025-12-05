@@ -120,6 +120,93 @@ function collectAssetsForShapes(editor: Editor, shapes: TLShape[]): TLAsset[] {
 }
 
 /**
+ * 生成形状的缩略图
+ * @param editor tldraw编辑器实例
+ * @param shapeIds 要生成缩略图的形状ID列表
+ * @returns 缩略图的base64编码字符串
+ */
+async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise<string | undefined> {
+    try {
+        console.log('[素材库] 开始生成缩略图，形状数量:', shapeIds.length);
+        
+        // 使用tldraw的toImage API生成图片
+        const imageResult = await editor.toImage(shapeIds, {
+            format: 'png',
+            background: false,
+            padding: 16,
+        });
+
+        if (!imageResult || !imageResult.blob) {
+            console.warn('[素材库] 生成缩略图失败：imageResult为空');
+            return undefined;
+        }
+        
+        const blob = imageResult.blob;
+        console.log('[素材库] 图片生成成功，大小:', blob.size, '尺寸:', imageResult.width, 'x', imageResult.height);
+
+        // 将blob转换为base64
+        return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = reader.result as string;
+                console.log('[素材库] base64转换成功，长度:', base64.length);
+                
+                // 创建一个临时图片来调整大小
+                const img = new Image();
+                img.onload = () => {
+                    console.log('[素材库] 图片加载成功，尺寸:', img.width, 'x', img.height);
+                    
+                    // 创建canvas进行缩放，生成小尺寸缩略图
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 200; // 缩略图最大尺寸
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // 保持宽高比，缩放到最大尺寸内
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height = (height * MAX_SIZE) / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width = (width * MAX_SIZE) / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const thumbnail = canvas.toDataURL('image/png');
+                        console.log('[素材库] 缩略图生成成功，最终尺寸:', width, 'x', height, '长度:', thumbnail.length);
+                        resolve(thumbnail);
+                    } else {
+                        console.log('[素材库] canvas上下文获取失败，返回原始base64');
+                        resolve(base64);
+                    }
+                };
+                img.onerror = (err) => {
+                    console.error('[素材库] 图片加载失败:', err);
+                    resolve(base64); // 如果缩放失败，返回原始base64
+                };
+                img.src = base64;
+            };
+            reader.onerror = () => {
+                console.error('[素材库] FileReader读取失败');
+                reject(new Error('读取blob失败'));
+            };
+            reader.readAsDataURL(blob);
+        });
+    } catch (err) {
+        console.error('[素材库] 生成缩略图失败:', err);
+        return undefined;
+    }
+}
+
+/**
  * 将选中的形状添加到素材库
  */
 export async function addShapesToLibrary(
@@ -138,6 +225,12 @@ export async function addShapesToLibrary(
         
         // 收集相关资源
         const assets = collectAssetsForShapes(editor, selectedShapes);
+        
+        // 生成缩略图
+        const shapeIds = selectedShapes.map(s => s.id);
+        console.log('[素材库] 准备为以下形状生成缩略图:', shapeIds);
+        const thumbnail = await generateThumbnail(editor, shapeIds);
+        console.log('[素材库] 缩略图生成完成:', thumbnail ? '成功' : '失败');
         
         // 计算形状的边界框，用于后续居中放置
         const bounds = editor.getSelectionRotatedPageBounds();
@@ -160,6 +253,7 @@ export async function addShapesToLibrary(
             createdAt: Date.now(),
             shapes,
             assets: assets.map(a => JSON.parse(JSON.stringify(a))),
+            thumbnail, // 添加缩略图
         };
 
         // 加载现有素材库并添加新项

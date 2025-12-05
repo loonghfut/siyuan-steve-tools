@@ -352,7 +352,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                 position: 'fixed',
                 top: pos ? `${pos.top}px` : '60px',
                 left: pos ? `${pos.left}px` : undefined,
-                width: '280px',
+                width: '340px',
                 maxHeight: 'calc(100vh - 120px)',
                 backgroundColor: 'var(--b3-theme-surface)',
                 border: '1px solid var(--b3-border-color)',
@@ -653,13 +653,19 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
         }
     };
 
+    // 调试日志
+    React.useEffect(() => {
+        console.log('[素材卡片] 渲染素材:', item.name, '缩略图:', item.thumbnail ? `存在(${item.thumbnail.substring(0, 50)}...)` : '不存在');
+    }, [item.name, item.thumbnail]);
+
     return (
         <div
             draggable
             onDragStart={(e) => onDragStart(e, item)}
             style={{
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: 'row',
+                gap: '10px',
                 padding: '10px 12px',
                 backgroundColor: 'var(--b3-theme-background)',
                 borderRadius: '6px',
@@ -675,63 +681,108 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                 e.currentTarget.style.backgroundColor = 'var(--b3-theme-background)';
             }}
         >
-            {/* 名称行 */}
+            {/* 缩略图或占位符 */}
             <div style={{
+                flexShrink: 0,
+                width: '80px',
+                height: '80px',
+                borderRadius: '4px',
+                overflow: 'hidden',
+                backgroundColor: 'var(--b3-theme-surface)',
+                border: '1px solid var(--b3-border-color)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '6px',
+                justifyContent: 'center',
             }}>
-                {isEditing ? (
-                    <input
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => onEditingNameChange(e.target.value)}
-                        onBlur={onSaveRename}
-                        onKeyDown={handleKeyDown}
-                        autoFocus
+                {item.thumbnail ? (
+                    <img
+                        src={item.thumbnail}
+                        alt={item.name}
                         style={{
-                            flex: 1,
-                            padding: '2px 6px',
-                            border: '1px solid var(--color-primary)',
-                            borderRadius: '4px',
-                            fontSize: '13px',
-                            backgroundColor: 'var(--color-background)',
-                            color: 'var(--color-text)',
-                            outline: 'none',
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain',
                         }}
                     />
                 ) : (
-                    <span
-                        style={{
-                            flex: 1,
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                        }}
-                        onDoubleClick={() => onStartRename(item)}
-                        title={item.name}
-                    >
-                        {item.name}
-                    </span>
+                    <div style={{
+                        fontSize: '32px',
+                        opacity: 0.3,
+                    }}>
+                        📦
+                    </div>
                 )}
             </div>
-
-            {/* 信息行 */}
+            
+            {/* 信息区域 */}
             <div style={{
+                flex: 1,
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
                 justifyContent: 'space-between',
-                fontSize: '11px',
-                color: 'var(--b3-theme-on-surface-light)',
+                minWidth: 0, // 允许内容收缩
             }}>
-                <span>
-                    {item.shapes.length} 个形状
-                    {item.assets.length > 0 && ` · ${item.assets.length} 个资源`}
-                </span>
-                <div style={{ display: 'flex', gap: '4px' }}>
+                {/* 名称行 */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '6px',
+                }}>
+                    {isEditing ? (
+                        <input
+                            type="text"
+                            value={editingName}
+                            onChange={(e) => onEditingNameChange(e.target.value)}
+                            onBlur={onSaveRename}
+                            onKeyDown={handleKeyDown}
+                            autoFocus
+                            style={{
+                                flex: 1,
+                                padding: '2px 6px',
+                                border: '1px solid var(--color-primary)',
+                                borderRadius: '4px',
+                                fontSize: '13px',
+                                backgroundColor: 'var(--color-background)',
+                                color: 'var(--color-text)',
+                                outline: 'none',
+                            }}
+                        />
+                    ) : (
+                        <span
+                            style={{
+                                flex: 1,
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}
+                            onDoubleClick={() => onStartRename(item)}
+                            title={item.name}
+                        >
+                            {item.name}
+                        </span>
+                    )}
+                </div>
+
+                {/* 信息行 */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '11px',
+                    color: 'var(--b3-theme-on-surface-light)',
+                    marginBottom: '4px',
+                }}>
+                    <span>
+                        {item.shapes.length} 个形状
+                        {item.assets.length > 0 && ` · ${item.assets.length} 个资源`}
+                    </span>
+                </div>
+
+                {/* 操作按钮行 */}
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -793,15 +844,15 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                         🗑️
                     </button>
                 </div>
-            </div>
 
-            {/* 创建时间 */}
-            <div style={{
-                marginTop: '4px',
-                fontSize: '10px',
-                color: 'var(--b3-theme-on-surface-light)',
-            }}>
-                {new Date(item.createdAt).toLocaleString('zh-CN')}
+                {/* 创建时间 */}
+                <div style={{
+                    marginTop: '4px',
+                    fontSize: '10px',
+                    color: 'var(--b3-theme-on-surface-light)',
+                }}>
+                    {new Date(item.createdAt).toLocaleString('zh-CN')}
+                </div>
             </div>
         </div>
     );
