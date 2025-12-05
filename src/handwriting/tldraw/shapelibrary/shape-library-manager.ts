@@ -132,7 +132,7 @@ async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise
         // 使用tldraw的toImage API生成图片
         const imageResult = await editor.toImage(shapeIds, {
             format: 'png',
-            background: false,
+            background: true,
             padding: 16,
         });
 

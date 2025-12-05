@@ -865,7 +865,7 @@ const CustomStylePanel = track(() => {
                             gap: '4px',
                             flexWrap: 'wrap'
                         }}>
-                            {[12, 14, 16, 18, 20, 24].map(size => (
+                            {[16, 18, 20, 24, 28, 32].map(size => (
                                 <TldrawUiButton
                                     key={size}
                                     type={mindMapFontSizeValue === size ? 'primary' : 'normal'}
