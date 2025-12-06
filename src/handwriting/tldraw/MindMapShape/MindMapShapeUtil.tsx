@@ -203,7 +203,11 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             handleExportMarkdownList,
             handleOpenColorPicker,
             handleColorChange,
-        } = useContextMenu(rootNode, updateShape, replaceRootNode)
+        } = useContextMenu(rootNode, updateShape, replaceRootNode, (nodeId: string, text?: string) => {
+            // 当从上下文菜单或 UI 添加节点时，进入编辑状态
+            setEditingNodeId(nodeId)
+            setEditText(text ?? '')
+        })
 
         const { handleKeyDown } = useKeyboardHandlers(
             rootNode,
@@ -407,6 +411,9 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             const parentNode = findNodeById(newRoot, nodeId)
             if (parentNode) parentNode.collapsed = false
             updateShape(newRoot, newNode.id)
+            // 进入编辑状态
+            setEditingNodeId(newNode.id)
+            setEditText(newNode.text)
         }, [rootNode, updateShape])
 
         return (

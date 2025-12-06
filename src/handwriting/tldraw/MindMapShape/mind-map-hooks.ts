@@ -264,7 +264,9 @@ export interface ContextMenuState {
 export const useContextMenu = (
     rootNode: MindMapNode,
     updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void,
-    replaceRootNode?: (newRootNode: MindMapNode) => void
+    replaceRootNode?: (newRootNode: MindMapNode) => void,
+    // startEdit: optional callback to set editing state for a newly created node
+    startEdit?: (nodeId: string, text?: string) => void,
 ) => {
     const [menuState, setMenuState] = useState<ContextMenuState>({
         nodeId: null,
@@ -309,8 +311,12 @@ export const useContextMenu = (
             const parentNode = findNodeById(newRoot, menuState.nodeId)
             if (parentNode) parentNode.collapsed = false
             updateShape(newRoot, newNode.id)
+            // 如果提供了 startEdit 回调，则进入编辑状态
+            if (startEdit) {
+                startEdit(newNode.id, newNode.text)
+            }
         }
-    }, [menuState.nodeId, rootNode, updateShape])
+    }, [menuState.nodeId, rootNode, updateShape, startEdit])
 
     const handleAddSibling = useCallback(() => {
         if (menuState.nodeId && !menuState.isRootNode) {
@@ -520,6 +526,9 @@ export const useKeyboardHandlers = (
                 const parentNode = findNodeById(newRoot, selectedNodeId)
                 if (parentNode) parentNode.collapsed = false
                 updateShape(newRoot, newNode.id)
+                // 进入编辑状态
+                setEditingNodeId(newNode.id)
+                setEditText(newNode.text)
                 break
             }
             case 'Enter': {
@@ -528,6 +537,9 @@ export const useKeyboardHandlers = (
                     const newNode = createMindMapNode('新节点')
                     addChildNode(newRoot, selectedNodeId, newNode)
                     updateShape(newRoot, newNode.id)
+                    // 进入编辑状态（为根节点添加子节点）
+                    setEditingNodeId(newNode.id)
+                    setEditText(newNode.text)
                 } else {
                     const newNode = createMindMapNode('新节点')
                     addSiblingNode(newRoot, selectedNodeId, newNode)
