@@ -17,6 +17,7 @@ import {
     MindMapNode,
     createMindMapNode,
     findNodeById,
+    addChildNode,
 } from './mind-map-shape-types'
 import { ThemeName } from './mind-map-constants'
 import { calculateFullLayout } from './mind-map-layout'
@@ -396,6 +397,18 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             handleToggleCollapse(nodeId, selectedNodeId)
         }, [handleToggleCollapse, selectedNodeId])
 
+        // 处理添加子节点（节点上的+按钮）点击
+        const handleAddChildClick = useCallback((nodeId: string, e: React.MouseEvent) => {
+            e.stopPropagation()
+            e.preventDefault()
+            const newRoot = deepCloneRootNode(rootNode)
+            const newNode = createMindMapNode('新节点')
+            addChildNode(newRoot, nodeId, newNode)
+            const parentNode = findNodeById(newRoot, nodeId)
+            if (parentNode) parentNode.collapsed = false
+            updateShape(newRoot, newNode.id)
+        }, [rootNode, updateShape])
+
         return (
             <HTMLContainer
                 id={shape.id}
@@ -491,7 +504,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 onDragMove={isLinkedMode ? undefined : handleDragMove}
                                 onDragEnd={isLinkedMode ? undefined : handleDragEnd}
                                 onDropTargetLeave={isLinkedMode ? undefined : clearDropTarget}
-                                onToggleCollapse={handleToggleCollapseClick}
+                                onAddChild={isLinkedMode ? undefined : handleAddChildClick}
                                 onEditTextChange={setEditText}
                                 onFinishEdit={handleFinishEdit}
                                 onCancelEdit={handleCancelEdit}

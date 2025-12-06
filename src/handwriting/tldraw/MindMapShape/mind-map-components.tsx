@@ -39,7 +39,7 @@ export interface NodeRenderProps {
     onDragMove?: (nodeId: string, e: React.PointerEvent) => void
     onDragEnd?: () => void
     onDropTargetLeave?: (nodeId: string) => void
-    onToggleCollapse: (nodeId: string, e: React.MouseEvent) => void
+    onAddChild?: (nodeId: string, e: React.MouseEvent) => void
     onEditTextChange: (text: string) => void
     onFinishEdit: () => void
     onCancelEdit: () => void
@@ -477,7 +477,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     onDragMove,
     onDragEnd,
     onDropTargetLeave,
-    onToggleCollapse,
+    onAddChild,
     onEditTextChange,
     onFinishEdit,
     onCancelEdit,
@@ -486,7 +486,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     const isRoot = level === 0
     const isSelected = node.id === selectedNodeId
     const isCurrentEditing = node.id === editingNodeId
-    const hasChildren = node.children.length > 0
+    // const hasChildren = node.children.length > 0
     const isDragging = node.id === draggingNodeId
     const isDropTarget = node.id === dropTargetId
     
@@ -564,7 +564,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     const maxWidth = isRoot ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
     const displayText = truncateText(node.text, displayFontSize, displayFontWeight, maxWidth)
 
-    // 折叠按钮尺寸根据字体大小动态调整，保证可点击性
+    // 操作按钮尺寸根据字体大小动态调整，保证可点击性
     const btnSize = Math.max(12, Math.round(fontSize * 1.0))
 
     // 根据方向计算连接线路径
@@ -650,8 +650,8 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     opacity: isDragging ? 0.6 : 1,
                 }}
             >
-                {/* 扩展的悬浮检测区域 - 包含折叠按钮区域（根据方向调整） */}
-                {hasChildren && (
+                {/* 扩展的悬浮检测区域 - 包含按钮区域（根据方向调整），在非绑定模式下才显示 */}
+                {!isLinkedMode && (
                     <rect
                         x={direction === 'left' ? -(COLLAPSE_BUTTON_GAP + btnSize + 4) : 0}
                         y={direction === 'up' ? -(COLLAPSE_BUTTON_GAP + btnSize + 4) : 0}
@@ -759,8 +759,8 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     </text>
                 )}
 
-                {/* 折叠/展开按钮 - 有子节点时显示，悬浮或已折叠时可见 */}
-                {hasChildren && (isHovered || node.collapsed || isSelected) && (
+                {/* 添加子节点按钮 - 有子节点或无子节点时在悬浮或选中时显示 */}
+                { (!isLinkedMode && (isHovered || isSelected)) && (
                     <g
                         transform={(() => {
                             const btnOffset = COLLAPSE_BUTTON_GAP + btnSize / 2
@@ -776,7 +776,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                                     return `translate(${width + btnOffset}, ${height / 2})`
                             }
                         })()}
-                        onClick={(e) => onToggleCollapse(node.id, e)}
+                        onClick={(e) => { e.stopPropagation(); onAddChild && onAddChild(node.id, e) }}
                         onPointerDown={(e) => e.stopPropagation()}
                         style={{ cursor: 'pointer', pointerEvents: 'all' }}
                     >
@@ -787,7 +787,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                             fontSize={12}
                             fill={colors.nodeText}
                         >
-                            {node.collapsed ? '+' : '−'}
+                            ➕
                         </text>
                     </g>
                 )}
@@ -820,7 +820,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     onDragMove={onDragMove}
                     onDragEnd={onDragEnd}
                     onDropTargetLeave={onDropTargetLeave}
-                    onToggleCollapse={onToggleCollapse}
+                    onAddChild={onAddChild}
                     onEditTextChange={onEditTextChange}
                     onFinishEdit={onFinishEdit}
                     onCancelEdit={onCancelEdit}
