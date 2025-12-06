@@ -2,6 +2,7 @@ import { createShapePropsMigrationIds, createShapePropsMigrationSequence } from 
 
 const versions = createShapePropsMigrationIds('single-block', {
 	addRefreshNonce: 1,
+    addAllowBinding: 2,
 })
 
 export const singleBlockShapeMigrations = createShapePropsMigrationSequence({
@@ -13,6 +14,15 @@ export const singleBlockShapeMigrations = createShapePropsMigrationSequence({
 			},
 			down(props) {
 				delete props.refreshNonce
+			},
+		},
+		{
+			id: versions.addAllowBinding,
+			up(props) {
+				props.allowBinding = props.allowBinding ?? true
+			},
+			down(props) {
+				delete props.allowBinding
 			},
 		},
 	],

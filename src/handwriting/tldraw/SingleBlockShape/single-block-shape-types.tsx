@@ -13,5 +13,7 @@ export type ISingleBlockShape = TLBaseShape<
 		refreshNonce?: number
 		/** 是否在按 Enter 创建新形状时自动与其建立连接（箭头） */
 		connectOnEnter?: boolean
+		/** 是否允许与其他形状建立绑定（自动或手动） */
+		allowBinding?: boolean
 	}
 >

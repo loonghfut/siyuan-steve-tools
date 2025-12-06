@@ -394,6 +394,14 @@ const CustomStylePanel = track(() => {
         return values.every(v => v === first) ? first : 'mixed'
     }, [hasSingleBlockSelection, selectedSingleBlockShapes])
 
+    // --- Single Block: allowBinding 开关 ---
+    const allowBindingState = React.useMemo<boolean | 'mixed'>(() => {
+        if (!hasSingleBlockSelection) return false
+        const values = selectedSingleBlockShapes.map(s => s.props.allowBinding !== false) // 未定义视为 true
+        const first = values[0]
+        return values.every(v => v === first) ? first : 'mixed'
+    }, [hasSingleBlockSelection, selectedSingleBlockShapes])
+
     const selectedJsShapes = React.useMemo(
         () => selectedShapes.filter((shape): shape is IJsShape => shape.type === 'js-shape'),
         [selectedShapes]
@@ -790,6 +798,26 @@ const CustomStylePanel = track(() => {
                             title="开启后按 Enter 新建的块会自动用箭头连接"
                         >
                             {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
+                        </TldrawUiButton>
+                    </div>
+                    <div className="tlui-style-panel__section">
+                        <TldrawUiButton
+                            type="normal"
+                            onClick={() => {
+                                const next = allowBindingState === 'mixed' ? true : !allowBindingState
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedSingleBlockShapes.map(s => ({
+                                            id: s.id,
+                                            type: 'single-block',
+                                            props: { ...s.props, allowBinding: next }
+                                        }))
+                                    )
+                                })
+                            }}
+                            title="开启后允许与其他形状建立绑定（拖动到目标后会自动绑定）"
+                        >
+                            {allowBindingState === 'mixed' ? '⚬ 启用绑定' : allowBindingState ? '✓ 启用绑定' : '启用绑定'}
                         </TldrawUiButton>
                     </div>
                     <div className="tlui-style-panel__section">

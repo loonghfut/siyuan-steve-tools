@@ -10,4 +10,5 @@ export const singleBlockShapeProps: RecordProps<ISingleBlockShape> = {
 	fontSize: T.optional(T.number),
 	refreshNonce: T.optional(T.number),
 	connectOnEnter: T.optional(T.boolean),
+	allowBinding: T.optional(T.boolean),
 }

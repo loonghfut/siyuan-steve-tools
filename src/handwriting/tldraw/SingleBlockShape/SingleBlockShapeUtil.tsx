@@ -18,7 +18,6 @@ import {
 	BindingUtil,
 	TLBaseBinding,
 	BindingOnShapeChangeOptions,
-	BindingOnShapeDeleteOptions,
 	Box,
 	invLerp,
 	lerp,
@@ -81,6 +80,14 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		if (prev.props.blockId && !next.props.blockId) {
 			next.props.blockId = prev.props.blockId
 		}
+
+		// 当从允许绑定切换到不允许绑定时，删除已有的 single-block 类型的绑定
+		if ((prev.props.allowBinding ?? true) && (next.props.allowBinding === false)) {
+			const bindings = this.editor.getBindingsFromShape(prev, 'single-block')
+			if (bindings.length > 0) {
+				this.editor.deleteBindings(bindings)
+			}
+		}
 	}
 
 	getDefaultProps(): ISingleBlockShape['props'] {
@@ -94,6 +101,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			fontSize: 22,
 			refreshNonce: Date.now(),
 			connectOnEnter: false,
+			// 是否允许与其他形状建立绑定（默认允许）
+			allowBinding: true,
 		}
 	}
 
@@ -826,6 +835,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	}
 
 	override onTranslateEnd(_initial: ISingleBlockShape, currentShape: ISingleBlockShape) {
+        // 如果当前 shape 标记为不允许绑定，则跳过创建绑定
+        if (currentShape.props.allowBinding === false) return
 		const pageAnchor = this.editor.getShapePageTransform(currentShape).applyToPoint({ x: 0, y: 0 })
 		const target = this.editor.getShapeAtPoint(pageAnchor, {
 			hitInside: true,
@@ -1069,6 +1080,16 @@ export class SingleBlockBindingUtil extends BindingUtil<SingleBlockBinding> {
 		const singleBlock = this.editor.getShape<ISingleBlockShape>(binding.fromId)
 		if (!singleBlock) return
 
+		// 如果 single-block 被设置为不允许绑定，则移除此 binding 并返回
+		if (singleBlock.props.allowBinding === false) {
+			try {
+				this.editor.deleteBindings([binding])
+			} catch (err) {
+				// ignore
+			}
+			return
+		}
+
 		const shapeBounds = this.editor.getShapeGeometry(shapeAfter)!.bounds
 		const shapeAnchor = {
 			x: lerp(shapeBounds.minX, shapeBounds.maxX, binding.props.anchor.x),
@@ -1090,7 +1111,7 @@ export class SingleBlockBindingUtil extends BindingUtil<SingleBlockBinding> {
 	}
 
 	// 当绑定的目标形状被删除时，删除 single-block
-	override onBeforeDeleteToShape({ binding }: BindingOnShapeDeleteOptions<SingleBlockBinding>): void {
-		this.editor.deleteShape(binding.fromId)
-	}
+	// override onBeforeDeleteToShape({ binding }: BindingOnShapeDeleteOptions<SingleBlockBinding>): void {
+	// 	this.editor.deleteShape(binding.fromId)
+	// }
 }
