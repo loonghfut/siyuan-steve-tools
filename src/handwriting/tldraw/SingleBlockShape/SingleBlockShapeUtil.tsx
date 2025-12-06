@@ -101,6 +101,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			fontSize: 22,
 			refreshNonce: Date.now(),
 			connectOnEnter: false,
+			// 默认不透明（带背景和边框）
+			transparentBackground: false,
 			// 是否允许与其他形状建立绑定（默认允许）
 			allowBinding: true,
 		}
@@ -195,7 +197,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			if (!target) return
 
 			const contentH = Math.ceil((target as HTMLElement).scrollHeight || (target as HTMLElement).offsetHeight || 0)
-			const nextHeight = Math.max(contentH + BORDER_PX * 2, MIN_HEIGHT)
+			const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
+			const nextHeight = Math.max(contentH + borderPx * 2, MIN_HEIGHT)
 			const nextWidth = Math.max(shape.props.w, 1)
 			SingleBlockSizes.update(editor, (map) => {
 				const existing = map.get(shape.id)
@@ -747,7 +750,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			updateDomSize()
 		}, [shape.props.fontSize]);
 
-		const handleDoubleClick = (e: React.MouseEvent) => {
+			const handleDoubleClick = (e: React.MouseEvent) => {
 			if (!isEditingState) {
 				e.stopPropagation()
 				editor.setEditingShape(shape.id)
@@ -761,13 +764,16 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 		}
 
+		// 计算当前是否需要绘制边框
+		const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
+
 		return (
 			<HTMLContainer
 				id={shape.id}
 				style={{
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: theme[shape.props.color].semi,
+					backgroundColor: shape.props.transparentBackground ? 'transparent' : theme[shape.props.color].semi,
 					color: theme[shape.props.color].solid,
 					position: 'relative',
 					isolation: 'isolate',
@@ -778,7 +784,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
-					border: `${BORDER_PX}px solid ${theme[shape.props.color].solid}`,
+					border: shape.props.transparentBackground ? 'none' : `${borderPx}px solid ${theme[shape.props.color].solid}`,
 					borderRadius: '10px',
 				}}
 				onDoubleClick={handleDoubleClick}
@@ -868,10 +874,11 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	override toSvg(shape: ISingleBlockShape, ctx: SvgExportContext): ReactElement | null {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
 		const { w, h: hProp, color, fontSize = 16, blockId } = shape.props
-		const border = BORDER_PX
+		const border = shape.props.transparentBackground ? 0 : BORDER_PX
 		const radius = 10
-		const strokeColor = theme[color].solid
-		const fillColor = theme[color].semi
+		const strokeColor = shape.props.transparentBackground ? 'none' : theme[color].solid
+		const fillColor = shape.props.transparentBackground ? 'none' : theme[color].semi
+		const textColor = theme[color].solid
 		let serialized = ''
 
 		const size = SingleBlockSizes.get(this.editor).get(shape.id)
@@ -1035,7 +1042,12 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		return (
 			<g>
-				<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
+				{border > 0 ? (
+					<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
+				) : (
+					// 保持形状几何但不绘制填充与边框
+					<rect width={w} height={h} fill="none" stroke="none" strokeWidth={0} rx={radius} ry={radius} />
+				)}
 				{serialized ? (
 					<foreignObject x={border} y={border} width={Math.max(innerW, 1)} height={Math.max(innerH, 1)}>
 						<div
@@ -1046,7 +1058,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						/>
 					</foreignObject>
 				) : (
-					<text x={w / 2} y={h / 2} fill={strokeColor} fontSize={fontSize * 0.9} dominantBaseline="middle" textAnchor="middle">
+					<text x={w / 2} y={h / 2} fill={textColor} fontSize={fontSize * 0.9} dominantBaseline="middle" textAnchor="middle">
 						{blockId ? `Block ${blockId.slice(-6)}` : 'Single Block'}
 					</text>
 				)}

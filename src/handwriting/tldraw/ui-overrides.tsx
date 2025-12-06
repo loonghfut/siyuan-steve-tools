@@ -402,6 +402,14 @@ const CustomStylePanel = track(() => {
         return values.every(v => v === first) ? first : 'mixed'
     }, [hasSingleBlockSelection, selectedSingleBlockShapes])
 
+    // --- Single Block: transparentBackground 开关 ---
+    const transparentBackgroundState = React.useMemo<boolean | 'mixed'>(() => {
+        if (!hasSingleBlockSelection) return false
+        const values = selectedSingleBlockShapes.map(s => !!s.props.transparentBackground)
+        const first = values[0]
+        return values.every(v => v === first) ? first : 'mixed'
+    }, [hasSingleBlockSelection, selectedSingleBlockShapes])
+
     const selectedJsShapes = React.useMemo(
         () => selectedShapes.filter((shape): shape is IJsShape => shape.type === 'js-shape'),
         [selectedShapes]
@@ -798,6 +806,26 @@ const CustomStylePanel = track(() => {
                             title="开启后按 Enter 新建的块会自动用箭头连接"
                         >
                             {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
+                        </TldrawUiButton>
+                    </div>
+                    <div className="tlui-style-panel__section">
+                        <TldrawUiButton
+                            type="normal"
+                            onClick={() => {
+                                const next = transparentBackgroundState === 'mixed' ? true : !transparentBackgroundState
+                                editor.run(() => {
+                                    editor.updateShapes(
+                                        selectedSingleBlockShapes.map(s => ({
+                                            id: s.id,
+                                            type: 'single-block',
+                                            props: { ...s.props, transparentBackground: next },
+                                        }))
+                                    )
+                                })
+                            }}
+                            title="启用透明背景（隐藏背景与边框）"
+                        >
+                            {transparentBackgroundState === 'mixed' ? '⚬ 透明背景' : transparentBackgroundState ? '✓ 透明背景' : '透明背景'}
                         </TldrawUiButton>
                     </div>
                     <div className="tlui-style-panel__section">

@@ -15,5 +15,7 @@ export type ISingleBlockShape = TLBaseShape<
 		connectOnEnter?: boolean
 		/** 是否允许与其他形状建立绑定（自动或手动） */
 		allowBinding?: boolean
+        /** 是否使用透明背景并且不显示边框 */
+        transparentBackground?: boolean
 	}
 >

@@ -11,4 +11,5 @@ export const singleBlockShapeProps: RecordProps<ISingleBlockShape> = {
 	refreshNonce: T.optional(T.number),
 	connectOnEnter: T.optional(T.boolean),
 	allowBinding: T.optional(T.boolean),
+	transparentBackground: T.optional(T.boolean),
 }
