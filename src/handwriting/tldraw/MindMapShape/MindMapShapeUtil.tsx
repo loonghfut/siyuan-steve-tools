@@ -170,6 +170,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             editingNodeId,
             editText,
             setEditText,
+            handleEditTextChange,
             handleDoubleClick,
             handleFinishEdit,
             handleCancelEdit,
@@ -189,6 +190,22 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             })
         }, [editor, shape.id, shape.props])
 
+        // 确认对话框状态（提前声明以便传入 hooks）
+        const [confirmDialog, setConfirmDialog] = useState<{
+            message: string
+            onConfirm: () => void
+        } | null>(null)
+
+        // 显示确认对话框的函数
+        const showConfirm = useCallback((message: string, onConfirm: () => void) => {
+            setConfirmDialog({ message, onConfirm })
+        }, [])
+
+        // 关闭确认对话框
+        const closeConfirmDialog = useCallback(() => {
+            setConfirmDialog(null)
+        }, [])
+
         const {
             menuState,
             showColorPicker,
@@ -207,7 +224,9 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             // 当从上下文菜单或 UI 添加节点时，进入编辑状态
             setEditingNodeId(nodeId)
             setEditText(text ?? '')
-        })
+        }, showConfirm)
+
+        
 
         const { handleKeyDown } = useKeyboardHandlers(
             rootNode,
@@ -215,26 +234,13 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             updateShape,
             setEditingNodeId,
             setEditText,
-            replaceRootNode
+            replaceRootNode,
+            showConfirm
         )
 
-        const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
+        const { handleSelectNode } = useNodeSelection(rootNode, updateShape)
 
-        // 确认对话框状态
-        const [confirmDialog, setConfirmDialog] = useState<{
-            message: string
-            onConfirm: () => void
-        } | null>(null)
-
-        // 显示确认对话框的函数
-        const showConfirm = useCallback((message: string, onConfirm: () => void) => {
-            setConfirmDialog({ message, onConfirm })
-        }, [])
-
-        // 关闭确认对话框
-        const closeConfirmDialog = useCallback(() => {
-            setConfirmDialog(null)
-        }, [])
+        
 
         // 编辑节点的处理函数（从上下文菜单调用）
         const handleEditFromMenu = useCallback(() => {
@@ -395,11 +401,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         }, [selectedNodeId, rootNode, updateShape])
 
         // 处理折叠按钮点击
-        const handleToggleCollapseClick = useCallback((nodeId: string, e: React.MouseEvent) => {
-            e.stopPropagation()
-            e.preventDefault()
-            handleToggleCollapse(nodeId, selectedNodeId)
-        }, [handleToggleCollapse, selectedNodeId])
+        // handleToggleCollapse is still provided by useNodeSelection for keyboard/logic
 
         // 处理添加子节点（节点上的+按钮）点击
         const handleAddChildClick = useCallback((nodeId: string, e: React.MouseEvent) => {
@@ -512,7 +514,7 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 onDragEnd={isLinkedMode ? undefined : handleDragEnd}
                                 onDropTargetLeave={isLinkedMode ? undefined : clearDropTarget}
                                 onAddChild={isLinkedMode ? undefined : handleAddChildClick}
-                                onEditTextChange={setEditText}
+                                onEditTextChange={handleEditTextChange}
                                 onFinishEdit={handleFinishEdit}
                                 onCancelEdit={handleCancelEdit}
                             />

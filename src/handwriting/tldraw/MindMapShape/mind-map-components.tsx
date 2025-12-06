@@ -2,12 +2,11 @@
 
 import React from 'react'
 import { NodeLayout, LayoutDirection } from './mind-map-layout'
-import { getContrastTextColor, truncateText } from './mind-map-utils'
+import { getContrastTextColor } from './mind-map-utils'
 import {
     NODE_COLORS,
     THEMES,
     ThemeName,
-    MAX_NODE_WIDTH,
     COLLAPSE_BUTTON_GAP,
     NodeStyle,
 } from './mind-map-constants'
@@ -561,8 +560,7 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     // 计算显示文本
     const displayFontSize = isRoot ? fontSize * 1.2 : fontSize
     const displayFontWeight = isRoot ? 'bold' : 'normal'
-    const maxWidth = isRoot ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
-    const displayText = truncateText(node.text, displayFontSize, displayFontWeight, maxWidth)
+    const displayText = node.text
 
     // 操作按钮尺寸根据字体大小动态调整，保证可点击性
     const btnSize = Math.max(12, Math.round(fontSize * 1.0))
@@ -744,19 +742,29 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                             }}
                         />
                     </foreignObject>
-                ) : (
-                    <text
-                        x={width / 2}
-                        y={height / 2}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill={textColor}
-                        fontSize={displayFontSize}
-                        fontWeight={displayFontWeight}
-                        style={{ pointerEvents: 'none', userSelect: 'none' }}
-                    >
-                        {displayText}
-                    </text>
+                    ) : (
+                    <foreignObject x={4} y={4} width={width - 8} height={height - 8}>
+                        <div 
+                            xmlns="http://www.w3.org/1999/xhtml"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                fontSize: `${displayFontSize}px`,
+                                fontWeight: displayFontWeight,
+                                color: textColor,
+                                pointerEvents: 'none',
+                                userSelect: 'none',
+                            }}
+                        >
+                            {displayText}
+                        </div>
+                    </foreignObject>
                 )}
 
                 {/* 添加子节点按钮 - 有子节点或无子节点时在悬浮或选中时显示 */}

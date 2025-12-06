@@ -1,7 +1,7 @@
 // ===== 思维导图布局计算 =====
 
 import { MindMapNode } from './mind-map-shape-types'
-import { calculateNodeWidth } from './mind-map-utils'
+import { calculateNodeWidth, calculateNodeHeight } from './mind-map-utils'
 import { PADDING, MIN_WIDTH, MIN_HEIGHT } from './mind-map-constants'
 
 // 当方向为 up/down 时，额外增加的父子间垂直间距（像素）
@@ -210,12 +210,13 @@ export const calculateLayoutWithBoundsDirectional = (
     direction: LayoutDirection
 ): LayoutResult => {
     const dynamicWidth = calculateNodeWidth(node.text, level, fontSize)
+    const dynamicHeight = calculateNodeHeight(node.text, level, fontSize, nodeHeight)
     const layout: NodeLayout = {
         node,
         x,
         y,
         width: dynamicWidth,
-        height: level === 0 ? nodeHeight * 1.2 : nodeHeight,
+        height: level === 0 ? dynamicHeight * 1.2 : dynamicHeight,
         children: [],
     }
 

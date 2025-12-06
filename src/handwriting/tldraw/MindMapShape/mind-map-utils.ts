@@ -1,6 +1,6 @@
 // ===== 思维导图工具函数 =====
 
-import { MIN_NODE_WIDTH, MAX_NODE_WIDTH, NODE_PADDING_H } from './mind-map-constants'
+import { MIN_NODE_WIDTH, NODE_PADDING_H } from './mind-map-constants'
 
 /**
  * 计算颜色亮度，用于决定文本颜色
@@ -45,35 +45,31 @@ export const measureTextWidth = (text: string, fontSize: number, fontWeight: str
 export const calculateNodeWidth = (text: string, level: number, fontSize: number): number => {
     const fs = level === 0 ? fontSize * 1.2 : fontSize
     const fw = level === 0 ? 'bold' : 'normal'
-    const textWidth = measureTextWidth(text, fs, fw)
-    // 添加水平内边距，并限制在最小/最大宽度范围内
+    // 支持多行文本 - 以最长一行为宽度
+    const lines = text.split(/\r?\n/)
+    let textWidth = 0
+    for (const line of lines) {
+        const w = measureTextWidth(line, fs, fw)
+        if (w > textWidth) textWidth = w
+    }
+    // 添加水平内边距，不再使用最大宽度限制，保证完整显示
     const calculatedWidth = textWidth + NODE_PADDING_H
     const minW = level === 0 ? MIN_NODE_WIDTH * 1.2 : MIN_NODE_WIDTH
-    const maxW = level === 0 ? MAX_NODE_WIDTH * 1.2 : MAX_NODE_WIDTH
-    return Math.max(minW, Math.min(maxW, calculatedWidth))
+    return Math.max(minW, calculatedWidth)
+}
+
+/**
+ * 根据文本计算节点高度（支持多行）
+ */
+export const calculateNodeHeight = (text: string, level: number, fontSize: number, baseHeight: number): number => {
+    const fs = level === 0 ? fontSize * 1.2 : fontSize
+    const lines = text.split(/\r?\n/).length
+    const lineHeight = fs * 1.2
+    const computedHeight = lines * lineHeight + 12 // 内边距: 6px top + 6px bottom
+    return Math.max(baseHeight, computedHeight)
 }
 
 /**
  * 截断过长的文本
  */
-export const truncateText = (
-    text: string, 
-    fontSize: number, 
-    fontWeight: string, 
-    maxWidth: number
-): string => {
-    const textWidth = measureTextWidth(text, fontSize, fontWeight)
-    if (textWidth + NODE_PADDING_H <= maxWidth) {
-        return text
-    }
-    
-    // 计算可显示的字符数
-    const availableWidth = maxWidth - NODE_PADDING_H - measureTextWidth('...', fontSize, fontWeight)
-    let displayText = ''
-    for (let i = 0; i < text.length; i++) {
-        const testText = text.slice(0, i + 1)
-        if (measureTextWidth(testText, fontSize, fontWeight) > availableWidth) break
-        displayText = testText
-    }
-    return displayText + '...'
-}
+// 以前用于截断文本的工具函数 - 现在改为多行换行显示，保留注释以备未来引用

@@ -185,10 +185,21 @@ export const useEditHandlers = (
         setEditText('')
     }, [])
 
+    // 当编辑文本发生变化时，实时更新 shape 的文本以触发布局变化
+    const handleEditTextChange = useCallback((text: string) => {
+        setEditText(text)
+        if (editingNodeId) {
+            const newRoot = deepCloneRootNode(rootNode)
+            updateNodeText(newRoot, editingNodeId, text)
+            updateShape(newRoot, editingNodeId)
+        }
+    }, [editingNodeId, rootNode, updateShape])
+
     return {
         editingNodeId,
         editText,
         setEditText,
+        handleEditTextChange,
         setEditingNodeId,
         handleDoubleClick,
         handleFinishEdit,
@@ -267,6 +278,8 @@ export const useContextMenu = (
     replaceRootNode?: (newRootNode: MindMapNode) => void,
     // startEdit: optional callback to set editing state for a newly created node
     startEdit?: (nodeId: string, text?: string) => void,
+    // confirm dialog callback: showConfirm(message, onConfirm)
+    confirm?: (message: string, onConfirm: () => void) => void,
 ) => {
     const [menuState, setMenuState] = useState<ContextMenuState>({
         nodeId: null,
@@ -329,12 +342,19 @@ export const useContextMenu = (
 
     const handleDelete = useCallback(() => {
         if (menuState.nodeId && !menuState.isRootNode) {
-            const newRoot = deepCloneRootNode(rootNode)
-            const parent = findParentNode(newRoot, menuState.nodeId)
-            deleteNodeById(newRoot, menuState.nodeId)
-            updateShape(newRoot, parent?.id)
+            const doDelete = () => {
+                const newRoot = deepCloneRootNode(rootNode)
+                const parent = findParentNode(newRoot, menuState.nodeId)
+                deleteNodeById(newRoot, menuState.nodeId)
+                updateShape(newRoot, parent?.id)
+            }
+            if (confirm) {
+                confirm('确认删除此节点？', doDelete)
+            } else {
+                doDelete()
+            }
         }
-    }, [menuState.nodeId, menuState.isRootNode, rootNode, updateShape])
+    }, [menuState.nodeId, menuState.isRootNode, rootNode, updateShape, confirm])
 
     const handlePasteMarkdown = useCallback(async () => {
         try {
@@ -447,7 +467,8 @@ export const useKeyboardHandlers = (
     updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void,
     setEditingNodeId: (id: string | null) => void,
     setEditText: (text: string) => void,
-    replaceRootNode?: (newRootNode: MindMapNode) => void
+    replaceRootNode?: (newRootNode: MindMapNode) => void,
+    confirm?: (message: string, onConfirm: () => void) => void
 ) => {
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Ctrl+Shift+V: 从 Markdown 粘贴并替换整个思维导图
@@ -549,12 +570,19 @@ export const useKeyboardHandlers = (
             }
             case 'Delete':
             case 'Backspace': {
-                if (selectedNodeId !== rootNode.id) {
-                    e.preventDefault()
-                    const parent = findParentNode(newRoot, selectedNodeId)
-                    deleteNodeById(newRoot, selectedNodeId)
-                    updateShape(newRoot, parent?.id)
-                }
+                    if (selectedNodeId !== rootNode.id) {
+                        e.preventDefault()
+                        const doDelete = () => {
+                            const parent = findParentNode(newRoot, selectedNodeId)
+                            deleteNodeById(newRoot, selectedNodeId)
+                            updateShape(newRoot, parent?.id)
+                        }
+                        if (confirm) {
+                            confirm('确认删除此节点？', doDelete)
+                        } else {
+                            doDelete()
+                        }
+                    }
                 break
             }
             case ' ': {
