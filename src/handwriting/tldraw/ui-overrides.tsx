@@ -272,7 +272,7 @@ const MindMapBindingUI: React.FC<{
             app: window.siyuan.ws.app,
             doc: {
                 id: linkedBlockId,
-                action: ['cb-get-hl'],
+                action: ['cb-get-hl','cb-get-all'],
                 zoomIn: true,
             },
             keepCursor: false,
@@ -616,7 +616,7 @@ const CustomStylePanel = track(() => {
                 app: window.siyuan.ws.app,
                 doc: {
                     id: blockId,
-                    action: ['cb-get-hl'],
+                    action: ['cb-get-hl','cb-get-all'],
                     zoomIn: true,
                 },
                 // position: 'right',
@@ -1559,7 +1559,7 @@ export const components: TLComponents = {
                                     app: window.siyuan.ws.app,
                                     doc: {
                                         id: blockId,
-                                        action: ['cb-get-hl'],
+                                        action: ['cb-get-hl','cb-get-all'],
                                     },
                                     position: 'right',
                                     keepCursor: false,
