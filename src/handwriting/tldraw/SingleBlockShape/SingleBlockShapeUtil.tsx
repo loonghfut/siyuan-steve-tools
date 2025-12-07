@@ -186,6 +186,21 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			setIsEditingState(isEditing)
 		}, [isEditing])
 
+		// 编辑模式切换时聚焦到形状
+		useEffect(() => {
+			// 延迟执行，确保编辑状态完全建立
+			const timer = setTimeout(() => {
+				if (isEditing) {
+					console.log('聚焦到形状:', shape.id);
+					// 刚刚进入编辑模式，聚焦到形状
+					editor.select(shape.id);
+					editor.zoomToSelection({ animation: { duration: 300 } });
+				}
+			}, 50); // 50ms 延迟确保状态同步完成
+
+			return () => clearTimeout(timer);
+		}, [isEditing, shape.id]);
+
 		// 计算并写入 DOM 尺寸（以内容高度为准，宽度沿用 props.w）
 		const updateDomSize = useCallback(() => {
 			// 优先测量 Protyle 的内容区域
