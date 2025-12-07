@@ -4,6 +4,7 @@ import { CardShapeTool } from './CardShape/CardShapeTool'
 import { CardShapeUtil } from './CardShape/CardShapeUtil'
 import { SingleBlockShapeTool } from './SingleBlockShape/SingleBlockShapeTool'
 import { SingleBlockShapeUtil, SingleBlockBindingUtil } from './SingleBlockShape/SingleBlockShapeUtil'
+import { BezierConnectorShapeUtil, BezierConnectorBindingUtil, keepConnectorsAtBottom, PointingPort } from './BezierConnectorShape'
 import { components, uiOverrides } from './ui-overrides'
 import {
     Tldraw,
@@ -59,8 +60,8 @@ const configuredArrowShapeUtil = ArrowShapeUtil.configure({
 })
 // 从默认形状工具中过滤掉原始的ArrowShapeUtil，避免重复定义
 const filteredDefaultShapeUtils = defaultShapeUtils.filter(util => util.type !== 'arrow')
-const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil]
-const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil]
+const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil, BezierConnectorShapeUtil]
+const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil, BezierConnectorBindingUtil]
 const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool]
 /**
  * TldrawManager类，用于管理tldraw实例和操作
@@ -405,6 +406,19 @@ export class TldrawManager {
                         if (settingdata['enableDoubleClickCreateSingleBlock'] !== false) {
                             setupDoubleClickHandler(editor);
                         }
+                        
+                        // 设置贝塞尔连接器的交互状态机
+                        try {
+                            const selectTool = editor.getStateDescendant('select');
+                            if (selectTool) {
+                                selectTool.addChild(PointingPort);
+                            }
+                        } catch (err) {
+                            console.warn('设置 PointingPort 状态机失败', err);
+                        }
+                        
+                        // 保持贝塞尔连接器在底层
+                        keepConnectorsAtBottom(editor);
                         
                         // 设置素材库拖放处理程序
                         setupShapeLibraryDropHandler(editor);

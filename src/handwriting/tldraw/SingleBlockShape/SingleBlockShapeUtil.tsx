@@ -31,6 +31,7 @@ import { singleBlockShapeMigrations } from './single-block-shape-migrations'
 import { ISingleBlockShape } from './single-block-shape-types'
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
+import { PortsOverlay } from '../BezierConnectorShape/Port'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -820,7 +821,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					pointerEvents: isEditingState ? 'auto' : 'none',
 					width: '100%',
 					height: '100%',
-					overflow: 'auto',
+					overflow: 'visible', // 改为 visible 以显示端口
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
@@ -837,7 +838,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					style={{
 						width: '100%',
 						height: '100%',
-						overflow: 'hidden',
+						overflow: 'auto', // 内容区域可滚动
 						pointerEvents: isEditingState ? 'all' : 'none',
 						touchAction: isEditingState ? 'auto' : 'none',
 						contain: 'strict',
@@ -861,6 +862,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						</div>
 					)}
 				</div>
+				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
+				<PortsOverlay shapeId={shape.id} />
 			</HTMLContainer>
 		)
 	}

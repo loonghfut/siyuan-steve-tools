@@ -245,3 +245,66 @@ input.tlui-input {
 .shape-library-panel button:hover {
   opacity: 0.8;
 }
+
+/* 贝塞尔连接器端口样式 */
+.bezier-connector-port {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-panel, #ffffff);
+  border: 2px solid var(--color-text-3, #666666);
+  box-sizing: border-box;
+  z-index: 999;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+  flex: 0 0 auto;
+  transition: transform 0.08s ease-in-out, background-color 0.1s ease, border-color 0.1s ease;
+  cursor: crosshair;
+  pointer-events: all !important;
+}
+
+/* 输入端口（左侧） */
+.bezier-connector-port--input {
+  left: -7px;
+}
+
+/* 输出端口（右侧） */
+.bezier-connector-port--output {
+  right: -7px;
+}
+
+/* 被指向时高亮 */
+.bezier-connector-port--hinting {
+  background: var(--color-selected, #3d8aff);
+  border-color: var(--color-selected, #3d8aff);
+  transform: translateY(-50%) scale(1.4);
+}
+
+/* 可连接目标高亮 */
+.bezier-connector-port--eligible {
+  border-color: var(--color-selected, #3d8aff);
+  box-shadow:
+    0 0 0 3px rgba(61, 138, 255, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* 端口覆盖层容器 */
+.bezier-connector-ports-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 10;
+}
+
+/* 贝塞尔连接器形状样式 */
+.BezierConnectorShape path {
+  stroke-linecap: round;
+  fill: none;
+}
