@@ -15,12 +15,17 @@ export {
 } from './bezier-connector-binding'
 export type { ConnectorBinding, ConnectorBindings } from './bezier-connector-binding'
 
-// 端口工具
+// 端口工具 - 形状端口 (无循环依赖)
 export {
 	getShapePorts,
 	getPortPagePosition,
-	getPortAtPoint,
 	isConnectableShape,
+	CONNECTABLE_SHAPE_TYPES,
+} from './shape-ports'
+
+// 端口工具 - 位置查找
+export {
+	getPortAtPoint,
 } from './port-utils'
 
 // 端口状态

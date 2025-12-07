@@ -1,7 +1,7 @@
 import React from 'react'
 import { TLShapeId, useEditor, useValue } from '@tldraw/tldraw'
 import { getPortState } from './port-state'
-import { getShapePorts } from './port-utils'
+import { getShapePorts } from './shape-ports'
 
 interface PortProps {
 	shapeId: TLShapeId
@@ -66,29 +66,14 @@ export function Port({ shapeId, portId }: PortProps) {
 				transform: 'translateY(-50%)',
 				pointerEvents: 'all',
 			}}
-			onPointerDown={(e) => {
-				e.preventDefault()
-				e.stopPropagation()
-				
-				// 设置状态以便 PointingPort 状态机可以识别
-				;(editor as any).__pointingPortInfo = {
+			onPointerDown={() => {
+				// 不要阻止事件传播，让 TLDraw 的 input 系统能够追踪拖拽状态
+				// 直接使用 setCurrentTool 切换到 pointing_port 状态，并传递端口信息
+				// 参考: https://github.com/tldraw/tldraw/tree/main/templates/workflow/src/ports/Port.tsx
+				editor.setCurrentTool('select.pointing_port', {
 					shapeId,
 					portId,
 					terminal: port.terminal,
-				}
-				
-				// 确保使用选择工具，然后切换到 pointing_port 状态
-				editor.setCurrentTool('select')
-				// 使用 requestAnimationFrame 确保工具已切换
-				requestAnimationFrame(() => {
-					try {
-						const selectTool = editor.getStateDescendant('select')
-						if (selectTool) {
-							selectTool.transition('pointing_port')
-						}
-					} catch (err) {
-						console.warn('切换到 pointing_port 状态失败', err)
-					}
 				})
 			}}
 		/>

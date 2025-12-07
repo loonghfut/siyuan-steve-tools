@@ -9,7 +9,7 @@ import {
 	TLShapeId,
 } from '@tldraw/tldraw'
 import { IBezierConnectorShape, PortTerminal } from './bezier-connector-types'
-import { getShapePorts } from './port-utils'
+import { getShapePorts } from './shape-ports'
 
 /**
  * 连接器绑定类型定义
