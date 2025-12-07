@@ -140,26 +140,59 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
+		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
+		const prevCameraRef = useRef<any | null>(null)
+		const hadFocusedRef = useRef(false)
 
 
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
 
-		// 编辑模式切换时聚焦到形状
+		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {
 			// 延迟执行，确保编辑状态完全建立
 			const timer = setTimeout(() => {
-				if (isEditing ) {
-					console.log('聚焦到Card形状:', shape.id);
-					// 刚刚进入编辑模式，聚焦到形状
-					this.editor.select(shape.id);
-					this.editor.zoomToSelection({ animation: { duration: 300 } });
+				const enabled = settingdata['restore-camera-on-edit'] === true
+				// 如果该功能被禁用，则不进行任何聚焦/恢复动作；并清理可能残留的状态
+				if (!enabled) {
+					if (!isEditing) {
+						hadFocusedRef.current = false
+						prevCameraRef.current = null
+					}
+					return
 				}
-			}, 50); // 50ms 延迟确保状态同步完成
+				if (isEditing) {
+					console.log('聚焦到Card形状:', shape.id);
+					// 进入编辑：仅在第一次进入时保存当前相机
+					if (!hadFocusedRef.current) {
+						try {
+							prevCameraRef.current = this.editor.getCamera()
+						} catch (e) {
+							prevCameraRef.current = null
+						}
+						hadFocusedRef.current = true
+					}
+					// 刚刚进入编辑模式，选中并聚焦到形状
+					this.editor.select(shape.id)
+					this.editor.zoomToSelection({ animation: { duration: 300 } })
+				} else {
+					// 退出编辑：如果之前保存过相机，则恢复视角
+					if (hadFocusedRef.current && prevCameraRef.current) {
+						try {
+							this.editor.setCamera(prevCameraRef.current, { animation: { duration: 300 } })
+						} catch (e) {
+							// ignore
+						}
+					}
+					// 清理保存的相机状态
+					hadFocusedRef.current = false
+					prevCameraRef.current = null
+				}
+			}, 50) // 50ms 延迟确保状态同步完成
 			// console.log('大苏打发')
-			return () => clearTimeout(timer);
-		}, [isEditing,shape.id]);
+			return () => clearTimeout(timer)
+		}, [isEditing, shape.id])
 
 		// 折叠状态下获取块的 markdown 内容并截取前10个字
 		useEffect(() => {

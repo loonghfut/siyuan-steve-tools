@@ -126,6 +126,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const [canLoad, setCanLoad] = useState(true)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const containerRef = useRef<HTMLDivElement>(null)
+		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
+		const prevCameraRef = useRef<any | null>(null)
+		const hadFocusedRef = useRef(false)
 		const protyleRef = useRef<Protyle | null>(null)
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		const detachKeyHandler = useRef<() => void>()
@@ -186,20 +189,49 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			setIsEditingState(isEditing)
 		}, [isEditing])
 
-		// 编辑模式切换时聚焦到形状
+		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {
 			// 延迟执行，确保编辑状态完全建立
 			const timer = setTimeout(() => {
-				if (isEditing) {
-					console.log('聚焦到形状:', shape.id);
-					// 刚刚进入编辑模式，聚焦到形状
-					editor.select(shape.id);
-					editor.zoomToSelection({ animation: { duration: 300 } });
+				const enabled = settingdata['restore-camera-on-edit'] === true
+				// 如果功能被禁用，则不进行聚焦/恢复，并在退出编辑时清理状态
+				if (!enabled) {
+					if (!isEditing) {
+						hadFocusedRef.current = false
+						prevCameraRef.current = null
+					}
+					return
 				}
-			}, 50); // 50ms 延迟确保状态同步完成
-
-			return () => clearTimeout(timer);
-		}, [isEditing, shape.id]);
+				if (isEditing) {
+					console.log('聚焦到形状:', shape.id)
+					// 进入编辑：仅在第一次进入时保存当前相机
+					if (!hadFocusedRef.current) {
+						try {
+							prevCameraRef.current = editor.getCamera()
+						} catch (e) {
+							prevCameraRef.current = null
+						}
+						hadFocusedRef.current = true
+					}
+					// 刚刚进入编辑模式，选中并聚焦到形状
+					editor.select(shape.id)
+					editor.zoomToSelection({ animation: { duration: 300 } })
+				} else {
+					// 退出编辑：如果之前保存过相机，则恢复视角
+					if (hadFocusedRef.current && prevCameraRef.current) {
+						try {
+							editor.setCamera(prevCameraRef.current, { animation: { duration: 300 } })
+						} catch (e) {
+							// ignore
+						}
+					}
+					// 清理保存的相机状态
+					hadFocusedRef.current = false
+					prevCameraRef.current = null
+				}
+			}, 50) // 50ms 延迟确保状态同步完成
+			return () => clearTimeout(timer)
+		}, [isEditing, shape.id])
 
 		// 计算并写入 DOM 尺寸（以内容高度为准，宽度沿用 props.w）
 		const updateDomSize = useCallback(() => {
