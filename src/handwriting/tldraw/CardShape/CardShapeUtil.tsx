@@ -530,14 +530,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				destroyRuntimeResources();
 			};
 		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, isCollapsed, shape.props.renderMode, canLoad]);
-		// 处理双击事件进入编辑模式
-		const handleDoubleClick = (e: React.MouseEvent) => {
-			if (!isEditingState) {
-				e.stopPropagation();
-				this.editor.setEditingShape(shape.id);
-				setIsEditingState(true);
-			}
-		};
 
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {
@@ -566,7 +558,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					border: `3px solid ${theme[shape.props.color].solid}`, // 添加颜色边框
 					borderRadius: '10px', // 增加圆角
 				}}
-				onDoubleClick={handleDoubleClick}
+				// onDoubleClick={handleDoubleClick}
 				onPointerDown={handlePointerEvent}
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}

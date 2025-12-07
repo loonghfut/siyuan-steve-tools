@@ -750,13 +750,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			updateDomSize()
 		}, [shape.props.fontSize]);
 
-			const handleDoubleClick = (e: React.MouseEvent) => {
-			if (!isEditingState) {
-				e.stopPropagation()
-				editor.setEditingShape(shape.id)
-				setIsEditingState(true)
-			}
-		}
 
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {
@@ -787,7 +780,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					border: shape.props.transparentBackground ? 'none' : `${borderPx}px solid ${theme[shape.props.color].solid}`,
 					borderRadius: '10px',
 				}}
-				onDoubleClick={handleDoubleClick}
 				onPointerDown={handlePointerEvent}
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
