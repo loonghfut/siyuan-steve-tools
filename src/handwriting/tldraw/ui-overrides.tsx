@@ -1222,10 +1222,22 @@ function CustomQuickActions() {
                 </div>
 
             </div>
-            <div>
+            <div
+                // 将样式放到外层容器，因为 TldrawUiMenuItem 不接受 style 属性
+                style={
+                    restoreOnEdit
+                        ? {
+                              borderRadius: 6,
+                              backgroundColor: 'var(--tl-color-hint)',
+                              display: 'inline-block',
+                          }
+                        : undefined
+                }
+                data-selected={restoreOnEdit ? 'true' : 'false'}
+            >
                 <TldrawUiMenuItem
                     id="toggle-restore-camera"
-                    icon="zoom-to-selection"
+                    icon="group"
                     label={restoreOnEdit ? '编辑时聚焦（已启用）' : '编辑时聚焦（已禁用）'}
                     isSelected={restoreOnEdit}
                     onSelect={() => { toggleRestoreOnEdit() }}
