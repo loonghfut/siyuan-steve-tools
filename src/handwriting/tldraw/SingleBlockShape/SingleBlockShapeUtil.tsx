@@ -784,7 +784,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					)}
 				</div>
 				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
-				<PortsOverlay shapeId={shape.id} parentHovered={isHovered} />
+				{/* 在透明模式下不显示端点（PortsOverlay） */}
+				{!shape.props.transparentBackground && (
+					<PortsOverlay shapeId={shape.id} parentHovered={isHovered} />
+				)}
 			</HTMLContainer>
 		)
 	}
