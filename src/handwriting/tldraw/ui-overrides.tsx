@@ -759,6 +759,63 @@ const CustomStylePanel = track(() => {
 
     return (
         <DefaultStylePanel>
+            <style>{` 
+                .connector-width-input {
+                    color: var(--color-text);
+                    background: var(--b3-theme-surface);
+                    border: 1px solid var(--color-border);
+                    border-radius: 8px;
+                    box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+                    height: 32px;
+                    width: 77px;
+                    text-align: right;
+                    padding: 0 8px;
+                    box-sizing: border-box;
+                }
+                .connector-width-input::placeholder {
+                    color: var(--color-text-muted);
+                    opacity: 1;
+                }
+                /* 移除 number input 的上下微调按钮 */
+                .connector-width-input::-webkit-outer-spin-button,
+                .connector-width-input::-webkit-inner-spin-button {
+                    -webkit-appearance: none;
+                    margin: 0;
+                }
+                /* Firefox */
+                .connector-width-input {
+                    -moz-appearance: textfield;
+                }
+                @media (prefers-color-scheme: light) {
+                    .connector-width-input::placeholder {
+                        color: rgba(0,0,0,0.45);
+                    }
+                }
+                /* Color input: remove native swatch background/padding */
+                .connector-color-input {
+                    background: transparent;
+                    padding: 0;
+                    height: 20px;
+                    width: 48px;
+                    border-radius: 4px;
+                    border: 1px solid var(--color-border);
+                    box-sizing: border-box;
+                }
+                .connector-color-input::-webkit-color-swatch-wrapper {
+                    padding: 0;
+                }
+                .connector-color-input::-webkit-color-swatch {
+                    border: none;
+                    background: transparent;
+                    border-radius: 4px;
+                }
+                /* Firefox */
+                .connector-color-input::-moz-color-swatch {
+                    border: none;
+                    background: transparent;
+                    border-radius: 4px;
+                }
+            `}</style>
             {/* 如果选中了思维导图（mind-map），我们不加载 DefaultStylePanelContent */}
             {!hasMindMapSelection && <DefaultStylePanelContent styles={styles} />}
 
@@ -800,16 +857,18 @@ const CustomStylePanel = track(() => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
                         <span style={{ minWidth: 60 }}>自定义</span>
                         <input
+                            className="connector-color-input"
                             type="color"
                             value={connectorColorState === 'mixed' ? '#666666' : connectorColorState}
                             onChange={(e) => handleConnectorColorChange(e.target.value)}
-                            style={{ flex: '0 0 48px', height: 28, padding: 0, border: '1px solid var(--color-border)', borderRadius: 4 }}
+                            style={{ flex: '0 0 48px'}}
                         />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                         <span style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>线宽</span>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
                             <input
+                                className="connector-width-input"
                                 type="number"
                                 min={0.5}
                                 max={12}
@@ -818,13 +877,7 @@ const CustomStylePanel = track(() => {
                                 placeholder={connectorStrokeState === 'mixed' ? '混合' : undefined}
                                 onChange={(e) => handleConnectorWidthChange(parseFloat(e.target.value))}
                                 style={{
-                                    height: 32,
-                                    width: 77,
-                                    border: '1px solid var(--color-border)',
-                                    borderRadius: 8,
-                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
-                                    textAlign: 'right',
-                                    background: 'var(--b3-theme-surface)'
+                                    color: 'var(--color-text)'
                                 }}
                             />
                             <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>px</span>
