@@ -2,17 +2,19 @@ import React from 'react'
 import { TLShapeId, useEditor, useValue } from '@tldraw/tldraw'
 import { getPortState } from './port-state'
 import { getShapePorts } from './shape-ports'
+import { getShapeConnections } from './bezier-connector-binding'
 
 interface PortProps {
 	shapeId: TLShapeId
 	portId: string
 	key?: string
+	parentHovered?: boolean
 }
 
 /**
  * 端口组件 - 用于在形状上显示可连接的端口
  */
-export function Port({ shapeId, portId }: PortProps) {
+export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 	const editor = useEditor()
 
 	const port = useValue(
@@ -62,6 +64,15 @@ export function Port({ shapeId, portId }: PortProps) {
 	const extraOffsetX = -3
 	const extraOffsetY = -3
 
+	// 判断该端口是否已有连接（若有连接则一直显示）
+	const isConnected = useValue(
+		'isConnected',
+		() => {
+			const conns = getShapeConnections(editor, shapeId)
+			return conns.some((c) => c.ownPortId === portId)
+		},
+		[editor, shapeId, portId]
+	)
 	return (
 		<div
 			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${
@@ -72,7 +83,9 @@ export function Port({ shapeId, portId }: PortProps) {
 				left,
 				top,
 				transform: `translate(-50%, -50%) translateX(${extraOffsetX}px) translateY(${extraOffsetY}px) scale(${scale})`,
-				pointerEvents: 'all',
+				pointerEvents: isConnected || parentHovered ? 'all' : 'none',
+				opacity: isConnected || parentHovered ? 1 : 0,
+				transition: 'opacity 0.12s ease, transform 0.08s ease-in-out',
 			}}
 			onPointerDown={() => {
 				// 不要阻止事件传播，让 TLDraw 的 input 系统能够追踪拖拽状态
@@ -91,7 +104,7 @@ export function Port({ shapeId, portId }: PortProps) {
 /**
  * 端口容器组件 - 在形状上显示输入和输出端口
  */
-export function PortsOverlay({ shapeId }: { shapeId: TLShapeId }) {
+export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLShapeId; parentHovered?: boolean }) {
 	const editor = useEditor()
 
 	const ports = useValue(
@@ -109,7 +122,7 @@ export function PortsOverlay({ shapeId }: { shapeId: TLShapeId }) {
 	return (
 		<div className="bezier-connector-ports-overlay">
 			{Object.keys(ports).map((portId) => (
-				<Port key={portId} shapeId={shapeId} portId={portId} />
+				<Port key={portId} shapeId={shapeId} portId={portId} parentHovered={parentHovered} />
 			))}
 		</div>
 	)
