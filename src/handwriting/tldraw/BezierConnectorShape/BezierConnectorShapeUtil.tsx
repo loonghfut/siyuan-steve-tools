@@ -41,40 +41,71 @@ const pendingBindingTargets = new Map<TLShapeId, PendingBindingTarget>()
 /**
  * 计算贝塞尔曲线的控制点
  */
-function getConnectionControlPoints(start: VecLike, end: VecLike): [Vec, Vec] {
+function getConnectionControlPoints(
+	start: VecLike,
+	end: VecLike,
+	startPortId?: string,
+	endPortId?: string
+): [Vec, Vec] {
 	const dx = end.x - start.x
 	const dy = end.y - start.y
 
-	// 根据主要轴向选择控制点方向：水平优先，否则使用垂直控制点
-	if (Math.abs(dx) >= Math.abs(dy)) {
-		// 水平主导：沿 X 方向偏移控制点（与之前逻辑一致，但使用绝对距离以避免符号问题）
-		const distance = dx
-		const adjustedDistance = Math.max(
-			30,
-			distance > 0 ? distance / 3 : clamp(Math.abs(distance) + 30, 0, 100)
-		)
-		return [
-			new Vec(start.x + adjustedDistance, start.y), // 控制点1：起点右侧或左侧（取决于 distance 符号）
-			new Vec(end.x - adjustedDistance, end.y), // 控制点2：终点左侧或右侧
-		]
+	// 先识别端口方向（若已绑定端口，则优先使用端口方向）
+	const startIsVertical = startPortId === 'top' || startPortId === 'bottom'
+	const startIsHorizontal = startPortId === 'input' || startPortId === 'output'
+	const endIsVertical = endPortId === 'top' || endPortId === 'bottom'
+	const endIsHorizontal = endPortId === 'input' || endPortId === 'output'
+
+	// 计算水平/垂直偏移大小
+	const distanceX = dx
+	const absX = Math.abs(distanceX)
+	const adjustedDistanceX = Math.max(30, distanceX > 0 ? distanceX / 3 : clamp(absX + 30, 0, 100))
+
+	const distanceY = dy
+	const absY = Math.abs(distanceY)
+	const adjustedDistanceY = Math.max(30, Math.min(absY / 3, 100))
+	const signY = distanceY >= 0 ? 1 : -1
+
+	// 计算控制点：分别独立处理每个端点，优先使用端口方向
+	let cp1: Vec
+	let cp2: Vec
+
+	// 起点控制点
+	if (startIsHorizontal) {
+		cp1 = new Vec(start.x + (startPortId === 'output' ? adjustedDistanceX : -adjustedDistanceX), start.y)
+	} else if (startIsVertical) {
+		cp1 = new Vec(start.x, start.y + (startPortId === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
 	} else {
-		// 垂直主导：沿 Y 方向偏移控制点，生成更自然的上下连线
-		const distance = dy
-		const absDist = Math.abs(distance)
-		const adjustedDistance = Math.max(30, Math.min(absDist / 3, 100))
-		const sign = distance >= 0 ? 1 : -1
-		return [
-			new Vec(start.x, start.y + sign * adjustedDistance), // 控制点1：起点下方/上方
-			new Vec(end.x, end.y - sign * adjustedDistance), // 控制点2：终点上方/下方
-		]
+		// 根据主轴选择偏移方向
+		if (Math.abs(dx) >= Math.abs(dy)) {
+			cp1 = new Vec(start.x + (distanceX > 0 ? adjustedDistanceX : -adjustedDistanceX), start.y)
+		} else {
+			cp1 = new Vec(start.x, start.y + signY * adjustedDistanceY)
+		}
 	}
+
+	// 终点控制点
+	if (endIsHorizontal) {
+		// 默认让控制点在端口外侧。
+		cp2 = new Vec(end.x + (endPortId === 'output' ? adjustedDistanceX : -adjustedDistanceX), end.y)
+	} else if (endIsVertical) {
+		cp2 = new Vec(end.x, end.y + (endPortId === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
+	} else {
+		if (Math.abs(dx) >= Math.abs(dy)) {
+			cp2 = new Vec(end.x + (distanceX > 0 ? -adjustedDistanceX : adjustedDistanceX), end.y)
+		} else {
+			cp2 = new Vec(end.x, end.y + (signY < 0 ? adjustedDistanceY : -adjustedDistanceY))
+		}
+	}
+
+	return [cp1, cp2]
 }
 
 /**
  * 生成 SVG 路径
  */
-function getConnectionPath(start: VecLike, end: VecLike): string {
-	const [cp1, cp2] = getConnectionControlPoints(start, end)
+function getConnectionPath(start: VecLike, end: VecLike, startPortId?: string, endPortId?: string): string {
+	const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
 	return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
 }
 
@@ -84,7 +115,14 @@ function getConnectionPath(start: VecLike, end: VecLike): string {
 export function getConnectorTerminals(
 	editor: Editor,
 	connector: IBezierConnectorShape
-): { start: VecLike; end: VecLike } {
+): {
+	start: VecLike
+	end: VecLike
+	startShapeId?: TLShapeId
+	endShapeId?: TLShapeId
+	startPortId?: string
+	endPortId?: string
+} {
 	let start: VecLike | undefined
 	let end: VecLike | undefined
 
@@ -109,7 +147,43 @@ export function getConnectorTerminals(
 	if (!start) start = connector.props.start
 	if (!end) end = connector.props.end
 
-	return { start, end }
+	// 从绑定中提取形状/端口信息（可用于决定控制点方向）
+	let startShapeId: TLShapeId | undefined
+	let endShapeId: TLShapeId | undefined
+	let startPortId: string | undefined
+	let endPortId: string | undefined
+	if (bindings.start) {
+		startShapeId = bindings.start.toId
+		startPortId = bindings.start.props.portId
+	}
+	if (bindings.end) {
+		endShapeId = bindings.end.toId
+		endPortId = bindings.end.props.portId
+	}
+
+	// 在拖拽过程中，优先使用未提交的 pendingBindingTargets 提供的端口信息以便实时显示
+	const pending = pendingBindingTargets.get(connector.id)
+	if (pending) {
+		if (pending.kind === 'set') {
+			if (pending.terminal === 'start') {
+				startShapeId = pending.targetId
+				startPortId = pending.portId
+			} else {
+				endShapeId = pending.targetId
+				endPortId = pending.portId
+			}
+		} else if (pending.kind === 'remove') {
+			if (pending.terminal === 'start') {
+				startShapeId = undefined
+				startPortId = undefined
+			} else {
+				endShapeId = undefined
+				endPortId = undefined
+			}
+		}
+	}
+
+	return { start, end, startShapeId, endShapeId, startPortId, endPortId }
 }
 
 /**
@@ -120,7 +194,7 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 	// 订阅 editor.user 的 isDarkMode，以便在主题切换时触发组件重渲染
 	const isDarkMode = useValue('isDarkMode', () => editor.user.getIsDarkMode(), [editor])
 	const theme = getDefaultColorTheme({ isDarkMode })
-	const { start, end } = useValue(
+	const { start, end, startPortId, endPortId } = useValue(
 		'terminals',
 		() => getConnectorTerminals(editor, connector),
 		[editor, connector]
@@ -128,7 +202,7 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 
 	return (
 		<SVGContainer className="BezierConnectorShape">
-			{renderConnectorPathAndEndpoints(start, end, connector.props, theme)}
+			{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId)}
 		</SVGContainer>
 	)
 }
@@ -140,22 +214,24 @@ function renderConnectorPathAndEndpoints(
 	start: VecLike,
 	end: VecLike,
 	props: IBezierConnectorShape['props'],
-	theme: ReturnType<typeof getDefaultColorTheme>
+	theme: ReturnType<typeof getDefaultColorTheme>,
+	startPortId?: string,
+	endPortId?: string
 ) {
-    const d = getConnectionPath(start, end)
-    const r = Math.max(3, (props.strokeWidth || 2) + 1)
-	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color
-    return (
-        <>
+	const d = getConnectionPath(start, end, startPortId, endPortId)
+	const r = Math.max(3, (props.strokeWidth || 2) + 1)
+	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color || theme.black.solid
+	return (
+		<>
 			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
-            {start && (
+			{start && (
 				<circle cx={start.x} cy={start.y} r={r} fill={color} stroke="none" />
-            )}
-            {end && (
+			)}
+			{end && (
 				<circle cx={end.x} cy={end.y} r={r} fill={color} stroke="none" />
-            )}
-        </>
-    )
+			)}
+		</>
+	)
 }
 
 /**
@@ -203,8 +279,8 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 
 	// 定义连接形状的几何形状为三次贝塞尔曲线
 	getGeometry(connector: IBezierConnectorShape) {
-		const { start, end } = getConnectorTerminals(this.editor, connector)
-		const [cp1, cp2] = getConnectionControlPoints(start, end)
+		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
+		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
 		return new CubicBezier2d({
 			start: Vec.From(start),
 			cp1: Vec.From(cp1),
@@ -325,23 +401,20 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 
 	// 导出为 SVG（用于导出/序列化）
 	override toSvg(connector: IBezierConnectorShape, ctx: SvgExportContext) {
-		const { start, end } = getConnectorTerminals(this.editor, connector)
+		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		return <g>{renderConnectorPathAndEndpoints(start, end, connector.props, theme)}</g>
+		return <g>{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId)}</g>
 	}
 
 	// 渲染选中指示器
 	indicator(connector: IBezierConnectorShape) {
-		const { start, end } = getConnectorTerminals(this.editor, connector)
-		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
-		const color = (theme && theme[connector.props.color] && theme[connector.props.color].solid) || connector.props.color
+		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		return (
 			<path
-				d={getConnectionPath(start, end)}
+				d={getConnectionPath(start, end, startPortId, endPortId)}
 				strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
 				strokeLinecap="round"
 				fill="none"
-				stroke={color}
 			/>
 		)
 	}
