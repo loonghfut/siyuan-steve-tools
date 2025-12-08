@@ -1,5 +1,5 @@
 import React from 'react'
-import { TLShapeId, useEditor, useValue } from '@tldraw/tldraw'
+import { TLShapeId, useEditor, useValue, getDefaultColorTheme } from '@tldraw/tldraw'
 import { getPortState } from './port-state'
 import { getShapePorts } from './shape-ports'
 import { getShapeConnections } from './bezier-connector-binding'
@@ -64,6 +64,12 @@ export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 	const extraOffsetX = -3
 	const extraOffsetY = -3
 
+	// 根据所属形状的配色决定点的默认颜色（当未处于 hint/eligible 时使用）
+	const shape = editor.getShape(shapeId) as any
+	const colorKey = shape?.props?.color ?? 'black'
+	const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
+	const defaultDotColor = (theme[colorKey] && theme[colorKey].solid) || theme.black.solid
+
 	// 判断该端口是否已有连接（若有连接则一直显示）
 	const isConnected = useValue(
 		'isConnected',
@@ -86,6 +92,7 @@ export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 				pointerEvents: isConnected || parentHovered ? 'all' : 'none',
 				opacity: isConnected || parentHovered ? 1 : 0,
 				transition: 'opacity 0.12s ease, transform 0.08s ease-in-out',
+				backgroundColor: isHinting || isEligible ? undefined : defaultDotColor,
 			}}
 			onPointerDown={() => {
 				// 不要阻止事件传播，让 TLDraw 的 input 系统能够追踪拖拽状态
