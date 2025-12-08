@@ -776,6 +776,31 @@ const CustomStylePanel = track(() => {
                     background: transparent;
                     border-radius: 4px;
                 }
+                /* Toggle button row */
+                .tlui-toggle-button-row {
+                    display: flex;
+                    gap: 0px;
+                }
+                .tlui-toggle-button {
+                    flex: 1 1 0;
+                    min-width: 0;
+                    font-weight: 400;
+                    color: var(--color-text);
+                }
+                .tlui-toggle-button--active {
+                    font-weight: 700;
+                    color: var(--b3-theme-on-surface, var(--color-text));
+                    background: var(--tl-color-muted-2);
+                }
+                .tlui-toggle-button--mixed {
+                    opacity: 0.8;
+                }
+                .tlui-toggle-icon {
+                    font-size: 16px;
+                    line-height: 1;
+                    display: inline-block;
+                    transform: translateY(-1px);
+                }
             `}</style>
             {/* 如果选中了思维导图（mind-map），我们不加载 DefaultStylePanelContent */}
             {!hasMindMapSelection && <DefaultStylePanelContent styles={styles} />}
@@ -911,69 +936,90 @@ const CustomStylePanel = track(() => {
             {hasSingleBlockSelection && (
                 <>
                     <div className="tlui-style-panel__section">
-                        <TldrawUiButton
-                            type="normal"
-                            onClick={() => {
-                                const next = connectOnEnterState === 'mixed' ? true : !connectOnEnterState
-                                editor.run(() => {
-                                    editor.updateShapes(
-                                        selectedSingleBlockShapes.map(s => ({
-                                            id: s.id,
-                                            type: 'single-block',
-                                            props: { ...s.props, connectOnEnter: next }
-                                        }))
-                                    )
-                                })
-                            }}
-                            // style={{
-                            //     marginTop: '-8px',
-                            //     width: '100%',
-                            //     color: connectOnEnterState ? 'white' : undefined
-                            // }}
-                            title="开启后按 Enter 新建的块会自动用箭头连接"
-                        >
-                            {connectOnEnterState === 'mixed' ? '⚬ 回车新建时连接' : connectOnEnterState ? '✓ 回车新建时连接' : '回车新建时连接'}
-                        </TldrawUiButton>
+                        
                     </div>
                     <div className="tlui-style-panel__section">
-                        <TldrawUiButton
-                            type="normal"
-                            onClick={() => {
-                                const next = transparentBackgroundState === 'mixed' ? true : !transparentBackgroundState
-                                editor.run(() => {
-                                    editor.updateShapes(
-                                        selectedSingleBlockShapes.map(s => ({
-                                            id: s.id,
-                                            type: 'single-block',
-                                            props: { ...s.props, transparentBackground: next },
-                                        }))
-                                    )
-                                })
-                            }}
-                            title="启用透明背景（隐藏背景与边框）"
-                        >
-                            {transparentBackgroundState === 'mixed' ? '⚬ 透明背景' : transparentBackgroundState ? '✓ 透明背景' : '透明背景'}
-                        </TldrawUiButton>
-                    </div>
-                    <div className="tlui-style-panel__section">
-                        <TldrawUiButton
-                            type="normal"
-                            onClick={() => {
-                                const next = allowBindingState === 'mixed' ? true : !allowBindingState
-                                editor.run(() => {
-                                    editor.updateShapes(
-                                        selectedSingleBlockShapes.map(s => ({
-                                            id: s.id,
-                                            type: 'single-block',
-                                            props: { ...s.props, allowBinding: next }
-                                        }))
-                                    )
-                                })
-                            }}
-                            title="开启后允许与其他形状建立绑定（拖动到目标后会自动绑定）"
-                        >
-                            {allowBindingState === 'mixed' ? '⚬ 启用绑定' : allowBindingState ? '✓ 启用绑定' : '启用绑定'}
-                        </TldrawUiButton>
+                        <div className="tlui-toggle-button-row">
+                                <TldrawUiButton
+                                    type="normal"
+                                    className={`tlui-toggle-button ${connectOnEnterState === true ? 'tlui-toggle-button--active' : connectOnEnterState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
+                                    onClick={() => {
+                                        const next = connectOnEnterState === 'mixed' ? true : !connectOnEnterState
+                                        editor.run(() => {
+                                            editor.updateShapes(
+                                                selectedSingleBlockShapes.map(s => ({
+                                                    id: s.id,
+                                                    type: 'single-block',
+                                                    props: { ...s.props, connectOnEnter: next }
+                                                }))
+                                            )
+                                        })
+                                    }}
+                                    title="开启后按 Enter 新建的块会自动用箭头连接"
+                                    aria-label="回车连接"
+                                    style={{
+                                        fontWeight: connectOnEnterState === true ? 700 : undefined,
+                                        background: connectOnEnterState === true ? 'var(--tl-color-muted-2)' : undefined,
+                                        color: connectOnEnterState === true ? 'var(--b3-theme-on-surface, var(--color-text))' : undefined,
+                                        opacity: connectOnEnterState === 'mixed' ? 0.85 : undefined,
+                                    }}
+                                >
+                                    <span className="tlui-toggle-icon">↵</span>
+                                </TldrawUiButton>
+                        
+                            <TldrawUiButton
+                                type="normal"
+                                className={`tlui-toggle-button ${transparentBackgroundState === true ? 'tlui-toggle-button--active' : transparentBackgroundState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
+                                onClick={() => {
+                                    const next = transparentBackgroundState === 'mixed' ? true : !transparentBackgroundState
+                                    editor.run(() => {
+                                        editor.updateShapes(
+                                            selectedSingleBlockShapes.map(s => ({
+                                                id: s.id,
+                                                type: 'single-block',
+                                                props: { ...s.props, transparentBackground: next },
+                                            }))
+                                        )
+                                    })
+                                }}
+                                title="启用透明背景（隐藏背景与边框）"
+                                aria-label="透明背景"
+                                style={{
+                                    fontWeight: transparentBackgroundState === true ? 700 : undefined,
+                                    background: transparentBackgroundState === true ? 'var(--tl-color-muted-2)' : undefined,
+                                    color: transparentBackgroundState === true ? 'var(--b3-theme-on-surface, var(--color-text))' : undefined,
+                                    opacity: transparentBackgroundState === 'mixed' ? 0.85 : undefined,
+                                }}
+                            >
+                                <span className="tlui-toggle-icon">◻️</span>
+                            </TldrawUiButton>
+                            <TldrawUiButton
+                                type="normal"
+                                className={`tlui-toggle-button ${allowBindingState === true ? 'tlui-toggle-button--active' : allowBindingState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
+                                onClick={() => {
+                                    const next = allowBindingState === 'mixed' ? true : !allowBindingState
+                                    editor.run(() => {
+                                        editor.updateShapes(
+                                            selectedSingleBlockShapes.map(s => ({
+                                                id: s.id,
+                                                type: 'single-block',
+                                                props: { ...s.props, allowBinding: next }
+                                            }))
+                                        )
+                                    })
+                                }}
+                                title="开启后允许与其他形状建立绑定（拖动到目标后会自动绑定）"
+                                aria-label="绑定"
+                                style={{
+                                    fontWeight: allowBindingState === true ? 700 : undefined,
+                                    background: allowBindingState === true ? 'var(--tl-color-muted-2)' : undefined,
+                                    color: allowBindingState === true ? 'var(--b3-theme-on-surface, var(--color-text))' : undefined,
+                                    opacity: allowBindingState === 'mixed' ? 0.85 : undefined,
+                                }}
+                            >
+                                <span className="tlui-toggle-icon">🔗</span>
+                            </TldrawUiButton>
+                        </div>
                     </div>
                     <div className="tlui-style-panel__section">
                         <div style={{ display: 'flex', gap: '0px' }}>
