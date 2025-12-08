@@ -1,4 +1,6 @@
 import { Editor, TLShapeId, Vec, createShapeId } from '@tldraw/tldraw'
+import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
+import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierConnectorShape/port-utils'
 import { showMessage } from 'siyuan'
 import { ICardShape } from '../CardShape/card-shape-types'
 import { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
@@ -12,10 +14,12 @@ const isConnectableShape = (shape: any): shape is ConnectableShape => {
 
 // 检查两个形状之间是否已经存在连接
 const hasExistingConnection = (editor: Editor, sourceId: TLShapeId, targetId: TLShapeId): boolean => {
-    const arrows = editor.getCurrentPageShapes().filter(shape => shape.type === 'arrow')
+    // 检查 arrow 或 bezier-connector 类型的连接是否已经存在
+    const connectors = editor.getCurrentPageShapes().filter(shape => shape.type === 'arrow' || shape.type === 'bezier-connector')
 
-    for (const arrow of arrows) {
-        const bindings = editor.getBindingsFromShape(arrow, 'arrow')
+    for (const conn of connectors) {
+        const type = conn.type === 'arrow' ? 'arrow' : 'bezier-connector'
+        const bindings = editor.getBindingsFromShape(conn, type)
         const boundShapeIds = bindings.map(b => b.toId)
 
         // 检查是否存在从 sourceId 到 targetId 的连接(任意方向)
@@ -38,13 +42,14 @@ export class ConnectionModeManager {
     private checkInterval: number | null = null
     private lastSelectionIds: string = ''
     private onStateChange?: (isActive: boolean) => void
+    private connectorKind: 'arrow' | 'bezier' = 'arrow'
 
     constructor(onStateChange?: (isActive: boolean) => void) {
         this.onStateChange = onStateChange
     }
 
     // 启用连接模式
-    enableConnectionMode(editor: Editor): boolean {
+    enableConnectionMode(editor: Editor, kind: 'arrow' | 'bezier' = 'arrow'): boolean {
         const shapes = editor.getSelectedShapes().filter(isConnectableShape)
 
         if (shapes.length < 1) {
@@ -55,6 +60,7 @@ export class ConnectionModeManager {
         this.pendingShapeIds = shapes.map(s => s.id)
         this.isActive = true
         this.editor = editor
+        this.connectorKind = kind
 
         showMessage(`已记录 ${shapes.length} 个形状，请点击目标形状建立连接`, 4000, 'info')
 
@@ -162,11 +168,13 @@ export class ConnectionModeManager {
                     return
                 }
 
-                // 创建箭头连接
-                const arrowId = this.createArrowBinding(sourceShape, targetShape, colorToUse)
-                if (arrowId) {
+                // 创建连接（支持 line 或 bezier）
+                const connId = this.connectorKind === 'bezier'
+                    ? this.createBezierBinding(sourceShape, targetShape, colorToUse)
+                    : this.createArrowBinding(sourceShape, targetShape, colorToUse)
+                if (connId) {
                     createdCount++
-                    createdArrowIds.push(arrowId)
+                    createdArrowIds.push(connId)
                 }
             })
         })
@@ -276,6 +284,70 @@ export class ConnectionModeManager {
             return arrowId
         } catch (error) {
             console.error('创建箭头连接失败', error)
+            return null
+        }
+    }
+
+    // 创建贝塞尔连接器，返回 connector id
+    private createBezierBinding(sourceShape: any, targetShape: ConnectableShape, color: string): TLShapeId | null {
+        if (!this.editor) return null
+        try {
+            const sourceBounds = this.editor.getShapePageBounds(sourceShape)
+            const targetBounds = this.editor.getShapePageBounds(targetShape)
+            if (!sourceBounds || !targetBounds) return null
+
+            const connectorId = createShapeId()
+
+            // 选定默认端口 output -> input
+            // Choose best ports based on relative position
+            const { sourcePortId: sourcePort, targetPortId: targetPort } = getBestPortPair(this.editor, sourceShape.id as any, targetShape.id as any)
+
+            // 获取端口在页面上的坐标，如果失败则使用 shape 的中心点。
+            let sourcePagePos = getPortPagePosition(this.editor, sourceShape.id, sourcePort) || this.editor.getShapePageTransform(sourceShape).applyToPoint({ x: sourceBounds.size.x / 2, y: sourceBounds.size.y / 2 })
+            let targetPagePos = getPortPagePosition(this.editor, targetShape.id, targetPort) || this.editor.getShapePageTransform(targetShape).applyToPoint({ x: targetBounds.size.x / 2, y: targetBounds.size.y / 2 })
+
+            // 获取 binding terminal 定义
+            const sourcePorts = getShapePorts(this.editor, sourceShape)
+            const targetPorts = getShapePorts(this.editor, targetShape)
+            const sourceTerminal = (sourcePorts && sourcePorts[sourcePort] && sourcePorts[sourcePort].terminal) || 'start'
+            const targetTerminal = (targetPorts && targetPorts[targetPort] && targetPorts[targetPort].terminal) || 'end'
+
+            // 若 terminal 方向与 start/end 约定相反（例如 sourcePort terminal 是 'end'），则 swap start/end
+            if (sourceTerminal === 'end' && targetTerminal === 'start') {
+                // swap
+                const tmp = sourcePagePos
+                sourcePagePos = targetPagePos
+                targetPagePos = tmp
+            }
+
+            // 使用 page coords 储存在 connector 的 props 中，shape origin 设为 0,0（PointingPort 也是这样）
+            this.editor.createShape({
+                id: connectorId,
+                type: 'bezier-connector',
+                x: 0,
+                y: 0,
+                props: {
+                    start: { x: sourcePagePos.x, y: sourcePagePos.y },
+                    end: { x: targetPagePos.x, y: targetPagePos.y },
+                    color: color,
+                    strokeWidth: 3,
+                },
+            })
+
+            // 创建 binding，优先使用默认端口 id
+
+            createOrUpdateConnectorBinding(this.editor, connectorId, sourceShape.id, {
+                portId: sourcePort,
+                terminal: sourceTerminal as any,
+            })
+            createOrUpdateConnectorBinding(this.editor, connectorId, targetShape.id, {
+                portId: targetPort,
+                terminal: targetTerminal as any,
+            })
+
+            return connectorId
+        } catch (err) {
+            console.error('创建 bezier 连接失败', err)
             return null
         }
     }

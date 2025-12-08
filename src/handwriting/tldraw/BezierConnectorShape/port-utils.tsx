@@ -129,3 +129,70 @@ export function getPortAtPoint(
 		existingConnections,
 	}
 }
+
+/**
+ * 根据两个形状的相对位置判断最佳端口对（sourcePort/targetPort）。
+ * 规则：
+ * - 若水平距离更大（|dx| > |dy|），则使用左右端口。若 target 在 source 的右侧，则 source.output -> target.input 否则反向
+ * - 若垂直距离更大，则使用上下端口。若 target 在 source 下方，则 source.bottom -> target.top 否则反向
+ * - 在重叠或极近时使用左右优先（作为默认），并在需要时回退到 output/input
+ */
+export function getBestPortPair(
+	editor: Editor,
+	sourceId: TLShapeId,
+	targetId: TLShapeId
+): { sourcePortId: string; targetPortId: string } {
+	// get center/page bbox
+	const sourceCache = shapePagePortsCache.get(editor, sourceId) as any
+	const targetCache = shapePagePortsCache.get(editor, targetId) as any
+	// fallback to page transforms
+	const sBbox = sourceCache?.bbox
+	const tBbox = targetCache?.bbox
+	const sCenter = sBbox
+		? { x: (sBbox.minX + sBbox.maxX) / 2, y: (sBbox.minY + sBbox.maxY) / 2 }
+		: (() => {
+			  const pb = editor.getShapePageBounds(sourceId as any)
+			  return pb ? { x: pb.point.x + pb.size.x / 2, y: pb.point.y + pb.size.y / 2 } : undefined
+		  })()
+	const tCenter = tBbox
+		? { x: (tBbox.minX + tBbox.maxX) / 2, y: (tBbox.minY + tBbox.maxY) / 2 }
+		: (() => {
+			  const pb = editor.getShapePageBounds(targetId as any)
+			  return pb ? { x: pb.point.x + pb.size.x / 2, y: pb.point.y + pb.size.y / 2 } : undefined
+		  })()
+
+	let dx = 0
+	let dy = 0
+	if (sCenter && tCenter) {
+		dx = tCenter.x - sCenter.x
+		dy = tCenter.y - sCenter.y
+	}
+
+	const absDx = Math.abs(dx)
+	const absDy = Math.abs(dy)
+	// 默认端口
+	let sourcePort = 'output'
+	let targetPort = 'input'
+
+	if (absDx >= absDy) {
+		// 水平主轴
+		if (dx >= 0) {
+			sourcePort = 'output'
+			targetPort = 'input'
+		} else {
+			sourcePort = 'input'
+			targetPort = 'output'
+		}
+	} else {
+		// 垂直主轴
+		if (dy >= 0) {
+			sourcePort = 'bottom'
+			targetPort = 'top'
+		} else {
+			sourcePort = 'top'
+			targetPort = 'bottom'
+		}
+	}
+
+	return { sourcePortId: sourcePort, targetPortId: targetPort }
+}

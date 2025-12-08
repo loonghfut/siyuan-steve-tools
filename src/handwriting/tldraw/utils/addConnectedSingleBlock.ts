@@ -1,6 +1,9 @@
 import { Editor, TLShapeId, Vec, createShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
+import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
+import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierConnectorShape/port-utils'
+import { settingdata } from '@/index'
 
 // Legacy automatic placement helpers were removed — we now prefer explicit click-to-place.
 
@@ -59,6 +62,51 @@ export const createArrowBetweenShapes = (
         Vec.MulV(targetBounds.size, Vec.Rot(Vec.From(normalizedAnchor), endRotation)),
     )
     const arrowOrigin = Vec.Min(startPoint, endPoint)
+    const connectorKind = String(settingdata['tldraw-connector-kind'] || 'arrow') === 'bezier' ? 'bezier' : 'arrow'
+
+    if (connectorKind === 'bezier') {
+        const startPoint = Vec.Add(
+            sourceBounds.point,
+            Vec.MulV(sourceBounds.size, Vec.Rot(Vec.From(normalizedAnchor), startRotation)),
+        )
+        const endPoint = Vec.Add(
+            targetBounds.point,
+            Vec.MulV(targetBounds.size, Vec.Rot(Vec.From(normalizedAnchor), endRotation)),
+        )
+
+        const connectorId = createShapeId()
+        // try to use ports
+        const { sourcePortId, targetPortId } = getBestPortPair(editor, source.id, target.id)
+        let sourcePagePos = getPortPagePosition(editor, source.id, sourcePortId) || startPoint
+        let targetPagePos = getPortPagePosition(editor, target.id, targetPortId) || endPoint
+
+        editor.createShape({
+            id: connectorId,
+            type: 'bezier-connector',
+            x: 0,
+            y: 0,
+            props: {
+                start: { x: sourcePagePos.x, y: sourcePagePos.y },
+                end: { x: targetPagePos.x, y: targetPagePos.y },
+                color,
+                strokeWidth: 3,
+            },
+        })
+        const sourcePorts = getShapePorts(editor, source as any)
+        const targetPorts = getShapePorts(editor, target as any)
+        const sourceTerminal = (sourcePorts && sourcePorts[sourcePortId] && sourcePorts[sourcePortId].terminal) || 'start'
+        const targetTerminal = (targetPorts && targetPorts[targetPortId] && targetPorts[targetPortId].terminal) || 'end'
+        if (sourceTerminal === 'end' && targetTerminal === 'start') {
+            const tmp = sourcePagePos
+            sourcePagePos = targetPagePos
+            targetPagePos = tmp
+        }
+        createOrUpdateConnectorBinding(editor, connectorId, source.id, { portId: sourcePortId, terminal: sourceTerminal as any })
+        createOrUpdateConnectorBinding(editor, connectorId, target.id, { portId: targetPortId, terminal: targetTerminal as any })
+
+        return connectorId
+    }
+
     const arrowId = createShapeId()
 
     editor.createShape({

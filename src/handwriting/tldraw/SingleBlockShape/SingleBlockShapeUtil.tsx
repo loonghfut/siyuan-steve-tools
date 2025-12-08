@@ -12,9 +12,6 @@ import {
 	resizeBox,
 	AtomMap,
 	EditorAtom,
-	TLArrowBinding,
-	TLArrowShape,
-	Vec,
 	BindingUtil,
 	TLBaseBinding,
 	BindingOnShapeChangeOptions,
@@ -32,6 +29,7 @@ import { ISingleBlockShape } from './single-block-shape-types'
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
+import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -601,96 +599,16 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							},
 						},
 					])
-					// 如果开启连接功能，创建一条绑定的箭头指向新形状
+					// 如果开启连接功能，创建一条绑定的箭头或曲线指向新形状
 					if (shape.props.connectOnEnter !== false) {
 						try {
-							const startShapePageBounds = editor.getShapePageBounds(shape.id)
-							const endShapePageBounds = editor.getShapePageBounds(newId)
-							if (!startShapePageBounds || !endShapePageBounds) {
-								throw new Error('无法获取形状边界')
+							const createdShape = editor.getShape(newId)
+							if (createdShape && createdShape.type === 'single-block') {
+								// 延迟到刚刚创建的 shape 可用后，再创建连接
+								createArrowBetweenShapes(editor, shape as ISingleBlockShape, createdShape as ISingleBlockShape, shape.props.color ?? 'black')
 							}
-
-							const startShapePageRotation = editor.getShapePageTransform(shape.id).rotation()
-							const endShapePageRotation = editor.getShapePageTransform(newId).rotation()
-
-							// 默认使用中心点作为归一化锚点
-							const startNormalizedAnchor = { x: 0.5, y: 0.5 }
-							const endNormalizedAnchor = { x: 0.5, y: 0.5 }
-
-							const startTerminalNormalizedPosition = Vec.From(startNormalizedAnchor)
-							const endTerminalNormalizedPosition = Vec.From(endNormalizedAnchor)
-
-							// 计算页面空间中的终端位置
-							const startTerminalPagePosition = Vec.Add(
-								startShapePageBounds.point,
-								Vec.MulV(
-									startShapePageBounds.size,
-									Vec.Rot(startTerminalNormalizedPosition, startShapePageRotation)
-								)
-							)
-							const endTerminalPagePosition = Vec.Add(
-								endShapePageBounds.point,
-								Vec.MulV(
-									endShapePageBounds.size,
-									Vec.Rot(endTerminalNormalizedPosition, endShapePageRotation)
-								)
-							)
-
-							// 箭头位置为两个终端位置的最小值
-							const arrowPointInParentSpace = Vec.Min(startTerminalPagePosition, endTerminalPagePosition)
-
-							const arrowId = createShapeId()
-							editor.run(() => {
-								// 创建箭头形状
-								editor.createShape<TLArrowShape>({
-									id: arrowId,
-									type: 'arrow',
-									x: arrowPointInParentSpace.x,
-									y: arrowPointInParentSpace.y,
-									props: {
-										color: shape.props.color,
-										// start 和 end 是相对于箭头位置的本地坐标
-										start: {
-											x: startTerminalPagePosition.x - arrowPointInParentSpace.x,
-											y: startTerminalPagePosition.y - arrowPointInParentSpace.y,
-										},
-										end: {
-											x: endTerminalPagePosition.x - arrowPointInParentSpace.x,
-											y: endTerminalPagePosition.y - arrowPointInParentSpace.y,
-										},
-										arrowheadStart: 'none',
-										arrowheadEnd: 'arrow',
-									},
-								})
-
-								// 创建绑定，使箭头依附于形状
-								editor.createBindings<TLArrowBinding>([
-									{
-										fromId: arrowId,
-										toId: shape.id,
-										type: 'arrow',
-										props: {
-											terminal: 'start',
-											normalizedAnchor: startNormalizedAnchor,
-											isExact: false,
-											isPrecise: false,
-										},
-									},
-									{
-										fromId: arrowId,
-										toId: newId,
-										type: 'arrow',
-										props: {
-											terminal: 'end',
-											normalizedAnchor: endNormalizedAnchor,
-											isExact: false,
-											isPrecise: false,
-										},
-									},
-								])
-							})
 						} catch (err) {
-							console.warn('connectOnEnter arrow creation failed', err)
+							console.warn('connectOnEnter connector creation failed', err)
 						}
 					}
 					editor.select(newId)
