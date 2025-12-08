@@ -44,7 +44,8 @@ export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 		() => {
 			const { eligiblePorts } = getPortState(editor)
 			if (!eligiblePorts || !port) return false
-			if (eligiblePorts.terminal !== port.terminal) return false
+			// 如果 eligiblePorts.terminal 未设置，则允许任何端口类型
+			if (eligiblePorts.terminal && eligiblePorts.terminal !== port.terminal) return false
 			if (eligiblePorts.excludeShapeIds?.has(shapeId)) return false
 			return true
 		},

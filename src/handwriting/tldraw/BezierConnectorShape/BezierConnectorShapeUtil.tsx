@@ -327,9 +327,9 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		const handlePagePosition = shapeTransform.applyToPoint(handle)
 
 		// 查找该位置的端口
+		// 不再按 terminal (start/end) 过滤目标端口，允许任意端口互连
 		const target = getPortAtPoint(this.editor, handlePagePosition, {
 			margin: 8,
-			terminal: draggingTerminal,
 		})
 
 		// 如果找到可用端口，记录待绑定目标

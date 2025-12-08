@@ -38,12 +38,10 @@ export class PointingPort extends StateNode {
 		// 设置光标
 		this.editor.setCursor({ type: 'cross', rotation: 0 })
 
-		// 设置可连接的端口状态
+		// 设置可连接的端口状态：将 terminal 设为 undefined，表示任何端口均可连接
 		updatePortState(this.editor, {
 			eligiblePorts: {
-				// 如果拖拽的是输出端口 (start)，需要连接到输入端口 (end)
-				// 如果拖拽的是输入端口 (end)，需要连接到输出端口 (start)
-				terminal: info.terminal === 'start' ? 'end' : 'start',
+				terminal: undefined,
 				excludeShapeIds: new Set([info.shapeId]),
 			},
 		})
@@ -69,9 +67,8 @@ export class PointingPort extends StateNode {
 		const currentPoint = this.editor.inputs.currentPagePoint
 
 		// 查找当前位置的端口
-		const targetTerminal = this.info.terminal === 'start' ? 'end' : 'start'
+		// 现在允许连接到任何端口类型（不再限制 start/end），因此不传 terminal
 		const target = getPortAtPoint(this.editor, currentPoint, {
-			terminal: targetTerminal,
 			margin: 20,
 			excludeShapeId: this.info.shapeId,
 		})

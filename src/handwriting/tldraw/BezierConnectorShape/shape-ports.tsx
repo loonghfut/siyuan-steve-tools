@@ -4,19 +4,17 @@ import { ShapePort } from './bezier-connector-types'
 /**
  * 支持端口连接的形状类型
  */
-export const CONNECTABLE_SHAPE_TYPES = ['card', 'single-block']
+/**
+ * NOTE: 原来仅允许特定类型的形状支持端口（card / single-block）。
+ * 我们移除该限制，使得任何形状都具有端口，进而支持任意端口互连。
+ */
+export const CONNECTABLE_SHAPE_TYPES: string[] = []
 
 /**
  * 获取形状的端口定义
  * 端口位于形状的左侧（输入）和右侧（输出）
  */
-export function getShapePorts(
-	editor: Editor,
-	shape: TLShape
-): Record<string, ShapePort> | null {
-	if (!CONNECTABLE_SHAPE_TYPES.includes(shape.type)) {
-		return null
-	}
+export function getShapePorts(editor: Editor, shape: TLShape): Record<string, ShapePort> | null {
 
 	const bounds = editor.getShapeGeometry(shape).bounds
 
@@ -74,6 +72,7 @@ export function getPortPagePosition(
 /**
  * 检查形状是否支持端口连接
  */
-export function isConnectableShape(shape: TLShape): boolean {
-	return CONNECTABLE_SHAPE_TYPES.includes(shape.type)
+export function isConnectableShape(_shape: TLShape): boolean {
+	// 所有形状均可被视作支持端口，移除原有基于 shape.type 的限制
+	return true
 }

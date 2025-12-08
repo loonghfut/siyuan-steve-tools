@@ -8,10 +8,13 @@ export interface PortState {
 	/** 当前正在指向的端口（鼠标悬停或拖拽到达） */
 	hintingPort: PortIdentifier | null
 	/** 可连接的端口条件 */
-	eligiblePorts: {
-		terminal: PortTerminal
-		excludeShapeIds: Set<TLShapeId> | null
-	} | null
+	eligiblePorts:
+		| {
+			  // 现在 terminal 可选；为 undefined 则表示允许任意端口类型
+			  terminal?: PortTerminal
+			  excludeShapeIds: Set<TLShapeId> | null
+		  }
+		| null
 }
 
 /**

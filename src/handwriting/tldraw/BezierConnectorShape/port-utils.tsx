@@ -1,7 +1,7 @@
 import { Editor, TLShapeId, Vec, VecLike } from '@tldraw/tldraw'
 import { ShapePort, PortTerminal } from './bezier-connector-types'
 import { getShapeConnections } from './bezier-connector-binding'
-import { getShapePorts, CONNECTABLE_SHAPE_TYPES } from './shape-ports'
+import { getShapePorts } from './shape-ports'
 
 // 重新导出便于其他模块使用
 export { getShapePorts, getPortPagePosition, isConnectableShape } from './shape-ports'
@@ -31,8 +31,6 @@ export function getPortAtPoint(
 	} | null = null
 
 	for (const shape of shapes) {
-		// 跳过不支持的类型
-		if (!CONNECTABLE_SHAPE_TYPES.includes(shape.type)) continue
 		// 跳过排除的形状
 		if (opts?.excludeShapeId && shape.id === opts.excludeShapeId) continue
 
