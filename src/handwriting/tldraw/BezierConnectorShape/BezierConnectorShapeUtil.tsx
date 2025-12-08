@@ -354,7 +354,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		return (
 			<path
 				d={getConnectionPath(start, end)}
-				strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1)}
+				strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
 				strokeLinecap="round"
 				fill="none"
 			/>
