@@ -58,6 +58,9 @@ export function Port({ shapeId, portId }: PortProps) {
 	const top = typeof port.y === 'number' ? `${port.y}px` : undefined
 
 	const scale = isHinting ? 1.4 : 1
+	// 所有端口统一向左偏移 3px，并向上偏移 3px
+	const extraOffsetX = -3
+	const extraOffsetY = -3
 
 	return (
 		<div
@@ -68,7 +71,7 @@ export function Port({ shapeId, portId }: PortProps) {
 				position: 'absolute',
 				left,
 				top,
-				transform: `translate(-50%, -50%) scale(${scale})`,
+				transform: `translate(-50%, -50%) translateX(${extraOffsetX}px) translateY(${extraOffsetY}px) scale(${scale})`,
 				pointerEvents: 'all',
 			}}
 			onPointerDown={() => {
