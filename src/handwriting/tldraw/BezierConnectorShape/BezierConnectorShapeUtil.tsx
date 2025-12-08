@@ -15,6 +15,7 @@ import {
 	clamp,
 	useEditor,
 	useValue,
+	getDefaultColorTheme,
 } from '@tldraw/tldraw'
 import { bezierConnectorShapeProps } from './bezier-connector-props'
 import { bezierConnectorShapeMigrations } from './bezier-connector-migrations'
@@ -116,6 +117,7 @@ export function getConnectorTerminals(
  */
 function BezierConnectorComponent({ connector }: { connector: IBezierConnectorShape }) {
 	const editor = useEditor()
+	const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 	const { start, end } = useValue(
 		'terminals',
 		() => getConnectorTerminals(editor, connector),
@@ -124,7 +126,7 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 
 	return (
 		<SVGContainer className="BezierConnectorShape">
-			{renderConnectorPathAndEndpoints(start, end, connector.props)}
+			{renderConnectorPathAndEndpoints(start, end, connector.props, theme)}
 		</SVGContainer>
 	)
 }
@@ -132,17 +134,23 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 /**
  * 抽取出的渲染函数：在 component 和 toSvg 中复用，避免样式/行为不同步
  */
-function renderConnectorPathAndEndpoints(start: VecLike, end: VecLike, props: IBezierConnectorShape['props']) {
+function renderConnectorPathAndEndpoints(
+	start: VecLike,
+	end: VecLike,
+	props: IBezierConnectorShape['props'],
+	theme: ReturnType<typeof getDefaultColorTheme>
+) {
     const d = getConnectionPath(start, end)
     const r = Math.max(3, (props.strokeWidth || 2) + 1)
+	const color = theme[props.color].solid
     return (
         <>
-            <path d={d} stroke={props.color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
+			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
             {start && (
-                <circle cx={start.x} cy={start.y} r={r} fill={props.color} stroke="none" />
+				<circle cx={start.x} cy={start.y} r={r} fill={color} stroke="none" />
             )}
             {end && (
-                <circle cx={end.x} cy={end.y} r={r} fill={props.color} stroke="none" />
+				<circle cx={end.x} cy={end.y} r={r} fill={color} stroke="none" />
             )}
         </>
     )
@@ -314,43 +322,24 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	}
 
 	// 导出为 SVG（用于导出/序列化）
-	override toSvg(connector: IBezierConnectorShape, _ctx: SvgExportContext) {
+	override toSvg(connector: IBezierConnectorShape, ctx: SvgExportContext) {
 		const { start, end } = getConnectorTerminals(this.editor, connector)
-		const d = getConnectionPath(start, end)
-		return (
-			<g>
-				<path d={d} stroke={connector.props.color} strokeWidth={connector.props.strokeWidth} strokeLinecap="round" fill="none" />
-				{start && (
-					<circle
-						cx={start.x}
-						cy={start.y}
-						r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
-						fill={connector.props.color}
-						stroke="none"
-					/>
-				)}
-				{end && (
-					<circle
-						cx={end.x}
-						cy={end.y}
-						r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
-						fill={connector.props.color}
-						stroke="none"
-					/>
-				)}
-			</g>
-		)
+		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
+		return <g>{renderConnectorPathAndEndpoints(start, end, connector.props, theme)}</g>
 	}
 
 	// 渲染选中指示器
 	indicator(connector: IBezierConnectorShape) {
 		const { start, end } = getConnectorTerminals(this.editor, connector)
+		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+		const color = theme[connector.props.color].solid
 		return (
 			<path
 				d={getConnectionPath(start, end)}
 				strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
 				strokeLinecap="round"
 				fill="none"
+				stroke={color}
 			/>
 		)
 	}
