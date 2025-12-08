@@ -1,4 +1,4 @@
-import { RecordProps, T, vecModelValidator } from '@tldraw/tldraw'
+import { DefaultColorStyle, RecordProps, T, vecModelValidator } from '@tldraw/tldraw'
 import { IBezierConnectorShape } from './bezier-connector-types'
 
 /**
@@ -7,6 +7,6 @@ import { IBezierConnectorShape } from './bezier-connector-types'
 export const bezierConnectorShapeProps: RecordProps<IBezierConnectorShape> = {
 	start: vecModelValidator,
 	end: vecModelValidator,
-	color: T.string,
+	color: DefaultColorStyle,
 	strokeWidth: T.number,
 }

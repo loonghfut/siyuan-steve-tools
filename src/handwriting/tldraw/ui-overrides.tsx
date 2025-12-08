@@ -449,29 +449,7 @@ const CustomStylePanel = track(() => {
         [selectedShapes]
     )
     const hasConnectorSelection = selectedConnectorShapes.length > 0
-    const connectorPalette = React.useMemo(
-        () => [
-            '#000000',
-            '#A0A4AB',
-            '#D98AFF',
-            '#B44AC0',
-            '#4A90E2',
-            '#F3B562',
-            '#D97428',
-            '#0DA59F',
-            '#42AF5F',
-            '#F27C7C',
-            '#D33F3F',
-            '#937474ff',
-        ],
-        []
-    )
-    const connectorColorState = React.useMemo<string | 'mixed'>(() => {
-        if (!hasConnectorSelection) return '#666666'
-        const colors = selectedConnectorShapes.map((s) => s.props.color ?? '#666666')
-        const first = colors[0]
-        return colors.every((c) => c === first) ? first : 'mixed'
-    }, [hasConnectorSelection, selectedConnectorShapes])
+
     const connectorStrokeState = React.useMemo<number | 'mixed'>(() => {
         if (!hasConnectorSelection) return 2
         const widths = selectedConnectorShapes.map((s) => s.props.strokeWidth ?? 2)
@@ -479,21 +457,6 @@ const CustomStylePanel = track(() => {
         return widths.every((w) => w === first) ? first : 'mixed'
     }, [hasConnectorSelection, selectedConnectorShapes])
 
-    const handleConnectorColorChange = React.useCallback(
-        (nextColor: string) => {
-            if (!hasConnectorSelection) return
-            editor.run(() => {
-                editor.updateShapes(
-                    selectedConnectorShapes.map((shape) => ({
-                        id: shape.id,
-                        type: 'bezier-connector',
-                        props: { ...shape.props, color: nextColor },
-                    }))
-                )
-            })
-        },
-        [editor, hasConnectorSelection, selectedConnectorShapes]
-    )
 
     const handleConnectorWidthChange = React.useCallback(
         (nextWidth: number) => {
@@ -820,50 +783,7 @@ const CustomStylePanel = track(() => {
             {!hasMindMapSelection && <DefaultStylePanelContent styles={styles} />}
 
             {hasConnectorSelection && (
-                <div
-                    className="tlui-style-panel__section"
-                    style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}
-                >
-                    <div
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 22px)',
-                            gridAutoRows: '22px',
-                            gap: 10,
-                            width: 'auto',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        {connectorPalette.map((color) => {
-                            const isActive = connectorColorState !== 'mixed' && connectorColorState === color
-                            return (
-                                <button
-                                    key={color}
-                                    onClick={() => handleConnectorColorChange(color)}
-                                    title={color}
-                                    style={{
-                                        width: 22,
-                                        height: 22,
-                                        borderRadius: 6,
-                                        border: isActive ? '2px solid var(--color-text)' : '1px solid var(--color-border)',
-                                        backgroundColor: color,
-                                        cursor: 'pointer',
-                                        padding: 0,
-                                    }}
-                                />
-                            )
-                        })}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
-                        <span style={{ minWidth: 60 }}>自定义</span>
-                        <input
-                            className="connector-color-input"
-                            type="color"
-                            value={connectorColorState === 'mixed' ? '#666666' : connectorColorState}
-                            onChange={(e) => handleConnectorColorChange(e.target.value)}
-                            style={{ flex: '0 0 48px'}}
-                        />
-                    </div>
+                <div className="tlui-style-panel__section">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                         <span style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>线宽</span>
                         <div style={{ display: 'flex', alignItems: 'center' }}>

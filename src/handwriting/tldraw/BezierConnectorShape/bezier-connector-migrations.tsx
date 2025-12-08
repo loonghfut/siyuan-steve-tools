@@ -12,7 +12,9 @@ export const bezierConnectorShapeMigrations = createShapePropsMigrationSequence(
 		{
 			id: versions.AddColorAndStrokeWidth,
 			up(props: any) {
-				props.color = props.color ?? '#666666'
+				// Use tldraw official color tokens instead of hardcoded hex.
+				// Align with other shapes which default to 'black'.
+				props.color = props.color ?? 'black'
 				props.strokeWidth = props.strokeWidth ?? 2
 			},
 			down(props: any) {

@@ -1,4 +1,4 @@
-import { TLBaseShape, VecModel } from '@tldraw/tldraw'
+import { TLBaseShape, TLDefaultColorStyle, VecModel } from '@tldraw/tldraw'
 
 /**
  * 贝塞尔连接器形状类型定义
@@ -12,7 +12,7 @@ export type IBezierConnectorShape = TLBaseShape<
 		/** 终点坐标（未绑定时使用） */
 		end: VecModel
 		/** 线条颜色 */
-		color: string
+		color: TLDefaultColorStyle
 		/** 线条宽度 */
 		strokeWidth: number
 	}

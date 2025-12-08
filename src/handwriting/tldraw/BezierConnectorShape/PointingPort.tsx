@@ -139,7 +139,7 @@ export class PointingPort extends StateNode {
 		const startPos = connectingTerminal === 'start' ? sourcePortPagePos : currentPoint
 		const endPos = connectingTerminal === 'start' ? currentPoint : sourcePortPagePos
 
-		this.editor.createShape({
+				this.editor.createShape({
 			type: 'bezier-connector',
 			id: connectionShapeId,
 			x: 0,
@@ -147,7 +147,8 @@ export class PointingPort extends StateNode {
 			props: {
 				start: { x: startPos.x, y: startPos.y },
 				end: { x: endPos.x, y: endPos.y },
-				color: '#666666',
+						// Set the color to tldraw's official color token instead of a custom hex.
+						color: 'black',
 				strokeWidth: 2,
 			},
 		})

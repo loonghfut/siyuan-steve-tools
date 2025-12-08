@@ -252,7 +252,8 @@ input.tlui-input {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-text-3, #666666); /* 默认实心颜色 */
+  /* 默认实心颜色 - 使用 tldraw 主题变量作为回退值而非自定义十六进制颜色 */
+  background: var(--color-text-3, var(--color-text));
   border: none; /* 去掉外边框，使用实心点 */
   box-sizing: border-box;
   z-index: 999;
