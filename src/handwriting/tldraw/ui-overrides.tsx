@@ -64,6 +64,7 @@ import { IMindMapShape } from './MindMapShape/mind-map-shape-types'
 import { ThemeName } from './MindMapShape/mind-map-constants'
 import { addShapesToLibrary, resetShapeLibraryPanelPosition } from './shapelibrary/shape-library-manager'
 import { ShapeLibraryPanel } from './shapelibrary/ShapeLibraryPanel'
+import { IBezierConnectorShape } from './BezierConnectorShape'
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
@@ -442,6 +443,74 @@ const CustomStylePanel = track(() => {
         return fontSizes.every(fs => fs === first) ? first : 'mixed'
     }, [hasMindMapSelection, selectedMindMapShapes])
 
+    // --- Bezier Connector: 颜色 & 线宽 ---
+    const selectedConnectorShapes = React.useMemo(
+        () => selectedShapes.filter((shape): shape is IBezierConnectorShape => shape.type === 'bezier-connector'),
+        [selectedShapes]
+    )
+    const hasConnectorSelection = selectedConnectorShapes.length > 0
+    const connectorPalette = React.useMemo(
+        () => [
+            '#000000',
+            '#A0A4AB',
+            '#D98AFF',
+            '#B44AC0',
+            '#4A90E2',
+            '#F3B562',
+            '#D97428',
+            '#0DA59F',
+            '#42AF5F',
+            '#F27C7C',
+            '#D33F3F',
+            '#937474ff',
+        ],
+        []
+    )
+    const connectorColorState = React.useMemo<string | 'mixed'>(() => {
+        if (!hasConnectorSelection) return '#666666'
+        const colors = selectedConnectorShapes.map((s) => s.props.color ?? '#666666')
+        const first = colors[0]
+        return colors.every((c) => c === first) ? first : 'mixed'
+    }, [hasConnectorSelection, selectedConnectorShapes])
+    const connectorStrokeState = React.useMemo<number | 'mixed'>(() => {
+        if (!hasConnectorSelection) return 2
+        const widths = selectedConnectorShapes.map((s) => s.props.strokeWidth ?? 2)
+        const first = widths[0]
+        return widths.every((w) => w === first) ? first : 'mixed'
+    }, [hasConnectorSelection, selectedConnectorShapes])
+
+    const handleConnectorColorChange = React.useCallback(
+        (nextColor: string) => {
+            if (!hasConnectorSelection) return
+            editor.run(() => {
+                editor.updateShapes(
+                    selectedConnectorShapes.map((shape) => ({
+                        id: shape.id,
+                        type: 'bezier-connector',
+                        props: { ...shape.props, color: nextColor },
+                    }))
+                )
+            })
+        },
+        [editor, hasConnectorSelection, selectedConnectorShapes]
+    )
+
+    const handleConnectorWidthChange = React.useCallback(
+        (nextWidth: number) => {
+            if (!hasConnectorSelection || Number.isNaN(nextWidth) || nextWidth <= 0) return
+            editor.run(() => {
+                editor.updateShapes(
+                    selectedConnectorShapes.map((shape) => ({
+                        id: shape.id,
+                        type: 'bezier-connector',
+                        props: { ...shape.props, strokeWidth: nextWidth },
+                    }))
+                )
+            })
+        },
+        [editor, hasConnectorSelection, selectedConnectorShapes]
+    )
+
     // --- 获取 rootId ---
 
     const container = editor.getContainer();
@@ -692,6 +761,77 @@ const CustomStylePanel = track(() => {
         <DefaultStylePanel>
             {/* 如果选中了思维导图（mind-map），我们不加载 DefaultStylePanelContent */}
             {!hasMindMapSelection && <DefaultStylePanelContent styles={styles} />}
+
+            {hasConnectorSelection && (
+                <div
+                    className="tlui-style-panel__section"
+                    style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}
+                >
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 22px)',
+                            gridAutoRows: '22px',
+                            gap: 10,
+                            width: 'auto',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        {connectorPalette.map((color) => {
+                            const isActive = connectorColorState !== 'mixed' && connectorColorState === color
+                            return (
+                                <button
+                                    key={color}
+                                    onClick={() => handleConnectorColorChange(color)}
+                                    title={color}
+                                    style={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: 6,
+                                        border: isActive ? '2px solid var(--color-text)' : '1px solid var(--color-border)',
+                                        backgroundColor: color,
+                                        cursor: 'pointer',
+                                        padding: 0,
+                                    }}
+                                />
+                            )
+                        })}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                        <span style={{ minWidth: 60 }}>自定义</span>
+                        <input
+                            type="color"
+                            value={connectorColorState === 'mixed' ? '#666666' : connectorColorState}
+                            onChange={(e) => handleConnectorColorChange(e.target.value)}
+                            style={{ flex: '0 0 48px', height: 28, padding: 0, border: '1px solid var(--color-border)', borderRadius: 4 }}
+                        />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                        <span style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>线宽</span>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                                type="number"
+                                min={0.5}
+                                max={12}
+                                step={0.5}
+                                value={connectorStrokeState === 'mixed' ? '' : connectorStrokeState}
+                                placeholder={connectorStrokeState === 'mixed' ? '混合' : undefined}
+                                onChange={(e) => handleConnectorWidthChange(parseFloat(e.target.value))}
+                                style={{
+                                    height: 32,
+                                    width: 77,
+                                    border: '1px solid var(--color-border)',
+                                    borderRadius: 8,
+                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+                                    textAlign: 'right',
+                                    background: 'var(--b3-theme-surface)'
+                                }}
+                            />
+                            <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>px</span>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {isSingleSlideSelected && slideShape && (
                 <div className="tlui-style-panel__section"> {/* 移除 styles={styles}，因为父级已经处理 */}
