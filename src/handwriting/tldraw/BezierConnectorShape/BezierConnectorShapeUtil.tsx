@@ -4,6 +4,7 @@ import {
 	Editor,
 	IndexKey,
 	Mat,
+	SvgExportContext,
 	ShapeUtil,
 	SVGContainer,
 	TLHandle,
@@ -316,6 +317,35 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	// 渲染连接组件
 	component(connector: IBezierConnectorShape) {
 		return <BezierConnectorComponent connector={connector} />
+	}
+
+	// 导出为 SVG（用于导出/序列化）
+	override toSvg(connector: IBezierConnectorShape, _ctx: SvgExportContext) {
+		const { start, end } = getConnectorTerminals(this.editor, connector)
+		const d = getConnectionPath(start, end)
+		return (
+			<g>
+				<path d={d} stroke={connector.props.color} strokeWidth={connector.props.strokeWidth} strokeLinecap="round" fill="none" />
+				{start && (
+					<circle
+						cx={start.x}
+						cy={start.y}
+						r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
+						fill={connector.props.color}
+						stroke="none"
+					/>
+				)}
+				{end && (
+					<circle
+						cx={end.x}
+						cy={end.y}
+						r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
+						fill={connector.props.color}
+						stroke="none"
+					/>
+				)}
+			</g>
+		)
 	}
 
 	// 渲染选中指示器
