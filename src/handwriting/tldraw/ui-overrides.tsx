@@ -122,7 +122,7 @@ export const uiOverrides: TLUiOverrides = {
             onSelect: () => editor.setCurrentTool('mind-map'),
         }
         // 删除文本工具
-        delete tools.text
+        // delete tools.text
         return tools
     },
     actions(editor, actions) {
