@@ -6,23 +6,25 @@ import { Editor, getIndicesBetween, IndexKey, TLParentId, TLShapeId } from '@tld
  */
 export function keepConnectorsAtBottom(editor: Editor) {
 	let pendingChangedParentIds = new Set<TLParentId>()
+	// 防重入锁：避免 updateShapes 再次触发 shape change handler 导致嵌套循环
+	let isUpdating = false
 
 	// 监听形状创建
 	editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
-		if (source === 'remote') return
+		if (source === 'remote' || isUpdating) return
 		pendingChangedParentIds.add(shape.parentId)
 	})
 
 	// 监听形状变化
 	editor.sideEffects.registerAfterChangeHandler('shape', (oldShape, newShape, source) => {
-		if (source === 'remote') return
+		if (source === 'remote' || isUpdating) return
 		if (oldShape.parentId === newShape.parentId && oldShape.index === newShape.index) return
 		pendingChangedParentIds.add(newShape.parentId)
 	})
 
 	// 在操作完成时重新排序
 	editor.sideEffects.registerOperationCompleteHandler(() => {
-		if (pendingChangedParentIds.size === 0) return
+		if (pendingChangedParentIds.size === 0 || isUpdating) return
 
 		const changedParentIds = pendingChangedParentIds
 		pendingChangedParentIds = new Set()
@@ -77,7 +79,12 @@ export function keepConnectorsAtBottom(editor: Editor) {
 		}
 
 		if (updates.length > 0) {
-			editor.updateShapes(updates)
+			isUpdating = true
+			try {
+				editor.updateShapes(updates)
+			} finally {
+				isUpdating = false
+			}
 		}
 	})
 }

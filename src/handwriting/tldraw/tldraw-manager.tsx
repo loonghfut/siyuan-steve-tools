@@ -417,9 +417,6 @@ export class TldrawManager {
                             console.warn('设置 PointingPort 状态机失败', err);
                         }
                         
-                        // 保持贝塞尔连接器在底层
-                        keepConnectorsAtBottom(editor);
-                        
                         // 设置素材库拖放处理程序
                         setupShapeLibraryDropHandler(editor);
                         

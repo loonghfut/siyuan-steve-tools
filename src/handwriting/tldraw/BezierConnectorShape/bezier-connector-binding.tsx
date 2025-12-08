@@ -126,9 +126,14 @@ export function createOrUpdateConnectorBinding(
 		editor.deleteBindings(existing.slice(1))
 	}
 
-	if (existing[0]) {
+	const current = existing[0]
+	if (current) {
+		// 如果没有变化则跳过，避免重复写 store
+		if (current.toId === targetId && current.props.portId === props.portId) {
+			return
+		}
 		editor.updateBinding({
-			...existing[0],
+			...current,
 			toId: targetId,
 			props,
 		})

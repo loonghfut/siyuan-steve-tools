@@ -8,6 +8,7 @@ import {
 	SVGContainer,
 	TLHandle,
 	TLHandleDragInfo,
+	TLShapeId,
 	Vec,
 	VecLike,
 	clamp,
@@ -24,6 +25,16 @@ import {
 	removeConnectorBinding,
 } from './bezier-connector-binding'
 import { getPortAtPoint } from './port-utils'
+
+/**
+ * 存储拖拽过程中最新检测到的目标端口信息
+ * 只在松手时（onHandleDragEnd）真正写入 binding，避免在 drag 回调中嵌套更新 store
+ */
+export type PendingBindingTarget =
+	| { kind: 'set'; targetId: TLShapeId; portId: string; terminal: PortTerminal }
+	| { kind: 'remove'; terminal: PortTerminal }
+
+const pendingBindingTargets = new Map<TLShapeId, PendingBindingTarget>()
 
 /**
  * 计算贝塞尔曲线的控制点
@@ -183,15 +194,20 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		]
 	}
 
-	// 处理手柄拖拽
+	/**
+	 * 处理手柄拖拽（纯函数，不写 store）
+	 * 只计算坐标并记录待绑定的目标，真正的 binding 在 onHandleDragEnd 落盘
+	 */
 	onHandleDrag(
 		connector: IBezierConnectorShape,
 		{ handle }: TLHandleDragInfo<IBezierConnectorShape>
 	): IBezierConnectorShape {
 		const draggingTerminal = handle.id as PortTerminal
+		const connectorId = connector.id
 
 		// 计算手柄在页面空间中的位置
 		const shapeTransform = this.editor.getShapePageTransform(connector)
+		const inverseShapeTransform = Mat.Inverse(shapeTransform)
 		const handlePagePosition = shapeTransform.applyToPoint(handle)
 
 		// 查找该位置的端口
@@ -200,23 +216,65 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 			terminal: draggingTerminal,
 		})
 
-		// 如果找到可用端口，创建或更新绑定
+		// 如果找到可用端口，记录待绑定目标
 		if (target) {
-			createOrUpdateConnectorBinding(this.editor, connector, target.shapeId, {
-				portId: target.port.id,
-				terminal: draggingTerminal,
-			})
-			return connector
+			const targetShape = this.editor.getShape(target.shapeId)
+			if (targetShape) {
+				const targetPortInPage = this.editor
+					.getShapePageTransform(targetShape)
+					.applyToPoint(target.port)
+				const targetPortOnConnector = Mat.applyToPoint(inverseShapeTransform, targetPortInPage)
+
+				// 只存储目标信息，不写 store
+				pendingBindingTargets.set(connectorId, {
+					kind: 'set',
+					targetId: target.shapeId,
+					portId: target.port.id,
+					terminal: draggingTerminal,
+				})
+
+				return {
+					...connector,
+					props: {
+						...connector.props,
+						[handle.id]: { x: targetPortOnConnector.x, y: targetPortOnConnector.y },
+					},
+				}
+			}
 		}
 
-		// 没有找到端口，移除绑定并更新位置
-		removeConnectorBinding(this.editor, connector, draggingTerminal)
+		// 没有找到端口，记录待移除
+		pendingBindingTargets.set(connectorId, {
+			kind: 'remove',
+			terminal: draggingTerminal,
+		})
 		return {
 			...connector,
 			props: {
 				...connector.props,
 				[handle.id]: { x: handle.x, y: handle.y },
 			},
+		}
+	}
+
+	/**
+	 * 拖拽结束时真正提交 binding 变更
+	 */
+	onHandleDragEnd(
+		connector: IBezierConnectorShape,
+		_info: TLHandleDragInfo<IBezierConnectorShape>
+	): void {
+		const pending = pendingBindingTargets.get(connector.id)
+		pendingBindingTargets.delete(connector.id)
+		if (!pending) return
+
+		if (pending.kind === 'remove') {
+			removeConnectorBinding(this.editor, connector.id, pending.terminal)
+		} else {
+			createOrUpdateConnectorBinding(this.editor, connector.id, pending.targetId, {
+				portId: pending.portId,
+				terminal: pending.terminal,
+			})
 		}
 	}
 
