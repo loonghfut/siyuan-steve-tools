@@ -364,8 +364,8 @@ const CustomStylePanel = track(() => {
     const selectedShapes = useValue('selected shapes', () => editor.getSelectedShapes(), [editor])
     const styles = useRelevantStyles()
     const [isCapturingScreenshot, setIsCapturingScreenshot] = React.useState(false)
-    const [connectionMode, setConnectionMode] = React.useState(false)
-    const [connectionConnectorKind, setConnectionConnectorKind] = React.useState<'arrow' | 'bezier'>(() => {
+    const [setConnectionMode] = React.useState(false)
+    const [connectionConnectorKind] = React.useState<'arrow' | 'bezier'>(() => {
         return (String(settingdata['tldraw-connector-kind'] || 'bezier') === 'arrow') ? 'arrow' : 'bezier'
     })
 
@@ -879,33 +879,31 @@ const CustomStylePanel = track(() => {
             )}
             {(hasSingleBlockSelection || hasCardSelection) && (
                 <div className="tlui-style-panel__section">
-                    <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                    <div style={{ display: 'flex' }}>
                         <TldrawUiButton
                             type={connectionConnectorKind === 'arrow' ? 'primary' : 'normal'}
-                            style={{ flex: 1 }}
-                            disabled={connectionMode}
+                            style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                             title="启用直线连接模式：选择目标形状以创建直线（Esc 取消）"
                             onClick={() => {
-                                setConnectionConnectorKind('arrow')
-                                try { settingdata['tldraw-connector-kind'] = 'arrow' } catch (err) { }
                                 if (connectionManager) {
                                     connectionManager.enableConnectionMode(editor, 'arrow')
                                 }
                             }}
-                        >直线</TldrawUiButton>
+                        >
+                            直线
+                        </TldrawUiButton>
                         <TldrawUiButton
                             type={connectionConnectorKind === 'bezier' ? 'primary' : 'normal'}
-                            style={{ flex: 1 }}
-                            disabled={connectionMode}
+                            style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                             title="启用曲线连接模式：选择目标形状以创建曲线（Esc 取消）"
                             onClick={() => {
-                                setConnectionConnectorKind('bezier')
-                                try { settingdata['tldraw-connector-kind'] = 'bezier' } catch (err) { }
                                 if (connectionManager) {
                                     connectionManager.enableConnectionMode(editor, 'bezier')
                                 }
                             }}
-                        >曲线</TldrawUiButton>
+                        >
+                            曲线
+                        </TldrawUiButton>
                     </div>
                     {/* 使用上方按钮直接启用连接模式，因此移除单独的“连接到其他形状”按钮 */}
                 </div>
