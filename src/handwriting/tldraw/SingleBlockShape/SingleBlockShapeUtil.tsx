@@ -125,6 +125,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const [isEditingState, setIsEditingState] = useState(isEditing)
 		const [isInViewport, setIsInViewport] = useState(true)
 		const [canLoad, setCanLoad] = useState(true)
+ 		const [isHovered, setIsHovered] = useState(false)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const containerRef = useRef<HTMLDivElement>(null)
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
@@ -810,6 +811,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		return (
 			<HTMLContainer
+				onMouseEnter={() => setIsHovered(true)}
+				onMouseLeave={() => setIsHovered(false)}
 				id={shape.id}
 				style={{
 					display: 'flex',
@@ -863,7 +866,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					)}
 				</div>
 				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
-				<PortsOverlay shapeId={shape.id} />
+				<PortsOverlay shapeId={shape.id} parentHovered={isHovered} />
 			</HTMLContainer>
 		)
 	}
