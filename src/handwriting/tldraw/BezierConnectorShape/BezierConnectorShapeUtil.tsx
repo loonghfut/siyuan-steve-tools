@@ -130,6 +130,25 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 				strokeLinecap="round"
 				fill="none"
 			/>
+			{/* 端点原点 */}
+			{start && (
+				<circle
+					cx={start.x}
+					cy={start.y}
+					r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
+					fill={connector.props.color}
+					stroke="none"
+				/>
+			)}
+			{end && (
+				<circle
+					cx={end.x}
+					cy={end.y}
+					r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
+					fill={connector.props.color}
+					stroke="none"
+				/>
+			)}
 		</SVGContainer>
 	)
 }
