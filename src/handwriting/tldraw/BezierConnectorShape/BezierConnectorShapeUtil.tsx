@@ -117,7 +117,9 @@ export function getConnectorTerminals(
  */
 function BezierConnectorComponent({ connector }: { connector: IBezierConnectorShape }) {
 	const editor = useEditor()
-	const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
+	// 订阅 editor.user 的 isDarkMode，以便在主题切换时触发组件重渲染
+	const isDarkMode = useValue('isDarkMode', () => editor.user.getIsDarkMode(), [editor])
+	const theme = getDefaultColorTheme({ isDarkMode })
 	const { start, end } = useValue(
 		'terminals',
 		() => getConnectorTerminals(editor, connector),
@@ -142,7 +144,7 @@ function renderConnectorPathAndEndpoints(
 ) {
     const d = getConnectionPath(start, end)
     const r = Math.max(3, (props.strokeWidth || 2) + 1)
-	const color = theme[props.color].solid
+	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color
     return (
         <>
 			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
@@ -332,7 +334,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	indicator(connector: IBezierConnectorShape) {
 		const { start, end } = getConnectorTerminals(this.editor, connector)
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
-		const color = theme[connector.props.color].solid
+		const color = (theme && theme[connector.props.color] && theme[connector.props.color].solid) || connector.props.color
 		return (
 			<path
 				d={getConnectionPath(start, end)}
