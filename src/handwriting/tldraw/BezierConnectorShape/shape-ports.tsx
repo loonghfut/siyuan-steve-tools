@@ -20,9 +20,11 @@ export function getShapePorts(
 
 	const bounds = editor.getShapeGeometry(shape).bounds
 
-	// 获取形状的中心 Y 坐标
+	// 获取形状的中心坐标
 	const centerY = bounds.height / 2
+	const centerX = bounds.width / 2
 
+	// 支持上下左右四个端口：left/right 保持原有语义；top/bottom 新增
 	return {
 		input: {
 			id: 'input',
@@ -35,6 +37,18 @@ export function getShapePorts(
 			x: bounds.width, // 右边缘
 			y: centerY,
 			terminal: 'start', // 输出端口对应连接的起点
+		},
+		top: {
+			id: 'top',
+			x: centerX,
+			y: 0,
+			terminal: 'end',
+		},
+		bottom: {
+			id: 'bottom',
+			x: centerX,
+			y: bounds.height,
+			terminal: 'start',
 		},
 	}
 }

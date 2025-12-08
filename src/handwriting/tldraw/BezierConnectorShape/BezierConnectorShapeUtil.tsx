@@ -40,16 +40,32 @@ const pendingBindingTargets = new Map<TLShapeId, PendingBindingTarget>()
  * 计算贝塞尔曲线的控制点
  */
 function getConnectionControlPoints(start: VecLike, end: VecLike): [Vec, Vec] {
-	const distance = end.x - start.x
-	// 根据水平距离计算控制点偏移量
-	const adjustedDistance = Math.max(
-		30,
-		distance > 0 ? distance / 3 : clamp(Math.abs(distance) + 30, 0, 100)
-	)
-	return [
-		new Vec(start.x + adjustedDistance, start.y), // 控制点1：起点右侧
-		new Vec(end.x - adjustedDistance, end.y), // 控制点2：终点左侧
-	]
+	const dx = end.x - start.x
+	const dy = end.y - start.y
+
+	// 根据主要轴向选择控制点方向：水平优先，否则使用垂直控制点
+	if (Math.abs(dx) >= Math.abs(dy)) {
+		// 水平主导：沿 X 方向偏移控制点（与之前逻辑一致，但使用绝对距离以避免符号问题）
+		const distance = dx
+		const adjustedDistance = Math.max(
+			30,
+			distance > 0 ? distance / 3 : clamp(Math.abs(distance) + 30, 0, 100)
+		)
+		return [
+			new Vec(start.x + adjustedDistance, start.y), // 控制点1：起点右侧或左侧（取决于 distance 符号）
+			new Vec(end.x - adjustedDistance, end.y), // 控制点2：终点左侧或右侧
+		]
+	} else {
+		// 垂直主导：沿 Y 方向偏移控制点，生成更自然的上下连线
+		const distance = dy
+		const absDist = Math.abs(distance)
+		const adjustedDistance = Math.max(30, Math.min(absDist / 3, 100))
+		const sign = distance >= 0 ? 1 : -1
+		return [
+			new Vec(start.x, start.y + sign * adjustedDistance), // 控制点1：起点下方/上方
+			new Vec(end.x, end.y - sign * adjustedDistance), // 控制点2：终点上方/下方
+		]
+	}
 }
 
 /**

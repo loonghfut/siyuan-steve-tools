@@ -53,6 +53,12 @@ export function Port({ shapeId, portId }: PortProps) {
 
 	const isInput = port.terminal === 'end'
 
+	// 使用端口返回的本地坐标进行定位（overlay 覆盖层已相对于形状定位）
+	const left = typeof port.x === 'number' ? `${port.x}px` : undefined
+	const top = typeof port.y === 'number' ? `${port.y}px` : undefined
+
+	const scale = isHinting ? 1.4 : 1
+
 	return (
 		<div
 			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${
@@ -60,10 +66,9 @@ export function Port({ shapeId, portId }: PortProps) {
 			}${isEligible ? ' bezier-connector-port--eligible' : ''}`}
 			style={{
 				position: 'absolute',
-				left: isInput ? -7 : undefined,
-				right: isInput ? undefined : -7,
-				top: '50%',
-				transform: 'translateY(-50%)',
+				left,
+				top,
+				transform: `translate(-50%, -50%) scale(${scale})`,
 				pointerEvents: 'all',
 			}}
 			onPointerDown={() => {
