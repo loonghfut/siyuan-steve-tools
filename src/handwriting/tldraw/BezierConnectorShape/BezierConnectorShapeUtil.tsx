@@ -124,34 +124,28 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 
 	return (
 		<SVGContainer className="BezierConnectorShape">
-			<path
-				d={getConnectionPath(start, end)}
-				stroke={connector.props.color}
-				strokeWidth={connector.props.strokeWidth}
-				strokeLinecap="round"
-				fill="none"
-			/>
-			{/* 端点原点 */}
-			{start && (
-				<circle
-					cx={start.x}
-					cy={start.y}
-					r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
-					fill={connector.props.color}
-					stroke="none"
-				/>
-			)}
-			{end && (
-				<circle
-					cx={end.x}
-					cy={end.y}
-					r={Math.max(3, (connector.props.strokeWidth || 2) + 1)}
-					fill={connector.props.color}
-					stroke="none"
-				/>
-			)}
+			{renderConnectorPathAndEndpoints(start, end, connector.props)}
 		</SVGContainer>
 	)
+}
+
+/**
+ * 抽取出的渲染函数：在 component 和 toSvg 中复用，避免样式/行为不同步
+ */
+function renderConnectorPathAndEndpoints(start: VecLike, end: VecLike, props: IBezierConnectorShape['props']) {
+    const d = getConnectionPath(start, end)
+    const r = Math.max(3, (props.strokeWidth || 2) + 1)
+    return (
+        <>
+            <path d={d} stroke={props.color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
+            {start && (
+                <circle cx={start.x} cy={start.y} r={r} fill={props.color} stroke="none" />
+            )}
+            {end && (
+                <circle cx={end.x} cy={end.y} r={r} fill={props.color} stroke="none" />
+            )}
+        </>
+    )
 }
 
 /**
