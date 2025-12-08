@@ -166,7 +166,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 			start: { x: 0, y: 0 },
 			end: { x: 100, y: 100 },
 			color: '#666666',
-			strokeWidth: 2,
+			strokeWidth: 3,
 		}
 	}
 
