@@ -70,8 +70,10 @@ export class ConnectionModeManager {
         // 开始监听选择变化
         this.startListening()
 
-        // 通知状态变化
-        this.onStateChange?.(true)
+        // 通知状态变化（确保 onStateChange 是函数，避免在传入非函数（如布尔值）时出错）
+        if (typeof this.onStateChange === 'function') {
+            this.onStateChange(true)
+        }
 
         return true
     }
@@ -82,7 +84,9 @@ export class ConnectionModeManager {
         this.pendingShapeIds = []
         this.editor = null
         this.stopListening()
-        this.onStateChange?.(false)
+        if (typeof this.onStateChange === 'function') {
+            this.onStateChange(false)
+        }
     }
 
     // 检查是否处于连接模式

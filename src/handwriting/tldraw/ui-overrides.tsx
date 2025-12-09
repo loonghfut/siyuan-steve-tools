@@ -364,7 +364,7 @@ const CustomStylePanel = track(() => {
     const selectedShapes = useValue('selected shapes', () => editor.getSelectedShapes(), [editor])
     const styles = useRelevantStyles()
     const [isCapturingScreenshot, setIsCapturingScreenshot] = React.useState(false)
-    const [setConnectionMode] = React.useState(false)
+    const [connectionMode, setConnectionMode] = React.useState(false)
     const [connectionConnectorKind] = React.useState<'arrow' | 'bezier'>(() => {
         return (String(settingdata['tldraw-connector-kind'] || 'bezier') === 'arrow') ? 'arrow' : 'bezier'
     })
@@ -907,6 +907,7 @@ const CustomStylePanel = track(() => {
                     <div style={{ display: 'flex' }}>
                         <TldrawUiButton
                             type={connectionConnectorKind === 'arrow' ? 'primary' : 'normal'}
+                            disabled={connectionMode}
                             style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                             title="启用直线连接模式：选择目标形状以创建直线（Esc 取消）"
                             onClick={() => {
@@ -919,6 +920,7 @@ const CustomStylePanel = track(() => {
                         </TldrawUiButton>
                         <TldrawUiButton
                             type={connectionConnectorKind === 'bezier' ? 'primary' : 'normal'}
+                            disabled={connectionMode}
                             style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                             title="启用曲线连接模式：选择目标形状以创建曲线（Esc 取消）"
                             onClick={() => {
