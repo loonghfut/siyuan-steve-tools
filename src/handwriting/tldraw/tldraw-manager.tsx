@@ -463,7 +463,7 @@ export class TldrawManager {
                             const idid = await api.generateSiyuanID();
                             const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
                             let aproblock: string;
-                            const content = (await api.getBlockByID(blockId)).markdown;
+                            const content = (await api.getBlockKramdown(blockId)).kramdown;
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
@@ -1000,7 +1000,7 @@ export class TldrawManager {
             // 只检查其他 single-block 是否仍然引用同一 blockId
             const remainingSingleBlockCount = this.countRemainingShapesReferencingBlock(editor, blockId, ['single-block']);
             if (remainingSingleBlockCount === 0) {
-                const block = await api.getBlockByID(blockId);
+                const block = await api.getBlockKramdown(blockId);
                 if (block) {
                     // single-block 删除行为：默认与 card 保持一致。
                     if (settingdata['SyncDelete']) {
@@ -1010,7 +1010,7 @@ export class TldrawManager {
                         // console.log("%%%",block.markdown);
                         // 只删除指向当前画板(this.id) 与该块(blockId) 的[*](...)链接
                         // 使用 URL 解析以便在 query 中精确匹配 rootid 与 blockid（支持 title 等额外参数）
-                        const replacedMarkdown = block.markdown.replace(/\[\*\]\((https:\/\/plugins\/siyuan-steve-tools\/\?[^)]+)\)/g, (match, url) => {
+                        const replacedMarkdown = block.kramdown.replace(/\[\*\]\((https:\/\/plugins\/siyuan-steve-tools\/\?[^)]+)\)/g, (match, url) => {
                             try {
                                 const params = new URL(url).searchParams;
                                 if (params.get('rootid') === this.id && params.get('blockid') === blockId) {
@@ -1024,7 +1024,7 @@ export class TldrawManager {
                             }
                             return match; // 不匹配则保留原链接
                         });
-                        if (replacedMarkdown !== block.markdown) {
+                        if (replacedMarkdown !== block.kramdown) {
                             await api.updateBlock("markdown", replacedMarkdown, blockId);
                         }
                     }
