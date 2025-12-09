@@ -464,17 +464,28 @@ export class TldrawManager {
                             const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
                             let aproblock: string;
                             const content = (await api.getBlockKramdown(blockId)).kramdown;
+                            /**
+                             * 将 linkMarkdown 插入到 kramdown 内容末尾（但在 IAL/attribute block 之前）
+                             * - 如果是 heading 类型（isHeading === true），将 link 插入到最后一行（heading 行）后面： `###### 标题 [🔗](...)`
+                             * - 否则，将 link 作为独立的行插入到内容末尾（在 IAL 之前）
+                             */
+                            // Use class-level helper to create updated content with link to avoid adding link inside IAL/attribute block
+                            const appendLinkToKramdown = this.appendLinkToKramdown.bind(this);
+                            console.log("拖拽块的内容", content);
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
                                 const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
-                                await api.updateBlock("markdown", `${content}[🔗](${link})`, aproblock)
+                                const linkMarkdown = `[🔗](${link})`;
+                                const newContent = appendLinkToKramdown(content, linkMarkdown, link, true);
+                                await api.updateBlock("markdown", newContent, aproblock)
                             } else if (blockIdo_rigin.includes('paragraph')) {
                                 aproblock = blockId;
                                 //要检测是否已经有此链接，避免重复添加
-                                if (content.includes(`https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}`)) {
-                                } else {
-                                    const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
-                                    await api.updateBlock("markdown", `${content}[*](${link})`, aproblock)
+                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const linkMarkdown = `[*](${link})`;
+                                if (!content.includes(link)) {
+                                    const newContent = appendLinkToKramdown(content, linkMarkdown, link, false);
+                                    await api.updateBlock("markdown", newContent, aproblock)
                                 }
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
@@ -634,6 +645,49 @@ export class TldrawManager {
             }
         };
         // console.log('已设置实时同步功能');
+    }
+    /**
+     * 将 linkMarkdown 插入到 kramdown 内容末尾（但在 IAL/attribute block 之前）
+     * - 如果是 heading 类型（isHeading === true），将 link 插入到最后一行（heading 行）后面： `###### 标题 [🔗](...)`
+     * - 否则，将 link 作为独立的行插入到内容末尾（在 IAL 之前）
+     */
+    private appendLinkToKramdown(origContent: string, linkMarkdown: string, linkUrl: string, isHeading = false) {
+        if (!origContent) return linkMarkdown;
+        // 检查是否已有该链接
+        if (origContent.includes(linkUrl)) return origContent;
+
+        // 尝试匹配结尾处的 IAL / attribute block：以换行 + '{:' 开头并以 '}' 结尾
+        const attrMatch = origContent.match(/(\n\{:\s*[\s\S]*?\}\s*)$/);
+        if (attrMatch) {
+            const attrs = attrMatch[1];
+            const before = origContent.slice(0, origContent.length - attrs.length);
+            if (isHeading) {
+                const lines = before.split('\n');
+                const lastLine = lines.pop() || '';
+                const newLastLine = `${lastLine}${lastLine.endsWith(' ') ? '' : ' '}${linkMarkdown}`;
+                lines.push(newLastLine);
+                return lines.join('\n') + attrs;
+            } else {
+                const trimmedBefore = before.replace(/[\s\n]+$/, '');
+                // 直接在内容后面加链接，不要加换行
+                const sep = trimmedBefore.endsWith(' ') ? '' : ' ';
+                return `${trimmedBefore}${sep}${linkMarkdown}${attrs}`;
+            }
+        } else {
+            // 没有 IAL
+            if (isHeading) {
+                const lines = origContent.split('\n');
+                const lastLine = lines.pop() || '';
+                const newLastLine = `${lastLine}${lastLine.endsWith(' ') ? '' : ' '}${linkMarkdown}`;
+                lines.push(newLastLine);
+                return lines.join('\n');
+            } else {
+                const trimmed = origContent.replace(/[\s\n]+$/, '');
+                // 直接在内容后面加链接，不要加换行
+                const sep = trimmed.endsWith(' ') ? '' : ' ';
+                return `${trimmed}${sep}${linkMarkdown}`;
+            }
+        }
     }
     /**
      * 设置自动保存功能
