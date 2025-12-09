@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.27.0 (2025年12月09日)
+### v0.27.2 (2025年12月09日)
 - feat(mind-map): 添加子节点功能，更新相关组件和事件处理 (loonghfut)
 - feat(context-menu): 添加编辑状态支持，允许在上下文菜单和键盘操作中进入编辑模式 (loonghfut)
 - feat(mind-map): 添加确认对话框功能，支持节点删除和文本编辑实时更新 (loonghfut)
@@ -82,6 +82,11 @@ win端s3同步后，docker端感知s3同步。
 - feat(CustomStylePanel): 添加切换按钮行和样式，优化单块形状的连接和透明背景设置 (loonghfut)
 - fix(connection): 确保状态变化通知函数有效，避免传入非函数值 (loonghfut)
 - chore(plugin): 更新版本号至0.27.0 (loonghfut)
+- docs: 更新 v0.27.0 版本的更新日志 (loonghfut)
+- fix(TldrawManager): 修改获取块内容的方法，从 getBlockByID 更改为 getBlockKramdown (loonghfut)
+- chore(plugin): 更新版本号至0.27.1 (loonghfut)
+- feat(TldrawManager): 添加将链接插入kramdown内容末尾的功能 (loonghfut)
+- chore(plugin): 更新版本号至0.27.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
