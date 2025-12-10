@@ -1,7 +1,7 @@
 import { Editor, TLShapeId } from '@tldraw/tldraw'
 import { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
 
-// 获取所有与给定 single-block 相连的 single-block（通过 arrow 绑定）
+// 获取所有与给定 single-block 相连的 single-block（通过 arrow 或 bezier-connector 绑定）
 type ArrowBindingLike = {
     toId: TLShapeId
     props?: {
@@ -19,6 +19,7 @@ type ArrowShapeLike = {
 const getConnectedSingleBlocks = (editor: Editor, centerId: TLShapeId): ISingleBlockShape[] => {
     const shapes = editor.getCurrentPageShapes()
     const arrows = shapes.filter(s => s.type === 'arrow')
+    const beziers = shapes.filter(s => s.type === 'bezier-connector')
     const result: ISingleBlockShape[] = []
     const visited = new Set<TLShapeId>()
 
@@ -48,6 +49,25 @@ const getConnectedSingleBlocks = (editor: Editor, centerId: TLShapeId): ISingleB
         if (!targetBinding || targetBinding.toId === centerId) return
 
         addIfSingleBlock(targetBinding.toId)
+    })
+
+    // 处理贝塞尔连接器：若 connector 对 centerId 有 binding，则把另一个绑定端的 single-block 加入
+    beziers.forEach(connector => {
+        const bindings = editor.getBindingsFromShape(connector, 'bezier-connector') as ArrowBindingLike[]
+        if (!bindings || bindings.length === 0) return
+
+        // Find if one end is centerId, and the other end points to a single-block.
+        const startBinding = bindings.find(b => b.props?.terminal === 'start')
+        const endBinding = bindings.find(b => b.props?.terminal === 'end')
+        if (!startBinding || !endBinding) return
+
+        // If start or end equals center, add the other
+        if (startBinding.toId === centerId && endBinding.toId && endBinding.toId !== centerId) {
+            addIfSingleBlock(endBinding.toId)
+        }
+        if (endBinding.toId === centerId && startBinding.toId && startBinding.toId !== centerId) {
+            addIfSingleBlock(startBinding.toId)
+        }
     })
 
     return result
