@@ -1,5 +1,6 @@
 import { Editor, TLShapeId, Vec, createShapeId } from '@tldraw/tldraw'
 import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
+import { updatePortState } from '../BezierConnectorShape/port-state'
 import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierConnectorShape/port-utils'
 import { showMessage } from 'siyuan'
 import { ICardShape } from '../CardShape/card-shape-types'
@@ -260,6 +261,9 @@ export class ConnectionModeManager {
                 },
             })
 
+            // 尝试确定靠近的最佳端口（便于做闪烁反馈）
+            const { sourcePortId: flashSourcePort, targetPortId: flashTargetPort } = getBestPortPair(this.editor, sourceShape.id as any, targetShape.id as any)
+
             this.editor.createBindings([
                 {
                     fromId: arrowId,
@@ -284,6 +288,17 @@ export class ConnectionModeManager {
                     },
                 },
             ])
+
+            // 端口闪烁反馈：短暂高亮 source/target 端口
+            try {
+                updatePortState(this.editor, { flashPort: { shapeId: sourceShape.id as any, portId: flashSourcePort }, flashConnectorId: arrowId })
+                updatePortState(this.editor, { flashPort: { shapeId: targetShape.id as any, portId: flashTargetPort }, flashConnectorId: arrowId })
+                setTimeout(() => updatePortState(this.editor, { flashPort: null, flashConnectorId: null }), 350)
+            } catch (e) {
+                // ignore
+            }
+            // 清除 hinting（若有）
+            try { updatePortState(this.editor, { hintingPort: null }) } catch (e) {}
 
             return arrowId
         } catch (error) {
@@ -348,6 +363,16 @@ export class ConnectionModeManager {
                 portId: targetPort,
                 terminal: targetTerminal as any,
             })
+
+            // 连接成功闪烁反馈
+            try {
+                updatePortState(this.editor, { flashPort: { shapeId: sourceShape.id as any, portId: sourcePort } })
+                updatePortState(this.editor, { flashPort: { shapeId: targetShape.id as any, portId: targetPort } })
+                setTimeout(() => updatePortState(this.editor, { flashPort: null }), 350)
+            } catch (e) {
+                // ignore
+            }
+            try { updatePortState(this.editor, { hintingPort: null }) } catch (e) {}
 
             return connectorId
         } catch (err) {

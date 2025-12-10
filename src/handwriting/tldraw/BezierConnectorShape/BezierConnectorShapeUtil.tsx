@@ -27,6 +27,7 @@ import {
 	removeConnectorBinding,
 } from './bezier-connector-binding'
 import { getPortAtPoint } from './port-utils'
+import { updatePortState, getPortState } from './port-state'
 
 /**
  * 存储拖拽过程中最新检测到的目标端口信息
@@ -199,10 +200,16 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 		() => getConnectorTerminals(editor, connector),
 		[editor, connector]
 	)
+	const { highlightConnectorId, flashConnectorId } = useValue('connector-highlights', () => {
+		const s = getPortState(editor)
+		return { highlightConnectorId: s.highlightConnectorId, flashConnectorId: s.flashConnectorId }
+	}, [editor])
+	const isHighlighted = highlightConnectorId === connector.id
+	const isFlashing = flashConnectorId === connector.id
 
 	return (
 		<SVGContainer className="BezierConnectorShape">
-			{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId)}
+			{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId, isHighlighted, isFlashing)}
 		</SVGContainer>
 	)
 }
@@ -217,12 +224,19 @@ function renderConnectorPathAndEndpoints(
 	theme: ReturnType<typeof getDefaultColorTheme>,
 	startPortId?: string,
 	endPortId?: string
+	, isHighlighted: boolean = false, isFlashing: boolean = false
 ) {
 	const d = getConnectionPath(start, end, startPortId, endPortId)
 	const r = Math.max(3, (props.strokeWidth || 2) + 1)
 	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color || theme.black.solid
+	// 如果需要高亮或闪烁，先画一条宽的半透明路径作为 glow/halo
+	const highlight = isHighlighted || isFlashing
+	const highlightWidth = Math.max(0, (props.strokeWidth || 2) + (isHighlighted ? 3 : 0) + (isFlashing ? 2 : 0))
+	const highlightOpacity = isFlashing ? 0.6 : 0.28
+
 	return (
 		<>
+			{highlight && <path d={d} stroke={color} strokeWidth={highlightWidth} strokeLinecap="round" fill="none" strokeOpacity={highlightOpacity} />}
 			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
 			{start && (
 				<circle cx={start.x} cy={start.y} r={r} fill={color} stroke="none" />
@@ -328,11 +342,19 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 
 		// 查找该位置的端口
 		// 不再按 terminal (start/end) 过滤目标端口，允许任意端口互连
-		const target = getPortAtPoint(this.editor, handlePagePosition, {
-			margin: 8,
+		// 将 handle 拖动视为连接模式的一部分：显示 eligible ports
+		updatePortState(this.editor, {
+			eligiblePorts: {
+				terminal: undefined,
+				excludeShapeIds: new Set([connector.id]),
+			},
 		})
 
-		// 如果找到可用端口，记录待绑定目标
+		const target = getPortAtPoint(this.editor, handlePagePosition, {
+			margin: 28,
+		})
+
+		// 如果找到可用端口，记录待绑定目标，并设置高亮当前 connector
 		if (target) {
 			const targetShape = this.editor.getShape(target.shapeId)
 			if (targetShape) {
@@ -341,6 +363,12 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 					.applyToPoint(target.port)
 				const targetPortOnConnector = Mat.applyToPoint(inverseShapeTransform, targetPortInPage)
 
+				// 更新 hinting 状态以便端口可视化高亮
+				updatePortState(this.editor, {
+					hintingPort: { shapeId: target.shapeId, portId: target.port.id },
+				})
+				// 高亮当前连接器用于视觉引导
+				updatePortState(this.editor, { highlightConnectorId: connectorId })
 				// 只存储目标信息，不写 store
 				pendingBindingTargets.set(connectorId, {
 					kind: 'set',
@@ -360,6 +388,10 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		}
 
 		// 没有找到端口，记录待移除
+		// 清除 hinting 状态
+		updatePortState(this.editor, { hintingPort: null, highlightConnectorId: null })
+		// clear eligible ports when not matching
+		updatePortState(this.editor, { eligiblePorts: null })
 		pendingBindingTargets.set(connectorId, {
 			kind: 'remove',
 			terminal: draggingTerminal,
@@ -392,6 +424,11 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 				terminal: pending.terminal,
 			})
 		}
+
+		// 清理 hinting，并清除 connector highlight
+	updatePortState(this.editor, { hintingPort: null, highlightConnectorId: null })
+		// 清理 eligiblePorts 以隐藏端口 overlay
+		updatePortState(this.editor, { eligiblePorts: null })
 	}
 
 	// 渲染连接组件
@@ -403,7 +440,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	override toSvg(connector: IBezierConnectorShape, ctx: SvgExportContext) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		return <g>{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId)}</g>
+		return <g>{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId, false, false)}</g>
 	}
 
 	// 渲染选中指示器

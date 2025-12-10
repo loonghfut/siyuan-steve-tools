@@ -11,10 +11,16 @@ export interface PortState {
 	eligiblePorts:
 		| {
 			  // 现在 terminal 可选；为 undefined 则表示允许任意端口类型
-			  terminal?: PortTerminal
+			    terminal?: PortTerminal
 			  excludeShapeIds: Set<TLShapeId> | null
 		  }
 		| null
+			/** 最近成功连接的端口，用于展示一次性的视觉反馈 */
+			flashPort: PortIdentifier | null
+			/** 用于高亮某个 connector（拖拽时 match 到端口时设置） */
+			highlightConnectorId: TLShapeId | null
+			/** 用于短暂高亮整条 connector（绑定创建/更新时设置） */
+			flashConnectorId: TLShapeId | null
 }
 
 /**
@@ -31,6 +37,9 @@ export function getPortStateAtom(editor: Editor): Atom<PortState> {
 		stateAtom = atom<PortState>('port state', {
 			hintingPort: null,
 			eligiblePorts: null,
+			flashPort: null,
+			highlightConnectorId: null,
+			flashConnectorId: null,
 		})
 		portStateAtoms.set(editor, stateAtom)
 	}
@@ -63,5 +72,8 @@ export function resetPortState(editor: Editor) {
 	stateAtom.set({
 		hintingPort: null,
 		eligiblePorts: null,
+		flashPort: null,
+		highlightConnectorId: null,
+		flashConnectorId: null,
 	})
 }

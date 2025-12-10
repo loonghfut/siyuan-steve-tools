@@ -80,18 +80,27 @@ export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 		},
 		[editor, shapeId, portId]
 	)
+	// 判断该端口是否最近被连接，用于短暂高亮反馈
+	const isFlashing = useValue(
+		'isFlashing',
+		() => {
+			const s = getPortState(editor)
+			return s.flashPort?.shapeId === shapeId && s.flashPort?.portId === portId
+		},
+		[editor, shapeId, portId]
+	)
 	return (
 		<div
 			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${
 				isHinting ? ' bezier-connector-port--hinting' : ''
-			}${isEligible ? ' bezier-connector-port--eligible' : ''}`}
+			}${isEligible ? ' bezier-connector-port--eligible' : ''}${isFlashing ? ' bezier-connector-port--flash' : ''}`}
 			style={{
 				position: 'absolute',
 				left,
 				top,
 				transform: `translate(-50%, -50%) translateX(${extraOffsetX}px) translateY(${extraOffsetY}px) scale(${scale})`,
-				pointerEvents: isConnected || parentHovered ? 'all' : 'none',
-				opacity: isConnected || parentHovered ? 1 : 0,
+				pointerEvents: isConnected || parentHovered || isEligible || isHinting || isFlashing ? 'all' : 'none',
+				opacity: isConnected || parentHovered || isEligible || isHinting || isFlashing ? 1 : 0,
 				transition: 'opacity 0.12s ease, transform 0.08s ease-in-out',
 				backgroundColor: isHinting || isEligible ? undefined : defaultDotColor,
 			}}

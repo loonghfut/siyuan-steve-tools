@@ -336,3 +336,13 @@ input.tlui-input {
   width: 40px;
   height: 40px;
 }
+
+/* 成功连接后短暂高亮效果 */
+.bezier-connector-port--flash {
+  box-shadow: 0 0 0 10px rgba(61, 138, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.12);
+  background: var(--color-selected, #3d8aff);
+}
+.bezier-connector-port--flash::after {
+  width: 48px;
+  height: 48px;
+}

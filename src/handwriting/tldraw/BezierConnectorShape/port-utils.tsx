@@ -59,7 +59,8 @@ export function getPortAtPoint(
 	port: ShapePort
 	existingConnections: ReturnType<typeof getShapeConnections>
 } | null {
-	const margin = opts?.margin ?? 8
+	// 默认识别范围设大一点以便拖拽时更容易命中（与 CSS 的 pseudo-element 相匹配）
+	const margin = opts?.margin ?? 28
 	const marginSq = margin * margin
 
 	// 获取当前页面的所有形状

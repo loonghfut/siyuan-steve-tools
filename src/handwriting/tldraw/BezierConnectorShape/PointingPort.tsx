@@ -39,6 +39,7 @@ export class PointingPort extends StateNode {
 		this.editor.setCursor({ type: 'cross', rotation: 0 })
 
 		// 设置可连接的端口状态：将 terminal 设为 undefined，表示任何端口均可连接
+		// 标记 eligiblePorts，使得目标形状上的端口可视化（即使没有 hover）
 		updatePortState(this.editor, {
 			eligiblePorts: {
 				terminal: undefined,
@@ -69,7 +70,7 @@ export class PointingPort extends StateNode {
 		// 查找当前位置的端口
 		// 现在允许连接到任何端口类型（不再限制 start/end），因此不传 terminal
 		const target = getPortAtPoint(this.editor, currentPoint, {
-			margin: 20,
+			margin: 28,
 			excludeShapeId: this.info.shapeId,
 		})
 

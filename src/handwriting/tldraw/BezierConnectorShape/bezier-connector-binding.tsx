@@ -10,6 +10,7 @@ import {
 } from '@tldraw/tldraw'
 import { IBezierConnectorShape, PortTerminal } from './bezier-connector-types'
 import { getShapePorts } from './shape-ports'
+import { updatePortState } from './port-state'
 
 /**
  * 连接器绑定类型定义
@@ -137,6 +138,13 @@ export function createOrUpdateConnectorBinding(
 			toId: targetId,
 			props,
 		})
+		// 显示短暂的连接高亮反馈（端口和整个 connector）
+		try {
+			updatePortState(editor, { flashPort: { shapeId: targetId, portId: props.portId }, flashConnectorId: connectorId })
+			setTimeout(() => updatePortState(editor, { flashPort: null, flashConnectorId: null }), 350)
+		} catch (e) {
+			// ignore
+		}
 	} else {
 		editor.createBinding({
 			type: 'bezier-connector',
@@ -144,6 +152,13 @@ export function createOrUpdateConnectorBinding(
 			toId: targetId,
 			props,
 		})
+		// 显示短暂的连接高亮反馈（端口和整个 connector）
+		try {
+			updatePortState(editor, { flashPort: { shapeId: targetId, portId: props.portId }, flashConnectorId: connectorId })
+			setTimeout(() => updatePortState(editor, { flashPort: null, flashConnectorId: null }), 350)
+		} catch (e) {
+			// ignore
+		}
 	}
 }
 
