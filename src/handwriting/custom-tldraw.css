@@ -247,6 +247,7 @@ input.tlui-input {
 }
 
 /* 贝塞尔连接器端口样式：小型实心点 */
+/* Small visible dot + larger clickable area (pseudo element) */
 .bezier-connector-port {
   position: absolute;
   width: 8px;
@@ -261,7 +262,9 @@ input.tlui-input {
   flex: 0 0 auto;
   transition: transform 0.08s ease-in-out, background-color 0.12s ease, opacity 0.12s ease;
   cursor: crosshair;
-  pointer-events: all !important;
+  /* pointer events controlled by inline styles in the Port component so that the
+   * ports are only interactive when they should be (e.g. parentHovered or connected)
+   */
 }
 
 /* 输入端口（左侧） */
@@ -305,4 +308,31 @@ input.tlui-input {
 .BezierConnectorShape path {
   stroke-linecap: round;
   fill: none;
+}
+
+/* Expand hit area using a transparent pseudo-element so that the small visible dot
+ * stays the same size, but the clickable/touch target becomes easier to hit.
+ */
+.bezier-connector-port::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  /* Accessible hit area: 28px (approx 11mm on typical displays) */
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  /* Allow pointer events on the pseudo element (the parent controls whether
+   * the port should be interactive via inline style), this expands the target.
+   */
+  pointer-events: inherit;
+}
+
+/* Slightly enlarge the hit area when hinting/eligible for better UX */
+.bezier-connector-port--eligible::after,
+.bezier-connector-port--hinting::after {
+  width: 40px;
+  height: 40px;
 }
