@@ -600,7 +600,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 只有在非编辑状态时才禁用指针事件
 					position: 'relative',
 					isolation: 'isolate',
-					pointerEvents: isEditingState ? 'auto' : 'none',
+					// Enable pointer events at the outer container so hover works and
+					// ports can be revealed even when not editing. The inner content
+					// will still block interactions unless in edit mode.
+					pointerEvents: 'auto',
 					width: '100%',
 					height: '100%',
 					overflow: 'visible', // 改为 visible 以显示端口

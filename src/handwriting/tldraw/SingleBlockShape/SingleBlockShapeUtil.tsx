@@ -739,7 +739,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					color: theme[shape.props.color].solid,
 					position: 'relative',
 					isolation: 'isolate',
-					pointerEvents: isEditingState ? 'auto' : 'none',
+					// Always allow pointer events at the container level so hover can be detected
+					// (used to reveal connector ports even when not editing). The inner content
+					// will still prevent interaction when not in edit mode.
+					pointerEvents: 'auto',
 					width: '100%',
 					height: '100%',
 					overflow: 'visible', // 改为 visible 以显示端口
@@ -760,6 +763,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						width: '100%',
 						height: '100%',
 						overflow: 'auto', // 内容区域可滚动
+						// Prevent content interactions when not editing to avoid blocking
+						// TL editor pointer handling. The overlay itself can still react
+						// to hover because HTMLContainer has pointer-events enabled.
 						pointerEvents: isEditingState ? 'all' : 'none',
 						touchAction: isEditingState ? 'auto' : 'none',
 						contain: 'strict',
