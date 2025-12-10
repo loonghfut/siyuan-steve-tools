@@ -42,14 +42,14 @@ export class ConnectionModeManager {
     private checkInterval: number | null = null
     private lastSelectionIds: string = ''
     private onStateChange?: (isActive: boolean) => void
-    private connectorKind: 'arrow' | 'bezier' = 'arrow'
+    private connectorKind: 'arrow' | 'bezier' = 'bezier'
 
     constructor(onStateChange?: (isActive: boolean) => void) {
         this.onStateChange = onStateChange
     }
 
     // 启用连接模式
-    enableConnectionMode(editor: Editor, kind: 'arrow' | 'bezier' = 'arrow'): boolean {
+    enableConnectionMode(editor: Editor, kind: 'arrow' | 'bezier' = 'bezier'): boolean {
         const shapes = editor.getSelectedShapes().filter(isConnectableShape)
 
         if (shapes.length < 1) {

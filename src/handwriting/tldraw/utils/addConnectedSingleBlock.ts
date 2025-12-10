@@ -62,7 +62,7 @@ export const createArrowBetweenShapes = (
         Vec.MulV(targetBounds.size, Vec.Rot(Vec.From(normalizedAnchor), endRotation)),
     )
     const arrowOrigin = Vec.Min(startPoint, endPoint)
-    const connectorKind = String(settingdata['tldraw-connector-kind'] || 'arrow') === 'bezier' ? 'bezier' : 'arrow'
+    const connectorKind = String(settingdata['tldraw-connector-kind'] || 'bezier') === 'bezier' ? 'bezier' : 'arrow'
 
     if (connectorKind === 'bezier') {
         const startPoint = Vec.Add(
@@ -197,7 +197,7 @@ export const createConnectedSingleBlockAt = (
         }
     })
 
-    showMessage('已在指定位置添加单块并生成箭头', 2000, 'info')
+    showMessage('已在指定位置添加单块并生成连线', 2000, 'info')
 }
 
 // keep file focused: createConnectedSingleBlockAt is the canonical API for placement + binding
