@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.27.2 (2025年12月09日)
+### v0.27.3 (2025年12月10日)
 - feat(mind-map): 添加子节点功能，更新相关组件和事件处理 (loonghfut)
 - feat(context-menu): 添加编辑状态支持，允许在上下文菜单和键盘操作中进入编辑模式 (loonghfut)
 - feat(mind-map): 添加确认对话框功能，支持节点删除和文本编辑实时更新 (loonghfut)
@@ -87,6 +87,19 @@ win端s3同步后，docker端感知s3同步。
 - chore(plugin): 更新版本号至0.27.1 (loonghfut)
 - feat(TldrawManager): 添加将链接插入kramdown内容末尾的功能 (loonghfut)
 - chore(plugin): 更新版本号至0.27.2 (loonghfut)
+- docs: 更新 v0.27.2 版本的更新日志 (loonghfut)
+- feat(BezierConnectorShape): 添加 createAndBindShape 辅助函数以支持快速添加连接目标 (loonghfut)
+- feat(arrangeSingleBlocks): 支持通过贝塞尔连接器获取相连的单块形状 (loonghfut)
+- fix: 修正连接器类型默认值为贝塞尔，并更新提示信息 (loonghfut)
+- feat(bezier-connector): 扩展可点击区域以改善用户体验 (loonghfut)
+- feat: 始终允许容器级别的指针事件，以便在非编辑模式下检测悬停并显示连接器端口 (loonghfut)
+- feat: 添加绑定关系收集和处理功能，以支持连接器与形状的绑定 (loonghfut)
+- feat: 添加连接器高亮和闪烁反馈功能，以改善用户体验 (loonghfut)
+- feat: 优化端口状态管理，减少不必要的更新，提升性能和用户体验 (loonghfut)
+- feat: 在样式面板中添加连接器两端均已连接时的跳转按钮，以改善用户导航体验 (loonghfut)
+- feat: 优化样式面板中的跳转按钮布局，改善用户界面和交互体验 (loonghfut)
+- feat: 优化自定义样式面板按钮布局，增强可用性和用户体验 (loonghfut)
+- feat: 更新版本号至0.27.3 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
