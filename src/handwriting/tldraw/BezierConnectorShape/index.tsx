@@ -44,3 +44,5 @@ export { PointingPort } from './PointingPort'
 
 // 工具函数
 export { keepConnectorsAtBottom } from './keep-connectors-at-bottom'
+// Create and bind helper
+export { createAndBindShape } from './createAndBindShape'

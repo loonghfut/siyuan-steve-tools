@@ -27,6 +27,7 @@ import {
     TldrawUiMenuGroup,
     TLUiContextMenuProps,
 } from '@tldraw/tldraw'
+// createAndBindShape moved to `BezierConnectorShape/createAndBindShape.ts`
 import { selectAdjacentShape } from './utils/selectAdjacentShape'
 import { ConnectionModeManager } from './utils/connectionMode'
 import { arrangeConnectedSingleBlocks } from './utils/arrangeSingleBlocks'
@@ -64,7 +65,8 @@ import { IMindMapShape } from './MindMapShape/mind-map-shape-types'
 import { ThemeName } from './MindMapShape/mind-map-constants'
 import { addShapesToLibrary, resetShapeLibraryPanelPosition } from './shapelibrary/shape-library-manager'
 import { ShapeLibraryPanel } from './shapelibrary/ShapeLibraryPanel'
-import { IBezierConnectorShape } from './BezierConnectorShape'
+import { IBezierConnectorShape, getConnectorTerminals } from './BezierConnectorShape'
+import { createAndBindShape } from './BezierConnectorShape'
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
@@ -828,6 +830,41 @@ const CustomStylePanel = track(() => {
                     </div>
                 </div>
             )}
+
+            {/* 快速添加连接目标（Card / Single Block）通过将新形状放在曲线端点方向上并建立绑定 */}
+            {hasConnectorSelection && selectedConnectorShapes.length === 1 && (() => {
+                const connector = selectedConnectorShapes[0]
+                const terminals = getConnectorTerminals(editor, connector)
+                // delegated to createAndBindShape
+
+                const createAndBindShapeLocal = (terminal: 'start' | 'end', type: 'card' | 'single-block') => {
+                    try {
+                        editor.run(() => {
+                            createAndBindShape(editor, connector.id, terminal, type)
+                        })
+                    } catch (err) {
+                        console.error('创建并绑定目标失败 (delegated)', err)
+                    }
+                }
+
+                const startConnected = !!terminals.startShapeId
+                const endConnected = !!terminals.endShapeId
+                // Only show buttons when exactly one end is connected
+                if (!(startConnected !== endConnected)) {
+                    return null
+                }
+                const unconnectedTerminal = startConnected ? 'end' : 'start'
+                return (
+                    <div className="tlui-style-panel__section" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex',justifyContent: 'center', marginTop: 6 }}>
+                                <TldrawUiButton type={'normal'} onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'card')}>卡片</TldrawUiButton>
+                                <TldrawUiButton type={'normal'} onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'single-block')}>单块</TldrawUiButton>
+                            </div>
+                        </div>
+                    </div>
+                )
+            })()}
 
             {isSingleSlideSelected && slideShape && (
                 <div className="tlui-style-panel__section"> {/* 移除 styles={styles}，因为父级已经处理 */}
