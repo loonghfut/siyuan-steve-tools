@@ -3,7 +3,7 @@
  * 用于保存、加载、删除形状素材
  */
 import { api } from "@frostime/siyuan-plugin-kits";
-import { Editor, TLShape, TLAsset, TLShapeId, createShapeId, TLAssetId } from "@tldraw/tldraw";
+import { Editor, TLShape, TLAsset, TLShapeId, createShapeId, TLAssetId, TLBinding, TLBindingId, createBindingId } from "@tldraw/tldraw";
 import { showMessage } from "siyuan";
 
 /** 素材库项目接口 */
@@ -18,6 +18,8 @@ export interface ShapeLibraryItem {
     shapes: TLShape[];
     /** 相关的资源数据（如图片等） */
     assets: TLAsset[];
+    /** 绑定关系数据（连接器与形状的绑定） */
+    bindings?: TLBinding[];
     /** 缩略图（可选，base64） */
     thumbnail?: string;
 }
@@ -117,6 +119,39 @@ function collectAssetsForShapes(editor: Editor, shapes: TLShape[]): TLAsset[] {
     }
 
     return assets;
+}
+
+/**
+ * 收集形状相关的绑定关系
+ * 包括 bezier-connector 和 arrow 类型的绑定
+ */
+function collectBindingsForShapes(editor: Editor, shapes: TLShape[]): TLBinding[] {
+    const bindings: TLBinding[] = [];
+    const shapeIds = new Set(shapes.map(s => s.id));
+    const addedBindingIds = new Set<string>();
+
+    for (const shape of shapes) {
+        // 获取从该形状发出的绑定（如连接器的绑定）
+        const outBindings = editor.getBindingsFromShape(shape.id, 'bezier-connector');
+        for (const binding of outBindings) {
+            // 只收集两端都在素材中的绑定
+            if (shapeIds.has(binding.toId) && !addedBindingIds.has(binding.id)) {
+                bindings.push(binding);
+                addedBindingIds.add(binding.id);
+            }
+        }
+        
+        // 同时处理 arrow 类型的绑定
+        const arrowBindings = editor.getBindingsFromShape(shape.id, 'arrow');
+        for (const binding of arrowBindings) {
+            if (shapeIds.has(binding.toId) && !addedBindingIds.has(binding.id)) {
+                bindings.push(binding);
+                addedBindingIds.add(binding.id);
+            }
+        }
+    }
+
+    return bindings;
 }
 
 /**
@@ -226,6 +261,9 @@ export async function addShapesToLibrary(
         // 收集相关资源
         const assets = collectAssetsForShapes(editor, selectedShapes);
         
+        // 收集相关绑定（连接器与形状的绑定关系）
+        const bindings = collectBindingsForShapes(editor, selectedShapes);
+        
         // 生成缩略图
         const shapeIds = selectedShapes.map(s => s.id);
         console.log('[素材库] 准备为以下形状生成缩略图:', shapeIds);
@@ -253,6 +291,7 @@ export async function addShapesToLibrary(
             createdAt: Date.now(),
             shapes,
             assets: assets.map(a => JSON.parse(JSON.stringify(a))),
+            bindings: bindings.map(b => JSON.parse(JSON.stringify(b))), // 保存绑定关系
             thumbnail, // 添加缩略图
         };
 
@@ -343,6 +382,41 @@ function generateNewAssetIds(assets: TLAsset[]): Map<string, TLAssetId> {
         idMap.set(asset.id, newId);
     }
     return idMap;
+}
+
+/**
+ * 生成新的绑定ID映射
+ */
+function generateNewBindingIds(bindings: TLBinding[]): Map<string, TLBindingId> {
+    const idMap = new Map<string, TLBindingId>();
+    for (const binding of bindings) {
+        idMap.set(binding.id, createBindingId());
+    }
+    return idMap;
+}
+
+/**
+ * 替换绑定中的ID引用
+ */
+function replaceIdsInBinding(
+    binding: TLBinding,
+    shapeIdMap: Map<string, TLShapeId>,
+    bindingIdMap: Map<string, TLBindingId>
+): TLBinding | null {
+    const newFromId = shapeIdMap.get(binding.fromId as string);
+    const newToId = shapeIdMap.get(binding.toId as string);
+    
+    // 如果两端的形状都不在素材中，则跳过此绑定
+    if (!newFromId || !newToId) {
+        return null;
+    }
+    
+    const newBinding = JSON.parse(JSON.stringify(binding));
+    newBinding.id = bindingIdMap.get(binding.id) || binding.id;
+    newBinding.fromId = newFromId;
+    newBinding.toId = newToId;
+    
+    return newBinding;
 }
 
 /**
@@ -442,6 +516,25 @@ export function addLibraryItemToCanvas(
         
         for (const shape of sortedShapes) {
             editor.createShape(shape);
+        }
+
+        // 恢复绑定关系（连接器与形状的绑定）
+        if (item.bindings && item.bindings.length > 0) {
+            const bindingIdMap = generateNewBindingIds(item.bindings);
+            const newBindings: TLBinding[] = [];
+            
+            for (const binding of item.bindings) {
+                const newBinding = replaceIdsInBinding(binding, shapeIdMap, bindingIdMap);
+                if (newBinding) {
+                    newBindings.push(newBinding);
+                }
+            }
+            
+            // 批量创建绑定
+            if (newBindings.length > 0) {
+                editor.createBindings(newBindings);
+                console.log(`[素材库] 已恢复 ${newBindings.length} 个绑定关系`);
+            }
         }
 
         // 选中新创建的形状
