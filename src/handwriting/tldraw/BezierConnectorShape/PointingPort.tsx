@@ -11,7 +11,7 @@ import {
 } from './bezier-connector-binding'
 import { getPortAtPoint } from './port-utils'
 import { getShapePorts } from './shape-ports'
-import { updatePortState, resetPortState } from './port-state'
+import { resetPortState, setEligiblePortsIfChanged, setHintingPortIfChanged } from './port-state'
 
 /**
  * 端口拖拽信息
@@ -40,11 +40,9 @@ export class PointingPort extends StateNode {
 
 		// 设置可连接的端口状态：将 terminal 设为 undefined，表示任何端口均可连接
 		// 标记 eligiblePorts，使得目标形状上的端口可视化（即使没有 hover）
-		updatePortState(this.editor, {
-			eligiblePorts: {
-				terminal: undefined,
-				excludeShapeIds: new Set([info.shapeId]),
-			},
+		setEligiblePortsIfChanged(this.editor, {
+			terminal: undefined,
+			excludeShapeIds: new Set([info.shapeId]),
 		})
 	}
 
@@ -75,11 +73,7 @@ export class PointingPort extends StateNode {
 		})
 
 		// 更新 hinting 状态
-		updatePortState(this.editor, {
-			hintingPort: target
-				? { shapeId: target.shapeId, portId: target.port.id }
-				: null,
-		})
+		setHintingPortIfChanged(this.editor, target ? { shapeId: target.shapeId, portId: target.port.id } : null)
 
 		// 检查输出端口是否允许多连接
 		const allowsMultipleConnections = this.info.terminal === 'start'

@@ -2,7 +2,7 @@ import { Editor, TLShapeId, Vec, createShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
 import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
-import { updatePortState } from '../BezierConnectorShape/port-state'
+import { setFlashWithConnectorIfChanged } from '../BezierConnectorShape/port-state'
 import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierConnectorShape/port-utils'
 import { settingdata } from '@/index'
 
@@ -105,9 +105,8 @@ export const createArrowBetweenShapes = (
         createOrUpdateConnectorBinding(editor, connectorId, source.id, { portId: sourcePortId, terminal: sourceTerminal as any })
         createOrUpdateConnectorBinding(editor, connectorId, target.id, { portId: targetPortId, terminal: targetTerminal as any })
         try {
-            updatePortState(editor, { flashPort: { shapeId: source.id as any, portId: sourcePortId } })
-            updatePortState(editor, { flashPort: { shapeId: target.id as any, portId: targetPortId } })
-            setTimeout(() => updatePortState(editor, { flashPort: null }), 350)
+            setFlashWithConnectorIfChanged(editor, { shapeId: source.id as any, portId: sourcePortId }, connectorId, 350)
+            setFlashWithConnectorIfChanged(editor, { shapeId: target.id as any, portId: targetPortId }, connectorId, 350)
         } catch (e) {}
 
         return connectorId
@@ -162,9 +161,8 @@ export const createArrowBetweenShapes = (
     try {
         // attempt to find best ports for visual feedback
         const { sourcePortId: sourcePort, targetPortId: targetPort } = getBestPortPair(editor, source.id, target.id)
-        updatePortState(editor, { flashPort: { shapeId: source.id as any, portId: sourcePort }, flashConnectorId: arrowId })
-        updatePortState(editor, { flashPort: { shapeId: target.id as any, portId: targetPort }, flashConnectorId: arrowId })
-        setTimeout(() => updatePortState(editor, { flashPort: null, flashConnectorId: null }), 350)
+        setFlashWithConnectorIfChanged(editor, { shapeId: source.id as any, portId: sourcePort }, arrowId, 350)
+        setFlashWithConnectorIfChanged(editor, { shapeId: target.id as any, portId: targetPort }, arrowId, 350)
     } catch (e) {}
 
     return arrowId

@@ -134,7 +134,24 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 		[editor, shapeId]
 	)
 
-	if (!ports) return null
+	const visible = useValue('overlay-visible', () => {
+		const state = getPortState(editor)
+		if (!ports) return false
+		if (parentHovered) return true
+		// 如果形状已有连接也显示
+		const conns = getShapeConnections(editor, shapeId)
+		if (conns.length > 0) return true
+		if (state.hintingPort?.shapeId === shapeId) return true
+		if (state.flashPort?.shapeId === shapeId) return true
+		const eligible = state.eligiblePorts
+		if (eligible) {
+			// 若不被排除，则显示
+			if (!eligible.excludeShapeIds?.has(shapeId)) return true
+		}
+		return false
+	}, [editor, shapeId, parentHovered, ports])
+
+	if (!ports || !visible) return null
 
 	return (
 		<div className="bezier-connector-ports-overlay">

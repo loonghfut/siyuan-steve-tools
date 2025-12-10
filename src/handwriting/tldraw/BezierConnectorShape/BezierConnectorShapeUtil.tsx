@@ -27,7 +27,7 @@ import {
 	removeConnectorBinding,
 } from './bezier-connector-binding'
 import { getPortAtPoint } from './port-utils'
-import { updatePortState, getPortState } from './port-state'
+import { getPortState, setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
 
 /**
  * 存储拖拽过程中最新检测到的目标端口信息
@@ -38,6 +38,8 @@ export type PendingBindingTarget =
 	| { kind: 'remove'; terminal: PortTerminal }
 
 const pendingBindingTargets = new Map<TLShapeId, PendingBindingTarget>()
+// 缓存上一次 handlePagePosition 字符化值，避免大量重复计算
+const handleLastDragKey = new Map<TLShapeId, string>()
 
 /**
  * 计算贝塞尔曲线的控制点
@@ -340,14 +342,20 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		const inverseShapeTransform = Mat.Inverse(shapeTransform)
 		const handlePagePosition = shapeTransform.applyToPoint(handle)
 
+			// 简单节流：若位置未发生实际变化，则跳过后续的计算与状态写入
+			const key = `${Math.round(handlePagePosition.x)}:${Math.round(handlePagePosition.y)}:${draggingTerminal}`
+			const lastKey = handleLastDragKey.get(connectorId)
+			if (lastKey === key) {
+				return connector
+			}
+			handleLastDragKey.set(connectorId, key)
+
 		// 查找该位置的端口
 		// 不再按 terminal (start/end) 过滤目标端口，允许任意端口互连
 		// 将 handle 拖动视为连接模式的一部分：显示 eligible ports
-		updatePortState(this.editor, {
-			eligiblePorts: {
-				terminal: undefined,
-				excludeShapeIds: new Set([connector.id]),
-			},
+		setEligiblePortsIfChanged(this.editor, {
+			terminal: undefined,
+			excludeShapeIds: new Set([connector.id]),
 		})
 
 		const target = getPortAtPoint(this.editor, handlePagePosition, {
@@ -364,11 +372,9 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 				const targetPortOnConnector = Mat.applyToPoint(inverseShapeTransform, targetPortInPage)
 
 				// 更新 hinting 状态以便端口可视化高亮
-				updatePortState(this.editor, {
-					hintingPort: { shapeId: target.shapeId, portId: target.port.id },
-				})
+				setHintingPortIfChanged(this.editor, { shapeId: target.shapeId, portId: target.port.id })
 				// 高亮当前连接器用于视觉引导
-				updatePortState(this.editor, { highlightConnectorId: connectorId })
+				setHighlightConnectorIfChanged(this.editor, connectorId)
 				// 只存储目标信息，不写 store
 				pendingBindingTargets.set(connectorId, {
 					kind: 'set',
@@ -389,9 +395,10 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 
 		// 没有找到端口，记录待移除
 		// 清除 hinting 状态
-		updatePortState(this.editor, { hintingPort: null, highlightConnectorId: null })
+		setHintingPortIfChanged(this.editor, null)
+		setHighlightConnectorIfChanged(this.editor, null)
 		// clear eligible ports when not matching
-		updatePortState(this.editor, { eligiblePorts: null })
+		setEligiblePortsIfChanged(this.editor, null)
 		pendingBindingTargets.set(connectorId, {
 			kind: 'remove',
 			terminal: draggingTerminal,
@@ -426,9 +433,13 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		}
 
 		// 清理 hinting，并清除 connector highlight
-	updatePortState(this.editor, { hintingPort: null, highlightConnectorId: null })
+		setHintingPortIfChanged(this.editor, null)
+		setHighlightConnectorIfChanged(this.editor, null)
 		// 清理 eligiblePorts 以隐藏端口 overlay
-		updatePortState(this.editor, { eligiblePorts: null })
+		setEligiblePortsIfChanged(this.editor, null)
+
+	// 清理位置节流缓存
+	handleLastDragKey.delete(connector.id)
 	}
 
 	// 渲染连接组件
