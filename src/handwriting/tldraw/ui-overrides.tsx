@@ -855,12 +855,24 @@ const CustomStylePanel = track(() => {
                 }
                 const unconnectedTerminal = startConnected ? 'end' : 'start'
                 return (
-                    <div className="tlui-style-panel__section" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex',justifyContent: 'center', marginTop: 6 }}>
-                                <TldrawUiButton type={'normal'} onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'card')}>卡片</TldrawUiButton>
-                                <TldrawUiButton type={'normal'} onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'single-block')}>单块</TldrawUiButton>
-                            </div>
+                    <div className="tlui-style-panel__section">
+                        <div style={{ display: 'flex' }}>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
+                                title="创建并绑定卡片"
+                                onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'card')}
+                            >
+                                卡片
+                            </TldrawUiButton>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
+                                title="创建并绑定单块"
+                                onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'single-block')}
+                            >
+                                单块
+                            </TldrawUiButton>
                         </div>
                     </div>
                 )
@@ -885,12 +897,24 @@ const CustomStylePanel = track(() => {
                 }
 
                 return (
-                    <div className="tlui-style-panel__section" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
-                                <TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.startShapeId)}>起点</TldrawUiButton>
-                                <TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.endShapeId)}>终点</TldrawUiButton>
-                            </div>
+                    <div className="tlui-style-panel__section">
+                        <div style={{ display: 'flex' }}>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
+                                title="跳转到起点"
+                                onClick={() => jumpToShape(terminals.startShapeId)}
+                            >
+                                起点
+                            </TldrawUiButton>
+                            <TldrawUiButton
+                                type="normal"
+                                style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
+                                title="跳转到终点"
+                                onClick={() => jumpToShape(terminals.endShapeId)}
+                            >
+                                终点
+                            </TldrawUiButton>
                         </div>
                     </div>
                 )
