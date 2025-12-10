@@ -881,12 +881,17 @@ const CustomStylePanel = track(() => {
                     const bounds = editor.getShapePageBounds(target)
                     if (!bounds) return
                     editor.centerOnPoint(bounds.center, { animation: { duration: 300 } })
-                    editor.select(shapeId)
+                    // editor.select(shapeId)
                 }
 
                 return (
-                    <div className="tlui-style-panel__section" style={{ display: 'flex', gap: 8 }}>
-                        <TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.startShapeId)}>跳转到起点</TldrawUiButton><TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.endShapeId)}>跳转到终点</TldrawUiButton>
+                    <div className="tlui-style-panel__section" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
+                                <TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.startShapeId)}>起点</TldrawUiButton>
+                                <TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.endShapeId)}>终点</TldrawUiButton>
+                            </div>
+                        </div>
                     </div>
                 )
             })()}
