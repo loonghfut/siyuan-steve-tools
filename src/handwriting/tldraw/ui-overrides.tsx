@@ -866,6 +866,31 @@ const CustomStylePanel = track(() => {
                 )
             })()}
 
+            {/* 当连接器两端均已连接时，在样式面板提供跳转按钮 */}
+            {hasConnectorSelection && selectedConnectorShapes.length === 1 && (() => {
+                const connector = selectedConnectorShapes[0]
+                const terminals = getConnectorTerminals(editor, connector)
+                const startConnected = !!terminals.startShapeId
+                const endConnected = !!terminals.endShapeId
+                if (!(startConnected && endConnected)) return null
+
+                const jumpToShape = (shapeId?: TLShapeId) => {
+                    if (!shapeId) return
+                    const target = editor.getShape(shapeId)
+                    if (!target) return
+                    const bounds = editor.getShapePageBounds(target)
+                    if (!bounds) return
+                    editor.centerOnPoint(bounds.center, { animation: { duration: 300 } })
+                    editor.select(shapeId)
+                }
+
+                return (
+                    <div className="tlui-style-panel__section" style={{ display: 'flex', gap: 8 }}>
+                        <TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.startShapeId)}>跳转到起点</TldrawUiButton><TldrawUiButton type="normal" onClick={() => jumpToShape(terminals.endShapeId)}>跳转到终点</TldrawUiButton>
+                    </div>
+                )
+            })()}
+
             {isSingleSlideSelected && slideShape && (
                 <div className="tlui-style-panel__section"> {/* 移除 styles={styles}，因为父级已经处理 */}
                     <input

@@ -125,6 +125,8 @@ export function getConnectorTerminals(
 	endShapeId?: TLShapeId
 	startPortId?: string
 	endPortId?: string
+	/** 是否两端都有绑定 */
+	hasBothBindings: boolean
 } {
 	let start: VecLike | undefined
 	let end: VecLike | undefined
@@ -186,8 +188,11 @@ export function getConnectorTerminals(
 		}
 	}
 
-	return { start, end, startShapeId, endShapeId, startPortId, endPortId }
+	const hasBothBindings = Boolean(startShapeId && endShapeId)
+	return { start, end, startShapeId, endShapeId, startPortId, endPortId, hasBothBindings }
 }
+
+// Navigation buttons are handled in the style panel now; keep component minimal.
 
 /**
  * 贝塞尔连接器组件
