@@ -241,6 +241,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const updateDomSize = useCallback(() => {
 			// 如果高度被锁定，跳过更新（用于切换态时避免闪烁）
 			if (heightLockRef.current) return
+
+			// 没有 blockId 的新块固定最小高度，避免反复测量造成抖动
+			if (!shape.props.blockId) {
+				const fallbackHeight = Math.max(shape.props.h, MIN_HEIGHT)
+				const fallbackWidth = Math.max(shape.props.w, 1)
+				lastMeasuredHeightRef.current = fallbackHeight
+				SingleBlockSizes.update(editor, (map) => {
+					const existing = map.get(shape.id)
+					if (existing && existing.height === fallbackHeight && existing.width === fallbackWidth) return map
+					return map.set(shape.id, { width: fallbackWidth, height: fallbackHeight })
+				})
+				return
+			}
 			
 			// 优先测量 Protyle 的内容区域
 			let target: HTMLElement | null = null
@@ -266,7 +279,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
 				return map.set(shape.id, { width: nextWidth, height: nextHeight })
 			})
-		}, [editor, shape.id, shape.props.w, shape.props.transparentBackground])
+		}, [editor, shape.id, shape.props.blockId, shape.props.h, shape.props.w, shape.props.transparentBackground])
 
 		// 在渲染和字体变化后尽快测量一次
 		useLayoutEffect(() => {
