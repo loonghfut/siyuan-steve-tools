@@ -287,6 +287,19 @@ export async function getBlockKramdown(id: BlockId): Promise<IResGetBlockKramdow
     return request(url, data);
 }
 
+/**
+ * 批量获取块的 DOM HTML
+ * @param ids 块 ID 数组
+ * @returns 块 ID 到 DOM HTML 的映射
+ */
+export async function getBlockDOMs(ids: BlockId[]): Promise<Record<string, string>> {
+    let data = {
+        ids: ids
+    }
+    let url = '/api/block/getBlockDOMs';
+    return request(url, data);
+}
+
 export async function getBlockMarkdown(id: BlockId) {
     const res = await getBlockByID(id);
     return res.markdown;
