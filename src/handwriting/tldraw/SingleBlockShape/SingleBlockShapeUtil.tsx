@@ -30,6 +30,7 @@ import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
+import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, getBlockDOM, wrapBlockDomHtml, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -131,6 +132,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const hadFocusedRef = useRef(false)
 		const protyleRef = useRef<Protyle | null>(null)
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
+		// 静态 HTML 内容（非编辑态显示）
+		const [staticHtml, setStaticHtml] = useState<string>('')
+		const [isLoadingContent, setIsLoadingContent] = useState(false)
 		const detachKeyHandler = useRef<() => void>()
 		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
@@ -240,7 +244,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			if (protyleHostRef.current) {
 				target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
 			}
-			if (!target && containerRef.current) target = containerRef.current
+			// 非编辑态时尝试从容器中测量静态内容
+			if (!target && containerRef.current) {
+				target = (containerRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || containerRef.current
+			}
 			if (!target) return
 
 			const contentH = Math.ceil((target as HTMLElement).scrollHeight || (target as HTMLElement).offsetHeight || 0)
@@ -252,12 +259,20 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
 				return map.set(shape.id, { width: nextWidth, height: nextHeight })
 			})
-		}, [editor, shape.id, shape.props.w])
+		}, [editor, shape.id, shape.props.w, shape.props.transparentBackground])
 
 		// 在渲染和字体变化后尽快测量一次
 		useLayoutEffect(() => {
 			updateDomSize()
 		})
+
+		// 静态内容变化时重新测量尺寸
+		useEffect(() => {
+			if (staticHtml) {
+				// 延迟一帧确保 DOM 已更新
+				requestAnimationFrame(() => updateDomSize())
+			}
+		}, [staticHtml, updateDomSize])
 
 
 
@@ -275,9 +290,76 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			return unregister
 		}, [isEditingState, shape.id])
 
+		// ===== 核心优化：只在编辑态创建 Protyle，非编辑态使用静态 HTML =====
+		
+		// 加载静态内容（非编辑态）
 		useEffect(() => {
-			const shouldRender = !isViewportCullingEnabled || isEditingState || (isInViewport && canLoad)
-			if (!shouldRender) {
+			// 编辑态不需要加载静态内容
+			if (isEditingState) return
+			
+			const blockId = shape.props.blockId
+			if (!blockId) return
+			
+			// 检查视口可见性
+			const shouldLoad = !isViewportCullingEnabled || (isInViewport && canLoad)
+			if (!shouldLoad) return
+			
+			// refreshNonce 变化时强制刷新缓存
+			const forceRefresh = shape.props.refreshNonce !== undefined
+			
+			// 尝试从缓存获取（除非需要强制刷新）
+			if (!forceRefresh) {
+				const cached = getCachedHtml(blockId)
+				if (cached) {
+					setStaticHtml(cached)
+					return
+				}
+			} else {
+				// 刷新时使缓存失效
+				invalidateCache(blockId)
+			}
+			
+			// 从 API 获取块的 DOM HTML
+			let cancelled = false
+			setIsLoadingContent(true)
+			
+			// 优先使用 getBlockDOMs API 获取真实思源 DOM
+			getBlockDOM(blockId).then((dom) => {
+				if (cancelled) return
+				if (dom) {
+					const html = wrapBlockDomHtml(dom, shape.props.fontSize || 16)
+					setCachedHtml(blockId, html)
+					setStaticHtml(html)
+					setIsLoadingContent(false)
+					return
+				}
+				// 备用：使用 getBlockContent + renderSimpleBlockHtml
+				return getBlockContent(blockId).then((content) => {
+					if (cancelled) return
+					if (content) {
+						const html = renderSimpleBlockHtml(content.content || content.markdown, shape.props.fontSize || 16)
+						setCachedHtml(blockId, html)
+						setStaticHtml(html)
+					}
+				})
+			}).finally(() => {
+				if (!cancelled) setIsLoadingContent(false)
+			})
+			
+			return () => { cancelled = true }
+		}, [isEditingState, shape.props.blockId, shape.props.fontSize, shape.props.refreshNonce, isInViewport, canLoad, isViewportCullingEnabled])
+
+		// ===== 编辑态专用：创建和管理 Protyle 实例 =====
+		useEffect(() => {
+			// 只在编辑态创建 Protyle
+			if (!isEditingState) {
+				// 退出编辑态时，保存静态快照到缓存并销毁 Protyle
+				if (protyleRef.current && protyleHostRef.current && shape.props.blockId) {
+					const html = cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16)
+					if (html) {
+						setStaticHtml(html)
+					}
+				}
 				destroyRuntimeResources()
 				return
 			}
@@ -291,21 +373,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				let blockId = shape.props.blockId || container.getAttribute('blockid') || null
 				if (blockId) return blockId
 
-				// 如果该形状刚创建（isNewlyCreated === true），且当前并非处于编辑态，则不在此时创建块。
-				// 我们将把 isNewlyCreated 置为 false，等待用户进入编辑态时再触发创建（保持与 card 行为一致）。
-				// 如果是新创建的 shape，则只有在进入编辑态时才把 isNewlyCreated 置为 false 并继续执行
+				// 如果该形状刚创建（isNewlyCreated === true），在编辑态时创建块
 				if (shape.props.isNewlyCreated) {
-					// 未进入编辑态则直接跳过创建流程
-					if (!isEditingState) {
-						return null
-					}
-					// 在编辑态时标记为已处理（isNewlyCreated = false），之后才继续创建块
 					try {
 						editor.updateShape({ id: shape.id, type: shape.type, props: { ...shape.props, isNewlyCreated: false } })
 					} catch (err) {
 						// ignore
 					}
 				}
+				
 				const editorElement = container.closest('.tldraw__editor')
 				const tldrawId = editorElement?.getAttribute('data-tldraw-id')
 				const title = editorElement?.getAttribute('data-tldraw-title')
@@ -353,6 +429,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					props: { ...shape.props, blockId },
 				})
 				container.setAttribute('blockid', blockId)
+				// 使旧缓存失效
+				invalidateCache(blockId)
 				return blockId
 			}
 
@@ -382,10 +460,11 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				updateDomSize()
 			}
 
-			const mountProtyle = async (blockId: string, priority: number) => {
+			const mountProtyle = async (blockId: string) => {
 				if (disposed) return
 				loadHandleRef.current?.cancel()
-				const handle = enqueueProtyleLoad(shape.id, priority, async (signal) => {
+				// 编辑态始终使用最高优先级
+				const handle = enqueueProtyleLoad(shape.id, 0, async (signal) => {
 					if (disposed || signal.aborted) return
 					const currentContainer = containerRef.current
 					if (!currentContainer) return
@@ -413,7 +492,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					const readyWithTimeout = Promise.race([readyPromise, timeoutPromise])
 					let protyleInstance: Protyle | null = null
 					try {
-						const actions = ['cb-get-all', ...(isEditingState ? ['cb-get-focus'] : [])] as TProtyleAction[]
+						// 编辑态始终获取焦点
+						const actions = ['cb-get-all', 'cb-get-focus'] as TProtyleAction[]
 						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
 							blockId,
 							render: {
@@ -440,7 +520,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						})
 					} catch (err) {
 						console.error('Protyle 构造失败', err)
-						// 若构造失败，确保不会阻塞队列并清理宿主
 						if (host.parentElement) {
 							try { host.parentElement.removeChild(host) } catch { }
 						}
@@ -456,7 +535,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					if (protyleInstance.protyle?.wysiwyg?.element) {
 						protyleInstance.protyle.wysiwyg.element.style.fontSize = `${shape.props.fontSize || 16}px`
 					}
-					// 等待 Protyle 就绪，但有超时保护，避免死等导致加载队列阻塞
+					// 等待 Protyle 就绪
 					await readyWithTimeout.catch(() => undefined)
 					if (readyTimeoutId) {
 						clearTimeout(readyTimeoutId)
@@ -464,6 +543,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					}
 					// 初始化观察与尺寸写入
 					setupObservers()
+					// 启用编辑
+					protyleInstance.enable()
 					if (signal.aborted || disposed) {
 						safeDestroyProtyle(protyleInstance)
 						if (protyleHostRef.current === host && host.parentElement) {
@@ -536,7 +617,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			const registerKeyHandler = () => {
 				detachKeyHandler.current?.()
 				const wys = protyleRef.current?.protyle?.wysiwyg?.element
-				if (!isEditingState || !wys) return
+				if (!wys) return
 
 				const handleKeyDown = (event: KeyboardEvent) => {
 					if (event.isComposing) return
@@ -546,7 +627,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							event.preventDefault()
 							event.stopImmediatePropagation()
 							event.stopPropagation()
-							// ; (event as any).returnValue = false
 						} catch (e) {
 							// ignore
 						}
@@ -562,8 +642,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						event.preventDefault()
 						event.stopImmediatePropagation()
 						event.stopPropagation()
-							// IE fallback
-							; (event as any).returnValue = false
+						; (event as any).returnValue = false
 					} catch (e) {
 						// ignore
 					}
@@ -604,7 +683,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						try {
 							const createdShape = editor.getShape(newId)
 							if (createdShape && createdShape.type === 'single-block') {
-								// 延迟到刚刚创建的 shape 可用后，再创建连接
 								createArrowBetweenShapes(editor, shape as ISingleBlockShape, createdShape as ISingleBlockShape, shape.props.color ?? 'black')
 							}
 						} catch (err) {
@@ -622,11 +700,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						event.preventDefault()
 						event.stopImmediatePropagation()
 						event.stopPropagation()
-							; (event as any).returnValue = false
+						; (event as any).returnValue = false
 					} catch (e) { }
 				}
 
-				// Use non-passive capture listeners so we can reliably prevent default actions
 				wys.addEventListener('keydown', handleKeyDown, { capture: true, passive: false } as AddEventListenerOptions)
 				wys.addEventListener('keyup', handleKeyUp, { capture: true, passive: false } as AddEventListenerOptions)
 
@@ -640,61 +717,14 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				}
 			}
 
-			const applyFontSize = () => {
-				const fontSize = `${shape.props.fontSize || 16}px`
-				if (protyleRef.current?.protyle?.wysiwyg?.element) {
-					protyleRef.current.protyle.wysiwyg.element.style.fontSize = fontSize
-				}
-			}
-
 			const setup = async () => {
 				const blockId = await ensureBlockId()
 				if (!blockId || disposed) return
-				const loadPriority = isEditingState ? 0 : 1
 
-				if (!protyleRef.current) {
-					await mountProtyle(blockId, loadPriority)
-				} else if (protyleRef.current?.protyle?.block?.parent?.id !== blockId) {
-					try {
-						protyleRef.current?.destroy()
-					} catch (err) {
-						console.error(err)
-					}
-					protyleRef.current = null
-					protyleHostRef.current?.remove()
-					await mountProtyle(blockId, loadPriority)
-				}
-
-				if (isEditingState) {
-					protyleRef.current?.enable()
-				} else {
-					// When leaving edit mode, destroy the Protyle instance but keep a static DOM copy
-					if (protyleRef.current) {
-						try {
-							const host = protyleHostRef.current
-							if (host && host.parentElement) {
-								const staticHost = document.createElement('div')
-								staticHost.style.width = host.style.width || '100%'
-								staticHost.style.height = host.style.height || '100%'
-								staticHost.style.overflow = host.style.overflow || 'hidden'
-								// copy innerHTML so the visual content remains
-								staticHost.innerHTML = host.innerHTML
-								host.parentElement.replaceChild(staticHost, host)
-								protyleHostRef.current = staticHost
-							}
-							try { protyleRef.current.destroy() } catch (e) { }
-						} catch (err) {
-							console.error('销毁 Protyle 时出错', err)
-						}
-						protyleRef.current = null
-						// 静态 DOM 也需要尺寸监听
-						setupObservers()
-					} else {
-						// no protyle instance, nothing to do
-					}
-				}
-
-				applyFontSize()
+				// 挂载 Protyle
+				await mountProtyle(blockId)
+				
+				// 注册键盘处理
 				registerKeyHandler()
 			}
 
@@ -704,7 +734,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				disposed = true
 				destroyRuntimeResources()
 			}
-		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, shape.props.blockId, shape.props.refreshNonce, canLoad])
+		}, [destroyRuntimeResources, isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce])
 
 		useEffect(() => {
 			if (protyleRef.current?.protyle?.wysiwyg?.element) {
@@ -772,7 +802,37 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						padding: '0px',
 					}}
 				>
-					{!isEditingState && !canLoad && (
+					{/* 非编辑态：显示静态 HTML 内容 */}
+					{!isEditingState && staticHtml && (
+						<div 
+							dangerouslySetInnerHTML={{ __html: staticHtml }}
+							style={{
+								width: '100%',
+								height: '100%',
+								pointerEvents: 'none',
+								userSelect: 'none',
+							}}
+						/>
+					)}
+					{/* 非编辑态：加载中提示 */}
+					{!isEditingState && !staticHtml && isLoadingContent && (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.fontSize, 16)}px`,
+							color: theme[shape.props.color].solid,
+							opacity: 0.5,
+							textAlign: 'center',
+							padding: '4px'
+						}}>
+							加载中...
+						</div>
+					)}
+					{/* 非编辑态：等待加载提示 */}
+					{!isEditingState && !staticHtml && !isLoadingContent && !canLoad && (
 						<div style={{
 							width: '100%',
 							height: '100%',
@@ -786,6 +846,23 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							padding: '4px'
 						}}>
 							双击加载内容
+						</div>
+					)}
+					{/* 非编辑态：新块占位符 */}
+					{!isEditingState && !staticHtml && !isLoadingContent && canLoad && shape.props.isNewlyCreated && (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.fontSize, 16)}px`,
+							color: theme[shape.props.color].solid,
+							opacity: 0.5,
+							textAlign: 'center',
+							padding: '4px'
+						}}>
+							双击编辑
 						</div>
 					)}
 				</div>

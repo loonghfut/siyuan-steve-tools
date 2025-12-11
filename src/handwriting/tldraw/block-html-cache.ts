@@ -1,0 +1,271 @@
+/**
+ * 块内容 HTML 缓存模块
+ * 用于缓存 SingleBlockShape 的静态 HTML 内容，避免每次都创建 Protyle 实例
+ */
+
+import * as api from '@/api/api'
+
+interface CacheEntry {
+	html: string
+	timestamp: number
+	blockId: string
+}
+
+// 全局 HTML 内容缓存
+const htmlCache = new Map<string, CacheEntry>()
+
+// 缓存过期时间（10分钟）
+const CACHE_TTL_MS = 10 * 60 * 1000
+
+// 最大缓存条目数
+const MAX_CACHE_SIZE = 100
+
+/**
+ * 获取缓存的 HTML 内容
+ */
+export function getCachedHtml(blockId: string): string | null {
+	const entry = htmlCache.get(blockId)
+	if (!entry) return null
+	
+	// 检查是否过期
+	if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+		htmlCache.delete(blockId)
+		return null
+	}
+	
+	return entry.html
+}
+
+/**
+ * 设置缓存的 HTML 内容
+ */
+export function setCachedHtml(blockId: string, html: string): void {
+	// 如果缓存已满，移除最旧的条目
+	if (htmlCache.size >= MAX_CACHE_SIZE) {
+		let oldestKey: string | null = null
+		let oldestTime = Infinity
+		for (const [key, entry] of htmlCache) {
+			if (entry.timestamp < oldestTime) {
+				oldestTime = entry.timestamp
+				oldestKey = key
+			}
+		}
+		if (oldestKey) {
+			htmlCache.delete(oldestKey)
+		}
+	}
+	
+	htmlCache.set(blockId, {
+		html,
+		timestamp: Date.now(),
+		blockId,
+	})
+}
+
+/**
+ * 使缓存失效
+ */
+export function invalidateCache(blockId: string): void {
+	htmlCache.delete(blockId)
+}
+
+/**
+ * 清空所有缓存
+ */
+export function clearAllCache(): void {
+	htmlCache.clear()
+}
+
+/**
+ * 从 DOM 克隆中提取静态 HTML，保留完整的内联样式
+ * @param container 包含 Protyle 内容的容器
+ * @param _fontSize 字体大小（保留参数以保持接口一致）
+ */
+export function extractStaticHtml(container: HTMLElement, _fontSize: number): string {
+	const wysiwyg = container.querySelector('.protyle-wysiwyg') as HTMLElement
+	if (!wysiwyg) return ''
+	
+	const clone = wysiwyg.cloneNode(true) as HTMLElement
+	
+	// 递归内联计算样式到每个元素
+	const inlineComputedStyles = (source: Element, target: Element) => {
+		if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) return
+		
+		const computed = window.getComputedStyle(source)
+		// 关键样式属性列表 - 保留影响外观的样式
+		const keyProps = [
+			'color', 'background-color', 'background',
+			'font-family', 'font-size', 'font-weight', 'font-style', 'text-decoration',
+			'line-height', 'letter-spacing', 'text-align',
+			'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+			'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+			'border', 'border-radius', 'border-color', 'border-width', 'border-style',
+			'display', 'flex-direction', 'align-items', 'justify-content', 'gap',
+			'white-space', 'word-break', 'overflow-wrap',
+			'opacity', 'visibility',
+			'box-shadow', 'text-shadow',
+		]
+		
+		const styleText = keyProps
+			.map((prop) => {
+				const value = computed.getPropertyValue(prop)
+				return value ? `${prop}:${value}` : ''
+			})
+			.filter(Boolean)
+			.join(';')
+		
+		const existing = target.getAttribute('style') || ''
+		if (styleText) {
+			target.setAttribute('style', `${styleText};${existing}`)
+		}
+		
+		// 递归处理子元素
+		const sourceChildren = Array.from(source.children)
+		const targetChildren = Array.from(target.children)
+		for (let i = 0; i < sourceChildren.length; i++) {
+			const srcChild = sourceChildren[i]
+			const tgtChild = targetChildren[i]
+			if (srcChild && tgtChild) {
+				inlineComputedStyles(srcChild, tgtChild)
+			}
+		}
+	}
+	
+	// 应用计算样式
+	inlineComputedStyles(wysiwyg, clone)
+	
+	// 移除可编辑属性
+	clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'))
+	
+	// 移除不需要的数据属性
+	clone.querySelectorAll('[data-node-id]').forEach((el) => el.removeAttribute('data-node-id'))
+	clone.querySelectorAll('[data-node-index]').forEach((el) => el.removeAttribute('data-node-index'))
+	clone.querySelectorAll('[updated]').forEach((el) => el.removeAttribute('updated'))
+	clone.querySelectorAll('[data-realwidth]').forEach((el) => el.removeAttribute('data-realwidth'))
+	clone.querySelectorAll('[data-readonly]').forEach((el) => el.removeAttribute('data-readonly'))
+	
+	// 禁用交互但保留原有样式
+	clone.style.pointerEvents = 'none'
+	clone.style.userSelect = 'none'
+	
+	return clone.outerHTML
+}
+
+/**
+ * 从 Protyle 宿主提取并缓存静态 HTML
+ */
+export function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): string {
+	const html = extractStaticHtml(host, fontSize)
+	if (html) {
+		setCachedHtml(blockId, html)
+	}
+	return html
+}
+
+/**
+ * 通过 API 直接获取块的 DOM HTML
+ * 这是最准确的方式，返回与思源编辑器完全一致的 DOM
+ */
+export async function getBlockDOM(blockId: string): Promise<string | null> {
+	try {
+		const result = await api.getBlockDOMs([blockId])
+		if (result && result[blockId]) {
+			return result[blockId]
+		}
+	} catch (e) {
+		console.warn('获取块 DOM 失败:', e)
+	}
+	return null
+}
+
+/**
+ * 批量获取块的 DOM HTML
+ */
+export async function getBlockDOMs(blockIds: string[]): Promise<Record<string, string>> {
+	try {
+		const result = await api.getBlockDOMs(blockIds)
+		return result || {}
+	} catch (e) {
+		console.warn('批量获取块 DOM 失败:', e)
+		return {}
+	}
+}
+
+/**
+ * 通过 SQL 获取块内容（markdown），作为备用方案
+ */
+export async function getBlockContent(blockId: string): Promise<{ markdown: string; content: string; type: string } | null> {
+	try {
+		const block = await api.getBlockByID(blockId)
+		if (block) {
+			return {
+				markdown: block.markdown || '',
+				content: block.content || '',
+				type: block.type || 'p',
+			}
+		}
+	} catch (e) {
+		console.warn('获取块内容失败:', e)
+	}
+	return null
+}
+
+/**
+ * 包装从 API 获取的 DOM HTML，添加必要的样式
+ */
+export function wrapBlockDomHtml(domHtml: string, fontSize: number): string {
+	// 处理 DOM：移除 contenteditable，添加禁用交互的样式
+	let processed = domHtml
+		// 将 contenteditable="true" 改为 false
+		.replace(/contenteditable="true"/g, 'contenteditable="false"')
+		// 移除 spellcheck
+		.replace(/spellcheck="[^"]*"/g, 'spellcheck="false"')
+	
+	return `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; pointer-events: none; user-select: none;">${processed}</div>`
+}
+
+/**
+ * 渲染块内容为 HTML（备用方案，当 getBlockDOM 失败时使用）
+ */
+export function renderSimpleBlockHtml(content: string, fontSize: number): string {
+	// 简化渲染
+	let html = content
+		// 转义 HTML
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		// 处理加粗
+		.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+		// 处理斜体
+		.replace(/\*(.+?)\*/g, '<em>$1</em>')
+		// 处理行内代码
+		.replace(/`(.+?)`/g, '<code style="background: rgba(128,128,128,0.1); padding: 0 4px; border-radius: 3px; font-family: monospace;">$1</code>')
+		// 处理换行
+		.replace(/\n/g, '<br>')
+	
+	return `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; padding: 8px 16px; pointer-events: none; user-select: none; line-height: 1.6; word-break: break-word;"><div class="p" data-type="NodeParagraph"><div contenteditable="false" spellcheck="false">${html || '<span style="opacity: 0.5; font-style: italic;">空内容</span>'}</div></div></div>`
+}
+
+/**
+ * 预加载指定块的内容到缓存
+ * 可用于视口内即将可见的块
+ */
+export async function preloadBlockContent(blockId: string, fontSize: number): Promise<void> {
+	// 如果已有缓存，跳过
+	if (getCachedHtml(blockId)) return
+	
+	// 优先使用 getBlockDOM API
+	const dom = await getBlockDOM(blockId)
+	if (dom) {
+		const html = wrapBlockDomHtml(dom, fontSize)
+		setCachedHtml(blockId, html)
+		return
+	}
+	
+	// 备用：使用简化渲染
+	const content = await getBlockContent(blockId)
+	if (content) {
+		const html = renderSimpleBlockHtml(content.content || content.markdown, fontSize)
+		setCachedHtml(blockId, html)
+	}
+}
