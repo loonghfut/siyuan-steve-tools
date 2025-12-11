@@ -20,7 +20,7 @@ import {
 	lerp,
 	VecModel,
 } from '@tldraw/tldraw'
-import { Protyle, showMessage, TProtyleAction } from 'siyuan'
+import { openAttributePanel, Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
 import { settingdata } from '@/index'
 import { singleBlockShapeProps } from './single-block-shape-props'
@@ -125,6 +125,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const [isInViewport, setIsInViewport] = useState(true)
 		const [canLoad, setCanLoad] = useState(true)
  		const [isHovered, setIsHovered] = useState(false)
+		const [hasAttrIcon, setHasAttrIcon] = useState(false)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const containerRef = useRef<HTMLDivElement>(null)
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
@@ -265,6 +266,14 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				target = (containerRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || containerRef.current
 			}
 			if (!target) return
+
+			// 检测是否包含属性视图图标（数据库图标），用于在形状外右上角显示标记
+			try {
+				const exists = !!(target as HTMLElement).querySelector('.protyle-attr--av')
+				setHasAttrIcon((prev) => (prev === exists ? prev : exists))
+			} catch {
+				// ignore
+			}
 
 			const contentH = Math.ceil((target as HTMLElement).scrollHeight || (target as HTMLElement).offsetHeight || 0)
 			const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
@@ -787,6 +796,39 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 		}
 
+		const handleAttrIconClick = useCallback(
+			async (e: React.MouseEvent<HTMLDivElement>) => {
+				e.preventDefault()
+				e.stopPropagation()
+				try {
+					// console.log('打开属性面板:', shape.props.blockId)
+					const container = containerRef.current
+					const blockId = shape.props.blockId || container?.getAttribute('blockid') || ''
+					if (!blockId) return
+					if (!window.siyuan?.ws?.app) return
+					const data = await (api as any).getBlockAttrs(blockId)
+					const tempContainer = document.createElement('div')
+					const protyle = new Protyle(window.siyuan.ws.app, tempContainer, {
+						blockId,
+						rootId: blockId,
+					}).protyle
+					openAttributePanel({
+						data,
+						focusName: 'av',
+						protyle,
+					})
+				} catch (err) {
+					console.error('open attribute panel failed', err)
+					try {
+						showMessage('打开属性面板失败')
+					} catch {
+						// ignore
+					}
+				}
+			},
+			[shape.props.blockId]
+		)
+
 		// 计算当前是否需要绘制边框
 		const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
 
@@ -819,6 +861,41 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
 			>
+				{/* 如果块中包含数据库属性视图图标，则在形状外右上角显示一个小徽标 */}
+				{hasAttrIcon && (
+					<div
+						onClick={handleAttrIconClick}
+						onPointerDown={(e) => {
+							e.preventDefault()
+							e.stopPropagation()
+						}}
+						style={{
+							position: 'absolute',
+							top: '-13px',
+							right: '0px',
+							width: '20px',
+							height: '20px',
+							borderRadius: '999px',
+							backgroundColor: theme[shape.props.color].solid,
+							boxShadow: '0 0 4px rgba(0,0,0,0.3)',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							pointerEvents: 'auto',
+							cursor: 'pointer',
+							zIndex: 2,
+						}}
+					>
+						<svg
+							viewBox="0 0 32 32"
+							width={14}
+							height={14}
+							style={{ fill: theme[shape.props.color].semi }}
+						>
+							<use xlinkHref="#iconDatabase" />
+						</svg>
+					</div>
+				)}
 				<div
 					ref={containerRef}
 					blockid={shape.props.blockId}
