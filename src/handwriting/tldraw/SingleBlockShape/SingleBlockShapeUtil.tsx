@@ -30,7 +30,7 @@ import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
-import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, getBlockDOM, wrapBlockDomHtml, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
+import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -141,6 +141,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const resizeObsRef = useRef<ResizeObserver | null>(null)
 		const mutationObsRef = useRef<MutationObserver | null>(null)
 		const imgListenersRef = useRef<Array<() => void>>([])
+		// 记录上次测量的高度，用于切换态时避免闪烁
+		const lastMeasuredHeightRef = useRef<number | null>(null)
+		// 切换态时暂时锁定高度更新
+		const heightLockRef = useRef(false)
 		// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
 		const DESTROYED_MARK = '__st_destroyed__'
 		const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
@@ -189,10 +193,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			protyleHostRef.current = null
 		}, [])
 
-		useEffect(() => {
-			setIsEditingState(isEditing)
-		}, [isEditing])
-
 		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {
 			// 延迟执行，确保编辑状态完全建立
@@ -239,6 +239,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		// 计算并写入 DOM 尺寸（以内容高度为准，宽度沿用 props.w）
 		const updateDomSize = useCallback(() => {
+			// 如果高度被锁定，跳过更新（用于切换态时避免闪烁）
+			if (heightLockRef.current) return
+			
 			// 优先测量 Protyle 的内容区域
 			let target: HTMLElement | null = null
 			if (protyleHostRef.current) {
@@ -254,6 +257,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
 			const nextHeight = Math.max(contentH + borderPx * 2, MIN_HEIGHT)
 			const nextWidth = Math.max(shape.props.w, 1)
+			
+			// 保存测量的高度
+			lastMeasuredHeightRef.current = nextHeight
+			
 			SingleBlockSizes.update(editor, (map) => {
 				const existing = map.get(shape.id)
 				if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
@@ -274,7 +281,22 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 		}, [staticHtml, updateDomSize])
 
-
+		// 同步编辑状态，切换时锁定高度避免闪烁
+		useEffect(() => {
+			setIsEditingState(isEditing)
+			
+			// 编辑态切换时锁定高度，避免闪烁
+			if (lastMeasuredHeightRef.current !== null) {
+				heightLockRef.current = true
+				// 延迟解锁，等待新内容渲染稳定
+				const unlockTimer = setTimeout(() => {
+					heightLockRef.current = false
+					// 解锁后重新测量
+					updateDomSize()
+				}, 150)
+				return () => clearTimeout(unlockTimer)
+			}
+		}, [isEditing, updateDomSize])
 
 		useEffect(() => {
 			shapeLoadManager.attachEditor(editor as any)
@@ -319,16 +341,14 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				invalidateCache(blockId)
 			}
 			
-			// 从 API 获取块的 DOM HTML
+			// 从 API 获取块的 DOM HTML（会自动批量合并请求）
 			let cancelled = false
 			setIsLoadingContent(true)
 			
-			// 优先使用 getBlockDOMs API 获取真实思源 DOM
-			getBlockDOM(blockId).then((dom) => {
+			// 使用批量请求函数获取 DOM
+			requestBlockDOM(blockId, shape.props.fontSize || 16).then((html) => {
 				if (cancelled) return
-				if (dom) {
-					const html = wrapBlockDomHtml(dom, shape.props.fontSize || 16)
-					setCachedHtml(blockId, html)
+				if (html) {
 					setStaticHtml(html)
 					setIsLoadingContent(false)
 					return
@@ -337,9 +357,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				return getBlockContent(blockId).then((content) => {
 					if (cancelled) return
 					if (content) {
-						const html = renderSimpleBlockHtml(content.content || content.markdown, shape.props.fontSize || 16)
-						setCachedHtml(blockId, html)
-						setStaticHtml(html)
+						const fallbackHtml = renderSimpleBlockHtml(content.content || content.markdown, shape.props.fontSize || 16)
+						setCachedHtml(blockId, fallbackHtml)
+						setStaticHtml(fallbackHtml)
 					}
 				})
 			}).finally(() => {
@@ -792,7 +812,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					style={{
 						width: '100%',
 						height: '100%',
-						overflow: 'auto', // 内容区域可滚动
+						// 编辑态隐藏滚动条，非编辑态允许滚动
+						overflow: isEditingState ? 'hidden' : 'auto',
 						// Prevent content interactions when not editing to avoid blocking
 						// TL editor pointer handling. The overlay itself can still react
 						// to hover because HTMLContainer has pointer-events enabled.

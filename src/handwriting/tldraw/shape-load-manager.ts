@@ -157,12 +157,40 @@ class ShapeLoadManager {
     sortable.sort((a, b) => a.score - b.score)
 
     const allowedSet = new Set<string>()
-    let count = 0
+    // 先收集所有已加载的形状
+    const previouslyAllowed: string[] = []
+    for (const s of this.shapes.values()) {
+      if (s.lastAllowed) previouslyAllowed.push(s.id)
+    }
+    
+    // 统计当前需要保留的形状数量
+    let allowedCount = 0
+    
+    // 第一遍：处理编辑中和已加载的形状
     for (const item of sortable) {
-      if (count < maxActive || item.editing) {
+      // 编辑中的形状始终允许（不计入配额）
+      if (item.editing) {
         allowedSet.add(item.id)
+        continue
       }
-      if (!item.editing) count++
+      
+      // 如果之前已加载，且总数未超限，则保留
+      const wasAllowed = previouslyAllowed.includes(item.id)
+      if (wasAllowed && allowedCount < maxActive) {
+        allowedSet.add(item.id)
+        allowedCount++
+      }
+    }
+    
+    // 第二遍：按优先级填充剩余配额（新形状）
+    for (const item of sortable) {
+      if (item.editing) continue
+      if (allowedSet.has(item.id)) continue
+      
+      if (allowedCount < maxActive) {
+        allowedSet.add(item.id)
+        allowedCount++
+      }
     }
 
     // Notify changes

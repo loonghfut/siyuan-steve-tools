@@ -20,6 +20,108 @@ const CACHE_TTL_MS = 10 * 60 * 1000
 // 最大缓存条目数
 const MAX_CACHE_SIZE = 100
 
+// ===== 批量请求队列 =====
+interface PendingRequest {
+	blockId: string
+	fontSize: number
+	resolve: (html: string | null) => void
+}
+
+let pendingQueue: PendingRequest[] = []
+let batchTimer: ReturnType<typeof setTimeout> | null = null
+const BATCH_DELAY_MS = 50 // 50ms 内的请求会被合并
+
+/**
+ * 处理批量请求队列
+ */
+async function processBatchQueue(): Promise<void> {
+	batchTimer = null
+	if (pendingQueue.length === 0) return
+	
+	// 取出当前队列中的所有请求
+	const currentBatch = pendingQueue
+	pendingQueue = []
+	
+	// 收集所有需要请求的 blockId（排除已缓存的）
+	const toFetch: Map<string, PendingRequest[]> = new Map()
+	for (const req of currentBatch) {
+		const cached = getCachedHtml(req.blockId)
+		if (cached) {
+			// 已有缓存，直接返回
+			req.resolve(cached)
+			continue
+		}
+		// 同一个 blockId 可能有多个请求，收集起来
+		const existing = toFetch.get(req.blockId)
+		if (existing) {
+			existing.push(req)
+		} else {
+			toFetch.set(req.blockId, [req])
+		}
+	}
+	
+	if (toFetch.size === 0) return
+	
+	// 批量获取 DOM
+	try {
+		const blockIds = Array.from(toFetch.keys())
+		const result = await api.getBlockDOMs(blockIds)
+		
+		// 处理结果
+		for (const [blockId, requests] of toFetch) {
+			const dom = result?.[blockId]
+			if (dom) {
+				// 取第一个请求的 fontSize（通常相同）
+				const fontSize = requests[0].fontSize
+				const html = wrapBlockDomHtml(dom, fontSize)
+				setCachedHtml(blockId, html)
+				// 通知所有等待该 blockId 的请求
+				for (const req of requests) {
+					req.resolve(html)
+				}
+			} else {
+				// 没有获取到，返回 null
+				for (const req of requests) {
+					req.resolve(null)
+				}
+			}
+		}
+	} catch (e) {
+		console.warn('批量获取块 DOM 失败:', e)
+		// 出错时，所有请求返回 null
+		for (const requests of toFetch.values()) {
+			for (const req of requests) {
+				req.resolve(null)
+			}
+		}
+	}
+}
+
+/**
+ * 请求块的 DOM（会自动批量合并）
+ * @param blockId 块 ID
+ * @param fontSize 字体大小
+ * @returns 包装后的 HTML 或 null
+ */
+export function requestBlockDOM(blockId: string, fontSize: number): Promise<string | null> {
+	return new Promise((resolve) => {
+		// 先检查缓存
+		const cached = getCachedHtml(blockId)
+		if (cached) {
+			resolve(cached)
+			return
+		}
+		
+		// 加入队列
+		pendingQueue.push({ blockId, fontSize, resolve })
+		
+		// 设置延迟处理
+		if (!batchTimer) {
+			batchTimer = setTimeout(processBatchQueue, BATCH_DELAY_MS)
+		}
+	})
+}
+
 /**
  * 获取缓存的 HTML 内容
  */
