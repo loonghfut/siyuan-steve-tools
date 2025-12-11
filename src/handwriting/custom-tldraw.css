@@ -57,6 +57,26 @@
   color: #f9f9f985 !important;
 }
 
+/* 变扁一点：减少高度与字体 */
+[custom-st-tldraw="1"][data-subtype="h6"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  /* 减少上下内边距以变矮 */
+  min-height: 20px;
+  max-height: 20px;
+  line-height: 16px;
+  pointer-events: auto;
+  isolation: isolate;
+  font-size: 12px;
+  /* 更小的字号 */
+  border-radius: 4px;
+  /* 更平的圆角 */
+  box-sizing: border-box;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 .slide-name-input {
   margin: 8px;
@@ -198,7 +218,7 @@ input.tlui-input {
 .tlui-popover__content,
 .tlui-style-panel__wrapper {
   background-color: var(--b3-theme-surface);
-  box-shadow:0px 0px 2px hsl(0, 0%, 0%, 16%), 0px 2px 3px hsl(0, 0%, 0%, 24%), 0px 2px 6px hsl(0, 0%, 0%, .1), inset 0px 0px 0px 1px var(--b3-theme-surface);
+  box-shadow: 0px 0px 2px hsl(0, 0%, 0%, 16%), 0px 2px 3px hsl(0, 0%, 0%, 24%), 0px 2px 6px hsl(0, 0%, 0%, .1), inset 0px 0px 0px 1px var(--b3-theme-surface);
   border-bottom: none;
   border-right: none;
   border-top: none;
@@ -206,7 +226,8 @@ input.tlui-input {
 }
 
 :root {
-  --tl-color-panel-contrast: var(--b3-theme-surface) !important; /* 改成半透明黑色 */
+  --tl-color-panel-contrast: var(--b3-theme-surface) !important;
+  /* 改成半透明黑色 */
 }
 
 /* 素材库面板样式 */
@@ -255,7 +276,8 @@ input.tlui-input {
   border-radius: 50%;
   /* 默认实心颜色 - 使用 tldraw 主题变量作为回退值而非自定义十六进制颜色 */
   background: var(--color-text-3, var(--color-text));
-  border: none; /* 去掉外边框，使用实心点 */
+  border: none;
+  /* 去掉外边框，使用实心点 */
   box-sizing: border-box;
   z-index: 999;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
@@ -342,6 +364,7 @@ input.tlui-input {
   box-shadow: 0 0 0 10px rgba(61, 138, 255, 0.18), 0 1px 2px rgba(0, 0, 0, 0.12);
   background: var(--color-selected, #3d8aff);
 }
+
 .bezier-connector-port--flash::after {
   width: 48px;
   height: 48px;
