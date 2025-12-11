@@ -47,6 +47,163 @@ const SingleBlockSizes = new EditorAtom('single-block sizes', (editor) => {
 const BORDER_PX = 3 // 与样式、SVG 导出保持一致
 const MIN_HEIGHT = 50
 
+// ===== 独立的尺寸测量 Hook =====
+// 参考 tldraw 官方示例，将尺寸测量逻辑抽取为可复用的 hook
+function useSingleBlockSize(
+	shape: ISingleBlockShape,
+	containerRef: React.RefObject<HTMLDivElement>,
+	protyleHostRef: React.RefObject<HTMLDivElement | null>,
+	isEditingState: boolean
+) {
+	const editor = (window as any).__tldrawEditor || null
+	// 用于在编辑态切换时临时锁定高度，防止闪烁
+	const heightLockRef = useRef(false)
+	const prevEditingRef = useRef(isEditingState)
+	// 记录上次测量的高度，用于锁定期间保持稳定
+	const lastHeightRef = useRef<number | null>(null)
+
+	// 检测编辑态切换，临时锁定高度
+	useEffect(() => {
+		if (prevEditingRef.current !== isEditingState) {
+			prevEditingRef.current = isEditingState
+			heightLockRef.current = true
+			// 延迟解锁，等待新内容渲染稳定
+			const timer = setTimeout(() => {
+				heightLockRef.current = false
+			}, 150)
+			return () => clearTimeout(timer)
+		}
+	}, [isEditingState])
+
+	const updateShapeSize = useCallback(() => {
+		if (!editor) return
+
+		// 如果高度被锁定，使用上次测量的高度
+		if (heightLockRef.current && lastHeightRef.current !== null) {
+			const lockedHeight = lastHeightRef.current
+			const lockedWidth = Math.max(shape.props.w, 1)
+			SingleBlockSizes.update(editor, (map) => {
+				const existing = map.get(shape.id)
+				if (existing && existing.height === lockedHeight && existing.width === lockedWidth) return map
+				return map.set(shape.id, { width: lockedWidth, height: lockedHeight })
+			})
+			return
+		}
+
+		// 没有 blockId 的新块固定最小高度
+		if (!shape.props.blockId) {
+			const fallbackHeight = Math.max(shape.props.h, MIN_HEIGHT)
+			const fallbackWidth = Math.max(shape.props.w, 1)
+			lastHeightRef.current = fallbackHeight
+			SingleBlockSizes.update(editor, (map) => {
+				const existing = map.get(shape.id)
+				if (existing && existing.height === fallbackHeight && existing.width === fallbackWidth) return map
+				return map.set(shape.id, { width: fallbackWidth, height: fallbackHeight })
+			})
+			return
+		}
+
+		// 优先测量 Protyle 的内容区域（编辑态）
+		let target: HTMLElement | null = null
+		if (isEditingState && protyleHostRef.current) {
+			target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
+		}
+		// 非编辑态时从容器中测量静态内容
+		if (!target && containerRef.current) {
+			target = (containerRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || containerRef.current
+		}
+		if (!target) return
+
+		// 获取实际 DOM 尺寸
+		const contentH = Math.ceil(target.scrollHeight || target.offsetHeight || 0)
+		const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
+		const nextHeight = Math.max(contentH + borderPx * 2, MIN_HEIGHT)
+		const nextWidth = Math.max(shape.props.w, 1)
+
+		// 保存测量的高度
+		lastHeightRef.current = nextHeight
+
+		// 更新全局 atom 中的尺寸
+		SingleBlockSizes.update(editor, (map) => {
+			const existing = map.get(shape.id)
+			if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
+			return map.set(shape.id, { width: nextWidth, height: nextHeight })
+		})
+	}, [editor, shape.id, shape.props.blockId, shape.props.h, shape.props.w, shape.props.transparentBackground, isEditingState])
+
+	// 在每次渲染后立即测量尺寸
+	useLayoutEffect(() => {
+		updateShapeSize()
+	})
+
+	// 使用 ResizeObserver 监听 DOM 尺寸变化
+	useLayoutEffect(() => {
+		let target: HTMLElement | null = null
+		if (isEditingState && protyleHostRef.current) {
+			target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
+		}
+		if (!target && containerRef.current) {
+			target = (containerRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || containerRef.current
+		}
+		if (!target) return
+
+		const observer = new ResizeObserver(() => {
+			updateShapeSize()
+		})
+		observer.observe(target)
+
+		return () => {
+			observer.disconnect()
+		}
+	}, [updateShapeSize, isEditingState])
+
+	// 使用 MutationObserver 监听 DOM 内容变化
+	useLayoutEffect(() => {
+		let target: HTMLElement | null = null
+		if (isEditingState && protyleHostRef.current) {
+			target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
+		}
+		if (!target && containerRef.current) {
+			target = (containerRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || containerRef.current
+		}
+		if (!target) return
+
+		const observer = new MutationObserver(() => {
+			updateShapeSize()
+		})
+		observer.observe(target, { subtree: true, childList: true, attributes: true, characterData: true })
+
+		return () => {
+			observer.disconnect()
+		}
+	}, [updateShapeSize, isEditingState])
+
+	// 监听图片加载完成后重新测量
+	useEffect(() => {
+		let target: HTMLElement | null = null
+		if (isEditingState && protyleHostRef.current) {
+			target = protyleHostRef.current
+		}
+		if (!target && containerRef.current) {
+			target = containerRef.current
+		}
+		if (!target) return
+
+		const handlers: Array<() => void> = []
+		target.querySelectorAll('img').forEach((img) => {
+			const handler = () => updateShapeSize()
+			img.addEventListener('load', handler)
+			handlers.push(() => img.removeEventListener('load', handler))
+		})
+
+		return () => {
+			handlers.forEach((off) => off())
+		}
+	}, [updateShapeSize, isEditingState])
+
+	return { updateShapeSize }
+}
+
 export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	static override type = 'single-block' as const
 	static override props = singleBlockShapeProps
@@ -119,6 +276,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	component(shape: ISingleBlockShape) {
 		const editor = this.editor
+		// 保存 editor 引用供 useSingleBlockSize hook 使用
+		;(window as any).__tldrawEditor = editor
 		const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 		const isEditing = editor.getEditingShapeId() === shape.id
 		const [isEditingState, setIsEditingState] = useState(isEditing)
@@ -139,13 +298,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const detachKeyHandler = useRef<() => void>()
 		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
-		const resizeObsRef = useRef<ResizeObserver | null>(null)
-		const mutationObsRef = useRef<MutationObserver | null>(null)
-		const imgListenersRef = useRef<Array<() => void>>([])
-		// 记录上次测量的高度，用于切换态时避免闪烁
-		const lastMeasuredHeightRef = useRef<number | null>(null)
-		// 切换态时暂时锁定高度更新
-		const heightLockRef = useRef(false)
 		// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
 		const DESTROYED_MARK = '__st_destroyed__'
 		const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
@@ -161,21 +313,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		}
 
 
-		const disconnectObservers = () => {
-			try { resizeObsRef.current?.disconnect() } catch { }
-			resizeObsRef.current = null
-			try { mutationObsRef.current?.disconnect() } catch { }
-			mutationObsRef.current = null
-			for (const off of imgListenersRef.current) {
-				try { off() } catch { }
-			}
-			imgListenersRef.current = []
-		}
-
 		const destroyRuntimeResources = useCallback(() => {
 			detachKeyHandler.current?.()
 			detachKeyHandler.current = undefined
-			disconnectObservers()
 			if (loadHandleRef.current) {
 				loadHandleRef.current.cancel()
 				loadHandleRef.current = null
@@ -193,6 +333,29 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 			protyleHostRef.current = null
 		}, [])
+
+		// 使用独立的尺寸测量 hook（自动处理尺寸更新）
+		useSingleBlockSize(shape, containerRef, protyleHostRef, isEditingState)
+
+		// 检测是否包含属性视图图标（数据库图标）
+		useEffect(() => {
+			const checkAttrIcon = () => {
+				let target: HTMLElement | null = null
+				if (protyleHostRef.current) {
+					target = protyleHostRef.current
+				} else if (containerRef.current) {
+					target = containerRef.current
+				}
+				if (!target) return
+				try {
+					const exists = !!target.querySelector('.protyle-attr--av')
+					setHasAttrIcon((prev) => (prev === exists ? prev : exists))
+				} catch {
+					// ignore
+				}
+			}
+			checkAttrIcon()
+		}, [isEditingState, staticHtml])
 
 		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {
@@ -238,87 +401,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			return () => clearTimeout(timer)
 		}, [isEditing, shape.id])
 
-		// 计算并写入 DOM 尺寸（以内容高度为准，宽度沿用 props.w）
-		const updateDomSize = useCallback(() => {
-			// 如果高度被锁定，跳过更新（用于切换态时避免闪烁）
-			if (heightLockRef.current) return
-
-			// 没有 blockId 的新块固定最小高度，避免反复测量造成抖动
-			if (!shape.props.blockId) {
-				const fallbackHeight = Math.max(shape.props.h, MIN_HEIGHT)
-				const fallbackWidth = Math.max(shape.props.w, 1)
-				lastMeasuredHeightRef.current = fallbackHeight
-				SingleBlockSizes.update(editor, (map) => {
-					const existing = map.get(shape.id)
-					if (existing && existing.height === fallbackHeight && existing.width === fallbackWidth) return map
-					return map.set(shape.id, { width: fallbackWidth, height: fallbackHeight })
-				})
-				return
-			}
-			
-			// 优先测量 Protyle 的内容区域
-			let target: HTMLElement | null = null
-			if (protyleHostRef.current) {
-				target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
-			}
-			// 非编辑态时尝试从容器中测量静态内容
-			if (!target && containerRef.current) {
-				target = (containerRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || containerRef.current
-			}
-			if (!target) return
-
-			// 检测是否包含属性视图图标（数据库图标），用于在形状外右上角显示标记
-			try {
-				const exists = !!(target as HTMLElement).querySelector('.protyle-attr--av')
-				setHasAttrIcon((prev) => (prev === exists ? prev : exists))
-			} catch {
-				// ignore
-			}
-
-			const contentH = Math.ceil((target as HTMLElement).scrollHeight || (target as HTMLElement).offsetHeight || 0)
-			const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
-			const nextHeight = Math.max(contentH + borderPx * 2, MIN_HEIGHT)
-			const nextWidth = Math.max(shape.props.w, 1)
-			
-			// 保存测量的高度
-			lastMeasuredHeightRef.current = nextHeight
-			
-			SingleBlockSizes.update(editor, (map) => {
-				const existing = map.get(shape.id)
-				if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
-				return map.set(shape.id, { width: nextWidth, height: nextHeight })
-			})
-		}, [editor, shape.id, shape.props.blockId, shape.props.h, shape.props.w, shape.props.transparentBackground])
-
-		// 在渲染和字体变化后尽快测量一次
-		useLayoutEffect(() => {
-			updateDomSize()
-		})
-
-		// 静态内容变化时重新测量尺寸
-		useEffect(() => {
-			if (staticHtml) {
-				// 延迟一帧确保 DOM 已更新
-				requestAnimationFrame(() => updateDomSize())
-			}
-		}, [staticHtml, updateDomSize])
-
-		// 同步编辑状态，切换时锁定高度避免闪烁
+		// 同步编辑状态
 		useEffect(() => {
 			setIsEditingState(isEditing)
-			
-			// 编辑态切换时锁定高度，避免闪烁
-			if (lastMeasuredHeightRef.current !== null) {
-				heightLockRef.current = true
-				// 延迟解锁，等待新内容渲染稳定
-				const unlockTimer = setTimeout(() => {
-					heightLockRef.current = false
-					// 解锁后重新测量
-					updateDomSize()
-				}, 150)
-				return () => clearTimeout(unlockTimer)
-			}
-		}, [isEditing, updateDomSize])
+		}, [isEditing])
 
 		useEffect(() => {
 			shapeLoadManager.attachEditor(editor as any)
@@ -476,32 +562,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				return blockId
 			}
 
-			const setupObservers = () => {
-				disconnectObservers()
-				let target: HTMLElement | null = null
-				if (protyleHostRef.current) {
-					target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
-				}
-				if (!target) return
-				try {
-					resizeObsRef.current = new ResizeObserver(() => updateDomSize())
-					resizeObsRef.current.observe(target)
-				} catch { }
-				try {
-					mutationObsRef.current = new MutationObserver(() => updateDomSize())
-					mutationObsRef.current.observe(target, { subtree: true, childList: true, attributes: true, characterData: true })
-				} catch { }
-				// 图片等资源加载后尺寸变化
-				imgListenersRef.current = []
-				target.querySelectorAll('img').forEach((img) => {
-					const handler = () => updateDomSize()
-					img.addEventListener('load', handler)
-					imgListenersRef.current.push(() => img.removeEventListener('load', handler))
-				})
-				// 初始测量
-				updateDomSize()
-			}
-
 			const mountProtyle = async (blockId: string) => {
 				if (disposed) return
 				loadHandleRef.current?.cancel()
@@ -583,8 +643,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						clearTimeout(readyTimeoutId)
 						readyTimeoutId = null
 					}
-					// 初始化观察与尺寸写入
-					setupObservers()
+					// 尺寸测量由 useSingleBlockSize hook 自动处理
 					// 启用编辑
 					protyleInstance.enable()
 					if (signal.aborted || disposed) {
@@ -785,8 +844,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				const wys = containerRef.current.querySelector(".protyle-wysiwyg");
 				if (wys) (wys as HTMLElement).style.fontSize = `${shape.props.fontSize || 20}px`;
 			}
-			// 字号变化可能导致高度变化
-			updateDomSize()
+			// 字号变化可能导致高度变化，由 useSingleBlockSize hook 自动处理
 		}, [shape.props.fontSize]);
 
 
