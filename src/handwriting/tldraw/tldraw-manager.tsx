@@ -1064,10 +1064,12 @@ export class TldrawManager {
                     } else {
                         // console.log("%%%",block.markdown);
                         // 只删除指向当前画板(this.id) 与该块(blockId) 的[*](...)链接
-                        // 使用 URL 解析以便在 query 中精确匹配 rootid 与 blockid（支持 title 等额外参数）
-                        const replacedMarkdown = block.kramdown.replace(/\[\*\]\((https:\/\/plugins\/siyuan-steve-tools\/\?[^)]+)\)/g, (match, url) => {
+                        // 支持 https:// 和 siyuan:// 两种协议
+                        const replacedMarkdown = block.kramdown.replace(/\[\*\]\(((https|siyuan):\/\/plugins\/siyuan-steve-tools\/\?[^)]+)\)/g, (match, url) => {
                             try {
-                                const params = new URL(url).searchParams;
+                                // 处理 siyuan:// 协议：转换为 https:// 以便使用 URL API
+                                const parseableUrl = url.startsWith('siyuan://') ? url.replace('siyuan://', 'https://') : url;
+                                const params = new URL(parseableUrl).searchParams;
                                 if (params.get('rootid') === this.id && params.get('blockid') === blockId) {
                                     return ''; // 匹配则删除该链接
                                 }
