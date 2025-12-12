@@ -831,7 +831,6 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 		async (e: React.MouseEvent<HTMLSpanElement>, attr: DatabaseAttributeEntry) => {
 			e.preventDefault()
 			e.stopPropagation()
-            console.log('attr', attr)
 			const element = e.currentTarget as HTMLElement
 
 			// 获取选项列表（用于 select/mSelect）
@@ -872,12 +871,47 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 		[blockId, onRefresh]
 	)
 
+	// 阻止容器上的鼠标事件传递到下层
+	const handleMouseDown = useCallback((e: React.MouseEvent) => {
+		e.stopPropagation()
+		e.preventDefault()
+	}, [])
+
+	const handleMouseUp = useCallback((e: React.MouseEvent) => {
+		e.stopPropagation()
+		e.preventDefault()
+	}, [])
+
+	const handleMouseMove = useCallback((e: React.MouseEvent) => {
+		e.stopPropagation()
+	}, [])
+
+	const handlePointerDown = useCallback((e: React.PointerEvent) => {
+		e.stopPropagation()
+		e.preventDefault()
+	}, [])
+
+	const handlePointerUp = useCallback((e: React.PointerEvent) => {
+		e.stopPropagation()
+		e.preventDefault()
+	}, [])
+
+	const handlePointerMove = useCallback((e: React.PointerEvent) => {
+		e.stopPropagation()
+	}, [])
+
 	if (dbAttributes.length === 0) {
 		return null
 	}
 
 	return (
 		<div
+			onMouseDown={handleMouseDown}
+			onMouseUp={handleMouseUp}
+			onMouseMove={handleMouseMove}
+			onPointerDown={handlePointerDown}
+			onPointerUp={handlePointerUp}
+			onPointerMove={handlePointerMove}
 			style={{
 				display: 'flex',
 				alignItems: 'center',

@@ -945,31 +945,32 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
 			>
-				{/* 如果块中包含数据库属性视图图标，则在形状外右上角显示属性条和小徽标 */}
-				{hasAttrIcon && (
-					<div
-						style={{
-							position: 'absolute',
-							top: '-16px',
-							right: '0px',
-							display: 'flex',
-							alignItems: 'center',
-							gap: '4px',
-							zIndex: 5,
-							pointerEvents: 'auto',
+				{/* 数据库属性栏 - 总是渲染，由 DbAttributeBar 组件决定是否显示内容 */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '-16px',
+						right: '0px',
+						display: 'flex',
+						alignItems: 'center',
+						gap: '4px',
+						zIndex: 5,
+						pointerEvents: 'auto',
+						minHeight: '20px',
+					}}
+				>
+					{/* 数据库属性内容 - 使用新组件 */}
+					<DbAttributeBar
+						blockId={shape.props.blockId}
+						themeColor={{
+							solid: theme[shape.props.color].solid,
+							semi: theme[shape.props.color].semi,
 						}}
-					>
-						{/* 数据库属性内容 - 使用新组件 */}
-						<DbAttributeBar
-							blockId={shape.props.blockId}
-							themeColor={{
-								solid: theme[shape.props.color].solid,
-								semi: theme[shape.props.color].semi,
-							}}
-							shapeWidth={shape.props.w}
-							refreshNonce={shape.props.refreshNonce}
-						/>
-						{/* 数据库图标按钮 */}
+						shapeWidth={shape.props.w}
+						refreshNonce={shape.props.refreshNonce}
+					/>
+					{/* 数据库图标按钮 - 当有属性时显示 */}
+					{hasAttrIcon && (
 						<div
 							onClick={handleAttrIconClick}
 							onPointerDown={(e) => {
@@ -999,8 +1000,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 								<use xlinkHref="#iconDatabase" />
 							</svg>
 						</div>
-					</div>
-				)}
+					)}
+				</div>
 				<div
 					ref={containerRef}
 					blockid={shape.props.blockId}
