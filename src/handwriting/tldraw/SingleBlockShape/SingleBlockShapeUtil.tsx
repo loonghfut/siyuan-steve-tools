@@ -23,6 +23,7 @@ import {
 import { openAttributePanel, Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
 import { settingdata } from '@/index'
+import { DbAttributeBar } from './single-block-db-attributes'
 import { singleBlockShapeProps } from './single-block-shape-props'
 import { singleBlockShapeMigrations } from './single-block-shape-migrations'
 import { ISingleBlockShape } from './single-block-shape-types'
@@ -944,39 +945,60 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
 			>
-				{/* 如果块中包含数据库属性视图图标，则在形状外右上角显示一个小徽标 */}
+				{/* 如果块中包含数据库属性视图图标，则在形状外右上角显示属性条和小徽标 */}
 				{hasAttrIcon && (
 					<div
-						onClick={handleAttrIconClick}
-						onPointerDown={(e) => {
-							e.preventDefault()
-							e.stopPropagation()
-						}}
 						style={{
 							position: 'absolute',
-							top: '-13px',
+							top: '-16px',
 							right: '0px',
-							width: '20px',
-							height: '20px',
-							borderRadius: '999px',
-							backgroundColor: theme[shape.props.color].solid,
-							boxShadow: '0 0 4px rgba(0,0,0,0.3)',
 							display: 'flex',
 							alignItems: 'center',
-							justifyContent: 'center',
+							gap: '4px',
+							zIndex: 5,
 							pointerEvents: 'auto',
-							cursor: 'pointer',
-							zIndex: 2,
 						}}
 					>
-						<svg
-							viewBox="0 0 32 32"
-							width={14}
-							height={14}
-							style={{ fill: theme[shape.props.color].semi }}
+						{/* 数据库属性内容 - 使用新组件 */}
+						<DbAttributeBar
+							blockId={shape.props.blockId}
+							themeColor={{
+								solid: theme[shape.props.color].solid,
+								semi: theme[shape.props.color].semi,
+							}}
+							shapeWidth={shape.props.w}
+							refreshNonce={shape.props.refreshNonce}
+						/>
+						{/* 数据库图标按钮 */}
+						<div
+							onClick={handleAttrIconClick}
+							onPointerDown={(e) => {
+								e.preventDefault()
+								e.stopPropagation()
+							}}
+							style={{
+								width: '20px',
+								height: '20px',
+								borderRadius: '999px',
+								backgroundColor: theme[shape.props.color].solid,
+								boxShadow: '0 0 4px rgba(0,0,0,0.3)',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								pointerEvents: 'auto',
+								cursor: 'pointer',
+								flexShrink: 0,
+							}}
 						>
-							<use xlinkHref="#iconDatabase" />
-						</svg>
+							<svg
+								viewBox="0 0 32 32"
+								width={14}
+								height={14}
+								style={{ fill: theme[shape.props.color].semi }}
+							>
+								<use xlinkHref="#iconDatabase" />
+							</svg>
+						</div>
 					</div>
 				)}
 				<div
