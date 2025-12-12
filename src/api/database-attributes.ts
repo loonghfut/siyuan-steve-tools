@@ -131,6 +131,10 @@ function formatViewKeys(data: any[], options: DatabaseAttributeOptions): Databas
 			const keyName = typeof key.name === 'string' ? key.name : ''
 			if (keyName && hiddenFields.has(keyName.trim().toLowerCase())) continue
 
+			// 只显示desc中包含'tldraw'的字段
+			const keyDesc = typeof key.desc === 'string' ? key.desc : ''
+			if (!keyDesc.includes('tldraw')) continue
+
 			const formatted = formatAttributeValue(kv?.values, keyType, options)
 			if (!formatted) continue
 
@@ -169,10 +173,14 @@ function formatAttributeValue(values: any, keyType: string, options: DatabaseAtt
 			return formatDateValue(values[0]?.updated, options)
 		}
 		case 'mSelect': {
-			return formatSelect(values[0]?.mSelect)
+			// select类型也返回mSelect格式的数据
+			const selectValue = values[0]?.mSelect || values[0]?.select
+			return selectValue ? formatSelect(selectValue) : null
 		}
 		case 'select': {
-			return formatSingleSelect(values[0]?.select)
+			// select类型也返回mSelect格式的数据
+			const selectValue = values[0]?.mSelect || values[0]?.select
+			return selectValue ? formatSelect(selectValue) : null
 		}
 		case 'relation': {
 			return formatRelation(values[0]?.relation)
@@ -217,7 +225,7 @@ function formatAttributeValue(values: any, keyType: string, options: DatabaseAtt
 	}
 }
 
-function formatCheckbox(checkbox: any, style: CheckboxStyle = 'emoji'): string | null {
+function formatCheckbox(checkbox: any, style: CheckboxStyle = 'symbol'): string | null {
 	if (typeof checkbox?.checked !== 'boolean') return null
 	const checked = checkbox.checked
 	switch (style) {
@@ -254,11 +262,6 @@ function formatSelect(values: any): string | null {
 		.filter(Boolean)
 	if (labels.length === 0) return null
 	return labels.join(' | ')
-}
-
-function formatSingleSelect(value: any): string | null {
-	if (!value) return null
-	return sanitizeString(value.content)
 }
 
 function formatRelation(value: any): string | null {
