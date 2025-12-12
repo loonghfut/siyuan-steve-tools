@@ -53,6 +53,7 @@ declare module '@tldraw/tldraw' {
 import React from 'react';
 import { CardRenderMode, ICardShape } from './CardShape/card-shape-types'
 import { settingdata } from '@/index'
+import { buildTldrawLink } from './utils/link-builder';
 import { captureSlideScreenshot } from './SlideShape/captureSlideScreenshot';
 import { SlidesPanel } from './SlideShape/SlidesPanel';
 import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
@@ -590,7 +591,7 @@ const CustomStylePanel = track(() => {
                     const assetPath = kernelPath.replace(/^data\//, '')
 
                     const alt = rawName || 'slide'
-                    const md = `[_](https://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${slideShape.id})![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}"}`
+                    const md = `[_](${buildTldrawLink(rootId, blockId, title, slideShape.id)})![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}"}`
 
                     let fallbackFromUpdateFailure = false
 
@@ -687,9 +688,9 @@ const CustomStylePanel = track(() => {
             // 使用幻灯片名称，如果为空则使用 rootId 作为后备标题
             let url: string;
             if (settingdata['copyLinkTitle']) {
-                url = `[slide:${slideShape.props.name}](https://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${shapeId})`;
+                url = `[slide:${slideShape.props.name}](${buildTldrawLink(rootId, blockId, title, shapeId)})`;
             } else {
-                url = `https://plugins/siyuan-steve-tools/?rootid=${rootId}&blockid=${blockId}&title=${title}&shapeid=${shapeId}`;
+                url = buildTldrawLink(rootId, blockId, title, shapeId);
             }
             try {
                 await navigator.clipboard.writeText(url);
@@ -1434,9 +1435,9 @@ function CustomQuickActions() {
                 <TldrawUiMenuItem id="external-link" icon="heading" label="复制白板链接" onSelect={() => {
                     let url: string;
                     if (settingdata['copyLinkTitle']) {
-                        url = `[画板:${title}](https://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title})`;
+                        url = `[画板:${title}](${buildTldrawLink(rootId, undefined, title)})`;
                     } else {
-                        url = `https://plugins/siyuan-steve-tools/?rootid=${rootId}&title=${title}`
+                        url = buildTldrawLink(rootId, undefined, title);
                     }
                     navigator.clipboard.writeText(url).then(() => {
                         showMessage('链接已复制到剪贴板!');

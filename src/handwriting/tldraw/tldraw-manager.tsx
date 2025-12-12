@@ -38,6 +38,7 @@ import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
 import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
+import { buildTldrawLink } from './utils/link-builder';
 const assetUrls = getAssetUrls({
     baseUrl: 'plugins/siyuan-steve-tools/asset/',
 })
@@ -474,14 +475,14 @@ export class TldrawManager {
                             console.log("拖拽块的内容", content);
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
-                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const link = buildTldrawLink(this.id, aproblock, this.title);
                                 const linkMarkdown = `[🔗](${link})`;
                                 const newContent = appendLinkToKramdown(content, linkMarkdown, link, true);
                                 await api.updateBlock("markdown", newContent, aproblock)
                             } else if (blockIdo_rigin.includes('paragraph')) {
                                 aproblock = blockId;
                                 //要检测是否已经有此链接，避免重复添加
-                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const link = buildTldrawLink(this.id, aproblock, this.title);
                                 const linkMarkdown = `[*](${link})`;
                                 if (!content.includes(link)) {
                                     const newContent = appendLinkToKramdown(content, linkMarkdown, link, false);
@@ -492,7 +493,7 @@ export class TldrawManager {
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
                             } else {
                                 aproblock = idid as string;
-                                const link = `https://plugins/siyuan-steve-tools/?rootid=${this.id}&blockid=${aproblock}&title=${this.title}`;
+                                const link = buildTldrawLink(this.id, aproblock, this.title);
                                 await api.insertBlock("markdown", `###### ${timestamp}[🔗](${link})
 {: id="${idid}" custom-st-tldraw="1"}`, blockId)
                             }

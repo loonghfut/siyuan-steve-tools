@@ -14,6 +14,7 @@ import { CardRenderMode, ICardShape } from './card-shape-types'
 import { Protyle, showMessage, TProtyleAction } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
+import { buildTldrawLink } from '../utils/link-builder';
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
@@ -353,7 +354,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							pendingCreationPromise = (async () => {
 								const idid = await api.generateSiyuanID() as string;
 								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-								const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`;
+								const link = buildTldrawLink(tldrawId, idid, title);
 								const content =
 									'###### ' + timestamp + '[🔗](' + link + ')' +
 									'\n' +

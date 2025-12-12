@@ -23,6 +23,7 @@ import {
 import { openAttributePanel, Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
 import { settingdata } from '@/index'
+import { buildTldrawLink } from '../utils/link-builder';
 import { DbAttributeBar } from './single-block-db-attributes'
 import { singleBlockShapeProps } from './single-block-shape-props'
 import { singleBlockShapeMigrations } from './single-block-shape-migrations'
@@ -555,7 +556,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					try {
 						pendingCreationPromise = (async () => {
 							const idid = (await api.generateSiyuanID()) as string
-							const link = `https://plugins/siyuan-steve-tools/?rootid=${tldrawId}&blockid=${idid}&title=${title}`
+							const link = buildTldrawLink(tldrawId, idid, title)
 							const redata = await api.appendBlock(
 								'markdown',
 								`[*](${link})\n{: id="${idid}" custom-st-tldraw-single="1" }\n\n`,
