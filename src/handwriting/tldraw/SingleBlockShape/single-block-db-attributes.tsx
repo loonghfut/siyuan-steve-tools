@@ -344,7 +344,20 @@ function handleMultiSelectEdit(options: InlineEditOptions) {
 
 	const dropdown = document.createElement('div')
 	dropdown.className = 'sb-inline-edit-dropdown'
-	dropdown.style.cssText = createPopupStyles() + 'max-height: 250px; overflow-y: auto;'
+	dropdown.style.cssText = `
+		position: fixed;
+		z-index: 999999;
+		background: var(--b3-theme-background);
+		border: 1px solid var(--b3-border-color);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+		padding: 8px;
+		font-size: 13px;
+		min-width: 150px;
+		color: var(--b3-theme-on-background, #000);
+		max-height: 250px;
+		overflow-y: auto;
+	`
 
 	// 添加备选项
 	;(selectOptions || []).forEach((option: any) => {
@@ -361,6 +374,9 @@ function handleMultiSelectEdit(options: InlineEditOptions) {
 			align-items: center;
 			gap: 6px;
 			border-radius: 4px;
+			color: var(--b3-theme-on-background, #000);
+			background: ${isSelected ? 'var(--b3-theme-primary-lightest, #e3f2fd)' : 'transparent'};
+			transition: background-color 0.2s ease;
 		`
 
 		const checkbox = document.createElement('input')
@@ -370,14 +386,13 @@ function handleMultiSelectEdit(options: InlineEditOptions) {
 
 		const label = document.createElement('span')
 		label.textContent = optionText
-		if (option.color) {
-			label.style.cssText = `
-				padding: 1px 6px;
-				border-radius: 4px;
-				background-color: ${option.color};
-				color: #fff;
-			`
-		}
+		// if (option.color) {
+		// 	label.style.cssText = `
+		// 		padding: 1px 6px;
+		// 		border-radius: 4px;
+		// 		background-color: ${option.color};
+		// 	`
+		// }
 
 		optionElement.appendChild(checkbox)
 		optionElement.appendChild(label)
@@ -388,15 +403,30 @@ function handleMultiSelectEdit(options: InlineEditOptions) {
 			checkbox.checked = !checkbox.checked
 			if (checkbox.checked) {
 				selectedValues.add(optionId)
+				optionElement.style.background = 'var(--b3-theme-primary-lightest, #e3f2fd)'
 			} else {
 				selectedValues.delete(optionId)
+				optionElement.style.background = 'transparent'
 			}
+		})
+
+		optionElement.addEventListener('mouseenter', () => {
+			optionElement.style.background = 'var(--b3-list-hover, #f5f5f5)'
+		})
+		optionElement.addEventListener('mouseleave', () => {
+			optionElement.style.background = isSelected ? 'var(--b3-theme-primary-lightest, #e3f2fd)' : 'transparent'
 		})
 	})
 
 	// 保存按钮
 	const buttonContainer = document.createElement('div')
-	buttonContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--b3-border-color, #eee);'
+	buttonContainer.style.cssText = `
+		display: flex;
+		gap: 8px;
+		margin-top: 8px;
+		padding-top: 8px;
+		border-top: 1px solid var(--b3-border-color, #eee);
+	`
 
 	const saveButton = document.createElement('button')
 	saveButton.textContent = '保存'
@@ -406,10 +436,17 @@ function handleMultiSelectEdit(options: InlineEditOptions) {
 		border: none;
 		border-radius: 4px;
 		background: var(--b3-theme-primary, #4285f4);
-		color: #fff;
+		color: var(--b3-theme-on-primary, #fff);
 		cursor: pointer;
 		font-size: 12px;
+		transition: opacity 0.2s ease;
 	`
+	saveButton.addEventListener('mouseenter', () => {
+		saveButton.style.opacity = '0.9'
+	})
+	saveButton.addEventListener('mouseleave', () => {
+		saveButton.style.opacity = '1'
+	})
 	saveButton.addEventListener('click', async () => {
 		const values = Array.from(selectedValues)
 
@@ -445,10 +482,18 @@ function handleMultiSelectEdit(options: InlineEditOptions) {
 		padding: 6px 12px;
 		border: 1px solid var(--b3-border-color, #ddd);
 		border-radius: 4px;
-		background: transparent;
+		background: var(--b3-theme-background, transparent);
+		color: var(--b3-theme-on-background, #000);
 		cursor: pointer;
 		font-size: 12px;
+		transition: background-color 0.2s ease;
 	`
+	cancelButton.addEventListener('mouseenter', () => {
+		cancelButton.style.backgroundColor = 'var(--b3-list-hover, #f5f5f5)'
+	})
+	cancelButton.addEventListener('mouseleave', () => {
+		cancelButton.style.backgroundColor = 'var(--b3-theme-background, transparent)'
+	})
 	cancelButton.addEventListener('click', () => {
 		dropdown.remove()
 		if (onCancel) onCancel()
@@ -765,13 +810,13 @@ function createDropdownOption(value: string, text: string, isSelected: boolean, 
 	if (color && text !== '（清除）') {
 		const colorBadge = document.createElement('span')
 		colorBadge.textContent = text
-		colorBadge.style.cssText = `
-			padding: 1px 6px;
-			border-radius: 4px;
-			background-color: ${color};
-			color: #fff;
-			font-size: 12px;
-		`
+		// colorBadge.style.cssText = `
+		// 	padding: 1px 6px;
+		// 	border-radius: 4px;
+		// 	background-color: ${color};
+		// 	color: #fff;
+		// 	font-size: 12px;
+		// `
 		option.appendChild(colorBadge)
 	} else {
 		option.textContent = text
@@ -944,7 +989,7 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 					}}
 					title={`${attr.keyName}: ${attr.text}${['created', 'updated'].includes(attr.keyType) ? '' : ' (点击编辑)'}`}
 				>
-					{attr.text}
+					{attr.keyType === 'checkbox' ? `${attr.keyName}${attr.text}` : attr.text}
 				</span>
 			))}
 		</div>
