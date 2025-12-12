@@ -1,5 +1,7 @@
 import { Editor, TLShape, TLShapeId, VecLike } from '@tldraw/tldraw'
 import { ShapePort } from './bezier-connector-types'
+import { IMindMapShape } from '../MindMapShape/mind-map-shape-types'
+import { getMindMapShapePorts } from '../MindMapShape/mind-map-ports'
 
 /**
  * 支持端口连接的形状类型
@@ -15,6 +17,10 @@ export const CONNECTABLE_SHAPE_TYPES: string[] = []
  * 端口位于形状的左侧（输入）和右侧（输出）
  */
 export function getShapePorts(editor: Editor, shape: TLShape): Record<string, ShapePort> | null {
+	// 思维导图形状：返回每个节点的端口
+	if (shape.type === 'mind-map') {
+		return getMindMapShapePorts(editor, shape as IMindMapShape)
+	}
 
 	const bounds = editor.getShapeGeometry(shape).bounds
 

@@ -53,11 +53,24 @@ function getConnectionControlPoints(
 	const dx = end.x - start.x
 	const dy = end.y - start.y
 
+	// 提取端口方向（支持两种格式：直接方向如 'input'/'output'/'top'/'bottom'，或思维导图格式 'nodeId:direction'）
+	const extractPortDirection = (portId?: string): string | null => {
+		if (!portId) return null
+		// 如果是思维导图格式，提取最后的方向部分
+		if (portId.includes(':')) {
+			return portId.split(':').pop() || null
+		}
+		return portId
+	}
+
+	const startDir = extractPortDirection(startPortId)
+	const endDir = extractPortDirection(endPortId)
+
 	// 先识别端口方向（若已绑定端口，则优先使用端口方向）
-	const startIsVertical = startPortId === 'top' || startPortId === 'bottom'
-	const startIsHorizontal = startPortId === 'input' || startPortId === 'output'
-	const endIsVertical = endPortId === 'top' || endPortId === 'bottom'
-	const endIsHorizontal = endPortId === 'input' || endPortId === 'output'
+	const startIsVertical = startDir === 'top' || startDir === 'bottom'
+	const startIsHorizontal = startDir === 'input' || startDir === 'output' || startDir === 'left' || startDir === 'right'
+	const endIsVertical = endDir === 'top' || endDir === 'bottom'
+	const endIsHorizontal = endDir === 'input' || endDir === 'output' || endDir === 'left' || endDir === 'right'
 
 	// 计算水平/垂直偏移大小
 	const distanceX = dx
@@ -75,9 +88,10 @@ function getConnectionControlPoints(
 
 	// 起点控制点
 	if (startIsHorizontal) {
-		cp1 = new Vec(start.x + (startPortId === 'output' ? adjustedDistanceX : -adjustedDistanceX), start.y)
+		const isLeftOrInput = startDir === 'input' || startDir === 'left'
+		cp1 = new Vec(start.x + (isLeftOrInput ? -adjustedDistanceX : adjustedDistanceX), start.y)
 	} else if (startIsVertical) {
-		cp1 = new Vec(start.x, start.y + (startPortId === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
+		cp1 = new Vec(start.x, start.y + (startDir === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
 	} else {
 		// 根据主轴选择偏移方向
 		if (Math.abs(dx) >= Math.abs(dy)) {
@@ -90,9 +104,10 @@ function getConnectionControlPoints(
 	// 终点控制点
 	if (endIsHorizontal) {
 		// 默认让控制点在端口外侧。
-		cp2 = new Vec(end.x + (endPortId === 'output' ? adjustedDistanceX : -adjustedDistanceX), end.y)
+		const isLeftOrInput = endDir === 'input' || endDir === 'left'
+		cp2 = new Vec(end.x + (isLeftOrInput ? -adjustedDistanceX : adjustedDistanceX), end.y)
 	} else if (endIsVertical) {
-		cp2 = new Vec(end.x, end.y + (endPortId === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
+		cp2 = new Vec(end.x, end.y + (endDir === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
 	} else {
 		if (Math.abs(dx) >= Math.abs(dy)) {
 			cp2 = new Vec(end.x + (distanceX > 0 ? -adjustedDistanceX : adjustedDistanceX), end.y)

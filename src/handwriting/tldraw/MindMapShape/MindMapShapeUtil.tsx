@@ -9,6 +9,7 @@ import {
     EditorAtom,
     TLShapeId,
     useValue,
+    useEditor,
 } from '@tldraw/tldraw'
 import { mindMapShapeMigrations } from './mind-map-shape-migrations'
 import { mindMapShapeProps } from './mind-map-shape-props'
@@ -31,6 +32,7 @@ import {
     useNodeSelection,
 } from './mind-map-hooks'
 import { parseMarkdownToMindMap } from './mind-map-markdown'
+import { collectAllNodePorts, MindMapNodePort, MindMapPortsOverlay } from './mind-map-ports'
 import { getBlockMarkdown } from '@/api/api'
 import { showMessage } from 'siyuan'
 
@@ -264,6 +266,14 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             layoutDirection
         )
 
+        // 计算所有节点的端口
+        const allNodePorts = React.useMemo(() => {
+            return collectAllNodePorts(layoutTree, offsetX, offsetY)
+        }, [layoutTree, offsetX, offsetY])
+
+        // 鼠标悬浮状态，用于控制端口显示
+        const [isHovered, setIsHovered] = useState(false)
+
         // 更新 DOM 尺寸并调整 shape 位置以保持根节点稳定
         const updateDomSizeAndPosition = useCallback(() => {
             const prevAnchor = MindMapRootAnchors.get(editor).get(shape.id)
@@ -451,6 +461,12 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                         position: 'relative',
                     }}
                 >
+                    {/* 端口覆盖层 - 用于连接曲线 */}
+                    <MindMapPortsOverlay
+                        shapeId={shape.id}
+                        ports={allNodePorts}
+                    />
+                    
                     {/* 加载/错误状态提示 */}
                     {isLinkedMode && (isLoading || loadError) && (
                         <div
