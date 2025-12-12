@@ -29,23 +29,23 @@ interface AttributeCacheEntry {
 	viewKeys: any[]
 }
 
-const DEFAULT_ALLOWED_ATTRIBUTE_TYPES = [
-	'text',
-	'number',
-	'date',
-	'mSelect',
-	'select',
-	'checkbox',
-	'url',
-	'email',
-	'phone',
-	'mAsset',
-	'created',
-	'updated',
-	'relation',
-	'template',
-	'block',
-]
+// const DEFAULT_ALLOWED_ATTRIBUTE_TYPES = [
+// 	'text',
+// 	'number',
+// 	'date',
+// 	'mSelect',
+// 	'select',
+// 	'checkbox',
+// 	'url',
+// 	'email',
+// 	'phone',
+// 	'mAsset',
+// 	'created',
+// 	'updated',
+// 	'relation',
+// 	'template',
+// 	'block',
+// ]
 
 const ATTRIBUTE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
@@ -115,7 +115,7 @@ async function fetchAttributeViewKeys(blockId: string): Promise<any[]> {
 function formatViewKeys(data: any[], options: DatabaseAttributeOptions): DatabaseAttributeEntry[] {
 	if (!Array.isArray(data) || data.length === 0) return []
 
-	const allowedTypes = buildStringSet(options.allowedTypes ?? DEFAULT_ALLOWED_ATTRIBUTE_TYPES)
+	// const allowedTypes = buildStringSet(options.allowedTypes ?? DEFAULT_ALLOWED_ATTRIBUTE_TYPES)
 	const hiddenFields = buildStringSet(options.hiddenFieldNames)
 	const result: DatabaseAttributeEntry[] = []
 
@@ -127,7 +127,7 @@ function formatViewKeys(data: any[], options: DatabaseAttributeOptions): Databas
 			const key = kv?.key
 			if (!key) continue
 			const keyType = typeof key.type === 'string' ? key.type : ''
-			if (allowedTypes.size > 0 && !allowedTypes.has(keyType)) continue
+			// if (allowedTypes.size > 0 && !allowedTypes.has(keyType)) continue
 			const keyName = typeof key.name === 'string' ? key.name : ''
 			if (keyName && hiddenFields.has(keyName.trim().toLowerCase())) continue
 
