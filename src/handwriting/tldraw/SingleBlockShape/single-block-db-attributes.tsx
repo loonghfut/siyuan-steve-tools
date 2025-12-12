@@ -984,7 +984,8 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 						padding: '1px 4px',
 						backgroundColor: 'var(--b3-theme-surface)',
 						borderRadius: '4px',
-						maxWidth: '80px',
+						// 将最大宽度设为基于外部形状宽度的动态值，至少 100px，最多 shapeWidth 的一半
+						maxWidth: `${Math.min(Math.max(shapeWidth / 2, 100), shapeWidth + 40)}px`,
 						overflow: 'hidden',
 						textOverflow: 'ellipsis',
 						cursor: ['created', 'updated'].includes(attr.keyType) ? 'default' : 'pointer',
