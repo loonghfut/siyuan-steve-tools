@@ -339,23 +339,48 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		// 检测是否包含属性视图图标（数据库图标）
 		useEffect(() => {
+			let container = containerRef.current
+			// 如果没有容器则无需检查
+			if (!container) return
+
 			const checkAttrIcon = () => {
-				let target: HTMLElement | null = null
-				if (protyleHostRef.current) {
-					target = protyleHostRef.current
-				} else if (containerRef.current) {
-					target = containerRef.current
-				}
-				if (!target) return
 				try {
+					// 优先检查 protyleHost（编辑态），否则检查容器（非编辑态）
+					const target = protyleHostRef.current || container
+					if (!target) return
 					const exists = !!target.querySelector('.protyle-attr--av')
 					setHasAttrIcon((prev) => (prev === exists ? prev : exists))
 				} catch {
 					// ignore
 				}
 			}
+
+			// 立即检查一次
 			checkAttrIcon()
-		}, [isEditingState, staticHtml])
+
+			// 监听容器及 protyleHost 的 DOM 变化，以便在编辑态/非编辑态都能及时检测到图标变化
+			const observer = new MutationObserver(() => {
+				checkAttrIcon()
+			})
+			const obsOptions: MutationObserverInit = { subtree: true, childList: true, attributes: true, characterData: true }
+
+			try {
+				observer.observe(container, obsOptions)
+				if (protyleHostRef.current && protyleHostRef.current !== container) {
+					observer.observe(protyleHostRef.current, obsOptions)
+				}
+			} catch {
+				// ignore
+			}
+
+			return () => {
+				try {
+					observer.disconnect()
+				} catch {
+					// ignore
+				}
+			}
+		}, [isEditingState, staticHtml, containerRef.current, protyleHostRef.current])
 
 		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {
