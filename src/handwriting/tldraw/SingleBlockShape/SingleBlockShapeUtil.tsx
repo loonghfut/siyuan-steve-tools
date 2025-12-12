@@ -954,7 +954,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						display: 'flex',
 						alignItems: 'center',
 						gap: '4px',
-						zIndex: 5,
+						zIndex: 1000,
 						pointerEvents: 'auto',
 						minHeight: '20px',
 					}}
