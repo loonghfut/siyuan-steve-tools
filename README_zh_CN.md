@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.29.0 (2025年12月12日)
+### v0.29.1 (2025年12月12日)
 - feat: 添加思维导图端口支持，优化端口提取和连接逻辑 (loonghfut)
 - feat: 优化属性视图图标检测逻辑，增加对容器和 protyleHost 的 DOM 变化监听 (loonghfut)
 - 移动文件 (loonghfut)
@@ -56,6 +56,8 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加构建画板深链接的工具函数，并在相关模块中应用 (loonghfut)
 - feat: 支持 https:// 和 siyuan:// 协议的链接解析，增强链接处理能力 (loonghfut)
 - feat: 更新版本号至 0.29.0 (loonghfut)
+- docs: 更新 v0.29.0 版本的更新日志 (loonghfut)
+- feat: 更新版本号至 0.29.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
