@@ -41,16 +41,21 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.28.0 (2025年12月11日)
-- feat: 添加批量获取块的 DOM HTML 功能 (loonghfut)
-- feat: 添加块内容 HTML 缓存模块，优化静态内容加载 (loonghfut)
-- feat: 优化块 DOM 请求，支持批量合并请求以提升性能 (loonghfut)
-- feat: 增加对新块的最小高度处理，优化测量逻辑以减少抖动 (loonghfut)
-- feat: 添加数据库属性处理模块，支持属性缓存和格式化功能 (loonghfut)
-- feat: 添加属性视图图标支持，点击可打开属性面板 (loonghfut)
-- feat: 优化 h6 子类型样式，调整高度和字体以提升视觉效果 (loonghfut)
-- feat: 添加独立的尺寸测量 Hook，优化形状尺寸更新逻辑以减少闪烁 (loonghfut)
-- feat: 更新版本号至 0.28.0 (loonghfut)
+### v0.29.0 (2025年12月12日)
+- feat: 添加思维导图端口支持，优化端口提取和连接逻辑 (loonghfut)
+- feat: 优化属性视图图标检测逻辑，增加对容器和 protyleHost 的 DOM 变化监听 (loonghfut)
+- 移动文件 (loonghfut)
+- feat: 添加数据库属性显示和编辑组件，优化属性图标展示逻辑 (loonghfut)
+- feat: 优化数据库属性栏的鼠标事件处理，增强用户交互体验 (loonghfut)
+- feat: 调整 SingleBlockShape 的 zIndex，提升层级以确保元素可交互 (loonghfut)
+- feat: 优化属性值格式化逻辑，增加对'tldraw'字段的过滤和select类型的兼容处理 (loonghfut)
+- feat: 注释掉默认允许的属性类型和相关逻辑，以便后续重构 (loonghfut)
+- feat: 优化多选编辑下拉菜单样式和交互体验，增强用户界面友好性 (loonghfut)
+- feat: 优化属性值格式化逻辑，允许空字符串并调整样式以增强用户界面一致性 (loonghfut)
+- feat: 动态调整最大宽度，确保属性显示组件在不同形状宽度下的适应性 (loonghfut)
+- feat: 添加构建画板深链接的工具函数，并在相关模块中应用 (loonghfut)
+- feat: 支持 https:// 和 siyuan:// 协议的链接解析，增强链接处理能力 (loonghfut)
+- feat: 更新版本号至 0.29.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
