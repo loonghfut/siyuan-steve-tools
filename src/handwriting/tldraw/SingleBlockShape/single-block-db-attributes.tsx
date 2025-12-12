@@ -583,7 +583,7 @@ function handleDateEdit(options: InlineEditOptions) {
 		border: none;
 		border-radius: 4px;
 		background: var(--b3-theme-primary, #4285f4);
-		color: #fff;
+		color: var(--b3-theme-on-primary, #fff);
 		cursor: pointer;
 		font-size: 12px;
 	`
@@ -632,7 +632,8 @@ function handleDateEdit(options: InlineEditOptions) {
 		padding: 6px 12px;
 		border: 1px solid var(--b3-border-color, #ddd);
 		border-radius: 4px;
-		background: transparent;
+		background: var(--b3-theme-background, transparent);
+		color: var(--b3-theme-on-background, #000);
 		cursor: pointer;
 		font-size: 12px;
 	`
@@ -710,7 +711,7 @@ function handlePopupEdit(options: InlineEditOptions) {
 		border: none;
 		border-radius: 4px;
 		background: var(--b3-theme-primary, #4285f4);
-		color: #fff;
+		color: var(--b3-theme-on-primary, #fff);
 		cursor: pointer;
 		font-size: 12px;
 	`
@@ -758,7 +759,8 @@ function handlePopupEdit(options: InlineEditOptions) {
 		padding: 6px 12px;
 		border: 1px solid var(--b3-border-color, #ddd);
 		border-radius: 4px;
-		background: transparent;
+		background: var(--b3-theme-background, transparent);
+		color: var(--b3-theme-on-background, #000);
 		cursor: pointer;
 		font-size: 12px;
 	`
@@ -980,7 +982,7 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 						lineHeight: '14px',
 						color: themeColor.solid,
 						padding: '1px 4px',
-						backgroundColor: 'rgba(255,255,255,0.5)',
+						backgroundColor: 'var(--b3-theme-surface)',
 						borderRadius: '4px',
 						maxWidth: '80px',
 						overflow: 'hidden',
@@ -989,7 +991,7 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 					}}
 					title={`${attr.keyName}: ${attr.text}${['created', 'updated'].includes(attr.keyType) ? '' : ' (点击编辑)'}`}
 				>
-					{attr.keyType === 'checkbox' ? `${attr.keyName}${attr.text}` : attr.text}
+					{attr.keyType === 'checkbox' ? `${attr.keyName}${attr.text}` : (attr.text || attr.keyName)}
 				</span>
 			))}
 		</div>

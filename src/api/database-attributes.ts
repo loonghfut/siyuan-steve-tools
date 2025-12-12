@@ -136,7 +136,8 @@ function formatViewKeys(data: any[], options: DatabaseAttributeOptions): Databas
 			if (!keyDesc.includes('tldraw')) continue
 
 			const formatted = formatAttributeValue(kv?.values, keyType, options)
-			if (!formatted) continue
+			// 允许空字符串，但不允许null（保留没有值的属性）
+			if (formatted === null) continue
 
 			result.push({
 				avID,
@@ -157,57 +158,57 @@ function formatViewKeys(data: any[], options: DatabaseAttributeOptions): Databas
 }
 
 function formatAttributeValue(values: any, keyType: string, options: DatabaseAttributeOptions): string | null {
-	if (!Array.isArray(values) || values.length === 0) return null
+	if (!Array.isArray(values) || values.length === 0) return ''
 
 	switch (keyType) {
 		case 'checkbox': {
-			return formatCheckbox(values[0]?.checkbox, options.checkboxStyle)
+			return formatCheckbox(values[0]?.checkbox, options.checkboxStyle) || ''
 		}
 		case 'date': {
-			return formatDateValue(values[0]?.date, options)
+			return formatDateValue(values[0]?.date, options) || ''
 		}
 		case 'created': {
-			return formatDateValue(values[0]?.created, options)
+			return formatDateValue(values[0]?.created, options) || ''
 		}
 		case 'updated': {
-			return formatDateValue(values[0]?.updated, options)
+			return formatDateValue(values[0]?.updated, options) || ''
 		}
 		case 'mSelect': {
 			// select类型也返回mSelect格式的数据
 			const selectValue = values[0]?.mSelect || values[0]?.select
-			return selectValue ? formatSelect(selectValue) : null
+			return selectValue ? formatSelect(selectValue) : ''
 		}
 		case 'select': {
 			// select类型也返回mSelect格式的数据
 			const selectValue = values[0]?.mSelect || values[0]?.select
-			return selectValue ? formatSelect(selectValue) : null
+			return selectValue ? formatSelect(selectValue) : ''
 		}
 		case 'relation': {
-			return formatRelation(values[0]?.relation)
+			return formatRelation(values[0]?.relation) || ''
 		}
 		case 'mAsset': {
-			return formatAssets(values[0]?.mAsset)
+			return formatAssets(values[0]?.mAsset) || ''
 		}
 		case 'number': {
 			const num = values[0]?.number?.content
-			if (num === undefined || num === null) return null
+			if (num === undefined || num === null) return ''
 			return `${num}`
 		}
 		case 'url': {
-			return sanitizeString(values[0]?.url?.content)
+			return sanitizeString(values[0]?.url?.content) || ''
 		}
 		case 'email': {
-			return sanitizeString(values[0]?.email?.content)
+			return sanitizeString(values[0]?.email?.content) || ''
 		}
 		case 'phone': {
-			return sanitizeString(values[0]?.phone?.content)
+			return sanitizeString(values[0]?.phone?.content) || ''
 		}
 		case 'template': {
-			return sanitizeString(values[0]?.template?.content)
+			return sanitizeString(values[0]?.template?.content) || ''
 		}
 		case 'block': {
 			const blockContent = values[0]?.block?.content || values[0]?.block?.id
-			return sanitizeString(blockContent)
+			return sanitizeString(blockContent) || ''
 		}
 		default: {
 			const texts: string[] = []
@@ -220,7 +221,7 @@ function formatAttributeValue(values: any, keyType: string, options: DatabaseAtt
 				return texts.join(' | ')
 			}
 			const fallback = sanitizeString(values[0]?.text?.content)
-			return fallback
+			return fallback || ''
 		}
 	}
 }
