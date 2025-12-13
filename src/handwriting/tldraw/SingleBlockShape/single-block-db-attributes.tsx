@@ -842,6 +842,7 @@ function createDropdownOption(value: string, text: string, isSelected: boolean, 
 export function DbAttributeBar(props: DbAttributeDisplayProps) {
 	const { blockId, themeColor, shapeWidth, refreshNonce, onRefresh } = props
 	const [dbAttributes, setDbAttributes] = useState<DatabaseAttributeEntry[]>([])
+	const [activeEditKeyID, setActiveEditKeyID] = useState<string | null>(null)
 
 	// 加载数据库属性
 	useEffect(() => {
@@ -880,6 +881,16 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 			e.stopPropagation()
 			const element = e.currentTarget as HTMLElement
 
+			// 如果点击的是已打开的编辑属性，则关闭弹窗
+			if (activeEditKeyID === attr.keyID) {
+				document.querySelectorAll('.sb-inline-edit-popup, .sb-inline-edit-dropdown').forEach((el) => el.remove())
+				setActiveEditKeyID(null)
+				return
+			}
+
+			// 更新当前活跃的编辑属性
+			setActiveEditKeyID(attr.keyID)
+
 			// 获取选项列表（用于 select/mSelect）
 			let selectOptions: any[] | undefined
 			if (attr.keyType === 'select' || attr.keyType === 'mSelect') {
@@ -903,6 +914,7 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 				currentValue: attr.rawValue,
 				selectOptions,
 				onSave: () => {
+					setActiveEditKeyID(null)
 					// 刷新属性显示
 					if (onRefresh) {
 						onRefresh()
@@ -913,9 +925,12 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 							.catch(() => {})
 					}
 				},
+				onCancel: () => {
+					setActiveEditKeyID(null)
+				},
 			})
 		},
-		[blockId, onRefresh]
+		[blockId, onRefresh, activeEditKeyID]
 	)
 
 	// 阻止容器上的鼠标事件传递到下层
