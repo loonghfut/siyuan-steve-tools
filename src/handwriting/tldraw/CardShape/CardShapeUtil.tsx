@@ -1,4 +1,4 @@
-import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { ReactElement, useCallback, useEffect, useRef, useState } from 'react'
 import {
 	HTMLContainer,
 	Rectangle2d,
@@ -157,12 +157,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
 		const isCollapsed = shape.props.isCollapsed || false;
 
-		// 使用 useMemo 缓存渲染模式计算
-		const effectiveRenderMode = useMemo(() => {
-			const globalMode: Exclude<CardRenderMode, 'inherit'> = 
-				settingdata["card-render-mode"] === 'live-protyle' ? 'live-protyle' : 'static-dom';
-			return shape.props.renderMode === 'inherit' ? globalMode : shape.props.renderMode;
-		}, [shape.props.renderMode]);
+		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）
+		const globalRenderMode: Exclude<CardRenderMode, 'inherit'> = 
+			settingdata["card-render-mode"] === 'live-protyle' ? 'live-protyle' : 'static-dom';
+		const effectiveRenderMode: Exclude<CardRenderMode, 'inherit'> = 
+			shape.props.renderMode === 'inherit' || !shape.props.renderMode 
+				? globalRenderMode 
+				: (shape.props.renderMode as Exclude<CardRenderMode, 'inherit'>);
 
 		// 缓存 blockId 以减少属性访问
 		const blockId = shape.props.blockId;
