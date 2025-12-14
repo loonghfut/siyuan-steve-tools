@@ -479,24 +479,23 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			// 从 API 获取块的 DOM HTML（会自动批量合并请求）
 			let cancelled = false
 			setIsLoadingContent(true)
+			const fontSize = shape.props.fontSize || 16
 			
 			// 使用批量请求函数获取 DOM
-			requestBlockDOM(blockId, shape.props.fontSize || 16).then((html) => {
+			requestBlockDOM(blockId, fontSize).then(async (html) => {
 				if (cancelled) return
 				if (html) {
 					setStaticHtml(html)
-					setIsLoadingContent(false)
 					return
 				}
 				// 备用：使用 getBlockContent + renderSimpleBlockHtml
-				return getBlockContent(blockId).then((content) => {
-					if (cancelled) return
-					if (content) {
-						const fallbackHtml = renderSimpleBlockHtml(content.content || content.markdown, shape.props.fontSize || 16)
-						setCachedHtml(blockId, fallbackHtml)
-						setStaticHtml(fallbackHtml)
-					}
-				})
+				const content = await getBlockContent(blockId)
+				if (cancelled) return
+				if (content) {
+					const fallbackHtml = await renderSimpleBlockHtml(content.content || content.markdown, fontSize)
+					setCachedHtml(blockId, fallbackHtml)
+					setStaticHtml(fallbackHtml)
+				}
 			}).finally(() => {
 				if (!cancelled) setIsLoadingContent(false)
 			})
@@ -506,17 +505,21 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		// ===== 编辑态专用：创建和管理 Protyle 实例 =====
 		useEffect(() => {
-			// 只在编辑态创建 Protyle
+			let cancelled = false
 			if (!isEditingState) {
 				// 退出编辑态时，保存静态快照到缓存并销毁 Protyle
 				if (protyleRef.current && protyleHostRef.current && shape.props.blockId) {
-					const html = cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16)
-					if (html) {
-						setStaticHtml(html)
-					}
+					cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16).then((html) => {
+						if (cancelled) return
+						if (html) {
+							setStaticHtml(html)
+						}
+					})
 				}
 				destroyRuntimeResources()
-				return
+				return () => {
+					cancelled = true
+				}
 			}
 
 			const container = containerRef.current

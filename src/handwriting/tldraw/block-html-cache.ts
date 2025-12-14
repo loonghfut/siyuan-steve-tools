@@ -4,6 +4,7 @@
  */
 
 import * as api from '@/api/api'
+import { renderMathInHtml } from './utils/math-renderer'
 
 interface CacheEntry {
 	html: string
@@ -71,16 +72,13 @@ async function processBatchQueue(): Promise<void> {
 		for (const [blockId, requests] of toFetch) {
 			const dom = result?.[blockId]
 			if (dom) {
-				// 取第一个请求的 fontSize（通常相同）
 				const fontSize = requests[0].fontSize
-				const html = wrapBlockDomHtml(dom, fontSize)
+				const html = await wrapBlockDomHtml(dom, fontSize)
 				setCachedHtml(blockId, html)
-				// 通知所有等待该 blockId 的请求
 				for (const req of requests) {
 					req.resolve(html)
 				}
 			} else {
-				// 没有获取到，返回 null
 				for (const req of requests) {
 					req.resolve(null)
 				}
@@ -256,12 +254,12 @@ export function extractStaticHtml(container: HTMLElement, _fontSize: number): st
 /**
  * 从 Protyle 宿主提取并缓存静态 HTML
  */
-export function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): string {
+export async function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): Promise<string> {
 	const html = extractStaticHtml(host, fontSize)
-	if (html) {
-		setCachedHtml(blockId, html)
-	}
-	return html
+	if (!html) return html
+	const rendered = await renderMathInHtml(html)
+	setCachedHtml(blockId, rendered)
+	return rendered
 }
 
 /**
@@ -315,43 +313,38 @@ export async function getBlockContent(blockId: string): Promise<{ markdown: stri
 /**
  * 包装从 API 获取的 DOM HTML，添加必要的样式
  */
-export function wrapBlockDomHtml(domHtml: string, fontSize: number): string {
-	// 处理 DOM：移除 contenteditable，添加禁用交互的样式
-	let processed = domHtml
-		// 将 contenteditable="true" 改为 false
+export async function wrapBlockDomHtml(domHtml: string, fontSize: number): Promise<string> {
+	const processed = domHtml
 		.replace(/contenteditable="true"/g, 'contenteditable="false"')
-		// 移除 spellcheck
 		.replace(/spellcheck="[^"]*"/g, 'spellcheck="false"')
-	
-	return `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; pointer-events: none; user-select: none;">${processed}</div>`
+
+	const wrapped = `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; pointer-events: none; user-select: none;">${processed}</div>`
+	return renderMathInHtml(wrapped)
 }
 
 /**
  * 渲染块内容为 HTML（备用方案，当 getBlockDOM 失败时使用）
  */
-export function renderSimpleBlockHtml(content: string, fontSize: number): string {
-	// 简化渲染
+export async function renderSimpleBlockHtml(content: string, fontSize: number): Promise<string> {
 	let html = content
-		// 转义 HTML
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
-		// 处理加粗
 		.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-		// 处理斜体
 		.replace(/\*(.+?)\*/g, '<em>$1</em>')
-		// 处理行内代码
 		.replace(/`(.+?)`/g, '<code style="background: rgba(128,128,128,0.1); padding: 0 4px; border-radius: 3px; font-family: monospace;">$1</code>')
-		// 处理换行
 		.replace(/\n/g, '<br>')
-	
-	return `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; padding: 8px 16px; pointer-events: none; user-select: none; line-height: 1.6; word-break: break-word;"><div class="p" data-type="NodeParagraph"><div contenteditable="false" spellcheck="false">${html || '<span style="opacity: 0.5; font-style: italic;">空内容</span>'}</div></div></div>`
+
+	const fallback = '<span style="opacity: 0.5; font-style: italic;">空内容</span>'
+	const wrapped = `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; padding: 8px 16px; pointer-events: none; user-select: none; line-height: 1.6; word-break: break-word;"><div class="p" data-type="NodeParagraph"><div contenteditable="false" spellcheck="false">${html || fallback}</div></div></div>`
+	return renderMathInHtml(wrapped)
 }
 
 /**
  * 预加载指定块的内容到缓存
  * 可用于视口内即将可见的块
  */
+
 export async function preloadBlockContent(blockId: string, fontSize: number): Promise<void> {
 	// 如果已有缓存，跳过
 	if (getCachedHtml(blockId)) return
@@ -359,7 +352,7 @@ export async function preloadBlockContent(blockId: string, fontSize: number): Pr
 	// 优先使用 getBlockDOM API
 	const dom = await getBlockDOM(blockId)
 	if (dom) {
-		const html = wrapBlockDomHtml(dom, fontSize)
+		const html = await wrapBlockDomHtml(dom, fontSize)
 		setCachedHtml(blockId, html)
 		return
 	}
@@ -367,7 +360,7 @@ export async function preloadBlockContent(blockId: string, fontSize: number): Pr
 	// 备用：使用简化渲染
 	const content = await getBlockContent(blockId)
 	if (content) {
-		const html = renderSimpleBlockHtml(content.content || content.markdown, fontSize)
+		const html = await renderSimpleBlockHtml(content.content || content.markdown, fontSize)
 		setCachedHtml(blockId, html)
 	}
 }

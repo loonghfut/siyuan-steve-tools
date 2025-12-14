@@ -18,6 +18,7 @@ import { buildTldrawLink } from '../utils/link-builder';
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
+import { renderMathInDOM } from '../utils/math-renderer'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -645,6 +646,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				clone.style.height = '100%';
 				clone.style.overflow = 'auto';
 				clone.style.fontSize = `${fontSize}px`;
+
+				// 渲染数学公式
+				renderMathInDOM(clone);
 				
 				// 缓存预览 HTML
 				if (currentBlockId) {
@@ -708,6 +712,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				previewWrapper.style.overflow = 'auto';
 				previewWrapper.style.fontSize = `${fontSize}px`;
 				previewWrapper.innerHTML = domContent;
+
+				// 渲染数学公式
+				renderMathInDOM(previewWrapper);
 				
 				// 缓存预览 HTML
 				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
