@@ -1418,3 +1418,16 @@ export async function getDoc(id: string): Promise<IResGetDoc> {
     const url = '/api/filetree/getDoc';
     return request(url, data);
 }
+
+/**
+ * 获取指定标题块下的所有直接子块的 DOM 字符串表示
+ * @param id 目标标题块的 ID
+ * @returns 包含所有子块 DOM 的字符串，如果没有子块则返回空字符串
+ */
+export async function getHeadingChildrenDOM(id: string): Promise<string> {
+    const data = {
+        id: id
+    };
+    const url = '/api/block/getHeadingChildrenDOM';
+    return request(url, data);
+}
