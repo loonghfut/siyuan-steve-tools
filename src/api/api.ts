@@ -1386,3 +1386,35 @@ export async function getDocOutline(blockId: string, preview = false): Promise<I
     const url = '/api/outline/getDocOutline';
     return request(url, data);
 }
+
+/**
+ * 获取文档/块的 DOM 内容
+ * @param id 块ID
+ * @returns 包含 content (DOM HTML) 等信息的对象
+ */
+export interface IResGetDoc {
+    blockCount: number;
+    box: string;
+    content: string;
+    eof: boolean;
+    id: string;
+    isBacklinkExpand: boolean;
+    isSyncing: boolean;
+    keywords: string[] | null;
+    mode: number;
+    parent2ID: string;
+    parentID: string;
+    path: string;
+    reqId: string | null;
+    rootID: string;
+    scroll: boolean;
+    type: string;
+}
+
+export async function getDoc(id: string): Promise<IResGetDoc> {
+    const data = {
+        id: id
+    };
+    const url = '/api/filetree/getDoc';
+    return request(url, data);
+}
