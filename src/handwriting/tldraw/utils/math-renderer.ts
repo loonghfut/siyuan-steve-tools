@@ -40,6 +40,12 @@ function renderKatexElement(katex: any, mathElement: Element, macros: Record<str
 			strict: (errorCode: string) => (errorCode === 'unicodeTextInMathMode' ? 'ignore' : 'warn'),
 		})
 		if (isBlock) {
+			// 公式块居中显示
+			htmlEl.style.display = 'flex'
+			htmlEl.style.justifyContent = 'center'
+			htmlEl.style.alignItems = 'center'
+			htmlEl.style.width = '100%'
+			htmlEl.style.textAlign = 'center'
 			if (!htmlEl.firstElementChild) {
 				htmlEl.innerHTML = '<div><span></span></div>'
 			}
@@ -47,6 +53,8 @@ function renderKatexElement(katex: any, mathElement: Element, macros: Record<str
 			if (target) {
 				target.classList.remove('ft__error')
 				target.setAttribute('contenteditable', 'false')
+				target.style.display = 'inline-block'
+				target.style.textAlign = 'center'
 				target.innerHTML = mathHTML
 			}
 		} else {
