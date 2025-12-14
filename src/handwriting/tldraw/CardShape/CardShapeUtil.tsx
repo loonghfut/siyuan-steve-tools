@@ -23,7 +23,7 @@ let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
 let pendingCreationPromise: Promise<string> | null = null;
 
-// 静态预览 DOM 缓存：避免重复克隆和样式内联
+// 静态预览 DOM 缓存：避免重复请求
 const staticPreviewCache = new Map<string, { html: string; fontSize: number }>();
 const MAX_CACHE_SIZE = 50;
 
@@ -44,6 +44,21 @@ function getCachedPreview(blockId: string, fontSize: number): string | null {
 // 使缓存失效
 function invalidatePreviewCache(blockId: string) {
 	staticPreviewCache.delete(blockId);
+}
+
+// 使用 getHeadingChildrenDOM API 获取静态 DOM 内容
+async function fetchStaticDomContent(blockId: string): Promise<string | null> {
+	try {
+		const res = await api.getHeadingChildrenDOM(blockId);
+		// getHeadingChildrenDOM 直接返回 DOM 字符串
+		if (res) {
+			return res;
+		}
+		return null;
+	} catch (err) {
+		console.error('获取静态 DOM 内容失败:', err);
+		return null;
+	}
 }
 
 // 批量块存在性检查：收集多个卡片的检查请求，合并处理
@@ -413,8 +428,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				});
 			};
 
-			const mountProtyle = async (priority: number) => {
-				if (cancelled) return;
+			const mountProtyle = async (priority: number): Promise<string | null> => {
+				if (cancelled) return null;
 				let currentBlockId: string | null = containerRef.current?.getAttribute('blockid') || shape.props.blockId || null;
 				if (!currentBlockId) {
 					const editorElement = containerRef.current?.closest('.tldraw__editor');
@@ -422,7 +437,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					const title = editorElement?.getAttribute('data-tldraw-title');
 					if (!settingdata["tl-draw-create-note-id"] && !tldrawId) {
 						showMessage('配置不完整,请检查设置');
-						return;
+						return null;
 					}
 					if (isCreatingBlock && pendingCreationPromise) {
 						try {
@@ -430,7 +445,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						} catch (e) {
 							console.error('等待块创建失败', e);
 						}
-						if (cancelled) return;
+						if (cancelled) return null;
 					} else if (!currentBlockId) {
 						isCreatingBlock = true;
 						try {
@@ -450,7 +465,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								return newBlockId;
 							})();
 							currentBlockId = await pendingCreationPromise;
-							if (cancelled) return;
+							if (cancelled) return null;
 						} catch (err) {
 							console.error('创建块失败', err);
 						} finally {
@@ -462,13 +477,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				if (!currentBlockId) {
 					showMessage('未找到块');
-					return;
+					return null;
 				}
 
-				if (cancelled) return;
-				this.editor.updateShape({ id: shape.id, type: shape.type, props: { ...shape.props, blockId: currentBlockId } });
+				if (cancelled) return null;
 				containerRef.current?.setAttribute('blockid', currentBlockId);
-				if (cancelled) return;
+				if (cancelled) return null;
 
 				loadHandleRef.current?.cancel();
 				const handle = enqueueProtyleLoad(shape.id, priority, async (signal) => {
@@ -573,8 +587,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						loadHandleRef.current = null;
 					}
 				}
+				return currentBlockId;
 			};
 
+			// 从 Protyle 实例克隆静态预览 - 用于文档块(isMain)的静态渲染
 			const useStaticPreviewFromProtyle = async (forceRefresh = false) => {
 				if (!protyleRef.current || cancelled) return;
 				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
@@ -642,6 +658,56 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 			};
 
+			// 使用 getDoc API 直接获取静态 DOM 内容（无需创建 Protyle）
+			const useStaticPreviewFromGetDoc = async (targetBlockId: string, forceRefresh = false) => {
+				if (cancelled || !containerRef.current) return;
+				
+				// 检查缓存（如果非强制刷新）
+				if (!forceRefresh) {
+					const cachedHtml = getCachedPreview(targetBlockId, fontSize);
+					if (cachedHtml) {
+						// 使用缓存的预览
+						if (staticPreviewRef.current?.parentElement === containerRef.current) {
+							containerRef.current.removeChild(staticPreviewRef.current);
+						}
+						const wrapper = document.createElement('div');
+						wrapper.innerHTML = cachedHtml;
+						const clone = wrapper.firstElementChild as HTMLElement;
+						if (clone) {
+							if (cancelled) return;
+							staticPreviewRef.current = clone;
+							containerRef.current.appendChild(clone);
+							return;
+						}
+					}
+				}
+				
+				// 使用 getDoc API 获取 DOM 内容
+				const domContent = await fetchStaticDomContent(targetBlockId);
+				if (cancelled || !domContent) return;
+				
+				// 移除旧的静态预览
+				if (staticPreviewRef.current?.parentElement === containerRef.current) {
+					containerRef.current.removeChild(staticPreviewRef.current);
+				}
+				
+				// 创建预览容器
+				const previewWrapper = document.createElement('div');
+				previewWrapper.className = 'protyle-wysiwyg protyle-wysiwyg--attr';
+				previewWrapper.style.width = '100%';
+				previewWrapper.style.height = '100%';
+				previewWrapper.style.overflow = 'auto';
+				previewWrapper.style.fontSize = `${fontSize}px`;
+				previewWrapper.innerHTML = domContent;
+				
+				// 缓存预览 HTML
+				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
+				
+				if (cancelled) return;
+				staticPreviewRef.current = previewWrapper;
+				containerRef.current.appendChild(previewWrapper);
+			};
+
 			let cancelled = false;
 			
 			// 检测是否刚从编辑状态退出（用于强制刷新缓存）
@@ -655,8 +721,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 					staticPreviewRef.current = null;
 					if (!protyleRef.current) {
-						await mountProtyle(0);
+						const createdBlockId = await mountProtyle(0);
 						if (cancelled) return;
+						if (createdBlockId && shape.props.blockId !== createdBlockId) {
+							this.editor.updateShape({
+								id: shape.id,
+								type: shape.type,
+								props: { ...shape.props, blockId: createdBlockId }
+							});
+						}
 					}
 					if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 						containerRef.current.appendChild(protyleHostRef.current);
@@ -665,18 +738,31 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				} else {
 					// 非编辑
 					if (effectiveRenderMode === 'static-dom') {
-						// 若已有 Protyle，用其生成静态预览后销毁实例；若没有且有 blockId，则临时创建->克隆->销毁
-						// 如果刚从编辑状态退出，强制刷新缓存
-						if (protyleRef.current) {
-							await useStaticPreviewFromProtyle(wasEditing);
-							if (cancelled) return;
-						} else {
-							const id = containerRef.current?.getAttribute('blockid') || blockId;
-							if (id) {
-								await mountProtyle(2);
-								if (cancelled) return;
-								if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
+						const id = containerRef.current?.getAttribute('blockid') || blockId;
+						if (id) {
+							// 对于文档块(isMain)，仍使用 Protyle 方式获取完整内容
+							// 对于普通块，使用 getHeadingChildrenDOM API 获取子块 DOM
+							if (shape.props.isMain) {
+								// 文档块：创建 Protyle 实例并克隆 DOM
+								if (!protyleRef.current) {
+									await mountProtyle(2);
+									if (cancelled) return;
+									if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
+								}
 								await useStaticPreviewFromProtyle(wasEditing);
+								if (cancelled) return;
+							} else {
+								// 普通块：使用 getHeadingChildrenDOM API 直接获取静态 DOM
+								// 如果有 Protyle 实例，先销毁它
+								if (protyleRef.current) {
+									if (protyleHostRef.current?.parentElement) {
+										protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
+									}
+									try { safeDestroyProtyle(protyleRef.current); } catch { }
+									protyleRef.current = null;
+									protyleHostRef.current = null;
+								}
+								await useStaticPreviewFromGetDoc(id, wasEditing);
 								if (cancelled) return;
 							}
 						}
