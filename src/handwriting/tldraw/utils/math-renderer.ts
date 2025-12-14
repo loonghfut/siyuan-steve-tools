@@ -1,9 +1,15 @@
+/**
+ * KaTeX 数学公式渲染器
+ */
+import { loadScript, loadStyle, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './content-renderer-base'
+
 const MATH_SELECTOR = '[data-subtype="math"]'
-const RENDERED_ATTR = 'data-render'
 const KATEX_CSS_ID = 'plugin-katex-style'
 const KATEX_CSS_URL = '/stage/protyle/js/katex/katex.min.css?v=0.16.9'
 const KATEX_JS_URL = '/stage/protyle/js/katex/katex.min.js?v=0.16.9'
+const KATEX_JS_ID = 'plugin-katex-script'
 const KATEX_MHCHEM_URL = '/stage/protyle/js/katex/mhchem.min.js?v=0.16.9'
+const KATEX_MHCHEM_ID = 'plugin-katex-mhchem'
 let katexLoadPromise: Promise<any> | null = null
 
 function getMacros(): Record<string, string> {
@@ -18,17 +24,11 @@ function getMacros(): Record<string, string> {
 	}
 }
 
-function unescapeHTML(raw: string): string {
-	if (!raw) return ''
-	const div = document.createElement('div')
-	div.innerHTML = raw
-	return div.textContent || div.innerText || ''
-}
-
-function renderElement(katex: any, mathElement: Element, macros: Record<string, string>): void {
+function renderKatexElement(katex: any, mathElement: Element, macros: Record<string, string>): void {
 	const htmlEl = mathElement as HTMLElement
-	if (htmlEl.getAttribute(RENDERED_ATTR) === 'true') return
-	htmlEl.setAttribute(RENDERED_ATTR, 'true')
+	if (isRendered(htmlEl)) return
+	markRendered(htmlEl)
+	
 	const isBlock = htmlEl.tagName === 'DIV'
 	const content = unescapeHTML(htmlEl.getAttribute('data-content') || '')
 	try {
@@ -54,8 +54,7 @@ function renderElement(katex: any, mathElement: Element, macros: Record<string, 
 			htmlEl.innerHTML = mathHTML
 		}
 	} catch (err: any) {
-		htmlEl.innerHTML = `<span style="color: red;">${err?.message || '公式渲染错误'}</span>`
-		htmlEl.classList.add('ft__error')
+		renderError(htmlEl, err)
 	}
 }
 
@@ -69,30 +68,22 @@ function ensureKatexLoaded(): Promise<any> {
 	if (katexLoadPromise) {
 		return katexLoadPromise
 	}
+	
 	katexLoadPromise = new Promise((resolve, reject) => {
 		try {
-			if (!document.getElementById(KATEX_CSS_ID)) {
-				const link = document.createElement('link')
-				link.id = KATEX_CSS_ID
-				link.rel = 'stylesheet'
-				link.href = KATEX_CSS_URL
-				document.head.appendChild(link)
-			}
-			const script1 = document.createElement('script')
-			script1.src = KATEX_JS_URL
-			script1.onload = () => {
-				const script2 = document.createElement('script')
-				script2.src = KATEX_MHCHEM_URL
-				script2.onload = () => resolve((window as any).katex)
-				script2.onerror = reject
-				document.head.appendChild(script2)
-			}
-			script1.onerror = reject
-			document.head.appendChild(script1)
+			// 加载 CSS
+			loadStyle(KATEX_CSS_URL, KATEX_CSS_ID)
+			
+			// 加载 KaTeX 主脚本
+			loadScript(KATEX_JS_URL, KATEX_JS_ID)
+				.then(() => loadScript(KATEX_MHCHEM_URL, KATEX_MHCHEM_ID))
+				.then(() => resolve((window as any).katex))
+				.catch(reject)
 		} catch (err) {
 			reject(err)
 		}
 	})
+	
 	return katexLoadPromise
 }
 
@@ -109,7 +100,7 @@ export async function renderMathInDOM(container: HTMLElement): Promise<void> {
 	}
 	const macros = getMacros()
 	const mathElements = container.querySelectorAll(MATH_SELECTOR)
-	mathElements.forEach((el) => renderElement(katex, el, macros))
+	mathElements.forEach((el) => renderKatexElement(katex, el, macros))
 }
 
 export async function renderMathInHtml(html: string): Promise<string> {
@@ -122,5 +113,24 @@ export async function renderMathInHtml(html: string): Promise<string> {
 	} catch (err) {
 		console.warn('公式渲染失败', err)
 		return html
+	}
+}
+
+export const mathRenderer: ContentRenderer = {
+	name: 'math',
+	selector: MATH_SELECTOR,
+	
+	async ensureLoaded() {
+		await ensureKatexLoaded()
+	},
+	
+	async renderElement(element: Element) {
+		const katex = await ensureKatexLoaded()
+		const macros = getMacros()
+		renderKatexElement(katex, element, macros)
+	},
+	
+	async renderAll(container: HTMLElement) {
+		await renderMathInDOM(container)
 	}
 }

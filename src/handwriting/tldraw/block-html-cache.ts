@@ -4,7 +4,7 @@
  */
 
 import * as api from '@/api/api'
-import { renderMathInHtml } from './utils/math-renderer'
+import { renderAllContent } from './utils/content-renderer'
 
 interface CacheEntry {
 	html: string
@@ -257,7 +257,11 @@ export function extractStaticHtml(container: HTMLElement, _fontSize: number): st
 export async function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): Promise<string> {
 	const html = extractStaticHtml(host, fontSize)
 	if (!html) return html
-	const rendered = await renderMathInHtml(html)
+	// 渲染所有内容类型（公式、图表等）
+	const wrapper = document.createElement('div')
+	wrapper.innerHTML = html
+	await renderAllContent(wrapper)
+	const rendered = wrapper.innerHTML
 	setCachedHtml(blockId, rendered)
 	return rendered
 }
@@ -319,7 +323,11 @@ export async function wrapBlockDomHtml(domHtml: string, fontSize: number): Promi
 		.replace(/spellcheck="[^"]*"/g, 'spellcheck="false"')
 
 	const wrapped = `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; pointer-events: none; user-select: none;">${processed}</div>`
-	return renderMathInHtml(wrapped)
+	// 渲染所有内容类型
+	const wrapper = document.createElement('div')
+	wrapper.innerHTML = wrapped
+	await renderAllContent(wrapper)
+	return wrapper.innerHTML
 }
 
 /**
@@ -337,7 +345,11 @@ export async function renderSimpleBlockHtml(content: string, fontSize: number): 
 
 	const fallback = '<span style="opacity: 0.5; font-style: italic;">空内容</span>'
 	const wrapped = `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; padding: 8px 16px; pointer-events: none; user-select: none; line-height: 1.6; word-break: break-word;"><div class="p" data-type="NodeParagraph"><div contenteditable="false" spellcheck="false">${html || fallback}</div></div></div>`
-	return renderMathInHtml(wrapped)
+	// 渲染所有内容类型
+	const wrapper = document.createElement('div')
+	wrapper.innerHTML = wrapped
+	await renderAllContent(wrapper)
+	return wrapper.innerHTML
 }
 
 /**
