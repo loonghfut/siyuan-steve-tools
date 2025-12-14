@@ -157,40 +157,48 @@ class ShapeLoadManager {
     sortable.sort((a, b) => a.score - b.score)
 
     const allowedSet = new Set<string>()
-    // 先收集所有已加载的形状
-    const previouslyAllowed: string[] = []
-    for (const s of this.shapes.values()) {
-      if (s.lastAllowed) previouslyAllowed.push(s.id)
-    }
     
-    // 统计当前需要保留的形状数量
+    // 统计当前需要保留的形状数量（不包括编辑中的）
     let allowedCount = 0
     
-    // 第一遍：处理编辑中和已加载的形状
+    // 分离视口内和视口外的形状
+    const inViewportItems = sortable.filter(item => !item.editing && item.meta.inViewport)
+    const outOfViewportItems = sortable.filter(item => !item.editing && !item.meta.inViewport)
+    
+    // 第一步：编辑中的形状始终允许（不计入配额）
     for (const item of sortable) {
-      // 编辑中的形状始终允许（不计入配额）
       if (item.editing) {
         allowedSet.add(item.id)
-        continue
-      }
-      
-      // 如果之前已加载，且总数未超限，则保留
-      const wasAllowed = previouslyAllowed.includes(item.id)
-      if (wasAllowed && allowedCount < maxActive) {
-        allowedSet.add(item.id)
-        allowedCount++
       }
     }
     
-    // 第二遍：按优先级填充剩余配额（新形状）
-    for (const item of sortable) {
-      if (item.editing) continue
-      if (allowedSet.has(item.id)) continue
-      
+    // 第二步：优先加载视口内的形状（按距离排序，已排好序）
+    for (const item of inViewportItems) {
       if (allowedCount < maxActive) {
         allowedSet.add(item.id)
         allowedCount++
       }
+    }
+    
+    // 第三步：如果配额有剩余，保留视口外已加载的形状（防止频繁卸载/加载）
+    for (const item of outOfViewportItems) {
+      if (allowedCount >= maxActive) break
+      
+      const shape = this.shapes.get(item.id as TLShapeId)
+      const wasAllowed = shape?.lastAllowed ?? false
+      if (wasAllowed) {
+        allowedSet.add(item.id)
+        allowedCount++
+      }
+    }
+    
+    // 第四步：如果配额还有剩余，按优先级加载视口外的新形状
+    for (const item of outOfViewportItems) {
+      if (allowedCount >= maxActive) break
+      if (allowedSet.has(item.id)) continue
+      
+      allowedSet.add(item.id)
+      allowedCount++
     }
 
     // Notify changes

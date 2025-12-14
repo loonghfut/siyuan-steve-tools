@@ -619,6 +619,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						wrapper.innerHTML = cachedHtml;
 						const clone = wrapper.firstElementChild as HTMLElement;
 						if (clone) {
+							// 渲染内容（公式、图表等）- 缓存的是原始 DOM，需要渲染
+							await renderAllContent(clone);
 							// 清理 Protyle
 							if (protyleHostRef.current?.parentElement) {
 								protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
@@ -647,13 +649,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				clone.style.overflow = 'auto';
 				clone.style.fontSize = `${fontSize}px`;
 
-				// 渲染所有内容类型（公式、图表等）
-				await renderAllContent(clone);
-				
-				// 缓存预览 HTML
+				// 缓存原始 DOM HTML（渲染前）
 				if (currentBlockId) {
 					cacheStaticPreview(currentBlockId, clone.outerHTML, fontSize);
 				}
+
+				// 渲染所有内容类型（公式、图表等）
+				await renderAllContent(clone);
 				
 				// 清理 Protyle host
 				if (protyleHostRef.current?.parentElement) {
@@ -687,6 +689,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						wrapper.innerHTML = cachedHtml;
 						const clone = wrapper.firstElementChild as HTMLElement;
 						if (clone) {
+							// 渲染内容（公式、图表等）- 缓存的是原始 DOM，需要渲染
+							await renderAllContent(clone);
 							if (cancelled) return;
 							staticPreviewRef.current = clone;
 							containerRef.current.appendChild(clone);
@@ -713,11 +717,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				previewWrapper.style.fontSize = `${fontSize}px`;
 				previewWrapper.innerHTML = domContent;
 
+				// 缓存原始 DOM HTML（渲染前）
+				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
+
 				// 渲染所有内容类型（公式、图表等）
 				await renderAllContent(previewWrapper);
-				
-				// 缓存预览 HTML
-				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
 				
 				if (cancelled) return;
 				staticPreviewRef.current = previewWrapper;

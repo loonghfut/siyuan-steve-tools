@@ -1,10 +1,11 @@
 /**
  * 块内容 HTML 缓存模块
  * 用于缓存 SingleBlockShape 的静态 HTML 内容，避免每次都创建 Protyle 实例
+ * 
+ * 缓存策略：只缓存 API 获取的原始 DOM，渲染（公式、图表等）在实际显示时执行
  */
 
 import * as api from '@/api/api'
-import { renderAllContent } from './utils/content-renderer'
 
 interface CacheEntry {
 	html: string
@@ -73,7 +74,7 @@ async function processBatchQueue(): Promise<void> {
 			const dom = result?.[blockId]
 			if (dom) {
 				const fontSize = requests[0].fontSize
-				const html = await wrapBlockDomHtml(dom, fontSize)
+				const html = wrapBlockDomHtml(dom, fontSize)
 				setCachedHtml(blockId, html)
 				for (const req of requests) {
 					req.resolve(html)
@@ -253,17 +254,13 @@ export function extractStaticHtml(container: HTMLElement, _fontSize: number): st
 
 /**
  * 从 Protyle 宿主提取并缓存静态 HTML
+ * 注意：只缓存原始 DOM，不执行内容渲染
  */
-export async function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): Promise<string> {
+export function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): string {
 	const html = extractStaticHtml(host, fontSize)
 	if (!html) return html
-	// 渲染所有内容类型（公式、图表等）
-	const wrapper = document.createElement('div')
-	wrapper.innerHTML = html
-	await renderAllContent(wrapper)
-	const rendered = wrapper.innerHTML
-	setCachedHtml(blockId, rendered)
-	return rendered
+	setCachedHtml(blockId, html)
+	return html
 }
 
 /**
@@ -316,24 +313,23 @@ export async function getBlockContent(blockId: string): Promise<{ markdown: stri
 
 /**
  * 包装从 API 获取的 DOM HTML，添加必要的样式
+ * 注意：此函数仅做 DOM 包装，不执行内容渲染（如公式、图表等）
+ * 渲染应该在实际挂载到页面时调用 renderAllContent
  */
-export async function wrapBlockDomHtml(domHtml: string, fontSize: number): Promise<string> {
+export function wrapBlockDomHtml(domHtml: string, fontSize: number): string {
 	const processed = domHtml
 		.replace(/contenteditable="true"/g, 'contenteditable="false"')
 		.replace(/spellcheck="[^"]*"/g, 'spellcheck="false"')
 
-	const wrapped = `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; pointer-events: none; user-select: none;">${processed}</div>`
-	// 渲染所有内容类型
-	const wrapper = document.createElement('div')
-	wrapper.innerHTML = wrapped
-	await renderAllContent(wrapper)
-	return wrapper.innerHTML
+	return `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; pointer-events: none; user-select: none;">${processed}</div>`
 }
 
 /**
  * 渲染块内容为 HTML（备用方案，当 getBlockDOM 失败时使用）
+ * 注意：此函数仅做 HTML 包装，不执行内容渲染（如公式、图表等）
+ * 渲染应该在实际挂载到页面时调用 renderAllContent
  */
-export async function renderSimpleBlockHtml(content: string, fontSize: number): Promise<string> {
+export function renderSimpleBlockHtml(content: string, fontSize: number): string {
 	let html = content
 		.replace(/&/g, '&amp;')
 		.replace(/</g, '&lt;')
@@ -344,12 +340,7 @@ export async function renderSimpleBlockHtml(content: string, fontSize: number): 
 		.replace(/\n/g, '<br>')
 
 	const fallback = '<span style="opacity: 0.5; font-style: italic;">空内容</span>'
-	const wrapped = `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; padding: 8px 16px; pointer-events: none; user-select: none; line-height: 1.6; word-break: break-word;"><div class="p" data-type="NodeParagraph"><div contenteditable="false" spellcheck="false">${html || fallback}</div></div></div>`
-	// 渲染所有内容类型
-	const wrapper = document.createElement('div')
-	wrapper.innerHTML = wrapped
-	await renderAllContent(wrapper)
-	return wrapper.innerHTML
+	return `<div class="protyle-wysiwyg protyle-wysiwyg--attr" style="font-size: ${fontSize}px; padding: 8px 16px; pointer-events: none; user-select: none; line-height: 1.6; word-break: break-word;"><div class="p" data-type="NodeParagraph"><div contenteditable="false" spellcheck="false">${html || fallback}</div></div></div>`
 }
 
 /**
@@ -364,7 +355,7 @@ export async function preloadBlockContent(blockId: string, fontSize: number): Pr
 	// 优先使用 getBlockDOM API
 	const dom = await getBlockDOM(blockId)
 	if (dom) {
-		const html = await wrapBlockDomHtml(dom, fontSize)
+		const html = wrapBlockDomHtml(dom, fontSize)
 		setCachedHtml(blockId, html)
 		return
 	}
@@ -372,7 +363,7 @@ export async function preloadBlockContent(blockId: string, fontSize: number): Pr
 	// 备用：使用简化渲染
 	const content = await getBlockContent(blockId)
 	if (content) {
-		const html = await renderSimpleBlockHtml(content.content || content.markdown, fontSize)
+		const html = renderSimpleBlockHtml(content.content || content.markdown, fontSize)
 		setCachedHtml(blockId, html)
 	}
 }

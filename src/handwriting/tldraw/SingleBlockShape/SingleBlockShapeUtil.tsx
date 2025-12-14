@@ -33,6 +33,7 @@ import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
+import { renderAllContent } from '../utils/content-renderer'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -296,6 +297,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		// 静态 HTML 内容（非编辑态显示）
 		const [staticHtml, setStaticHtml] = useState<string>('')
+		// 静态内容容器的 ref，用于渲染后执行 renderAllContent
+		const staticContentRef = useRef<HTMLDivElement | null>(null)
+		// 标记内容是否已渲染（公式、图表等）
+		const [, setIsContentRendered] = useState(false)
 		const [isLoadingContent, setIsLoadingContent] = useState(false)
 		const detachKeyHandler = useRef<() => void>()
 		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
@@ -503,23 +508,39 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			return () => { cancelled = true }
 		}, [isEditingState, shape.props.blockId, shape.props.fontSize, shape.props.refreshNonce, isInViewport, canLoad, isViewportCullingEnabled])
 
+		// ===== 静态内容渲染：在 staticHtml 挂载后执行 renderAllContent =====
+		useEffect(() => {
+			if (!staticHtml || isEditingState || !staticContentRef.current) return
+			
+			// 重置渲染状态
+			setIsContentRendered(false)
+			
+			// 等待 DOM 更新后执行渲染
+			const timer = setTimeout(() => {
+				if (staticContentRef.current) {
+					renderAllContent(staticContentRef.current).then(() => {
+						setIsContentRendered(true)
+					}).catch(() => {
+						// 忽略渲染错误
+					})
+				}
+			}, 0)
+			
+			return () => clearTimeout(timer)
+		}, [staticHtml, isEditingState])
+
 		// ===== 编辑态专用：创建和管理 Protyle 实例 =====
 		useEffect(() => {
-			let cancelled = false
 			if (!isEditingState) {
 				// 退出编辑态时，保存静态快照到缓存并销毁 Protyle
 				if (protyleRef.current && protyleHostRef.current && shape.props.blockId) {
-					cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16).then((html) => {
-						if (cancelled) return
-						if (html) {
-							setStaticHtml(html)
-						}
-					})
+					const html = cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16)
+					if (html) {
+						setStaticHtml(html)
+					}
 				}
 				destroyRuntimeResources()
-				return () => {
-					cancelled = true
-				}
+				return
 			}
 
 			const container = containerRef.current
@@ -1026,6 +1047,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					{/* 非编辑态：显示静态 HTML 内容 */}
 					{!isEditingState && staticHtml && (
 						<div 
+							ref={staticContentRef}
 							dangerouslySetInnerHTML={{ __html: staticHtml }}
 							style={{
 								width: '100%',
