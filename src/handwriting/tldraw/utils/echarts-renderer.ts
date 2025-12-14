@@ -42,15 +42,48 @@ async function renderEChartsElement(element: Element, isMindmap = false): Promis
 
 	try {
 		markRendered(htmlEl)
-		
-		// 清空容器并设置尺寸
+		// console.log('Rendering ECharts element with content:', htmlEl)
+		// 保留原有的 style 属性中的尺寸信息
+		const computedStyle = window.getComputedStyle(htmlEl)
+		const inlineStyle = htmlEl.getAttribute('style') || ''
+		const extractInline = (name: string) => {
+			const match = inlineStyle.match(new RegExp(`${name}\s*:\s*([^;]+)`))
+			return match ? match[1].trim() : ''
+		}
+        // console.log('Computed styles0:', htmlEl.style.cssText)
+		const existingHeight = htmlEl.style.height || extractInline('height') || computedStyle.height
+		const existingWidth = htmlEl.style.width || extractInline('width') || computedStyle.width
+		const existingMinHeight = htmlEl.style.minHeight || extractInline('min-height') || computedStyle.minHeight
+		console.log('Existing dimensions:', { existingHeight, existingWidth, existingMinHeight })
+        // 清空容器内容
 		htmlEl.innerHTML = ''
-		htmlEl.style.height = htmlEl.getAttribute('data-height') || '400px'
+		
+		// 恢复或设置尺寸
+		if (existingHeight && existingHeight !== 'auto' && existingHeight !== '0px') {
+			htmlEl.style.height = existingHeight
+		} else {
+			htmlEl.style.height = htmlEl.getAttribute('data-height') || '400px'
+		}
+		
+		if (existingWidth && existingWidth !== 'auto' && existingWidth !== '0px') {
+			htmlEl.style.width = existingWidth
+		} else {
+			htmlEl.style.width = '100%'
+		}
+		
+		if (existingMinHeight && existingMinHeight !== 'auto' && existingMinHeight !== '0px') {
+			htmlEl.style.minHeight = existingMinHeight
+		} else {
+			htmlEl.style.minHeight = existingHeight || '300px'
+		}
+		 console.log('Computed styles1:', htmlEl.style.cssText)
+		// 确保容器有实际尺寸，延迟初始化图表
+		await new Promise(resolve => setTimeout(resolve, 0))
 		
 		let option
 		if (isMindmap) {
 			// 思维导图特殊处理
-			option = parseMindmapOption(content)
+			option = parseMindmapOption(content, echarts)
 		} else {
 			// 普通 ECharts 配置
 			option = JSON.parse(content)
@@ -58,11 +91,15 @@ async function renderEChartsElement(element: Element, isMindmap = false): Promis
 		
 		// 创建图表实例
 		const chart = echarts.init(htmlEl)
-		chart.setOption(option)
+		chart.setOption(option, true)
 		
 		// 响应式调整
 		const resizeObserver = new ResizeObserver(() => {
-			chart.resize()
+			try {
+				chart.resize()
+			} catch (err) {
+				// 忽略resize错误
+			}
 		})
 		resizeObserver.observe(htmlEl)
 		
@@ -76,22 +113,83 @@ async function renderEChartsElement(element: Element, isMindmap = false): Promis
 	}
 }
 
-function parseMindmapOption(content: string): any {
-	// 简化的思维导图解析，实际应该更复杂
-	// 这里仅作示例
+function parseMindmapOption(content: string, echarts: any): any {
 	try {
-		return JSON.parse(content)
-	} catch {
-		// 如果不是JSON，尝试简单的文本解析
-		return {
-			series: [{
-				type: 'tree',
-				data: [{ name: content }],
-				layout: 'radial',
-				symbol: 'emptyCircle',
-				symbolSize: 7
-			}]
+		// 尝试解析为 JSON 配置
+		const parsed = JSON.parse(content)
+		// 如果已经是完整的 ECharts 配置，直接返回
+		if (parsed.series) {
+			return parsed
 		}
+		// 否则构建思维导图配置
+		return buildMindmapOption(parsed, echarts)
+	} catch {
+		// 解析失败，尝试简单文本解析
+		return buildSimpleMindmapOption(content, echarts)
+	}
+}
+
+function buildMindmapOption(data: any, echarts: any): any {
+	return {
+		tooltip: {
+			trigger: 'item',
+			triggerOn: 'mousemove'
+		},
+		series: [{
+			type: 'tree',
+			data: Array.isArray(data) ? data : [data],
+			orient: 'LR',
+			layout: 'orthogonal',
+			roam: true,
+			initialTreeDepth: -1,
+			label: {
+				position: 'left',
+				verticalAlign: 'middle',
+				align: 'right'
+			},
+			leaves: {
+				label: {
+					position: 'right',
+					verticalAlign: 'middle',
+					align: 'left'
+				}
+			},
+			expandAndCollapse: true,
+			animationDuration: 550,
+			animationDurationUpdate: 750
+		}]
+	}
+}
+
+function buildSimpleMindmapOption(content: string, echarts: any): any {
+	// 简单文本转为基础树状图
+	return {
+		tooltip: {
+			trigger: 'item',
+			triggerOn: 'mousemove'
+		},
+		series: [{
+			type: 'tree',
+			data: [{ 
+				name: content || '思维导图',
+				children: []
+			}],
+			orient: 'LR',
+			layout: 'orthogonal',
+			roam: true,
+			label: {
+				position: 'left',
+				verticalAlign: 'middle',
+				align: 'right'
+			},
+			leaves: {
+				label: {
+					position: 'right',
+					verticalAlign: 'middle',
+					align: 'left'
+				}
+			}
+		}]
 	}
 }
 
