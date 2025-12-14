@@ -186,6 +186,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		// 追踪上一次的编辑状态，用于检测编辑->非编辑的切换
 		const prevIsEditingRef = useRef(isEditingState);
+		const refreshNonceRef = useRef(shape.props.refreshNonce);
 
 
 		// 仅在编辑时创建 Protyle 实例
@@ -389,6 +390,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// Protyle 生命周期管理主 Effect
 		// 注意：对于 live-protyle 模式，编辑状态切换不应触发重建
 		useEffect(() => {
+			const shouldForceReloadLiveProtyle =
+				effectiveRenderMode === 'live-protyle' &&
+				refreshNonceRef.current !== shape.props.refreshNonce;
+			refreshNonceRef.current = shape.props.refreshNonce;
 			// 折叠状态下不渲染 Protyle
 			if (isCollapsed && !isEditingState) {
 				destroyRuntimeResources();
@@ -399,6 +404,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			if (!shouldRender) {
 				destroyRuntimeResources();
 				return;
+			}
+
+			if (shouldForceReloadLiveProtyle) {
+				destroyRuntimeResources();
 			}
 
 			if (!containerRef.current || !window.siyuan?.ws?.app) return;
