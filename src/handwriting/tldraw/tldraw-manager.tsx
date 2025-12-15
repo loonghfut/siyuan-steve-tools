@@ -39,6 +39,7 @@ import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
 import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
 import { buildTldrawLink } from './utils/link-builder';
+import { setInteracting } from './utils/idle-scheduler';
 const assetUrls = getAssetUrls({
     baseUrl: 'plugins/siyuan-steve-tools/asset/',
 })
@@ -421,6 +422,10 @@ export class TldrawManager {
                         // 设置素材库拖放处理程序
                         setupShapeLibraryDropHandler(editor);
                         
+                        // 设置交互状态监听，用于优化拖动时的性能
+                        // 在拖动、缩放画布时暂停内容加载和渲染
+                        this.setupInteractionStateListener(editor);
+                        
                         // 添加全局拖放事件监听
                         const container = editor.getContainer();
 
@@ -690,6 +695,138 @@ export class TldrawManager {
             }
         }
     }
+    
+    /**
+     * 设置交互状态监听器
+     * 在拖动画布、缩放、移动形状等操作时通知空闲调度器暂停后台任务
+     * 这样可以避免在交互时加载内容导致卡顿
+     */
+    private setupInteractionStateListener(editor: Editor) {
+        // 跟踪交互状态的变量
+        let isCurrentlyInteracting = false;
+        let interactionDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+        
+        const startInteraction = () => {
+            if (interactionDebounceTimer) {
+                clearTimeout(interactionDebounceTimer);
+                interactionDebounceTimer = null;
+            }
+            if (!isCurrentlyInteracting) {
+                isCurrentlyInteracting = true;
+                setInteracting(true);
+            }
+        };
+        
+        const endInteraction = () => {
+            // 使用防抖，避免在快速连续操作时频繁切换状态
+            if (interactionDebounceTimer) {
+                clearTimeout(interactionDebounceTimer);
+            }
+            interactionDebounceTimer = setTimeout(() => {
+                isCurrentlyInteracting = false;
+                setInteracting(false);
+                interactionDebounceTimer = null;
+            }, 100);
+        };
+        
+        // 监听编辑器事件来检测交互状态
+        // tldraw 的 Editor 会在工具状态变化时触发事件
+        const checkInteractionState = () => {
+            try {
+                const currentPath = editor.getPath();
+                // 这些状态表示正在进行交互操作
+                const interactingStates = [
+                    'select.translating',      // 拖动形状
+                    'select.resizing',         // 调整大小
+                    'select.rotating',         // 旋转
+                    'select.brushing',         // 框选
+                    'select.scribble_brushing', // 涂鸦选择
+                    'hand.dragging',           // 手型工具拖动
+                    'zoom.zooming',            // 缩放
+                ];
+                
+                const isInteracting = interactingStates.some(state => currentPath.includes(state));
+                
+                if (isInteracting) {
+                    startInteraction();
+                } else {
+                    endInteraction();
+                }
+            } catch {
+                // 忽略错误
+            }
+        };
+        
+        // 监听指针事件来检测画布拖动
+        const container = editor.getContainer();
+        let isPointerDown = false;
+        
+        const handlePointerDown = (e: PointerEvent) => {
+            isPointerDown = true;
+            // 如果是鼠标中键或按住空格键拖动画布
+            if (e.button === 1 || (e.button === 0 && e.target === container.querySelector('.tl-background'))) {
+                startInteraction();
+            }
+        };
+        
+        const handlePointerMove = () => {
+            if (isPointerDown) {
+                // 检查当前工具状态
+                checkInteractionState();
+            }
+        };
+        
+        const handlePointerUp = () => {
+            isPointerDown = false;
+            endInteraction();
+        };
+        
+        // 监听滚轮事件（缩放）
+        const handleWheel = () => {
+            startInteraction();
+            // 滚轮缩放后短暂延迟结束交互状态
+            if (interactionDebounceTimer) {
+                clearTimeout(interactionDebounceTimer);
+            }
+            interactionDebounceTimer = setTimeout(() => {
+                isCurrentlyInteracting = false;
+                setInteracting(false);
+                interactionDebounceTimer = null;
+            }, 200);
+        };
+        
+        container.addEventListener('pointerdown', handlePointerDown, { passive: true });
+        container.addEventListener('pointermove', handlePointerMove, { passive: true });
+        container.addEventListener('pointerup', handlePointerUp, { passive: true });
+        container.addEventListener('pointercancel', handlePointerUp, { passive: true });
+        container.addEventListener('wheel', handleWheel, { passive: true });
+        
+        // 使用 store 监听器来检测形状变化（拖动、调整大小等）
+        const unsubscribe = editor.store.listen(
+            throttle(() => {
+                checkInteractionState();
+            }, 50),
+            { source: 'user', scope: 'document' }
+        );
+        
+        // 清理函数（在 destroy 时调用）
+        const cleanup = () => {
+            if (interactionDebounceTimer) {
+                clearTimeout(interactionDebounceTimer);
+            }
+            container.removeEventListener('pointerdown', handlePointerDown);
+            container.removeEventListener('pointermove', handlePointerMove);
+            container.removeEventListener('pointerup', handlePointerUp);
+            container.removeEventListener('pointercancel', handlePointerUp);
+            container.removeEventListener('wheel', handleWheel);
+            unsubscribe();
+            setInteracting(false);
+        };
+        
+        // 保存清理函数以便后续调用
+        (this as any)._interactionCleanup = cleanup;
+    }
+    
     /**
      * 设置自动保存功能
      */
@@ -953,6 +1090,17 @@ export class TldrawManager {
     public async destroy() {
         // 销毁前保存当前状态
         await this.saveData();
+
+        // 清理交互状态监听器
+        try {
+            const interactionCleanup = (this as any)._interactionCleanup;
+            if (typeof interactionCleanup === 'function') {
+                interactionCleanup();
+                (this as any)._interactionCleanup = null;
+            }
+        } catch (err) {
+            console.warn('清理交互状态监听器出错', err);
+        }
 
         // 清空容器
         this.container.innerHTML = '';

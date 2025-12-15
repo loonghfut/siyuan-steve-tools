@@ -3,9 +3,15 @@
  * 用于缓存 SingleBlockShape 的静态 HTML 内容，避免每次都创建 Protyle 实例
  * 
  * 缓存策略：只缓存 API 获取的原始 DOM，渲染（公式、图表等）在实际显示时执行
+ * 
+ * 优化：
+ * - 使用空闲调度，在拖动画布时暂停加载
+ * - 批量请求合并，减少网络请求次数
+ * - 分帧处理，避免阻塞主线程
  */
 
 import * as api from '@/api/api'
+import { isInteracting } from './utils/idle-scheduler'
 
 interface CacheEntry {
 	html: string
@@ -31,18 +37,34 @@ interface PendingRequest {
 
 let pendingQueue: PendingRequest[] = []
 let batchTimer: ReturnType<typeof setTimeout> | null = null
-const BATCH_DELAY_MS = 50 // 50ms 内的请求会被合并
+let rafId: number | null = null
+
+// 批量延迟时间，在交互时使用更长的延迟
+const BATCH_DELAY_MS = 50 // 正常延迟
+const BATCH_DELAY_INTERACTING_MS = 200 // 交互时延迟
+
+// 每批最多处理的块数量，避免单次请求过多
+const MAX_BATCH_SIZE = 10
 
 /**
  * 处理批量请求队列
+ * 优化：在交互时推迟处理，分批处理避免阻塞
  */
 async function processBatchQueue(): Promise<void> {
 	batchTimer = null
+	rafId = null
+	
 	if (pendingQueue.length === 0) return
 	
-	// 取出当前队列中的所有请求
-	const currentBatch = pendingQueue
-	pendingQueue = []
+	// 如果正在交互，推迟处理
+	if (isInteracting()) {
+		scheduleBatchProcessing()
+		return
+	}
+	
+	// 取出当前队列中的部分请求（限制批次大小）
+	const batchSize = Math.min(pendingQueue.length, MAX_BATCH_SIZE)
+	const currentBatch = pendingQueue.splice(0, batchSize)
 	
 	// 收集所有需要请求的 blockId（排除已缓存的）
 	const toFetch: Map<string, PendingRequest[]> = new Map()
@@ -62,7 +84,13 @@ async function processBatchQueue(): Promise<void> {
 		}
 	}
 	
-	if (toFetch.size === 0) return
+	if (toFetch.size === 0) {
+		// 如果还有剩余的请求，继续调度
+		if (pendingQueue.length > 0) {
+			scheduleBatchProcessing()
+		}
+		return
+	}
 	
 	// 批量获取 DOM
 	try {
@@ -94,6 +122,27 @@ async function processBatchQueue(): Promise<void> {
 			}
 		}
 	}
+	
+	// 如果还有剩余的请求，继续调度
+	if (pendingQueue.length > 0) {
+		scheduleBatchProcessing()
+	}
+}
+
+/**
+ * 调度批量处理
+ * 使用 requestAnimationFrame 确保在下一帧处理，避免阻塞当前帧
+ */
+function scheduleBatchProcessing() {
+	if (batchTimer !== null || rafId !== null) return
+	
+	const delay = isInteracting() ? BATCH_DELAY_INTERACTING_MS : BATCH_DELAY_MS
+	
+	// 使用 RAF + setTimeout 组合，确保不阻塞交互
+	rafId = requestAnimationFrame(() => {
+		rafId = null
+		batchTimer = setTimeout(processBatchQueue, delay)
+	})
 }
 
 /**
@@ -114,10 +163,8 @@ export function requestBlockDOM(blockId: string, fontSize: number): Promise<stri
 		// 加入队列
 		pendingQueue.push({ blockId, fontSize, resolve })
 		
-		// 设置延迟处理
-		if (!batchTimer) {
-			batchTimer = setTimeout(processBatchQueue, BATCH_DELAY_MS)
-		}
+		// 调度处理
+		scheduleBatchProcessing()
 	})
 }
 

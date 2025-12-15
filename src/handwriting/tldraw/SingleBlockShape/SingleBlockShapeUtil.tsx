@@ -33,7 +33,8 @@ import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
-import { renderAllContent } from '../utils/content-renderer'
+import { renderAllContentIdle } from '../utils/content-renderer'
+import { cancelIdleRender } from '../utils/idle-scheduler'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -508,26 +509,34 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			return () => { cancelled = true }
 		}, [isEditingState, shape.props.blockId, shape.props.fontSize, shape.props.refreshNonce, isInViewport, canLoad, isViewportCullingEnabled])
 
-		// ===== 静态内容渲染：在 staticHtml 挂载后执行 renderAllContent =====
+		// ===== 静态内容渲染：在 staticHtml 挂载后执行 renderAllContentIdle =====
+		// 使用空闲调度，避免在拖动画布时阻塞主线程
 		useEffect(() => {
 			if (!staticHtml || isEditingState || !staticContentRef.current) return
 			
 			// 重置渲染状态
 			setIsContentRendered(false)
 			
-			// 等待 DOM 更新后执行渲染
-			const timer = setTimeout(() => {
+			// 生成唯一的渲染任务 ID
+			const renderTaskId = `render-static-${shape.id}`
+			
+			// 使用 requestAnimationFrame 确保 DOM 已更新
+			const rafId = requestAnimationFrame(() => {
 				if (staticContentRef.current) {
-					renderAllContent(staticContentRef.current).then(() => {
+					// 使用空闲调度渲染，在交互时会暂停
+					renderAllContentIdle(staticContentRef.current, undefined, 10).then(() => {
 						setIsContentRendered(true)
 					}).catch(() => {
 						// 忽略渲染错误
 					})
 				}
-			}, 0)
+			})
 			
-			return () => clearTimeout(timer)
-		}, [staticHtml, isEditingState])
+			return () => {
+				cancelAnimationFrame(rafId)
+				cancelIdleRender(renderTaskId)
+			}
+		}, [staticHtml, isEditingState, shape.id])
 
 		// ===== 编辑态专用：创建和管理 Protyle 实例 =====
 		useEffect(() => {

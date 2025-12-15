@@ -14,12 +14,13 @@ API:
 Configuration:
   maxActive from settingdata['tldraw-max-active-shapes'] or default 40
 Internals:
-  Recomputes every 500ms or on demand.
+  Recomputes every 500ms (or 1000ms when interacting) or on demand.
   Each shape uses its own editor's viewport for visibility calculation.
 */
 
 import { settingdata } from '@/index'
 import type { Editor, TLShapeId } from '@tldraw/tldraw'
+import { isInteracting } from './utils/idle-scheduler'
 
 interface ShapeLoadMeta {
   editing: boolean
@@ -109,7 +110,9 @@ class ShapeLoadManager {
   private maybeRecompute() {
     const now = performance.now()
     const since = now - this.lastRecomputeAt
-    if (since >= 500) {
+    // 交互时使用更长的间隔，减少计算开销
+    const interval = isInteracting() ? 1000 : 500
+    if (since >= interval) {
       this.recompute()
     }
   }
