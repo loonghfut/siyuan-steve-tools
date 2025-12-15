@@ -1,7 +1,7 @@
 /**
  * Flowchart 流程图渲染器
  */
-import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './render/content-renderer-base'
+import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from '../render/content-renderer-base'
 
 const FLOWCHART_SELECTOR = '[data-subtype="flowchart"]'
 const FLOWCHART_JS_URL = '/stage/protyle/js/flowchart.js/flowchart.min.js?v=1.18.0'

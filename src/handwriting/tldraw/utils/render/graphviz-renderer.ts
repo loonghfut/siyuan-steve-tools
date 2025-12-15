@@ -1,7 +1,7 @@
 /**
  * Graphviz 图形渲染器
  */
-import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './render/content-renderer-base'
+import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from '../render/content-renderer-base'
 
 const GRAPHVIZ_SELECTOR = '[data-subtype="graphviz"]'
 const GRAPHVIZ_JS_URL = '/stage/protyle/js/graphviz/viz.js?v=3.11.0'
