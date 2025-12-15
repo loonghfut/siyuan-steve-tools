@@ -944,11 +944,59 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 	override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		const { w, h, color, fontSize = 16, blockId } = shape.props
-		const border = -10
-		const radius = 10
+		const { w, h, color, fontSize = 16, blockId, isCollapsed } = shape.props
+		const borderWidth = 3 // 与实际渲染的边框宽度一致
+		const radius = 10 // 与实际渲染的圆角一致
 		const strokeColor = theme[color].solid
 		const fillColor = theme[color].semi
+		// 内容区域的尺寸（去掉边框后的可用空间）
+		const contentWidth = Math.max(w - borderWidth * 2, 1)
+		const contentHeight = Math.max(h - borderWidth * 2, 1)
+
+		// 折叠状态：直接返回简化的 SVG
+		if (isCollapsed) {
+			// 获取折叠时显示的文本
+			let collapsedText = 'Card'
+			if (blockId) {
+				try {
+					const xhr = new XMLHttpRequest()
+					xhr.open('POST', '/api/block/getBlockInfo', false)
+					xhr.setRequestHeader('Content-Type', 'application/json')
+					xhr.send(JSON.stringify({ id: blockId }))
+					if (xhr.status >= 200 && xhr.status < 300) {
+						const res = JSON.parse(xhr.responseText)
+						if (res?.data?.rootTitle) {
+							collapsedText = res.data.rootTitle.slice(0, 10) + (res.data.rootTitle.length > 10 ? '...' : '')
+						}
+					}
+				} catch { }
+			}
+			const collapsedFontSize = Math.min(w / 6, h / 2, 24)
+			return (
+				<g>
+					<rect
+						width={w}
+						height={h}
+						fill={fillColor}
+						stroke={strokeColor}
+						strokeWidth={borderWidth}
+						rx={radius}
+						ry={radius}
+					/>
+					<text
+						x={w / 2}
+						y={h / 2}
+						fill={strokeColor}
+						fontSize={collapsedFontSize}
+						dominantBaseline="middle"
+						textAnchor="middle"
+					>
+						{collapsedText}
+					</text>
+				</g>
+			)
+		}
+
 		let serialized = ''
 
 		const serializeContent = () => {
@@ -957,7 +1005,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			if (!host) return ''
 			const content = host.querySelector('[blockid]') as HTMLElement | null
 			if (!content) return ''
-			const clone = content.cloneNode(true) as HTMLElement
+
+			// 二进制转 Base64
 			const binaryToBase64 = (binary: string) => {
 				let base64 = ''
 				const chunkSize = 0x6000 // divisible by 3 to keep padding predictable
@@ -971,6 +1020,24 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 				return base64
 			}
+
+			// MIME 类型映射
+			const mimeMap: Record<string, string> = {
+				png: 'image/png',
+				jpg: 'image/jpeg',
+				jpeg: 'image/jpeg',
+				gif: 'image/gif',
+				webp: 'image/webp',
+				svg: 'image/svg+xml',
+				bmp: 'image/bmp',
+				ico: 'image/x-icon',
+				avif: 'image/avif',
+				mp4: 'video/mp4',
+				webm: 'video/webm',
+				ogg: 'video/ogg',
+			}
+
+			// 将资源路径转换为 data URL
 			const assetToDataUrl = (rawSrc: string | null) => {
 				if (!rawSrc) return ''
 				const trimmed = rawSrc.trim()
@@ -991,18 +1058,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (xhr.status >= 200 && xhr.status < 300 && typeof xhr.responseText === 'string') {
 						const base64 = binaryToBase64(xhr.responseText)
 						const ext = (logicalPath.split('.').pop() || 'png').toLowerCase()
-						const mimeMap: Record<string, string> = {
-							png: 'image/png',
-							jpg: 'image/jpeg',
-							jpeg: 'image/jpeg',
-							gif: 'image/gif',
-							webp: 'image/webp',
-							svg: 'image/svg+xml',
-							bmp: 'image/bmp',
-							ico: 'image/x-icon',
-							avif: 'image/avif'
-						}
-						const mime = mimeMap[ext] || 'image/png'
+						const mime = mimeMap[ext] || 'application/octet-stream'
 						return `data:${mime};base64,${base64}`
 					}
 				} catch (err) {
@@ -1011,23 +1067,42 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				return trimmed
 			}
 
-			// 优化：只内联关键样式属性，而非全部计算样式
+			// 克隆内容
+			const clone = content.cloneNode(true) as HTMLElement
+
+			// 扩展的关键样式属性列表（包含更多可能影响外观的属性）
+			const EXTENDED_STYLE_PROPS = [
+				...CRITICAL_STYLE_PROPS,
+				'text-decoration', 'text-transform', 'letter-spacing', 'word-spacing',
+				'box-shadow', 'text-shadow', 'transform', 'border-radius', 'border-color',
+				'border-width', 'border-style', 'outline', 'position', 'top', 'left', 'right', 'bottom',
+				'gap', 'grid-template-columns', 'grid-template-rows', 'flex-wrap', 'flex-grow', 'flex-shrink',
+				'min-width', 'min-height', 'list-style', 'list-style-type', 'vertical-align',
+				'text-indent', 'cursor', 'user-select', 'backdrop-filter', 'filter'
+			]
+
+			// 内联计算样式（使用扩展属性列表）
 			const inlineComputedStyles = (source: Element, target: Element, depth = 0) => {
-				// 限制递归深度，避免深层嵌套导致性能问题
-				if (depth > 10) return;
-				const computed = window.getComputedStyle(source)
-				const styleText = CRITICAL_STYLE_PROPS
-					.map((prop) => {
-						const value = computed.getPropertyValue(prop);
-						return value ? `${prop}:${value};` : '';
-					})
-					.filter(Boolean)
-					.join('')
-				const existing = target.getAttribute('style') || ''
-				target.setAttribute('style', `${styleText}${existing}`)
+				// 增加递归深度限制
+				if (depth > 15) return
+				try {
+					const computed = window.getComputedStyle(source)
+					const styleText = EXTENDED_STYLE_PROPS
+						.map((prop) => {
+							const value = computed.getPropertyValue(prop)
+							// 跳过默认值和空值
+							if (!value || value === 'none' || value === 'normal' || value === 'auto') return ''
+							return `${prop}:${value};`
+						})
+						.filter(Boolean)
+						.join('')
+					const existing = target.getAttribute('style') || ''
+					target.setAttribute('style', `${styleText}${existing}`)
+				} catch { }
+
 				const sourceChildren = Array.from(source.children)
 				const targetChildren = Array.from(target.children)
-				const maxChildren = Math.min(sourceChildren.length, 100); // 限制子元素数量
+				const maxChildren = Math.min(sourceChildren.length, targetChildren.length, 150) // 增加子元素限制
 				for (let i = 0; i < maxChildren; i++) {
 					const srcChild = sourceChildren[i]
 					const tgtChild = targetChildren[i]
@@ -1038,31 +1113,42 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			}
 
 			inlineComputedStyles(content, clone)
-			clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'))
-			clone.querySelectorAll('[data-node-id]').forEach((el) => el.removeAttribute('data-node-id'))
-			clone.querySelectorAll('[data-node-index]').forEach((el) => el.removeAttribute('data-node-index'))
-			clone.querySelectorAll('[updated]').forEach((el) => el.removeAttribute('updated'))
-			clone.querySelectorAll('[data-realwidth]').forEach((el) => el.removeAttribute('data-realwidth'))
-			clone.querySelectorAll('[data-readonly]').forEach((el) => el.removeAttribute('data-readonly'))
+
+			// 清理不需要的属性
+			const attrsToRemove = [
+				'contenteditable', 'data-node-id', 'data-node-index', 'updated',
+				'data-realwidth', 'data-readonly', 'spellcheck', 'draggable'
+			]
+			attrsToRemove.forEach(attr => {
+				clone.querySelectorAll(`[${attr}]`).forEach((el) => el.removeAttribute(attr))
+			})
+
+			// 隐藏滚动条
 			clone.querySelectorAll('*').forEach((node) => {
 				if (node instanceof HTMLElement) {
 					node.style.setProperty('scrollbar-width', 'none', 'important')
-					node.style.setProperty('ms-overflow-style', 'none', 'important')
+					node.style.setProperty('-ms-overflow-style', 'none', 'important')
 					node.style.setProperty('overscroll-behavior', 'contain')
 				}
 			})
+
+			// 处理图片
 			clone.querySelectorAll('img').forEach((img) => {
 				const embedded = assetToDataUrl(img.getAttribute('src'))
 				if (embedded) {
 					img.setAttribute('src', embedded)
 					img.removeAttribute('crossorigin')
+					img.removeAttribute('loading')
 				}
+				// 处理 srcset
 				const srcset = img.getAttribute('srcset')
 				if (srcset) {
 					const resolvedSet = srcset
 						.split(',')
 						.map((entry) => {
-							const [url, descriptor] = entry.trim().split(/\s+/, 2)
+							const parts = entry.trim().split(/\s+/)
+							const url = parts[0]
+							const descriptor = parts.slice(1).join(' ')
 							const resolved = assetToDataUrl(url)
 							return resolved ? (descriptor ? `${resolved} ${descriptor}` : resolved) : ''
 						})
@@ -1071,7 +1157,43 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (resolvedSet) img.setAttribute('srcset', resolvedSet)
 					else img.removeAttribute('srcset')
 				}
+				// 设置图片样式确保正确显示
+				img.style.maxWidth = '100%'
+				img.style.height = 'auto'
 			})
+
+			// 处理视频：替换为第一帧截图或占位符
+			clone.querySelectorAll('video').forEach((video) => {
+				const poster = video.getAttribute('poster')
+				if (poster) {
+					// 如果有海报图，用图片替换视频
+					const img = document.createElement('img')
+					const embeddedPoster = assetToDataUrl(poster)
+					img.setAttribute('src', embeddedPoster || poster)
+					img.style.width = video.style.width || '100%'
+					img.style.height = video.style.height || 'auto'
+					img.style.objectFit = 'cover'
+					video.replaceWith(img)
+				} else {
+					// 无海报时显示视频占位符
+					const placeholder = document.createElement('div')
+					placeholder.style.cssText = `
+						width: ${video.style.width || '100%'};
+						height: ${video.style.height || '150px'};
+						background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+						display: flex;
+						align-items: center;
+						justify-content: center;
+						color: white;
+						font-size: 14px;
+						border-radius: 4px;
+					`
+					placeholder.textContent = '🎬 Video'
+					video.replaceWith(placeholder)
+				}
+			})
+
+			// 处理 source 元素
 			clone.querySelectorAll('source').forEach((sourceEl) => {
 				const src = sourceEl.getAttribute('src')
 				const resolved = assetToDataUrl(src)
@@ -1084,7 +1206,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					const resolvedSet = srcset
 						.split(',')
 						.map((entry) => {
-							const [url, descriptor] = entry.trim().split(/\s+/, 2)
+							const parts = entry.trim().split(/\s+/)
+							const url = parts[0]
+							const descriptor = parts.slice(1).join(' ')
 							const result = assetToDataUrl(url)
 							return result ? (descriptor ? `${result} ${descriptor}` : result) : ''
 						})
@@ -1094,29 +1218,139 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					else sourceEl.removeAttribute('srcset')
 				}
 			})
-			clone.style.width = `${Math.max(w - border * 2, 1)}px`
-			clone.style.height = `${Math.max(h - border * 2, 1)}px`
+
+			// 处理 iframe（替换为占位符）
+			clone.querySelectorAll('iframe').forEach((iframe) => {
+				const placeholder = document.createElement('div')
+				placeholder.style.cssText = `
+					width: ${iframe.style.width || '100%'};
+					height: ${iframe.style.height || '150px'};
+					background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					color: white;
+					font-size: 14px;
+					border-radius: 4px;
+				`
+				placeholder.textContent = '🌐 Embedded Content'
+				iframe.replaceWith(placeholder)
+			})
+
+			// 处理 canvas（尝试导出为图片）
+			const originalCanvases = content.querySelectorAll('canvas')
+			const clonedCanvases = clone.querySelectorAll('canvas')
+			originalCanvases.forEach((canvas, index) => {
+				const clonedCanvas = clonedCanvases[index]
+				if (clonedCanvas && canvas instanceof HTMLCanvasElement) {
+					try {
+						const dataUrl = canvas.toDataURL('image/png')
+						const img = document.createElement('img')
+						img.src = dataUrl
+						img.style.width = canvas.style.width || `${canvas.width}px`
+						img.style.height = canvas.style.height || `${canvas.height}px`
+						clonedCanvas.replaceWith(img)
+					} catch {
+						// Canvas 可能受到跨域限制
+						const placeholder = document.createElement('div')
+						placeholder.style.cssText = `
+							width: ${canvas.style.width || canvas.width + 'px'};
+							height: ${canvas.style.height || canvas.height + 'px'};
+							background: #f0f0f0;
+							display: flex;
+							align-items: center;
+							justify-content: center;
+							color: #666;
+							font-size: 12px;
+						`
+						placeholder.textContent = 'Canvas'
+						clonedCanvas.replaceWith(placeholder)
+					}
+				}
+			})
+
+			// 处理 SVG 中的 use 元素（尝试内联）
+			clone.querySelectorAll('svg use').forEach((use) => {
+				const href = use.getAttribute('href') || use.getAttribute('xlink:href')
+				if (href && href.startsWith('#')) {
+					const targetId = href.slice(1)
+					const target = document.getElementById(targetId)
+					if (target) {
+						const clonedTarget = target.cloneNode(true) as Element
+						clonedTarget.removeAttribute('id')
+						use.replaceWith(clonedTarget)
+					}
+				}
+			})
+
+			// 设置克隆容器的样式（与实际渲染一致）
+			clone.style.width = `${contentWidth}px`
+			clone.style.height = `${contentHeight}px`
 			clone.style.pointerEvents = 'none'
 			clone.style.overflow = 'hidden'
 			clone.style.fontSize = `${fontSize}px`
 			clone.style.boxSizing = 'border-box'
+			clone.style.padding = '0px'
+
 			return clone.outerHTML
 		}
 
 		serialized = serializeContent()
-		const hideScrollbarStyle = serialized
-			? '<style xmlns="http://www.w3.org/1999/xhtml">*::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}*::-webkit-scrollbar-thumb{display:none!important;}*{scrollbar-width:none!important;}</style>'
+
+		// 全局样式：隐藏滚动条、重置一些默认样式
+		const globalStyles = serialized
+			? `<style xmlns="http://www.w3.org/1999/xhtml">
+				*::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+				*::-webkit-scrollbar-thumb { display: none !important; }
+				* { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+				a { color: inherit; text-decoration: none; }
+				img { max-width: 100%; height: auto; }
+			</style>`
 			: ''
 
 		return (
 			<g>
-				<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
+				{/* 背景矩形：带边框和圆角 */}
+				<rect
+					width={w}
+					height={h}
+					fill={fillColor}
+					stroke={strokeColor}
+					strokeWidth={borderWidth}
+					rx={radius}
+					ry={radius}
+				/>
+				{/* 内容区域：使用 clipPath 裁剪圆角 */}
+				<defs>
+					<clipPath id={`clip-${shape.id}`}>
+						<rect
+							x={borderWidth}
+							y={borderWidth}
+							width={contentWidth}
+							height={contentHeight}
+							rx={Math.max(radius - borderWidth, 0)}
+							ry={Math.max(radius - borderWidth, 0)}
+						/>
+					</clipPath>
+				</defs>
 				{serialized ? (
-					<foreignObject x={border} y={border} width={Math.max(w - border * 2, 1)} height={Math.max(h - border * 2, 1)}>
+					<foreignObject
+						x={borderWidth}
+						y={borderWidth}
+						width={contentWidth}
+						height={contentHeight}
+						clipPath={`url(#clip-${shape.id})`}
+					>
 						<div
 							xmlns="http://www.w3.org/1999/xhtml"
-							style={{ width: '100%', height: '100%', overflow: 'hidden', fontSize: `${fontSize}px` }}
-							dangerouslySetInnerHTML={{ __html: `${hideScrollbarStyle}${serialized}` }}
+							style={{
+								width: '100%',
+								height: '100%',
+								overflow: 'hidden',
+								fontSize: `${fontSize}px`,
+								backgroundColor: 'transparent',
+							}}
+							dangerouslySetInnerHTML={{ __html: `${globalStyles}${serialized}` }}
 						/>
 					</foreignObject>
 				) : (
@@ -1124,7 +1358,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						x={w / 2}
 						y={h / 2}
 						fill={strokeColor}
-						fontSize={fontSize * 0.9}
+						fontSize={Math.min(fontSize * 0.9, 16)}
 						dominantBaseline="middle"
 						textAnchor="middle"
 					>
