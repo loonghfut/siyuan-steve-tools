@@ -18,7 +18,7 @@ import { buildTldrawLink } from '../utils/link-builder';
 import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
-import { renderAllContent } from '../utils/content-renderer'
+import { renderAllContent } from '../utils/render/content-renderer'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -71,13 +71,13 @@ function scheduleBlockCheck(blockId: string, shapeId: string): Promise<boolean> 
 		const list = blockCheckQueue.get(blockId) || [];
 		list.push({ shapeId, resolve });
 		blockCheckQueue.set(blockId, list);
-		
+
 		if (blockCheckTimer === null) {
 			blockCheckTimer = window.setTimeout(async () => {
 				blockCheckTimer = null;
 				const entries = [...blockCheckQueue.entries()];
 				blockCheckQueue.clear();
-				
+
 				// 并行检查所有块
 				await Promise.allSettled(
 					entries.map(async ([bid, callbacks]) => {
@@ -174,11 +174,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isCollapsed = shape.props.isCollapsed || false;
 
 		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）
-		const globalRenderMode: Exclude<CardRenderMode, 'inherit'> = 
+		const globalRenderMode: Exclude<CardRenderMode, 'inherit'> =
 			settingdata["card-render-mode"] === 'live-protyle' ? 'live-protyle' : 'static-dom';
-		const effectiveRenderMode: Exclude<CardRenderMode, 'inherit'> = 
-			shape.props.renderMode === 'inherit' || !shape.props.renderMode 
-				? globalRenderMode 
+		const effectiveRenderMode: Exclude<CardRenderMode, 'inherit'> =
+			shape.props.renderMode === 'inherit' || !shape.props.renderMode
+				? globalRenderMode
 				: (shape.props.renderMode as Exclude<CardRenderMode, 'inherit'>);
 
 		// 缓存 blockId 以减少属性访问
@@ -250,7 +250,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			const wasEditing = prevIsEditingRef.current;
 			prevIsEditingRef.current = isEditingState;
-			
+
 			// 从编辑状态退出时，使该 blockId 的缓存失效，确保下次使用最新内容
 			if (wasEditing && !isEditingState && blockId) {
 				invalidatePreviewCache(blockId);
@@ -535,30 +535,30 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						const shouldFocus = isEditingState && effectiveRenderMode === 'live-protyle';
 						const actions = ['cb-get-all', ...(shouldFocus ? ['cb-get-focus'] : [])] as TProtyleAction[]
 						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
-						blockId: currentBlockId,
-						rootId: currentBlockId,
-						defId: currentBlockId,
-						render: {
-							background: (shape.props.isMain && tldrawHeaderImage),
-							breadcrumb: shape.props.isMain,
-							gutter: true,
-							title: shape.props.isMain,
-							breadcrumbDocName: shape.props.isMain,
-						},
-						action: actions,
-						mode: "wysiwyg",
-						after: (protyle: Protyle) => {
-							protyle.protyle.wysiwyg.preventKeyup = true;
-							resolveReady && resolveReady();
-						},
-						handleEmptyContent: () => {
-							showMessage('块已被删除');
-						},
-					});
+							blockId: currentBlockId,
+							rootId: currentBlockId,
+							defId: currentBlockId,
+							render: {
+								background: (shape.props.isMain && tldrawHeaderImage),
+								breadcrumb: shape.props.isMain,
+								gutter: true,
+								title: shape.props.isMain,
+								breadcrumbDocName: shape.props.isMain,
+							},
+							action: actions,
+							mode: "wysiwyg",
+							after: (protyle: Protyle) => {
+								protyle.protyle.wysiwyg.preventKeyup = true;
+								resolveReady && resolveReady();
+							},
+							handleEmptyContent: () => {
+								showMessage('块已被删除');
+							},
+						});
 					} catch (err) {
 						console.error('Protyle 构造失败', err);
 						if (host.parentElement) {
-							try { host.parentElement.removeChild(host); } catch {}
+							try { host.parentElement.removeChild(host); } catch { }
 						}
 						return;
 					}
@@ -605,7 +605,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (!protyleRef.current || cancelled) return;
 				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
 				if (!ce) return;
-				
+
 				// 检查缓存（如果非强制刷新）
 				const currentBlockId = containerRef.current?.getAttribute('blockid') || blockId;
 				if (!forceRefresh && currentBlockId) {
@@ -635,7 +635,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 					}
 				}
-				
+
 				// 保险起见，再等待一次渲染完成
 				await waitForProtyleRendered(protyleRef.current);
 				if (cancelled) return;
@@ -656,7 +656,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				// 渲染所有内容类型（公式、图表等）
 				await renderAllContent(clone);
-				
+
 				// 清理 Protyle host
 				if (protyleHostRef.current?.parentElement) {
 					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
@@ -676,7 +676,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			// 使用 getDoc API 直接获取静态 DOM 内容（无需创建 Protyle）
 			const useStaticPreviewFromGetDoc = async (targetBlockId: string, forceRefresh = false) => {
 				if (cancelled || !containerRef.current) return;
-				
+
 				// 检查缓存（如果非强制刷新）
 				if (!forceRefresh) {
 					const cachedHtml = getCachedPreview(targetBlockId, fontSize);
@@ -698,16 +698,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 					}
 				}
-				
+
 				// 使用 getDoc API 获取 DOM 内容
 				const domContent = await fetchStaticDomContent(targetBlockId);
 				if (cancelled || !domContent) return;
-				
+
 				// 移除旧的静态预览
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
 					containerRef.current.removeChild(staticPreviewRef.current);
 				}
-				
+
 				// 创建预览容器
 				const previewWrapper = document.createElement('div');
 				previewWrapper.className = 'protyle-wysiwyg protyle-wysiwyg--attr';
@@ -722,14 +722,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				// 渲染所有内容类型（公式、图表等）
 				await renderAllContent(previewWrapper);
-				
+
 				if (cancelled) return;
 				staticPreviewRef.current = previewWrapper;
 				containerRef.current.appendChild(previewWrapper);
 			};
 
 			let cancelled = false;
-			
+
 			// 检测是否刚从编辑状态退出（用于强制刷新缓存）
 			const wasEditing = prevIsEditingRef.current && !isEditingState;
 
@@ -920,7 +920,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							wordBreak: 'break-all',
 							color: theme[shape.props.color].solid,
 							textAlign: 'center',
-							opacity: 0.4, 
+							opacity: 0.4,
 						}}>
 							双击加载内容
 						</div>
@@ -1134,7 +1134,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			</g>
 		)
 	}
-
 
 }
 /* 

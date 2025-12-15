@@ -1,7 +1,7 @@
 /**
  * Mermaid 图表渲染器
  */
-import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './content-renderer-base'
+import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './render/content-renderer-base'
 
 const MERMAID_SELECTOR = '[data-subtype="mermaid"]'
 const MERMAID_JS_URL = '/stage/protyle/js/mermaid/mermaid.min.js?v=11.6.0'

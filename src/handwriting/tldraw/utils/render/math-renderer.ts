@@ -1,7 +1,7 @@
 /**
  * KaTeX 数学公式渲染器
  */
-import { loadScript, loadStyle, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './content-renderer-base'
+import { loadScript, loadStyle, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './render/content-renderer-base'
 
 const MATH_SELECTOR = '[data-subtype="math"]'
 const KATEX_CSS_ID = 'plugin-katex-style'

@@ -7,14 +7,14 @@
  * - 分帧渲染，避免一次性渲染过多内容
  */
 import { type ContentRenderer } from './content-renderer-base'
-import { mathRenderer } from './math-renderer'
-import { mermaidRenderer } from './mermaid-renderer'
-import { echartsRenderer, mindmapRenderer } from './echarts-renderer'
+import { mathRenderer } from '../math-renderer'
+import { mermaidRenderer } from '../mermaid-renderer'
+import { echartsRenderer, mindmapRenderer } from '../echarts-renderer'
 import { abcRenderer } from './abc-renderer'
-import { flowchartRenderer } from './flowchart-renderer'
-import { graphvizRenderer } from './graphviz-renderer'
+import { flowchartRenderer } from '../flowchart-renderer'
+import { graphvizRenderer } from '../graphviz-renderer'
 import { plantumlRenderer } from './plantuml-renderer'
-import { scheduleIdleRender, isInteracting } from './idle-scheduler'
+import { scheduleIdleRender, isInteracting } from '../idle-scheduler'
 
 // 所有可用的渲染器
 const allRenderers: ContentRenderer[] = [
@@ -153,12 +153,12 @@ export function getAllRenderers(): ContentRenderer[] {
 }
 
 // 导出各个渲染器以便单独使用
-export { mathRenderer } from './math-renderer'
-export { mermaidRenderer } from './mermaid-renderer'
-export { echartsRenderer, mindmapRenderer } from './echarts-renderer'
+export { mathRenderer } from '../math-renderer'
+export { mermaidRenderer } from '../mermaid-renderer'
+export { echartsRenderer, mindmapRenderer } from '../echarts-renderer'
 export { abcRenderer } from './abc-renderer'
-export { flowchartRenderer } from './flowchart-renderer'
-export { graphvizRenderer } from './graphviz-renderer'
+export { flowchartRenderer } from '../flowchart-renderer'
+export { graphvizRenderer } from '../graphviz-renderer'
 export { plantumlRenderer } from './plantuml-renderer'
 
 // 导出类型

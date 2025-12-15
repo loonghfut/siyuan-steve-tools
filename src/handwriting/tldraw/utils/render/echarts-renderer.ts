@@ -1,7 +1,7 @@
 /**
  * ECharts 图表渲染器
  */
-import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './content-renderer-base'
+import { loadScript, unescapeHTML, isRendered, markRendered, renderError, type ContentRenderer } from './render/content-renderer-base'
 
 const ECHARTS_SELECTOR = '[data-subtype="echarts"]'
 const MINDMAP_SELECTOR = '[data-subtype="mindmap"]'
