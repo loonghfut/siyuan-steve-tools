@@ -1297,11 +1297,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		serialized = serializeContent()
 
-		// 全局样式：隐藏滚动条、重置一些默认样式
+		// 全局样式：(隐藏滚动条)、重置一些默认样式
+		//*::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+		//*::-webkit-scrollbar-thumb { display: none !important; }
 		const globalStyles = serialized
 			? `<style xmlns="http://www.w3.org/1999/xhtml">
-				*::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
-				*::-webkit-scrollbar-thumb { display: none !important; }
 				* { scrollbar-width: none !important; -ms-overflow-style: none !important; }
 				a { color: inherit; text-decoration: none; }
 				img { max-width: 100%; height: auto; }
