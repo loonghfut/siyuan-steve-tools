@@ -1,4 +1,4 @@
-import { appendBlock, putFile } from "@/api/api";
+import { appendBlock, generateSiyuanID, putFile } from "@/api/api";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
@@ -6,6 +6,7 @@ import { runWpsScriptSync } from "../wps_api";
 // import { createWebviewDock_for_wps, } from "@/api/api2";
 // import { generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
+import { generateLinkCard } from "@/api/api3";
 
 export class WpsDataServ {
     private settingdata: any;
@@ -218,6 +219,15 @@ export class WpsDataServ {
         //     const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
         //     return `![${name}](${assetPath})`;
         // }
+        if (this.settingdata["wps-file-insert-as-card"]) {
+            const siyuanID = await generateSiyuanID()
+            const cardHtml = await generateLinkCard(url, [
+                { id: 'change', title: '转换', text: '★', onClick: `window.wps.ChangeLinkStyle('${url}', '${siyuanID}');` },
+                { id: 'show', title: '预览', text: '🔍', onClick: `window.wps.ShowLinkContent('${url}');` },
+                { id: 'tab', title: '新页签预览', text: '🗔', onClick: `window.wps.OpenPreviewTab('${url}');` }
+            ])
+            return `<div>${cardHtml}</div>\n{: id="${siyuanID}" custom-st-wps="1" custom-wps-id="${url}" custom-wps-link="${url}" custom-wps-name="${name || ''}" custom-wps-block="true"}`;
+        }
         return `[${name}](${url})`;
     }
 
