@@ -214,10 +214,10 @@ export class WpsDataServ {
         const name = att.fileName || '附件';
         const url = att.url || '';
         if (!url) return name;
-        if (this.isImageUrl(url, name)) {
-            const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
-            return `![${name}](${assetPath})`;
-        }
+        // if (this.isImageUrl(url, name)) {
+        //     const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
+        //     return `![${name}](${assetPath})`;
+        // }
         return `[${name}](${url})`;
     }
 
