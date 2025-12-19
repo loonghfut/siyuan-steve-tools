@@ -537,7 +537,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						protyleInstance = new Protyle(window.siyuan.ws.app, host, {
 							blockId: currentBlockId,
 							rootId: currentBlockId,
-							defId: currentBlockId,
 							render: {
 								background: (shape.props.isMain && tldrawHeaderImage),
 								breadcrumb: shape.props.isMain,
