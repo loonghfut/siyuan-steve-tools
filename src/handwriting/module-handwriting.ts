@@ -17,6 +17,10 @@ export class M_handwriting {
     private dockComponent: any | null = null;
     // 记录点击拦截器以便卸载时移除
     private clickHandler?: (e: MouseEvent) => void;
+    // 复用的插件 URL 处理函数
+    private handlePluginUrl?: (url: string) => Promise<void>;
+    // 监听带 custom-tldraw-link 元素的观察器
+    private tldrawLinkObserver?: MutationObserver;
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -124,6 +128,9 @@ export class M_handwriting {
                 console.error('解析插件 URL 参数出错:', error);
             }
         };
+
+        // 暴露给实例，供其他处理复用
+        this.handlePluginUrl = handlePluginUrl;
 
         // 监听来自思源的自定义事件（原有逻辑）
         this.plugin.eventBus.on('open-siyuan-url-plugin', async (e) => {
@@ -305,6 +312,10 @@ export class M_handwriting {
             // console.log(this.currentid);
 
             addWhiteboardButton(e);
+            const protyleEl = e.detail?.protyle?.element as HTMLElement | undefined;
+            if (protyleEl) {
+                this.startTldrawLinkWatcher(protyleEl);
+            }
         });
     }
 
@@ -333,6 +344,90 @@ export class M_handwriting {
         });
     }
 
+    private injectTldrawLinkIcons(container: HTMLElement) {
+        if (!container || !this.handlePluginUrl) return;
+        const nodes = container.querySelectorAll<HTMLElement>('[custom-tldraw-link]');
+        nodes.forEach((node) => {
+            this.injectTldrawIconForNode(node);
+        });
+    }
+
+    private injectTldrawIconForNode(node: HTMLElement) {
+        if (!node || !this.handlePluginUrl) return;
+        const linkAttr = node.getAttribute('custom-tldraw-link');
+        if (!linkAttr) return;
+
+        const attrEl = Array.from(node.children).find((child) => (child as HTMLElement).classList?.contains('protyle-attr')) as HTMLElement | undefined;
+        if (!attrEl) return;
+
+        if (attrEl.querySelector('.st-tldraw-link-icon')) return;
+
+        const icon = document.createElement('span');
+        icon.className = 'st-tldraw-link-icon block__icon fn__flex-center';
+        icon.setAttribute('aria-label', '打开白板');
+        icon.title = '打开白板';
+        //加opacity: 1
+        icon.style.opacity = '1';
+        icon.innerHTML = '<svg class="item__graphic"><use xlink:href="#iconSTWhiteboard">🔗</use></svg>';
+        icon.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            let normalized = linkAttr;
+            while (normalized.includes('&amp;')) {
+                normalized = normalized.replace(/&amp;/g, '&');
+            }
+            this.handlePluginUrl?.(normalized);
+        });
+
+        attrEl.appendChild(icon);
+    }
+
+    private startTldrawLinkWatcher(protyleEl: HTMLElement) {
+        if (!protyleEl) return;
+        // 先停止上一个观察器
+        this.stopTldrawLinkWatcher();
+
+        // 先对现有内容做一次注入
+        this.injectTldrawLinkIcons(protyleEl);
+
+        // 监听新增节点或属性变化
+        this.tldrawLinkObserver = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+                if (m.type === 'childList') {
+                    m.addedNodes.forEach((n) => {
+                        if (n instanceof HTMLElement) {
+                            if (n.hasAttribute('custom-tldraw-link')) {
+                                this.injectTldrawIconForNode(n);
+                            }
+                            n.querySelectorAll<HTMLElement>('[custom-tldraw-link]').forEach((child) => {
+                                this.injectTldrawIconForNode(child);
+                            });
+                        }
+                    });
+                } else if (m.type === 'attributes') {
+                    const target = m.target as HTMLElement;
+                    if (m.attributeName === 'custom-tldraw-link') {
+                        this.injectTldrawIconForNode(target);
+                    }
+                }
+            }
+        });
+
+        this.tldrawLinkObserver.observe(protyleEl, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['custom-tldraw-link'],
+        });
+    }
+
+    private stopTldrawLinkWatcher() {
+        if (this.tldrawLinkObserver) {
+            this.tldrawLinkObserver.disconnect();
+            this.tldrawLinkObserver = undefined;
+        }
+    }
+
     /**
      * 插件卸载时的清理工作
      */
@@ -350,6 +445,8 @@ export class M_handwriting {
             document.removeEventListener('click', this.clickHandler, true);
             this.clickHandler = undefined;
         }
+        // 停止观察器
+        this.stopTldrawLinkWatcher();
         // 销毁 dock 上的 svelte 组件（如果存在）
         try {
             if (this.dockComponent && typeof this.dockComponent.$destroy === 'function') {
