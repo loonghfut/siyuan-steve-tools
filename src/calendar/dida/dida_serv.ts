@@ -20,6 +20,9 @@ export class Dida365Service {
     private creatingDidaIds: Set<string> = new Set();
     private syncDebounceTimer: NodeJS.Timeout | null = null; // 防抖计时器
     private netInterceptorHandle: InterceptorHandle | null = null; // 独立拦截句柄
+    private lastModifiedTime: Map<string, number> = new Map(); // 记录每个任务的最后修改时间戳(didaID -> timestamp)
+    private taskSyncLocks: Map<string, boolean> = new Map(); // 任务级别的同步锁(didaID -> isLocked)
+    private lastSyncDirection: Map<string, 'siyuan-to-dida' | 'dida-to-siyuan'> = new Map(); // 记录最后同步方向
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -142,7 +145,8 @@ export class Dida365Service {
     }
 
     /**
-     * 防抖同步方法：等待10秒，如果期间有新的调用则重新计时
+     * 防抖同步方法：等待指定时间，如果期间有新的调用则重新计时
+     * 优化：添加冷却期检查，避免刚修改后立即反向同步覆盖
      */
     private debouncedSyncTasksToSiyuan(delay = 10000): void {
         // 清除之前的计时器
@@ -156,6 +160,15 @@ export class Dida365Service {
             try {
                 let isUpdate = false;
                 console.log("防抖等待完成，开始执行同步任务到思源");
+                
+                // 检查是否有任务正在被锁定（正在同步中）
+                const hasLockedTasks = Array.from(this.taskSyncLocks.values()).some(locked => locked);
+                if (hasLockedTasks) {
+                    console.log("检测到有任务正在同步中，延迟5秒后重试");
+                    this.debouncedSyncTasksToSiyuan(5000);
+                    return;
+                }
+                
                 isUpdate = await this.syncTasksToSiyuan();
                 this.syncDebounceTimer = null; // 清空计时器引用
                 if (isUpdate && delay === 10000) {
@@ -167,7 +180,7 @@ export class Dida365Service {
                 console.error("防抖同步执行失败:", error);
                 this.syncDebounceTimer = null; // 清空计时器引用
             }
-        }, delay); // 10秒延迟
+        }, delay);
 
         console.log(`设置防抖同步计时器，将在${delay / 1000}秒后执行（如无新的调用）`);
     }
@@ -182,9 +195,9 @@ export class Dida365Service {
 
             try {
                 didaTasks = await this.getAllTasks();
-                console.log("❤️❤️❤️❤️❤️")
+                // console.log("❤️❤️❤️❤️❤️")
             } catch (error) {
-                console.log("💩💩💩💩💩");
+                // console.log("💩💩💩💩💩");
                 console.error("获取滴答清单任务失败，可能网络断开:", error);
                 isOnline = false;
                 // 断网时使用缓存数据
@@ -227,21 +240,45 @@ export class Dida365Service {
             for (const didaTask of didaTasks) {
                 if (!didaTask.id) continue;
 
+                // 检查任务是否被锁定（正在同步中）
+                if (this.taskSyncLocks.get(didaTask.id)) {
+                    console.log(`任务 [${didaTask.id}] 正在同步中，跳过本次更新`);
+                    continue;
+                }
+
                 const existingTask = existingTasksMap.get(didaTask.id);
 
                 if (existingTask) {
-                    // 更新现有任务
+                    // 更新现有任务 - 添加时间戳检查
+                    const lastModified = this.lastModifiedTime.get(didaTask.id);
+                    const lastDirection = this.lastSyncDirection.get(didaTask.id);
+                    const now = Date.now();
+                    
+                    // 如果最近5秒内刚从思源同步到滴答，跳过反向同步以避免覆盖
+                    if (lastModified && lastDirection === 'siyuan-to-dida' && (now - lastModified) < 5000) {
+                        console.log(`任务 [${didaTask.id}] 刚从思源同步到滴答（${now - lastModified}ms前），跳过反向同步`);
+                        continue;
+                    }
+                    
                     const taskData = this.buildTaskData(didaTask, existingTask);
 
                     // 比较任务数据，仅在有变化时更新
                     if (this.isTaskChanged(taskData, existingTask)) {
                         await this.updateSiyuanTask(existingTask, taskData);
+                        // 更新时间戳和方向
+                        this.lastModifiedTime.set(didaTask.id, Date.now());
+                        this.lastSyncDirection.set(didaTask.id, 'dida-to-siyuan');
                         updateCount++;
                     }
                 } else {
                     // 创建新任务
                     const taskData = this.buildTaskData(didaTask, existingTask);
                     await this.createSiyuanTask(taskData);
+                    // 更新时间戳和方向
+                    if (didaTask.id) {
+                        this.lastModifiedTime.set(didaTask.id, Date.now());
+                        this.lastSyncDirection.set(didaTask.id, 'dida-to-siyuan');
+                    }
                     syncCount++;
                 }
             }
@@ -1157,14 +1194,33 @@ ${taskData.描述?.content || "描述：暂无"}
                 updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
                 console.log("❤️❤️❤️❤️更新的任务内容：", updatePayload);
                 if (Object.keys(updatePayload).length > 0) {
-                    await this.apiClient.updateTask(didaTaskId, {
-                        ...updatePayload,
-                        id: didaTaskId,
-                        projectId: updatePayload.projectId || currentProjectId
-                    });
-                    if (updatePayload.projectId) cachedTask.projectId = updatePayload.projectId;
-                    console.log(`思源任务 [${blockId}] 的变更已同步到滴答任务 [${didaTaskId}]`);
-                    showStatusMessage("滴答任务已更新", 2000);
+                    // 加锁，防止并发修改
+                    this.taskSyncLocks.set(didaTaskId, true);
+                    try {
+                        await this.apiClient.updateTask(didaTaskId, {
+                            ...updatePayload,
+                            id: didaTaskId,
+                            projectId: updatePayload.projectId || currentProjectId
+                        });
+                        
+                        // 立即更新本地缓存，避免使用过时数据
+                        if (cachedTask) {
+                            Object.assign(cachedTask, updatePayload);
+                            if (updatePayload.projectId) cachedTask.projectId = updatePayload.projectId;
+                        }
+                        
+                        // 更新时间戳和同步方向
+                        this.lastModifiedTime.set(didaTaskId, Date.now());
+                        this.lastSyncDirection.set(didaTaskId, 'siyuan-to-dida');
+                        
+                        console.log(`思源任务 [${blockId}] 的变更已同步到滴答任务 [${didaTaskId}]`);
+                        showStatusMessage("滴答任务已更新", 2000);
+                    } finally {
+                        // 延迟解锁，给一点缓冲时间
+                        setTimeout(() => {
+                            this.taskSyncLocks.set(didaTaskId, false);
+                        }, 1000);
+                    }
                 }
 
             } else {
@@ -1228,6 +1284,11 @@ ${taskData.描述?.content || "描述：暂无"}
                     const newDidaTask = await this.apiClient.createTask(createTaskPayload);
 
                     if (newDidaTask && newDidaTask.id) {
+                        // 立即更新缓存和时间戳
+                        this.taskCache.set(newDidaTask.id, newDidaTask);
+                        this.lastModifiedTime.set(newDidaTask.id, Date.now());
+                        this.lastSyncDirection.set(newDidaTask.id, 'siyuan-to-dida');
+                        
                         // 将新生成的 didaID 和链接字段写回思源数据库
                         const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID');
                         const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接');
@@ -1255,8 +1316,6 @@ ${taskData.描述?.content || "描述：暂无"}
                             await this.withDidaTagged(async () => {
                                 await Promise.all(updatePromises);
                             });
-                            // 更新缓存
-                            this.taskCache.set(newDidaTask.id, newDidaTask);
                             console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
                             showStatusMessage("新任务已同步到滴答清单", 2000);
                         } else {
@@ -1269,7 +1328,8 @@ ${taskData.描述?.content || "描述：暂无"}
                     }, 2000);
                 }
             }
-            this.debouncedSyncTasksToSiyuan(3000); // 防抖同步检测
+            // 优化：延长防抖时间，避免频繁触发反向同步
+            this.debouncedSyncTasksToSiyuan(8000); // 防抖同步检测，延长至8秒
         } catch (error) {
             console.error("从思源同步到滴答失败:", error);
         }
