@@ -4,6 +4,8 @@ export const handwritingDefaults: Record<string, any> = {
     "handwriting-enable": false,
     "tl-draw-create-note-id": null,
     "isGridMode": false,
+    // 是否显示card形状边框
+    "showCardBorder": true,
     "copyLinkTitle": true,
     // 画板引用链接协议：https://plugins/... 或 siyuan://plugins/...
     "tldraw-link-scheme": "https",
@@ -29,6 +31,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
             { type: "checkbox", title: "启用画板功能", description: "启用后可使用画板模块", key: "handwriting-enable", value: ctx.settings["handwriting-enable"] },
             { type: "select", title: "画板数据块备用创建位置", description: "选择日记本", key: "tl-draw-create-note-id", value: ctx.settings["tl-draw-create-note-id"], options: (() => { const nb=(window as any).siyuan?.notebooks; if(!Array.isArray(nb)||!nb.length) return {"":"无可用日记本"}; return Object.fromEntries(nb.map((n:any)=>[n.id,n.name])); })() },
             { type: "checkbox", title: "启用双击创建单块", description: "启用后双击画板空白处将创建单块", key: "enableDoubleClickCreateSingleBlock", value: ctx.settings["enableDoubleClickCreateSingleBlock"] },
+            { type: "checkbox", title: "显示 Card 形状边框", description: "启用后 Card 形状将显示边框", key: "showCardBorder", value: ctx.settings["showCardBorder"] },
             { type: "checkbox", title: "启用画板网格背景", description: "默认开启网格", key: "isGridMode", value: ctx.settings["isGridMode"] },
             { type: "checkbox", title: "复制链接标题", description: "复制链接时包含标题", key: "copyLinkTitle", value: ctx.settings["copyLinkTitle"] },
             { type: "select", title: "画板链接协议", description: "选择写入块内容的画板引用链接使用 https 还是 siyuan 协议", key: "tldraw-link-scheme", value: ctx.settings["tldraw-link-scheme"], options: { "https": "https://plugins/...", "siyuan": "siyuan://plugins/..." } },
