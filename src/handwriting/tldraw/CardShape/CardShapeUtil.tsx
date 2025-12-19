@@ -112,6 +112,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	static override migrations = cardShapeMigrations
 
 	// [3]
+	override canCull(_shape: ICardShape) {
+		return false
+	}
 	override isAspectRatioLocked(_shape: ICardShape) {
 		return false
 	}
