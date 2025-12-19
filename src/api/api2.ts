@@ -130,6 +130,7 @@ interface WebviewExtraOptions {
     buttons?: WebviewButtonConfig[];       // 自定义按钮集合（完全自定义覆盖默认按钮）
     onRoamingIntercept?: (data: { kind: string; url: string; body: string }) => void; // 监听 /api/v3/roaming 拦截数据回调
     roamingTransportMode?: 'console' | 'poll'; // webview 与宿主数据传输模式，默认 console
+    initRun?: () => void;                 // 初始化运行函数
 }
 interface WebviewButtonConfig {
     id?: string;                           // 按钮 id，不含容器前缀；最终实际 id = `${containerClass}-btn-${id}`
@@ -741,7 +742,7 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             // 在覆盖 innerHTML 前先清理旧 root（防止重复绑定）
             const existing = dock.element.querySelector(`#${containerClass}`) as HTMLElement | null;
             cleanupRoot(existing);
-
+            options.initRun();
             dock.element.innerHTML = createWebviewHTML(containerClass, url, iframeStyle, zoom);
             const targetElement = dock.element.querySelector(`#${containerClass} webview`);
             setupResizeObserver(targetElement as HTMLElement);
