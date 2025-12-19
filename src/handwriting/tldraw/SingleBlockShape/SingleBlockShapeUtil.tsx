@@ -57,7 +57,8 @@ function useSingleBlockSize(
 	shape: ISingleBlockShape,
 	containerRef: React.RefObject<HTMLDivElement>,
 	protyleHostRef: React.RefObject<HTMLDivElement | null>,
-	isEditingState: boolean
+	isEditingState: boolean,
+	shouldSkipMeasurement: boolean
 ) {
 	const editor = (window as any).__tldrawEditor || null
 	// 用于在编辑态切换时临时锁定高度，防止闪烁
@@ -80,6 +81,7 @@ function useSingleBlockSize(
 	}, [isEditingState])
 
 	const updateShapeSize = useCallback(() => {
+		if (shouldSkipMeasurement) return
 		if (!editor) return
 
 		// 如果高度被锁定，使用上次测量的高度
@@ -133,15 +135,26 @@ function useSingleBlockSize(
 			if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
 			return map.set(shape.id, { width: nextWidth, height: nextHeight })
 		})
-	}, [editor, shape.id, shape.props.blockId, shape.props.h, shape.props.w, shape.props.transparentBackground, isEditingState])
+	}, [
+		editor,
+		shape.id,
+		shape.props.blockId,
+		shape.props.h,
+		shape.props.w,
+		shape.props.transparentBackground,
+		isEditingState,
+		shouldSkipMeasurement,
+	])
 
 	// 在每次渲染后立即测量尺寸
 	useLayoutEffect(() => {
+		if (shouldSkipMeasurement) return
 		updateShapeSize()
 	})
 
 	// 使用 ResizeObserver 监听 DOM 尺寸变化
 	useLayoutEffect(() => {
+		if (shouldSkipMeasurement) return
 		let target: HTMLElement | null = null
 		if (isEditingState && protyleHostRef.current) {
 			target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
@@ -159,10 +172,11 @@ function useSingleBlockSize(
 		return () => {
 			observer.disconnect()
 		}
-	}, [updateShapeSize, isEditingState])
+	}, [updateShapeSize, isEditingState, shouldSkipMeasurement])
 
 	// 使用 MutationObserver 监听 DOM 内容变化
 	useLayoutEffect(() => {
+		if (shouldSkipMeasurement) return
 		let target: HTMLElement | null = null
 		if (isEditingState && protyleHostRef.current) {
 			target = (protyleHostRef.current.querySelector('.protyle-wysiwyg') as HTMLElement) || protyleHostRef.current
@@ -180,10 +194,11 @@ function useSingleBlockSize(
 		return () => {
 			observer.disconnect()
 		}
-	}, [updateShapeSize, isEditingState])
+	}, [updateShapeSize, isEditingState, shouldSkipMeasurement])
 
 	// 监听图片加载完成后重新测量
 	useEffect(() => {
+		if (shouldSkipMeasurement) return
 		let target: HTMLElement | null = null
 		if (isEditingState && protyleHostRef.current) {
 			target = protyleHostRef.current
@@ -203,7 +218,7 @@ function useSingleBlockSize(
 		return () => {
 			handlers.forEach((off) => off())
 		}
-	}, [updateShapeSize, isEditingState])
+	}, [updateShapeSize, isEditingState, shouldSkipMeasurement])
 
 	return { updateShapeSize }
 }
@@ -343,7 +358,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		}, [])
 
 		// 使用独立的尺寸测量 hook（自动处理尺寸更新）
-		useSingleBlockSize(shape, containerRef, protyleHostRef, isEditingState)
+		useSingleBlockSize(shape, containerRef, protyleHostRef, isEditingState, isLoadingContent)
 
 		// 检测是否包含属性视图图标（数据库图标）
 		useEffect(() => {
