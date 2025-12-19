@@ -175,6 +175,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const tldrawHeaderImage = settingdata['tldraw-header-image'] !== false;
 		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
 		const isCollapsed = shape.props.isCollapsed || false;
+		const isMainCard = Boolean(shape.props.isMain);
 
 		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）
 		const globalRenderMode: Exclude<CardRenderMode, 'inherit'> =
@@ -604,6 +605,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 			// 从 Protyle 实例克隆静态预览 - 用于文档块(isMain)的静态渲染
 			const useStaticPreviewFromProtyle = async (forceRefresh = false) => {
+				if (!isMainCard) return;
 				if (!protyleRef.current || cancelled) return;
 				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
 				if (!ce) return;
@@ -764,32 +766,28 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 非编辑
 					if (effectiveRenderMode === 'static-dom') {
 						const id = containerRef.current?.getAttribute('blockid') || blockId;
-						if (id) {
-							// 对于文档块(isMain)，仍使用 Protyle 方式获取完整内容
-							// 对于普通块，使用 getHeadingChildrenDOM API 获取子块 DOM
-							if (shape.props.isMain) {
-								// 文档块：创建 Protyle 实例并克隆 DOM
-								if (!protyleRef.current) {
-									await mountProtyle(2);
-									if (cancelled) return;
-									if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
-								}
-								await useStaticPreviewFromProtyle(wasEditing);
+						if (!id) return;
+						if (isMainCard) {
+							// 文档块：创建 Protyle 实例并克隆 DOM
+							if (!protyleRef.current) {
+								await mountProtyle(2);
 								if (cancelled) return;
-							} else {
-								// 普通块：使用 getHeadingChildrenDOM API 直接获取静态 DOM
-								// 如果有 Protyle 实例，先销毁它
-								if (protyleRef.current) {
-									if (protyleHostRef.current?.parentElement) {
-										protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
-									}
-									try { safeDestroyProtyle(protyleRef.current); } catch { }
-									protyleRef.current = null;
-									protyleHostRef.current = null;
-								}
-								await useStaticPreviewFromGetDoc(id, wasEditing);
-								if (cancelled) return;
+								if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
 							}
+							await useStaticPreviewFromProtyle(wasEditing);
+							if (cancelled) return;
+						} else {
+							// 普通块：使用 fetchStaticDomContent API 直接获取静态 DOM
+							if (protyleRef.current) {
+								if (protyleHostRef.current?.parentElement) {
+									protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
+								}
+								try { safeDestroyProtyle(protyleRef.current); } catch { }
+								protyleRef.current = null;
+								protyleHostRef.current = null;
+							}
+							await useStaticPreviewFromGetDoc(id, wasEditing);
+							if (cancelled) return;
 						}
 					} else {
 						// live-protyle 模式：保留 Protyle 实例，仅切换 enable/disable 状态
