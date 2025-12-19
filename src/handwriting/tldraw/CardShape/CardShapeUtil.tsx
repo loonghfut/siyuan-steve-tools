@@ -467,10 +467,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								const idid = await api.generateSiyuanID() as string;
 								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 								const link = buildTldrawLink(tldrawId, idid, title);
+								// 将链接保存到自定义属性中
 								const content =
-									'###### ' + timestamp + '[🔗](' + link + ')' +
+									'###### ' + timestamp +
 									'\n' +
-									'{: id="' + idid + '" custom-st-tldraw="1" }' +
+									'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
 									'\n\n' +
 									'{: custom-st-tldraw-none="1" }' +
 									'\n';

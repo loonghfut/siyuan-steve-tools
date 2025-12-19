@@ -481,26 +481,21 @@ export class TldrawManager {
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
-                                const linkMarkdown = `[🔗](${link})`;
-                                const newContent = appendLinkToKramdown(content, linkMarkdown, link, true);
-                                await api.updateBlock("markdown", newContent, aproblock)
+                                // 将链接保存到块的自定义属性中
+                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link })
                             } else if (blockIdo_rigin.includes('paragraph')) {
                                 aproblock = blockId;
-                                //要检测是否已经有此链接，避免重复添加
+                                // 将链接保存到块的自定义属性中
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
-                                const linkMarkdown = `[*](${link})`;
-                                if (!content.includes(link)) {
-                                    const newContent = appendLinkToKramdown(content, linkMarkdown, link, false);
-                                    await api.updateBlock("markdown", newContent, aproblock)
-                                }
+                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link })
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
                             } else {
                                 aproblock = idid as string;
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
-                                await api.insertBlock("markdown", `###### ${timestamp}[🔗](${link})
-{: id="${idid}" custom-st-tldraw="1"}`, blockId)
+                                await api.insertBlock("markdown", `###### ${timestamp}
+{: id="${idid}" custom-st-tldraw="1" custom-tldraw-link="${link}"}`, blockId)
                             }
                             // 创建新的Card形状
                             // console.log("创建新的卡片形状",  aproblock[0].doOperations[0].id);

@@ -615,9 +615,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						pendingCreationPromise = (async () => {
 							const idid = (await api.generateSiyuanID()) as string
 							const link = buildTldrawLink(tldrawId, idid, title)
+							// 将链接保存到自定义属性中
 							const redata = await api.appendBlock(
 								'markdown',
-								`[*](${link})\n{: id="${idid}" custom-st-tldraw-single="1" }\n\n`,
+								`\n{: id="${idid}" custom-st-tldraw-single="1" custom-tldraw-link="${link}" }\n\n`,
 								tldrawId!
 							)
 							return redata[0].doOperations[0].id as string
