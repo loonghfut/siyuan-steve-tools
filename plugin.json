@@ -2,8 +2,9 @@
   "name": "siyuan-steve-tools",
   "author": "steve",
   "url": "https://github.com/loonghfut/siyuan-steve-tools",
-  "version": "0.30.0", 
+  "version": "0.30.0",
   "minAppVersion": "3.5.1",
+  "disabledInPublish": true,
   "backends": [
     "all"
   ],
@@ -24,7 +25,7 @@
   },
   "funding": {
     "custom": [
-      ""
+      "https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png"
     ]
   },
   "keywords": [
