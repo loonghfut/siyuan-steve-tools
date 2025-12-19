@@ -3,6 +3,7 @@ import { TLShapeId, useEditor, useValue, getDefaultColorTheme } from '@tldraw/tl
 import { getPortState } from './port-state'
 import { getShapePorts } from './shape-ports'
 import { getShapeConnections } from './bezier-connector-binding'
+import { settingdata } from '@/index'
 
 interface PortProps {
 	shapeId: TLShapeId
@@ -62,8 +63,14 @@ export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 
 	const scale = isHinting ? 1.4 : 1
 	// 所有端口统一向左偏移 3px，并向上偏移 3px
-	const extraOffsetX = -3
-	const extraOffsetY = -3
+	let extraOffsetX = 0
+	let extraOffsetY = 0
+	// 如果设置了显示 Card 边框，则额外偏移 3px 以避免遮挡
+	if (settingdata["showCardBorder"]) {
+		extraOffsetX = -3
+		extraOffsetY = -3
+	}
+
 
 	// 根据所属形状的配色决定点的默认颜色（当未处于 hint/eligible 时使用）
 	const shape = editor.getShape(shapeId) as any
@@ -91,9 +98,8 @@ export function Port({ shapeId, portId, parentHovered = false }: PortProps) {
 	)
 	return (
 		<div
-			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${
-				isHinting ? ' bezier-connector-port--hinting' : ''
-			}${isEligible ? ' bezier-connector-port--eligible' : ''}${isFlashing ? ' bezier-connector-port--flash' : ''}`}
+			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${isHinting ? ' bezier-connector-port--hinting' : ''
+				}${isEligible ? ' bezier-connector-port--eligible' : ''}${isFlashing ? ' bezier-connector-port--flash' : ''}`}
 			style={{
 				position: 'absolute',
 				left,

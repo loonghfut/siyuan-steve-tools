@@ -524,7 +524,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			const rafId = requestAnimationFrame(() => {
 				if (staticContentRef.current) {
 					// 使用空闲调度渲染，在交互时会暂停
-					renderAllContentIdle(staticContentRef.current, undefined, 10).then(() => {
+					renderAllContentIdle(staticContentRef.current, 10).then(() => {
 						setIsContentRendered(true)
 					}).catch(() => {
 						// 忽略渲染错误
@@ -972,7 +972,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
-					border: shape.props.transparentBackground ? 'none' : `${borderPx}px solid ${theme[shape.props.color].solid}`,
+					border: settingdata["showCardBorder"] ? (shape.props.transparentBackground ? 'none' : `${borderPx}px solid ${theme[shape.props.color].solid}`) : 'none',
 					borderRadius: '10px',
 				}}
 				onPointerDown={handlePointerEvent}
