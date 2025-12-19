@@ -91,6 +91,7 @@ export const createArrowBetweenShapes = (
                 end: { x: targetPagePos.x, y: targetPagePos.y },
                 color,
                 strokeWidth: 3,
+                strokeStyle: 'solid',
             },
         })
         const sourcePorts = getShapePorts(editor, source as any)

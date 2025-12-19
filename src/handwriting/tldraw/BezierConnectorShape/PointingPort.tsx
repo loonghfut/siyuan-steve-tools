@@ -142,6 +142,7 @@ export class PointingPort extends StateNode {
 				// Set the color to tldraw's official color token instead of a custom hex.
 				color: 'black',
 				strokeWidth: 3,
+				strokeStyle: 'solid',
 			},
 		})
 

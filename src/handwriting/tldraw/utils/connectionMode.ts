@@ -349,6 +349,7 @@ export class ConnectionModeManager {
                     end: { x: targetPagePos.x, y: targetPagePos.y },
                     color: color,
                     strokeWidth: 3,
+                    strokeStyle: 'solid',
                 },
             })
 

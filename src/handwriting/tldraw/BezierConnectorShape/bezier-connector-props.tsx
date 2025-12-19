@@ -9,4 +9,5 @@ export const bezierConnectorShapeProps: RecordProps<IBezierConnectorShape> = {
 	end: vecModelValidator,
 	color: DefaultColorStyle,
 	strokeWidth: T.number,
+	strokeStyle: T.optional(T.literalEnum('solid', 'dashed')),
 }

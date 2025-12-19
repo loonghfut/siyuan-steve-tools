@@ -15,6 +15,8 @@ export type IBezierConnectorShape = TLBaseShape<
 		color: TLDefaultColorStyle
 		/** 线条宽度 */
 		strokeWidth: number
+		/** 线条样式 */
+		strokeStyle?: 'solid' | 'dashed'
 	}
 >
 

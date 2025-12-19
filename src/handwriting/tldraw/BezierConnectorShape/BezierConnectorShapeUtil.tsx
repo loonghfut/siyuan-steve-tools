@@ -251,6 +251,8 @@ function renderConnectorPathAndEndpoints(
 	const d = getConnectionPath(start, end, startPortId, endPortId)
 	const r = Math.max(3, (props.strokeWidth || 2) + 1)
 	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color || theme.black.solid
+	const strokeStyle = props.strokeStyle ?? 'solid'
+	const strokeDasharray = strokeStyle === 'dashed' ? '12 8' : undefined
 	// 如果需要高亮或闪烁，先画一条宽的半透明路径作为 glow/halo
 	const highlight = isHighlighted || isFlashing
 	const highlightWidth = Math.max(0, (props.strokeWidth || 2) + (isHighlighted ? 3 : 0) + (isFlashing ? 2 : 0))
@@ -258,8 +260,8 @@ function renderConnectorPathAndEndpoints(
 
 	return (
 		<>
-			{highlight && <path d={d} stroke={color} strokeWidth={highlightWidth} strokeLinecap="round" fill="none" strokeOpacity={highlightOpacity} />}
-			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" />
+			{highlight && <path d={d} stroke={color} strokeWidth={highlightWidth} strokeLinecap="round" fill="none" strokeOpacity={highlightOpacity} strokeDasharray={strokeDasharray} />}
+			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" strokeDasharray={strokeDasharray} />
 			{start && (
 				<circle cx={start.x} cy={start.y} r={r} fill={color} stroke="none" />
 			)}
@@ -284,6 +286,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 			end: { x: 100, y: 100 },
 			color: 'grey',
 			strokeWidth: 3,
+			strokeStyle: 'solid',
 		}
 	}
 
@@ -477,11 +480,13 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	// 渲染选中指示器
 	indicator(connector: IBezierConnectorShape) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
+		const strokeStyle = connector.props.strokeStyle ?? 'solid'
 		return (
 			<path
 				d={getConnectionPath(start, end, startPortId, endPortId)}
 				strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
 				strokeLinecap="round"
+				strokeDasharray={strokeStyle === 'dashed' ? '12 8' : undefined}
 				fill="none"
 			/>
 		)

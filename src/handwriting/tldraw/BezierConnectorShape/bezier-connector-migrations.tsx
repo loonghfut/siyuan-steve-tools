@@ -2,6 +2,7 @@ import { createShapePropsMigrationIds, createShapePropsMigrationSequence } from 
 
 const versions = createShapePropsMigrationIds('bezier-connector', {
 	AddColorAndStrokeWidth: 1,
+	AddStrokeStyle: 2,
 })
 
 /**
@@ -20,6 +21,17 @@ export const bezierConnectorShapeMigrations = createShapePropsMigrationSequence(
 			down(props: any) {
 				delete props.color
 				delete props.strokeWidth
+			},
+		},
+		{
+			id: versions.AddStrokeStyle,
+			up(props: any) {
+				if (props.strokeStyle !== 'solid' && props.strokeStyle !== 'dashed') {
+					props.strokeStyle = 'solid'
+				}
+			},
+			down(props: any) {
+				delete props.strokeStyle
 			},
 		},
 	],

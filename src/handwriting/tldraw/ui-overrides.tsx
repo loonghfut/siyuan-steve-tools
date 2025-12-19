@@ -463,6 +463,13 @@ const CustomStylePanel = track(() => {
         return widths.every((w) => w === first) ? first : 'mixed'
     }, [hasConnectorSelection, selectedConnectorShapes])
 
+    const connectorStrokeStyleState = React.useMemo<'solid' | 'dashed' | 'mixed'>(() => {
+        if (!hasConnectorSelection) return 'solid'
+        const styles = selectedConnectorShapes.map((s) => s.props.strokeStyle ?? 'solid')
+        const first = styles[0]
+        return styles.every((s) => s === first) ? first : 'mixed'
+    }, [hasConnectorSelection, selectedConnectorShapes])
+
 
     const handleConnectorWidthChange = React.useCallback(
         (nextWidth: number) => {
@@ -473,6 +480,22 @@ const CustomStylePanel = track(() => {
                         id: shape.id,
                         type: 'bezier-connector',
                         props: { ...shape.props, strokeWidth: nextWidth },
+                    }))
+                )
+            })
+        },
+        [editor, hasConnectorSelection, selectedConnectorShapes]
+    )
+
+    const handleConnectorStyleChange = React.useCallback(
+        (nextStyle: 'solid' | 'dashed') => {
+            if (!hasConnectorSelection) return
+            editor.run(() => {
+                editor.updateShapes(
+                    selectedConnectorShapes.map((shape) => ({
+                        id: shape.id,
+                        type: 'bezier-connector',
+                        props: { ...shape.props, strokeStyle: nextStyle },
                     }))
                 )
             })
@@ -827,6 +850,25 @@ const CustomStylePanel = track(() => {
                                 }}
                             />
                             <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>px</span>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 8 }}>
+                        <span style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>线型</span>
+                        <div className="tlui-toggle-button-row" style={{ marginLeft: 8 }}>
+                            {(['solid', 'dashed'] as const).map((style) => {
+                                const isMixed = connectorStrokeStyleState === 'mixed'
+                                const isActive = connectorStrokeStyleState === style
+                                return (
+                                    <TldrawUiButton
+                                        key={style}
+                                        type="normal"
+                                        className={`tlui-toggle-button ${isActive ? 'tlui-toggle-button--active' : isMixed ? 'tlui-toggle-button--mixed' : ''}`}
+                                        onClick={() => handleConnectorStyleChange(style)}
+                                    >
+                                        {style === 'solid' ? '实线' : '虚线'}
+                                    </TldrawUiButton>
+                                )
+                            })}
                         </div>
                     </div>
                 </div>
