@@ -617,8 +617,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						const wrapper = document.createElement('div');
 						wrapper.innerHTML = cachedHtml;
 						const clone = wrapper.firstElementChild as HTMLElement;
-						if (clone) {
-							// 渲染内容（公式、图表等）- 缓存的是原始 DOM，需要渲染
+						if (clone && containerRef.current) {
+							if (protyleHostRef.current?.parentElement === containerRef.current) {
+								try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
+							}
+							staticPreviewRef.current = clone;
+							containerRef.current.appendChild(clone);
 							await renderAllContent(clone);
 							// 清理 Protyle
 							if (protyleHostRef.current?.parentElement) {
@@ -628,8 +632,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							protyleRef.current = null;
 							protyleHostRef.current = null;
 							if (cancelled) return;
-							staticPreviewRef.current = clone;
-							if (containerRef.current) containerRef.current.appendChild(clone);
 							return;
 						}
 					}
@@ -653,8 +655,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					cacheStaticPreview(currentBlockId, clone.outerHTML, fontSize);
 				}
 
-				// 渲染所有内容类型（公式、图表等）
-				await renderAllContent(clone);
+				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
+				if (containerRef.current) {
+					if (protyleHostRef.current?.parentElement === containerRef.current) {
+						try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
+					}
+					staticPreviewRef.current = clone;
+					containerRef.current.appendChild(clone);
+					await renderAllContent(clone);
+				}
 
 				// 清理 Protyle host
 				if (protyleHostRef.current?.parentElement) {
@@ -664,12 +673,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				try { safeDestroyProtyle(protyleRef.current); } catch { }
 				protyleRef.current = null;
 				protyleHostRef.current = null;
-				// 挂载克隆预览
 				if (cancelled) return;
-				staticPreviewRef.current = clone;
-				if (containerRef.current) {
-					containerRef.current.appendChild(clone);
-				}
 			};
 
 			// 使用 getDoc API 直接获取静态 DOM 内容（无需创建 Protyle）
@@ -687,12 +691,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						const wrapper = document.createElement('div');
 						wrapper.innerHTML = cachedHtml;
 						const clone = wrapper.firstElementChild as HTMLElement;
-						if (clone) {
-							// 渲染内容（公式、图表等）- 缓存的是原始 DOM，需要渲染
-							await renderAllContent(clone);
-							if (cancelled) return;
+						if (clone && containerRef.current) {
 							staticPreviewRef.current = clone;
 							containerRef.current.appendChild(clone);
+							await renderAllContent(clone);
+							if (cancelled) return;
 							return;
 						}
 					}
@@ -719,12 +722,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				// 缓存原始 DOM HTML（渲染前）
 				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
 
-				// 渲染所有内容类型（公式、图表等）
+				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
+				staticPreviewRef.current = previewWrapper;
+				containerRef.current.appendChild(previewWrapper);
 				await renderAllContent(previewWrapper);
 
 				if (cancelled) return;
-				staticPreviewRef.current = previewWrapper;
-				containerRef.current.appendChild(previewWrapper);
 			};
 
 			let cancelled = false;
