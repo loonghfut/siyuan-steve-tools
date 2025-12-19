@@ -304,6 +304,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const [canLoad, setCanLoad] = useState(true)
  		const [isHovered, setIsHovered] = useState(false)
 		const [hasAttrIcon, setHasAttrIcon] = useState(false)
+		const [hasLoadError, setHasLoadError] = useState(false)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const containerRef = useRef<HTMLDivElement>(null)
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
@@ -358,8 +359,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		}, [])
 
 		// 使用独立的尺寸测量 hook（自动处理尺寸更新）
-		useSingleBlockSize(shape, containerRef, protyleHostRef, isEditingState, isLoadingContent)
-
+	// 如果有加载错误，跳过测量以避免异常增长
+	useSingleBlockSize(shape, containerRef, protyleHostRef, isEditingState, isLoadingContent || hasLoadError)
 		// 检测是否包含属性视图图标（数据库图标）
 		useEffect(() => {
 			let container = containerRef.current
@@ -500,6 +501,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			// 从 API 获取块的 DOM HTML（会自动批量合并请求）
 			let cancelled = false
 			setIsLoadingContent(true)
+			setHasLoadError(false)
 			const fontSize = shape.props.fontSize || 16
 			
 			// 使用批量请求函数获取 DOM
@@ -507,6 +509,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (cancelled) return
 				if (html) {
 					setStaticHtml(html)
+					setHasLoadError(false)
 					return
 				}
 				// 备用：使用 getBlockContent + renderSimpleBlockHtml
@@ -516,7 +519,14 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					const fallbackHtml = await renderSimpleBlockHtml(content.content || content.markdown, fontSize)
 					setCachedHtml(blockId, fallbackHtml)
 					setStaticHtml(fallbackHtml)
+					setHasLoadError(false)
+				} else {
+					// 块不存在，设置错误状态
+					setHasLoadError(true)
 				}
+			}).catch(() => {
+				// API调用失败，设置错误状态
+				if (!cancelled) setHasLoadError(true)
 			}).finally(() => {
 				if (!cancelled) setIsLoadingContent(false)
 			})
@@ -634,6 +644,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				container.setAttribute('blockid', blockId)
 				// 使旧缓存失效
 				invalidateCache(blockId)
+				// 重置错误状态
+				setHasLoadError(false)
 				return blockId
 			}
 
@@ -1116,7 +1128,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						</div>
 					)}
 					{/* 非编辑态：新块占位符 */}
-					{!isEditingState && !staticHtml && !isLoadingContent && canLoad && shape.props.isNewlyCreated && (
+					{!isEditingState && !staticHtml && !isLoadingContent && !hasLoadError && canLoad && shape.props.isNewlyCreated && (
 						<div style={{
 							width: '100%',
 							height: '100%',
@@ -1130,6 +1142,23 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							padding: '4px'
 						}}>
 							双击编辑
+						</div>
+					)}
+					{/* 非编辑态：块不存在错误提示 */}
+					{!isEditingState && !staticHtml && !isLoadingContent && hasLoadError && (
+						<div style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							fontSize: `${Math.min(shape.props.fontSize, 14)}px`,
+							color: theme[shape.props.color].solid,
+							opacity: 0.6,
+							textAlign: 'center',
+							padding: '4px'
+						}}>
+							块不存在或已删除
 						</div>
 					)}
 				</div>
