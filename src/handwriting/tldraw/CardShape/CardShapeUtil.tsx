@@ -721,7 +721,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				previewWrapper.className = 'protyle-wysiwyg protyle-wysiwyg--attr';
 				previewWrapper.style.width = '100%';
 				previewWrapper.style.height = '100%';
-				previewWrapper.style.overflow = 'auto';
+				previewWrapper.style.overflow = 'scroll';
 				previewWrapper.style.fontSize = `${fontSize}px`;
 				previewWrapper.innerHTML = domContent;
 
