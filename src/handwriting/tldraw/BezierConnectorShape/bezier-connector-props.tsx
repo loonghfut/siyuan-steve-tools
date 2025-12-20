@@ -1,4 +1,4 @@
-import { DefaultColorStyle, RecordProps, T, vecModelValidator } from '@tldraw/tldraw'
+import { DefaultColorStyle, DefaultFontStyle, DefaultSizeStyle, RecordProps, T, vecModelValidator } from '@tldraw/tldraw'
 import { IBezierConnectorShape } from './bezier-connector-types'
 
 /**
@@ -10,4 +10,9 @@ export const bezierConnectorShapeProps: RecordProps<IBezierConnectorShape> = {
 	color: DefaultColorStyle,
 	strokeWidth: T.number,
 	strokeStyle: T.optional(T.literalEnum('solid', 'dashed')),
+	richText: T.any,
+	labelPosition: T.number,
+	font: DefaultFontStyle,
+	size: DefaultSizeStyle,
+	scale: T.number,
 }

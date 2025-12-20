@@ -1,4 +1,4 @@
-import { TLBaseShape, TLDefaultColorStyle, VecModel } from '@tldraw/tldraw'
+import { TLBaseShape, TLDefaultColorStyle, TLDefaultFontStyle, TLDefaultSizeStyle, TLRichText, VecModel } from '@tldraw/tldraw'
 
 /**
  * 贝塞尔连接器形状类型定义
@@ -17,6 +17,16 @@ export type IBezierConnectorShape = TLBaseShape<
 		strokeWidth: number
 		/** 线条样式 */
 		strokeStyle?: 'solid' | 'dashed'
+		/** 标签富文本内容 */
+		richText: TLRichText
+		/** 标签位置（0-1，沿曲线的位置） */
+		labelPosition: number
+		/** 字体样式 */
+		font: TLDefaultFontStyle
+		/** 字号 */
+		size: TLDefaultSizeStyle
+		/** 缩放比例 */
+		scale: number
 	}
 >
 

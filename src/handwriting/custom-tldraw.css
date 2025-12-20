@@ -330,6 +330,44 @@ input.tlui-input {
   fill: none;
 }
 
+/* 标签交互层：用于拖拽与双击编辑 */
+.tl-shape[data-shape-type='bezier-connector'] .bezier-connector-label-overlay {
+  /* 不遮挡编辑态的输入框：编辑态时由内联 pointerEvents 控制 */
+  z-index: 2;
+}
+
+.tl-shape[data-shape-type='bezier-connector'] .bezier-connector-label-overlay:active {
+  cursor: grabbing;
+}
+
+/* ========== 贝塞尔连接器文字标签样式 ========== */
+/* 模拟 tldraw 箭头形状的标签定位方式 */
+.tl-shape[data-shape-type='bezier-connector'] .tl-text-label {
+  position: absolute;
+  /* 从一个小参考点开始，由 transform 控制实际位置 */
+  top: -1px;
+  left: -1px;
+  width: 2px;
+  height: 2px;
+  padding: 0px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: var(--tl-color-text);
+}
+
+.tl-shape[data-shape-type='bezier-connector'] .tl-text-label__inner {
+  border-radius: var(--tl-radius-1);
+  box-sizing: content-box;
+  height: max-content;
+  width: max-content;
+}
+
+.tl-shape[data-shape-type='bezier-connector'] .tl-text {
+  height: max-content;
+}
+
 /* Expand hit area using a transparent pseudo-element so that the small visible dot
  * stays the same size, but the clickable/touch target becomes easier to hit.
  */

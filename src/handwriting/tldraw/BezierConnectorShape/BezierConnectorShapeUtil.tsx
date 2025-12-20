@@ -1,9 +1,12 @@
 import React from 'react'
 import {
+	Box,
 	CubicBezier2d,
 	Editor,
+	Group2d,
 	IndexKey,
 	Mat,
+	Rectangle2d,
 	SvgExportContext,
 	ShapeUtil,
 	SVGContainer,
@@ -16,7 +19,14 @@ import {
 	useEditor,
 	useValue,
 	getDefaultColorTheme,
+	getColorValue,
+	toRichText,
+	createComputedCache,
+	renderHtmlFromRichTextForMeasurement,
+	renderPlaintextFromRichText,
+	TLRichText,
 } from '@tldraw/tldraw'
+import { RichTextLabel, RichTextSVG } from '@tldraw/tldraw'
 import { bezierConnectorShapeProps } from './bezier-connector-props'
 import { bezierConnectorShapeMigrations } from './bezier-connector-migrations'
 import { IBezierConnectorShape, PortTerminal } from './bezier-connector-types'
@@ -28,6 +38,120 @@ import {
 } from './bezier-connector-binding'
 import { getPortAtPoint } from './port-utils'
 import { getPortState, setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
+
+// 常量定义（参考 tldraw 的 default-shape-constants）
+const ARROW_LABEL_FONT_SIZES: Record<string, number> = {
+	s: 18,
+	m: 20,
+	l: 24,
+	xl: 28,
+}
+
+const ARROW_LABEL_PADDING = 4.25
+
+const TEXT_PROPS = {
+	lineHeight: 1.35,
+	fontWeight: 'normal',
+	fontVariant: 'normal',
+	fontStyle: 'normal',
+	padding: '0px',
+}
+
+const FONT_FAMILIES: Record<string, string> = {
+	draw: 'var(--tl-font-draw)',
+	sans: 'var(--tl-font-sans)',
+	serif: 'var(--tl-font-serif)',
+	mono: 'var(--tl-font-mono)',
+}
+
+/**
+ * 判断富文本是否为空
+ */
+function isEmptyRichText(richText: TLRichText | undefined): boolean {
+	if (!richText) return true
+	if (typeof richText === 'object' && richText.content) {
+		return richText.content.every((node: any) => {
+			if (node.type === 'paragraph') {
+				if (!node.content || node.content.length === 0) return true
+				return node.content.every((child: any) => {
+					if (child.type === 'text') {
+						return !child.text || child.text.trim() === ''
+					}
+					return false
+				})
+			}
+			return false
+		})
+	}
+	return true
+}
+
+// tldraw 箭头/默认标签使用的 padding（用于几何与裁剪）
+// 这里保持与 ARROW_LABEL_PADDING 一致，确保：
+// - 几何命中区域与实际渲染一致
+// - 曲线裁剪缺口与文字框一致
+const LABEL_PADDING = ARROW_LABEL_PADDING
+
+function isRichTextEmpty(editor: Editor, richText: any) {
+	return renderPlaintextFromRichText(editor, richText).trim().length === 0
+}
+
+const bezierLabelSizeCache = createComputedCache(
+	'bezier-connector-label-size',
+	(editor: Editor, shape: IBezierConnectorShape) => {
+		editor.fonts.trackFontsForShape(shape)
+		const isEmpty = isRichTextEmpty(editor, shape.props.richText)
+		const html = renderHtmlFromRichTextForMeasurement(
+			editor,
+			isEmpty ? toRichText('i') : shape.props.richText
+		)
+		const fontSize = getBezierLabelFontSize(shape)
+		const { w, h } = editor.textMeasure.measureHtml(html, {
+			...TEXT_PROPS,
+			fontFamily: FONT_FAMILIES[shape.props.font],
+			fontSize,
+			maxWidth: null,
+		})
+		return new Vec(w, h).addScalar(LABEL_PADDING * 2 * shape.props.scale)
+	},
+	{ areRecordsEqual: (a, b) => a.props === b.props }
+)
+
+function getBezierLabelFontSize(shape: IBezierConnectorShape) {
+	return ARROW_LABEL_FONT_SIZES[shape.props.size] * (shape.props.scale ?? 1)
+}
+
+function getBezierLabelSize(editor: Editor, shape: IBezierConnectorShape) {
+	return bezierLabelSizeCache.get(editor, shape.id) ?? new Vec(0, 0)
+}
+
+/**
+ * 获取贝塞尔连接器标签位置
+ */
+function getBezierLabelPosition(
+	editor: Editor,
+	connector: IBezierConnectorShape
+): { box: Box } {
+	const { start, end, startPortId, endPortId } = getConnectorTerminals(editor, connector)
+	const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
+
+	// 创建贝塞尔曲线几何体
+	const bezier = new CubicBezier2d({
+		start: Vec.From(start),
+		cp1: Vec.From(cp1),
+		cp2: Vec.From(cp2),
+		end: Vec.From(end),
+	})
+
+	// 在标签位置插值获取中心点
+	const labelPosition = clamp(connector.props.labelPosition, 0, 1)
+	const labelCenter = bezier.interpolateAlongEdge(labelPosition)
+
+	// 获取标签大小
+	const labelSize = getBezierLabelSize(editor, connector)
+
+	return { box: Box.FromCenter(labelCenter, labelSize) }
+}
 
 /**
  * 存储拖拽过程中最新检测到的目标端口信息
@@ -229,10 +353,219 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 	const isHighlighted = highlightConnectorId === connector.id
 	const isFlashing = flashConnectorId === connector.id
 
+	// 标签相关
+	const isEditing = useValue('isEditing', () => editor.getEditingShapeId() === connector.id, [editor, connector.id])
+	const isSelected = useValue('isSelected', () => editor.getOnlySelectedShapeId() === connector.id, [editor, connector.id])
+	const showLabel = isEditing || !isEmptyRichText(connector.props.richText)
+	const labelPosition = getBezierLabelPosition(editor, connector)
+	const fontSize = getBezierLabelFontSize(connector)
+	const labelColor = getColorValue(theme, connector.props.color, 'solid')
+
+	const clipPathId = React.useMemo(
+		() => `bezier-connector-clip-${connector.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`,
+		[connector.id]
+	)
+
+	const bezier = React.useMemo(() => {
+		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
+		return new CubicBezier2d({
+			start: Vec.From(start),
+			cp1: Vec.From(cp1),
+			cp2: Vec.From(cp2),
+			end: Vec.From(end),
+		})
+	}, [start, end, startPortId, endPortId])
+
+	// 直接拖拽文字框：仿照 tldraw 的 PointingArrowLabel
+	const dragState = React.useRef<{
+		isDragging: boolean
+		didDrag: boolean
+		offset: Vec
+	}>(
+		{ isDragging: false, didDrag: false, offset: new Vec(0, 0) }
+	)
+
+	const updateLabelPositionFromClientPoint = React.useCallback(
+		(clientX: number, clientY: number) => {
+			const pagePoint = editor.screenToPage({ x: clientX, y: clientY })
+			const pointInShapeSpace = editor
+				.getPointInShapeSpace(connector, pagePoint)
+				.add(dragState.current.offset)
+
+			let next = bezier.uninterpolateAlongEdge(pointInShapeSpace)
+			if (isNaN(next)) return
+
+			// 避免贴近端点
+			next = clamp(next, 0.05, 0.95)
+
+			// 贴近默认位置时吸附到中间
+			const defaultPos = 0.5
+			const nextPoint = bezier.interpolateAlongEdge(next)
+			const defaultPoint = bezier.interpolateAlongEdge(defaultPos)
+			const snapDist = 16 / editor.getZoomLevel()
+			if (Vec.Dist(nextPoint, defaultPoint) < snapDist) {
+				next = defaultPos
+			}
+
+			editor.updateShape({
+				id: connector.id,
+				type: connector.type,
+				props: { labelPosition: next },
+			})
+		},
+		[editor, connector, bezier]
+	)
+
+	const handleLabelPointerDown = React.useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (isEditing) return
+			// 让 tldraw 不把这次 pointer down 当作画布交互
+			editor.markEventAsHandled(e)
+			;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+
+			dragState.current.isDragging = true
+			dragState.current.didDrag = false
+
+			const pagePoint = editor.screenToPage({ x: e.clientX, y: e.clientY })
+			const pointInShapeSpace = editor.getPointInShapeSpace(connector, pagePoint)
+			const labelCenter = labelPosition.box.center
+			dragState.current.offset = Vec.Sub(labelCenter, pointInShapeSpace)
+
+			// 同时选中该连接器，提升交互一致性
+			editor.select(connector.id)
+		},
+		[editor, connector, isEditing, labelPosition.box.center]
+	)
+
+	const handleLabelPointerMove = React.useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!dragState.current.isDragging) return
+			if (isEditing) return
+			// 只有按下并移动时才算拖拽
+			if (e.buttons !== 1) return
+			dragState.current.didDrag = true
+			updateLabelPositionFromClientPoint(e.clientX, e.clientY)
+		},
+		[isEditing, updateLabelPositionFromClientPoint]
+	)
+
+	const endLabelDrag = React.useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!dragState.current.isDragging) return
+			dragState.current.isDragging = false
+			try {
+				;(e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId)
+			} catch {
+				// ignore
+			}
+		},
+		[]
+	)
+
+	const handleLabelDoubleClick = React.useCallback(
+		(e: React.MouseEvent<HTMLDivElement>) => {
+			if (isEditing) return
+			editor.markEventAsHandled(e)
+			editor.select(connector.id)
+			// 进入编辑态（RichTextLabel 内部会根据 editingShapeId 切换为可编辑）
+			editor.setEditingShape(connector.id)
+			editor.setCurrentTool('select.editing_shape', {})
+			// 体验：双击进入后全选
+			editor.emit('select-all-text', { shapeId: connector.id })
+		},
+		[editor, connector.id, isEditing]
+	)
+
 	return (
-		<SVGContainer className="BezierConnectorShape">
-			{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId, isHighlighted, isFlashing)}
-		</SVGContainer>
+		<>
+			<SVGContainer className="BezierConnectorShape">
+				{showLabel && (
+					<defs>
+						<clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
+							<path
+								clipRule="evenodd"
+								d={(() => {
+									const b = bezier.bounds
+									const pad = 100
+									const outerLeft = b.minX - pad
+									const outerTop = b.minY - pad
+									const outerRight = b.maxX + pad
+									const outerBottom = b.maxY + pad
+
+									// 缺口按整个 label box 裁掉（与 tldraw arrow 一致），确保曲线不穿过文字框
+									const hole = labelPosition.box.clone().expandBy(0)
+									return [
+										`M ${outerLeft} ${outerTop}`,
+										`L ${outerRight} ${outerTop}`,
+										`L ${outerRight} ${outerBottom}`,
+										`L ${outerLeft} ${outerBottom}`,
+										`Z`,
+										`M ${hole.minX} ${hole.minY}`,
+										`L ${hole.maxX} ${hole.minY}`,
+										`L ${hole.maxX} ${hole.maxY}`,
+										`L ${hole.minX} ${hole.maxY}`,
+										`Z`,
+									].join(' ')
+								})()}
+							/>
+						</clipPath>
+					</defs>
+				)}
+				{renderConnectorPathAndEndpoints(
+					start,
+					end,
+					connector.props,
+					theme,
+					startPortId,
+					endPortId,
+					isHighlighted,
+					isFlashing,
+					showLabel ? clipPathId : undefined
+				)}
+			</SVGContainer>
+			{showLabel && (
+				<>
+					{/* 交互层：用于拖拽标签位置与双击进入编辑（非编辑态时生效） */}
+					<div
+						className="bezier-connector-label-overlay"
+						style={{
+							position: 'absolute',
+							top: 0,
+							left: 0,
+							width: labelPosition.box.w,
+							height: labelPosition.box.h,
+							transform: `translate(${labelPosition.box.x}px, ${labelPosition.box.y}px)`,
+							pointerEvents: isEditing ? 'none' : 'all',
+							cursor: isEditing ? 'text' : 'grab',
+							background: 'transparent',
+							borderRadius: 4 * connector.props.scale,
+						}}
+						onPointerDown={handleLabelPointerDown}
+						onPointerMove={handleLabelPointerMove}
+						onPointerUp={endLabelDrag}
+						onPointerCancel={endLabelDrag}
+						onDoubleClick={handleLabelDoubleClick}
+					/>
+					<RichTextLabel
+						shapeId={connector.id}
+						type="bezier-connector"
+						font={connector.props.font}
+						fontSize={fontSize}
+						lineHeight={TEXT_PROPS.lineHeight}
+						align="middle"
+						verticalAlign="middle"
+						labelColor={labelColor}
+						richText={connector.props.richText}
+						isSelected={isSelected}
+						textWidth={labelPosition.box.w - ARROW_LABEL_PADDING * 2 * connector.props.scale}
+						padding={0}
+						style={{
+							transform: `translate(${labelPosition.box.center.x}px, ${labelPosition.box.center.y}px)`,
+						}}
+					/>
+				</>
+			)}
+		</>
 	)
 }
 
@@ -246,7 +579,8 @@ function renderConnectorPathAndEndpoints(
 	theme: ReturnType<typeof getDefaultColorTheme>,
 	startPortId?: string,
 	endPortId?: string
-	, isHighlighted: boolean = false, isFlashing: boolean = false
+	, isHighlighted: boolean = false, isFlashing: boolean = false,
+	clipPathId?: string
 ) {
 	const d = getConnectionPath(start, end, startPortId, endPortId)
 	const r = Math.max(3, (props.strokeWidth || 2) + 1)
@@ -260,8 +594,27 @@ function renderConnectorPathAndEndpoints(
 
 	return (
 		<>
-			{highlight && <path d={d} stroke={color} strokeWidth={highlightWidth} strokeLinecap="round" fill="none" strokeOpacity={highlightOpacity} strokeDasharray={strokeDasharray} />}
-			<path d={d} stroke={color} strokeWidth={props.strokeWidth} strokeLinecap="round" fill="none" strokeDasharray={strokeDasharray} />
+			{highlight && (
+				<path
+					d={d}
+					stroke={color}
+					strokeWidth={highlightWidth}
+					strokeLinecap="round"
+					fill="none"
+					strokeOpacity={highlightOpacity}
+					strokeDasharray={strokeDasharray}
+					clipPath={clipPathId ? `url(#${clipPathId})` : undefined}
+				/>
+			)}
+			<path
+				d={d}
+				stroke={color}
+				strokeWidth={props.strokeWidth}
+				strokeLinecap="round"
+				fill="none"
+				strokeDasharray={strokeDasharray}
+				clipPath={clipPathId ? `url(#${clipPathId})` : undefined}
+			/>
 			{start && (
 				<circle cx={start.x} cy={start.y} r={r} fill={color} stroke="none" />
 			)}
@@ -287,12 +640,17 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 			color: 'grey',
 			strokeWidth: 3,
 			strokeStyle: 'solid',
+			richText: toRichText(''),
+			labelPosition: 0.5,
+			font: 'draw',
+			size: 'm',
+			scale: 1,
 		}
 	}
 
-	// 禁用编辑、调整大小、旋转等
+	// 启用编辑功能以支持双击编辑文字
 	override canEdit() {
-		return false
+		return true
 	}
 	override canResize() {
 		return false
@@ -318,19 +676,44 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 
 	// 定义连接形状的几何形状为三次贝塞尔曲线
 	getGeometry(connector: IBezierConnectorShape) {
+		const isEditing = this.editor.getEditingShapeId() === connector.id
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-		return new CubicBezier2d({
+
+		const bodyGeom = new CubicBezier2d({
 			start: Vec.From(start),
 			cp1: Vec.From(cp1),
 			cp2: Vec.From(cp2),
 			end: Vec.From(end),
 		})
+
+		// 如果正在编辑或有文本，添加标签几何体
+		let labelGeom: Rectangle2d | undefined
+		if (isEditing || !isEmptyRichText(connector.props.richText)) {
+			const labelPosition = getBezierLabelPosition(this.editor, connector)
+			labelGeom = new Rectangle2d({
+				x: labelPosition.box.x,
+				y: labelPosition.box.y,
+				width: labelPosition.box.w,
+				height: labelPosition.box.h,
+				isFilled: true,
+				isLabel: true,
+			})
+		}
+
+		return new Group2d({
+			children: labelGeom ? [bodyGeom, labelGeom] : [bodyGeom],
+		})
 	}
 
-	// 定义可拖拽的手柄（起点和终点）
+	override getText(shape: IBezierConnectorShape) {
+		return renderPlaintextFromRichText(this.editor, shape.props.richText)
+	}
+
+	// 定义可拖拽的手柄（起点、中点标签、终点）
 	getHandles(connector: IBezierConnectorShape): TLHandle[] {
 		const { start, end } = getConnectorTerminals(this.editor, connector)
+
 		return [
 			{
 				id: 'start',
@@ -342,7 +725,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 			{
 				id: 'end',
 				type: 'vertex',
-				index: 'a1' as IndexKey,
+				index: 'a2' as IndexKey,
 				x: end.x,
 				y: end.y,
 			},
@@ -357,8 +740,10 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		connector: IBezierConnectorShape,
 		{ handle }: TLHandleDragInfo<IBezierConnectorShape>
 	): IBezierConnectorShape {
-		const draggingTerminal = handle.id as PortTerminal
+		const handleId = handle.id
 		const connectorId = connector.id
+
+		const draggingTerminal = handleId as PortTerminal
 
 		// 计算手柄在页面空间中的位置
 		const shapeTransform = this.editor.getShapePageTransform(connector)
@@ -474,21 +859,172 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	override toSvg(connector: IBezierConnectorShape, ctx: SvgExportContext) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		return <g>{renderConnectorPathAndEndpoints(start, end, connector.props, theme, startPortId, endPortId, false, false)}</g>
+		const labelPosition = getBezierLabelPosition(this.editor, connector)
+		const isEmpty = isEmptyRichText(connector.props.richText)
+		const fontSize = getBezierLabelFontSize(connector)
+		const labelColor = getColorValue(theme, connector.props.color, 'solid')
+		const clipPathId = `bezier-connector-export-clip-${connector.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
+		const bezier = new CubicBezier2d({
+			start: Vec.From(start),
+			cp1: Vec.From(cp1),
+			cp2: Vec.From(cp2),
+			end: Vec.From(end),
+		})
+
+		return (
+			<g>
+				{!isEmpty && (
+					<defs>
+						<clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
+							<path
+								clipRule="evenodd"
+								d={(() => {
+									const b = bezier.bounds
+									const pad = 100
+									const outerLeft = b.minX - pad
+									const outerTop = b.minY - pad
+									const outerRight = b.maxX + pad
+									const outerBottom = b.maxY + pad
+									const hole = labelPosition.box.clone().expandBy(0)
+									return [
+										`M ${outerLeft} ${outerTop}`,
+										`L ${outerRight} ${outerTop}`,
+										`L ${outerRight} ${outerBottom}`,
+										`L ${outerLeft} ${outerBottom}`,
+										`Z`,
+										`M ${hole.minX} ${hole.minY}`,
+										`L ${hole.maxX} ${hole.minY}`,
+										`L ${hole.maxX} ${hole.maxY}`,
+										`L ${hole.minX} ${hole.maxY}`,
+										`Z`,
+									].join(' ')
+								})()}
+							/>
+						</clipPath>
+					</defs>
+				)}
+				{renderConnectorPathAndEndpoints(
+					start,
+					end,
+					connector.props,
+					theme,
+					startPortId,
+					endPortId,
+					false,
+					false,
+					!isEmpty ? clipPathId : undefined
+				)}
+				{!isEmpty && (
+					<RichTextSVG
+						fontSize={fontSize}
+						font={connector.props.font}
+						align="middle"
+						verticalAlign="middle"
+						labelColor={labelColor}
+						richText={connector.props.richText}
+						bounds={labelPosition.box.clone().expandBy(-ARROW_LABEL_PADDING * connector.props.scale)}
+						padding={0}
+					/>
+				)}
+			</g>
+		)
 	}
 
 	// 渲染选中指示器
 	indicator(connector: IBezierConnectorShape) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		const strokeStyle = connector.props.strokeStyle ?? 'solid'
+		const isEmpty = isEmptyRichText(connector.props.richText)
+		const isEditing = this.editor.getEditingShapeId() === connector.id
+		const clipPathId = `bezier-connector-indicator-clip-${connector.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+
+		const labelPosition = getBezierLabelPosition(this.editor, connector)
+		const labelBounds = labelPosition.box
+		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
+		const bezier = new CubicBezier2d({
+			start: Vec.From(start),
+			cp1: Vec.From(cp1),
+			cp2: Vec.From(cp2),
+			end: Vec.From(end),
+		})
+
+		// 如果正在编辑，只显示标签框的指示器
+		if (isEditing && !isEmpty) {
+			return (
+				<rect
+					x={labelBounds.x}
+					y={labelBounds.y}
+					width={labelBounds.w}
+					height={labelBounds.h}
+					rx={3.5 * connector.props.scale}
+					ry={3.5 * connector.props.scale}
+				/>
+			)
+		}
+
 		return (
-			<path
-				d={getConnectionPath(start, end, startPortId, endPortId)}
-				strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
-				strokeLinecap="round"
-				strokeDasharray={strokeStyle === 'dashed' ? '12 8' : undefined}
-				fill="none"
-			/>
+			<g>
+				{!isEmpty && (
+					<defs>
+						<clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
+							<path
+								clipRule="evenodd"
+								d={(() => {
+									const b = bezier.bounds
+									const pad = 100
+									const outerLeft = b.minX - pad
+									const outerTop = b.minY - pad
+									const outerRight = b.maxX + pad
+									const outerBottom = b.maxY + pad
+									const hole = labelBounds.clone().expandBy(0)
+									return [
+										`M ${outerLeft} ${outerTop}`,
+										`L ${outerRight} ${outerTop}`,
+										`L ${outerRight} ${outerBottom}`,
+										`L ${outerLeft} ${outerBottom}`,
+										`Z`,
+										`M ${hole.minX} ${hole.minY}`,
+										`L ${hole.maxX} ${hole.minY}`,
+										`L ${hole.maxX} ${hole.maxY}`,
+										`L ${hole.minX} ${hole.maxY}`,
+										`Z`,
+									].join(' ')
+								})()}
+							/>
+						</clipPath>
+					</defs>
+				)}
+				<path
+					d={getConnectionPath(start, end, startPortId, endPortId)}
+					strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
+					strokeLinecap="round"
+					strokeDasharray={strokeStyle === 'dashed' ? '12 8' : undefined}
+					fill="none"
+					clipPath={!isEmpty ? `url(#${clipPathId})` : undefined}
+				/>
+				{!isEmpty && (
+					<rect
+						x={labelBounds.x}
+						y={labelBounds.y}
+						width={labelBounds.w}
+						height={labelBounds.h}
+						rx={3.5 * connector.props.scale}
+						ry={3.5 * connector.props.scale}
+					/>
+				)}
+			</g>
 		)
+	}
+
+	// 开始编辑时，如果是首次编辑空文本，设置默认标签位置
+	override onEditStart(connector: IBezierConnectorShape) {
+		if (isEmptyRichText(connector.props.richText)) {
+			this.editor.updateShape({
+				id: connector.id,
+				type: connector.type,
+				props: { labelPosition: 0.5 },
+			})
+		}
 	}
 }
