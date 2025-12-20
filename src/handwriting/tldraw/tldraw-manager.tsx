@@ -1174,7 +1174,7 @@ export class TldrawManager {
                         console.log(`Deleted block ${blockId} because no other cards reference it.`);
                     } else {
                         // 否则只重置属性，保留块
-                        await api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' });
+                        await api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' , 'custom-tldraw-link': ''});
                         console.log(`Block attribute updated for ${blockId} as no other cards reference it.`);
                     }
                 }
@@ -1205,6 +1205,7 @@ export class TldrawManager {
                         await api.deleteBlock(blockId);
                         console.log(`Deleted block ${blockId} because no other single-blocks reference it.`);
                     } else {
+                        await api.setBlockAttrs(blockId, { 'custom-st-tldraw': '0' , 'custom-tldraw-link': ''});
                         // console.log("%%%",block.markdown);
                         // 只删除指向当前画板(this.id) 与该块(blockId) 的[*](...)链接
                         // 支持 https:// 和 siyuan:// 两种协议
