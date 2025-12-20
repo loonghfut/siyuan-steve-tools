@@ -22,6 +22,8 @@ export const handwritingDefaults: Record<string, any> = {
     "enableDoubleClickCreateSingleBlock": true,
     // 精确箭头模式
     "tldraw-exact-arrow-mode": true,
+    // 自定义卡片标题内容
+    "tldraw-custom-card-title": "",
 };
 
 export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -38,6 +40,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "select", title: "工具栏方向", description: "选择工具栏是垂直显示还是水平显示", key: "tldraw-toolbar-orientation", value: ctx.settings["tldraw-toolbar-orientation"], options: { "vertical": "垂直", "horizontal": "水平" } },
                 { type: "checkbox", title: "文档块是否渲染题头图", description: "启用文档块题头图渲染", key: "tldraw-header-image", value: ctx.settings["tldraw-header-image"] },
                 { type: "checkbox", title: "启用精确箭头模式", description: "启用后绘制箭头时将使用精确模式", key: "tldraw-exact-arrow-mode", value: ctx.settings["tldraw-exact-arrow-mode"] },
+                { type: "textinput", title: "自定义卡片标题内容", description: "在此输入自定义的卡片标题内容，支持使用变量 ${timestamp}", key: "tldraw-custom-card-title", value: ctx.settings["tldraw-custom-card-title"] },
             ]
         },
         {

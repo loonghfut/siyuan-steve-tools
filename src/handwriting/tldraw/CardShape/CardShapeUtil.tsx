@@ -465,11 +465,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						try {
 							pendingCreationPromise = (async () => {
 								const idid = await api.generateSiyuanID() as string;
+								const customTitleTemplate = settingdata["tldraw-custom-card-title"] || "${timestamp}";
 								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+								const renderedTitle = customTitleTemplate
+									? customTitleTemplate.replace(/\$\{timestamp\}/g, timestamp)
+									: timestamp;
 								const link = buildTldrawLink(tldrawId, idid, title);
 								// 将链接保存到自定义属性中
 								const content =
-									'###### ' + timestamp +
+									'###### ' + renderedTitle +
 									'\n' +
 									'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
 									'\n\n' +
