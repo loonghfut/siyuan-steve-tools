@@ -1,5 +1,5 @@
 import * as ic from "@/icon"
-import { openTab, Plugin, showMessage, Tab } from "siyuan";
+import { openTab, Plugin, showMessage } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 // 替换为新的卡片视图组件
@@ -7,7 +7,6 @@ import TldrawWhiteboardCards from './tldraw/tldraw-whiteboard-cards.svelte';
 import { addWhiteboardButton } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
-const tldrawInstances: Map<string, TldrawManager> = new Map();
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -17,10 +16,15 @@ export class M_handwriting {
     private dockComponent: any | null = null;
     // 记录点击拦截器以便卸载时移除
     private clickHandler?: (e: MouseEvent) => void;
+    // 委托的 icon 点击处理，用于单点管理所有注入的 icon
+    private delegatedIconClickHandler?: (e: MouseEvent) => void;
     // 复用的插件 URL 处理函数
     private handlePluginUrl?: (url: string) => Promise<void>;
     // 监听带 custom-tldraw-link 元素的观察器
     private tldrawLinkObserver?: MutationObserver;
+    private pendingTldrawNodes?: Set<HTMLElement>;
+    private mutationFlushHandle?: number;
+    private mutationFlushHandleIsTimeout?: boolean;
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -42,13 +46,7 @@ export class M_handwriting {
                 }
 
                 // 规范化 URL：把 HTML 实体中的 &amp; 解码为 &，避免查询参数解析失败
-                let normalizedUrl = url;
-                if (normalizedUrl.includes('&amp;')) {
-                    // 多次替换，处理可能出现的 &amp;amp; 等情况
-                    while (normalizedUrl.includes('&amp;')) {
-                        normalizedUrl = normalizedUrl.replace(/&amp;/g, '&');
-                    }
-                }
+                const normalizedUrl = this.decodeAmpEntities(url);
 
                 // 提取查询参数部分
                 const queryString = normalizedUrl.split('?')[1];
@@ -143,43 +141,47 @@ export class M_handwriting {
             // 仅处理左键点击且未被修饰键干预的常规点击
             if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
-            // 向上寻找最近的 <a> 元素
-            const path = e.composedPath ? e.composedPath() : [];
-            let anchor: HTMLAnchorElement | null = null;
-            let dataHrefEl: HTMLElement | null = null;
-            let candidateUrl: string | null = null;
-            for (const node of path as any[]) {
-                if (node instanceof HTMLAnchorElement) { anchor = node; break; }
-                if (!anchor && node instanceof HTMLElement) {
-                    const dt = node.getAttribute && node.getAttribute('data-type');
-                    if (dt === 'a') {
-                        const dh = node.getAttribute('data-href') || '';
-                        if (dh) {
-                            dataHrefEl = node;
-                            candidateUrl = dh;
-                            // 不 break，让上层如存在 <a> 优先
-                        }
-                    }
+            const target = e.target as HTMLElement | null;
+            if (!target) return;
+
+            // 优先：如果点击的是注入的图标（或其子元素），直接从图标属性读取链接
+            const iconEl = (target.closest && target.closest('.st-tldraw-link-icon')) as HTMLElement | null;
+            if (iconEl) {
+                const link = iconEl.getAttribute('data-tldraw-link') || '';
+                if (!link) return;
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    const toHandle = this.decodeAmpEntities(link);
+                    await handlePluginUrl(toHandle);
+                } catch (err) {
+                    console.error('处理图标链接失败:', err);
                 }
+                return;
             }
+
+            // 其次快速尝试找到最近的 <a> 元素（避免遍历完整的 composedPath）
+            let anchor = (target.closest && target.closest('a')) as HTMLAnchorElement | null;
+            let candidateUrl: string | null = null;
             if (!anchor) {
-                // 兼容性退路：从事件目标向上查找
-                let el = e.target as HTMLElement | null;
+                // 回退：向上查找可能的 data-type="a" 节点
+                let el = target;
                 while (el) {
                     if (el instanceof HTMLAnchorElement) { anchor = el; break; }
-                    if (!dataHrefEl && el.getAttribute) {
+                    if (el.getAttribute) {
                         const dt = el.getAttribute('data-type');
                         if (dt === 'a') {
                             const dh = el.getAttribute('data-href') || '';
                             if (dh) {
-                                dataHrefEl = el;
                                 candidateUrl = dh;
+                                break;
                             }
                         }
                     }
                     el = el.parentElement;
                 }
             }
+
             // 先取 <a href>，如无则取 data-href
             let href = anchor ? (anchor.getAttribute('href') || '') : '';
             if (!href && candidateUrl) href = candidateUrl;
@@ -190,13 +192,7 @@ export class M_handwriting {
                 e.preventDefault();
                 e.stopPropagation();
                 try {
-                    // 同样对 &amp; 进行解码，避免参数丢失
-                    let toHandle = href;
-                    if (toHandle.includes('&amp;')) {
-                        while (toHandle.includes('&amp;')) {
-                            toHandle = toHandle.replace(/&amp;/g, '&');
-                        }
-                    }
+                    const toHandle = this.decodeAmpEntities(href);
                     await handlePluginUrl(toHandle);
                 } catch (err) {
                     console.error('处理插件 https 链接失败:', err);
@@ -204,6 +200,24 @@ export class M_handwriting {
             }
         };
         document.addEventListener('click', this.clickHandler, true);
+
+        // 委托：统一处理注入的图标点击，减少每个图标绑定事件的开销
+        this.delegatedIconClickHandler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (!target) return;
+            const icon = (target.closest && target.closest('.st-tldraw-link-icon')) as HTMLElement | null;
+            if (!icon) return;
+            // 阻止默认并使用图标上的链接属性
+            e.preventDefault();
+            e.stopPropagation();
+            const link = icon.getAttribute('data-tldraw-link') || '';
+            if (link && this.handlePluginUrl) {
+                const normalized = this.decodeAmpEntities(link);
+                // 不等待，交由处理器异步执行
+                void this.handlePluginUrl(normalized);
+            }
+        };
+        document.addEventListener('click', this.delegatedIconClickHandler, true);
 
 
         this.plugin.addTab({
@@ -369,15 +383,8 @@ export class M_handwriting {
         //加opacity: 1
         icon.style.opacity = '1';
         icon.innerHTML = '<svg class="item__graphic"><use xlink:href="#iconSTWhiteboard">🔗</use></svg>';
-        icon.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            let normalized = linkAttr;
-            while (normalized.includes('&amp;')) {
-                normalized = normalized.replace(/&amp;/g, '&');
-            }
-            this.handlePluginUrl?.(normalized);
-        });
+        // 把链接存到 icon 的属性上，供委托处理器使用
+        icon.setAttribute('data-tldraw-link', linkAttr);
 
         attrEl.appendChild(icon);
     }
@@ -397,17 +404,17 @@ export class M_handwriting {
                     m.addedNodes.forEach((n) => {
                         if (n instanceof HTMLElement) {
                             if (n.hasAttribute('custom-tldraw-link')) {
-                                this.injectTldrawIconForNode(n);
+                                this.scheduleTldrawNodeInjection(n);
                             }
                             n.querySelectorAll<HTMLElement>('[custom-tldraw-link]').forEach((child) => {
-                                this.injectTldrawIconForNode(child);
+                                this.scheduleTldrawNodeInjection(child);
                             });
                         }
                     });
                 } else if (m.type === 'attributes') {
                     const target = m.target as HTMLElement;
                     if (m.attributeName === 'custom-tldraw-link') {
-                        this.injectTldrawIconForNode(target);
+                        this.scheduleTldrawNodeInjection(target);
                     }
                 }
             }
@@ -426,24 +433,22 @@ export class M_handwriting {
             this.tldrawLinkObserver.disconnect();
             this.tldrawLinkObserver = undefined;
         }
+        this.clearScheduledTldrawNodes();
+        // 注意：不要在这里移除 `delegatedIconClickHandler`，它应当在插件卸载时统一清理。
     }
 
     /**
      * 插件卸载时的清理工作
      */
     async onunload() {
-        // 销毁所有tldraw实例
-        tldrawInstances.forEach(instance => {
-            instance.destroy();
-        });
-
-        // 清空实例映射表
-        tldrawInstances.clear();
-
         // 移除链接点击拦截器
         if (this.clickHandler) {
             document.removeEventListener('click', this.clickHandler, true);
             this.clickHandler = undefined;
+        }
+        if (this.delegatedIconClickHandler) {
+            document.removeEventListener('click', this.delegatedIconClickHandler, true);
+            this.delegatedIconClickHandler = undefined;
         }
         // 停止观察器
         this.stopTldrawLinkWatcher();
@@ -454,5 +459,69 @@ export class M_handwriting {
                 this.dockComponent = null;
             }
         } catch (e) { /* ignore */ }
+    }
+
+    private decodeAmpEntities(value: string): string {
+        if (!value || value.indexOf('&amp;') === -1) {
+            return value;
+        }
+        let result = value;
+        for (let i = 0; i < 5; i++) {
+            const replaced = result.replace(/&amp;/g, '&');
+            if (replaced === result) {
+                break;
+            }
+            result = replaced;
+        }
+        return result;
+    }
+
+    private scheduleTldrawNodeInjection(node: HTMLElement) {
+        if (!node) return;
+        if (!this.pendingTldrawNodes) {
+            this.pendingTldrawNodes = new Set();
+        }
+        this.pendingTldrawNodes.add(node);
+        if (this.mutationFlushHandle !== undefined) {
+            return;
+        }
+
+        const flush = () => {
+            if (this.pendingTldrawNodes) {
+                this.pendingTldrawNodes.forEach((pendingNode) => {
+                    if (pendingNode.isConnected) {
+                        this.injectTldrawIconForNode(pendingNode);
+                    }
+                });
+                this.pendingTldrawNodes.clear();
+                this.pendingTldrawNodes = undefined;
+            }
+            this.mutationFlushHandle = undefined;
+            this.mutationFlushHandleIsTimeout = undefined;
+        };
+
+        if (typeof requestAnimationFrame === 'function') {
+            this.mutationFlushHandle = requestAnimationFrame(flush);
+            this.mutationFlushHandleIsTimeout = false;
+        } else {
+            this.mutationFlushHandle = window.setTimeout(flush, 16);
+            this.mutationFlushHandleIsTimeout = true;
+        }
+    }
+
+    private clearScheduledTldrawNodes() {
+        if (this.mutationFlushHandle !== undefined) {
+            if (this.mutationFlushHandleIsTimeout) {
+                clearTimeout(this.mutationFlushHandle);
+            } else {
+                cancelAnimationFrame(this.mutationFlushHandle);
+            }
+        }
+        if (this.pendingTldrawNodes) {
+            this.pendingTldrawNodes.clear();
+            this.pendingTldrawNodes = undefined;
+        }
+        this.mutationFlushHandle = undefined;
+        this.mutationFlushHandleIsTimeout = undefined;
     }
 }
