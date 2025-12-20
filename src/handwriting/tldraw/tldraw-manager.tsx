@@ -482,12 +482,12 @@ export class TldrawManager {
                                 aproblock = blockId;
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
                                 // 将链接保存到块的自定义属性中
-                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link })
+                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
                             } else if (blockIdo_rigin.includes('paragraph')) {
                                 aproblock = blockId;
                                 // 将链接保存到块的自定义属性中
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
-                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link })
+                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw-single':"1"})
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
