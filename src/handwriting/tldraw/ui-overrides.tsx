@@ -68,6 +68,7 @@ import { addShapesToLibrary, resetShapeLibraryPanelPosition } from './shapelibra
 import { ShapeLibraryPanel } from './shapelibrary/ShapeLibraryPanel'
 import { IBezierConnectorShape, getConnectorTerminals } from './BezierConnectorShape'
 import { createAndBindShape } from './BezierConnectorShape'
+import { convertConnectorsToArrow, convertConnectorsToBezier } from './utils/connector-convert'
 // There's a guide at the bottom of this file!
 
 type CardLikeShape = ICardShape | ISingleBlockShape;
@@ -830,6 +831,76 @@ const CustomStylePanel = track(() => {
             `}</style>
             {/* 如果选中了思维导图（mind-map），我们不加载 DefaultStylePanelContent */}
             {!hasMindMapSelection && <DefaultStylePanelContent styles={styles} />}
+
+            {/* 连接线类型互换（arrow <-> bezier-connector），支持批量并保留文字 */}
+            {(() => {
+                const convertible = selectedShapes.filter((s: any) => s?.type === 'arrow' || s?.type === 'bezier-connector') as any[]
+                if (!convertible.length) return null
+
+                const hasAnyArrow = convertible.some((s) => s.type === 'arrow')
+                const hasAnyBezier = convertible.some((s) => s.type === 'bezier-connector')
+                if (!hasAnyArrow && !hasAnyBezier) return null
+
+                const ids = convertible.map((s) => s.id)
+                const keepSelectedIds = selectedShapes
+                    .filter((s: any) => s?.type !== 'arrow' && s?.type !== 'bezier-connector')
+                    .map((s: any) => s.id)
+
+                const handleToBezier = () => {
+                    try {
+                        editor.run(() => {
+                            const nextIds = convertConnectorsToBezier(editor, ids)
+                            if (keepSelectedIds.length) {
+                                editor.setSelectedShapes([...keepSelectedIds, ...nextIds])
+                            }
+                        })
+                    } catch (err) {
+                        console.error('convert connectors to bezier failed', err)
+                        showMessage('批量转换为曲线失败', 3000, 'error')
+                    }
+                }
+
+                const handleToArrow = () => {
+                    try {
+                        editor.run(() => {
+                            const nextIds = convertConnectorsToArrow(editor, ids)
+                            if (keepSelectedIds.length) {
+                                editor.setSelectedShapes([...keepSelectedIds, ...nextIds])
+                            }
+                        })
+                    } catch (err) {
+                        console.error('convert connectors to arrow failed', err)
+                        showMessage('批量转换为直线失败', 3000, 'error')
+                    }
+                }
+
+                return (
+                    <div className="tlui-style-panel__section">
+                        <div style={{ display: 'flex', gap: 0 }}>
+                            {hasAnyArrow && (
+                                <TldrawUiButton
+                                    type="normal"
+                                    style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
+                                    title="将选中箭头批量转换为曲线连接器（保留文字，尽量保留绑定）"
+                                    onClick={handleToBezier}
+                                >
+                                    全部转为曲线
+                                </TldrawUiButton>
+                            )}
+                            {hasAnyBezier && (
+                                <TldrawUiButton
+                                    type="normal"
+                                    style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
+                                    title="将选中曲线连接器批量转换为箭头（保留文字，尽量保留绑定）"
+                                    onClick={handleToArrow}
+                                >
+                                    全部转为直线
+                                </TldrawUiButton>
+                            )}
+                        </div>
+                    </div>
+                )
+            })()}
 
             {hasConnectorSelection && (
                 <div className="tlui-style-panel__section">
