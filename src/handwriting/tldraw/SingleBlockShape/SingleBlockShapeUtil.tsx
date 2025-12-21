@@ -240,6 +240,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		return true
 	}
 
+	override canCull(_shape: ISingleBlockShape): boolean {
+		return false
+	}
+
 	override canResize(): boolean {
 		return true
 	}
