@@ -595,7 +595,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 					height: '100%',
 					backgroundColor: theme[shape.props.color].semi,
 					color: theme[shape.props.color].solid,
-					border: `2px solid ${theme[shape.props.color].solid}`,
+					border: settingdata["showCardBorder"] ? `3px solid ${theme[shape.props.color].solid}` : 'none', 
 					borderRadius: '10px',
 					overflow: 'hidden',
 					pointerEvents: 'auto',
