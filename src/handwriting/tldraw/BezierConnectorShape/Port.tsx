@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { TLShapeId, useEditor, useValue, getDefaultColorTheme } from '@tldraw/tldraw'
 import { getPortState } from './port-state'
 import { getShapePorts } from './shape-ports'
@@ -140,6 +140,48 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 		[editor, shapeId]
 	)
 
+	// 延时显示：当 parentHovered 为 true 时，延迟一段时间再显示端口
+	const [hoveredVisible, setHoveredVisible] = useState(false)
+	const hoverTimerRef = useRef<number | null>(null)
+
+	useEffect(() => {
+		// 清理定时器
+		return () => {
+			if (hoverTimerRef.current) {
+				clearTimeout(hoverTimerRef.current)
+				hoverTimerRef.current = null
+			}
+		}
+	}, [])
+
+	useEffect(() => {
+		// 如果工具为 hand，确保不显示
+		if (editor.getCurrentToolId() === 'hand') {
+			setHoveredVisible(false)
+			if (hoverTimerRef.current) {
+				clearTimeout(hoverTimerRef.current)
+				hoverTimerRef.current = null
+			}
+			return
+		}
+
+		if (parentHovered) {
+			// start timer to show after 300ms
+			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+			hoverTimerRef.current = window.setTimeout(() => {
+				hoverTimerRef.current = null
+				setHoveredVisible(true)
+			}, 700)
+		} else {
+			// hide immediately
+			if (hoverTimerRef.current) {
+				clearTimeout(hoverTimerRef.current)
+				hoverTimerRef.current = null
+			}
+			setHoveredVisible(false)
+		}
+	}, [parentHovered, editor])
+
 	const visible = useValue('overlay-visible', () => {
 		// 当工具为 hand 时，隐藏端口
 		const currentToolId = editor.getCurrentToolId()
@@ -147,10 +189,8 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 
 		const state = getPortState(editor)
 		if (!ports) return false
-		if (parentHovered) return true
-		// 如果形状已有连接也显示
-		const conns = getShapeConnections(editor, shapeId)
-		if (conns.length > 0) return true
+		// 只有在 hoveredVisible 为 true 或满足其他即时条件时才显示
+		if (hoveredVisible) return true
 		if (state.hintingPort?.shapeId === shapeId) return true
 		if (state.flashPort?.shapeId === shapeId) return true
 		const eligible = state.eligiblePorts
@@ -159,7 +199,7 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 			if (!eligible.excludeShapeIds?.has(shapeId)) return true
 		}
 		return false
-	}, [editor, shapeId, parentHovered, ports])
+	}, [editor, shapeId, parentHovered, ports, hoveredVisible])
 
 	if (!ports || !visible) return null
 
