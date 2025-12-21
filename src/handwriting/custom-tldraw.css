@@ -94,7 +94,7 @@
   background-color: var(--color-panel);
 }
 
-input.tlui-input {
+/* input.tlui-input {
   background: none;
   margin-top: -3px;
   position: relative;
@@ -117,7 +117,7 @@ input.tlui-input {
   user-select: all;
   text-rendering: optimizeLegibility;
   -webkit-user-select: auto !important;
-}
+} */
 
 
 .tlui-style-panel__section:has(.tlui-slider__container:last-child):not(:nth-last-child(-n+1 of.tlui-style-panel__section:not(:empty))) {
