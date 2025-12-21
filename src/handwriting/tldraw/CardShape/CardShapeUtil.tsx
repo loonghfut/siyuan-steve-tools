@@ -52,10 +52,60 @@ async function fetchStaticDomContent(blockId: string): Promise<string | null> {
 	try {
 		const res = await api.getHeadingChildrenDOM(blockId);
 		// getHeadingChildrenDOM 直接返回 DOM 字符串
-		if (res) {
+		if (!res) {
+			return null;
+		}
+		if (typeof document === 'undefined') {
 			return res;
 		}
-		return null;
+		const wrapper = document.createElement('div');
+		wrapper.innerHTML = res;
+		const embedNodes = Array.from(
+			wrapper.querySelectorAll('[data-type="NodeBlockQueryEmbed"]')
+		);
+		if (embedNodes.length === 0) {
+			return wrapper.innerHTML;
+		}
+
+		const idsToResolve = embedNodes
+			.map((node) => node.getAttribute('data-node-id')?.trim() || '')
+			.filter(Boolean);
+		const uniqueIds = Array.from(new Set(idsToResolve));
+		if (uniqueIds.length === 0) {
+			return wrapper.innerHTML;
+		}
+
+		let embedDomMap: Record<string, string> | null = null;
+		try {
+			embedDomMap = await api.getBlockDOMsWithEmbed(uniqueIds);
+		} catch (err) {
+			console.error('获取嵌入 DOM 内容失败:', err);
+			return wrapper.innerHTML;
+		}
+		if (!embedDomMap) {
+			return wrapper.innerHTML;
+		}
+
+		const buildFragmentFromHtml = (html: string) => {
+			const temp = document.createElement('div');
+			temp.innerHTML = html;
+			const fragment = document.createDocumentFragment();
+			while (temp.firstChild) {
+				fragment.appendChild(temp.firstChild);
+			}
+			return fragment;
+		};
+
+		embedNodes.forEach((node) => {
+			const targetId = node.getAttribute('data-node-id')?.trim();
+			if (!targetId) return;
+			const replacementHtml = embedDomMap[targetId];
+			if (!replacementHtml) return;
+			const fragment = buildFragmentFromHtml(replacementHtml);
+			node.replaceWith(fragment);
+		});
+
+		return wrapper.innerHTML;
 	} catch (err) {
 		console.error('获取静态 DOM 内容失败:', err);
 		return null;

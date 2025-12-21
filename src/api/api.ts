@@ -300,6 +300,27 @@ export async function getBlockDOMs(ids: BlockId[]): Promise<Record<string, strin
     return request(url, data);
 }
 
+export interface IResBlockDOMWithEmbed {
+    id: string;
+    dom: string;
+}
+
+export async function getBlockDOMWithEmbed(id: BlockId): Promise<IResBlockDOMWithEmbed> {
+    const data = {
+        id: id
+    };
+    const url = '/api/block/getBlockDOMWithEmbed';
+    return request(url, data);
+}
+
+export async function getBlockDOMsWithEmbed(ids: BlockId[]): Promise<Record<string, string>> {
+    const data = {
+        ids: ids
+    };
+    const url = '/api/block/getBlockDOMsWithEmbed';
+    return request(url, data);
+}
+
 export async function getBlockMarkdown(id: BlockId) {
     const res = await getBlockByID(id);
     return res.markdown;
