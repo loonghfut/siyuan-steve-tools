@@ -141,6 +141,10 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 	)
 
 	const visible = useValue('overlay-visible', () => {
+		// 当工具为 hand 时，隐藏端口
+		const currentToolId = editor.getCurrentToolId()
+		if (currentToolId === 'hand') return false
+
 		const state = getPortState(editor)
 		if (!ports) return false
 		if (parentHovered) return true
