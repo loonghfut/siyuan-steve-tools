@@ -1866,6 +1866,85 @@ export const components: TLComponents = {
         const isJsShapeSelection = isValidSelection && selectedShape.type === 'js-shape'
         const selectedJsShape = isJsShapeSelection ? (selectedShape as IJsShape) : null
 
+        const pointerDownPoint = React.useRef<{ x: number; y: number } | null>(null)
+        const pointerMovedWhileDown = React.useRef(false)
+        React.useEffect(() => {
+            const container = editor.getContainer()
+            if (!container) return
+
+            const isInteractiveTarget = (target: EventTarget | null) => {
+                if (!(target instanceof Element)) return false
+                return Boolean(target.closest('button, [role="button"], input, textarea, select, [contenteditable="true"]'))
+            }
+
+            const handlePointerDown = (event: PointerEvent) => {
+                if (event.button !== 0 || isInteractiveTarget(event.target) || event.defaultPrevented) {
+                    pointerDownPoint.current = null
+                    return
+                }
+                pointerDownPoint.current = { x: event.clientX, y: event.clientY }
+                pointerMovedWhileDown.current = false
+            }
+
+            const handlePointerMove = (event: PointerEvent) => {
+                const start = pointerDownPoint.current
+                if (!start) return
+                const dx = event.clientX - start.x
+                const dy = event.clientY - start.y
+                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                    pointerMovedWhileDown.current = true
+                }
+            }
+
+            const handlePointerUp = (event: PointerEvent) => {
+                const start = pointerDownPoint.current
+                pointerDownPoint.current = null
+                if (event.button !== 0 || !start || pointerMovedWhileDown.current || event.defaultPrevented) {
+                    pointerMovedWhileDown.current = false
+                    return
+                }
+                if (editor.getCurrentToolId() !== 'hand') return
+                if (isInteractiveTarget(event.target)) return
+
+                const pagePoint = editor.screenToPage({ x: event.clientX, y: event.clientY })
+                const targetShape = editor.getShapeAtPoint(pagePoint, {
+                    hitInside: true,
+                    filter: (shape) => isCardLikeShape(shape) && Boolean((shape as CardLikeShape).props.blockId),
+                })
+                if (!targetShape || !isCardLikeShape(targetShape)) return
+                const blockId = (targetShape as CardLikeShape).props.blockId
+                if (!blockId) {
+                    console.error('未找到块ID')
+                    return
+                }
+                void openTab({
+                    app: window.siyuan.ws.app,
+                    doc: {
+                        id: blockId,
+                        action: ['cb-get-hl', 'cb-get-all'],
+                        zoomIn: true,
+                    },
+                    position: 'right',
+                    keepCursor: false,
+                }).catch((err) => {
+                    console.error('跳转到笔记失败', err)
+                    showMessage('跳转到笔记失败', 3000, 'error')
+                })
+            }
+
+            container.addEventListener('pointerdown', handlePointerDown, { passive: true })
+            container.addEventListener('pointermove', handlePointerMove, { passive: true })
+            container.addEventListener('pointerup', handlePointerUp, { passive: true })
+            container.addEventListener('pointercancel', handlePointerUp, { passive: true })
+
+            return () => {
+                container.removeEventListener('pointerdown', handlePointerDown)
+                container.removeEventListener('pointermove', handlePointerMove)
+                container.removeEventListener('pointerup', handlePointerUp)
+                container.removeEventListener('pointercancel', handlePointerUp)
+            }
+        }, [editor])
+
         const buttonStyle = {
             width: '32px',
             height: '32px',
