@@ -38,11 +38,14 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 		avElements.forEach(avElement => {
 			const blockID = avElement.getAttribute('data-node-id')
 			if (blockID) {
-				const protyle = new Protyle(window.siyuan.ws.app, document.createElement('div'), { 
+				const Tprotyle = new Protyle(window.siyuan.ws.app, document.createElement('div'), { 
 					blockId: blockID, 
 					rootId: blockID 
-				}).protyle
+				})
+				const protyle = Tprotyle.protyle;
 				ProtyleMethod.avRender(container, protyle)
+				// 销毁临时 Protyle 实例
+				Tprotyle.destroy();
 			}
 		})
 	
