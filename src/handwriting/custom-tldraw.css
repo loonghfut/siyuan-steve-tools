@@ -94,35 +94,13 @@
   background-color: var(--color-panel);
 }
 
-/* input.tlui-input {
-  background: none;
-  margin-top: -3px;
-  position: relative;
-  z-index: var(--layer-above);
-  height: 0px;
-  max-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: inherit;
-  color: var(--color-text-1);
-  padding: var(--space-4);
-  padding-left: 0;
-  border: none;
-  outline: none;
-  text-overflow: ellipsis;
-  width: 100%;
-  user-select: all;
-  text-rendering: optimizeLegibility;
-  -webkit-user-select: auto !important;
-} */
-
-
-.tlui-style-panel__section:has(.tlui-slider__container:last-child):not(:nth-last-child(-n+1 of.tlui-style-panel__section:not(:empty))) {
-  margin-bottom: 0px;
+.tl-html-container {
+  .protyle-wysiwyg [data-node-id].render-node {
+    min-height: auto !important;
+  }
 }
+
+
 
 .slides-panel {
   /* ... 其他现有样式 ... */
