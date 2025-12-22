@@ -30,6 +30,12 @@ import { check, trackFeatureUsage } from "./stats/public-stats";
 import SettingExample from "@/setting.svelte";
 import { PluginConfig } from "./savedata";
 
+declare global {
+    interface Window {
+        __steveToolsLoadedModules?: Record<string, boolean>;
+    }
+}
+
 export let frontEnd;
 
 // let islog = false;
@@ -42,8 +48,18 @@ export default class steveTools extends Plugin {
     private pluginConfig: PluginConfig;
     // private modules: any[];
     private loadModule(ModuleClass: any, moduleName: string) {
+        // 检查模块是否已加载，防止重复加载
+        const loadedModules = window.__steveToolsLoadedModules = window.__steveToolsLoadedModules || {};
+        if (loadedModules[moduleName]) {
+            console.warn(`模块 ${moduleName} 已加载，跳过重复加载`);
+            return;
+        }
+        
         const moduleInstance = new ModuleClass(this);//解释：new ModuleClass(this)相当于new ModuleClass(steveTools)
         moduleInstances[moduleName] = moduleInstance; // 同时存储到全局对象中
+        
+        // 标记该模块已加载
+        loadedModules[moduleName] = true;
     }
     private runloadModule(data: any) {
         // 遍历模块配置，根据设置启用相应模块
