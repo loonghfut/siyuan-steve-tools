@@ -446,10 +446,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// Protyle 生命周期管理主 Effect
 		// 注意：对于 live-protyle 模式，编辑状态切换不应触发重建
 		useEffect(() => {
-			const shouldForceReloadLiveProtyle =
-				effectiveRenderMode === 'live-protyle' &&
-				refreshNonceRef.current !== shape.props.refreshNonce;
-			refreshNonceRef.current = shape.props.refreshNonce;
+				// 检测是否为手动刷新（通过 refreshNonce 变更触发）
+				const manualRefreshTriggered = refreshNonceRef.current !== shape.props.refreshNonce;
+				const shouldForceReloadLiveProtyle =
+					effectiveRenderMode === 'live-protyle' &&
+					manualRefreshTriggered;
+				// 更新引用以记录最新的 nonce
+				refreshNonceRef.current = shape.props.refreshNonce;
 			// 折叠状态下不渲染 Protyle
 			if (isCollapsed && !isEditingState) {
 				destroyRuntimeResources();
@@ -833,9 +836,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							if (!protyleRef.current) {
 								await mountProtyle(2);
 								if (cancelled) return;
-								if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
-							}
-							await useStaticPreviewFromProtyle(wasEditing);
+								    if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
+									    }
+									    // 如果是手动刷新，则强制 bypass 缓存并通过 API 重新获取 DOM
+									    await useStaticPreviewFromProtyle(wasEditing || manualRefreshTriggered);
 							if (cancelled) return;
 						} else {
 							// 普通块：使用 fetchStaticDomContent API 直接获取静态 DOM
@@ -847,7 +851,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								protyleRef.current = null;
 								protyleHostRef.current = null;
 							}
-							await useStaticPreviewFromGetDoc(id, wasEditing);
+							// 如果是手动刷新，则强制 bypass 缓存并通过 API 重新获取 DOM
+							await useStaticPreviewFromGetDoc(id, manualRefreshTriggered || wasEditing);
 							if (cancelled) return;
 						}
 					} else {
