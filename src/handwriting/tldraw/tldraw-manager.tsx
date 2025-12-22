@@ -124,7 +124,7 @@ export class TldrawManager {
             // 在 root 中显示错误信息和强制加载按钮
             root.innerHTML = `
                 <div style="padding: 20px; color: red; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-                    <p>加载画板数据失败，请检查控制台获取更多信息。</p>
+                    <p>加载画板数据失败，请不要用低版本的插件，打开高版本的tldraw数据，请检查控制台获取更多信息。</p>
                     <p style="color: orange; margin-top: 10px;">您可以强制创建一个新的空白画板，但这将导致无法加载的数据丢失！！！。</p>
                     <button id="force-load-tldraw-${this.id}" style="margin-top: 15px; padding: 8px 15px; cursor: pointer;">强制创建新画板</button>
                 </div>
