@@ -30,7 +30,7 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 		ProtyleMethod.flowchartRender(container, CDN)
 		ProtyleMethod.graphvizRender(container, CDN)
 		ProtyleMethod.plantumlRender(container, CDN)
-		ProtyleMethod.htmlRender(container)
+		// ProtyleMethod.htmlRender(container)
 		ProtyleMethod.highlightRender(container)
 		
 		// 渲染数据库视图：从 container 中提取带有 data-av-id 的元素

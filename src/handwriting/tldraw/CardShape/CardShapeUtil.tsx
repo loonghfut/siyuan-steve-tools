@@ -19,6 +19,7 @@ import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContent } from '../utils/render/content-renderer'
+import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -678,11 +679,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						wrapper.innerHTML = cachedHtml;
 						const clone = wrapper.firstElementChild as HTMLElement;
 						if (clone && containerRef.current) {
-							if (protyleHostRef.current?.parentElement === containerRef.current) {
+										if (protyleHostRef.current?.parentElement === containerRef.current) {
 								try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
 							}
 							staticPreviewRef.current = clone;
 							containerRef.current.appendChild(clone);
+							// 先把 protyle-html 转为普通 DOM，再运行后续渲染
+							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
 							await renderAllContent(clone);
 							// 清理 Protyle
 							if (protyleHostRef.current?.parentElement) {
@@ -754,6 +757,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (clone && containerRef.current) {
 							staticPreviewRef.current = clone;
 							containerRef.current.appendChild(clone);
+							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
 							await renderAllContent(clone);
 							if (cancelled) return;
 							return;
@@ -785,6 +789,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
 				staticPreviewRef.current = previewWrapper;
 				containerRef.current.appendChild(previewWrapper);
+				// 先把 protyle-html 转为普通 DOM，再运行后续渲染
+				try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
 				await renderAllContent(previewWrapper);
 
 				if (cancelled) return;
