@@ -539,7 +539,7 @@ export class CalendarDataStats {
     public showStatsMessage(stats: CalendarStatsData): void {
         const summary = this.getStatsSummary(stats);
         showMessage(`统计完成！总事件数：${stats.totalEvents}，完成率：${stats.completionRate.toFixed(1)}%`, 3000);
-        console.log(summary);
+        console.debug(summary);
     }
 }
 

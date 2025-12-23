@@ -31,7 +31,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
           try {
             const blockId = await api.getAttributeViewBoundBlockIDsByItemIDs(op.avID, [op.rowID]).then(data => data[op.rowID]);
             const avDetails = await api.getAttributeViewKeys(blockId);
-            // console.log("获取到的属性视图信息🚧🚧:", avDetails);
+            // console.debug("获取到的属性视图信息🚧🚧:", avDetails);
             let statusKeyDefinition: any;
             if (avDetails && avDetails[0]?.keyValues) {
               const statusKeyValue = avDetails[0].keyValues.find(kv => kv.key && kv.key.name === '状态');

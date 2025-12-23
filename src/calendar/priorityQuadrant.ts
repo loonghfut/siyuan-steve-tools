@@ -341,7 +341,7 @@ const QuadrantViewConfig = {
             if (target.matches('.kanban-add-button')) {
               e.preventDefault();
               e.stopPropagation();
-              // console.log('添加按钮被点击');
+              // console.debug('添加按钮被点击');
               await handleAddButtonClick('未完成');
             }
           });

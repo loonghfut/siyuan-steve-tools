@@ -106,7 +106,7 @@ export const icsFileManager = new IcsFileManager();// function convertTimestampT
 
 
 export function transformEvents(inputEvents: any[], isZQ: boolean = false) {
-    // console.log("inputEvents", inputEvents);
+    // console.debug("inputEvents", inputEvents);
     function timestampToArray(timestamp: number): [number, number, number, number, number] {
         const date = new Date(timestamp);
         return [

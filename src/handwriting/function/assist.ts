@@ -24,7 +24,7 @@ export async function addWhiteboardButton(e) {
                 //         block?.content?.trim())
                 //     .map(block => block.id);
 
-                // console.log("Extracted block IDs:", blockIds);
+                // console.debug("Extracted block IDs:", blockIds);
                 moduleInstances['M_handwriting'].openWhiteBoard_in(e);
             });
 

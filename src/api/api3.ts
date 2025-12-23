@@ -179,7 +179,7 @@ export function extractDataAvId(markdown: string): string | null {
 
 
 export const extractNewAvId = (oldAvs: string, newAvs: string): string | null => {
-    console.log("提取新的 avID:", oldAvs, newAvs);
+    console.debug("提取新的 avID:", oldAvs, newAvs);
     if (!newAvs) return null;
     const oldList = oldAvs ? oldAvs.split(',') : [];
     const newList = newAvs.split(',');
@@ -223,6 +223,6 @@ export async function getallavids() {
         id: extractDataAvId(item.markdown),
         name: item.content?.split(' ')[0] || 'N/A'
     })).filter(item => item.id !== null);
-    console.log("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+    console.debug("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
     return avIds;
 }

@@ -146,7 +146,7 @@ export function createDock(options: DockOptions) {
         },
 
         destroy() {
-            console.log("destroy dock:", type);
+            console.debug("destroy dock:", type);
             cleanup();
 
             // 调用外部传入的 destroy 回调
@@ -445,12 +445,12 @@ export class DidaLinkInterceptor {
                 return;
             }
             const isExpanded = this.dock_more.getState().isExpanded;
-            console.log("当前dock状态:", isExpanded);
+            console.debug("当前dock状态:", isExpanded);
             if (!isExpanded) {
                 // 模拟点击dock元素来展开
                 const dockElement = document.querySelector('[data-type="siyuan-steve-toolsdida-dock"]') as HTMLElement;
                 if (dockElement) {
-                    console.log("找到dock元素，模拟点击展开");
+                    console.debug("找到dock元素，模拟点击展开");
                     dockElement.click();
                     // this.showMessage("已展开滴答清单侧边栏", 2000, "info");
                 } else {

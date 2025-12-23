@@ -104,7 +104,7 @@ export async function run(
         const Fcalendar = createFloatingCalendar(calendarEl);
         calendarEl = Fcalendar.element;
     } else if (id === "2") {//日历内插入视图逻辑
-        console.log(elementca)
+        console.debug(elementca)
         calendarEl = elementca;
     }
     else {
@@ -248,7 +248,7 @@ export async function run(
                         myF.updataqqcalendar(info);
                         return;
                     }
-                    // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                    // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                     myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                     return;
                 } else {
@@ -265,15 +265,15 @@ export async function run(
             } else if (clicks2 === 2) {
                 clearTimeout(clickTimeout);
                 clicks2 = 0;
-                // console.log("双击事件", info.event);
+                // console.debug("双击事件", info.event);
                 if (info.event._def.extendedProps.isRecurring) {
-                    console.log("周期条件进入");
+                    console.debug("周期条件进入");
                     if (info.event._def.extendedProps.source === 'qqcalendar') {
-                        console.log("qqcalendar", info.event.id);
+                        console.debug("qqcalendar", info.event.id);
                         myF.updataqqcalendar(info);
                         return;
                     }
-                    // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                    // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                     myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                     return;
                 } else {
@@ -283,7 +283,7 @@ export async function run(
             }
         },
         select: function (_info) {//TODO: 选择处理
-            // console.log('select', info);
+            // console.debug('select', info);
         },
         // 日期点击处理
         //// 双击触发(可选)
@@ -293,12 +293,12 @@ export async function run(
                 showMessage('未选择视图，无法创建事件。请先点击“视图选择”。', 3000, 'info');
                 return;
             }
-            // console.log('dateClick', info);
+            // console.debug('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
             let rootid;
             if (filterViewId.includes('qqcalendar')) {
                 rootid = 'qqcalendar'; // 特殊标识，用于在createEventInDatabase中区分
-                console.log("QQ日历事件创建");
+                console.debug("QQ日历事件创建");
             } else {
                 rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
             }
@@ -334,11 +334,11 @@ export async function run(
                 const day = date.getDate();
 
                 // 调试输出
-                // console.log('Solar date:', year, month, day);
+                // console.debug('Solar date:', year, month, day);
 
                 // 转换为农历
                 const lunar = solarLunar.solar2lunar(year, month, day);
-                // console.log('Lunar result:', lunar);
+                // console.debug('Lunar result:', lunar);
 
                 // 添加空值检查
                 if (!lunar) {
@@ -658,7 +658,7 @@ export async function run(
                             // 检查是否需要根据视图筛选（仅当筛选包含该视图时）
                             const showIcsEvents = filterViewId.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
                             if (showIcsEvents) {
-                                console.log(`加载了 ${icsEvents.length} 个ICS订阅日历事件`);
+                                console.debug(`加载了 ${icsEvents.length} 个ICS订阅日历事件`);
                                 // 为每个ICS订阅事件添加不可拖拽属性和标识
                                 const formattedIcsEvents = icsEvents.map(event => ({
                                     ...event,
@@ -686,12 +686,12 @@ export async function run(
                     const showLifelogEvents = filterViewId.includes('lifelog');
                     if (showLifelogEvents) {
                         const lifelogEvents = await LifelogView.getLifelogEvents(info.start, info.end);
-                        console.log('是否显示 Lifelog 事件:', showLifelogEvents);
-                        console.log('当前过滤视图:', filterViewId);
-                        console.log('当前视图类型:', calendar.view.type);
+                        console.debug('是否显示 Lifelog 事件:', showLifelogEvents);
+                        console.debug('当前过滤视图:', filterViewId);
+                        console.debug('当前视图类型:', calendar.view.type);
 
                         if (lifelogEvents && Array.isArray(lifelogEvents)) {
-                            console.log(`加载了 ${lifelogEvents.length} 个 Lifelog 事件`);
+                            console.debug(`加载了 ${lifelogEvents.length} 个 Lifelog 事件`);
                             const formattedLifelogEvents = lifelogEvents.map(event => ({
                                 ...event,
                                 editable: false,
@@ -741,14 +741,14 @@ export async function run(
                 // 3. 获取视图数据
                 viewValue = viewIDs?.length ? await myF.getViewValue(viewIDs) : [];
                 viewValue_zq = (showRecurring && viewIDs_zq?.length) ? await myF.getViewValue(viewIDs_zq, true) : [];
-                // console.log("View data:", viewValue, "周期", viewValue_zq);
+                // console.debug("View data:", viewValue, "周期", viewValue_zq);
 
                 // 3.5 增加筛选函数
                 viewValue = await myF.filterViewValue(viewValue, filterViewId);
 
                 // 4. 转换事件数据
                 const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
-                // console.log('Fetched calendar events:', events);
+                // console.debug('Fetched calendar events:', events);
                 allEvents = allEvents.concat(events);
 
                 // --- 动态调整 slotMinTime 的逻辑 ---
@@ -846,7 +846,7 @@ export async function run(
                                 myF.updataqqcalendar(info);
                                 return;
                             }
-                            // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                            // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                             myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                             return;
                         } else {
@@ -865,11 +865,11 @@ export async function run(
                         clicks2 = 0;
                         if (info.event._def.extendedProps.isRecurring) {
                             if (info.event._def.extendedProps.source === 'qqcalendar') {
-                                console.log("qqcalendar", info.event.id);
+                                console.debug("qqcalendar", info.event.id);
                                 myF.updataqqcalendar(info);
                                 return;
                             }
-                            // console.log('周期事件点击日期:', info.event.start.toLocaleDateString());
+                            // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                             myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                             return;
                         } else {
@@ -932,11 +932,11 @@ export async function run(
             if (info.event.extendedProps.isRecurring && info.event.extendedProps.source !== 'qqcalendar') {
                 const isCompleted = isEventCompleted(info.event);
                 // 动态更新 status 属性
-                // console.log('Before update:', {...info.event.extendedProps}); // 记录更新前的属性
+                // console.debug('Before update:', {...info.event.extendedProps}); // 记录更新前的属性
                 info.event.setExtendedProp('status', isCompleted ? '完成' : '未完成');
-                // console.log('After update:', {...info.event.extendedProps}); // 记录更新后的属性
+                // console.debug('After update:', {...info.event.extendedProps}); // 记录更新后的属性
             }
-            // console.log("info.event.extendedProps", info.event.extendedProps);
+            // console.debug("info.event.extendedProps", info.event.extendedProps);
             ////完成样式
 
             try {
@@ -958,7 +958,7 @@ export async function run(
                             info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
                         } catch (colorError) {
                             console.error('背景色处理错误:', colorError);
-                            console.log('事件数据:', info.event);
+                            console.debug('事件数据:', info.event);
                         }
                     }
                     try {
@@ -976,15 +976,15 @@ export async function run(
                         info.el.classList.add('event-completed');
                     } catch (styleError) {
                         console.error('样式应用错误:', styleError);
-                        console.log('DOM元素:', info.el);
+                        console.debug('DOM元素:', info.el);
                     }
                 }
             } catch (mainError) {
                 console.error('完成状态处理主要错误:', mainError);
-                console.log('完整 info 对象:', info);
-                console.log('info.event:', info?.event._def);
+                console.debug('完整 info 对象:', info);
+                console.debug('info.event:', info?.event._def);
                 if (info?.event) {
-                    console.log('info.event.extendedProps:', info.event.extendedProps);
+                    console.debug('info.event.extendedProps:', info.event.extendedProps);
                 }
             }
             // // steveTools.outlog(info);
@@ -1037,7 +1037,7 @@ export async function run(
     });
     update_thisCalendars();
     thisCalendars.push(calendar);
-    console.log("thisCalendars", thisCalendars);
+    console.debug("thisCalendars", thisCalendars);
     OUTcalendar = calendar;
     calendar.render();
     updatePlanButtonLabel();
@@ -1341,7 +1341,7 @@ export function isEventCompleted(event: any): boolean {
     if (!event || !event.extendedProps) return false;
 
     const okday = event.extendedProps.okday;
-    // console.log("okday",okday);
+    // console.debug("okday",okday);
     if (!okday) return false;
 
     const completedDates = okday.split(',').map(d => d.trim());
@@ -1350,8 +1350,8 @@ export function isEventCompleted(event: any): boolean {
         currentDateStr = event.range.start.toISOString?.()?.split('T')?.[0] || '';
     }
     if (!currentDateStr) return false;
-    // console.log("completedDates",completedDates);
-    // console.log("currentDateStr",currentDateStr);
+    // console.debug("completedDates",completedDates);
+    // console.debug("currentDateStr",currentDateStr);
     return completedDates.includes(currentDateStr);
 }
 

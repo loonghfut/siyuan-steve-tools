@@ -58,7 +58,7 @@ export const setupDoubleClickHandler = (editor: Editor) => {
         selectIdleState.handleDoubleClickOnCanvas = 
             customDoubleClickOnCanvasHandler.bind(selectIdleState)
             
-        console.log('双击画布创建 single-block 功能已启用')
+        console.debug('双击画布创建 single-block 功能已启用')
     } catch (err) {
         console.error('设置双击处理器失败:', err)
     }

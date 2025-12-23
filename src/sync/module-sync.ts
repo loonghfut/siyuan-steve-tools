@@ -18,18 +18,18 @@ export class M_sync {
         // this.settingdata = settingdata;
         url = settingdata["sync-url"];
         token = settingdata["sync-token"];
-        // console.log("url: ", url);
-        // console.log("token: ", token);
+        // console.debug("url: ", url);
+        // console.debug("token: ", token);
         siyuan.ws.ws.addEventListener('message', async (e) => {
             const msg = JSON.parse(e.data);
             if (msg.cmd === "syncing") {
-                // console.log(msg);
+                // console.debug(msg);
                 if (msg.msg && msg.msg.startsWith('上传')) {
-                    console.log("同步结束");
+                    console.debug("同步结束");
                     //延时1s再同步
                     const currentHost = window.location.host;
                     if (url.includes(currentHost)) {
-                        console.log("取消感知");
+                        console.debug("取消感知");
                     } else {
                         setTimeout(async () => {
                             try {
@@ -41,9 +41,9 @@ export class M_sync {
                                     iconElement.setAttribute('xlink:href', '#iconHistory');
                                 }
                                 const state = await api.URLsync(url, token);
-                                // console.log("state: ", state);
+                                // console.debug("state: ", state);
                                 if (state) {
-                                    console.log("docker感知成功");//OK：后面改为图标交互
+                                    console.debug("docker感知成功");//OK：后面改为图标交互
                                     if (originalIcon) { // 确保 originalIcon 不为空
                                         iconElement.setAttribute('xlink:href', originalIcon);
                                     }
@@ -60,7 +60,7 @@ export class M_sync {
                 }
 
             }
-            // console.log(msg);
+            // console.debug(msg);
         });
 
         // steveTools.outlog("同步模块初始化完成");
@@ -69,7 +69,7 @@ export class M_sync {
     async testSync() {
         // steveTools.outlog("测试同步...");
         let res: any = await api.testSync(url, token);
-        console.log("res: ", res);
+        console.debug("res: ", res);
         if (res) {
             showMessage("成功");
         } else {

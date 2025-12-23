@@ -71,11 +71,11 @@ export class M_lifelog {
     }
 
     onunload() {
-        console.log('LifeLog module unloading...');
+        console.debug('LifeLog module unloading...');
         // 移除属性标记
         document.body.removeAttribute('data-lifelog-enabled');
         this.plugin.eventBus.off("ws-main", this.wsMainHandler);
-        console.log('LifeLog module unloaded');
+        console.debug('LifeLog module unloaded');
     }
 
     // 添加设置更新处理方法
@@ -90,7 +90,7 @@ export class M_lifelog {
 
     private debug(message: string, ...args: any[]) {
         if (this.settings['lifelog-debug']) {
-            console.log(message, ...args);
+            console.debug(message, ...args);
         }
     }
 

@@ -407,7 +407,7 @@ export const useContextMenu = (
             try {
                 await navigator.clipboard.writeText(markdown)
                 // 可以添加提示
-                console.log('已复制 Markdown 到剪贴板(标题格式)')
+                console.debug('已复制 Markdown 到剪贴板(标题格式)')
             } catch (err) {
                 console.error('复制到剪贴板失败:', err)
             }
@@ -422,7 +422,7 @@ export const useContextMenu = (
             const markdown = exportMindMapToMarkdown(targetNode, false) // 使用列表格式
             try {
                 await navigator.clipboard.writeText(markdown)
-                console.log('已复制 Markdown 到剪贴板(列表格式)')
+                console.debug('已复制 Markdown 到剪贴板(列表格式)')
             } catch (err) {
                 console.error('复制到剪贴板失败:', err)
             }

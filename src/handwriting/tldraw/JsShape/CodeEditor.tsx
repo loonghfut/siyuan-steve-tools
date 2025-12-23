@@ -99,7 +99,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(({
 			{ label: 'env', type: 'variable', detail: 'Script runtime environment', info: 'env' },
 			// helpful snippets
 			snippetCompletion('for (let ${1:i} = 0; ${1} < ${2:len}; ${1}++) {\n\t$0\n}', { label: 'for-loop', type: 'keyword', detail: 'for loop' }),
-			snippetCompletion('console.log(${1:obj})', { label: 'console.log', type: 'keyword', detail: 'console.log' }),
+			snippetCompletion('console.debug(${1:obj})', { label: 'console.debug', type: 'keyword', detail: 'console.debug' }),
 			// Common shape props (externally injected) — merge via extraCompletions
 			// merge external completions (if any)
 			...extraCompletions,

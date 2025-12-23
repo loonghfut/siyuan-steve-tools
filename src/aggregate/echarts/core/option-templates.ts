@@ -511,7 +511,7 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
         series: seriesDbg, // 映射后：各系列的最终 data（含 x/y 对样本）
         network: net // 网络原始响应（截断）
       };
-      console.log('[ECharts AV Debug]', dbg);
+      console.debug('[ECharts AV Debug]', dbg);
     }catch(e){}
     ` : ''}
     option.animation = false;
@@ -999,7 +999,7 @@ export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
         xSample: Array.isArray(xData)? xData.slice(0, __N) : [],
         series: seriesDbg
       };
-      console.log('[ECharts SQL Debug]', dbg);
+      console.debug('[ECharts SQL Debug]', dbg);
     }catch(e){}
     ` : ''}
     option.animation = false;

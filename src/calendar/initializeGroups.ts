@@ -554,7 +554,7 @@ export async function createViewFilterMenu(
     function refreshFiltersDisplay(filterViewId: string[], _viewIDs: any[]) {
         // 这里可能需要设置一个全局变量或回调来更新视图名称
         // 暂时不实现具体逻辑，因为这个函数主要用于更新UI状态
-        console.log('refreshFiltersDisplay called with:', filterViewId.length, 'views');
+        console.debug('refreshFiltersDisplay called with:', filterViewId.length, 'views');
     }
 
     function showGroupManagementDialog(viewIDs: any[]) {

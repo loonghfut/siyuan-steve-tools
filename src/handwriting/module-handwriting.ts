@@ -223,7 +223,7 @@ export class M_handwriting {
         this.plugin.addTab({
             type: "steveTool-whiteboard",
             async init() {
-                console.log("初始化画板选项卡", this.tab.title);
+                console.debug("初始化画板选项卡", this.tab.title);
                 const panelElement = this.element;
                 const tldrawContainer = document.createElement('div');
                 tldrawContainer.id = `tldraw-container-${this.data.rootid}`;
@@ -235,11 +235,11 @@ export class M_handwriting {
 
             },
             async destroy() {
-                console.log("销毁画板选项卡", this);
+                console.debug("销毁画板选项卡", this);
                 const tldrawManager = (this.element as any).tldrawManager;
                 if (tldrawManager) {
                     tldrawManager.destroy();
-                    // console.log("销毁画板实例", tldrawManager);
+                    // console.debug("销毁画板实例", tldrawManager);
                 }
             }
         })
@@ -321,9 +321,9 @@ export class M_handwriting {
     async onLayoutReady(_settingdata) {
         // 可以在这里初始化任何需要DOM加载完成后的逻辑
         this.plugin.eventBus.on('switch-protyle', (e) => {
-            // console.log("切换思源块:", e);
+            // console.debug("切换思源块:", e);
             this.currentid = e.detail.protyle.block.rootID;
-            // console.log(this.currentid);
+            // console.debug(this.currentid);
 
             addWhiteboardButton(e);
             const protyleEl = e.detail?.protyle?.element as HTMLElement | undefined;

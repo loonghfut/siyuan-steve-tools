@@ -60,7 +60,7 @@ export class WpsDataServ {
             }
         });
         const data = result.result as IWpsRecord[];
-        // console.log("导入WPS数据", data);
+        // console.debug("导入WPS数据", data);
         // 从设置中读取需要提取的字段列表，按逗号/换行/分号分隔并去空白
         const fieldSetting: string = this.settingdata['wps-data-fields'] || '';
         const fieldList = fieldSetting
@@ -68,7 +68,7 @@ export class WpsDataServ {
             .map(s => s.trim())
             .filter(s => s.length > 0);
         const extract_data = extractFields(data, fieldList);
-        // console.log("提取的WPS数据", extract_data);
+        // console.debug("提取的WPS数据", extract_data);
         // 写入思源日记
         try {
             await this.insertIntoDailyNote(fieldList, extract_data);
@@ -95,7 +95,7 @@ export class WpsDataServ {
         const notebookId = this.settingdata['wps-data-notebook'];
         if (!notebookId) throw new Error('未配置 wps-data-notebook');
         const now = new Date();
-        // console.log("当前时间（东八区）:", now);
+        // console.debug("当前时间（东八区）:", now);
         const dailyNoteResp = await createDailynote(notebookId, now);
         const dailyNoteId = dailyNoteResp;
 

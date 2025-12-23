@@ -6,17 +6,17 @@ export class CardShapeTool extends BaseBoxShapeTool {
 	// override onComplete(info: TLCompleteEventInfo): void {
 	// 	// Handle double click event here
 	// 	// For example, you can open a modal or perform some action
-	// 	console.log('CardShapeTool double clicked', info)
+	// 	console.debug('CardShapeTool double clicked', info)
 	// }
 	// onMiddleClick(info: TLPointerEventInfo): void {
 	// 	// Handle middle click event here
 	// 	// For example, you can open a context menu or perform some action
-	// 	console.log('CardShapeTool middle clicked', info)
+	// 	console.debug('CardShapeTool middle clicked', info)
 	// }
 	// onPointerDown(info: TLPointerEventInfo): void {
 	// 	// Handle pointer down event here
 	// 	// For example, you can start dragging the shape or perform some action
-	// 	console.log('CardShapeTool pointer down', info)
+	// 	console.debug('CardShapeTool pointer down', info)
 	// }
 }
 /*

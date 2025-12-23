@@ -19,7 +19,7 @@ const btn = dom.querySelector('#save')
 const btnClear = dom.querySelector('#clear')
 const curr = getData() || {}
 // 形状基本信息（只读快照）
-console.log('当前形状信息', shape)
+console.debug('当前形状信息', shape)
 // 显示宽高
 if (out && shape) {
 	out.textContent = 'shape: ' + shape.id + ' - ' + shape.type + ' (' + shape.width + 'x' + shape.height + ')'

@@ -655,7 +655,7 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
 
     // 调试日志
     React.useEffect(() => {
-        console.log('[素材卡片] 渲染素材:', item.name, '缩略图:', item.thumbnail ? `存在(${item.thumbnail.substring(0, 50)}...)` : '不存在');
+        console.debug('[素材卡片] 渲染素材:', item.name, '缩略图:', item.thumbnail ? `存在(${item.thumbnail.substring(0, 50)}...)` : '不存在');
     }, [item.name, item.thumbnail]);
 
     return (

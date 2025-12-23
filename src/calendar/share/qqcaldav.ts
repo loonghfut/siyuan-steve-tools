@@ -51,11 +51,11 @@ export class CalDAVClient {
         try {
             // 测试连接 - 先测试根路径
             await this.makeRequest('OPTIONS', '/');
-            console.log('QQ日历连接成功');
+            console.debug('QQ日历连接成功');
 
             // 尝试获取当前用户信息
             const userInfo = await this.getCurrentUser();
-            console.log('用户信息:', userInfo);
+            console.debug('用户信息:', userInfo);
         } catch (e) {
             console.error('QQ日历登录失败:', e);
             showMessage('QQ日历登录失败，请检查网络，QQ邮箱配置', -1, 'error');
@@ -113,7 +113,7 @@ export class CalDAVClient {
 
             if (body !== undefined) {
                 proxyPayload.payload = body;
-                console.log(`代理请求 ${method} ${url} - Payload:`, body);
+                console.debug(`代理请求 ${method} ${url} - Payload:`, body);
             }
             // 如果 CalDAV 的 Content-Type 需要通过 proxyPayload.contentType 指定，可以在这里设置
             proxyPayload.contentType = requestHeaders['Content-Type'] || 'application/xml; charset=utf-8';
@@ -161,7 +161,7 @@ export class CalDAVClient {
                 const actualBody = proxyResult.data.body; // 已经是字符串，因为 responseEncoding: "text"
                 const actualHeaders = new Headers(proxyResult.data.headers || {});
 
-                console.log(`${method} ${url} (通过代理) - Status: ${actualStatus}`);
+                console.debug(`${method} ${url} (通过代理) - Status: ${actualStatus}`);
 
                 // 创建一个模拟原始 fetch 返回的 Response 对象
                 const emulatedResponse = new Response(actualBody, {
@@ -217,7 +217,7 @@ export class CalDAVClient {
 
             const response = await this.makeRequest('PROPFIND', '/', propfindBody);
             const xmlText = await response.text();
-            console.log('Current user response:', xmlText);
+            console.debug('Current user response:', xmlText);
 
             // 解析用户主路径
             const principalMatch = xmlText.match(/<D:current-user-principal[^>]*>\s*<D:href[^>]*>(.*?)<\/D:href>/);
@@ -232,7 +232,7 @@ export class CalDAVClient {
         try {
             // 先获取用户的主路径
             const userPrincipal = await this.getCurrentUser();
-            console.log('User principal:', userPrincipal);
+            console.debug('User principal:', userPrincipal);
 
             // 尝试多个可能的路径
             const possiblePaths = [
@@ -246,19 +246,19 @@ export class CalDAVClient {
 
             for (const path of possiblePaths) {
                 try {
-                    console.log(`尝试路径: ${path}`);
+                    console.debug(`尝试路径: ${path}`);
                     const calendars = await this.tryGetCalendarsFromPath(path);
                     if (calendars.length > 0) {
-                        console.log(`成功从路径 ${path} 获取到 ${calendars.length} 个日历`);
+                        console.debug(`成功从路径 ${path} 获取到 ${calendars.length} 个日历`);
                         return calendars;
                     }
                 } catch (error) {
-                    console.log(`路径 ${path} 失败:`, error.message);
+                    console.debug(`路径 ${path} 失败:`, error.message);
                     continue;
                 }
             }
 
-            console.log('所有路径都失败了，返回空数组');
+            console.debug('所有路径都失败了，返回空数组');
             showMessage('未找到可用的日历，请检查QQ邮箱日历设置', -1, 'error');
             return [];
         } catch (error) {
@@ -283,7 +283,7 @@ export class CalDAVClient {
 
         const response = await this.makeRequest('PROPFIND', path, propfindBody);
         const xmlText = await response.text();
-        console.log(`Path ${path} response:`, xmlText);
+        console.debug(`Path ${path} response:`, xmlText);
 
         // 解析XML响应
         const calendars = this.parseCalendarsFromXML(xmlText);
@@ -327,7 +327,7 @@ export class CalDAVClient {
                         const ctag = ctagMatch ? ctagMatch[1] : undefined;
                         const description = descriptionMatch ? descriptionMatch[1] : undefined;
 
-                        console.log(`找到日历: ${displayName} - ${url}`);
+                        console.debug(`找到日历: ${displayName} - ${url}`);
 
                         calendars.push({
                             url: url,
@@ -339,7 +339,7 @@ export class CalDAVClient {
                 }
             }
 
-            console.log(`总共解析到 ${calendars.length} 个日历`);
+            console.debug(`总共解析到 ${calendars.length} 个日历`);
         } catch (error) {
             console.error('解析日历XML失败:', error);
         }
@@ -363,7 +363,7 @@ export class CalDAVClient {
                 requestUrl += '/';
             }
 
-            console.log(`获取日历事件: ${requestUrl}`);
+            console.debug(`获取日历事件: ${requestUrl}`);
 
             // REPORT 请求获取事件
             const reportBody = `<?xml version="1.0" encoding="utf-8" ?>
@@ -381,11 +381,11 @@ export class CalDAVClient {
 
             const response = await this.makeRequest('REPORT', requestUrl, reportBody);
             const xmlText = await response.text();
-            console.log('事件响应:', xmlText);
+            console.debug('事件响应:', xmlText);
 
             // 解析事件数据
             const events = this.parseEventsFromXML(xmlText);
-            console.log(`解析到 ${events.length} 个事件AAAAAAAAAAAAAAAAAAAAAAAA`);
+            console.debug(`解析到 ${events.length} 个事件AAAAAAAAAAAAAAAAAAAAAAAA`);
             return events;
         } catch (error) {
             console.error('获取日历事件失败:', error);
@@ -407,7 +407,7 @@ export class CalDAVClient {
      */
     public async updateEventsFromQQCalDAV(calendarUrl: string): Promise<CalendarEvent[]> {
         this.qqFullCalendarEvents = await this.getEvents(calendarUrl);
-        console.log('QQevent', this.qqFullCalendarEvents);
+        console.debug('QQevent', this.qqFullCalendarEvents);
         return this.qqFullCalendarEvents;
     }
 
@@ -437,7 +437,7 @@ export class CalDAVClient {
                             .replace(/&quot;/g, '"')         // 替换引号
                             .replace(/&apos;/g, "'");        // 替换单引号
 
-                        console.log('解码后的ICS数据:', icsData.substring(0, 300) + '...');
+                        console.debug('解码后的ICS数据:', icsData.substring(0, 300) + '...');
 
                         const parsedEvents = this.parseICSData(icsData);
                         events.push(...parsedEvents);
@@ -445,7 +445,7 @@ export class CalDAVClient {
                 }
             }
 
-            console.log(`成功解析 ${events.length} 个事件`);
+            console.debug(`成功解析 ${events.length} 个事件`);
         } catch (error) {
             console.error('解析事件XML失败:', error);
         }
@@ -461,22 +461,22 @@ export class CalDAVClient {
             const veventMatches = icsData.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/g);
 
             if (veventMatches) {
-                console.log(`找到 ${veventMatches.length} 个VEVENT块`);
+                console.debug(`找到 ${veventMatches.length} 个VEVENT块`);
 
                 for (const veventBlock of veventMatches) {
                     const veventData = veventBlock.match(/BEGIN:VEVENT([\s\S]*?)END:VEVENT/)?.[1];
 
                     if (veventData) {
-                        console.log('处理VEVENT数据:', veventData.substring(0, 200) + '...');
+                        console.debug('处理VEVENT数据:', veventData.substring(0, 200) + '...');
                         const event = this.parseVEventData(veventData);
                         if (event) {
-                            console.log('成功解析事件:', event.title);
+                            console.debug('成功解析事件:', event.title);
                             events.push(event);
                         }
                     }
                 }
             } else {
-                console.log('未找到VEVENT块');
+                console.debug('未找到VEVENT块');
             }
         } catch (error) {
             console.error('解析ICS数据失败:', error);
@@ -493,7 +493,7 @@ export class CalDAVClient {
             const description = veventData.match(/DESCRIPTION:(.+?)(?:\r\n|\n|$)/)?.[1] || '';
             const rruleMatch = veventData.match(/RRULE:(.+?)(?:\r\n|\n|$)/)?.[1];
 
-            console.log(`解析事件: ${summary}, UID: ${uid}`);
+            console.debug(`解析事件: ${summary}, UID: ${uid}`);
 
             // 解析开始时间
             let start: Date | null = null;
@@ -538,7 +538,7 @@ export class CalDAVClient {
                 }
             };
 
-            console.log('解析完成的事件:', event);
+            console.debug('解析完成的事件:', event);
             return event;
         } catch (error) {
             console.error('解析事件数据失败:', error);

@@ -225,7 +225,7 @@ export class MinutiaeImageBase {
             }
             const pick = imgFiles[Math.floor(Math.random() * imgFiles.length)];
             const url = `assets/${sub}/${encodeURIComponent(pick)}`;
-            console.log('Minutiae 本地随机选取图片', url);
+            console.debug('Minutiae 本地随机选取图片', url);
             return url;
         } catch (e) {
             console.warn('pickRandomLocalAsset 异常', e);
@@ -316,33 +316,33 @@ export class MinutiaeImageBase {
         }
         const isImageUrl = (s: string) => /\.(png|jpe?g|gif|webp)(?:[?#].*)?$/i.test(s);
         if (isImageUrl(url)) {
-            console.log("Minutiae 模块验证图片链接通过", url);
+            console.debug("Minutiae 模块验证图片链接通过", url);
             return url;
         }
         try {
-            console.log("Minutiae 模块验证图片链接，发起GET请求", url);
+            console.debug("Minutiae 模块验证图片链接，发起GET请求", url);
             const getResponse = await this.net.request({ method: "GET", path: url });
             if (getResponse) {
                 const effectiveUrl = ((getResponse as any).redirected && getResponse.url && getResponse.url !== url)
-                    ? (console.log("Minutiae 模块GET已跟随重定向，最终URL:", getResponse.url), getResponse.url)
+                    ? (console.debug("Minutiae 模块GET已跟随重定向，最终URL:", getResponse.url), getResponse.url)
                     : url;
                 const location = getResponse.headers.get("location") || getResponse.headers.get("Location") || getResponse.headers.get("content-location") || getResponse.headers.get("Content-Location");
                 if (location) {
                     const abs = this.resolveAbsoluteRedirectUrl(effectiveUrl, getResponse.headers, location);
                     if (abs) {
-                        console.log("Minutiae 模块GET请求发现重定向", abs);
+                        console.debug("Minutiae 模块GET请求发现重定向", abs);
                         return this.validateAndResolveImageUrl(abs, depth + 1);
                     }
                 }
                 const pseudoAbs = this.resolveAbsoluteRedirectUrl(effectiveUrl, getResponse.headers);
                 if (pseudoAbs) {
-                    console.log("Minutiae 模块GET根据伪头推断重定向URL", pseudoAbs);
+                    console.debug("Minutiae 模块GET根据伪头推断重定向URL", pseudoAbs);
                     return this.validateAndResolveImageUrl(pseudoAbs, depth + 1);
                 }
 
                 const contentType = (getResponse.headers.get("content-type") || "").toLowerCase();
                 if (contentType.startsWith("image/")) {
-                    console.log("Minutiae 模块GET请求确认是图片类型", contentType, effectiveUrl);
+                    console.debug("Minutiae 模块GET请求确认是图片类型", contentType, effectiveUrl);
                     return effectiveUrl;
                 }
 
@@ -350,14 +350,14 @@ export class MinutiaeImageBase {
                     const text = await getResponse.text();
                     let body = String(text).trim();
                     if (isImageUrl(body) && /^(https?:)?\/\//i.test(body)) {
-                        console.log("Minutiae 模块GET响应文本是图片链接", body);
+                        console.debug("Minutiae 模块GET响应文本是图片链接", body);
                         return body;
                     }
                     try {
                         const obj = JSON.parse(body);
                         const found = this.findImageUrlInObject(obj, isImageUrl);
                         if (found) {
-                            console.log("Minutiae 模块GET响应JSON中找到图片链接", found);
+                            console.debug("Minutiae 模块GET响应JSON中找到图片链接", found);
                             return found;
                         }
                     } catch {
@@ -370,7 +370,7 @@ export class MinutiaeImageBase {
                     while ((match = urlRegex.exec(normalized)) !== null) {
                         const candidate = match[1].replace(/[)\]"',>]+$/g, "");
                         if (isImageUrl(candidate)) {
-                            console.log("Minutiae 模块从GET响应文本中提取到图片链接", candidate);
+                            console.debug("Minutiae 模块从GET响应文本中提取到图片链接", candidate);
                             return candidate;
                         }
                     }
@@ -443,7 +443,7 @@ export class MinutiaeImageBase {
             const assetPath = `/data/assets/${sub}/${finalName}`;
             await putFile(assetPath, false, blob);
             const assetUrl = `assets/${sub}/${encodeURIComponent(finalName)}`;
-            console.log('Minutiae 下载远程题头图到本地', assetUrl);
+            console.debug('Minutiae 下载远程题头图到本地', assetUrl);
             return assetUrl;
         } catch (e) {
             console.warn('maybeDownloadToLocal 失败', e);

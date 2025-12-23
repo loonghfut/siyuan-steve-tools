@@ -136,11 +136,11 @@ export class WebDAVSync {
                 overwrite: true,
                 onUploadProgress: (progressEvent) => {
                     // 可以在这里添加上传进度处理
-                    console.log(`上传进度: ${progressEvent.loaded}/${progressEvent.total}`);
+                    console.debug(`上传进度: ${progressEvent.loaded}/${progressEvent.total}`);
                 }
             });
 
-            console.log(`WebDAV 上传文件成功: ${fullPath}`);
+            console.debug(`WebDAV 上传文件成功: ${fullPath}`);
             // showMessage(`WebDAV 上传文件成功: ${fullPath}`, 3000, 'info');
         } catch (error) {
             console.error('WebDAV 上传错误详情:', error);

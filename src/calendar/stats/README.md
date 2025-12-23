@@ -237,10 +237,10 @@ src/calendar/
 
 ```typescript
 // 检查事件数据结构
-console.log(calendar.getEvents());
+console.debug(calendar.getEvents());
 
 // 检查统计数据
-console.log(calendarStatsManager.getLastStatsData());
+console.debug(calendarStatsManager.getLastStatsData());
 
 // 测试统计功能
 window.calendarStats.manager.quickStats(calendar.getEvents());

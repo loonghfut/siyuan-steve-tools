@@ -29,7 +29,7 @@
     }
 
     const onChanged = ({ detail }: CustomEvent<ChangeEvent>) => {
-        console.log(detail.key, detail.value);
+        console.debug(detail.key, detail.value);
         const setting = settings[detail.key];
         if (setting !== undefined) {
             settings[detail.key] = detail.value;

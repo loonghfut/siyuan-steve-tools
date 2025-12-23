@@ -35,7 +35,7 @@ export class Dida365Service {
         }
         // 初始化时可以进行一些验证或设置
         this.isTokenValid();
-        console.log("Dida365Service initialized", this.todoListId);
+        console.debug("Dida365Service initialized", this.todoListId);
         this.init();
 
         this.plugin.addIcons(`
@@ -60,7 +60,7 @@ export class Dida365Service {
                 position: "right",
                 callback: async () => {
                     // const data = await this.getAllTasks();
-                    // console.log("获取到的所有任务数据:", data);
+                    // console.debug("获取到的所有任务数据:", data);
                     await this.syncTasksToSiyuan();
                 }
             });
@@ -96,12 +96,12 @@ export class Dida365Service {
 
         const data = await getViewId([this.avId]);
         if (logMessage) {
-            console.log(`${logMessage} - 获取到的 avId 数据:`, data);
+            console.debug(`${logMessage} - 获取到的 avId 数据:`, data);
         }
 
         const viewValue = await getViewValue(data, false, "dida");
         if (logMessage) {
-            console.log(`${logMessage} - 获取到的 avId 对应的值:`, viewValue);
+            console.debug(`${logMessage} - 获取到的 avId 对应的值:`, viewValue);
         }
 
         return viewValue;
@@ -134,7 +134,7 @@ export class Dida365Service {
             onDockCreated: (dock) => {
                 // 设置链接拦截器
                 this.linkInterceptor.setDock(dock);
-                console.log("滴答清单dock创建成功", dock);
+                console.debug("滴答清单dock创建成功", dock);
             },
             iframeId: "dida-dock",
             containerClass: "dida-dock-container"
@@ -152,19 +152,19 @@ export class Dida365Service {
         // 清除之前的计时器
         if (this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
-            console.log("取消之前的同步计时器，重新开始等待");
+            console.debug("取消之前的同步计时器，重新开始等待");
         }
 
         // 设置新的计时器
         this.syncDebounceTimer = setTimeout(async () => {
             try {
                 let isUpdate = false;
-                console.log("防抖等待完成，开始执行同步任务到思源");
+                console.debug("防抖等待完成，开始执行同步任务到思源");
                 
                 // 检查是否有任务正在被锁定（正在同步中）
                 const hasLockedTasks = Array.from(this.taskSyncLocks.values()).some(locked => locked);
                 if (hasLockedTasks) {
-                    console.log("检测到有任务正在同步中，延迟5秒后重试");
+                    console.debug("检测到有任务正在同步中，延迟5秒后重试");
                     this.debouncedSyncTasksToSiyuan(5000);
                     return;
                 }
@@ -182,7 +182,7 @@ export class Dida365Service {
             }
         }, delay);
 
-        console.log(`设置防抖同步计时器，将在${delay / 1000}秒后执行（如无新的调用）`);
+        console.debug(`设置防抖同步计时器，将在${delay / 1000}秒后执行（如无新的调用）`);
     }
 
     async syncTasksToSiyuan(): Promise<boolean> {
@@ -195,9 +195,9 @@ export class Dida365Service {
 
             try {
                 didaTasks = await this.getAllTasks();
-                // console.log("❤️❤️❤️❤️❤️")
+                // console.debug("❤️❤️❤️❤️❤️")
             } catch (error) {
-                // console.log("💩💩💩💩💩");
+                // console.debug("💩💩💩💩💩");
                 console.error("获取滴答清单任务失败，可能网络断开:", error);
                 isOnline = false;
                 // 断网时使用缓存数据
@@ -242,7 +242,7 @@ export class Dida365Service {
 
                 // 检查任务是否被锁定（正在同步中）
                 if (this.taskSyncLocks.get(didaTask.id)) {
-                    console.log(`任务 [${didaTask.id}] 正在同步中，跳过本次更新`);
+                    console.debug(`任务 [${didaTask.id}] 正在同步中，跳过本次更新`);
                     continue;
                 }
 
@@ -256,7 +256,7 @@ export class Dida365Service {
                     
                     // 如果最近5秒内刚从思源同步到滴答，跳过反向同步以避免覆盖
                     if (lastModified && lastDirection === 'siyuan-to-dida' && (now - lastModified) < 5000) {
-                        console.log(`任务 [${didaTask.id}] 刚从思源同步到滴答（${now - lastModified}ms前），跳过反向同步`);
+                        console.debug(`任务 [${didaTask.id}] 刚从思源同步到滴答（${now - lastModified}ms前），跳过反向同步`);
                         continue;
                     }
                     
@@ -295,10 +295,10 @@ export class Dida365Service {
 
                 if (tasksToArchive.length > 0) {
                     archiveCount = await this.archiveSiyuanTasksBatch(tasksToArchive);
-                    console.log(`批量归档了 ${archiveCount} 个任务`);
+                    console.debug(`批量归档了 ${archiveCount} 个任务`);
                 }
             } else {
-                console.log("网络异常，跳过归档检查以避免误操作");
+                console.debug("网络异常，跳过归档检查以避免误操作");
             }
 
             const statusMessage = isOnline
@@ -330,18 +330,18 @@ export class Dida365Service {
         const newEventTitle = this.removeLinksFromTitle(newTaskData.事件.content);
         const oldEventTitle = oldSiyuanTask.事件?.content ? this.removeLinksFromTitle(oldSiyuanTask.事件.content) : '';
         if (newEventTitle !== oldEventTitle) {
-            console.log("事件标题变化", newEventTitle, oldEventTitle);
+            console.debug("事件标题变化", newEventTitle, oldEventTitle);
             return true;
         }
         // 比较优先级
-        // console.log("比较事件", newTaskData, oldSiyuanTask);
+        // console.debug("比较事件", newTaskData, oldSiyuanTask);
         if (newTaskData.优先级.content !== oldSiyuanTask.优先级?.content) {
-            console.log("优先级变化", newTaskData.优先级.content, oldSiyuanTask.优先级?.content);
+            console.debug("优先级变化", newTaskData.优先级.content, oldSiyuanTask.优先级?.content);
             return true;
         }
         // 比较状态
         if (newTaskData.状态.content !== oldSiyuanTask.状态?.content) {
-            console.log("状态变化", newTaskData.状态.content, oldSiyuanTask.状态?.content);
+            console.debug("状态变化", newTaskData.状态.content, oldSiyuanTask.状态?.content);
             return true;
         }
         // 比较标签
@@ -350,14 +350,14 @@ export class Dida365Service {
         // 将标签转换为字符串数组以便比较
         const newTagContents = newTags.map((tag: any) => tag.content).sort();
         const oldTagContents = oldTags.map((tag: any) => tag).sort();
-        // console.log("比较标签", newTagContents, oldTagContents);
+        // console.debug("比较标签", newTagContents, oldTagContents);
         if (newTagContents.join(",") !== oldTagContents.join(",")) {
-            console.log("标签变化", newTagContents, oldTagContents);
+            console.debug("标签变化", newTagContents, oldTagContents);
             return true;
         }
         // 比较描述
         if ((newTaskData.描述.content || "") !== (oldSiyuanTask.描述?.content || "")) {
-            console.log("描述变化", newTaskData.描述.content, oldSiyuanTask.描述?.content);
+            console.debug("描述变化", newTaskData.描述.content, oldSiyuanTask.描述?.content);
             return true;
         }
         // 比较时间
@@ -371,7 +371,7 @@ export class Dida365Service {
         const oldEnd = oldTime?.end || null;
 
         if (newStart !== oldStart || newEnd !== oldEnd) {
-            console.log("时间变化", { start: newStart, end: newEnd }, { start: oldStart, end: oldEnd });
+            console.debug("时间变化", { start: newStart, end: newEnd }, { start: oldStart, end: oldEnd });
             return true;
         }
 
@@ -379,7 +379,7 @@ export class Dida365Service {
         const newLink = newTaskData.链接?.content || "";
         const oldLink = oldSiyuanTask.链接?.content || "";
         if (newLink !== oldLink) {
-            console.log("链接变化", newLink, oldLink);
+            console.debug("链接变化", newLink, oldLink);
             return true;
         }
 
@@ -621,14 +621,14 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 更新缓存中的任务标题
                         cachedTask.title = titleWithSLink;
 
-                        console.log(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
+                        console.debug(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
                     }
                 } catch (error) {
                     console.warn("更新滴答任务 S 链接失败:", error);
                 }
             }
 
-            console.log("成功创建新任务:", taskData.事件?.content);
+            console.debug("成功创建新任务:", taskData.事件?.content);
 
         } catch (error) {
             console.error("创建思源任务失败:", error);
@@ -683,7 +683,7 @@ ${taskData.描述?.content || "描述：暂无"}
                             // 更新缓存中的任务标题
                             cachedTask.title = titleWithSLink;
 
-                            console.log(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
+                            console.debug(`滴答任务 [${didaTaskId}] 已更新 S 链接`);
                         }
                     }
                 } catch (error) {
@@ -691,7 +691,7 @@ ${taskData.描述?.content || "描述：暂无"}
                 }
             }
 
-            console.log("成功更新任务:", newTaskData.事件?.content);
+            console.debug("成功更新任务:", newTaskData.事件?.content);
 
         } catch (error) {
             console.error("更新思源任务失败:", error);
@@ -749,7 +749,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         "select"
                     ).then(() => {
                         successCount++;
-                        console.log(`任务 [${task.事件?.content}] 已设置为归档状态`);
+                        console.debug(`任务 [${task.事件?.content}] 已设置为归档状态`);
                     }).catch(error => {
                         console.error(`更新任务 [${task.事件?.content}] 状态失败:`, error);
                     })
@@ -773,7 +773,7 @@ ${taskData.描述?.content || "描述：暂无"}
             // 等待所有块属性更新完成
             await Promise.all(blockAttrPromises);
 
-            console.log(`批量归档完成：成功归档 ${successCount} 个任务`);
+            console.debug(`批量归档完成：成功归档 ${successCount} 个任务`);
             return successCount;
 
         } catch (error) {
@@ -877,7 +877,7 @@ ${taskData.描述?.content || "描述：暂无"}
             const newTags = (taskData.标签?.content || []).map((t: any) => t.content).sort().join(',');
             const oldTags = (existingTask?.标签?.content || []).sort().join(',');
             if (tagKeyID && taskData.标签?.content && newTags !== oldTags) {
-                console.log("更新标签：", taskData.标签.content);
+                console.debug("更新标签：", taskData.标签.content);
                 updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -899,10 +899,10 @@ ${taskData.描述?.content || "描述：暂无"}
                     "text"
                 ));
             }
-            // console.log("更新链接BBBBBBBBBBBBB：", taskData.链接.content, urlKeyID);
+            // console.debug("更新链接BBBBBBBBBBBBB：", taskData.链接.content, urlKeyID);
             if (urlKeyID && taskData.链接?.content) {
                 // 更新链接
-                // console.log("更新链接!!!!!!!!!!!!!!!!!!!：", taskData.链接.content);
+                // console.debug("更新链接!!!!!!!!!!!!!!!!!!!：", taskData.链接.content);
                 updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -937,7 +937,7 @@ ${taskData.描述?.content || "描述：暂无"}
             if (!viewData.data || !Array.isArray(viewData.data) || viewData.data.length === 0) {
                 return null;
             }
-            // console.log("获取字段 keyID：", fieldName, viewData.data);
+            // console.debug("获取字段 keyID：", fieldName, viewData.data);
             // 从第一条数据中获取字段的 keyID
             const firstRecord = viewData.data[0];
             if (firstRecord[fieldName] && firstRecord[fieldName].keyID) {
@@ -1067,7 +1067,7 @@ ${taskData.描述?.content || "描述：暂无"}
     handleSiyuanUpdate = async (e: any, blockId = '', itemID = '') => {
         let isDetached: boolean;
         if (e == 'force' && blockId && itemID) {
-            console.log("fore滴答更新");
+            console.debug("fore滴答更新");
         } else {
             const msg = e.detail;
             if (msg.cmd !== "transactions") return;
@@ -1076,12 +1076,12 @@ ${taskData.描述?.content || "描述：暂无"}
                 return;
             }
             // 检查是否是我们正在监听的数据库
-            console.log("处理思源更新DDD🚧🚧", operation);
+            console.debug("处理思源更新DDD🚧🚧", operation);
             // Calculate the newly added avID by comparing old and new custom-avs
 
 
             const avID = operation.avID || extractNewAvId(operation?.data?.old?.['custom-avs'], operation?.data?.new?.['custom-avs']);
-            console.log("获取到的🚧🚧 avID:", avID);
+            console.debug("获取到的🚧🚧 avID:", avID);
             if (avID !== this.avId) {
                 return;
             }
@@ -1098,8 +1098,8 @@ ${taskData.描述?.content || "描述：暂无"}
                     blockId = operation.id;
                     itemID = await getAttributeViewItemIDsByBoundIDs(avID, [operation.id]).then(data => data[operation.id]);
                 }
-                console.log("🚧🚧: blockId", blockId);
-                console.log("🚧🚧: itemID", itemID);
+                console.debug("🚧🚧: blockId", blockId);
+                console.debug("🚧🚧: itemID", itemID);
             }
         }
         // return;
@@ -1107,7 +1107,7 @@ ${taskData.描述?.content || "描述：暂无"}
         if (!blockId) return;
         try {
             // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
-            console.log(`处理思源更新：块ID ${blockId}`);
+            console.debug(`处理思源更新：块ID ${blockId}`);
             const viewData = await this.getAvViewData("处理思源更新");
             const allTasks = viewData.flatMap(view => view.data || []);
             const siyuanTask = allTasks.find((task: any) => task.事件?.itemID === itemID);
@@ -1176,9 +1176,9 @@ ${taskData.描述?.content || "描述：暂无"}
 
                 // 处理状态和标签
                 const newStatus = siyuanTask.状态?.content;
-                // console.log("标签：：：", siyuanTask.标签?.content);
+                // console.debug("标签：：：", siyuanTask.标签?.content);
                 const tagsFromSiyuan = (siyuanTask.标签?.content || []).map((item: any) => item);
-                // console.log("标签：：：", tagsFromSiyuan);
+                // console.debug("标签：：：", tagsFromSiyuan);
                 const statusTags = [];
                 if (newStatus === '完成') {
                     statusTags.push('完成');
@@ -1192,7 +1192,7 @@ ${taskData.描述?.content || "描述：暂无"}
                     statusTags.push('未完成');
                 }
                 updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
-                console.log("❤️❤️❤️❤️更新的任务内容：", updatePayload);
+                console.debug("❤️❤️❤️❤️更新的任务内容：", updatePayload);
                 if (Object.keys(updatePayload).length > 0) {
                     // 加锁，防止并发修改
                     this.taskSyncLocks.set(didaTaskId, true);
@@ -1213,7 +1213,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         this.lastModifiedTime.set(didaTaskId, Date.now());
                         this.lastSyncDirection.set(didaTaskId, 'siyuan-to-dida');
                         
-                        console.log(`思源任务 [${blockId}] 的变更已同步到滴答任务 [${didaTaskId}]`);
+                        console.debug(`思源任务 [${blockId}] 的变更已同步到滴答任务 [${didaTaskId}]`);
                         showStatusMessage("滴答任务已更新", 2000);
                     } finally {
                         // 延迟解锁，给一点缓冲时间
@@ -1236,11 +1236,11 @@ ${taskData.描述?.content || "描述：暂无"}
                     const latestTask = latestViewData.flatMap(view => view.data || []).find((task: any) => task.事件?.id === blockId);
                     if (latestTask?.didaID?.content) {
                         // 已经有 didaID，说明刚刚写入成功，直接返回
-                        console.log(`任务 [${blockId}] 已经有 didaID，跳过创建。`);
+                        console.debug(`任务 [${blockId}] 已经有 didaID，跳过创建。`);
                         return;
                     }
                     const taskTitle = siyuanTask.事件?.content || "新建任务";
-                    console.log(`检测到新的思源任务 [${taskTitle}]，正在创建滴答任务...`);
+                    console.debug(`检测到新的思源任务 [${taskTitle}]，正在创建滴答任务...`);
 
                     // 确定目标清单，如果状态未定，则默认为未完成清单
                     // 2025/7/5 修改：根据状态标签来确定目标清单，不再设置多个清单了
@@ -1316,7 +1316,7 @@ ${taskData.描述?.content || "描述：暂无"}
                             await this.withDidaTagged(async () => {
                                 await Promise.all(updatePromises);
                             });
-                            console.log(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
+                            console.debug(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
                             showStatusMessage("新任务已同步到滴答清单", 2000);
                         } else {
                             showMessage("无法写回滴答任务信息，请检查数据库是否有名为 'didaID' 和 '链接' 的列", -1, "error");
@@ -1353,7 +1353,7 @@ ${taskData.描述?.content || "描述：暂无"}
     async isTokenValid(): Promise<boolean> {
         try {
             const projects = await this.apiClient.getUserProjects();
-            console.log("Dida365 API Token 验证成功，获取到的项目数量:", projects ? projects.length : 0);
+            console.debug("Dida365 API Token 验证成功，获取到的项目数量:", projects ? projects.length : 0);
             return Array.isArray(projects) && projects.length > 0;
         } catch (error) {
             console.error("Dida365 API Token 验证失败:", error instanceof Error ? error.message : String(error));

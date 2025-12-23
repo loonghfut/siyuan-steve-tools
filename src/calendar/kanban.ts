@@ -49,15 +49,15 @@ let dataArray: NestedKBCalendarEvent[] = [];
 const CustomViewConfig = {
     classNames: ['custom-view'],
     content: function (props) {
-        // console.log('custom view content！！！！！！！！！！！！1');
+        // console.debug('custom view content！！！！！！！！！！！！1');
         const allEvents = props.eventStore.defs;
         dataArray = convertToArray(allEvents) as KBCalendarEvent[];
         allKBEvents = dataArray;//重要
-        // console.log("allKBEvents::::::::", allKBEvents);
+        // console.debug("allKBEvents::::::::", allKBEvents);
         ///
         if (isFilter) {
             //带日期筛选的数据
-            // console.log("OUTcalendar::::::::",);
+            // console.debug("OUTcalendar::::::::",);
             const filterEvents = sliceEvents(props, false);
             const Tevent = myK.transformEventData_fr_filter(filterEvents) as KBCalendarEvent[];
             // 先处理事件的嵌套结构
@@ -79,18 +79,18 @@ const CustomViewConfig = {
             }
         }
         ///
-        // console.log("处理前数据", dataArray);
+        // console.debug("处理前数据", dataArray);
 
 
-        // console.log("处理后数据allKBEvents", allKBEvents);
-        // console.log("处理后数据", dataArray);
+        // console.debug("处理后数据allKBEvents", allKBEvents);
+        // console.debug("处理后数据", dataArray);
 
         const columns = {
             todo: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '未完成')),
             inProgress: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '进行中')),
             done: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '完成'))
         };
-        // console.log(columns);
+        // console.debug(columns);
 
         // 在createCard函数中添加环形进度统计
         const createCard = (event: NestedKBCalendarEvent) => {
@@ -98,7 +98,7 @@ const CustomViewConfig = {
             // const starttime = new Date(event.extendedProps.Kstart).toLocaleString(); // 未使用，注释
             let endtime = '';
             let nowToEndTime;
-            // console.log('event.extendedProps.priority:', event);
+            // console.debug('event.extendedProps.priority:', event);
             //周期事件处理
             const isRecurring = event.extendedProps?.isRecurring;
             // const recurringPattern = event.extendedProps?.recurringPattern;
@@ -142,7 +142,7 @@ const CustomViewConfig = {
                         // 异步更新状态，不阻塞渲染
                         setTimeout(() => {
                             myK.run_changestatus(event, selectdata)
-                                .then(() => console.log(`自动更新事件状态: ${event.title} -> ${newStatus}`))
+                                .then(() => console.debug(`自动更新事件状态: ${event.title} -> ${newStatus}`))
                                 .catch(err => console.error('自动更新状态失败:', err));
                         }, 100);
                     }
@@ -254,7 +254,7 @@ const CustomViewConfig = {
         Promise.resolve().then(() => {
             requestAnimationFrame(async () => {
                 await initializeSortableKanban();
-                // console.log('初始化完成');
+                // console.debug('初始化完成');
             });
         });
 
@@ -266,7 +266,7 @@ const CustomViewConfig = {
     // datesSet: function (info) {
     // },
     // willUnmount: function (props) {
-    //     console.log('：：：：：：：：：：about to change away from custom view', props);
+    //     console.debug('：：：：：：：：：：about to change away from custom view', props);
     // },
 }
 
@@ -303,11 +303,11 @@ export async function handleAddButtonClick(status = "", direct = { isdirect: fal
 }
 
 export async function handleAddButtonClick_Independent(status = "", direct = { isdirect: false, directid: "" }, isrefresh = true) {
-    // console.log('添加事件按钮被点击');
+    // console.debug('添加事件按钮被点击');
     const now = new Date()
-    // console.log('当前时间:', now);
+    // console.debug('当前时间:', now);
     const fnow = myK.formatDateTime(now);
-    // console.log('格式化时间:', fnow);
+    // console.debug('格式化时间:', fnow);
 
     const viewIDs = await getViewId([settingdata["cal-db-id"]])
     const viewValue = await getViewValue(viewIDs);
@@ -318,7 +318,7 @@ export async function handleAddButtonClick_Independent(status = "", direct = { i
 
 async function handleKanbanClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    // console.log('点击事件:1');
+    // console.debug('点击事件:1');
     // 处理 st-ref 点击
     if (target.matches('.st-ref')) {
         e.preventDefault();
@@ -356,9 +356,9 @@ async function handleKanbanClick(e: MouseEvent) {
 export async function initializeSortableKanban() {
     await destroyAllSortables();
     // setTimeout(() => {
-    console.log('initializing sortable kanban');
+    console.debug('initializing sortable kanban');
     const containers = document.querySelectorAll('.kanban-board');
-    // console.log('containers:', containers);
+    // console.debug('containers:', containers);
     if (!containers.length) return;
 
     // Remove click handlers from all containers
@@ -423,14 +423,14 @@ export async function initializeSortableKanban() {
                 } else if (!isDragging && clicks === 2) {
                     clearTimeout(clickTimeout);
                     clicks = 0;
-                    // console.log('onunChoose', evt);
+                    // console.debug('onunChoose', evt);
                     await myK.runclick(evt);
                 }
 
 
             },
             // onChoose: function (evt) {
-            //     console.log('onchoose', evt);
+            //     console.debug('onchoose', evt);
             // },
             onEnd: async function (evt) {
                 try {
@@ -441,7 +441,7 @@ export async function initializeSortableKanban() {
                     const itemId = itemEl.getAttribute('data-id');
 
                     // 检查是否需要处理
-                    // console.log('onEnd', evt);
+                    // console.debug('onEnd', evt);
                     if (evt.to?.attributes[1]?.nodeValue === evt.from?.attributes[1]?.nodeValue) {
                         if (evt.oldIndex === evt.newIndex && evt.from === evt.to) {
                             logDebug('相同位置，无需处理');
@@ -559,7 +559,7 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
                 const currentDateStr = clonedEvent.range.start.toISOString().split('T')[0];
                 const newStatus = completedDates.includes(currentDateStr) ? '完成' : '未完成';
                 clonedEvent.extendedProps.status = newStatus;
-                // console.log('Status updated:', {
+                // console.debug('Status updated:', {
                 //     id: clonedEvent.extendedProps.blockId,
                 //     date: currentDateStr,
                 //     okday: okday,
@@ -606,10 +606,10 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
         .map(event => buildNested(event, new Set(), 0))
         .filter((e): e is NestedKBCalendarEvent => e !== null);
 
-    // console.log('被引用的事件:', Array.from(referencedEvents));
-    // console.log('过滤前事件数:', events.length);
-    // console.log('顶层事件数:', topLevelEvents.length);
-    // console.log('过滤后事件数:', nestedEvents.length);
+    // console.debug('被引用的事件:', Array.from(referencedEvents));
+    // console.debug('过滤前事件数:', events.length);
+    // console.debug('顶层事件数:', topLevelEvents.length);
+    // console.debug('过滤后事件数:', nestedEvents.length);
     return myK.sortEvents(nestedEvents);
 }
 
@@ -628,7 +628,7 @@ export async function destroyAllSortables() {
 // 创建防抖后的 refreshKanban
 const _refreshKanban = async () => {
     thisCalendars = thisCalendars.filter(calendar => document.body.contains(calendar.el));
-    // console.log("++++",thisCalendars);
+    // console.debug("++++",thisCalendars);
     if (!thisCalendars.length) return;
     // 记录所有日历的滚动位置
     thisCalendars.forEach(calendar => {
@@ -651,7 +651,7 @@ const _refreshKanban = async () => {
         destroyAllSortables();
         (card as HTMLElement).style.cursor = 'wait';
     });
-    // console.log('ST开始依次刷新日历');
+    // console.debug('ST开始依次刷新日历');
     // 依次刷新每个日历
     for (const calendar of thisCalendars) {
         await new Promise<void>(resolve => {
@@ -673,7 +673,7 @@ const _refreshKanban = async () => {
                 resolve();
             });
         });
-        // console.log(`日历 ${calendar.el.id} 刷新完成`);
+        // console.debug(`日历 ${calendar.el.id} 刷新完成`);
     }
     kanbanCards.forEach(card => {
         (card as HTMLElement).style.cursor = '';
@@ -684,7 +684,7 @@ const _refreshKanban = async () => {
 export const refreshKanban = debounce(_refreshKanban, 500);
 
 const logDebug = (message: string, ...args: any[]) => {
-    console.log(`[Kanban] ${message}`, ...args);
+    console.debug(`[Kanban] ${message}`, ...args);
 };
 
 

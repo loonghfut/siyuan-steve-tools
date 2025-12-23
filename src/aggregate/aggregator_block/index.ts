@@ -393,7 +393,7 @@ export class aggregatorBlock {
         // 使用字段以避免未使用的编译/lint 警告
         void this._plugin;
         void this._settingdata;
-        console.log("aggregatorBlock 模块初始化");
+        console.debug("aggregatorBlock 模块初始化");
 
         // 初始化定时任务管理器
         this.timerManager = new TimerManager(this);
@@ -425,7 +425,7 @@ export class aggregatorBlock {
             const presets = await this.getSqlPresets();
             const names = Object.keys(presets);
 
-            console.log(`[aggregatorBlock] 加载定时任务，共 ${names.length} 个预设`);
+            console.debug(`[aggregatorBlock] 加载定时任务，共 ${names.length} 个预设`);
 
             for (const name of names) {
                 const preset = presets[name] as PresetItem;
@@ -434,13 +434,13 @@ export class aggregatorBlock {
                 const dailyValid = (mode === 'daily') && Number.isFinite(preset.dailyHour) && Number.isFinite(preset.dailyMinute);
                 const intervalValid = (mode === 'interval') && !!preset.timerInterval;
                 if (dailyValid || intervalValid) {
-                    console.log(`[aggregatorBlock] 启动定时任务: ${name}`);
+                    console.debug(`[aggregatorBlock] 启动定时任务: ${name}`);
                     await this.timerManager?.startTimer(name, preset);
                 }
             }
 
             const activeTimers = this.timerManager?.getActiveTimers() || [];
-            console.log(`[aggregatorBlock] 已启动 ${activeTimers.length} 个定时任务:`, activeTimers);
+            console.debug(`[aggregatorBlock] 已启动 ${activeTimers.length} 个定时任务:`, activeTimers);
         } catch (error) {
             console.error('[aggregatorBlock] 加载定时任务失败:', error);
         }
@@ -450,7 +450,7 @@ export class aggregatorBlock {
      * 销毁方法，停止所有定时器
      */
     destroy(): void {
-        console.log("[aggregatorBlock] 销毁模块，停止所有定时任务");
+        console.debug("[aggregatorBlock] 销毁模块，停止所有定时任务");
         this.timerManager?.stopAll();
     }
 
@@ -1406,7 +1406,7 @@ export class aggregatorBlock {
                 }
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
-                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的定时设置`);
+                console.debug(`[aggregatorBlock] 更新预设 "${presetName}" 的定时设置`);
             } else {
                 console.warn('[aggregatorBlock] preset not found:', presetName);
             }
@@ -1439,7 +1439,7 @@ export class aggregatorBlock {
                     stmt += ` WHERE ${excludeCondition}`;
                 }
 
-                console.log('[aggregatorBlock] Modified SQL with exclude condition:', stmt);
+                console.debug('[aggregatorBlock] Modified SQL with exclude condition:', stmt);
             }
 
             // 如果提供了 lastInsertTime，添加时间过滤条件
@@ -1462,7 +1462,7 @@ export class aggregatorBlock {
                     stmt += ` WHERE ${timeCondition}`;
                 }
 
-                console.log(`[aggregatorBlock] Modified SQL with time filter (${timeField} > ${lastInsertTime}):`, stmt);
+                console.debug(`[aggregatorBlock] Modified SQL with time filter (${timeField} > ${lastInsertTime}):`, stmt);
             }
 
             const res = await runSql(stmt);
@@ -1883,7 +1883,7 @@ export class aggregatorBlock {
                 current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
-                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的 databaseIdField: ${field || '默认(id)'}`);
+                console.debug(`[aggregatorBlock] 更新预设 "${presetName}" 的 databaseIdField: ${field || '默认(id)'}`);
             } else {
                 console.warn('[aggregatorBlock] preset not found:', presetName);
             }
@@ -1904,7 +1904,7 @@ export class aggregatorBlock {
                 current[presetName].lastInsertTime = timestamp || undefined; // 空字符串存为 undefined
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
-                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的 lastInsertTime: ${timestamp || '已清除'}`);
+                console.debug(`[aggregatorBlock] 更新预设 "${presetName}" 的 lastInsertTime: ${timestamp || '已清除'}`);
             } else {
                 console.warn('[aggregatorBlock] preset not found:', presetName);
             }
@@ -1926,7 +1926,7 @@ export class aggregatorBlock {
                 current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
-                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的文档插入位置: ${mode || '默认(跟随全局)'}`);
+                console.debug(`[aggregatorBlock] 更新预设 "${presetName}" 的文档插入位置: ${mode || '默认(跟随全局)'}`);
             } else {
                 console.warn('[aggregatorBlock] preset not found:', presetName);
             }
@@ -1948,7 +1948,7 @@ export class aggregatorBlock {
                 current[presetName].updatedAt = Date.now();
                 this.pluginConfig.set('presets', current);
                 await this.pluginConfig.save();
-                console.log(`[aggregatorBlock] 更新预设 "${presetName}" 的置顶状态: ${pinned}`);
+                console.debug(`[aggregatorBlock] 更新预设 "${presetName}" 的置顶状态: ${pinned}`);
             } else {
                 console.warn('[aggregatorBlock] preset not found:', presetName);
             }

@@ -52,7 +52,7 @@ export async function loadShapeLibrary(): Promise<ShapeLibraryData> {
             };
         }
     } catch (err) {
-        console.log('素材库文件不存在或读取失败，将创建新的素材库');
+        console.debug('素材库文件不存在或读取失败，将创建新的素材库');
     }
     return { version: 1, items: [] };
 }
@@ -162,7 +162,7 @@ function collectBindingsForShapes(editor: Editor, shapes: TLShape[]): TLBinding[
  */
 async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise<string | undefined> {
     try {
-        console.log('[素材库] 开始生成缩略图，形状数量:', shapeIds.length);
+        console.debug('[素材库] 开始生成缩略图，形状数量:', shapeIds.length);
         
         // 使用tldraw的toImage API生成图片
         const imageResult = await editor.toImage(shapeIds, {
@@ -177,19 +177,19 @@ async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise
         }
         
         const blob = imageResult.blob;
-        console.log('[素材库] 图片生成成功，大小:', blob.size, '尺寸:', imageResult.width, 'x', imageResult.height);
+        console.debug('[素材库] 图片生成成功，大小:', blob.size, '尺寸:', imageResult.width, 'x', imageResult.height);
 
         // 将blob转换为base64
         return new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const base64 = reader.result as string;
-                console.log('[素材库] base64转换成功，长度:', base64.length);
+                console.debug('[素材库] base64转换成功，长度:', base64.length);
                 
                 // 创建一个临时图片来调整大小
                 const img = new Image();
                 img.onload = () => {
-                    console.log('[素材库] 图片加载成功，尺寸:', img.width, 'x', img.height);
+                    console.debug('[素材库] 图片加载成功，尺寸:', img.width, 'x', img.height);
                     
                     // 创建canvas进行缩放，生成小尺寸缩略图
                     const canvas = document.createElement('canvas');
@@ -216,10 +216,10 @@ async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise
                     if (ctx) {
                         ctx.drawImage(img, 0, 0, width, height);
                         const thumbnail = canvas.toDataURL('image/png');
-                        console.log('[素材库] 缩略图生成成功，最终尺寸:', width, 'x', height, '长度:', thumbnail.length);
+                        console.debug('[素材库] 缩略图生成成功，最终尺寸:', width, 'x', height, '长度:', thumbnail.length);
                         resolve(thumbnail);
                     } else {
-                        console.log('[素材库] canvas上下文获取失败，返回原始base64');
+                        console.debug('[素材库] canvas上下文获取失败，返回原始base64');
                         resolve(base64);
                     }
                 };
@@ -266,9 +266,9 @@ export async function addShapesToLibrary(
         
         // 生成缩略图
         const shapeIds = selectedShapes.map(s => s.id);
-        console.log('[素材库] 准备为以下形状生成缩略图:', shapeIds);
+        console.debug('[素材库] 准备为以下形状生成缩略图:', shapeIds);
         const thumbnail = await generateThumbnail(editor, shapeIds);
-        console.log('[素材库] 缩略图生成完成:', thumbnail ? '成功' : '失败');
+        console.debug('[素材库] 缩略图生成完成:', thumbnail ? '成功' : '失败');
         
         // 计算形状的边界框，用于后续居中放置
         const bounds = editor.getSelectionRotatedPageBounds();
@@ -533,7 +533,7 @@ export function addLibraryItemToCanvas(
             // 批量创建绑定
             if (newBindings.length > 0) {
                 editor.createBindings(newBindings);
-                console.log(`[素材库] 已恢复 ${newBindings.length} 个绑定关系`);
+                console.debug(`[素材库] 已恢复 ${newBindings.length} 个绑定关系`);
             }
         }
 

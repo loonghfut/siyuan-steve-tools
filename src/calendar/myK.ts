@@ -7,7 +7,7 @@ import { settingdata } from '@/index';
 //更新子级
 ////添加子级
 export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
-    // console.log("run_getsubevents", "F:", Fr_event, "T:", To_event);
+    // console.debug("run_getsubevents", "F:", Fr_event, "T:", To_event);
     if (!To_event.extendedProps.subid) {
         showMessage("目标数据库未设置关联自身的列", -1, "error");
         return false;
@@ -27,7 +27,7 @@ export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event
             action: "add"
         },
         "relation");
-    console.log("done-updateAttrViewCell_pro-add");
+    console.debug("done-updateAttrViewCell_pro-add");
     return true;
 }
 ////删除子级
@@ -51,7 +51,7 @@ export async function run_delsubevents(Fr_event: NestedKBCalendarEvent, To_event
             action: "remove"
         },
         "relation");
-    console.log("done-updateAttrViewCell_pro-remove");
+    console.debug("done-updateAttrViewCell_pro-remove");
     return true;
 }
 
@@ -67,10 +67,10 @@ export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatu
         Fr_event.extendedProps.itemID,
         newstatus,
         "select");
-    console.log("status changed to:", newstatus[0].content);
+    console.debug("status changed to:", newstatus[0].content);
     api.setBlockAttrs(Fr_event.publicId, { 'custom-st-event': statusMap[newstatus[0].content] });
     api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId, Fr_event.extendedProps.itemID);
-    console.log("done-updateAttrViewCell_pro-select");
+    console.debug("done-updateAttrViewCell_pro-select");
     return true;
 }
 
@@ -160,7 +160,7 @@ export function getDaysFromNow(time: string | Date, status: string): string {
 }
 
 export function transformEventData_fr_filter(events: any[]): any[] {
-    // console.log("transformEventData_fr_filter", events);
+    // console.debug("transformEventData_fr_filter", events);
     return events.map(event => {
         // 从 def 中提取所需属性
         const {
@@ -203,7 +203,7 @@ export function transformEventData_fr_filter(events: any[]): any[] {
 }
 
 export async function runclick(evt) {
-    // console.log("click", evt);
+    // console.debug("click", evt);
     try {
         const eventId = evt.item.dataset.id;
         const eventData = await findEventByPublicId(allKBEvents, eventId);
@@ -211,7 +211,7 @@ export async function runclick(evt) {
         if (!eventData) {
             throw new Error("Event not found");
         }
-        // console.log('data', eventData);
+        // console.debug('data', eventData);
     } catch (error) {
         console.error("Error processing event click:", error);
         showMessage("处理事件点击时出错: " + error.message, -1, "error");
@@ -259,7 +259,7 @@ export async function globalOpen() {
     win.webContents.executeJavaScript(`
         setTimeout(() => {
             window.siyuan = window.opener.siyuan;
-            console.log("window.siyuan", window.siyuan);
+            console.debug("window.siyuan", window.siyuan);
         }, 1000);
     `);
 
@@ -358,6 +358,6 @@ export async function run_changepriority(Fr_event: NestedKBCalendarEvent, newPri
         "select"
     );
     api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId, Fr_event.extendedProps.itemID);
-    console.log("done-updateAttrViewCell_pro-select-priority");
+    console.debug("done-updateAttrViewCell_pro-select-priority");
     return true;
 }

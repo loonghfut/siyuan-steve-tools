@@ -20,7 +20,7 @@ export class M_Aggregate {
     }
 
     async init(_settingdata: any) {
-        console.log("Aggregate 模块初始化");
+        console.debug("Aggregate 模块初始化");
         if (_settingdata["aggregate-enable-content-aggregator"]) {
             // Provide PluginConfig for persistent presets storage
             const confAgg = new PluginConfig(this.plugin.name, 'aggregate-sql');
@@ -206,7 +206,7 @@ export class M_Aggregate {
                         persistKey: `visual-sql-tab`,
                         onSqlChange: (_sql) => {
                             // 可在此触发查询/日志
-                            // console.log("[Tab] 生成的 SQL:", _sql);
+                            // console.debug("[Tab] 生成的 SQL:", _sql);
                         },
                     });
                     const applyPresetIfExists = async (presetName?: string) => {
@@ -253,7 +253,7 @@ export class M_Aggregate {
                 },
                 async destroy() {
                     const id = this.data.id as string;
-                    // console.log("销毁 SQL 选项卡", id);
+                    // console.debug("销毁 SQL 选项卡", id);
                     const ui = aggregate._tabInstances.get(id);
                     if (ui) {
                         (ui as any).destroy?.();
@@ -355,7 +355,7 @@ export class M_Aggregate {
                                     const sql = (getSQL() || '').trim();
                                     if (!sql) { return; }
                                     try {
-                                        console.log("nodeElement", nodeElement);
+                                        console.debug("nodeElement", nodeElement);
                                         const blockID = nodeElement.getAttribute('data-node-id');
                                         updateBlock("markdown", `{{${sql}}}`, blockID);
                                     } finally {
@@ -482,13 +482,13 @@ export class M_Aggregate {
             },
             onSqlChange: (_sql) => {
                 // 可同步 SQL 或发起查询
-                console.log("生成的 SQL:", _sql);
+                console.debug("生成的 SQL:", _sql);
             }
         });
     }
 
     onunload() {
-        console.log("M_Aggregate unloaded");
+        console.debug("M_Aggregate unloaded");
         // 如需销毁 UI，可在此处清理，并读取 _ui 以满足 noUnusedLocals
         if (this._ui) {
             // 例如：清空容器（如有需要）

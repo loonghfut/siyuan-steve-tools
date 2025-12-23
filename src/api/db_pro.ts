@@ -140,7 +140,7 @@ export class AVManager {
     private async findKeyByName(avID: string, keyName: string): Promise<AttributeViewKey> {
         const keys = await this.getAttributeViewKeysWithCache(avID);
         const key = keys.find(k => k.name === keyName);
-        // console.log("kEEY", key);
+        // console.debug("kEEY", key);
         if (!key) {
             showMessage(`未找到名称为 ${keyName} 的属性键`, -1, "error");
             console.error(`未找到名称为 ${keyName} 的属性键`);

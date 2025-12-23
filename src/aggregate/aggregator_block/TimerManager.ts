@@ -23,7 +23,7 @@ export class TimerManager {
         // 先停止已有的定时器
         this.stopTimer(presetName);
         if (!preset.timerEnabled) {
-            console.log(`[TimerManager] 预设 "${presetName}" 定时未启用`);
+            console.debug(`[TimerManager] 预设 "${presetName}" 定时未启用`);
             return;
         }
 
@@ -43,7 +43,7 @@ export class TimerManager {
 
             // 检查定时器是否仍然启用
             if (!currentPreset.timerEnabled) {
-                console.log(`[TimerManager] 预设 "${presetName}" 定时已禁用，停止定时器`);
+                console.debug(`[TimerManager] 预设 "${presetName}" 定时已禁用，停止定时器`);
                 this.stopTimer(presetName);
                 return;
             }
@@ -53,7 +53,7 @@ export class TimerManager {
 
         if (mode === 'interval') {
             if (!preset.timerInterval) {
-                console.log(`[TimerManager] 预设 "${presetName}" 间隔模式下未设置有效间隔，跳过`);
+                console.debug(`[TimerManager] 预设 "${presetName}" 间隔模式下未设置有效间隔，跳过`);
                 return;
             }
 
@@ -64,13 +64,13 @@ export class TimerManager {
             if (typeof preset.nextExecuteTime === 'number' && isFinite(preset.nextExecuteTime)) {
                 if (preset.nextExecuteTime <= now) {
                     initialDelay = Math.max(1, 1 * 60 * 1000); // 1 分钟后执行
-                    console.log(`[TimerManager] 预设 "${presetName}" 已错过下次执行时间，安排在 ${Math.round(initialDelay / 1000)} 秒后补跑一次`);
+                    console.debug(`[TimerManager] 预设 "${presetName}" 已错过下次执行时间，安排在 ${Math.round(initialDelay / 1000)} 秒后补跑一次`);
                 } else {
                     initialDelay = preset.nextExecuteTime - now;
                 }
             }
 
-            console.log(`[TimerManager] 启动定时器(interval): ${presetName}, 首次延迟: ${initialDelay}ms, 间隔: ${intervalMs}ms`);
+            console.debug(`[TimerManager] 启动定时器(interval): ${presetName}, 首次延迟: ${initialDelay}ms, 间隔: ${intervalMs}ms`);
 
             const startIntervalLoop = () => {
                 handles.interval = setInterval(async () => {
@@ -97,7 +97,7 @@ export class TimerManager {
         const h = Number.isFinite(preset.dailyHour) ? (preset.dailyHour as number) : NaN;
         const m = Number.isFinite(preset.dailyMinute) ? (preset.dailyMinute as number) : NaN;
         if (!(h >= 0 && h <= 23) || !(m >= 0 && m <= 59)) {
-            console.log(`[TimerManager] 预设 "${presetName}" 每日模式时间无效，需设置小时(0-23)与分钟(0-59)`);
+            console.debug(`[TimerManager] 预设 "${presetName}" 每日模式时间无效，需设置小时(0-23)与分钟(0-59)`);
             return;
         }
 
@@ -121,14 +121,14 @@ export class TimerManager {
         const missedToday = now >= todayTs && last < todayTs;
         if (missedToday) {
             initialDelay = 60 * 1000; // 1 分钟后补跑
-            console.log(`[TimerManager] 预设 "${presetName}" 今日 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} 已错过，1 分钟后补跑`);
+            console.debug(`[TimerManager] 预设 "${presetName}" 今日 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} 已错过，1 分钟后补跑`);
         } else if (now < todayTs) {
             initialDelay = todayTs - now;
         } else {
             initialDelay = computeTomorrowTs() - now;
         }
 
-        console.log(`[TimerManager] 启动定时器(daily): ${presetName}, 首次延迟: ${initialDelay}ms (每日 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')})`);
+        console.debug(`[TimerManager] 启动定时器(daily): ${presetName}, 首次延迟: ${initialDelay}ms (每日 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')})`);
 
         const scheduleNextDaily = (delayMs: number) => {
             if (handles.timeout) {
@@ -163,7 +163,7 @@ export class TimerManager {
             if (handles.timeout) clearTimeout(handles.timeout);
             if (handles.interval) clearInterval(handles.interval);
             this.timers.delete(presetName);
-            console.log(`[TimerManager] 停止定时器: ${presetName}`);
+            console.debug(`[TimerManager] 停止定时器: ${presetName}`);
         }
     }
 
@@ -172,7 +172,7 @@ export class TimerManager {
      */
     private async executePreset(presetName: string, preset: PresetItem): Promise<void> {
         try {
-            console.log(`[TimerManager] 执行定时任务: ${presetName}`);
+            console.debug(`[TimerManager] 执行定时任务: ${presetName}`);
 
             const targetDocId = preset.targetDocId;
             const targetDatabaseId = preset.targetDatabaseId;
@@ -254,7 +254,7 @@ export class TimerManager {
                 });
 
                 if (hasRecentUpdate) {
-                    console.log(`[TimerManager] 预设 "${presetName}" 检测到存在 5 分钟内更新的块，跳过本次定时触发`);
+                    console.debug(`[TimerManager] 预设 "${presetName}" 检测到存在 5 分钟内更新的块，跳过本次定时触发`);
                     // 跳过本次执行，下次执行时间改为 1 分钟后
                     preset.lastExecuteTime = now;
                     preset.nextExecuteTime = now + 60 * 1000; // 一分钟后
@@ -267,7 +267,7 @@ export class TimerManager {
 
             // 如果没有新数据，跳过
             if (!sqlResult || sqlResult.length === 0) {
-                console.log(`[TimerManager] 预设 "${presetName}" 没有新数据`);
+                console.debug(`[TimerManager] 预设 "${presetName}" 没有新数据`);
                 
                 // 更新执行时间
                 await this.updateExecutionTime(presetName, preset);
@@ -316,9 +316,9 @@ export class TimerManager {
             }
 
             if (operations.length) {
-                console.log(`[TimerManager] 成功执行定时任务: ${presetName}, 插入 ${operations.join('，')}`);
+                console.debug(`[TimerManager] 成功执行定时任务: ${presetName}, 插入 ${operations.join('，')}`);
             } else {
-                console.log(`[TimerManager] 预设 "${presetName}" 没有可执行的插入操作`);
+                console.debug(`[TimerManager] 预设 "${presetName}" 没有可执行的插入操作`);
             }
 
             if (errors.length) {
@@ -393,7 +393,7 @@ export class TimerManager {
         this.timers.forEach((handles, name) => {
             if (handles.timeout) clearTimeout(handles.timeout);
             if (handles.interval) clearInterval(handles.interval);
-            console.log(`[TimerManager] 停止定时器: ${name}`);
+            console.debug(`[TimerManager] 停止定时器: ${name}`);
         });
         this.timers.clear();
     }
@@ -417,7 +417,7 @@ export class TimerManager {
      * 重新加载定时器（当预设配置更新时调用）
      */
     async reloadTimer(presetName: string, preset: PresetItem): Promise<void> {
-        console.log(`[TimerManager] 重新加载定时器: ${presetName}`);
+        console.debug(`[TimerManager] 重新加载定时器: ${presetName}`);
         
         // 停止旧的定时器
         this.stopTimer(presetName);

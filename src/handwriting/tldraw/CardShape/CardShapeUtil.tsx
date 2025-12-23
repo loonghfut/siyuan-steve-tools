@@ -326,7 +326,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					return
 				}
 				if (isEditing) {
-					console.log('聚焦到Card形状:', shape.id);
+					console.debug('聚焦到Card形状:', shape.id);
 					// 进入编辑：仅在第一次进入时保存当前相机
 					if (!hadFocusedRef.current) {
 						try {
@@ -353,7 +353,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					prevCameraRef.current = null
 				}
 			}, 50) // 50ms 延迟确保状态同步完成
-			// console.log('大苏打发')
+			// console.debug('大苏打发')
 			return () => clearTimeout(timer)
 		}, [isEditing, shape.id])
 

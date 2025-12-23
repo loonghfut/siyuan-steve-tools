@@ -20,7 +20,7 @@ export class M_Wps {
 
     async init(settingdata: any) {
         this.settingdata = settingdata;
-        console.log("Wps 模块初始化");
+        console.debug("Wps 模块初始化");
         if (this.settingdata["wps-pic-enable"]) {
             this.wpsPicServ = new WpsPicServ(this.plugin);
             this.wpsPicServ.init(settingdata);
@@ -36,7 +36,7 @@ export class M_Wps {
     }
 
     async onLayoutReady() {
-        // console.log("Wps onLayoutReady");
+        // console.debug("Wps onLayoutReady");
         if (this.settingdata["wps-pic-enable"]) {
             (this.wpsPicServ as any)?.onLayoutReady?.();
         }
@@ -50,6 +50,6 @@ export class M_Wps {
     }
 
     onunload() {
-        console.log("M_Wps unloaded");
+        console.debug("M_Wps unloaded");
     }
 }

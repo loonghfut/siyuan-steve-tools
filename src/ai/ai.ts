@@ -24,7 +24,7 @@ export class M_ai {
                ${ic.steveTools_ai}
             </symbol>  
                 `);
-        console.log("ai模块初始化");
+        console.debug("ai模块初始化");
         
         // 获取当前 URL
         const urlType = settingdata["ai-url-type"] || "https://www.doubao.com/chat/";
@@ -69,7 +69,7 @@ export class M_ai {
         // 绑定下拉切换事件
         
 
-        console.log("ai模块初始化完成");
+        console.debug("ai模块初始化完成");
 
     }
     updateSettings(settingdata: any) {

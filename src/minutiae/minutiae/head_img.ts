@@ -133,7 +133,7 @@ export class headImg extends MinutiaeImageBase {
         }
 
         if (this.isNotebookBlacklisted(notebookInfo, docPath)) {
-            console.log('Minutiae head image auto-set skipped due to notebook blacklist', notebookInfo);
+            console.debug('Minutiae head image auto-set skipped due to notebook blacklist', notebookInfo);
             return;
         }
 

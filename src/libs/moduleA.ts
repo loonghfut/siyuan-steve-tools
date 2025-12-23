@@ -1,12 +1,12 @@
 export class ModuleA {
     init() {
-        console.log("ModuleA initialized");
+        console.debug("ModuleA initialized");
     }
 
     doSomething() {
-        console.log("ModuleA is doing something");
+        console.debug("ModuleA is doing something");
     }
     onunload() {
-        console.log("ModuleA unloaded");
+        console.debug("ModuleA unloaded");
     }
 }

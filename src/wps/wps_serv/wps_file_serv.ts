@@ -110,7 +110,7 @@ export class WpsFileServ {
                 showMessage('插入失败', 1800, 'error');
             }
         };
-        const roamingMonitorSnippet = `(()=>{try{if((window as any).__ROAMING_MONITOR_INSTALLED__)return;(window as any).__ROAMING_MONITOR_INSTALLED__=true;const TARGET='https://drive.kdocs.cn/api/v3/roaming';const log=(tag,url,body)=>{try{console.log('[RoamingAPI]',tag,url,body);}catch(_){} };const of=window.fetch; if(of){window.fetch=async (...args)=>{const r=await of(...args);try{const raw=args[0];const u=typeof raw==='string'?raw:(raw&&raw.url)||''; if(u.includes(TARGET)){r.clone().text().then(t=>log('fetch',u,t)).catch(()=>{});} }catch(_){} return r;};}const oOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,...rest){(this as any).__isRoaming= typeof u==='string' && u.includes(TARGET);return oOpen.call(this,m,u,...rest);};const oSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){if((this as any).__isRoaming){this.addEventListener('load',function(){try{log('xhr',this.responseURL,this.responseText);}catch(_){} });}return oSend.call(this,b);};}catch(e){console.error('roaming monitor inject failed',e);} })();`;
+        const roamingMonitorSnippet = `(()=>{try{if((window as any).__ROAMING_MONITOR_INSTALLED__)return;(window as any).__ROAMING_MONITOR_INSTALLED__=true;const TARGET='https://drive.kdocs.cn/api/v3/roaming';const log=(tag,url,body)=>{try{console.debug('[RoamingAPI]',tag,url,body);}catch(_){} };const of=window.fetch; if(of){window.fetch=async (...args)=>{const r=await of(...args);try{const raw=args[0];const u=typeof raw==='string'?raw:(raw&&raw.url)||''; if(u.includes(TARGET)){r.clone().text().then(t=>log('fetch',u,t)).catch(()=>{});} }catch(_){} return r;};}const oOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,...rest){(this as any).__isRoaming= typeof u==='string' && u.includes(TARGET);return oOpen.call(this,m,u,...rest);};const oSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){if((this as any).__isRoaming){this.addEventListener('load',function(){try{log('xhr',this.responseURL,this.responseText);}catch(_){} });}return oSend.call(this,b);};}catch(e){console.error('roaming monitor inject failed',e);} })();`;
         createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
@@ -132,7 +132,7 @@ export class WpsFileServ {
             iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
             pointerEventsDelay: 300,
             zoom: 1,
-            injectJS: ["console.log('WPS文件加载完成');" + roamingMonitorSnippet]
+            injectJS: ["console.debug('WPS文件加载完成');" + roamingMonitorSnippet]
         });
         // 注入 CSS 实现暗色主题反色（只在设置开启时注入）
         this._ensureInvertStyleTag(!!this.settingdata?.["wps-webview-invert-dark"]);
@@ -143,13 +143,13 @@ export class WpsFileServ {
         this.plugin.eventBus.on("switch-protyle", async (event) => {
             this.cursorID_b = event.detail.protyle.block.id;
             this.cursorID = this.cursorID_b;
-            // console.log("switch-image-protyle");
+            // console.debug("switch-image-protyle");
         });
     }
 
     async onLayoutReady() {
         this.WPSfile = window.siyuanWPS;
-        // console.log(this.WPSfile);
+        // console.debug(this.WPSfile);
         if (this.WPSfile?.loaded) {
             this.plugin.addTopBar({
                 icon: "iconSTwpsFile",
@@ -161,7 +161,7 @@ export class WpsFileServ {
                         parentId: this.WPSfile.parentId,
                         headers: { cookie: this.WPSfile.cookie }
                     });
-                    console.log(data);
+                    console.debug(data);
                 }
             });
         }
@@ -283,7 +283,7 @@ export class WpsFileServ {
                 return;
             }
             appendBlock('markdown', md, this.cursorID);
-            console.log(md);
+            console.debug(md);
             showMessage(`已插入 ${lines.length} 条`, 1500, 'info');
         } catch (e) {
             console.error('handleInsertFilelist error', e);
@@ -340,14 +340,14 @@ export class WpsFileServ {
             }
 
 
-            // console.log(`Found ${importedUIDs.size} imported event UIDs from SiYuan.`);
+            // console.debug(`Found ${importedUIDs.size} imported event UIDs from SiYuan.`);
         } catch (error) {
             console.error('获取已导入WPS文件ID时出错:', error);
             showMessage('获取已导入WPS文件列表失败，更新检查可能不准确。', 3000, 'error');
         }
-        // console.log("已导入的UIDs:");
+        // console.debug("已导入的UIDs:");
         // for (const uid of importedIDs) {
-        //     console.log(uid);
+        //     console.debug(uid);
         // }
         return importedIDs;
     }

@@ -238,7 +238,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
     for (const viewId_Data of viewIds_Data) {
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
-            // console.log("viewValue_CHUSHI:::", viewValue);
+            // console.debug("viewValue_CHUSHI:::", viewValue);
             const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type);
             viewValue_Data.push({
                 from: viewId_Data,
@@ -253,14 +253,14 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
         }
     }
 
-    // console.log("ceshi2222:::::::::::::2", viewValue_Data);
+    // console.debug("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
 
 
 
 async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal") {
-    // console.log("🚧🚧🚧🚧🚧🚧", data);
+    // console.debug("🚧🚧🚧🚧🚧🚧", data);
     const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
     const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
     // 兼容：含有 groups 的分组看板（看板分组后顶层 cards 为空，真实数据在 groups[i].cards 内）
@@ -278,7 +278,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     const requiredFields = getRequiredFields(isZQ, type);
 
     // 1. 创建字段映射
-    // console.log("DATA：", data);
+    // console.debug("DATA：", data);
     const fieldMap = new Map();
     // 分组看板优先使用顶层 fields，否则回退到第一个分组的 fields
     let fields = isGalleryView ? data.fields : data.columns;
@@ -311,14 +311,14 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
 
         // 如果有缺失的字段，创建它们
         if (missingFields.length > 0) {
-            console.log(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
+            console.debug(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
             sy.showMessage(`检测到缺失的字段: ${missingFields.join(', ')}，正在自动创建...`);
             sy.showMessage(`数据库字段创建后，请不要删除，无用字段请自行隐藏`, -1, "error");
             try {
                 for (const fieldName of missingFields) {
                     const fieldType = requiredFields[fieldName];
                     await api.addAttributeViewKey(avID, fieldName, fieldType);
-                    console.log(`成功创建字段: ${fieldName} (类型: ${fieldType})`);
+                    console.debug(`成功创建字段: ${fieldName} (类型: ${fieldType})`);
                 }
 
                 // 重新获取视图数据以包含新创建的字段
@@ -390,7 +390,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
             try {
                 // 提取事件
                 const eventCell = getCell('事件');
-                // console.log("eventCell:", eventCell);
+                // console.debug("eventCell:", eventCell);
                 if (eventCell) {
                     rowData['事件'] = {
                         content: eventCell.block?.content || '',
@@ -433,7 +433,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 // 提取标签
                 const tagCell = getCell('标签');
                 if (tagCell) {
-                    // console.log("tagCell:::", tagCell);
+                    // console.debug("tagCell:::", tagCell);
                     rowData['标签'] = {
                         content: tagCell.mSelect?.map((item: ISelectOption) => item.content) || [],
                         keyID: tagCell.keyID || ''
@@ -523,14 +523,14 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                         keyID: didaIdCell.keyID || ''
                     };
                 }
-                // console.log("rowData:::", rowData);
+                // console.debug("rowData:::", rowData);
                 return rowData;
             } catch (error) {
                 console.error('Error processing row/card:', item, error);
                 return {};
             }
         });
-        // console.log("extractDataFromTable🛠️🛠️ result:::", result);
+        // console.debug("extractDataFromTable🛠️🛠️ result:::", result);
         return result;
     } catch (error) {
         console.error('Error in extractDataFromTable:', error);
@@ -544,7 +544,7 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
     if (!filterKeys || filterKeys.length === 0) {
         return viewValue;
     }
-    // console.log("filterKeys:::", filterKeys);
+    // console.debug("filterKeys:::", filterKeys);
     // 筛选出匹配任一 ID 的视图
     const filteredViewValue = viewValue.filter(item =>
         filterKeys.includes(item.from.viewId)
@@ -569,7 +569,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
     const events: CalendarEventItem[] = [];
     const addedEventIds = new Set<string>();
     const unscheduledCollector: UnscheduledEvent[] = [];
-    // console.log("viewData:::", viewData);
+    // console.debug("viewData:::", viewData);
     // 处理普通事件（界面展示与跳转使用块 id，数据库更新使用 itemID）
     for (const view of viewData) {
         for (const item of view.data) {
@@ -828,7 +828,7 @@ export async function showEvent(blockID, _rootId?, isSeeMore = false, forceSeeMo
         //     width: '500px',
         //     height: 'auto',
         //     destroyCallback: async (option) => {
-        //         // console.log("ishandle",option?.ishandle)
+        //         // console.debug("ishandle",option?.ishandle)
         //         if (option?.ishandle) {
         //         } else {
         //             await refreshKanban();
@@ -849,13 +849,13 @@ export async function showEvent(blockID, _rootId?, isSeeMore = false, forceSeeMo
         //     // action: ["cb-get-focus"],
         //     after: () => {
         //         if (seemore) {
-        //             // console.log(panel.protyle);
+        //             // console.debug(panel.protyle);
         //             const parentElement = document.getElementById('eventPanel-show');
-        //             // console.log("parentElement", parentElement);
+        //             // console.debug("parentElement", parentElement);
         //             if (parentElement) {
         //                 const targetElement = parentElement.querySelector('.popover__block') && parentElement.querySelector(`[data-av-id="${rootId}"]`);
         //                 // const targetElement = parentElement.querySelector(`[data-av-id="${rootId}"]`);
-        //                 // console.log("找到目标元素:", targetElement);
+        //                 // console.debug("找到目标元素:", targetElement);
         //                 if (targetElement) {
         //                     (targetElement as HTMLElement).click();
         //                     dialog.destroy({ ishandle: "1" });
@@ -920,31 +920,31 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         return;
     }
     if (direct.isdirect) {
-        // console.log("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
+        // console.debug("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
         const itemID = await api.generateSiyuanID() as string; //直接使用块ID作为itemID
         if (await checkBlockInEvent(direct.directid, to_db_id)) {
-            console.log("目标数据库已存在此事件");
+            console.debug("目标数据库已存在此事件");
             return;
         }
         //块时间处理
         const blockdata = await api.getBlockKramdown(direct.directid);
-        // console.log("blockdata:::", blockdata.kramdown);
+        // console.debug("blockdata:::", blockdata.kramdown);
         const ce = runblockdata_for_time(blockdata?.kramdown);
         const minsub = runblockdata_for_sub(blockdata?.kramdown);
         const categorie = runblockdata_for_category(blockdata?.kramdown);
         const tags = runblockdata_for_tags(blockdata?.kramdown);
         const note = runblockdata_for_note(blockdata?.kramdown);
         const title = runblockdata_for_title(blockdata?.kramdown);
-        console.log("title:::", title);
+        console.debug("title:::", title);
         let ismain = false;
         if (minsub.length > 0) {
             ismain = true;
         }
         if (ce) {
             dateStr = ce;
-            // console.log("ce:::", ce);
+            // console.debug("ce:::", ce);
         }
-        // console.log("dateStr:::", dateStr);
+        // console.debug("dateStr:::", dateStr);
         //块时间处理
 
         await api.addBlockToDatabase_pro(direct.directid, to_db_id, itemID);
@@ -958,7 +958,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const titleKeyID = await getKeyIDfromViewValue(viewValue, '事件', to_db_id);
         const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
         if (titleKeyID && title) {
-            console.log("titleKeyID:::", titleKeyID);
+            console.debug("titleKeyID:::", titleKeyID);
             await api.updatemainkey({
                 avID: to_db_id,
                 blockID: direct.directid,
@@ -984,7 +984,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date"));
 
         const selectdata: ISelectOption[] = [{ content: status }];
-        // console.log("selectdata", selectdata);
+        // console.debug("selectdata", selectdata);
         // 2025/7/5新增默认添加优先级
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select"));
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select"));
@@ -1030,7 +1030,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     const id = idid;
     const itemID = await api.generateSiyuanID() as string;
     // // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
-    // console.log("dateStr:::", dateStr, "databaseId:::", to_db_id);
+    // console.debug("dateStr:::", dateStr, "databaseId:::", to_db_id);
     const dialog = new sy.Dialog({
         title: `   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <span>添加事件</span>
@@ -1100,7 +1100,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
 
     const handleKeydown = async (e: KeyboardEvent) => {//添加事件主代码
-        // console.log(e);
+        // console.debug(e);
         if (e.type === 'click' && !ok) { sy.showMessage('请先输入内容') }
         if ((e.key === 'Enter' && e.ctrlKey && ok) || e.type === 'click' && ok) {
             e.preventDefault();
@@ -1114,7 +1114,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             //// 如果块内容为空，则删除块
             // // steveTools.outlog("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
-            // console.log(markdownContent);
+            // console.debug(markdownContent);
             if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
                 await api.deleteBlock(id);
                 // steveTools.outlog('删除空白块');
@@ -1155,7 +1155,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             // 手动输入分类优先
             const category = category1 || category2;
             let ismain = false;
-            // console.log("minsub", minsub);
+            // console.debug("minsub", minsub);
             if (minsub.length > 0) {
                 ismain = true;
             }
@@ -1170,7 +1170,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const selectdata: ISelectOption[] = [{ content: status }];
             const priorityData: ISelectOption[] = [{ content: priority }];
             const categoryData: ISelectOption[] = [{ content: category }];
-            console.log("selectdata", selectdata);
+            console.debug("selectdata", selectdata);
 
             ///////////更新属性////////////////////
             if (noteKeyID && note) {
@@ -1273,7 +1273,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
 export async function checkBlockInEvent(blockId: string, to_db_id: string) {
     const attrs = await api.getBlockAttrs(blockId);
-    // console.log("attrs", attrs);
+    // console.debug("attrs", attrs);
     // 判断 "custom-avs" 是否存在
     if ("custom-avs" in attrs) {
         const avsValue = attrs["custom-avs"];
@@ -1281,11 +1281,11 @@ export async function checkBlockInEvent(blockId: string, to_db_id: string) {
         const avsList = avsValue.split(',');
         // 判断 to_db_id 是否在数组中
         const isInEvent = avsList.includes(to_db_id);
-        // console.log("Is block in the specified event database?", isInEvent);
+        // console.debug("Is block in the specified event database?", isInEvent);
         return isInEvent;
     }
     // 如果 "custom-avs" 不存在，则返回 false
-    // console.log("Is block in the specified event database?", false);
+    // console.debug("Is block in the specified event database?", false);
     return false;
 }
 
@@ -1494,7 +1494,7 @@ function createEventInDatabase_QQ(to_db_id: string, dateStr: string) {
             }
 
             // 解析开始时间和结束时间
-            console.log('dateStr:', dateStr);
+            console.debug('dateStr:', dateStr);
             const startTime = new Date(dateStr);
             let endTime = new Date(startTime);
             endTime.setHours(startTime.getHours() + 1); // 默认1小时
@@ -1719,15 +1719,15 @@ export function updataqqcalendar(info) {
 // 获取数据库中已有的优先级列表
 async function getPriorities(dbId: string): Promise<string[]> {
     try {
-        // console.log('获取优先级列表:', dbId);
+        // console.debug('获取优先级列表:', dbId);
         const view = await api.renderAttributeView(dbId);
-        // console.log('获取优先级列表:', view);
+        // console.debug('获取优先级列表:', view);
 
         // 兼容表格和画廊视图
         const columnsOrFields = view.view?.columns || view.view?.fields || [];
         // 查找优先级列
         const priorityColumn = columnsOrFields.find((col: any) => col.name === '优先级');
-        // console.log('获取优先级列表:', priorityColumn);
+        // console.debug('获取优先级列表:', priorityColumn);
         if (!priorityColumn) return ['无'];
 
         // 直接从选项中获取优先级名称
@@ -1739,7 +1739,7 @@ async function getPriorities(dbId: string): Promise<string[]> {
         }
 
         // 返回排序后的优先级列表
-        // console.log('获取优先级列表:', priorities);
+        // console.debug('获取优先级列表:', priorities);
         return priorities.sort();
     } catch (error) {
         console.error('获取优先级列表失败:', error);

@@ -17,7 +17,7 @@ export class PluginConfig {
     async load(): Promise<void> {
         try {
             const configData = await getFile(this.configPath);
-            // console.log("::::", configData);
+            // console.debug("::::", configData);
             if (configData) {
                 this.config = configData;
             } else {
@@ -39,7 +39,7 @@ export class PluginConfig {
             const configString = JSON.stringify(this.config, null, 2);
             const blob = new Blob([configString], { type: 'application/json' });
             await putFile(this.configPath, false, blob);
-            console.log("配置文件保存成功:", this.configPath);
+            console.debug("配置文件保存成功:", this.configPath);
         } catch (error) {
             console.error("保存配置文件失败:", error);
             throw error;

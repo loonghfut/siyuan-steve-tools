@@ -424,7 +424,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					return
 				}
 				if (isEditing) {
-					console.log('聚焦到形状:', shape.id)
+					console.debug('聚焦到形状:', shape.id)
 					// 进入编辑：仅在第一次进入时保存当前相机
 					if (!hadFocusedRef.current) {
 						try {
@@ -951,7 +951,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				e.preventDefault()
 				e.stopPropagation()
 				try {
-					// console.log('打开属性面板:', shape.props.blockId)
+					// console.debug('打开属性面板:', shape.props.blockId)
 					const container = containerRef.current
 					const blockId = shape.props.blockId || container?.getAttribute('blockid') || ''
 					if (!blockId) return

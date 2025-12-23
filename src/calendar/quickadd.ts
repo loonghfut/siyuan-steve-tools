@@ -195,7 +195,7 @@ export function quickadd_event_more(event: CustomEvent<{//无法实现（短时�
     blockElements: HTMLElement[];
 }>) {
     const menu = event.detail.menu;
-    // console.log('quickadd_event_more', menu);
+    // console.debug('quickadd_event_more', menu);
     menu.addItem({
         icon: 'iconCalendar',
         label: '添加日程pro',
@@ -203,9 +203,9 @@ export function quickadd_event_more(event: CustomEvent<{//无法实现（短时�
         click: async () => {
             const blockElement = event.detail.blockElements[0];
             const result = extractBlockTree(blockElement);
-            // console.log('完整树结构:', result.tree);
-            // console.log('段落列表:', result.paragraphs);
-            console.log('列表项列表:', result.listItems);
+            // console.debug('完整树结构:', result.tree);
+            // console.debug('段落列表:', result.paragraphs);
+            console.debug('列表项列表:', result.listItems);
             const listItemsdata = result.listItems;
             await quickadd_event_more_main(listItemsdata);
             await quickadd_event_more_sub(listItemsdata);
@@ -323,7 +323,7 @@ export async function addquikaddButton(e) {
                     .filter(block => block.content && block.content.includes('@日程'))
                     .map(block => block.id);
 
-                console.log('包含"@日程"的块ID:', idsWithSchedule);
+                console.debug('包含"@日程"的块ID:', idsWithSchedule);
                 if (idsWithSchedule.length === 0) {
                     showMessage('未找到包含"@日程"的块。');
                     return;
@@ -770,7 +770,7 @@ Your response:
                 return runblockdata_for_time(content);
             }
         } else {
-            console.log(`DeepSeek AI could not parse date/time from content: "${content}". Falling back to original parser.`);
+            console.debug(`DeepSeek AI could not parse date/time from content: "${content}". Falling back to original parser.`);
             return runblockdata_for_time(content);
         }
 

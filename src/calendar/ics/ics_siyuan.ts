@@ -29,7 +29,7 @@ export class ICSImporter {
     }
 
     async init() {
-        console.log('ICSImporter init called');
+        console.debug('ICSImporter init called');
         //获取日记id
         this.topBarButton = this.plugin.addTopBar({
             icon: "iconArrowDown",
@@ -60,7 +60,7 @@ export class ICSImporter {
                         await this.importEventsToDailyNotes(icsUrl, notebookIdForImport);
                     } else {
                         const dailyNoteResponse = await api.createDailyNote(window.siyuan.ws.app.appId, notebookIdForImport);
-                        console.log('创建的日记ID (单文档模式):', dailyNoteResponse);
+                        console.debug('创建的日记ID (单文档模式):', dailyNoteResponse);
                         if (!dailyNoteResponse || !dailyNoteResponse.id) {
                             showMessage('无法创建日记 (单文档模式)，请检查设置的笔记本ID是否正确', 3000, 'error');
                             return;
@@ -69,7 +69,7 @@ export class ICSImporter {
                         await this.importEventsToDocument(icsUrl, dailyNoteResponse.id);
                     }
                 } finally {
-                    console.log('导入操作完成');
+                    console.debug('导入操作完成');
                 }
             }
         });
@@ -508,14 +508,14 @@ ${renderedContent}
             }
 
 
-            // console.log(`Found ${importedUIDs.size} imported event UIDs from SiYuan.`);
+            // console.debug(`Found ${importedUIDs.size} imported event UIDs from SiYuan.`);
         } catch (error) {
             console.error('获取已导入ICS事件UID时出错:', error);
             showMessage('获取已导入日程列表失败，更新检查可能不准确。', 3000, 'error');
         }
-        // console.log("已导入的UIDs:");
+        // console.debug("已导入的UIDs:");
         // for (const uid of importedUIDs) {
-        //     console.log(uid);
+        //     console.debug(uid);
         // }
         return importedUIDs;
     }
@@ -524,10 +524,10 @@ ${renderedContent}
      * 在后台检查ICS源是否有更新
      */
     private async checkForUpdatesInBackground() {
-        console.log('开始在后台检查ICS更新...');
+        console.debug('开始在后台检查ICS更新...');
         const icsUrl = this.settings['cal-ics-subscribe-url'];
         if (!icsUrl) {
-            console.log('ICS订阅URL未设置，跳过更新检查。');
+            console.debug('ICS订阅URL未设置，跳过更新检查。');
             return;
         }
 
@@ -536,7 +536,7 @@ ${renderedContent}
             const remoteEvents = this.parseICSContent(icsContent);
 
             if (remoteEvents.length === 0) {
-                console.log('远程ICS源中未找到事件。');
+                console.debug('远程ICS源中未找到事件。');
                 return;
             }
 
@@ -557,7 +557,7 @@ ${renderedContent}
                 api.showStatusMessage(`检测到 ${newEventCount} 个新的ICS日程。请点击顶栏按钮手动导入。`, 7000, 'info');
 
             } else {
-                console.log('未检测到新的ICS日程。');
+                console.debug('未检测到新的ICS日程。');
                 // 确保图标是原始状态
                 this.updateTopBarIcon("iconArrowDown");
             }
@@ -647,7 +647,7 @@ ${renderedContent}
                         event.tags = [];
                     }
                 }
-                console.log(`处理事件:taggggg `, event.tags);
+                console.debug(`处理事件:taggggg `, event.tags);
 
                 const eventYear = event.startTime.getFullYear();
                 const eventMonth = (event.startTime.getMonth() + 1).toString().padStart(2, '0');
@@ -659,7 +659,7 @@ ${renderedContent}
 
                 if (!dailyNoteId) {
                     try {
-                        console.log(`尝试为日期 ${forDateSiyuan} 在笔记本 ${notebookIdForDailyNotes} 中创建/获取日记`);
+                        console.debug(`尝试为日期 ${forDateSiyuan} 在笔记本 ${notebookIdForDailyNotes} 中创建/获取日记`);
                         const dateForNote = new Date(eventYear, parseInt(eventMonth) - 1, parseInt(eventDay));
                         const dailyNoteResponse = await createDailynote(notebookIdForDailyNotes, dateForNote);
                         if (!dailyNoteResponse) {
@@ -669,7 +669,7 @@ ${renderedContent}
                         }
                         dailyNoteId = dailyNoteResponse;
                         dailyNoteCache.set(forDateSiyuan, dailyNoteId);
-                        console.log(`获取/创建日期 ${forDateSiyuan} 的日记ID: ${dailyNoteId}`);
+                        console.debug(`获取/创建日期 ${forDateSiyuan} 的日记ID: ${dailyNoteId}`);
                     } catch (e) {
                         const errorMessage = e instanceof Error ? e.message : String(e);
                         console.error(`为日期 ${forDateSiyuan} 创建日记失败:`, e);
@@ -683,13 +683,13 @@ ${renderedContent}
                 const exists = await this.checkEventExists(dailyNoteId, event.uid);
                 if (exists) {
                     skippedCount++;
-                    console.log(`跳过已存在的日程: ${event.title} (UID: ${event.uid}) 于日记 ${dailyNoteId}`);
+                    console.debug(`跳过已存在的日程: ${event.title} (UID: ${event.uid}) 于日记 ${dailyNoteId}`);
                     continue;
                 }
 
                 const { content: blockContent, blockId: targetBlockId } = await this.generateEventBlock(event);
                 try {
-                    console.log(`将事件反馈`, blockContent);
+                    console.debug(`将事件反馈`, blockContent);
                     const result = await api.appendBlock("markdown", blockContent, dailyNoteId);
 
                     // 如果插入成功且启用了数据库功能，添加到数据库
@@ -702,7 +702,7 @@ ${renderedContent}
 
                         if (useBlockId) {
                             await this.addBlockToDatabase(useBlockId, event);
-                            console.log(`已将ICS事件 "${event.title}" 添加到数据库 (日记模式)`);
+                            console.debug(`已将ICS事件 "${event.title}" 添加到数据库 (日记模式)`);
                         } else {
                             console.warn(`无法确定新创建块的ID，跳过添加到数据库 (日记模式): ${event.title}`);
                         }
@@ -762,10 +762,10 @@ ${renderedContent}
             for (const event of events) {
                 // 检查是否已存在
                 const exists = await this.checkEventExists(documentId, event.uid);
-                console.log(`检查UID: ${event.uid} 是否存在: ${exists}`);
+                console.debug(`检查UID: ${event.uid} 是否存在: ${exists}`);
                 if (exists) {
                     skippedCount++;
-                    console.log(`跳过已存在的日程: ${event.title} (UID: ${event.uid})`);
+                    console.debug(`跳过已存在的日程: ${event.title} (UID: ${event.uid})`);
                     continue;
                 }
 
@@ -783,14 +783,14 @@ ${renderedContent}
                         event.tags = [];
                     }
                 }
-                console.log(`处理事件:taggggg `, event.tags);
+                console.debug(`处理事件:taggggg `, event.tags);
 
                 // 生成超级块内容（带指定 SYID）
                 const { content: blockContent, blockId: targetBlockId2 } = await this.generateEventBlock(event);
 
                 // 插入到文档
                 const result = await api.appendBlock("markdown", blockContent, documentId);
-                console.log(`生成超级块内容: ${blockContent}`);
+                console.debug(`生成超级块内容: ${blockContent}`);
                 // 如果插入成功且启用了数据库功能，添加到数据库
                 if (result && this.settings['cal-ics-add-to-database']) {
                     // 优先使用模板生成的 SYID；否则回退解析 append 结果中的新块 ID
@@ -801,7 +801,7 @@ ${renderedContent}
 
                     if (useBlockId) {
                         await this.addBlockToDatabase(useBlockId, event);
-                        console.log(`已将ICS事件 "${event.title}" 添加到数据库`);
+                        console.debug(`已将ICS事件 "${event.title}" 添加到数据库`);
                     } else {
                         console.warn(`无法确定新创建块的ID，跳过添加到数据库: ${event.title}`);
                     }
@@ -856,7 +856,7 @@ ${renderedContent}
         try {
             // 添加块到数据库
             await api.addBlockToDatabase_pro(blockId, databaseId, blockId);
-            console.log(`成功将块 ${blockId} 添加到数据库 ${databaseId}`);
+            console.debug(`成功将块 ${blockId} 添加到数据库 ${databaseId}`);
 
             // 添加小延时确保块已添加到数据库
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -954,7 +954,7 @@ ${renderedContent}
      */
     private async updateDatabaseAttributes(blockId: string, databaseId: string, event: ICSEvent, viewValue: any): Promise<void> {
         try {
-            console.log(`更新数据库属性ICSICS`, event);
+            console.debug(`更新数据库属性ICSICS`, event);
 
             // 批量更新：收集所有需要更新的字段
             const updatePromises: Promise<any>[] = [];

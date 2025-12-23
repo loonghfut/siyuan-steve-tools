@@ -56,7 +56,7 @@ export class M_calendar {
         setTimeout(async () => {
             try {
                 await this.getEventsFromSiYuanDatabase();
-                console.log("更新日历文件<schedule>");
+                console.debug("更新日历文件<schedule>");
             } finally {
                 this.isUpdating = false;
             }
@@ -94,16 +94,16 @@ export class M_calendar {
                 calendarinstance.set(id, calendar);
             },
             async destroy() {
-                console.log("销毁日历选项卡", this.data.id);
+                console.debug("销毁日历选项卡", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
                     calendar.destroy();
                     calendarinstance.delete(this.data.id);
-                    console.log("销毁日历实例", this.data.id);
+                    console.debug("销毁日历实例", this.data.id);
                 }
             },
             resize() {
-                console.log("resize", this.data.id);
+                console.debug("resize", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
                     calendar.updateSize();
@@ -122,16 +122,16 @@ export class M_calendar {
                 calendarinstance.set(id, calendar);
             },
             async destroy() {
-                console.log("销毁日历选项卡", this.data.id);
+                console.debug("销毁日历选项卡", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
                     calendar.destroy();
                     calendarinstance.delete(this.data.id);
-                    console.log("销毁日历实例", this.data.id);
+                    console.debug("销毁日历实例", this.data.id);
                 }
             },
             resize() {
-                console.log("resize", this.data.id);
+                console.debug("resize", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
                     calendar.updateSize();
@@ -150,16 +150,16 @@ export class M_calendar {
                 calendarinstance.set(id, calendar);
             },
             async destroy() {
-                console.log("销毁日历选项卡", this.data.id);
+                console.debug("销毁日历选项卡", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
                     calendar.destroy();
                     calendarinstance.delete(this.data.id);
-                    console.log("销毁日历实例", this.data.id);
+                    console.debug("销毁日历实例", this.data.id);
                 }
             },
             resize() {
-                console.log("resize", this.data.id);
+                console.debug("resize", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
                     calendar.updateSize();
@@ -169,7 +169,7 @@ export class M_calendar {
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
         await this.calConfig.load();
-        // console.log(this.calConfig.getAll());
+        // console.debug(this.calConfig.getAll());
         this_settingdata = settingdata;
         calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
         calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
@@ -289,7 +289,7 @@ export class M_calendar {
                                 this.isUpdating = true;
                                 setTimeout(async () => {
                                     await this.getEventsFromSiYuanDatabase();
-                                    console.log("更新日历文件<2>");
+                                    console.debug("更新日历文件<2>");
                                     this.isUpdating = false;
                                 }, 10000);
                             }
@@ -302,7 +302,7 @@ export class M_calendar {
                             this.isUpdating = true;
                             setTimeout(async () => {
                                 await this.getEventsFromSiYuanDatabase();
-                                console.log("更新日历文件<2>");
+                                console.debug("更新日历文件<2>");
                                 this.isUpdating = false;
                             }, 10000);
                         }
@@ -340,10 +340,10 @@ export class M_calendar {
         }
         //dida
         // const avManager = new AVManager();
-        // // console.log("avManager", avManager);
-        // // console.log("avidMMMM", settingdata["cal-db-id"]);
+        // // console.debug("avManager", avManager);
+        // // console.debug("avidMMMM", settingdata["cal-db-id"]);
         // this.calendarAV = avManager.createOperator(settingdata["cal-db-id"]);
-        // // console.log("avidMMMM22", settingdata["cal-av-id"]);
+        // // console.debug("avidMMMM22", settingdata["cal-av-id"]);
         //配置实现只在某一端上传ics
         const selectToPics = this_settingdata["SelectTOPics"];
         if (!selectToPics || selectToPics === frontEnd) {
@@ -358,7 +358,7 @@ export class M_calendar {
             await this.QQCalDAVClient.updateEventsFromQQCalDAV(qqCalendars_url);
             this.qqFullCalendarEvents = this.QQCalDAVClient.getEventsFromQQCalDAV();
             refreshKanban();
-            console.log("QQevent", this.qqFullCalendarEvents);
+            console.debug("QQevent", this.qqFullCalendarEvents);
         }
         await init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
@@ -374,7 +374,7 @@ export class M_calendar {
                     return;
                 }
                 isCommandExecuting = true;
-                // console.log("添加日程waiwai");
+                // console.debug("添加日程waiwai");
                 try {
                     // await globalOpen();//失败
                     globalOpen2();
@@ -408,7 +408,7 @@ export class M_calendar {
             hotkey: "",
             editorCallback: async () => {
                 const cursorElement = getCursorElement();
-                console.log("🚧🚧🚧elemet:", cursorElement);
+                console.debug("🚧🚧🚧elemet:", cursorElement);
 
                 // 1) 优先在常规块元素上查找（含 data-type 的块容器）
                 let cursorElementId = cursorElement?.closest('[data-type][data-node-id]')?.getAttribute('data-node-id') ?? null;
@@ -416,7 +416,7 @@ export class M_calendar {
                 // 2) 列表项特殊处理，最高优先获取 .li 的 data-node-id
                 if ( cursorElement?.closest('.li')) {
                     cursorElementId = cursorElement.closest('.li')!.getAttribute('data-node-id');
-                    console.log("c🚧🚧🚧(li)", cursorElementId);
+                    console.debug("c🚧🚧🚧(li)", cursorElementId);
                 }
 
                 // 3) 兼容文档标题区域，例如：<div class="protyle-title ..." data-node-id="..."> ... </div>
@@ -424,7 +424,7 @@ export class M_calendar {
                     const titleEl = cursorElement?.closest('.protyle-title');
                     if (titleEl) {
                         cursorElementId = titleEl.getAttribute('data-node-id');
-                        console.log("c🚧🚧🚧(title)", cursorElementId);
+                        console.debug("c🚧🚧🚧(title)", cursorElementId);
                     }
                 }
 
@@ -433,20 +433,20 @@ export class M_calendar {
                     const nodeEl = cursorElement?.closest('[data-node-id]');
                     if (nodeEl) {
                         cursorElementId = nodeEl.getAttribute('data-node-id');
-                        console.log("c🚧🚧🚧(any [data-node-id])", cursorElementId);
+                        console.debug("c🚧🚧🚧(any [data-node-id])", cursorElementId);
                     }
                 }
 
-                console.log("cursorElementId", cursorElementId);
+                console.debug("cursorElementId", cursorElementId);
                 const blockId = cursorElementId;
-                console.log("🚧🚧🚧blockId", blockId);
+                console.debug("🚧🚧🚧blockId", blockId);
                 if (!blockId) {
                     showMessage("请先选中一个块", 3000, "error");
                     return;
                 }
                 
-                // console.log("pro", blockId);
-                // console.log("创建日程（光标所在块）", blockId);
+                // console.debug("pro", blockId);
+                // console.debug("创建日程（光标所在块）", blockId);
                 handleAddButtonClick_Independent('', { isdirect: true, directid: blockId });
             },
         })
@@ -504,7 +504,7 @@ export class M_calendar {
         if (settingdata["cal-ics-enable-subscribe"]) {
             this.icsSubscription = new ICSSubscription([settingdata["cal-ics-subscribe-url"]]);
             await this.icsSubscription.init();
-            console.log("ST_ics状态:", this.icsSubscription.getEvents());
+            console.debug("ST_ics状态:", this.icsSubscription.getEvents());
         }
         if (settingdata["cal-share"] === "alist") {
             this.alistPlugin = new ics_alist();
@@ -514,7 +514,7 @@ export class M_calendar {
             this.s3Client = new ics_s3({});
             this.s3Client.load_date_from_siyuan();
             this.s3Client.init();
-            console.log("ST_s3状态:", await this.s3Client.testConnection());
+            console.debug("ST_s3状态:", await this.s3Client.testConnection());
         }
         if (this_settingdata["cal-share"] === "s3-diy") {
             const bucket = this_settingdata["cal-s3-bucket"];
@@ -523,7 +523,7 @@ export class M_calendar {
             this.s3Client = new ics_s3({ bucket: bucket, accessKeyId: accessKeyId, secretAccessKey: secretAccessKey });
             this.s3Client.load_little_date_from_siyuan();
             this.s3Client.init();
-            console.log("ST_s3状态:", await this.s3Client.testConnection());
+            console.debug("ST_s3状态:", await this.s3Client.testConnection());
         }
         if (this_settingdata["cal-share"] === "webdav") {
             const serverUrl = this_settingdata["cal-webdav-url"];
@@ -538,7 +538,7 @@ export class M_calendar {
                 remotePath
             });
             await this.webdavClient.init();
-            console.log("WebDAV状态:", await this.webdavClient.testConnection());
+            console.debug("WebDAV状态:", await this.webdavClient.testConnection());
         }
     }
 
@@ -558,7 +558,7 @@ export class M_calendar {
 
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
-                        // console.log('按钮被点击了');
+                        // console.debug('按钮被点击了');
                         // Find the closest element with the specified classes
                         let dataId = '';
                         const avBlocks = document.querySelectorAll('div.item.item--focus[data-id]');
@@ -577,7 +577,7 @@ export class M_calendar {
                             });
 
                             dataId = closestBlock.getAttribute('data-id');
-                            // console.log('data-id:', dataId);
+                            // console.debug('data-id:', dataId);
                             // steveTools.outlog('Selected AV block ID:', dataId);
                         }
 
@@ -744,7 +744,7 @@ export class M_calendar {
             name: item.content?.split(' ')[0] || 'N/A'
         })).filter(item => item.id !== null);
 
-        console.log("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+        console.debug("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
 
         return avIds;
     }
@@ -767,7 +767,7 @@ export class M_calendar {
             const avIds = await this.getAVreferenceid();
             const viewIDs = await myF.getViewId(avIds);
             const viewValue = await myF.getViewValue(viewIDs);
-            // console.log("EEEEEEEEEEEEEEEEEView data:", viewValue);
+            // console.debug("EEEEEEEEEEEEEEEEEView data:", viewValue);
             const result = transformEvents(viewValue);
             await this.addEventToGlobal(result);
 
@@ -788,7 +788,7 @@ export class M_calendar {
             if (!selectToPics || selectToPics === frontEnd) {
                 if (settingdata["cal-share"] === "alist") {
                     await this.alistPlugin.upload_ics();
-                    console.log("alist_ics");
+                    console.debug("alist_ics");
                 }
                 if (settingdata["cal-share"] === "s3") {
                     const ics = await api.getFileBlob(calendarpath)
@@ -823,7 +823,7 @@ export class M_calendar {
                 allEvents.push(newEvents);
             }
             // steveTools.outlog('新事件已添加到全局变量');
-            // console.log("allEvents", allEvents);
+            // console.debug("allEvents", allEvents);
         } catch (error) {
             console.error('添加事件到全局变量时出错：', error);
         }

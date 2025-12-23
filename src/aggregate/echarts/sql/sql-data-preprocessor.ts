@@ -81,7 +81,7 @@ export class SqlDataPreprocessor {
         this.buildNotebooksMap(notebooks);
         
         if (this.options.debug) {
-          console.log('📚 从全局变量加载笔记本列表:', notebooks.length, '个');
+          console.debug('📚 从全局变量加载笔记本列表:', notebooks.length, '个');
         }
       } else {
         if (this.options.debug) {
@@ -200,7 +200,7 @@ export class SqlDataPreprocessor {
         result[key] = value;
         
         if (this.options.debug) {
-          console.log(`  📋 解析IAL属性: ${key} = "${value}"`);
+          console.debug(`  📋 解析IAL属性: ${key} = "${value}"`);
         }
       }
       
@@ -248,7 +248,7 @@ export class SqlDataPreprocessor {
       processedRow.box = this.convertBoxField(originalBox);
       
       if (this.options.debug && processedRow.box !== originalBox) {
-        console.log(`🔄 box字段转换: ${originalBox} -> ${processedRow.box}`);
+        console.debug(`🔄 box字段转换: ${originalBox} -> ${processedRow.box}`);
       }
     }
 
@@ -260,7 +260,7 @@ export class SqlDataPreprocessor {
         processedRow.created = this.convertTimestamp(originalCreated);
         
         if (this.options.debug && processedRow.created !== String(originalCreated)) {
-          console.log(`🕐 created字段转换: ${originalCreated} -> ${processedRow.created}`);
+          console.debug(`🕐 created字段转换: ${originalCreated} -> ${processedRow.created}`);
         }
       }
       
@@ -270,7 +270,7 @@ export class SqlDataPreprocessor {
         processedRow.updated = this.convertTimestamp(originalUpdated);
         
         if (this.options.debug && processedRow.updated !== String(originalUpdated)) {
-          console.log(`🕐 updated字段转换: ${originalUpdated} -> ${processedRow.updated}`);
+          console.debug(`🕐 updated字段转换: ${originalUpdated} -> ${processedRow.updated}`);
         }
       }
     }
@@ -280,7 +280,7 @@ export class SqlDataPreprocessor {
       const ialParsed = this.parseIAL(processedRow.ial);
       
       if (this.options.debug && Object.keys(ialParsed).length > 0) {
-        console.log(`📋 IAL字段解析: 提取了 ${Object.keys(ialParsed).length} 个属性`);
+        console.debug(`📋 IAL字段解析: 提取了 ${Object.keys(ialParsed).length} 个属性`);
       }
       
       // 将解析后的IAL属性作为新字段添加到行数据中
@@ -313,8 +313,8 @@ export class SqlDataPreprocessor {
 
     if (this.options.debug) {
       console.group('🔧 SQL数据预处理');
-      console.log('📊 原始数据行数:', rows.length);
-      console.log('📄 第一行数据(处理前):', rows[0]);
+      console.debug('📊 原始数据行数:', rows.length);
+      console.debug('📄 第一行数据(处理前):', rows[0]);
     }
 
     // 第一步: 预处理所有行
@@ -343,21 +343,21 @@ export class SqlDataPreprocessor {
         });
 
         if (this.options.debug) {
-          console.log('📋 发现的IAL字段:', Array.from(allIALKeys));
-          console.log('📋 已为缺失字段填充默认值 "无"');
+          console.debug('📋 发现的IAL字段:', Array.from(allIALKeys));
+          console.debug('📋 已为缺失字段填充默认值 "无"');
         }
       }
     }
 
     if (this.options.debug) {
-      console.log('📄 第一行数据(处理后):', processedRows[0]);
+      console.debug('📄 第一行数据(处理后):', processedRows[0]);
       
       // 统计box字段转换情况
       if (this.options.convertBoxIdToName) {
         const boxFields = processedRows.filter(r => r.box);
         const uniqueBoxes = new Set(boxFields.map(r => r.box));
-        console.log('📚 涉及的笔记本:', Array.from(uniqueBoxes));
-        console.log('📚 笔记本映射表大小:', this.notebooksMap.size);
+        console.debug('📚 涉及的笔记本:', Array.from(uniqueBoxes));
+        console.debug('📚 笔记本映射表大小:', this.notebooksMap.size);
       }
       
       console.groupEnd();
@@ -396,7 +396,7 @@ export class SqlDataPreprocessor {
     }
     
     if (this.options.debug) {
-      console.log('🔄 已重新加载笔记本映射表,当前大小:', this.notebooksMap.size);
+      console.debug('🔄 已重新加载笔记本映射表,当前大小:', this.notebooksMap.size);
     }
   }
 

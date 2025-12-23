@@ -61,6 +61,6 @@ export function convertProjectsToRecord(projects: Project[]): Record<string, str
             result[project.id] = project.name;
         }
     }
-    console.log("转换后的项目数据:", result);
+    console.debug("转换后的项目数据:", result);
     return result;
 }

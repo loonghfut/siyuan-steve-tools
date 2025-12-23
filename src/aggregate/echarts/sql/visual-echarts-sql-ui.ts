@@ -1212,15 +1212,15 @@ export class VisualEchartsSqlUI {
     `}
     
   console.group('🔍 多SQL预设对比 - 数据调试');
-  console.log('📊 预设列表:', presets);
+  console.debug('📊 预设列表:', presets);
   ${isPie ? `
-  console.log('📊 饼图数据:', pieData);
+  console.debug('📊 饼图数据:', pieData);
   ` : chartType === 'radar' ? `
-  console.log('📐 指标(indicator):', indicator);
-  console.log('📐 值(radarValues):', radarValues);
+  console.debug('📐 指标(indicator):', indicator);
+  console.debug('📐 值(radarValues):', radarValues);
   ` : `
-  console.log('📐 X轴(预设名称):', xAxisData);
-  console.log('📐 Y轴(查询数量):', yAxisData);
+  console.debug('📐 X轴(预设名称):', xAxisData);
+  console.debug('📐 Y轴(查询数量):', yAxisData);
   `}
     console.groupEnd();
     

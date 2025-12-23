@@ -18,7 +18,7 @@ export async function getAVreferenceid_pro(forwhat: string = 'dida') {
         name: item.content?.split(' ')[0] || 'N/A'
     })).filter(item => item.id !== null);
 
-    console.log("avIDs", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+    console.debug("avIDs", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
 
     return avIds;
 }

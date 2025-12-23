@@ -194,7 +194,7 @@ export function addStatsToCalendar(
             addStatsPreviewToCalendar(calendar, calendarEl);
         }
         
-        console.log('✅ 日历统计功能已成功集成');
+        console.debug('✅ 日历统计功能已成功集成');
     } catch (error) {
         console.error('❌ 集成日历统计功能失败:', error);
     }

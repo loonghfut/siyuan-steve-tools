@@ -24,9 +24,9 @@ export class M_imageCompression {
         };
 
         try {
-            console.log(`原始图片大小: ${(imageFile.size / 1024 / 1024).toFixed(2)} MB`);
+            console.debug(`原始图片大小: ${(imageFile.size / 1024 / 1024).toFixed(2)} MB`);
             const compressedFile = await imageCompression(imageFile, options);
-            console.log(`压缩后图片大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
+            console.debug(`压缩后图片大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
             return compressedFile;
         } catch (error) {
             console.error('压缩图片失败:', error);
@@ -38,7 +38,7 @@ export class M_imageCompression {
     private async compressVideo(videoFile: File): Promise<File | null> {
         return new Promise(async (resolve) => {
             try {
-                console.log(`原始视频大小: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
+                console.debug(`原始视频大小: ${(videoFile.size / 1024 / 1024).toFixed(2)} MB`);
                 
                 // 为大型文件显示警告
                 if (videoFile.size > 50 * 1024 * 1024) { // 50MB
@@ -131,7 +131,7 @@ export class M_imageCompression {
                             type: mimeType.split(';')[0]
                         });
                         
-                        console.log(`压缩后视频大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
+                        console.debug(`压缩后视频大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
                         resolve(compressedFile);
                     };
                     
@@ -277,7 +277,7 @@ export class M_imageCompression {
                     const response = await api.upload(uploadDir, [renamedFile]);
 
                     if (response.succMap) {
-                        // console.log('上传成功:', response.succMap);
+                        // console.debug('上传成功:', response.succMap);
                         let mediaId = response.succMap[renamedFile.name].replace("data/", "");
 
                         // 根据媒体类型选择插入方式
@@ -487,13 +487,13 @@ export class M_imageCompression {
                     markdown = `![](${item.mediaId})`;
                 }
 
-                console.log("插入媒体", this.cursorID);
+                console.debug("插入媒体", this.cursorID);
                 if (this.cursorID) {
                     await api.appendBlock("markdown", markdown, this.cursorID);
                 } else {
                     showMessage("请将光标放在需要插入媒体的位置", -1, "error");
                 }
-                console.log("插入媒体", item.mediaId);
+                console.debug("插入媒体", item.mediaId);
                 item.resolve();
                 await new Promise(resolve => setTimeout(resolve, this.DELAY_TIME));
             }
@@ -514,7 +514,7 @@ export class M_imageCompression {
             this.M_image_protyle = event.detail.protyle;
             this.cursorID_b = event.detail.protyle.block.id;
             this.cursorID = this.cursorID_b;
-            console.log("switch-image-protyle");
+            console.debug("switch-image-protyle");
         });
     }
 }

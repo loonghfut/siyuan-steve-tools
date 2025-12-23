@@ -27,7 +27,7 @@ export function example1_AddStatsButton(calendar: any, calendarEl: HTMLElement):
     };
     
     toolbar.appendChild(statsBtn);
-    console.log('✅ 统计按钮已添加到日历工具栏');
+    console.debug('✅ 统计按钮已添加到日历工具栏');
 }
 
 /**
@@ -71,7 +71,7 @@ export function example2_AddStatsPreview(calendar: any, calendarEl: HTMLElement)
         calendar.on('eventsSet', updatePreview);
     }
     
-    console.log('✅ 统计预览已添加到日历');
+    console.debug('✅ 统计预览已添加到日历');
 }
 
 /**
@@ -81,13 +81,13 @@ export function example3_QuickStatsReport(calendar: any): void {
     const events = calendar.getEvents();
     
     if (!events || events.length === 0) {
-        console.log('⚠️ 没有事件数据可供统计');
+        console.debug('⚠️ 没有事件数据可供统计');
         return;
     }
     
     // 生成快速统计
     const stats = calendarStatsManager.quickStats(events);
-    console.log('📊 快速统计结果:', stats);
+    console.debug('📊 快速统计结果:', stats);
     
     // 显示统计摘要
     calendarStatsManager.showStatsSummary(events);
@@ -100,13 +100,13 @@ export function example4_ExportStats(calendar: any, format: 'json' | 'csv' | 'su
     const events = calendar.getEvents();
     
     if (!events || events.length === 0) {
-        console.log('⚠️ 没有事件数据可供导出');
+        console.debug('⚠️ 没有事件数据可供导出');
         return;
     }
     
     // 导出统计数据
     calendarStatsManager.exportStats(events, format);
-    console.log(`✅ 统计数据已导出为 ${format.toUpperCase()} 格式`);
+    console.debug(`✅ 统计数据已导出为 ${format.toUpperCase()} 格式`);
 }
 
 /**
@@ -117,22 +117,22 @@ export function example5_AnalyzeTimeRange(calendar: any): void {
     
     // 分析当前月份
     const monthStats = calendarStatsManager.getCurrentMonthStats(events);
-    console.log('📅 当月统计:', monthStats);
+    console.debug('📅 当月统计:', monthStats);
     
     // 分析最近一周
     const weekStats = calendarStatsManager.getRecentWeekStats(events);
-    console.log('📈 最近一周:', weekStats);
+    console.debug('📈 最近一周:', weekStats);
     
     // 自定义时间范围（今年）
     const yearStats = calendarStatsManager.getCurrentYearStats(events);
-    console.log('🗓️ 今年统计:', yearStats);
+    console.debug('🗓️ 今年统计:', yearStats);
 }
 
 /**
  * 一键集成所有功能
  */
 export function quickIntegration(calendar: any, calendarEl: HTMLElement): void {
-    console.log('🚀 开始快速集成日历统计功能...');
+    console.debug('🚀 开始快速集成日历统计功能...');
     
     try {
         // 添加统计按钮
@@ -141,8 +141,8 @@ export function quickIntegration(calendar: any, calendarEl: HTMLElement): void {
         // 添加统计预览
         example2_AddStatsPreview(calendar, calendarEl);
         
-        console.log('✨ 日历统计功能集成完成！');
-        console.log('💡 提示: 可以点击右上角的统计按钮查看详细数据');
+        console.debug('✨ 日历统计功能集成完成！');
+        console.debug('💡 提示: 可以点击右上角的统计按钮查看详细数据');
         
     } catch (error) {
         console.error('❌ 集成失败:', error);
@@ -176,12 +176,12 @@ if (typeof window !== 'undefined') {
         }
     };
     
-    console.log('🎯 快速统计工具已加载！');
-    console.log('使用方法:');
-    console.log('  window.quickStats.integrate(calendar, calendarEl) - 一键集成');
-    console.log('  window.quickStats.show(calendar) - 显示统计对话框');
-    console.log('  window.quickStats.preview(calendar) - 获取统计预览');
-    console.log('  window.quickStats.report(calendar) - 生成快速报告');
+    console.debug('🎯 快速统计工具已加载！');
+    console.debug('使用方法:');
+    console.debug('  window.quickStats.integrate(calendar, calendarEl) - 一键集成');
+    console.debug('  window.quickStats.show(calendar) - 显示统计对话框');
+    console.debug('  window.quickStats.preview(calendar) - 获取统计预览');
+    console.debug('  window.quickStats.report(calendar) - 生成快速报告');
 }
 
 // 使用说明注释
@@ -197,7 +197,7 @@ if (typeof window !== 'undefined') {
 
 3. 获取统计预览:
    const preview = calendarStatsManager.getStatsPreview(events);
-   console.log(preview);
+   console.debug(preview);
 
 4. 导出数据:
    calendarStatsManager.exportStats(events, 'csv');

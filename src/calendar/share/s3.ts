@@ -35,7 +35,7 @@ export class ics_s3 {
         this.endpoint = window.siyuan.config.sync.s3?.endpoint;
         this.pathStyle = window.siyuan.config.sync.s3?.pathStyle;
         this.tls = !window.siyuan.config.sync.s3?.skipTlsVerify;
-        // console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
+        // console.debug(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
     }
 
     load_date_from_siyuan() {
@@ -46,7 +46,7 @@ export class ics_s3 {
         this.endpoint = window.siyuan.config.sync.s3?.endpoint;
         this.pathStyle = window.siyuan.config.sync.s3?.pathStyle;
         this.tls = !window.siyuan.config.sync.s3?.skipTlsVerify;
-        // console.log(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
+        // console.debug(this.region, this.accessKeyId, this.secretAccessKey, this.bucket);
     }
 
     async init(): Promise<void> {
@@ -143,7 +143,7 @@ export class ics_s3 {
             });
     
             await this.s3Client.send(command);
-            console.log(`ST_s3上传文件成功: ${key}`);
+            console.debug(`ST_s3上传文件成功: ${key}`);
         } catch (error) {
             console.error('ST_s3上传错误详情:', error);
             showMessage(`ST_s3上传文件失败: ${error.message}`, -1, 'error');

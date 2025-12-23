@@ -67,7 +67,7 @@ export default class steveTools extends Plugin {
             const moduleConfig = MODULE_CONFIG[moduleKey];
             if (data[moduleConfig.settingKey] === true) {
                 this.loadModule(moduleConfig.class, moduleConfig.name);
-                console.log(moduleConfig.logMessage);
+                console.debug(moduleConfig.logMessage);
             }
         });
     }
@@ -158,7 +158,7 @@ export default class steveTools extends Plugin {
                 enabledFeatures.push("aggregate");
             }
             const mergedFeatures = enabledFeatures.join("+");
-            console.log("功能:", mergedFeatures);
+            console.debug("功能:", mergedFeatures);
             await trackFeatureUsage(this.pluginConfig, mergedFeatures);
         } catch (error) {
             console.warn("统计失败:", error);
@@ -184,7 +184,7 @@ export default class steveTools extends Plugin {
             content: `<div id="SettingPanel" style="height: 100%;"></div>`,
             width: "900px",
             destroyCallback: (options) => {
-                console.log("destroyCallback", options);
+                console.debug("destroyCallback", options);
                 //You'd better destroy the component when the dialog is closed
                 pannel.$destroy();
             }
@@ -200,7 +200,7 @@ export default class steveTools extends Plugin {
     }
 
     uninstall() {
-        console.log("uninstall");
+        console.debug("uninstall");
         for (const moduleName in moduleInstances) {
             moduleInstances[moduleName]?.onunload?.();
         }

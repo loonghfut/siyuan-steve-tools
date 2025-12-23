@@ -54,7 +54,7 @@ export class Dida365ApiClient {
 
         // 检查缓存：如果请求体与上次相同，则直接返回缓存的响应数据
         if (cachedData && cachedData.requestBody === requestBody) {
-            console.log(`Task ${taskId} data has not changed. Returning cached response.`);
+            console.debug(`Task ${taskId} data has not changed. Returning cached response.`);
             return Promise.resolve(cachedData.response);
         }
 

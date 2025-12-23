@@ -16,7 +16,7 @@ export class WpsPicServ {
 
     async init(settingdata: any) {
         this.settingdata = settingdata;
-        // console.log("WpsPicServ initialized with settings:", this.settingdata);
+        // console.debug("WpsPicServ initialized with settings:", this.settingdata);
         this.plugin.eventBus.on("switch-protyle", (e) => {
             this.protyle = e.detail.protyle;
         });
@@ -68,7 +68,7 @@ export class WpsPicServ {
                     argv: { pic_data: base64, pic_name: file.name },
                 }
             });
-            console.log(result);
+            console.debug(result);
             if (result.result.startsWith("https")) {
                 if (this.protyle) {
                     appendBlock("markdown", `![${file.name}](${result.result})`, this.protyle.block.id);

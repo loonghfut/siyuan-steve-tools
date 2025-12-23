@@ -85,7 +85,7 @@ const isOverlayShape = (shape: any): shape is OverlayShape =>
 export const uiOverrides: TLUiOverrides = {
     tools(editor, tools) {
         // Create a tool item in the ui's context.
-        // console.log('tools', tools)
+        // console.debug('tools', tools)
         tools.card = {
             id: 'card',
             icon: 'color',
@@ -719,7 +719,7 @@ const CustomStylePanel = track(() => {
             try {
                 await navigator.clipboard.writeText(url);
                 showMessage('幻灯片链接已复制到剪贴板!'); // 简单反馈
-                console.log('Link copied:', url);
+                console.debug('Link copied:', url);
             } catch (err) {
                 console.error('无法复制链接: ', err);
                 showMessage('复制链接失败。', -1, "error");

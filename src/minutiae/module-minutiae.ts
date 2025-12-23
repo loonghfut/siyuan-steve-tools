@@ -13,7 +13,7 @@ export class M_Minutiae {
     }
 
     async init(settingdata: any) {
-        console.log("Minutiae 模块初始化");
+        console.debug("Minutiae 模块初始化");
         this.settingdata = settingdata;
         await this.ensureHeadImgService();
         await this.ensureBackgroundService();
@@ -27,7 +27,7 @@ export class M_Minutiae {
     }
 
     onunload() {
-        console.log("M_Minutiae unloaded");
+        console.debug("M_Minutiae unloaded");
         this.headImgServ?.destroy();
         this.headImgServ = undefined;
         this.backgroundServ?.destroy();
