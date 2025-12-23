@@ -176,6 +176,20 @@
             applyFilters(); // 重新应用过滤器刷新列表
             // 触发白板卡片栏/已打开画板实例更新
             triggerWhiteboardsRefresh('delete', file.name, file.drawingId);
+
+            // 为了应对 tldraw 的自动保存竞争问题，延迟 5 秒再尝试一次删除
+            // 如果自动保存在同时写回文件，第二次删除会把它彻底移除
+            setTimeout(async () => {
+                try {
+                    // 再次尝试删除（若文件已不存在则忽略错误）
+                    await api.removeFile(file.path);
+                    // 再次触发更新，确保所有打开的实例和列表都同步
+                    triggerWhiteboardsRefresh('delete', file.name, file.drawingId);
+                } catch (e) {
+                    // 如果第二次删除失败，记录日志但不打扰用户
+                    console.debug('延迟删除重试失败（可能已被移除）:', file.path, e);
+                }
+            }, 5000);
         } catch (error) {
             console.error(`删除文件 ${file.path} 失败:`, error);
             showMessage('删除数据文件失败', 5000, 'error');
