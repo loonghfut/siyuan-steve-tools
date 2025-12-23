@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import { showMessage, openTab, Plugin } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
+    import { whiteboardFilesUpdated } from './whiteboards.store';
 
     // 父层传入 plugin 以便打开白板
     export let plugin: Plugin;
@@ -492,6 +493,37 @@
     }
 
     $: initBatchObserver();
+
+    // 订阅白板文件更新事件（用于删除后自动刷新）
+    let unsubscribe: () => void;
+    $: {
+        if (!unsubscribe) {
+            unsubscribe = whiteboardFilesUpdated.subscribe(({ action, fileName, drawingId }) => {
+                if (action === 'delete') {
+                    const matchByFileName = (card: WhiteboardCard) => (fileName ? card.fileName !== fileName : true);
+                    const matchByDrawingId = (card: WhiteboardCard) => (drawingId ? card.id !== drawingId : true);
+
+                    // 删除对应的卡片条目（按 fileName / drawingId 任一匹配）
+                    allCards = allCards.filter(card => matchByFileName(card) && matchByDrawingId(card));
+                    allFileEntries = allFileEntries.filter(f => {
+                        if (fileName && f.name === fileName) return false;
+                        if (drawingId && (f as any).id === drawingId) return false;
+                        return true;
+                    });
+
+                    applyFilters();
+                } else if (action === 'refresh') {
+                    // 完全刷新
+                    loadWhiteboards();
+                }
+            });
+        }
+    }
+
+    // 清理订阅
+    onDestroy(() => {
+        if (unsubscribe) unsubscribe();
+    });
 </script>
 
 <div class="whiteboard-card-view">

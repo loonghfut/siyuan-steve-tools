@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { showMessage } from 'siyuan';
     import { api } from "@frostime/siyuan-plugin-kits";
+    import { triggerWhiteboardsRefresh } from './whiteboards.store';
 
     interface WhiteboardFile {
         name: string;       // 文件名 e.g., tldraw-data-2023...-xxxxxxx.json
@@ -173,6 +174,8 @@
             // 从列表中移除已删除的文件
             allWhiteboardFiles = allWhiteboardFiles.filter(f => f.path !== file.path);
             applyFilters(); // 重新应用过滤器刷新列表
+            // 触发白板卡片栏/已打开画板实例更新
+            triggerWhiteboardsRefresh('delete', file.name, file.drawingId);
         } catch (error) {
             console.error(`删除文件 ${file.path} 失败:`, error);
             showMessage('删除数据文件失败', 5000, 'error');

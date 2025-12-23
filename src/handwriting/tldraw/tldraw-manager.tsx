@@ -40,6 +40,7 @@ import { tldrawkey } from '@/../my/key';
 import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
 import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
+import { whiteboardFilesUpdated } from './whiteboards.store';
 const assetUrls = getAssetUrls({
     baseUrl: 'plugins/siyuan-steve-tools/asset/',
 })
@@ -85,6 +86,12 @@ export class TldrawManager {
     private applyingRemoteChanges = false;
     private title: string;
     private themeObserver: MutationObserver | null = null;
+    private _whiteboardDeleteUnsub: (() => void) | null = null;
+    private _autosaveUnsub: (() => void) | null = null;
+    private _realtimeUnsub: (() => void) | null = null;
+    private _broadcastChannel: BroadcastChannel | null = null;
+    private _destroying = false;
+    private _destroyed = false;
 
     constructor(id: string, container: HTMLElement, blockIds?: string[], title?: string) {
         this.id = id;
@@ -97,14 +104,40 @@ export class TldrawManager {
             bindingUtils: customBindingUtils,
         });
 
+        // 监听白板数据文件删除事件：若当前实例对应数据被删除，自动销毁实例
+        this.setupWhiteboardDeletionListener();
+
         // 初始化tldraw
         this.initialize();
+    }
+
+    private setupWhiteboardDeletionListener() {
+        if (this._whiteboardDeleteUnsub) return;
+        try {
+            this._whiteboardDeleteUnsub = whiteboardFilesUpdated.subscribe(({ action, fileName, drawingId }) => {
+                if (action !== 'delete') return;
+                // 事件中可能携带 fileName 或 drawingId，任一匹配即可
+                const expectedFileName = `${this.storageKey}.json`;
+                const hit = (drawingId && drawingId === this.id) || (fileName && fileName === expectedFileName);
+                if (!hit) return;
+
+                // 数据已被删除：不要再保存（否则会把文件写回去）
+                try {
+                    showMessage(`画板数据已删除，已自动销毁实例：${this.title}`, 4000, 'info');
+                } catch { /* ignore */ }
+
+                void this.destroy({ skipSave: true, reason: 'data-deleted' });
+            });
+        } catch (err) {
+            console.warn('Failed to setup whiteboard deletion listener', err);
+        }
     }
 
     /**
      * 初始化tldraw组件
      */
     private async initialize() {
+        if (this._destroyed) return;
         const root = document.createElement('div');
         root.style.width = '100%';
         root.style.height = '100%';
@@ -112,6 +145,7 @@ export class TldrawManager {
         try {
             // 加载之前保存的数据
             await this.loadData();
+            if (this._destroyed) return;
             // 原先每次初始化自动清理未被任何 shape 引用的 asset，改为手动触发以避免在初始化时误删
             // 只有在加载成功后才渲染
             console.log("加载数据成功，开始渲染Tldraw");
@@ -600,12 +634,13 @@ export class TldrawManager {
         // 创建一个专用于此TLDraw实例的广播频道
         const channelName = `tldraw-sync-${this.id}`;
         const broadcastChannel = new BroadcastChannel(channelName);
+        this._broadcastChannel = broadcastChannel;
 
         // 为识别消息源，生成一个唯一的会话ID
         const sessionId = Date.now().toString() + Math.random().toString(36).slice(2);
 
         // 监听本地变更并广播
-        this.store.listen(
+        this._realtimeUnsub = this.store.listen(
             (update) => {
                 // 如果当前正在应用远程更改，不广播以避免循环
                 if (this.applyingRemoteChanges) return;
@@ -834,7 +869,7 @@ export class TldrawManager {
         }, 3000); // 3秒节流
 
         // 监听存储变化
-        this.store.listen(throttledSave);
+        this._autosaveUnsub = this.store.listen(throttledSave);
     }
 
     private applyThemeToEditor() {
@@ -1082,9 +1117,18 @@ export class TldrawManager {
     /**
      * 销毁tldraw实例和清理资源
      */
-    public async destroy() {
-        // 销毁前保存当前状态
-        await this.saveData();
+    public async destroy(options?: { skipSave?: boolean; reason?: string }) {
+        if (this._destroyed || this._destroying) return;
+        this._destroying = true;
+
+        // 销毁前保存当前状态（数据文件已被删除时必须跳过，否则会被重新写回）
+        if (!options?.skipSave) {
+            try {
+                await this.saveData();
+            } catch (err) {
+                console.warn('destroy(): saveData failed', err);
+            }
+        }
 
         // 清理交互状态监听器
         try {
@@ -1096,6 +1140,32 @@ export class TldrawManager {
         } catch (err) {
             console.warn('清理交互状态监听器出错', err);
         }
+
+        // 取消订阅 store listeners / 广播频道
+        try {
+            if (this._autosaveUnsub) {
+                this._autosaveUnsub();
+                this._autosaveUnsub = null;
+            }
+        } catch { /* ignore */ }
+        try {
+            if (this._realtimeUnsub) {
+                this._realtimeUnsub();
+                this._realtimeUnsub = null;
+            }
+        } catch { /* ignore */ }
+        try {
+            if (this._broadcastChannel) {
+                this._broadcastChannel.close();
+                this._broadcastChannel = null;
+            }
+        } catch { /* ignore */ }
+        try {
+            if (this._whiteboardDeleteUnsub) {
+                this._whiteboardDeleteUnsub();
+                this._whiteboardDeleteUnsub = null;
+            }
+        } catch { /* ignore */ }
 
         // 清空容器
         this.container.innerHTML = '';
@@ -1126,6 +1196,29 @@ export class TldrawManager {
         }
 
         this.tldrawComponent = null;
+
+        // 如果是因为数据被删除而销毁，向用户展示说明而不是简单清空容器
+        if (options?.reason === 'data-deleted') {
+            try {
+                // 清空并展示说明文字
+                this.container.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:center;height:100%;padding:16px;box-sizing:border-box;">
+                        <div style="max-width:640px;text-align:center;color:var(--b3-theme-secondary);">
+                            <h3 style="margin:0 0 8px 0;color:var(--b3-theme-on-surface);">画板数据已被删除</h3>
+                            <div>此画板对应的数据文件已从存储中删除。已为您关闭画板实例以避免出现未定义行为。</div>
+                            <div style="margin-top:8px;font-size:0.85em;color:var(--b3-theme-secondary);">如果需要，可重新创建新画板或从回收站恢复备份文件。</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                try { this.container.innerHTML = ''; } catch { /* ignore */ }
+            }
+        } else {
+            try { this.container.innerHTML = ''; } catch { /* ignore */ }
+        }
+
+        this._destroyed = true;
+        this._destroying = false;
     }
 
     /**
