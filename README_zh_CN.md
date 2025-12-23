@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.31.0 (2025年12月22日)
+### v0.31.1 (2025年12月23日)
 - feat: 注释掉处理图片下载的逻辑，简化附件处理 (loonghfut)
 - feat: 添加生成链接卡片的功能，支持插入为卡片格式 (loonghfut)
 - feat: 更新依赖项 siyuan 至版本 1.1.6 (loonghfut)
@@ -83,6 +83,11 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加 tl-html-container 样式以优化渲染节点的最小高度 (loonghfut)
 - feat: 添加模块加载检查，防止重复加载已加载模块 (loonghfut)
 - feat: 更新版本号至0.31.0，并优化错误提示信息以指导用户使用高版本插件 (loonghfut)
+- docs: 更新 v0.31.0 版本的更新日志 (loonghfut)
+- feat: 添加白板文件更新机制，支持删除和刷新操作的自动通知 (loonghfut)
+- feat: 添加延迟删除机制以应对 tldraw 自动保存竞争问题 (loonghfut)
+- 优化日志输出 (loonghfut)
+- feat: 更新版本号至0.31.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
