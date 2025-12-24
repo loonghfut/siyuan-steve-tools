@@ -278,7 +278,7 @@ const MindMapBindingUI: React.FC<{
             doc: {
                 id: linkedBlockId,
                 action: ['cb-get-hl', 'cb-get-all'],
-                zoomIn: true,
+                zoomIn: false,
             },
             keepCursor: false,
         })
@@ -695,7 +695,7 @@ const CustomStylePanel = track(() => {
                 doc: {
                     id: blockId,
                     action: ['cb-get-hl', 'cb-get-all'],
-                    zoomIn: true,
+                    zoomIn: false,
                 },
                 // position: 'right',
                 keepCursor: false,
@@ -1922,7 +1922,7 @@ export const components: TLComponents = {
                     doc: {
                         id: blockId,
                         action: ['cb-get-hl', 'cb-get-all'],
-                        zoomIn: true,
+                        zoomIn: false,
                     },
                     position: 'right',
                     keepCursor: false,
