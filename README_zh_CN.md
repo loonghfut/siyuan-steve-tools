@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.31.1 (2025年12月23日)
+### v0.31.2 (2025年12月24日)
 - feat: 注释掉处理图片下载的逻辑，简化附件处理 (loonghfut)
 - feat: 添加生成链接卡片的功能，支持插入为卡片格式 (loonghfut)
 - feat: 更新依赖项 siyuan 至版本 1.1.6 (loonghfut)
@@ -88,6 +88,16 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加延迟删除机制以应对 tldraw 自动保存竞争问题 (loonghfut)
 - 优化日志输出 (loonghfut)
 - feat: 更新版本号至0.31.1 (loonghfut)
+- docs: 更新 v0.31.1 版本的更新日志 (loonghfut)
+- docs: 更新感谢名单 (loonghfut)
+- 删除无用代码 (loonghfut)
+- feat: 添加 cameraSlideFriction 选项以增强相机滑动效果 (loonghfut)
+- Refactor code structure for improved readability and maintainability (loonghfut)
+- feat: 在编辑器初始化时启用自动对齐模式 (loonghfut)
+- feat: 更新吸附模式设置，允许根据用户偏好配置 (loonghfut)
+- feat: 添加画布点击清除文本选区功能，并在销毁时移除监听器 (loonghfut)
+- feat: 修改 MindMapBindingUI 和 CustomStylePanel 中的 zoomIn 属性为 false (loonghfut)
+- feat: 更新插件版本至 0.31.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
