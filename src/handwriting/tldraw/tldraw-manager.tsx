@@ -332,7 +332,7 @@ export class TldrawManager {
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: false,
         maxFontsToLoadBeforeRender: 10,
-
+        cameraSlideFriction: 1,
     }
     /**
      * 渲染tldraw组件
