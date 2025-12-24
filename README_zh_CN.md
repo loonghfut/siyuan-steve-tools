@@ -98,6 +98,7 @@ win端s3同步后，docker端感知s3同步。
 - feat: 添加画布点击清除文本选区功能，并在销毁时移除监听器 (loonghfut)
 - feat: 修改 MindMapBindingUI 和 CustomStylePanel 中的 zoomIn 属性为 false (loonghfut)
 - feat: 更新插件版本至 0.31.2 (loonghfut)
+- docs: 更新 v0.31.2 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
