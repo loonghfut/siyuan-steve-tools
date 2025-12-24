@@ -4,7 +4,7 @@ import { CardShapeTool } from './CardShape/CardShapeTool'
 import { CardShapeUtil } from './CardShape/CardShapeUtil'
 import { SingleBlockShapeTool } from './SingleBlockShape/SingleBlockShapeTool'
 import { SingleBlockShapeUtil, SingleBlockBindingUtil } from './SingleBlockShape/SingleBlockShapeUtil'
-import { BezierConnectorShapeUtil, BezierConnectorBindingUtil, keepConnectorsAtBottom, PointingPort } from './BezierConnectorShape'
+import { BezierConnectorShapeUtil, BezierConnectorBindingUtil, PointingPort } from './BezierConnectorShape'
 import { components, uiOverrides } from './ui-overrides'
 import {
     Tldraw,
@@ -510,7 +510,7 @@ export class TldrawManager {
                              * - 否则，将 link 作为独立的行插入到内容末尾（在 IAL 之前）
                              */
                             // Use class-level helper to create updated content with link to avoid adding link inside IAL/attribute block
-                            const appendLinkToKramdown = this.appendLinkToKramdown.bind(this);
+                            // const appendLinkToKramdown = this.appendLinkToKramdown.bind(this);
                             console.debug("拖拽块的内容", content);
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
@@ -687,44 +687,44 @@ export class TldrawManager {
      * - 如果是 heading 类型（isHeading === true），将 link 插入到最后一行（heading 行）后面： `###### 标题 [🔗](...)`
      * - 否则，将 link 作为独立的行插入到内容末尾（在 IAL 之前）
      */
-    private appendLinkToKramdown(origContent: string, linkMarkdown: string, linkUrl: string, isHeading = false) {
-        if (!origContent) return linkMarkdown;
-        // 检查是否已有该链接
-        if (origContent.includes(linkUrl)) return origContent;
+    // private appendLinkToKramdown(origContent: string, linkMarkdown: string, linkUrl: string, isHeading = false) {
+    //     if (!origContent) return linkMarkdown;
+    //     // 检查是否已有该链接
+    //     if (origContent.includes(linkUrl)) return origContent;
 
-        // 尝试匹配结尾处的 IAL / attribute block：以换行 + '{:' 开头并以 '}' 结尾
-        const attrMatch = origContent.match(/(\n\{:\s*[\s\S]*?\}\s*)$/);
-        if (attrMatch) {
-            const attrs = attrMatch[1];
-            const before = origContent.slice(0, origContent.length - attrs.length);
-            if (isHeading) {
-                const lines = before.split('\n');
-                const lastLine = lines.pop() || '';
-                const newLastLine = `${lastLine}${lastLine.endsWith(' ') ? '' : ' '}${linkMarkdown}`;
-                lines.push(newLastLine);
-                return lines.join('\n') + attrs;
-            } else {
-                const trimmedBefore = before.replace(/[\s\n]+$/, '');
-                // 直接在内容后面加链接，不要加换行
-                const sep = trimmedBefore.endsWith(' ') ? '' : ' ';
-                return `${trimmedBefore}${sep}${linkMarkdown}${attrs}`;
-            }
-        } else {
-            // 没有 IAL
-            if (isHeading) {
-                const lines = origContent.split('\n');
-                const lastLine = lines.pop() || '';
-                const newLastLine = `${lastLine}${lastLine.endsWith(' ') ? '' : ' '}${linkMarkdown}`;
-                lines.push(newLastLine);
-                return lines.join('\n');
-            } else {
-                const trimmed = origContent.replace(/[\s\n]+$/, '');
-                // 直接在内容后面加链接，不要加换行
-                const sep = trimmed.endsWith(' ') ? '' : ' ';
-                return `${trimmed}${sep}${linkMarkdown}`;
-            }
-        }
-    }
+    //     // 尝试匹配结尾处的 IAL / attribute block：以换行 + '{:' 开头并以 '}' 结尾
+    //     const attrMatch = origContent.match(/(\n\{:\s*[\s\S]*?\}\s*)$/);
+    //     if (attrMatch) {
+    //         const attrs = attrMatch[1];
+    //         const before = origContent.slice(0, origContent.length - attrs.length);
+    //         if (isHeading) {
+    //             const lines = before.split('\n');
+    //             const lastLine = lines.pop() || '';
+    //             const newLastLine = `${lastLine}${lastLine.endsWith(' ') ? '' : ' '}${linkMarkdown}`;
+    //             lines.push(newLastLine);
+    //             return lines.join('\n') + attrs;
+    //         } else {
+    //             const trimmedBefore = before.replace(/[\s\n]+$/, '');
+    //             // 直接在内容后面加链接，不要加换行
+    //             const sep = trimmedBefore.endsWith(' ') ? '' : ' ';
+    //             return `${trimmedBefore}${sep}${linkMarkdown}${attrs}`;
+    //         }
+    //     } else {
+    //         // 没有 IAL
+    //         if (isHeading) {
+    //             const lines = origContent.split('\n');
+    //             const lastLine = lines.pop() || '';
+    //             const newLastLine = `${lastLine}${lastLine.endsWith(' ') ? '' : ' '}${linkMarkdown}`;
+    //             lines.push(newLastLine);
+    //             return lines.join('\n');
+    //         } else {
+    //             const trimmed = origContent.replace(/[\s\n]+$/, '');
+    //             // 直接在内容后面加链接，不要加换行
+    //             const sep = trimmed.endsWith(' ') ? '' : ' ';
+    //             return `${trimmed}${sep}${linkMarkdown}`;
+    //         }
+    //     }
+    // }
     
     /**
      * 设置交互状态监听器
