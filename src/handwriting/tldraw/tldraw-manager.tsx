@@ -330,7 +330,7 @@ export class TldrawManager {
 
 
     private options: Partial<TldrawOptions> = {
-        createTextOnCanvasDoubleClick: false,
+        createTextOnCanvasDoubleClick: settingdata['enableDoubleClickCreateSingleBlock'] ? false : true,
         maxFontsToLoadBeforeRender: 10,
         cameraSlideFriction: 1,
     }
