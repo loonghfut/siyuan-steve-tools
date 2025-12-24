@@ -88,11 +88,9 @@ Changelog:
 For more details see the commit history: https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/
 
 Thanks to:
-- wilsons: guidance on implementing .ics calendar generation
 - Frostime: plugin template and development toolkit
 - seanduo: PR contributor
 - BoysFight: PR contributor for lifelog feature
-- Achuan-2: provided kanban examples
 
 Disclaimer:
 - This plugin may risk data loss (documented in the plugin description). Test before use. The author is not responsible for any consequences from usage.

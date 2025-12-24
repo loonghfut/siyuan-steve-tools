@@ -93,11 +93,9 @@ win端s3同步后，docker端感知s3同步。
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
 
 #### 感谢：
-- [wilsons](https://ld246.com/member/wilsons)：开发`生成日历文件ics功能`指导
 - [Frostime](https://ld246.com/member/Frostime): 提供插件开发模板和开发工具包
 - [seanduo](https://github.com/seanduo)：PR
 - [BoysFight](https://github.com/BoysFight)：PR lifelog功能
-- [Achuan-2](https://ld246.com/member/Achuan-2)：提供看板示例参考
 - [空幽]()： `the first ` `the most` 打赏支持
 
 ~~##### 收费预告：仅仅在插件介绍页感谢打赏用户是不够的，为使之前打赏的用户不虚此心，减少我的精力损耗，后续会开始收费，之前用户无论打赏多少，都可一直享受免费使用权（只需提供之前的打赏证明即可）。~~  
