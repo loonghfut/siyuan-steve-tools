@@ -6,6 +6,9 @@ export const handwritingDefaults: Record<string, any> = {
     "isGridMode": false,
     // 是否显示card形状边框
     "showCardBorder": true,
+    // 是否始终吸附
+    "isSnapMode": true,
+    // 复制链接时是否包含标题
     "copyLinkTitle": true,
     // 画板引用链接协议：https://plugins/... 或 siyuan://plugins/...
     "tldraw-link-scheme": "https",
@@ -35,6 +38,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "启用双击创建单块", description: "启用后双击画板空白处将创建单块", key: "enableDoubleClickCreateSingleBlock", value: ctx.settings["enableDoubleClickCreateSingleBlock"] },
                 { type: "checkbox", title: "显示 Card 形状边框", description: "启用后 Card 形状将显示边框", key: "showCardBorder", value: ctx.settings["showCardBorder"] },
                 { type: "checkbox", title: "启用画板网格背景", description: "默认开启网格", key: "isGridMode", value: ctx.settings["isGridMode"] },
+                { type: "checkbox", title: "启用形状吸附模式", description: "启用后形状将自动吸附到网格", key: "isSnapMode", value: ctx.settings["isSnapMode"] },
                 { type: "checkbox", title: "复制链接标题", description: "复制链接时包含标题", key: "copyLinkTitle", value: ctx.settings["copyLinkTitle"] },
                 { type: "select", title: "画板链接协议", description: "选择写入块内容的画板引用链接使用 https 还是 siyuan 协议", key: "tldraw-link-scheme", value: ctx.settings["tldraw-link-scheme"], options: { "https": "https://plugins/...", "siyuan": "siyuan://plugins/..." } },
                 { type: "select", title: "工具栏方向", description: "选择工具栏是垂直显示还是水平显示", key: "tldraw-toolbar-orientation", value: ctx.settings["tldraw-toolbar-orientation"], options: { "vertical": "垂直", "horizontal": "水平" } },
