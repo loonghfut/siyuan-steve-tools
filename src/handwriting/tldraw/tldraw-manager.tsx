@@ -460,6 +460,31 @@ export class TldrawManager {
                         // 设置交互状态监听，用于优化拖动时的性能
                         // 在拖动、缩放画布时暂停内容加载和渲染
                         this.setupInteractionStateListener(editor);
+
+                        // 点击画布背景时清除页面文本选区，避免残留选区影响后续操作
+                        try {
+                            const editorContainer = editor.getContainer();
+                            const canvasClickHandler = (ev: MouseEvent) => {
+                                try {
+                                    const target = ev.target as HTMLElement | null;
+                                    if (!target) return;
+                                    // 如果点击在可编辑区域或 protyle 内容内，则忽略
+                                    if (target.closest('.protyle-wysiwyg') || target.closest('[contenteditable="true"]')) return;
+                                    if (window.getSelection) {
+                                        const sel = window.getSelection();
+                                        if (sel && !sel.isCollapsed) sel.removeAllRanges();
+                                    }
+                                    if (document.activeElement instanceof HTMLElement) {
+                                        try { (document.activeElement as HTMLElement).blur(); } catch { }
+                                    }
+                                } catch { }
+                            };
+                            // store handler reference for cleanup
+                            (this as any)._canvasClickHandler = canvasClickHandler;
+                            editorContainer.addEventListener('click', canvasClickHandler);
+                        } catch (err) {
+                            console.warn('注册画布点击清除选区监听器失败', err);
+                        }
                         
                         // 添加全局拖放事件监听
                         const container = editor.getContainer();
@@ -1184,6 +1209,20 @@ export class TldrawManager {
             try { (window as any).__st_dragNodeId = null; } catch (e) { }
         } catch (err) {
             console.warn('移除 drag 监听器出错', err);
+        }
+
+        // 移除画布点击清除选区监听器
+        try {
+            const handler = (this as any)._canvasClickHandler as ((ev: MouseEvent) => void) | undefined;
+            if (handler && this.editor) {
+                try {
+                    const container = this.editor.getContainer();
+                    container.removeEventListener('click', handler);
+                } catch (e) { /* ignore */ }
+            }
+            (this as any)._canvasClickHandler = null;
+        } catch (err) {
+            console.warn('移除画布点击清除选区监听器失败', err);
         }
 
         if (this.themeObserver) {
