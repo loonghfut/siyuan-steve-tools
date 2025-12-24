@@ -366,6 +366,7 @@ export class TldrawManager {
                     embeds={allEmbeds}
                     onMount={(editor) => {
                         this.editor = editor;
+                        editor.user.updateUserPreferences({ isSnapMode: true })
                         this.applyThemeToEditor();
                         this.setupThemeObserver();
                         // 设置自动保存功能
