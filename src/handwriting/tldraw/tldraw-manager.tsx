@@ -92,6 +92,8 @@ export class TldrawManager {
     private _broadcastChannel: BroadcastChannel | null = null;
     private _destroying = false;
     private _destroyed = false;
+    private _mouseDownPos: { x: number; y: number } | null = null;
+    private _isDragging = false;
 
     constructor(id: string, container: HTMLElement, blockIds?: string[], title?: string) {
         this.id = id;
@@ -464,11 +466,36 @@ export class TldrawManager {
                         // 点击画布背景时清除页面文本选区，避免残留选区影响后续操作
                         try {
                             const editorContainer = editor.getContainer();
+                            
+                            const mouseDownHandler = (ev: MouseEvent) => {
+                                this._mouseDownPos = { x: ev.clientX, y: ev.clientY };
+                                this._isDragging = false;
+                            };
+                            
+                            const mouseMoveHandler = (ev: MouseEvent) => {
+                                if (this._isDragging || !this._mouseDownPos) return;
+                                
+                                const dx = ev.clientX - this._mouseDownPos.x;
+                                const dy = ev.clientY - this._mouseDownPos.y;
+                                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                                    this._isDragging = true;
+                                }
+                            };
+                            
+                            const mouseUpHandler = () => {
+                                this._mouseDownPos = null;
+                                setTimeout(() => {
+                                    this._isDragging = false;
+                                }, 50);
+                            };
+                            
                             const canvasClickHandler = (ev: MouseEvent) => {
                                 try {
                                     const target = ev.target as HTMLElement | null;
                                     if (!target) return;
-                                    // 如果点击在可编辑区域或 protyle 内容内，则忽略
+                                    
+                                    if (this._isDragging) return;
+                                    
                                     if (target.closest('.protyle-wysiwyg') || target.closest('[contenteditable="true"]')) return;
                                     if (window.getSelection) {
                                         const sel = window.getSelection();
@@ -479,8 +506,15 @@ export class TldrawManager {
                                     }
                                 } catch { }
                             };
-                            // store handler reference for cleanup
+                            
+                            (this as any)._canvasMouseDownHandler = mouseDownHandler;
+                            (this as any)._canvasMouseMoveHandler = mouseMoveHandler;
+                            (this as any)._canvasMouseUpHandler = mouseUpHandler;
                             (this as any)._canvasClickHandler = canvasClickHandler;
+                            
+                            editorContainer.addEventListener('mousedown', mouseDownHandler);
+                            editorContainer.addEventListener('mousemove', mouseMoveHandler);
+                            editorContainer.addEventListener('mouseup', mouseUpHandler);
                             editorContainer.addEventListener('click', canvasClickHandler);
                         } catch (err) {
                             console.warn('注册画布点击清除选区监听器失败', err);
@@ -1213,14 +1247,32 @@ export class TldrawManager {
 
         // 移除画布点击清除选区监听器
         try {
-            const handler = (this as any)._canvasClickHandler as ((ev: MouseEvent) => void) | undefined;
-            if (handler && this.editor) {
+            const clickHandler = (this as any)._canvasClickHandler as ((ev: MouseEvent) => void) | undefined;
+            const mouseDownHandler = (this as any)._canvasMouseDownHandler as ((ev: MouseEvent) => void) | undefined;
+            const mouseMoveHandler = (this as any)._canvasMouseMoveHandler as ((ev: MouseEvent) => void) | undefined;
+            const mouseUpHandler = (this as any)._canvasMouseUpHandler as (() => void) | undefined;
+            
+            if (this.editor) {
                 try {
                     const container = this.editor.getContainer();
-                    container.removeEventListener('click', handler);
+                    if (clickHandler) {
+                        container.removeEventListener('click', clickHandler);
+                    }
+                    if (mouseDownHandler) {
+                        container.removeEventListener('mousedown', mouseDownHandler);
+                    }
+                    if (mouseMoveHandler) {
+                        container.removeEventListener('mousemove', mouseMoveHandler);
+                    }
+                    if (mouseUpHandler) {
+                        container.removeEventListener('mouseup', mouseUpHandler);
+                    }
                 } catch (e) { /* ignore */ }
             }
             (this as any)._canvasClickHandler = null;
+            (this as any)._canvasMouseDownHandler = null;
+            (this as any)._canvasMouseMoveHandler = null;
+            (this as any)._canvasMouseUpHandler = null;
         } catch (err) {
             console.warn('移除画布点击清除选区监听器失败', err);
         }
