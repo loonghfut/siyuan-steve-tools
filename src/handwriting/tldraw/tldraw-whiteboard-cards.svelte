@@ -524,6 +524,26 @@
     onDestroy(() => {
         if (unsubscribe) unsubscribe();
     });
+
+    // 打开高级管理 Tab
+    async function openManagerTab() {
+        try {
+            await openTab({
+                app: plugin.app,
+                custom: {
+                    id: plugin.name + "steveTool-whiteboard-manager",
+                    title: "白板高级管理",
+                    icon: "iconSettings",
+                    data: {
+                        text: "steveTool-whiteboard-manager",
+                    },
+                },
+            });
+        } catch (e) {
+            console.error('打开白板管理 Tab 失败:', e);
+            showMessage('打开白板管理失败', 3000, 'error');
+        }
+    }
 </script>
 
 <div class="whiteboard-card-view">
@@ -587,6 +607,16 @@
               on:click={() => showOnlyValid = !showOnlyValid}
               on:keydown={(e)=>{ if(e.key==='Enter') showOnlyValid = !showOnlyValid; }}>
             <svg><use xlink:href="#iconEye{showOnlyValid ? 'off' : ''}"></use></svg>
+        </span>
+        <span class="fn__space"></span>
+        <span data-type="open-manager" 
+              class="block__icon b3-tooltips b3-tooltips__sw"
+              aria-label="打开高级管理"
+              role="button"
+              tabindex="0"
+              on:click={openManagerTab}
+              on:keydown={(e)=>{ if(e.key==='Enter') openManagerTab(); }}>
+            <svg><use xlink:href="#iconSettings"></use></svg>
         </span>
     </div>
 

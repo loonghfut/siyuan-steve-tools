@@ -4,6 +4,7 @@ import { openTab, Plugin, showMessage } from "siyuan";
 import { TldrawManager } from './tldraw/tldraw-manager';
 // 替换为新的卡片视图组件
 import TldrawWhiteboardCards from './tldraw/tldraw-whiteboard-cards.svelte';
+import TldrawWhiteboardManager from './tldraw/tldraw-whiteboard-manager.svelte';
 import { addWhiteboardButton } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
@@ -243,6 +244,42 @@ export class M_handwriting {
                 }
             }
         })
+
+        // 注册白板管理 Tab
+        const managerPlugin = this.plugin;
+        this.plugin.addTab({
+            type: "steveTool-whiteboard-manager",
+            async init() {
+                console.debug("初始化白板管理选项卡");
+                try {
+                    this.element.innerHTML = '';
+                    const root = document.createElement('div');
+                    root.className = 'steve-handwriting-manager-root';
+                    root.style.width = '100%';
+                    root.style.height = '100%';
+                    this.element.appendChild(root);
+                    // @ts-ignore
+                    (this.element as any).__svelteComponent = new TldrawWhiteboardManager({ 
+                        target: root, 
+                        props: { plugin: managerPlugin } 
+                    });
+                } catch (err) {
+                    console.error('挂载白板管理组件失败:', err);
+                }
+            },
+            async destroy() {
+                console.debug("销毁白板管理选项卡");
+                try {
+                    const component = (this.element as any).__svelteComponent;
+                    if (component && typeof component.$destroy === 'function') {
+                        component.$destroy();
+                    }
+                } catch (e) {
+                    console.warn('销毁白板管理组件时出错:', e);
+                }
+            }
+        })
+
         // 添加顶栏按钮
         // this.plugin.addTopBar({
         //     icon: "iconSTWhiteboard",

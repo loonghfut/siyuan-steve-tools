@@ -28,6 +28,7 @@ import { captureSlideScreenshot, CaptureSlideScreenshotOptions, CaptureSlideScre
 import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage, Dialog } from 'siyuan';
+import { backupWhiteboardData } from './backup-utils';
 import TldrawBackupManager from './tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
 import { JsShapeUtil } from './JsShape/JsShapeUtil';
@@ -1098,26 +1099,22 @@ export class TldrawManager {
     }
     private async backupToTrash(reason: string = '自动备份'): Promise<string> {
         try {
-            // 确保回收站目录存在
-            try {
-                await api.putFile(`/data/storage/petal/sttools/trash/.gitkeep`, false, new Blob([''], { type: 'text/plain' }));
-            } catch (err) {
-                // 目录可能已存在，忽略错误
-            }
-
             // 获取当前数据
             const snapshot = getSnapshot(this.store);
             const jsonData = JSON.stringify(snapshot);
             console.debug('备份数据:', jsonData);
 
-            // 生成备份文件名
-            const trashFileName = `${this.storageKey}-${reason}-${Date.now()}.json`;
+            // 使用通用备份工具
+            const result = await backupWhiteboardData(this.storageKey, jsonData, {
+                reason,
+                includeTimestamp: true,
+            });
 
-            // 将数据写入回收站
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, blob);
+            if (!result.success) {
+                throw new Error(result.error || '备份失败');
+            }
 
-            return trashFileName;
+            return result.fileName!;
         } catch (err) {
             console.error('备份数据到回收站失败:', err);
             throw err;
