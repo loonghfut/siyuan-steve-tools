@@ -788,18 +788,22 @@
     {#if contextMenu.visible && contextMenu.item}
         <div
             class="whiteboard-context-menu"
+            role="menu"
+            aria-label="白板菜单"
+            tabindex="0"
             style={`left:${contextMenu.x}px;top:${contextMenu.y}px;`}
-            on:click={(event) => event.stopPropagation()}>
-            <button type="button" on:click={() => handleMenuAction('board')}>
+            on:click={(event) => event.stopPropagation()}
+            on:keydown={(event) => event.stopPropagation()}>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('board')}>
                 打开白板
             </button>
-            <button type="button" on:click={() => handleMenuAction('doc')} disabled={!contextMenu.item.docId}>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('doc')} disabled={!contextMenu.item.docId}>
                 跳转文档
             </button>
-            <button type="button" on:click={() => handleMenuAction('backup')}>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('backup')}>
                 备份
             </button>
-            <button type="button" class="danger" on:click={() => handleMenuAction('delete')}>
+            <button type="button" role="menuitem" class="danger" on:click={() => handleMenuAction('delete')}>
                 删除
             </button>
         </div>
@@ -1033,6 +1037,7 @@
     text-align: left;
     font-size: 13px;
     cursor: pointer;
+    color: var(--b3-theme-on-background);
 }
 
 .whiteboard-context-menu button:hover {
