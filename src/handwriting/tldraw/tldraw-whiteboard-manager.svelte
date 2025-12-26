@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy, tick } from 'svelte';
+    import { onMount, onDestroy} from 'svelte';
     import { showMessage, openTab, Plugin, confirm } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
     import { whiteboardFilesUpdated } from './whiteboards.store';
@@ -22,7 +22,6 @@
         docId?: string;
         mtime: number;
         tags: string[];
-        selected: boolean;
         loadingPreview: boolean;
         shapes: PreviewShape[];
         previewError?: string;
@@ -40,11 +39,7 @@
         item: WhiteboardItem | null;
     }
 
-    interface TagEditorState {
-        itemId: string;
-        mode: 'edit' | 'add';
-        index: number;
-    }
+    
 
     let allItems: WhiteboardItem[] = [];
     let filteredItems: WhiteboardItem[] = [];
@@ -56,23 +51,14 @@
     let sortKey: 'blkUpdated-desc' | 'blkUpdated-asc' | 'blkCreated-desc' | 'blkCreated-asc' | 'title' | 'id' = 'blkUpdated-desc';
     let groupByTag = false;
 
-    let selectedCount = 0;
-    let isSelectMode = false;
-
     let availableTags: string[] = [];
     let selectedTagFilter = '';
-    let showTagManager = false;
-    let newTag = '';
 
     let contextMenu: ContextMenuState = { visible: false, x: 0, y: 0, item: null };
-    let tagEditor: TagEditorState | null = null;
-    let tagEditorValue = '';
-    let tagEditorInput: HTMLInputElement | null = null;
 
     let observer: IntersectionObserver;
     let unsubscribe: () => void;
 
-    $: selectedCount = allItems.filter(item => item.selected).length;
     $: {
         searchQuery;
         showOnlyValid;
@@ -140,7 +126,6 @@
                     docId: undefined,
                     mtime: parseSyTimestamp(file.mtime),
                     tags: [],
-                    selected: false,
                     loadingPreview: false,
                     shapes: [],
                     previewError: undefined,
@@ -328,24 +313,7 @@
         }
     }
 
-    function toggleSelectMode() {
-        isSelectMode = !isSelectMode;
-        if (!isSelectMode) {
-            allItems.forEach(item => (item.selected = false));
-            allItems = allItems;
-        }
-    }
-
-    function selectAll() {
-        const allSelected = filteredItems.every(item => item.selected);
-        filteredItems.forEach(item => (item.selected = !allSelected));
-        allItems = allItems;
-    }
-
-    function toggleItemSelection(item: WhiteboardItem) {
-        item.selected = !item.selected;
-        allItems = allItems;
-    }
+    // 多选相关逻辑已移除
 
     function confirmDelete(items: WhiteboardItem[]) {
         if (items.length === 0) return;
@@ -385,14 +353,7 @@
         );
     }
 
-    async function deleteSelected() {
-        const selected = allItems.filter(item => item.selected);
-        if (selected.length === 0) {
-            showMessage('请先选择要删除的白板', 3000, 'info');
-            return;
-        }
-        confirmDelete(selected);
-    }
+    // 批量删除已移除，保留单项删除（右键菜单）
 
     async function backupItems(items: WhiteboardItem[]) {
         if (items.length === 0) return;
@@ -419,156 +380,9 @@
         }
     }
 
-    async function backupSelected() {
-        const selected = allItems.filter(item => item.selected);
-        if (selected.length === 0) {
-            showMessage('请先选择要备份的白板', 3000, 'info');
-            return;
-        }
-        await backupItems(selected);
-    }
+    // 批量备份已移除，保留单项备份（右键菜单）
 
-    async function addTagToSelected() {
-        if (!newTag.trim()) {
-            showMessage('请输入标签名称', 2000, 'info');
-            return;
-        }
-
-        const selected = allItems.filter(item => item.selected && item.exists);
-        if (selected.length === 0) {
-            showMessage('请先选择有效的白板', 3000, 'info');
-            return;
-        }
-
-        const tag = newTag.trim();
-        let successCount = 0;
-
-        for (const item of selected) {
-            const nextTags = item.tags.includes(tag) ? item.tags : [...item.tags, tag];
-            const saved = await persistTags(item, nextTags);
-            if (saved) successCount++;
-        }
-
-        showMessage(`成功为 ${successCount}/${selected.length} 个白板添加标签`, 3000, 'info');
-        newTag = '';
-        collectAvailableTags();
-        allItems = allItems;
-    }
-
-    async function removeTagFromSelected(tag: string) {
-        const selected = allItems.filter(item => item.selected && item.exists && item.tags.includes(tag));
-        if (selected.length === 0) {
-            showMessage('没有选中包含该标签的白板', 3000, 'info');
-            return;
-        }
-
-        let successCount = 0;
-        for (const item of selected) {
-            const nextTags = item.tags.filter(t => t !== tag);
-            const saved = await persistTags(item, nextTags);
-            if (saved) successCount++;
-        }
-
-        showMessage(`成功从 ${successCount}/${selected.length} 个白板移除标签`, 3000, 'info');
-        collectAvailableTags();
-        allItems = allItems;
-    }
-
-    async function persistTags(item: WhiteboardItem, tags: string[]): Promise<boolean> {
-        try {
-            const tagString = tags.map(t => `#${t}#`).join('');
-            await fetch('/api/attr/setBlockAttrs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: item.id,
-                    attrs: { tags: tagString },
-                }),
-            });
-
-            item.tags = tags;
-            return true;
-        } catch (e) {
-            console.error(`更新 ${item.id} 标签失败:`, e);
-            showMessage('更新标签失败', 2000, 'error');
-            return false;
-        }
-    }
-
-    function isEditingTag(itemId: string, index: number) {
-        return !!tagEditor && tagEditor.itemId === itemId && tagEditor.mode === 'edit' && tagEditor.index === index;
-    }
-
-    function isAddingTag(itemId: string) {
-        return !!tagEditor && tagEditor.itemId === itemId && tagEditor.mode === 'add';
-    }
-
-    async function startTagEdit(event: MouseEvent, item: WhiteboardItem, index: number) {
-        event.stopPropagation();
-        tagEditor = { itemId: item.id, mode: 'edit', index };
-        tagEditorValue = item.tags[index] || '';
-        await tick();
-        tagEditorInput?.focus();
-        tagEditorInput?.select();
-    }
-
-    async function startTagAdd(event: MouseEvent, item: WhiteboardItem) {
-        event.stopPropagation();
-        tagEditor = { itemId: item.id, mode: 'add', index: item.tags.length };
-        tagEditorValue = '';
-        await tick();
-        tagEditorInput?.focus();
-    }
-
-    async function commitTagEditor() {
-        if (!tagEditor) return;
-        const target = allItems.find(item => item.id === tagEditor.itemId);
-        if (!target) {
-            cancelTagEditor();
-            return;
-        }
-
-        const value = tagEditorValue.trim();
-        let nextTags = [...target.tags];
-
-        if (tagEditor.mode === 'edit') {
-            if (!value) {
-                nextTags.splice(tagEditor.index, 1);
-            } else {
-                nextTags[tagEditor.index] = value;
-            }
-        } else {
-            if (!value) {
-                showMessage('标签不能为空', 2000, 'info');
-                return;
-            }
-            if (!nextTags.includes(value)) {
-                nextTags.push(value);
-            }
-        }
-
-        const saved = await persistTags(target, nextTags);
-        if (saved) {
-            collectAvailableTags();
-            allItems = allItems;
-            cancelTagEditor();
-        }
-    }
-
-    function cancelTagEditor() {
-        tagEditor = null;
-        tagEditorValue = '';
-    }
-
-    function handleTagEditorKeydown(event: KeyboardEvent) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            void commitTagEditor();
-        } else if (event.key === 'Escape') {
-            event.preventDefault();
-            cancelTagEditor();
-        }
-    }
+    // 标签编辑、批量添加/移除与多选相关逻辑已移除
 
     function handleContextMenu(event: MouseEvent, item: WhiteboardItem) {
         event.preventDefault();
@@ -815,16 +629,7 @@
         </button>
         <span class="fn__space"></span>
 
-        <button
-            type="button"
-            class="block__icon"
-            class:block__icon--active={isSelectMode}
-            title="多选模式"
-            aria-pressed={isSelectMode}
-            on:click={toggleSelectMode}>
-            <svg><use xlink:href="#iconSelect"></use></svg>
-        </button>
-        <span class="fn__space"></span>
+        
 
         <button
             type="button"
@@ -835,51 +640,7 @@
         </button>
     </div>
 
-    {#if isSelectMode && selectedCount > 0}
-        <div class="batch-actions">
-            <span class="selected-info">已选择 {selectedCount} 项</span>
-            <span class="fn__flex-1"></span>
-            <button class="b3-button b3-button--text" on:click={selectAll}>
-                {filteredItems.every(i => i.selected) ? '取消全选' : '全选'}
-            </button>
-            <button class="b3-button b3-button--text" on:click={() => showTagManager = !showTagManager}>
-                标签管理
-            </button>
-            <button class="b3-button b3-button--text" on:click={backupSelected}>
-                备份
-            </button>
-            <button class="b3-button b3-button--error" on:click={deleteSelected}>
-                删除
-            </button>
-        </div>
-
-        {#if showTagManager}
-            <div class="tag-manager">
-                <div class="tag-input-group">
-                    <input
-                        class="b3-text-field"
-                        type="text"
-                        placeholder="输入新标签名..."
-                        bind:value={newTag}
-                        on:keydown={(e) => e.key === 'Enter' && addTagToSelected()} />
-                    <button class="b3-button b3-button--primary" on:click={addTagToSelected}>
-                        添加标签
-                    </button>
-                </div>
-                {#if availableTags.length > 0}
-                    <div class="tag-list">
-                        <span class="tag-list-label">已有标签：</span>
-                        {#each availableTags as tag}
-                            <span class="tag-chip">
-                                {tag}
-                                <span class="tag-remove" on:click={() => removeTagFromSelected(tag)}>×</span>
-                            </span>
-                        {/each}
-                    </div>
-                {/if}
-            </div>
-        {/if}
-    {/if}
+    
 
     {#if loading}
         <div class="loading">加载中...</div>
@@ -898,17 +659,9 @@
                             {#each group.items as item (item.id + group.name)}
                                 <article
                                     class="whiteboard-card"
-                                    class:selected={item.selected}
                                     class:invalid={!item.exists}
                                     on:contextmenu={(event) => handleContextMenu(event, item)}>
-                                    {#if isSelectMode}
-                                        <label class="card-select">
-                                            <input
-                                                type="checkbox"
-                                                checked={item.selected}
-                                                on:change={() => toggleItemSelection(item)} />
-                                        </label>
-                                    {/if}
+                                    
                                     <div class="card-preview" use:setupObserver={item}>
                                         <button class="preview-hit" type="button" on:click={() => openWhiteboard(item)}>
                                             {#if item.previewError}
@@ -947,43 +700,12 @@
                                         <div class="card-meta" title={item.fileName}>{item.fileName}</div>
                                         <div class="card-meta muted">{formatTime(getLatestUpdate(item))}</div>
                                         <div class="card-tags">
-                                            {#if item.tags.length === 0 && !isAddingTag(item.id)}
+                                            {#if item.tags.length === 0}
                                                 <span class="tag-empty">无标签</span>
                                             {/if}
-                                            {#each item.tags as tag, index}
-                                                {#if isEditingTag(item.id, index)}
-                                                    <input
-                                                        class="tag-input"
-                                                        bind:this={tagEditorInput}
-                                                        bind:value={tagEditorValue}
-                                                        on:keydown={handleTagEditorKeydown}
-                                                        on:blur={commitTagEditor}
-                                                        placeholder="编辑标签" />
-                                                {:else}
-                                                    <button
-                                                        type="button"
-                                                        class="tag-pill"
-                                                        on:click={(event) => startTagEdit(event, item, index)}>
-                                                        {tag}
-                                                    </button>
-                                                {/if}
+                                            {#each item.tags as tag}
+                                                <span class="tag-pill">{tag}</span>
                                             {/each}
-                                            {#if isAddingTag(item.id)}
-                                                <input
-                                                    class="tag-input"
-                                                    bind:this={tagEditorInput}
-                                                    bind:value={tagEditorValue}
-                                                    on:keydown={handleTagEditorKeydown}
-                                                    on:blur={commitTagEditor}
-                                                    placeholder="输入新标签" />
-                                            {:else}
-                                                <button
-                                                    class="tag-pill tag-pill--add"
-                                                    type="button"
-                                                    on:click={(event) => startTagAdd(event, item)}>
-                                                    + 标签
-                                                </button>
-                                            {/if}
                                         </div>
                                     </div>
                                 </article>
@@ -996,17 +718,8 @@
                     {#each galleryItems as item (item.id)}
                         <article
                             class="whiteboard-card"
-                            class:selected={item.selected}
                             class:invalid={!item.exists}
                             on:contextmenu={(event) => handleContextMenu(event, item)}>
-                            {#if isSelectMode}
-                                <label class="card-select">
-                                    <input
-                                        type="checkbox"
-                                        checked={item.selected}
-                                        on:change={() => toggleItemSelection(item)} />
-                                </label>
-                            {/if}
                             <div class="card-preview" use:setupObserver={item}>
                                 <button class="preview-hit" type="button" on:click={() => openWhiteboard(item)}>
                                     {#if item.previewError}
@@ -1045,43 +758,12 @@
                                 <div class="card-meta" title={item.fileName}>{item.fileName}</div>
                                 <div class="card-meta muted">{formatTime(getLatestUpdate(item))}</div>
                                 <div class="card-tags">
-                                    {#if item.tags.length === 0 && !isAddingTag(item.id)}
+                                    {#if item.tags.length === 0}
                                         <span class="tag-empty">无标签</span>
                                     {/if}
-                                    {#each item.tags as tag, index}
-                                        {#if isEditingTag(item.id, index)}
-                                            <input
-                                                class="tag-input"
-                                                bind:this={tagEditorInput}
-                                                bind:value={tagEditorValue}
-                                                on:keydown={handleTagEditorKeydown}
-                                                on:blur={commitTagEditor}
-                                                placeholder="编辑标签" />
-                                        {:else}
-                                            <button
-                                                type="button"
-                                                class="tag-pill"
-                                                on:click={(event) => startTagEdit(event, item, index)}>
-                                                {tag}
-                                            </button>
-                                        {/if}
+                                    {#each item.tags as tag}
+                                        <span class="tag-pill">{tag}</span>
                                     {/each}
-                                    {#if isAddingTag(item.id)}
-                                        <input
-                                            class="tag-input"
-                                            bind:this={tagEditorInput}
-                                            bind:value={tagEditorValue}
-                                            on:keydown={handleTagEditorKeydown}
-                                            on:blur={commitTagEditor}
-                                            placeholder="输入新标签" />
-                                    {:else}
-                                        <button
-                                            class="tag-pill tag-pill--add"
-                                            type="button"
-                                            on:click={(event) => startTagAdd(event, item)}>
-                                            + 标签
-                                        </button>
-                                    {/if}
                                 </div>
                             </div>
                         </article>
@@ -1159,70 +841,6 @@
     padding: 4px 8px;
 }
 
-.batch-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    background: var(--b3-theme-primary-lightest);
-    border-bottom: 1px solid var(--b3-border-color);
-}
-
-.selected-info {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--b3-theme-primary);
-}
-
-.tag-manager {
-    padding: 12px;
-    background: var(--b3-theme-surface-lighter);
-    border-bottom: 1px solid var(--b3-border-color);
-}
-
-.tag-input-group {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.tag-input-group input {
-    flex: 1;
-}
-
-.tag-list {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.tag-list-label {
-    font-size: 12px;
-    color: var(--b3-theme-on-surface);
-}
-
-.tag-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    background: var(--b3-theme-primary-light);
-    border-radius: 12px;
-    font-size: 12px;
-    color: var(--b3-theme-primary);
-}
-
-.tag-remove {
-    cursor: pointer;
-    font-weight: bold;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-
-.tag-remove:hover {
-    opacity: 1;
-}
 
 .gallery-scroll {
     flex: 1;
@@ -1253,28 +871,8 @@
     border-color: var(--b3-theme-primary);
 }
 
-.whiteboard-card.selected {
-    border-color: var(--b3-theme-primary);
-    box-shadow: 0 0 0 2px rgba(61, 142, 255, 0.2);
-}
-
 .whiteboard-card.invalid {
     opacity: 0.7;
-}
-
-.card-select {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 999px;
-    padding: 4px 6px;
-    z-index: 2;
-}
-
-.card-select input {
-    width: 16px;
-    height: 16px;
 }
 
 .card-preview {
@@ -1367,12 +965,6 @@
     border-radius: 999px;
     font-size: 11px;
     cursor: pointer;
-}
-
-.tag-pill--add {
-    background: transparent;
-    border: 1px dashed var(--b3-border-color);
-    color: var(--b3-theme-on-surface-light);
 }
 
 .tag-input {
