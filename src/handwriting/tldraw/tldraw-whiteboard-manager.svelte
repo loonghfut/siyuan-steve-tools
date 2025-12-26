@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy} from 'svelte';
+    import { onMount, onDestroy, tick } from 'svelte';
     import { showMessage, openTab, Plugin, confirm } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
     import { whiteboardFilesUpdated } from './whiteboards.store';
@@ -521,11 +521,23 @@
             item.previewError = '预览失败';
         } finally {
             item.loadingPreview = false;
+            // trigger reactive updates for arrays used in template
             allItems = allItems;
+            filteredItems = filteredItems;
+            galleryItems = galleryItems;
+            galleryGroups = galleryGroups;
+            try { await tick(); } catch {}
         }
     }
 
     function setupObserver(node: HTMLElement, item: WhiteboardItem) {
+        const rootEl = document.querySelector('.gallery-scroll') as Element | null;
+        // If existing observer's root is different (e.g. after re-render/refresh), recreate it
+        if (observer && observer.root !== (rootEl ?? null)) {
+            try { observer.disconnect(); } catch {}
+            observer = undefined as unknown as IntersectionObserver;
+        }
+
         if (!observer) {
             observer = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
@@ -534,26 +546,26 @@
                         if (targetItem) {
                             loadPreview(targetItem);
                         }
-                        observer.unobserve(entry.target);
+                        try { observer.unobserve(entry.target); } catch {}
                     }
                 });
             }, {
-                root: null,
-                rootMargin: '200px 0px 200px 0px',
-                threshold: 0.1,
+                root: rootEl ?? null,
+                rootMargin: '320px 0px 320px 0px',
+                threshold: 0.05,
             });
         }
 
         (node as any).__whiteboardItem = item;
-        observer.observe(node);
+        try { observer.observe(node); } catch {}
 
         return {
             update(newItem: WhiteboardItem) {
                 (node as any).__whiteboardItem = newItem;
-                observer.observe(node);
+                try { observer.observe(node); } catch {}
             },
             destroy() {
-                observer.unobserve(node);
+                try { observer.unobserve(node); } catch {}
             },
         };
     }
@@ -696,8 +708,8 @@
                                                 <span class="badge badge-error">无效</span>
                                             {/if}
                                         </div>
-                                        <div class="card-meta" title={item.id}>{item.id}</div>
-                                        <div class="card-meta" title={item.fileName}>{item.fileName}</div>
+                                        <!-- <div class="card-meta" title={item.id}>{item.id}</div>
+                                        <div class="card-meta" title={item.fileName}>{item.fileName}</div> -->
                                         <div class="card-meta muted">{formatTime(getLatestUpdate(item))}</div>
                                         <div class="card-tags">
                                             {#if item.tags.length === 0}
@@ -754,8 +766,8 @@
                                         <span class="badge badge-error">无效</span>
                                     {/if}
                                 </div>
-                                <div class="card-meta" title={item.id}>{item.id}</div>
-                                <div class="card-meta" title={item.fileName}>{item.fileName}</div>
+                                <!-- <div class="card-meta" title={item.id}>{item.id}</div>
+                                <div class="card-meta" title={item.fileName}>{item.fileName}</div> -->
                                 <div class="card-meta muted">{formatTime(getLatestUpdate(item))}</div>
                                 <div class="card-tags">
                                     {#if item.tags.length === 0}
