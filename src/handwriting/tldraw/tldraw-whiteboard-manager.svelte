@@ -142,7 +142,8 @@
             await api.setBlockAttrs(editingTagItem.id, { tags: newTagsValue });
 
             // Update local state - 单个条目刷新
-            const idx = allItems.findIndex(i => i.id === editingTagItem.id);
+            const itemId = editingTagItem.id;
+            const idx = allItems.findIndex(i => i.id === itemId);
             if (idx !== -1) {
                 allItems[idx] = { ...allItems[idx], tags: editingTags.slice() };
                 allItems = allItems;
@@ -153,6 +154,15 @@
             }
 
             showMessage('标签已保存', 2000, 'info');
+
+            // 延迟刷新单个条目以确保数据已同步到数据库
+            setTimeout(async () => {
+                const itemToRefresh = allItems.find(i => i.id === itemId);
+                if (itemToRefresh) {
+                    await refreshItem(itemToRefresh);
+                }
+            }, 500);
+
             closeTagEditor();
         } catch (e) {
             console.error('保存标签失败:', e);
@@ -638,7 +648,61 @@
         }
     }
 
-    function handleMenuAction(action: 'delete' | 'backup' | 'doc' | 'board') {
+    async function refreshItem(item: WhiteboardItem) {
+        try {
+            // 刷新白板元数据
+            const blk = await api.getBlockByID(item.id);
+            if (blk) {
+                item.exists = true;
+                item.blkCreated = parseSyTimestamp(blk.created);
+                item.blkUpdated = parseSyTimestamp(blk.updated);
+                item.tags = blk.tag ? blk.tag.match(/#([^#]+)#/g)?.map(t => t.replace(/#/g, '')) || [] : [];
+                item.docId = blk.root_id || undefined;
+
+                if (blk.root_id) {
+                    const docBlk = await api.getBlockByID(blk.root_id);
+                    if (docBlk) {
+                        item.title = docBlk.fcontent || docBlk.content || '未命名文档';
+                        item.docCreated = parseSyTimestamp(docBlk.created);
+                        item.docUpdated = parseSyTimestamp(docBlk.updated);
+                    }
+                }
+            } else {
+                item.exists = false;
+            }
+
+            // 清除旧预览，触发重新加载
+            item.shapes = [];
+            item.previewError = undefined;
+            item.loadingPreview = false;
+
+            // 触发响应式更新
+            const idx = allItems.findIndex(i => i.id === item.id);
+            if (idx !== -1) {
+                allItems[idx] = { ...item };
+                allItems = allItems;
+            }
+
+            // 更新过滤列表中的对应项
+            const filteredIdx = filteredItems.findIndex(i => i.id === item.id);
+            if (filteredIdx !== -1) {
+                filteredItems[filteredIdx] = { ...item };
+                filteredItems = filteredItems;
+            }
+
+            // 重新收集标签并更新过滤列表和画廊数据
+            collectAvailableTags();
+            applyFilters();
+            buildGalleryData();
+
+            showMessage('已刷新', 1500, 'info');
+        } catch (e) {
+            console.error('刷新白板失败:', e);
+            showMessage('刷新失败', 2000, 'error');
+        }
+    }
+
+    function handleMenuAction(action: 'delete' | 'backup' | 'doc' | 'board' | 'refresh') {
         const item = contextMenu.item;
         if (!item) return;
         switch (action) {
@@ -653,6 +717,9 @@
                 break;
             case 'board':
                 openWhiteboard(item).finally(() => closeContextMenu());
+                break;
+            case 'refresh':
+                refreshItem(item).finally(() => closeContextMenu());
                 break;
         }
     }
@@ -1151,6 +1218,9 @@
             </button>
             <button type="button" role="menuitem" on:click={() => handleMenuAction('doc')} disabled={!contextMenu.item.docId}>
                 跳转文档
+            </button>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('refresh')}>
+                刷新
             </button>
             <button type="button" role="menuitem" on:click={() => handleMenuAction('backup')}>
                 备份
