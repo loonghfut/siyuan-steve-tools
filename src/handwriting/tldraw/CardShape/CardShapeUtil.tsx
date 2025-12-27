@@ -170,6 +170,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		} | null>(null);
 		const isCollapsed = shape.props.isCollapsed || false;
 		const isMainCard = Boolean(shape.props.isMain);
+		const headerGradientFallback = `linear-gradient(135deg, ${theme[shape.props.color].solid} 0%, ${theme[shape.props.color].semi} 100%)`;
 
 		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）
 		const globalRenderMode: Exclude<CardRenderMode, 'inherit'> =
@@ -1089,7 +1090,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								overflow: 'hidden',
 							}}
 						>
-							{tldrawHeaderImage && collapsedDocInfo?.titleImgSrc && (
+							{tldrawHeaderImage && (
 								<div
 									style={{
 										width: '100%',
@@ -1097,13 +1098,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 										minHeight: '120px',
 										borderRadius: '12px',
 										overflow: 'hidden',
-										background: collapsedDocInfo.titleImgBackground || collapsedDocInfo.titleImgColor || '#f2f2f2',
+										background: collapsedDocInfo?.titleImgBackground || collapsedDocInfo?.titleImgColor || headerGradientFallback,
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
 									}}
 								>
-									{collapsedDocInfo.titleImgHasUrl ? (
+									{collapsedDocInfo?.titleImgHasUrl ? (
 										<img
 											src={collapsedDocInfo.titleImgSrc}
 											style={{ width: '100%', height: '100%', objectFit: 'cover' }}
