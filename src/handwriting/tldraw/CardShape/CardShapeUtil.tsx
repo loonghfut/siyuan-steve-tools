@@ -178,6 +178,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 追踪上一次的编辑状态，用于检测编辑->非编辑的切换
 		const prevIsEditingRef = useRef(isEditingState);
 		const refreshNonceRef = useRef(shape.props.refreshNonce);
+		const prevCollapsedRef = useRef(isCollapsed);
 
 
 		// 仅在编辑时创建 Protyle 实例
@@ -246,6 +247,81 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				invalidatePreviewCache(blockId);
 			}
 		}, [isEditingState, blockId]);
+
+		// 折叠/展开时记录高度并在展开时恢复
+		useEffect(() => {
+			const prev = prevCollapsedRef.current;
+			const collapsedHeight = Math.max((shape.props.fontSize || 16) * 2.5, 64);
+			const storedHeight = shape.props.preCollapseHeight;
+
+			// 折叠状态下进入编辑：临时恢复到折叠前高度，便于编辑
+			if (isCollapsed && isEditingState) {
+				const restoreHeight = (storedHeight && storedHeight > 0) ? storedHeight : shape.props.h || collapsedHeight;
+				const ensuredStoredHeight = storedHeight || shape.props.h || collapsedHeight;
+				if (shape.props.h !== restoreHeight) {
+					this.editor.updateShape({
+						id: shape.id,
+						type: shape.type,
+						props: {
+							...shape.props,
+							isCollapsed: true,
+							preCollapseHeight: ensuredStoredHeight,
+							h: restoreHeight,
+						},
+					});
+				}
+				prevCollapsedRef.current = isCollapsed;
+				return;
+			}
+
+			// 折叠且非编辑：如果未记录高度则记录并收缩；若已记录则确保收缩到折叠高度
+			if (isCollapsed) {
+				if (!storedHeight) {
+					this.editor.updateShape({
+						id: shape.id,
+						type: shape.type,
+						props: {
+							...shape.props,
+							isCollapsed: true,
+							preCollapseHeight: shape.props.h,
+							h: collapsedHeight,
+						},
+					});
+				} else if (shape.props.h !== collapsedHeight) {
+					this.editor.updateShape({
+						id: shape.id,
+						type: shape.type,
+						props: {
+							...shape.props,
+							isCollapsed: true,
+							preCollapseHeight: storedHeight,
+							h: collapsedHeight,
+						},
+					});
+				}
+				prevCollapsedRef.current = isCollapsed;
+				return;
+			}
+
+			// 从折叠 -> 展开时恢复高度
+			if (prev && !isCollapsed && storedHeight && storedHeight > 0) {
+				this.editor.updateShape({
+					id: shape.id,
+					type: shape.type,
+					props: {
+						...shape.props,
+						h: storedHeight,
+						isCollapsed: false,
+						preCollapseHeight: undefined,
+					},
+				});
+				prevCollapsedRef.current = isCollapsed;
+				return;
+			}
+
+			// 同步记录当前折叠状态
+			prevCollapsedRef.current = isCollapsed;
+		}, [isCollapsed, isEditingState, shape.props.h, shape.props.preCollapseHeight, shape.id, shape.props.fontSize, shape.type]);
 
 		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {

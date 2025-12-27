@@ -17,6 +17,7 @@ export type ICardShape = TLBaseShape<
 		version?: number // 添加 vision 属性
 		refreshNonce?: number // 添加 refreshNonce 属性
 		isCollapsed?: boolean // 添加折叠状态属性
+		preCollapseHeight?: number // 折叠前的高度，用于展开时恢复
 		renderMode?: string// 每块渲染模式优先级高于全局  'inherit' | 'static-dom' | 'live-protyle'
 	}
 >

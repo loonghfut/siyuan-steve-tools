@@ -2024,13 +2024,24 @@ export const components: TLComponents = {
 
                                         const card = shape as ICardShape
                                         const collapsed = !!card.props?.isCollapsed
+                                        const nextCollapsed = !collapsed
+                                        const collapsedHeight = Math.max((card.props.fontSize || 16) * 2.5, 64)
+                                        const nextProps = {
+                                            ...card.props,
+                                            isCollapsed: nextCollapsed,
+                                        } as ICardShape['props']
+
+                                        if (nextCollapsed) {
+                                            nextProps.preCollapseHeight = card.props.h
+                                            nextProps.h = collapsedHeight
+                                        } else if (card.props.preCollapseHeight && card.props.preCollapseHeight > 0) {
+                                            nextProps.h = card.props.preCollapseHeight
+                                        }
+
                                         editor.updateShape({
                                             id: card.id,
                                             type: 'card',
-                                            props: {
-                                                ...card.props,
-                                                isCollapsed: !collapsed,
-                                            },
+                                            props: nextProps,
                                         })
                                     }}
                                     title={
