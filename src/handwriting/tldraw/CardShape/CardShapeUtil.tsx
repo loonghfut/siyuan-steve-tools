@@ -645,6 +645,16 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				if (cancelled || !domContent) return;
 
+				// 对于 isMain 形状，获取文档信息（标题和题头图）
+				let docInfo: api.IResGetDocInfo | null = null;
+				if (isMainCard) {
+					try {
+						docInfo = await api.getDocInfo(targetBlockId);
+					} catch (err) {
+						console.error('获取文档信息失败:', err);
+					}
+				}
+
 				// 移除旧的静态预览
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
 					containerRef.current.removeChild(staticPreviewRef.current);
@@ -666,6 +676,95 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				previewWrapper.style.overflow = 'auto';
 				previewWrapper.style.fontSize = `${fontSize}px`;
 				previewWrapper.innerHTML = domContent;
+
+				// 如果是 isMain 形状，添加题头图和标题
+				if (isMainCard && docInfo) {
+					const ial = docInfo.ial || {};
+					const titleImg = ial['title-img'];
+					const title = ial.title || docInfo.name || '未命名文档';
+
+					// 创建顶部区域容器
+					const topContainer = document.createElement('div');
+					topContainer.className = 'protyle-top';
+
+					// 添加题头图
+					if (titleImg && tldrawHeaderImage) {
+						const bgContainer = document.createElement('div');
+						bgContainer.className = 'protyle-background protyle-background--enable';
+						bgContainer.setAttribute('data-node-id', targetBlockId);
+
+						const bgImg = document.createElement('div');
+						bgImg.className = 'protyle-background__img';
+
+						// 处理 title-img 的背景图片兼容
+						let bgStyle = titleImg;
+						let imgSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+						const urlMatch = titleImg.match(/background-image:\s*url\(["']?([^"')]+)["']?\)/);
+						if (urlMatch) {
+							const imgPath = urlMatch[1];
+							// 构建静态资源 URL
+							const assetUrl = `/static/${imgPath}`;
+							imgSrc = assetUrl;
+							// 移除 background-image 部分，只保留其他样式（如 background-color）
+							bgStyle = titleImg.replace(/background-image:\s*url\(["']?[^"')]+["']?\);?/g, '').trim();
+							// 移除末尾分号
+							if (bgStyle.endsWith(';')) bgStyle = bgStyle.slice(0, -1);
+						}
+
+						bgImg.innerHTML = `<img src="${imgSrc}" style="${bgStyle}">`;
+
+						const bgIa = document.createElement('div');
+						bgIa.className = 'protyle-background__ia';
+						bgIa.style.marginLeft = '24px';
+						bgIa.style.marginRight = '16px';
+
+						bgContainer.appendChild(bgImg);
+						bgContainer.appendChild(bgIa);
+						topContainer.appendChild(bgContainer);
+					}
+
+					// 添加标题
+					const titleContainer = document.createElement('div');
+					titleContainer.className = 'protyle-title protyle-wysiwyg--attr';
+					titleContainer.setAttribute('data-node-id', targetBlockId);
+					titleContainer.setAttribute('data-render', 'true');
+					titleContainer.style.margin = '16px 16px 0px 24px';
+
+					const iconSpan = document.createElement('span');
+					iconSpan.className = 'protyle-title__icon';
+					iconSpan.innerHTML = '<svg><use xlink:href="#iconFile"></use></svg>';
+
+					const titleInput = document.createElement('div');
+					titleInput.contentEditable = 'false';
+					titleInput.spellcheck = false;
+					titleInput.className = 'protyle-title__input';
+					titleInput.style.outline = 'none';
+					titleInput.textContent = title;
+
+					const attrDiv = document.createElement('div');
+					attrDiv.className = 'protyle-attr';
+
+					// 添加书签（如果有）
+					const bookmark = ial.bookmark;
+					if (bookmark) {
+						const bookmarkDiv = document.createElement('div');
+						bookmarkDiv.className = 'protyle-attr--bookmark';
+						bookmarkDiv.textContent = bookmark;
+						attrDiv.appendChild(bookmarkDiv);
+					}
+
+					titleContainer.appendChild(iconSpan);
+					titleContainer.appendChild(titleInput);
+					titleContainer.appendChild(attrDiv);
+					topContainer.appendChild(titleContainer);
+
+					// 将 topContainer 插入到内容最前面
+					if (previewWrapper.firstChild) {
+						previewWrapper.insertBefore(topContainer, previewWrapper.firstChild);
+					} else {
+						previewWrapper.appendChild(topContainer);
+					}
+				}
 
 				// 缓存原始 DOM HTML（渲染前）
 				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
