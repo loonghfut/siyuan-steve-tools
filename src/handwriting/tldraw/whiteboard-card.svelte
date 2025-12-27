@@ -1,126 +1,41 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
-    import type { WhiteboardItem } from './tldraw-whiteboard-manager.svelte';
+    import { createEventDispatcher } from "svelte";
+    // import type { WhiteboardItem } from './tldraw-whiteboard-manager.svelte';
+    interface WhiteboardItem {
+        id: string;
+        fileName: string;
+        path: string;
+        title: string;
+        exists: boolean;
+        blkCreated: number;
+        blkUpdated: number;
+        docCreated: number;
+        docUpdated: number;
+        docId?: string;
+        mtime: number;
+        tags: string[];
+        loadingPreview: boolean;
+        shapes: PreviewShape[];
+        previewError?: string;
+    }
 
     export let item: WhiteboardItem;
     export let selectedIds: Set<string>;
-    export let setupObserver: (node: HTMLElement, item: WhiteboardItem) => { update(newItem: WhiteboardItem): void; destroy(): void };
+    export let setupObserver: (
+        node: HTMLElement,
+        item: WhiteboardItem,
+    ) => { update(newItem: WhiteboardItem): void; destroy(): void };
 
-    const dispatch = createEventDispatcher<{
-        contextmenu: { item: WhiteboardItem; originalEvent: MouseEvent };
-        select: { item: WhiteboardItem; checked: boolean; shiftKey: boolean };
-        openboard: { item: WhiteboardItem };
-        opendoc: { item: WhiteboardItem };
-        edittags: { item: WhiteboardItem };
-    }>();
+    type PreviewShape = {
+        id?: string;
+        type?: string;
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+    };
 
-    function handleSelectChange(event: Event) {
-        event.stopPropagation();
-        const target = event.currentTarget as HTMLInputElement;
-        dispatch('select', {
-            item,
-            checked: target.checked,
-            shiftKey: (event as MouseEvent).shiftKey
-        });
-    }
-
-    function handleContextMenu(event: MouseEvent) {
-        event.preventDefault();
-        dispatch('contextmenu', { item, originalEvent: event });
-    }
-
-    function openWhiteboard() {
-        dispatch('openboard', { item });
-    }
-
-    function openDocument() {
-        if (!item.docId) return;
-        dispatch('opendoc', { item });
-    }
-
-    function startEditTags() {
-        dispatch('edittags', { item });
-    }
-</script>
-
-<article
-    class="whiteboard-card"
-    class:invalid={!item.exists}
-    class:selected={selectedIds.has(item.id)}
-    on:contextmenu={handleContextMenu}
-    role="button"
-    tabindex="0"
-    on:keydown={(e) => e.key === 'Enter' && openWhiteboard()}
->
-    <label class="card-select" aria-label="选择白板">
-        <input
-            type="checkbox"
-            checked={selectedIds.has(item.id)}
-            on:change={handleSelectChange} />
-    </label>
-
-    <div class="card-preview" use:setupObserver={item}>
-        <button class="preview-hit" type="button" on:click={openWhiteboard}>
-            {#if item.previewError}
-                <div class="preview-fallback">{item.previewError}</div>
-            {:else if item.loadingPreview}
-                <div class="preview-fallback">生成预览...</div>
-            {:else if item.shapes.length > 0}
-                {@const bounds = computeBounds(item.shapes)}
-                {@const viewW = 300 - 12}
-                {@const viewH = 180 - 12}
-                {@const scale = Math.min(viewW / bounds.width, viewH / bounds.height)}
-                {@const pad = 6}
-                <svg viewBox="0 0 300 180" class="preview-canvas" preserveAspectRatio="xMidYMid meet">
-                    {#each item.shapes as shape}
-                        {@const pos = projectShape(shape, item.shapes, bounds, scale, pad)}
-                        <rect
-                            x={pos.x}
-                            y={pos.y}
-                            width={pos.w}
-                            height={pos.h}
-                            rx="3"
-                            ry="3"
-                            fill="rgba(61,142,255,0.08)"
-                            stroke="rgba(61,142,255,0.35)"
-                            stroke-width="1" />
-                    {/each}
-                    <rect x="1" y="1" width="298" height="178" fill="none" stroke="rgba(0,0,0,0.06)" />
-                </svg>
-            {:else}
-                <div class="preview-empty">暂无预览</div>
-            {/if}
-        </button>
-    </div>
-
-    <div class="card-info">
-        <div class="card-title" title={item.title}>
-            <button type="button" class="title-link" on:click={openDocument} disabled={!item.docId}>
-                {item.title}
-            </button>
-            {#if !item.exists}
-                <span class="badge badge-error">无效</span>
-            {/if}
-        </div>
-        <div class="card-meta muted">{formatTime(getLatestUpdate(item))}</div>
-        <div class="card-tags">
-            {#if item.tags.length === 0}
-                <span class="tag-empty">无标签</span>
-            {/if}
-            {#each item.tags as tag}
-                <span class="tag-pill">{tag}</span>
-            {/each}
-            <button type="button" class="tag-edit-btn" title="编辑标签" on:click|stopPropagation={startEditTags}>
-                <svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-            </button>
-        </div>
-    </div>
-</article>
-
-<script context="module" lang="ts">
-    type PreviewShape = { id?: string; type?: string; x: number; y: number; w: number; h: number };
-
-    export function computeBounds(shapes: PreviewShape[]) {
+    function computeBounds(shapes: PreviewShape[]) {
         if (!shapes || shapes.length === 0) {
             return { minX: 0, minY: 0, width: 300, height: 200 };
         }
@@ -128,7 +43,7 @@
         let minY = Number.POSITIVE_INFINITY;
         let maxX = Number.NEGATIVE_INFINITY;
         let maxY = Number.NEGATIVE_INFINITY;
-        shapes.forEach(shape => {
+        shapes.forEach((shape) => {
             const left = (shape.x || 0) - (shape.w || 0) / 2;
             const top = (shape.y || 0) - (shape.h || 0) / 2;
             minX = Math.min(minX, left);
@@ -136,13 +51,30 @@
             maxX = Math.max(maxX, left + (shape.w || 0));
             maxY = Math.max(maxY, top + (shape.h || 0));
         });
-        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+        if (
+            !isFinite(minX) ||
+            !isFinite(minY) ||
+            !isFinite(maxX) ||
+            !isFinite(maxY)
+        ) {
             return { minX: 0, minY: 0, width: 300, height: 200 };
         }
-        return { minX, minY, width: Math.max(maxX - minX, 1), height: Math.max(maxY - minY, 1) };
+        return {
+            minX,
+            minY,
+            width: Math.max(maxX - minX, 1),
+            height: Math.max(maxY - minY, 1),
+        };
     }
 
-    export function projectShape(shape: PreviewShape, shapes: PreviewShape[], bounds: ReturnType<typeof computeBounds>, scale: number, pad: number) {
+    function projectShape(
+        shape: PreviewShape,
+        _shapes: PreviewShape[],
+        bounds: ReturnType<typeof computeBounds>,
+        scale: number,
+        pad: number,
+    ) {
+        void _shapes;
         const cx = shape.x || 0;
         const cy = shape.y || 0;
         const w = shape.w || 60;
@@ -157,25 +89,172 @@
         };
     }
 
-    export function formatTime(ms: number): string {
-        if (!ms || !Number.isFinite(ms) || ms <= 0) return '-';
+    function formatTime(ms: number): string {
+        if (!ms || !Number.isFinite(ms) || ms <= 0) return "-";
         try {
-            return new Date(ms).toLocaleString('zh-CN', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
+            return new Date(ms).toLocaleString("zh-CN", {
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
             });
         } catch {
-            return '-';
+            return "-";
         }
     }
 
     function getLatestUpdate(item: WhiteboardItem) {
         return item.blkUpdated || item.docUpdated || item.mtime;
     }
+
+    const dispatch = createEventDispatcher<{
+        contextmenu: { item: WhiteboardItem; originalEvent: MouseEvent };
+        select: { item: WhiteboardItem; checked: boolean; shiftKey: boolean };
+        openboard: { item: WhiteboardItem };
+        opendoc: { item: WhiteboardItem };
+        edittags: { item: WhiteboardItem };
+    }>();
+
+    function handleSelectChange(event: Event) {
+        event.stopPropagation();
+        const target = event.currentTarget as HTMLInputElement;
+        dispatch("select", {
+            item,
+            checked: target.checked,
+            shiftKey: (event as MouseEvent).shiftKey,
+        });
+    }
+
+    function handleContextMenu(event: MouseEvent) {
+        event.preventDefault();
+        dispatch("contextmenu", { item, originalEvent: event });
+    }
+
+    function openWhiteboard() {
+        dispatch("openboard", { item });
+    }
+
+    function openDocument() {
+        if (!item.docId) return;
+        dispatch("opendoc", { item });
+    }
+
+    function startEditTags() {
+        dispatch("edittags", { item });
+    }
 </script>
+
+<article
+    class="whiteboard-card"
+    class:invalid={!item.exists}
+    class:selected={selectedIds.has(item.id)}
+    on:contextmenu={handleContextMenu}
+    role="button"
+    tabindex="0"
+    on:keydown={(e) => e.key === "Enter" && openWhiteboard()}
+>
+    <label class="card-select" aria-label="选择白板">
+        <input
+            type="checkbox"
+            checked={selectedIds.has(item.id)}
+            on:change={handleSelectChange}
+        />
+    </label>
+
+    <div class="card-preview" use:setupObserver={item}>
+        <button class="preview-hit" type="button" on:click={openWhiteboard}>
+            {#if item.previewError}
+                <div class="preview-fallback">{item.previewError}</div>
+            {:else if item.loadingPreview}
+                <div class="preview-fallback">生成预览...</div>
+            {:else if item.shapes.length > 0}
+                {@const bounds = computeBounds(item.shapes)}
+                {@const viewW = 300 - 12}
+                {@const viewH = 180 - 12}
+                {@const scale = Math.min(
+                    viewW / bounds.width,
+                    viewH / bounds.height,
+                )}
+                {@const pad = 6}
+                <svg
+                    viewBox="0 0 300 180"
+                    class="preview-canvas"
+                    preserveAspectRatio="xMidYMid meet"
+                >
+                    {#each item.shapes as shape}
+                        {@const pos = projectShape(
+                            shape,
+                            item.shapes,
+                            bounds,
+                            scale,
+                            pad,
+                        )}
+                        <rect
+                            x={pos.x}
+                            y={pos.y}
+                            width={pos.w}
+                            height={pos.h}
+                            rx="3"
+                            ry="3"
+                            fill="rgba(61,142,255,0.08)"
+                            stroke="rgba(61,142,255,0.35)"
+                            stroke-width="1"
+                        />
+                    {/each}
+                    <rect
+                        x="1"
+                        y="1"
+                        width="298"
+                        height="178"
+                        fill="none"
+                        stroke="rgba(0,0,0,0.06)"
+                    />
+                </svg>
+            {:else}
+                <div class="preview-empty">暂无预览</div>
+            {/if}
+        </button>
+    </div>
+
+    <div class="card-info">
+        <div class="card-title" title={item.title}>
+            <button
+                type="button"
+                class="title-link"
+                on:click={openDocument}
+                disabled={!item.docId}
+            >
+                {item.title}
+            </button>
+            {#if !item.exists}
+                <span class="badge badge-error">无效</span>
+            {/if}
+        </div>
+        <div class="card-meta muted">{formatTime(getLatestUpdate(item))}</div>
+        <div class="card-tags">
+            {#if item.tags.length === 0}
+                <span class="tag-empty">无标签</span>
+            {/if}
+            {#each item.tags as tag}
+                <span class="tag-pill">{tag}</span>
+            {/each}
+            <button
+                type="button"
+                class="tag-edit-btn"
+                title="编辑标签"
+                on:click|stopPropagation={startEditTags}
+            >
+                <svg width="12" height="12" viewBox="0 0 24 24"
+                    ><path
+                        fill="currentColor"
+                        d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                    /></svg
+                >
+            </button>
+        </div>
+    </div>
+</article>
 
 <style>
     .whiteboard-card {
@@ -186,7 +265,10 @@
         box-shadow: 0 8px 24px rgba(15, 18, 46, 0.08);
         display: flex;
         flex-direction: column;
-        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease,
+            border-color 0.25s ease;
     }
 
     .whiteboard-card:hover {
@@ -230,7 +312,7 @@
         cursor: pointer;
         appearance: none;
         -webkit-appearance: none;
-        border: 1.5px solid var(--b3-border-color);
+        border: 0.5px solid var(--b3-border-color);
         border-radius: 4px;
         background: var(--b3-theme-background);
         transition: all 0.15s ease;
@@ -244,7 +326,7 @@
     }
 
     .card-select input:checked::after {
-        content: '';
+        content: "";
         position: absolute;
         left: 5px;
         top: 2px;
@@ -264,7 +346,11 @@
         width: 100%;
         aspect-ratio: 5 / 3;
         border-bottom: 1px solid var(--b3-border-color);
-        background: linear-gradient(135deg, rgba(72, 94, 255, 0.08), rgba(72, 94, 255, 0.02));
+        background: linear-gradient(
+            135deg,
+            rgba(72, 94, 255, 0.08),
+            rgba(72, 94, 255, 0.02)
+        );
         border-radius: 14px 14px 0 0;
         overflow: hidden;
     }
