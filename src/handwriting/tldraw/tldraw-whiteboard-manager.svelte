@@ -57,8 +57,143 @@
 
     let contextMenu: ContextMenuState = { visible: false, x: 0, y: 0, item: null };
 
+    let selectedIds: Set<string> = new Set();
+    let selectedItems: WhiteboardItem[] = [];
+    let visibleSelectedCount = 0;
+    let lastSelectedId: string | null = null;
+
     let observer: IntersectionObserver;
     let unsubscribe: () => void;
+
+    function pruneSelection() {
+        const validIds = new Set(allItems.map(item => item.id));
+        let changed = false;
+        selectedIds.forEach(id => {
+            if (!validIds.has(id)) {
+                selectedIds.delete(id);
+                changed = true;
+            }
+        });
+        if (changed) {
+            selectedIds = new Set(selectedIds);
+        }
+    }
+
+    // ==================== 标签编辑 ====================
+    let editingTagItem: WhiteboardItem | null = null;
+    let editingTags: string[] = [];
+    let tagInputQuery = '';
+    let showTagSuggestions = false;
+    let savingTags = false;
+
+    function startEditTags(item: WhiteboardItem) {
+        editingTagItem = item;
+        editingTags = item.tags.slice();
+        tagInputQuery = '';
+        showTagSuggestions = false;
+    }
+
+    function closeTagEditor() {
+        editingTagItem = null;
+        editingTags = [];
+        tagInputQuery = '';
+        showTagSuggestions = false;
+    }
+
+    function getTagSuggestions(): string[] {
+        const query = tagInputQuery.trim().toLowerCase();
+        if (!query) {
+            return availableTags.filter(t => !editingTags.includes(t));
+        }
+        return availableTags.filter(t =>
+            !editingTags.includes(t) && t.toLowerCase().includes(query)
+        );
+    }
+
+    function addTag(tag: string) {
+        if (tag && !editingTags.includes(tag)) {
+            editingTags = [...editingTags, tag];
+        }
+        tagInputQuery = '';
+        showTagSuggestions = false;
+    }
+
+    function removeTag(tag: string) {
+        editingTags = editingTags.filter(t => t !== tag);
+    }
+
+    function handleTagInputKeydown(event: KeyboardEvent) {
+        if (event.key === 'Enter' && tagInputQuery.trim()) {
+            const tag = tagInputQuery.trim();
+            if (!editingTags.includes(tag)) {
+                addTag(tag);
+            }
+        } else if (event.key === 'Escape') {
+            showTagSuggestions = false;
+        }
+    }
+
+    async function saveTags() {
+        if (!editingTagItem || savingTags) return;
+        savingTags = true;
+
+        try {
+            const newTagsValue = editingTags.map(t => `#${t}#`).join('');
+            await api.setBlockAttrs(editingTagItem.id, { tags: newTagsValue });
+
+            // Update local state
+            const idx = allItems.findIndex(i => i.id === editingTagItem.id);
+            if (idx !== -1) {
+                allItems[idx] = { ...allItems[idx], tags: editingTags.slice() };
+                allItems = allItems;
+                collectAvailableTags();
+            }
+
+            showMessage('标签已保存', 2000, 'info');
+            closeTagEditor();
+        } catch (e) {
+            console.error('保存标签失败:', e);
+            showMessage('保存标签失败', 3000, 'error');
+        } finally {
+            savingTags = false;
+        }
+    }
+
+    async function handleBulkAddTag(tag: string) {
+        if (!tag || selectedItems.length === 0) return;
+        try {
+            for (const item of selectedItems) {
+                if (!item.tags.includes(tag)) {
+                    const newTags = [...item.tags, tag];
+                    const newTagsValue = newTags.map(t => `#${t}#`).join('');
+                    await api.setBlockAttrs(item.id, { tags: newTagsValue });
+                }
+            }
+            showMessage(`已为 ${selectedItems.length} 个白板添加标签 "${tag}"`, 3000, 'info');
+            await loadWhiteboards();
+        } catch (e) {
+            console.error('批量添加标签失败:', e);
+            showMessage('批量添加标签失败', 3000, 'error');
+        }
+    }
+
+    async function handleBulkRemoveTag(tag: string) {
+        if (!tag || selectedItems.length === 0) return;
+        try {
+            for (const item of selectedItems) {
+                if (item.tags.includes(tag)) {
+                    const newTags = item.tags.filter(t => t !== tag);
+                    const newTagsValue = newTags.map(t => `#${t}#`).join('');
+                    await api.setBlockAttrs(item.id, { tags: newTagsValue });
+                }
+            }
+            showMessage(`已从 ${selectedItems.length} 个白板移除标签 "${tag}"`, 3000, 'info');
+            await loadWhiteboards();
+        } catch (e) {
+            console.error('批量移除标签失败:', e);
+            showMessage('批量移除标签失败', 3000, 'error');
+        }
+    }
 
     $: {
         searchQuery;
@@ -71,6 +206,11 @@
         filteredItems;
         groupByTag;
         buildGalleryData();
+    }
+    $: {
+        pruneSelection();
+        selectedItems = allItems.filter(item => selectedIds.has(item.id));
+        visibleSelectedCount = filteredItems.filter(item => selectedIds.has(item.id)).length;
     }
 
     onMount(() => {
@@ -158,6 +298,7 @@
             }
 
             allItems = items;
+            pruneSelection();
             collectAvailableTags();
             applyFilters();
         } catch (e) {
@@ -314,9 +455,59 @@
         }
     }
 
-    // 多选相关逻辑已移除
+    function toggleSelection(item: WhiteboardItem, checked?: boolean, useRange = false) {
+        const next = new Set(selectedIds);
+        const shouldSelect = typeof checked === 'boolean' ? checked : !next.has(item.id);
 
-    function confirmDelete(items: WhiteboardItem[]) {
+        if (useRange && lastSelectedId) {
+            const ids = filteredItems.map(i => i.id);
+            const start = ids.indexOf(lastSelectedId);
+            const end = ids.indexOf(item.id);
+            if (start !== -1 && end !== -1) {
+                const [lo, hi] = start <= end ? [start, end] : [end, start];
+                for (let i = lo; i <= hi; i++) {
+                    if (shouldSelect) next.add(ids[i]);
+                    else next.delete(ids[i]);
+                }
+            }
+        }
+
+        if (shouldSelect) next.add(item.id);
+        else next.delete(item.id);
+
+        selectedIds = next;
+        lastSelectedId = item.id;
+    }
+
+    function handleSelectChange(event: Event, item: WhiteboardItem) {
+        event.stopPropagation();
+        const target = event.currentTarget as HTMLInputElement;
+        const useRange = (event as MouseEvent).shiftKey;
+        toggleSelection(item, target.checked, useRange);
+    }
+
+    function selectAllVisible() {
+        const next = new Set(selectedIds);
+        filteredItems.forEach(item => next.add(item.id));
+        selectedIds = next;
+    }
+
+    function clearSelection() {
+        selectedIds = new Set();
+        lastSelectedId = null;
+    }
+
+    function handleBulkDeleteSelected() {
+        if (selectedItems.length === 0) return;
+        confirmDelete([...selectedItems], clearSelection);
+    }
+
+    function handleBulkBackupSelected() {
+        if (selectedItems.length === 0) return;
+        void backupItems([...selectedItems], clearSelection);
+    }
+
+    function confirmDelete(items: WhiteboardItem[], onCompleted?: () => void) {
         if (items.length === 0) return;
         confirm(
             '删除确认',
@@ -366,6 +557,7 @@
                 showMessage(`成功删除 ${successCount}/${items.length} 个白板`, 3000, 'info');
                 closeContextMenu();
                 await loadWhiteboards();
+                onCompleted?.();
 
                 try {
                     dialog && (dialog as any).close && (dialog as any).close();
@@ -381,7 +573,7 @@
 
     // 批量删除已移除，保留单项删除（右键菜单）
 
-    async function backupItems(items: WhiteboardItem[]) {
+    async function backupItems(items: WhiteboardItem[], onCompleted?: () => void) {
         if (items.length === 0) return;
         try {
             const whiteboardIds = items.map(item => item.id);
@@ -404,6 +596,7 @@
             console.error('备份失败:', e);
             showMessage('备份失败', 3000, 'error');
         }
+        onCompleted?.();
     }
 
     // 批量备份已移除，保留单项备份（右键菜单）
@@ -667,7 +860,52 @@
         </button>
         <span class="fn__space"></span>
 
-        
+        <div class="selection-tools">
+            <span class="selection-counter" title={`当前视图选中 ${visibleSelectedCount}/${filteredItems.length}`}>
+                已选 {selectedItems.length}
+            </span>
+            <button type="button" class="b3-button" on:click={selectAllVisible} disabled={filteredItems.length === 0 || visibleSelectedCount === filteredItems.length}>
+                全选
+            </button>
+            <button type="button" class="b3-button" on:click={clearSelection} disabled={selectedItems.length === 0}>
+                清空
+            </button>
+            <button type="button" class="b3-button" on:click={handleBulkBackupSelected} disabled={selectedItems.length === 0}>
+                备份选中
+            </button>
+            <button type="button" class="b3-button danger" on:click={handleBulkDeleteSelected} disabled={selectedItems.length === 0}>
+                删除选中
+            </button>
+            {#if selectedItems.length > 0 && availableTags.length > 0}
+                <span class="fn__space"></span>
+                <select class="b3-select" style="font-size:12px" on:change={(e) => {
+                    const sel = e.currentTarget;
+                    if (sel.value) {
+                        handleBulkAddTag(sel.value);
+                        sel.value = '';
+                    }
+                }}>
+                    <option value="">+ 添加标签</option>
+                    {#each availableTags as tag}
+                        <option value={tag}>{tag}</option>
+                    {/each}
+                </select>
+                <select class="b3-select" style="font-size:12px" on:change={(e) => {
+                    const sel = e.currentTarget;
+                    if (sel.value) {
+                        handleBulkRemoveTag(sel.value);
+                        sel.value = '';
+                    }
+                }}>
+                    <option value="">- 移除标签</option>
+                    {#each availableTags as tag}
+                        <option value={tag}>{tag}</option>
+                    {/each}
+                </select>
+            {/if}
+        </div>
+        <span class="fn__space"></span>
+
 
         <button
             type="button"
@@ -698,7 +936,14 @@
                                 <article
                                     class="whiteboard-card"
                                     class:invalid={!item.exists}
+                                    class:selected={selectedIds.has(item.id)}
                                     on:contextmenu={(event) => handleContextMenu(event, item)}>
+                                    <label class="card-select" aria-label="选择白板">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(item.id)}
+                                            on:change|stopPropagation={(event) => handleSelectChange(event, item)} />
+                                    </label>
                                     
                                     <div class="card-preview" use:setupObserver={item}>
                                         <button class="preview-hit" type="button" on:click={() => openWhiteboard(item)}>
@@ -729,7 +974,9 @@
                                     </div>
                                     <div class="card-info">
                                         <div class="card-title" title={item.title}>
-                                            {item.title}
+                                            <button type="button" class="title-link" on:click={() => openDocument(item)} disabled={!item.docId}>
+                                                {item.title}
+                                            </button>
                                             {#if !item.exists}
                                                 <span class="badge badge-error">无效</span>
                                             {/if}
@@ -744,6 +991,9 @@
                                             {#each item.tags as tag}
                                                 <span class="tag-pill">{tag}</span>
                                             {/each}
+                                            <button type="button" class="tag-edit-btn" title="编辑标签" on:click|stopPropagation={() => startEditTags(item)}>
+                                                <svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                            </button>
                                         </div>
                                     </div>
                                 </article>
@@ -757,7 +1007,14 @@
                         <article
                             class="whiteboard-card"
                             class:invalid={!item.exists}
+                            class:selected={selectedIds.has(item.id)}
                             on:contextmenu={(event) => handleContextMenu(event, item)}>
+                            <label class="card-select" aria-label="选择白板">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedIds.has(item.id)}
+                                    on:change|stopPropagation={(event) => handleSelectChange(event, item)} />
+                            </label>
                             <div class="card-preview" use:setupObserver={item}>
                                 <button class="preview-hit" type="button" on:click={() => openWhiteboard(item)}>
                                     {#if item.previewError}
@@ -787,7 +1044,9 @@
                             </div>
                             <div class="card-info">
                                 <div class="card-title" title={item.title}>
-                                    {item.title}
+                                    <button type="button" class="title-link" on:click={() => openDocument(item)} disabled={!item.docId}>
+                                        {item.title}
+                                    </button>
                                     {#if !item.exists}
                                         <span class="badge badge-error">无效</span>
                                     {/if}
@@ -802,12 +1061,79 @@
                                     {#each item.tags as tag}
                                         <span class="tag-pill">{tag}</span>
                                     {/each}
+                                    <button type="button" class="tag-edit-btn" title="编辑标签" on:click|stopPropagation={() => startEditTags(item)}>
+                                        <svg width="12" height="12" viewBox="0 0 24 24"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                    </button>
                                 </div>
                             </div>
                         </article>
                     {/each}
                 </div>
             {/if}
+        </div>
+    {/if}
+
+    {#if editingTagItem}
+        <div class="tag-editor-overlay" on:click={closeTagEditor} role="dialog" aria-label="编辑标签">
+            <div class="tag-editor-modal" on:click|stopPropagation role="document">
+                <header class="tag-editor-header">
+                    <h3>编辑标签</h3>
+                    <button type="button" class="close-btn" on:click={closeTagEditor}>
+                        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
+                </header>
+                <div class="tag-editor-body">
+                    <div class="current-tags">
+                        {#if editingTags.length === 0}
+                            <span class="tag-empty">暂无标签</span>
+                        {:else}
+                            {#each editingTags as tag}
+                                <span class="tag-pill removable" title="点击移除">
+                                    {tag}
+                                    <button type="button" class="remove-tag" on:click={() => removeTag(tag)}>×</button>
+                                </span>
+                            {/each}
+                        {/if}
+                    </div>
+                    <div class="add-tag-row">
+                        <input
+                            class="b3-text-field"
+                            type="text"
+                            placeholder="输入或选择标签..."
+                            bind:value={tagInputQuery}
+                            on:input={() => showTagSuggestions = true}
+                            on:keydown={handleTagInputKeydown} />
+                        <button type="button" class="b3-button" on:click={() => tagInputQuery.trim() && addTag(tagInputQuery.trim())} disabled={!tagInputQuery.trim()}>
+                            添加
+                        </button>
+                    </div>
+                    {#if showTagSuggestions}
+                        <ul class="tag-suggestions">
+                            {#each getTagSuggestions() as tag}
+                                <li>
+                                    <button type="button" on:click={() => addTag(tag)}>{tag}</button>
+                                </li>
+                            {/each}
+                            {#if tagInputQuery.trim() && !editingTags.includes(tagInputQuery.trim())}
+                                <li>
+                                    <button type="button" on:click={() => addTag(tagInputQuery.trim())}>
+                                        创建 "{tagInputQuery.trim()}"
+                                    </button>
+                                </li>
+                            {/if}
+                            {#if getTagSuggestions().length === 0 && !tagInputQuery.trim()}
+                                <li class="empty">无匹配标签</li>
+                            {/if}
+                        </ul>
+                    {/if}
+                </div>
+                <footer class="tag-editor-footer">
+                    <button type="button" class="b3-button" on:click={closeTagEditor}>取消</button>
+                    <button type="button" class="b3-button b3-button--primary" on:click={saveTags} disabled={savingTags}>
+                        {savingTags ? '保存中...' : '保存'}
+                    </button>
+                </footer>
+            </div>
         </div>
     {/if}
 
@@ -883,6 +1209,31 @@
     padding: 4px 8px;
 }
 
+.selection-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.selection-counter {
+    font-size: 12px;
+    color: var(--b3-theme-on-surface);
+    padding: 4px 8px;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    background: var(--b3-theme-background);
+}
+
+.selection-tools .b3-button {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.selection-tools .b3-button.danger {
+    color: var(--b3-theme-error);
+    border-color: var(--b3-theme-error);
+}
+
 
 .gallery-scroll {
     flex: 1;
@@ -915,6 +1266,29 @@
 
 .whiteboard-card.invalid {
     opacity: 0.7;
+}
+
+.whiteboard-card.selected {
+    border-color: var(--b3-theme-primary);
+    box-shadow: 0 16px 32px rgba(61, 142, 255, 0.18);
+}
+
+.card-select {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    padding: 4px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.card-select input {
+    width: 16px;
+    height: 16px;
 }
 
 .card-preview {
@@ -964,6 +1338,29 @@
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.title-link {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.title-link:hover:not(:disabled) {
+    color: var(--b3-theme-primary);
+}
+
+.title-link:disabled {
+    cursor: default;
+    opacity: 0.7;
 }
 
 .card-meta {
@@ -1021,6 +1418,43 @@
     font-size: 11px;
     color: var(--b3-theme-on-surface-light);
     opacity: 0.7;
+}
+
+.tag-edit-btn {
+    border: none;
+    background: transparent;
+    color: var(--b3-theme-on-surface-light);
+    padding: 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+}
+
+.tag-edit-btn:hover {
+    background: rgba(61, 142, 255, 0.12);
+    color: var(--b3-theme-primary);
+}
+
+.tag-pill.removable {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.remove-tag {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.remove-tag:hover {
+    opacity: 1;
 }
 
 .tag-group {
@@ -1104,5 +1538,127 @@
         width: 100%;
         max-width: 100%;
     }
+}
+
+/* 标签编辑器弹窗 */
+.tag-editor-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tag-editor-modal {
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 12px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+}
+
+.tag-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--b3-border-color);
+}
+
+.tag-editor-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.close-btn {
+    border: none;
+    background: transparent;
+    color: var(--b3-theme-on-surface);
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    background: var(--b3-list-hover);
+}
+
+.tag-editor-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.current-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 32px;
+    padding: 8px;
+    background: var(--b3-theme-background);
+    border-radius: 8px;
+}
+
+.add-tag-row {
+    display: flex;
+    gap: 8px;
+}
+
+.add-tag-row input {
+    flex: 1;
+}
+
+.tag-suggestions {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    background: var(--b3-theme-surface);
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.tag-suggestions li {
+    margin: 0;
+}
+
+.tag-suggestions button {
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--b3-theme-on-background);
+}
+
+.tag-suggestions button:hover {
+    background: var(--b3-list-hover);
+}
+
+.tag-suggestions li.empty {
+    padding: 8px 12px;
+    color: var(--b3-theme-on-surface-light);
+    font-size: 12px;
+}
+
+.tag-editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 16px;
+    border-top: 1px solid var(--b3-border-color);
 }
 </style>
