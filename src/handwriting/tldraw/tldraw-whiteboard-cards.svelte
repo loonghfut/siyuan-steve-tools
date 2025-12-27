@@ -655,8 +655,8 @@
                                 <span class="badge badge-warn">无附属</span>
                             {/if}
                         </div>
-                        <div class="id-line" title={card.id}>{card.id}</div>
-                        <div class="file-line" title={card.fileName}>{card.fileName}</div>
+                        <!-- <div class="id-line" title={card.id}>{card.id}</div>
+                        <div class="file-line" title={card.fileName}>{card.fileName}</div> -->
                         {#if card.mtime}
                             <div class="mtime-line" title={new Date(card.mtime).toISOString()}>{formatTime(card.mtime)}</div>
                         {/if}
