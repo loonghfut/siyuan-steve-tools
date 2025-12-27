@@ -138,7 +138,7 @@
         savingTags = true;
 
         try {
-            const newTagsValue = editingTags.map(t => `#${t}#`).join('');
+            const newTagsValue = editingTags.join(',');
             await api.setBlockAttrs(editingTagItem.id, { tags: newTagsValue });
 
             // Update local state - 单个条目刷新
@@ -168,7 +168,7 @@
             for (const item of selectedItems) {
                 if (!item.tags.includes(tag)) {
                     const newTags = [...item.tags, tag];
-                    const newTagsValue = newTags.map(t => `#${t}#`).join('');
+                    const newTagsValue = newTags.join(',');
                     await api.setBlockAttrs(item.id, { tags: newTagsValue });
                 }
             }
@@ -186,7 +186,7 @@
             for (const item of selectedItems) {
                 if (item.tags.includes(tag)) {
                     const newTags = item.tags.filter(t => t !== tag);
-                    const newTagsValue = newTags.map(t => `#${t}#`).join('');
+                    const newTagsValue = newTags.join(',');
                     await api.setBlockAttrs(item.id, { tags: newTagsValue });
                 }
             }
@@ -281,7 +281,7 @@
                         item.exists = true;
                         item.blkCreated = parseSyTimestamp(blk.created);
                         item.blkUpdated = parseSyTimestamp(blk.updated);
-                        item.tags = blk.tag ? blk.tag.split('#').filter((t: string) => t.trim()) : [];
+                        item.tags = blk.tag ? blk.tag.match(/#([^#]+)#/g)?.map(t => t.replace(/#/g, '')) || [] : [];
                         item.docId = blk.root_id || undefined;
 
                         if (blk.root_id) {
