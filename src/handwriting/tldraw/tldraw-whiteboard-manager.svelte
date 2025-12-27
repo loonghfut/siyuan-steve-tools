@@ -4,7 +4,7 @@
     import { api } from '@frostime/siyuan-plugin-kits';
     import { whiteboardFilesUpdated } from './whiteboards.store';
     import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from './whiteboard-file-manager';
-    import { destroyInstance } from './tldraw-instance-manager';
+    import { closeTab } from './tldraw-instance-manager';
 
     export let plugin: Plugin;
 
@@ -327,8 +327,8 @@
                 
                 for (const item of items) {
                     try {
-                        // 先销毁此白板的实例（如果存在）
-                        await destroyInstance(item.id, 'user-delete');
+                        // 关闭此白板的页签（如果存在），这将自动触发销毁回调
+                        closeTab(item.id, 'user-delete');
 
                         // 再删除白板文件
                         await api.removeFile(item.path);

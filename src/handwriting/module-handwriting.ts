@@ -8,6 +8,7 @@ import TldrawWhiteboardManager from './tldraw/tldraw-whiteboard-manager.svelte';
 import { addWhiteboardButton } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
+import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -113,6 +114,7 @@ export class M_handwriting {
                         },
                         position: "right",
                     });
+                    
                     const tldrawManager = (tab.panelElement as any).tldrawManager as TldrawManager;
                     // 延时后再导航到指定块/形状
                     setTimeout(() => {
@@ -233,14 +235,20 @@ export class M_handwriting {
                 panelElement.appendChild(tldrawContainer);
                 const tl = new TldrawManager(this.data.rootid, tldrawContainer, [this.data.rootid], this.tab.title);
                 (panelElement as any).tldrawManager = tl;
-
+                
+                // 注册 Tab 实例
+                registerTab(this.data.rootid, this.tab);
             },
             async destroy() {
                 console.debug("销毁画板选项卡", this);
+                const rootid = this.data.rootid;
                 const tldrawManager = (this.element as any).tldrawManager;
                 if (tldrawManager) {
                     tldrawManager.destroy();
-                    // console.debug("销毁画板实例", tldrawManager);
+                }
+                // 注销 Tab 实例
+                if (rootid) {
+                    unregisterTab(rootid);
                 }
             }
         })

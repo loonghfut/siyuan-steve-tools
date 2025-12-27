@@ -3,7 +3,7 @@
     import { showMessage } from 'siyuan';
     import { api } from "@frostime/siyuan-plugin-kits";
     import { triggerWhiteboardsRefresh } from './whiteboards.store';
-    import { destroyInstance } from './tldraw-instance-manager';
+    import { closeTab } from './tldraw-instance-manager';
 
     interface WhiteboardFile {
         name: string;       // 文件名 e.g., tldraw-data-2023...-xxxxxxx.json
@@ -170,8 +170,8 @@
         if (!confirmed) return;
 
         try {
-            // 先销毁此白板的实例（如果存在）
-            await destroyInstance(file.drawingId, 'user-delete');
+            // 关闭此白板的页签（如果存在），这将自动触发销毁回调
+            closeTab(file.drawingId, 'user-delete');
 
             // 再删除白板文件
             await api.removeFile(file.path);
