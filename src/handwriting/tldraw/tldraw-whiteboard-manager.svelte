@@ -1348,17 +1348,55 @@
     top: 10px;
     left: 10px;
     z-index: 2;
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--b3-theme-surface);
     border: 1px solid var(--b3-border-color);
     border-radius: 6px;
-    padding: 4px;
+    padding: 3px;
     display: inline-flex;
     align-items: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card-select:hover {
+    border-color: var(--b3-theme-primary);
+    box-shadow: 0 2px 6px rgba(61, 142, 255, 0.2);
 }
 
 .card-select input {
     width: 16px;
     height: 16px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1.5px solid var(--b3-border-color);
+    border-radius: 4px;
+    background: var(--b3-theme-background);
+    transition: all 0.15s ease;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.card-select input:checked {
+    background: var(--b3-theme-primary);
+    border-color: var(--b3-theme-primary);
+}
+
+.card-select input:checked::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.card-select input:hover {
+    transform: scale(1.1);
+    border-color: var(--b3-theme-primary);
 }
 
 .card-preview {
