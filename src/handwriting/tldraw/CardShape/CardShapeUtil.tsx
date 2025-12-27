@@ -48,71 +48,6 @@ function invalidatePreviewCache(blockId: string) {
 	staticPreviewCache.delete(blockId);
 }
 
-// 使用 getHeadingChildrenDOM API 获取静态 DOM 内容
-async function fetchStaticDomContent(blockId: string): Promise<string | null> {
-	try {
-		const res = await api.getHeadingChildrenDOM(blockId);
-		// getHeadingChildrenDOM 直接返回 DOM 字符串
-		if (!res) {
-			return null;
-		}
-		if (typeof document === 'undefined') {
-			return res;
-		}
-		const wrapper = document.createElement('div');
-		wrapper.innerHTML = res;
-		const embedNodes = Array.from(
-			wrapper.querySelectorAll('[data-type="NodeBlockQueryEmbed"]')
-		);
-		if (embedNodes.length === 0) {
-			return wrapper.innerHTML;
-		}
-
-		const idsToResolve = embedNodes
-			.map((node) => node.getAttribute('data-node-id')?.trim() || '')
-			.filter(Boolean);
-		const uniqueIds = Array.from(new Set(idsToResolve));
-		if (uniqueIds.length === 0) {
-			return wrapper.innerHTML;
-		}
-
-		let embedDomMap: Record<string, string> | null = null;
-		try {
-			embedDomMap = await api.getBlockDOMsWithEmbed(uniqueIds);
-		} catch (err) {
-			console.error('获取嵌入 DOM 内容失败:', err);
-			return wrapper.innerHTML;
-		}
-		if (!embedDomMap) {
-			return wrapper.innerHTML;
-		}
-
-		const buildFragmentFromHtml = (html: string) => {
-			const temp = document.createElement('div');
-			temp.innerHTML = html;
-			const fragment = document.createDocumentFragment();
-			while (temp.firstChild) {
-				fragment.appendChild(temp.firstChild);
-			}
-			return fragment;
-		};
-
-		embedNodes.forEach((node) => {
-			const targetId = node.getAttribute('data-node-id')?.trim();
-			if (!targetId) return;
-			const replacementHtml = embedDomMap[targetId];
-			if (!replacementHtml) return;
-			const fragment = buildFragmentFromHtml(replacementHtml);
-			node.replaceWith(fragment);
-		});
-
-		return wrapper.innerHTML;
-	} catch (err) {
-		console.error('获取静态 DOM 内容失败:', err);
-		return null;
-	}
-}
-
 // 批量块存在性检查：收集多个卡片的检查请求，合并处理
 const blockCheckQueue = new Map<string, { shapeId: string; resolve: (exists: boolean) => void }[]>();
 let blockCheckTimer: number | null = null;
@@ -662,87 +597,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				return currentBlockId;
 			};
 
-			// 从 Protyle 实例克隆静态预览 - 用于文档块(isMain)的静态渲染
-			const useStaticPreviewFromProtyle = async (forceRefresh = false) => {
-				if (!isMainCard) return;
-				if (!protyleRef.current || cancelled) return;
-				const ce = protyleRef.current.protyle?.contentElement as HTMLElement | undefined;
-				if (!ce) return;
-
-				// 检查缓存（如果非强制刷新）
-				const currentBlockId = containerRef.current?.getAttribute('blockid') || blockId;
-				if (!forceRefresh && currentBlockId) {
-					const cachedHtml = getCachedPreview(currentBlockId, fontSize);
-					if (cachedHtml) {
-						// 使用缓存的预览
-						if (staticPreviewRef.current?.parentElement === containerRef.current) {
-							containerRef.current.removeChild(staticPreviewRef.current);
-						}
-						const wrapper = document.createElement('div');
-						wrapper.innerHTML = cachedHtml;
-						const clone = wrapper.firstElementChild as HTMLElement;
-						if (clone && containerRef.current) {
-										if (protyleHostRef.current?.parentElement === containerRef.current) {
-								try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
-							}
-							staticPreviewRef.current = clone;
-							containerRef.current.appendChild(clone);
-							// 先把 protyle-html 转为普通 DOM，再运行后续渲染
-							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-							await renderAllContent(clone);
-							// 清理 Protyle
-							if (protyleHostRef.current?.parentElement) {
-								protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
-							}
-							try { safeDestroyProtyle(protyleRef.current); } catch { }
-							protyleRef.current = null;
-							protyleHostRef.current = null;
-							if (cancelled) return;
-							return;
-						}
-					}
-				}
-
-				// 保险起见，再等待一次渲染完成
-				await waitForProtyleRendered(protyleRef.current);
-				if (cancelled) return;
-				// 克隆只读 DOM
-				if (staticPreviewRef.current?.parentElement === containerRef.current) {
-					containerRef.current.removeChild(staticPreviewRef.current);
-				}
-				const clone = ce.cloneNode(true) as HTMLElement;
-				clone.style.width = '100%';
-				clone.style.height = '100%';
-				clone.style.overflow = 'auto';
-				clone.style.fontSize = `${fontSize}px`;
-
-				// 缓存原始 DOM HTML（渲染前）
-				if (currentBlockId) {
-					cacheStaticPreview(currentBlockId, clone.outerHTML, fontSize);
-				}
-
-				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
-				if (containerRef.current) {
-					if (protyleHostRef.current?.parentElement === containerRef.current) {
-						try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
-					}
-					staticPreviewRef.current = clone;
-					containerRef.current.appendChild(clone);
-					await renderAllContent(clone);
-				}
-
-				// 清理 Protyle host
-				if (protyleHostRef.current?.parentElement) {
-					protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
-				}
-				// 销毁 Protyle 实例
-				try { safeDestroyProtyle(protyleRef.current); } catch { }
-				protyleRef.current = null;
-				protyleHostRef.current = null;
-				if (cancelled) return;
-			};
-
-			// 使用 getDoc API 直接获取静态 DOM 内容（无需创建 Protyle）
+			// 从 API 获取静态预览 - 用于文档块(isMain)的静态渲染
 			const useStaticPreviewFromGetDoc = async (targetBlockId: string, forceRefresh = false) => {
 				if (cancelled || !containerRef.current) return;
 
@@ -758,6 +613,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						wrapper.innerHTML = cachedHtml;
 						const clone = wrapper.firstElementChild as HTMLElement;
 						if (clone && containerRef.current) {
+							// 清理 Protyle host
+							if (protyleHostRef.current?.parentElement === containerRef.current) {
+								try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
+							}
+							// 销毁 Protyle 实例
+							try { safeDestroyProtyle(protyleRef.current); } catch { }
+							protyleRef.current = null;
+							protyleHostRef.current = null;
+
 							staticPreviewRef.current = clone;
 							containerRef.current.appendChild(clone);
 							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
@@ -769,20 +633,37 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 
 				// 使用 getDoc API 获取 DOM 内容
-				const domContent = await fetchStaticDomContent(targetBlockId);
+				let domContent: string | null = null;
+				try {
+					const res = await api.getDoc(targetBlockId);
+					if (res && res.content) {
+						domContent = res.content;
+					}
+				} catch (err) {
+					console.error('获取文档 DOM 内容失败:', err);
+				}
+
 				if (cancelled || !domContent) return;
 
 				// 移除旧的静态预览
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
 					containerRef.current.removeChild(staticPreviewRef.current);
 				}
+				// 清理 Protyle host
+				if (protyleHostRef.current?.parentElement === containerRef.current) {
+					try { containerRef.current.removeChild(protyleHostRef.current); } catch { }
+				}
+				// 销毁 Protyle 实例
+				try { safeDestroyProtyle(protyleRef.current); } catch { }
+				protyleRef.current = null;
+				protyleHostRef.current = null;
 
 				// 创建预览容器
 				const previewWrapper = document.createElement('div');
 				previewWrapper.className = 'protyle-wysiwyg protyle-wysiwyg--attr';
 				previewWrapper.style.width = '100%';
 				previewWrapper.style.height = '100%';
-				previewWrapper.style.overflow = 'scroll';
+				previewWrapper.style.overflow = 'auto';
 				previewWrapper.style.fontSize = `${fontSize}px`;
 				previewWrapper.innerHTML = domContent;
 
@@ -839,10 +720,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								    if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
 									    }
 									    // 如果是手动刷新，则强制 bypass 缓存并通过 API 重新获取 DOM
-									    await useStaticPreviewFromProtyle(wasEditing || manualRefreshTriggered);
+									    await useStaticPreviewFromGetDoc(id, wasEditing || manualRefreshTriggered);
 							if (cancelled) return;
 						} else {
-							// 普通块：使用 fetchStaticDomContent API 直接获取静态 DOM
+							// 普通块：使用 getDoc API 直接获取静态 DOM
 							if (protyleRef.current) {
 								if (protyleHostRef.current?.parentElement) {
 									protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
