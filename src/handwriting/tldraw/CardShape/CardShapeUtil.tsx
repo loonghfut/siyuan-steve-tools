@@ -160,6 +160,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
 		const tldrawHeaderImage = settingdata['tldraw-header-image'] !== false;
 		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
+		const [collapsedDocInfo, setCollapsedDocInfo] = useState<{
+			title: string;
+			titleImg?: string;
+			titleImgSrc?: string;
+			titleImgBackground?: string;
+			titleImgColor?: string;
+			titleImgHasUrl?: boolean;
+		} | null>(null);
 		const isCollapsed = shape.props.isCollapsed || false;
 		const isMainCard = Boolean(shape.props.isMain);
 
@@ -251,7 +259,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 折叠/展开时记录高度并在展开时恢复
 		useEffect(() => {
 			const prev = prevCollapsedRef.current;
-			const collapsedHeight = Math.max((shape.props.fontSize || 16) * 2.5, 64);
+			const collapsedHeight = Math.max((shape.props.fontSize || 16) * 6, 180);
 			const storedHeight = shape.props.preCollapseHeight;
 
 			// 折叠状态下进入编辑：临时恢复到折叠前高度，便于编辑
@@ -368,27 +376,100 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			return () => clearTimeout(timer)
 		}, [isEditing, shape.id])
 
-		// 折叠状态下获取块的 markdown 内容并截取前10个字
+		// 解析题头图：提取背景图 URL/渐变，并返回 img src 以及背景信息
+		const parseTitleImg = (titleImg?: string): {
+			src: string;
+			backgroundImage?: string;
+			backgroundColor?: string;
+			hasUrl?: boolean;
+		} => {
+			const fallback = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+			if (!titleImg) return { src: fallback };
+			let imgSrc = fallback;
+			let hasUrl = false;
+			let backgroundImage: string | undefined;
+			let backgroundColor: string | undefined;
+
+			const urlMatch = titleImg.match(/background-image\s*:\s*url\(["']?([^"')]+)["']?\)/i);
+			if (urlMatch) {
+				hasUrl = true;
+				const imgPath = urlMatch[1];
+				imgSrc = `${imgPath}`;
+				backgroundImage = `url(${imgSrc})`;
+			} else {
+				const bgImageMatch = titleImg.match(/background-image\s*:\s*([^;]+);?/i);
+				if (bgImageMatch) {
+					backgroundImage = bgImageMatch[1].trim(); // 支持线性渐变等
+				}
+			}
+
+			const bgColorMatch = titleImg.match(/background-color\s*:\s*([^;]+);?/i);
+			if (bgColorMatch) {
+				backgroundColor = bgColorMatch[1].trim();
+			}
+
+			return { src: imgSrc, backgroundImage, backgroundColor, hasUrl };
+		};
+
+		// 折叠状态下的展示内容：
+		// - isMain: 显示题头图和标题
+		// - 其他: 显示块内容摘要
 		useEffect(() => {
-			if (isCollapsed && shape.props.blockId) {
-				api.getBlockByID(shape.props.blockId).then((res) => {
+			if (!isCollapsed || !shape.props.blockId) return;
+
+			let cancelled = false;
+
+			const loadForMain = async () => {
+				try {
+					const info = await api.getDocInfo(shape.props.blockId);
+					if (cancelled) return;
+					const ial = info?.ial || {};
+					const titleImg = ial['title-img'];
+					const title = ial.title || info?.name || '未命名文档';
+					const parsed = parseTitleImg(titleImg);
+					setCollapsedDocInfo({
+						title,
+						titleImg,
+						titleImgSrc: parsed.src,
+						titleImgBackground: parsed.backgroundImage,
+						titleImgColor: parsed.backgroundColor,
+						titleImgHasUrl: parsed.hasUrl,
+					});
+				} catch (e) {
+					if (cancelled) return;
+					setCollapsedDocInfo({ title: '未命名文档' });
+				}
+			};
+
+			const loadForNormal = async () => {
+				try {
+					const res = await api.getBlockByID(shape.props.blockId);
+					if (cancelled) return;
 					if (res && res.content) {
-						// 移除 markdown 标记和链接，只保留纯文本
 						const plainText = res.content
-							.replace(/\[🔗\]\([^)]+\)/g, '') // 移除链接
-							.replace(/^#+\s+/gm, '') // 移除标题标记
-							.replace(/\{:[^}]+\}/g, '') // 移除属性
+							.replace(/\[🔗\]\([^)]+\)/g, '')
+							.replace(/^#+\s+/gm, '')
+							.replace(/\{:[^}]+\}/g, '')
 							.trim();
 						const preview = plainText.slice(0, 10) + (plainText.length > 10 ? '...' : '');
 						setCollapsedText(preview || '空块');
 					} else {
 						setCollapsedText('空块');
 					}
-				}).catch(() => {
+				} catch {
+					if (cancelled) return;
 					setCollapsedText('加载失败');
-				});
+				}
+			};
+
+			if (isMainCard) {
+				loadForMain();
+			} else {
+				loadForNormal();
 			}
-		}, [isCollapsed, shape.props.blockId]);
+
+			return () => { cancelled = true; };
+		}, [isCollapsed, shape.props.blockId, isMainCard]);
 
 
 
@@ -993,20 +1074,77 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				>
 					{/* 折叠状态 */}
 					{isCollapsed && !isEditingState && (
-						<div style={{
-							width: '100%',
-							height: '100%',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							fontSize: `${Math.min(shape.props.w / 6, shape.props.h / 2)}px`,
-							padding: '8px',
-							wordBreak: 'break-all',
-							color: theme[shape.props.color].solid,
-							textAlign: 'center',
-						}}>
-							{collapsedText}
+						isMainCard ? (
+							<div style={{
+								width: '100%',
+								height: '100%',
+								display: 'flex',
+								flexDirection: 'column',
+								alignItems: 'flex-start',
+								justifyContent: 'flex-start',
+								gap: '12px',
+								padding: '12px',
+								boxSizing: 'border-box',
+								color: theme[shape.props.color].solid,
+								overflow: 'hidden',
+							}}
+						>
+							{tldrawHeaderImage && collapsedDocInfo?.titleImgSrc && (
+								<div
+									style={{
+										width: '100%',
+										height: '60%',
+										minHeight: '120px',
+										borderRadius: '12px',
+										overflow: 'hidden',
+										background: collapsedDocInfo.titleImgBackground || collapsedDocInfo.titleImgColor || '#f2f2f2',
+										display: 'flex',
+										alignItems: 'center',
+										justifyContent: 'center',
+									}}
+								>
+									{collapsedDocInfo.titleImgHasUrl ? (
+										<img
+											src={collapsedDocInfo.titleImgSrc}
+											style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+											alt={collapsedDocInfo.title || '文档'}
+										/>
+									) : null}
+								</div>
+							)}
+							<div style={{
+								width: '100%',
+								display: 'flex',
+								alignItems: 'center',
+								gap: '8px',
+								fontSize: `${Math.min(shape.props.w / 8, 28)}px`,
+								fontWeight: 600,
+								wordBreak: 'break-all',
+							}}>
+								<span style={{ display: 'flex', alignItems: 'center' }}>
+									<svg width="20" height="20" style={{ marginRight: '6px' }}>
+										<use xlinkHref="#iconFile"></use>
+									</svg>
+									{collapsedDocInfo?.title || '加载中...'}
+								</span>
+							</div>
 						</div>
+						) : (
+							<div style={{
+								width: '100%',
+								height: '100%',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								fontSize: `${Math.min(shape.props.w / 6, shape.props.h / 2)}px`,
+								padding: '8px',
+								wordBreak: 'break-all',
+								color: theme[shape.props.color].solid,
+								textAlign: 'center',
+							}}>
+								{collapsedText}
+							</div>
+						)
 					)}
 					{shape.props.isNewlyCreated && !shape.props.blockId && !isEditingState && (
 						<div style={{
