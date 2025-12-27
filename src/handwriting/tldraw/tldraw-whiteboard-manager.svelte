@@ -3,7 +3,8 @@
     import { showMessage, openTab, Plugin, confirm } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
     import { whiteboardFilesUpdated } from './whiteboards.store';
-    import { backupWhiteboardFiles, getBackupStats, WHITEBOARD_TRASH_DIR } from './backup-utils';
+    import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from './whiteboard-file-manager';
+    import { destroyInstance } from './tldraw-instance-manager';
 
     export let plugin: Plugin;
 
@@ -322,10 +323,19 @@
             `确定要删除 ${items.length} 个白板文件吗？此操作不可恢复！`,
             async (dialog) => {
                 let successCount = 0;
+                const deletedItems: WhiteboardItem[] = [];
+                
                 for (const item of items) {
                     try {
+                        // 先销毁此白板的实例（如果存在）
+                        await destroyInstance(item.id, 'user-delete');
+
+                        // 再删除白板文件
                         await api.removeFile(item.path);
                         successCount++;
+                        deletedItems.push(item);
+                        
+                        // 通知其他组件白板已删除
                         whiteboardFilesUpdated.set({
                             action: 'delete',
                             fileName: item.fileName,
@@ -335,6 +345,22 @@
                     } catch (error) {
                         console.error(`删除 ${item.fileName} 失败:`, error);
                     }
+                }
+
+                // 为了应对 tldraw 的自动保存竞争问题，延迟 2 秒再尝试一次删除
+                // 如果自动保存在同时写回文件，第二次删除会把它彻底移除
+                if (deletedItems.length > 0) {
+                    setTimeout(async () => {
+                        for (const item of deletedItems) {
+                            try {
+                                await api.removeFile(item.path);
+                                console.debug(`延迟删除成功: ${item.path}`);
+                            } catch (e) {
+                                // 如果第二次删除失败，记录日志但不打扰用户
+                                console.debug('延迟删除重试失败（可能已被移除）:', item.path, e);
+                            }
+                        }
+                    }, 2000);
                 }
 
                 showMessage(`成功删除 ${successCount}/${items.length} 个白板`, 3000, 'info');
@@ -358,13 +384,13 @@
     async function backupItems(items: WhiteboardItem[]) {
         if (items.length === 0) return;
         try {
-            const sourcePaths = items.map(item => item.path);
-            const results = await backupWhiteboardFiles(sourcePaths, {
+            const whiteboardIds = items.map(item => item.id);
+            const results = await WhiteboardFileManager.batchBackupWhiteboards(whiteboardIds, {
                 reason: '手动备份',
                 includeTimestamp: true,
             });
 
-            const stats = getBackupStats(results);
+            const stats = WhiteboardFileManager.getOperationStats(results);
             if (stats.success > 0) {
                 showMessage(
                     `成功备份 ${stats.success}/${items.length} 个白板到 ${WHITEBOARD_TRASH_DIR}`,

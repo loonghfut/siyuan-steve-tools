@@ -3,6 +3,7 @@
     import { showMessage } from 'siyuan';
     import { api } from "@frostime/siyuan-plugin-kits";
     import { triggerWhiteboardsRefresh } from './whiteboards.store';
+    import { destroyInstance } from './tldraw-instance-manager';
 
     interface WhiteboardFile {
         name: string;       // 文件名 e.g., tldraw-data-2023...-xxxxxxx.json
@@ -169,6 +170,10 @@
         if (!confirmed) return;
 
         try {
+            // 先销毁此白板的实例（如果存在）
+            await destroyInstance(file.drawingId, 'user-delete');
+
+            // 再删除白板文件
             await api.removeFile(file.path);
             showMessage(`已删除数据文件: ${file.name}`);
             // 从列表中移除已删除的文件
@@ -177,7 +182,7 @@
             // 触发白板卡片栏/已打开画板实例更新
             triggerWhiteboardsRefresh('delete', file.name, file.drawingId);
 
-            // 为了应对 tldraw 的自动保存竞争问题，延迟 5 秒再尝试一次删除
+            // 为了应对 tldraw 的自动保存竞争问题，延迟 2 秒再尝试一次删除
             // 如果自动保存在同时写回文件，第二次删除会把它彻底移除
             setTimeout(async () => {
                 try {
@@ -189,7 +194,7 @@
                     // 如果第二次删除失败，记录日志但不打扰用户
                     console.debug('延迟删除重试失败（可能已被移除）:', file.path, e);
                 }
-            }, 5000);
+            }, 2000);
         } catch (error) {
             console.error(`删除文件 ${file.path} 失败:`, error);
             showMessage('删除数据文件失败', 5000, 'error');

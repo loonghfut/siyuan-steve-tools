@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import * as tldata from './datamanager';
+    import { WhiteboardFileManager } from './whiteboard-file-manager';
     import { showMessage } from 'siyuan';
     import * as api from '@/api/api';
 
@@ -53,16 +53,13 @@
     async function loadBackups() {
         loading = true;
         try {
-            const files = await tldata.getBackupList();
+            const files = await WhiteboardFileManager.getBackupList();
             
             // 处理文件列表，提取画板ID
-            backupFiles = files.map(file => {
-                const drawingId = extractDrawingId(file.name);
-                return {
-                    ...file,
-                    drawingId
-                };
-            });
+            backupFiles = files.map(file => ({
+                ...file,
+                // drawingId 已经在 getBackupList 中提取
+            }));
             
             // 按画板ID分组
             await groupBackupsByDrawingId();
@@ -164,13 +161,6 @@
             minute: '2-digit',
             second: '2-digit'
         });
-    }
-    
-    // 提取画板ID
-    function extractDrawingId(filename: string): string {
-        // Match IDs like 20250308145324-1pyvr3u
-        const match = filename.match(/tldraw-data-([\d]+-[a-zA-Z0-9]+)(?:-|\.)/);
-        return match ? match[1] : '未知画板';
     }
 
     function updatePreviewState(path: string, state: Partial<PreviewMeta>) {
@@ -365,8 +355,8 @@
         const confirmed = confirm(`确定要将此备份${filename}恢复到画板 "${title || drawingId}" 吗？这将覆盖当前画板数据。`);
         if (!confirmed) return;
         console.debug('恢复备份:', drawingId);
-        const success = await tldata.restoreBackup(path, drawingId);
-        if (success) {
+        const result = await WhiteboardFileManager.restoreBackupFile(path, drawingId);
+        if (result.success) {
             showMessage(`备份已恢复到画板 ${title || drawingId}`);
         }
         api.refresh();
@@ -377,12 +367,12 @@
         const confirmed = confirm(`确定要删除备份 ${filename} 吗？此操作不可撤销。`);
         if (!confirmed) return;
         
-        const success = await tldata.deleteBackup(path);
-        if (success) {
+        const result = await WhiteboardFileManager.deleteBackupFile(path);
+        if (result.success) {
             showMessage('备份文件已删除');
             loadBackups();
         } else {
-            showMessage('删除备份文件失败');
+            showMessage('删除备份文件失败: ' + result.error);
         }
     }
     

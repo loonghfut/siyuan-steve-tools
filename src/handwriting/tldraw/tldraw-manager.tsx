@@ -28,7 +28,7 @@ import { captureSlideScreenshot, CaptureSlideScreenshotOptions, CaptureSlideScre
 import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage, Dialog } from 'siyuan';
-import { backupWhiteboardData } from './backup-utils';
+import { WhiteboardFileManager } from './whiteboard-file-manager';
 import TldrawBackupManager from './tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
 import { JsShapeUtil } from './JsShape/JsShapeUtil';
@@ -41,7 +41,7 @@ import { tldrawkey } from '@/../my/key';
 import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
 import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
-import { whiteboardFilesUpdated } from './whiteboards.store';
+import { registerInstance, unregisterInstance } from './tldraw-instance-manager';
 const assetUrls = getAssetUrls({
     baseUrl: 'plugins/siyuan-steve-tools/asset/',
 })
@@ -67,6 +67,7 @@ const filteredDefaultShapeUtils = defaultShapeUtils.filter(util => util.type !==
 const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil, BezierConnectorShapeUtil]
 const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil, BezierConnectorBindingUtil]
 const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool]
+
 /**
  * TldrawManager类，用于管理tldraw实例和操作
  */
@@ -87,7 +88,6 @@ export class TldrawManager {
     private applyingRemoteChanges = false;
     private title: string;
     private themeObserver: MutationObserver | null = null;
-    private _whiteboardDeleteUnsub: (() => void) | null = null;
     private _autosaveUnsub: (() => void) | null = null;
     private _realtimeUnsub: (() => void) | null = null;
     private _broadcastChannel: BroadcastChannel | null = null;
@@ -107,40 +107,22 @@ export class TldrawManager {
             bindingUtils: customBindingUtils,
         });
 
-        // 监听白板数据文件删除事件：若当前实例对应数据被删除，自动销毁实例
-        this.setupWhiteboardDeletionListener();
+        // 将当前实例注册到实例管理器
+        registerInstance(this.id, this);
 
         // 初始化tldraw
         this.initialize();
     }
 
-    private setupWhiteboardDeletionListener() {
-        if (this._whiteboardDeleteUnsub) return;
-        try {
-            this._whiteboardDeleteUnsub = whiteboardFilesUpdated.subscribe(({ action, fileName, drawingId }) => {
-                if (action !== 'delete') return;
-                // 事件中可能携带 fileName 或 drawingId，任一匹配即可
-                const expectedFileName = `${this.storageKey}.json`;
-                const hit = (drawingId && drawingId === this.id) || (fileName && fileName === expectedFileName);
-                if (!hit) return;
 
-                // 数据已被删除：不要再保存（否则会把文件写回去）
-                try {
-                    showMessage(`画板数据已删除，已自动销毁实例：${this.title}`, 4000, 'info');
-                } catch { /* ignore */ }
-
-                void this.destroy({ skipSave: true, reason: 'data-deleted' });
-            });
-        } catch (err) {
-            console.warn('Failed to setup whiteboard deletion listener', err);
-        }
-    }
 
     /**
      * 初始化tldraw组件
      */
     private async initialize() {
         if (this._destroyed) return;
+        // 清空container中的旧内容（如果有）
+        this.container.innerHTML = '';
         const root = document.createElement('div');
         root.style.width = '100%';
         root.style.height = '100%';
@@ -293,13 +275,14 @@ export class TldrawManager {
     */
     private async loadData(): Promise<boolean> {
         try {
-            // 从思源笔记的存储中获取数据
-            const data = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
+            // 使用统一文件管理器加载数据
+            const dataContent = await WhiteboardFileManager.readWhiteboardFile(this.id);
 
-            if (data) {
-                console.debug("加载到数据", data);
+            if (dataContent) {
+                console.debug("加载到数据", dataContent);
                 // 尝试解析和加载快照
                 try {
+                    const data = JSON.parse(dataContent);
                     loadSnapshot(this.store, data);
                     console.debug('已加载保存的画布数据');
                     return true; // 加载成功
@@ -323,9 +306,12 @@ export class TldrawManager {
             const jsonData = JSON.stringify(snapshot);
 
             // 保存到思源笔记的存储中
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            await api.putFile(`/data/storage/petal/sttools/${this.storageKey}.json`, false, blob);
-            console.debug('画布数据已保存');
+            const result = await WhiteboardFileManager.saveWhiteboardFile(this.id, jsonData);
+            if (result.success) {
+                console.debug('画布数据已保存');
+            } else {
+                console.error('保存画布数据失败:', result.error);
+            }
         } catch (error) {
             console.error('保存画布数据失败', error);
         }
@@ -1104,8 +1090,8 @@ export class TldrawManager {
             const jsonData = JSON.stringify(snapshot);
             console.debug('备份数据:', jsonData);
 
-            // 使用通用备份工具
-            const result = await backupWhiteboardData(this.storageKey, jsonData, {
+            // 使用统一文件管理器备份
+            const result = await WhiteboardFileManager.backupWhiteboardData(this.id, jsonData, {
                 reason,
                 includeTimestamp: true,
             });
@@ -1138,26 +1124,15 @@ export class TldrawManager {
             // 如果需要，从存储中删除持久化数据
             if (removeStorage) {
                 try {
-                    // Create trash directory if it doesn't exist
-                    try {
-                        await api.putFile(`/data/storage/petal/sttools/trash/.gitkeep`, false, new Blob([''], { type: 'text/plain' }));
-                    } catch (err) {
-                        // Directory likely already exists
+                    const result = await WhiteboardFileManager.deleteWhiteboardFile(this.id, {
+                        reason: '清空画板',
+                    });
+                    
+                    if (result.success) {
+                        showMessage('已将画布数据移动到回收站: ' + result.fileName);
+                    } else {
+                        console.warn('删除存储文件失败:', result.error);
                     }
-
-                    // Get the data content before removal
-                    const dataContent = await api.getFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
-
-                    // 确保写入的是字符串（api.getFile 可能返回对象）
-                    const contentToSave = typeof dataContent === 'string' ? dataContent : JSON.stringify(dataContent);
-
-                    // Move to trash with timestamp
-                    const trashFileName = `${this.storageKey}-${Date.now()}.json`;
-                    await api.putFile(`/data/storage/petal/sttools/trash/${trashFileName}`, false, new Blob([contentToSave], { type: 'application/json' }));
-
-                    // Remove original file
-                    await api.removeFile(`/data/storage/petal/sttools/${this.storageKey}.json`);
-                    showMessage('已将画布数据移动到回收站' + `/data/storage/petal/sttools/trash/${trashFileName}`);
                 } catch (err) {
                     // 如果文件不存在，忽略错误
                     console.warn('删除存储文件失败，可能文件不存在', err);
@@ -1215,12 +1190,6 @@ export class TldrawManager {
             if (this._broadcastChannel) {
                 this._broadcastChannel.close();
                 this._broadcastChannel = null;
-            }
-        } catch { /* ignore */ }
-        try {
-            if (this._whiteboardDeleteUnsub) {
-                this._whiteboardDeleteUnsub();
-                this._whiteboardDeleteUnsub = null;
             }
         } catch { /* ignore */ }
 
@@ -1305,6 +1274,9 @@ export class TldrawManager {
         } else {
             try { this.container.innerHTML = ''; } catch { /* ignore */ }
         }
+
+        // 从实例管理器中注销当前实例
+        unregisterInstance(this.id);
 
         this._destroyed = true;
         this._destroying = false;
