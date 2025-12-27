@@ -141,12 +141,15 @@
             const newTagsValue = editingTags.map(t => `#${t}#`).join('');
             await api.setBlockAttrs(editingTagItem.id, { tags: newTagsValue });
 
-            // Update local state
+            // Update local state - 单个条目刷新
             const idx = allItems.findIndex(i => i.id === editingTagItem.id);
             if (idx !== -1) {
                 allItems[idx] = { ...allItems[idx], tags: editingTags.slice() };
                 allItems = allItems;
                 collectAvailableTags();
+                // 触发响应式更新
+                filteredItems = filteredItems;
+                buildGalleryData();
             }
 
             showMessage('标签已保存', 2000, 'info');
@@ -859,7 +862,15 @@
             <svg><use xlink:href={"#iconEye" + (showOnlyValid ? 'off' : '')}></use></svg>
         </button>
         <span class="fn__space"></span>
-
+        <button
+            type="button"
+            class="block__icon"
+            title="刷新"
+            on:click={loadWhiteboards}>
+            <svg><use xlink:href="#iconRefresh"></use></svg>
+        </button>
+    </div>
+        {#if selectedItems.length > 0}
         <div class="selection-tools">
             <span class="selection-counter" title={`当前视图选中 ${visibleSelectedCount}/${filteredItems.length}`}>
                 已选 {selectedItems.length}
@@ -904,18 +915,7 @@
                 </select>
             {/if}
         </div>
-        <span class="fn__space"></span>
-
-
-        <button
-            type="button"
-            class="block__icon"
-            title="刷新"
-            on:click={loadWhiteboards}>
-            <svg><use xlink:href="#iconRefresh"></use></svg>
-        </button>
-    </div>
-
+        {/if}
     
 
     {#if loading}
