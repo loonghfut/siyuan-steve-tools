@@ -1440,6 +1440,31 @@ export async function getDoc(id: string): Promise<IResGetDoc> {
     return request(url, data);
 }
 
+export interface IResGetDocInfo {
+    id: string;
+    rootID: string;
+    name: string;
+    refCount: number;
+    subFileCount: number;
+    refIDs: string[];
+    ial: Record<string, string>;
+    icon: string;
+    attrViews: Array<{ id: string; name: string }>;
+}
+
+/**
+ * 获取文档信息（标题、题头图等）
+ * @param id 文档块 ID
+ * @returns 文档信息对象
+ */
+export async function getDocInfo(id: string): Promise<IResGetDocInfo> {
+    const data = {
+        id: id
+    };
+    const url = '/api/block/getDocInfo';
+    return request(url, data);
+}
+
 /**
  * 获取指定标题块下的所有直接子块的 DOM 字符串表示
  * @param id 目标标题块的 ID
