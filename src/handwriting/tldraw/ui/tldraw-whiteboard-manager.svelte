@@ -2,9 +2,9 @@
     import { onMount, onDestroy, tick } from 'svelte';
     import { showMessage, openTab, Plugin, confirm } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
-    import { whiteboardFilesUpdated } from './whiteboards.store';
-    import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from './whiteboard-file-manager';
-    import { closeTab } from './tldraw-instance-manager';
+    import { whiteboardFilesUpdated } from '../whiteboards.store';
+    import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from '../whiteboard-file-manager';
+    import { closeTab } from '../tldraw-instance-manager';
     import WhiteboardCard from './whiteboard-card.svelte';
 
     export let plugin: Plugin;

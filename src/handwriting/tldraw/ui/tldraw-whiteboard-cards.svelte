@@ -2,7 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import { showMessage, openTab, Plugin } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
-    import { whiteboardFilesUpdated } from './whiteboards.store';
+    import { whiteboardFilesUpdated } from '../whiteboards.store';
 
     // 父层传入 plugin 以便打开白板
     export let plugin: Plugin;

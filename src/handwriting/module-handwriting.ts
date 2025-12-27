@@ -3,8 +3,8 @@ import { openTab, Plugin, showMessage } from "siyuan";
 // import './handwriting.css';
 import { TldrawManager } from './tldraw/tldraw-manager';
 // 替换为新的卡片视图组件
-import TldrawWhiteboardCards from './tldraw/tldraw-whiteboard-cards.svelte';
-import TldrawWhiteboardManager from './tldraw/tldraw-whiteboard-manager.svelte';
+import TldrawWhiteboardCards from './tldraw/ui/tldraw-whiteboard-cards.svelte';
+import TldrawWhiteboardManager from './tldraw/ui/tldraw-whiteboard-manager.svelte';
 import { addWhiteboardButton } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";

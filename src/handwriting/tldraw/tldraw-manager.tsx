@@ -29,7 +29,7 @@ import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
 import { showMessage, Dialog } from 'siyuan';
 import { WhiteboardFileManager } from './whiteboard-file-manager';
-import TldrawBackupManager from './tldraw-backup-manager.svelte';
+import TldrawBackupManager from './ui/tldraw-backup-manager.svelte';
 import { settingdata } from '@/index';
 import { JsShapeUtil } from './JsShape/JsShapeUtil';
 import { JsShapeTool } from './JsShape/JsShapeTool';

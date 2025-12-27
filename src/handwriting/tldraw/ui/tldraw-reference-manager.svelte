@@ -2,8 +2,8 @@
     import { onMount } from 'svelte';
     import { showMessage } from 'siyuan';
     import { api } from "@frostime/siyuan-plugin-kits";
-    import { triggerWhiteboardsRefresh } from './whiteboards.store';
-    import { closeTab } from './tldraw-instance-manager';
+    import { triggerWhiteboardsRefresh } from '../whiteboards.store';
+    import { closeTab } from '../tldraw-instance-manager';
 
     interface WhiteboardFile {
         name: string;       // 文件名 e.g., tldraw-data-2023...-xxxxxxx.json

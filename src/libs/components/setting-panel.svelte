@@ -8,8 +8,8 @@
 -->
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import TldrawBackupManager from '@/handwriting/tldraw/tldraw-backup-manager.svelte';
-    import TldrawReferenceManager from '@/handwriting/tldraw/tldraw-reference-manager.svelte';
+    import TldrawBackupManager from '@/handwriting/tldraw/ui/tldraw-backup-manager.svelte';
+    import TldrawReferenceManager from '@/handwriting/tldraw/ui/tldraw-reference-manager.svelte';
     import Form from './Form';
     import HeadimgMappingEditor from '@/settings/components/HeadimgMappingEditor.svelte';
     import NotebookBlacklistEditor from '@/settings/components/NotebookBlacklistEditor.svelte';

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte";
-    import { WhiteboardFileManager } from "./whiteboard-file-manager";
+    import { WhiteboardFileManager } from "../whiteboard-file-manager";
     import { showMessage } from "siyuan";
     import * as api from "@/api/api";
 
