@@ -381,13 +381,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// Protyle 生命周期管理主 Effect
 		// 注意：对于 live-protyle 模式，编辑状态切换不应触发重建
 		useEffect(() => {
-				// 检测是否为手动刷新（通过 refreshNonce 变更触发）
-				const manualRefreshTriggered = refreshNonceRef.current !== shape.props.refreshNonce;
-				const shouldForceReloadLiveProtyle =
-					effectiveRenderMode === 'live-protyle' &&
-					manualRefreshTriggered;
-				// 更新引用以记录最新的 nonce
-				refreshNonceRef.current = shape.props.refreshNonce;
+			// 检测是否为手动刷新（通过 refreshNonce 变更触发）
+			const manualRefreshTriggered = refreshNonceRef.current !== shape.props.refreshNonce;
+			const shouldForceReloadLiveProtyle =
+				effectiveRenderMode === 'live-protyle' &&
+				manualRefreshTriggered;
+			// 更新引用以记录最新的 nonce
+			refreshNonceRef.current = shape.props.refreshNonce;
 			// 折叠状态下不渲染 Protyle
 			if (isCollapsed && !isEditingState) {
 				destroyRuntimeResources();
@@ -408,28 +408,28 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			// effectiveRenderMode 已通过 useMemo 计算
 
 			// 等待 Protyle 完成首次内容渲染（尽量接近编辑态样式）
-			const waitForProtyleRendered = async (pt: Protyle, timeout = 800) => {
-				const ce = pt.protyle?.contentElement as HTMLElement | undefined;
-				if (!ce) return;
-				if (ce.childElementCount > 0) {
-					await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-					return;
-				}
-				await new Promise<void>((resolve) => {
-					let done = false;
-					const finish = () => {
-						if (done) return; done = true; resolve();
-					};
-					const obs = new MutationObserver(() => {
-						if (ce.childElementCount > 0) {
-							obs.disconnect();
-							requestAnimationFrame(() => requestAnimationFrame(finish));
-						}
-					});
-					obs.observe(ce, { childList: true, subtree: true });
-					setTimeout(() => { try { obs.disconnect(); } catch { } finish(); }, timeout);
-				});
-			};
+			// const waitForProtyleRendered = async (pt: Protyle, timeout = 800) => {
+			// 	const ce = pt.protyle?.contentElement as HTMLElement | undefined;
+			// 	if (!ce) return;
+			// 	if (ce.childElementCount > 0) {
+			// 		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+			// 		return;
+			// 	}
+			// 	await new Promise<void>((resolve) => {
+			// 		let done = false;
+			// 		const finish = () => {
+			// 			if (done) return; done = true; resolve();
+			// 		};
+			// 		const obs = new MutationObserver(() => {
+			// 			if (ce.childElementCount > 0) {
+			// 				obs.disconnect();
+			// 				requestAnimationFrame(() => requestAnimationFrame(finish));
+			// 			}
+			// 		});
+			// 		obs.observe(ce, { childList: true, subtree: true });
+			// 		setTimeout(() => { try { obs.disconnect(); } catch { } finish(); }, timeout);
+			// 	});
+			// };
 
 			const mountProtyle = async (priority: number): Promise<string | null> => {
 				if (cancelled) return null;
@@ -812,14 +812,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						const id = containerRef.current?.getAttribute('blockid') || blockId;
 						if (!id) return;
 						if (isMainCard) {
-							// 文档块：创建 Protyle 实例并克隆 DOM
-							if (!protyleRef.current) {
-								await mountProtyle(2);
-								if (cancelled) return;
-								    if (protyleRef.current) await waitForProtyleRendered(protyleRef.current);
-									    }
-									    // 如果是手动刷新，则强制 bypass 缓存并通过 API 重新获取 DOM
-									    await useStaticPreviewFromGetDoc(id, wasEditing || manualRefreshTriggered);
+							await useStaticPreviewFromGetDoc(id, wasEditing || manualRefreshTriggered);
 							if (cancelled) return;
 						} else {
 							// 普通块：使用 getDoc API 直接获取静态 DOM
