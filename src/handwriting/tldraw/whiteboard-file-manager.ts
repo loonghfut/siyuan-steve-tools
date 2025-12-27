@@ -184,9 +184,33 @@ export class WhiteboardFileManager {
      * @returns 提取的ID
      */
     private static extractDrawingId(fileName: string): string {
-        // 从文件名提取白板ID: tldraw-data-{id}-备份-timestamp.json -> {id}
-        const match = fileName.match(/^tldraw-data-([^-]+)/);
-        return match ? match[1] : '';
+        // 文件名格式来自 generateBackupFileName():
+        // - 普通文件: tldraw-data-{id}.json
+        // - 备份/删除等: tldraw-data-{id}-{reason}-{timestamp}.json
+        // 其中 {id} 可能包含连字符（如 20251224190547-dka1p22），因此不能用“遇到第一个-就截断”的方式。
+
+        const prefix = 'tldraw-data-';
+        const base = fileName.endsWith('.json') ? fileName.slice(0, -'.json'.length) : fileName;
+        if (!base.startsWith(prefix)) return '';
+
+        // 尝试剥离末尾时间戳（通常是毫秒级 13 位，这里放宽到 >=10 位）
+        const tsMatch = base.match(/-(\d{10,})$/);
+        if (tsMatch) {
+            const withoutTs = base.slice(0, -tsMatch[0].length); // 去掉 "-timestamp"
+            // 再剥离 reason（一个段落，默认“备份”，也可能是“删除”等）
+            const lastDash = withoutTs.lastIndexOf('-');
+            if (lastDash > prefix.length) {
+                const storageKey = withoutTs.slice(0, lastDash); // 得到 "tldraw-data-{id}"
+                if (storageKey.startsWith(prefix)) {
+                    return storageKey.slice(prefix.length);
+                }
+            }
+            // 如果 reason 不存在（理论上不会），退化为直接取 prefix 后面全部
+            return withoutTs.slice(prefix.length);
+        }
+
+        // 无时间戳（例如主文件）：直接取 prefix 后面的内容
+        return base.slice(prefix.length);
     }
 
     // ==================== 基础文件操作 ====================
