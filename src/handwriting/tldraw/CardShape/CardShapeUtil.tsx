@@ -703,7 +703,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (urlMatch) {
 							const imgPath = urlMatch[1];
 							// 构建静态资源 URL
-							const assetUrl = `/static/${imgPath}`;
+							const assetUrl = `${imgPath}`;
 							imgSrc = assetUrl;
 							// 移除 background-image 部分，只保留其他样式（如 background-color）
 							bgStyle = titleImg.replace(/background-image:\s*url\(["']?[^"')]+["']?\);?/g, '').trim();
