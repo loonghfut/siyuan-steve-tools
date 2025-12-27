@@ -259,7 +259,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 折叠/展开时记录高度并在展开时恢复
 		useEffect(() => {
 			const prev = prevCollapsedRef.current;
-			const collapsedHeight = Math.max((shape.props.fontSize || 16) * 6, 180);
+			const collapsedHeight = Math.max(fontSize * 6, isMainCard ? 260 : 180);
 			const storedHeight = shape.props.preCollapseHeight;
 
 			// 折叠状态下进入编辑：临时恢复到折叠前高度，便于编辑
@@ -329,7 +329,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 			// 同步记录当前折叠状态
 			prevCollapsedRef.current = isCollapsed;
-		}, [isCollapsed, isEditingState, shape.props.h, shape.props.preCollapseHeight, shape.id, shape.props.fontSize, shape.type]);
+		}, [isCollapsed, isEditingState, shape.props.h, shape.props.preCollapseHeight, shape.id, shape.props.fontSize, shape.type, isMainCard]);
 
 		// 编辑模式切换时聚焦到形状，并在退出编辑后恢复之前的视角
 		useEffect(() => {
@@ -1093,7 +1093,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								<div
 									style={{
 										width: '100%',
-										height: '60%',
+										height: '80%',
 										minHeight: '120px',
 										borderRadius: '12px',
 										overflow: 'hidden',

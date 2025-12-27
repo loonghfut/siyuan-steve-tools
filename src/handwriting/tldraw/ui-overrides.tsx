@@ -2025,7 +2025,7 @@ export const components: TLComponents = {
                                         const card = shape as ICardShape
                                         const collapsed = !!card.props?.isCollapsed
                                         const nextCollapsed = !collapsed
-                                        const collapsedHeight = Math.max((card.props.fontSize || 16) * 6, 180)
+                                        const collapsedHeight = Math.max((card.props.fontSize || 16) * 6, card.props.isMain ? 260 : 180)
                                         const nextProps = {
                                             ...card.props,
                                             isCollapsed: nextCollapsed,
