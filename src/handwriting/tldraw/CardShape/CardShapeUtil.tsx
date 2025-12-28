@@ -445,7 +445,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							.replace(/^#+\s+/gm, '')
 							.replace(/\{:[^}]+\}/g, '')
 							.trim();
-						const preview = plainText.slice(0, 20) + (plainText.length > 20 ? '...' : '');
+						const preview = plainText
 						setCollapsedText(preview || '空块');
 					} else {
 						setCollapsedText('空块');
@@ -1129,14 +1129,39 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								height: '100%',
 								display: 'flex',
 								alignItems: 'center',
-								justifyContent: 'center',
-								fontSize: `${Math.min(shape.props.w / 6, shape.props.h / 2)}px`,
-								padding: '8px',
-								wordBreak: 'break-all',
-								color: theme[shape.props.color].solid,
-								textAlign: 'center',
+								justifyContent: 'flex-start',
+								padding: '10px 14px',
+								boxSizing: 'border-box',
+								gap: '10px',
 							}}>
-								{collapsedText}
+								{/* 折叠图标 */}
+								<svg
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke={theme[shape.props.color].solid}
+									strokeWidth="2"
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									style={{ flexShrink: 0, opacity: 0.6 }}
+								>
+									<polyline points="4 14 10 14 10 20"></polyline>
+									<polyline points="20 10 14 10 14 4"></polyline>
+									<line x1="14" y1="10" x2="21" y2="3"></line>
+									<line x1="3" y1="21" x2="10" y2="14"></line>
+								</svg>
+								{/* 内容摘要文字 */}
+								<span style={{
+									fontSize: '21px',
+									fontWeight: 500,
+									color: theme[shape.props.color].solid,
+									wordBreak: 'break-all',
+									lineHeight: 1.4,
+									opacity: 0.85,
+								}}>
+									{collapsedText}
+								</span>
 							</div>
 						)
 					)}
