@@ -1223,16 +1223,18 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	override toSvg(shape: ISingleBlockShape, ctx: SvgExportContext): ReactElement | null {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		const { w, h: hProp, color, fontSize = 16, blockId } = shape.props
-		const border = shape.props.transparentBackground ? 0 : BORDER_PX
+		const { w, h: hProp, color, fontSize = 16, blockId, transparentBackground } = shape.props
+		const showBorder = settingdata["showCardBorder"] !== false && !transparentBackground
+		const border = showBorder ? BORDER_PX : 0
 		const radius = 10
-		const strokeColor = shape.props.transparentBackground ? 'none' : theme[color].solid
-		const fillColor = shape.props.transparentBackground ? 'none' : theme[color].semi
+		const strokeColor = showBorder ? theme[color].solid : 'none'
+		const fillColor = showBorder ? theme[color].semi : 'none'
 		const textColor = theme[color].solid
 		let serialized = ''
 
 		const size = SingleBlockSizes.get(this.editor).get(shape.id)
-		const h = size?.height ?? hProp
+		// 使用实际渲染高度，如果没有则使用属性高度，确保导出与实际一致
+		const h = size?.height ?? Math.max(hProp, MIN_HEIGHT)
 
 		// Clamp inner dimensions to avoid negative <foreignObject> size during export
 		const innerW = Math.max(w - border * 2, 1)
@@ -1386,6 +1388,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		serialized = serializeContent()
 		const containerAttrSelector = `[data-sb-id="${shape.id}"]`
+		// 使用与实际渲染一致的样式：.protyle-wysiwyg padding-left: 8px
 		const hideScrollbarStyle = serialized
 			? `<style xmlns="http://www.w3.org/1999/xhtml">${containerAttrSelector} *::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}${containerAttrSelector} *::-webkit-scrollbar-thumb{display:none!important;}${containerAttrSelector} *{scrollbar-width:none!important;}${containerAttrSelector} .protyle-wysiwyg{position:relative;padding:0 0 0 8px!important;}</style>`
 			: ''
