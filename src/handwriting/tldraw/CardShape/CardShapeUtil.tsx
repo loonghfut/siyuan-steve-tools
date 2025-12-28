@@ -445,7 +445,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							.replace(/^#+\s+/gm, '')
 							.replace(/\{:[^}]+\}/g, '')
 							.trim();
-						const preview = plainText.slice(0, 10) + (plainText.length > 10 ? '...' : '');
+						const preview = plainText.slice(0, 20) + (plainText.length > 20 ? '...' : '');
 						setCollapsedText(preview || '空块');
 					} else {
 						setCollapsedText('空块');
