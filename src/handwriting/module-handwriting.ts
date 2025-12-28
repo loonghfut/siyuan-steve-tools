@@ -5,7 +5,7 @@ import { TldrawManager } from './tldraw/tldraw-manager';
 // 替换为新的卡片视图组件
 import TldrawWhiteboardCards from './tldraw/ui/tldraw-whiteboard-cards.svelte';
 import TldrawWhiteboardManager from './tldraw/ui/tldraw-whiteboard-manager.svelte';
-import { addWhiteboardButton } from "./function/assist";
+import { addWhiteboardButton, setupFileTreeObserver } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
 import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
@@ -27,9 +27,16 @@ export class M_handwriting {
     private pendingTldrawNodes?: Set<HTMLElement>;
     private mutationFlushHandle?: number;
     private mutationFlushHandleIsTimeout?: boolean;
+    // 文档树观察器实例
+    private fileTreeObserver?: MutationObserver;
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
+    }
+
+    // 公开访问 plugin 的 getter
+    get pluginInstance() {
+        return this.plugin;
     }
 
     async init(settingdata) {
@@ -376,6 +383,9 @@ export class M_handwriting {
                 this.startTldrawLinkWatcher(protyleEl);
             }
         });
+
+        // 设置文档树白板按钮观察器
+        this.fileTreeObserver = setupFileTreeObserver();
     }
 
     /**
@@ -497,6 +507,11 @@ export class M_handwriting {
         }
         // 停止观察器
         this.stopTldrawLinkWatcher();
+        // 停止文档树观察器
+        if (this.fileTreeObserver) {
+            this.fileTreeObserver.disconnect();
+            this.fileTreeObserver = undefined;
+        }
         // 销毁 dock 上的 svelte 组件（如果存在）
         try {
             if (this.dockComponent && typeof this.dockComponent.$destroy === 'function') {

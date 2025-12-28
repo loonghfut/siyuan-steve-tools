@@ -1,5 +1,5 @@
 import { moduleInstances } from "@/index";
-import { showMessage } from "siyuan";
+import { showMessage, openTab } from "siyuan";
 
 //添加进入画板按钮
 export async function addWhiteboardButton(e) {
@@ -10,21 +10,12 @@ export async function addWhiteboardButton(e) {
         if (!existingButton) {
             // Create the button
             const button = document.createElement('button');
-            button.className = 'block__icon fn__flex-center ariaLabel whiteboard-button'; 
+            button.className = 'block__icon fn__flex-center ariaLabel whiteboard-button';
             button.innerHTML = '<svg class="item__graphic"><use xlink:href="#iconSTWhiteboard"></use></svg>';
-            button.setAttribute('aria-label', '在画板中打开'); 
+            button.setAttribute('aria-label', '在画板中打开');
 
             // Add click event
             button.addEventListener('click', async () => {
-                // let ChildBlocks = await api.getChildBlocks(e.detail.protyle.block.rootID);
-                // // 过滤和提取块ID
-                // const blockIds = ChildBlocks
-                //     .filter(block =>
-                //         // block?.type === cn_type &&
-                //         block?.content?.trim())
-                //     .map(block => block.id);
-
-                // console.debug("Extracted block IDs:", blockIds);
                 moduleInstances['M_handwriting'].openWhiteBoard_in(e);
             });
 
@@ -32,6 +23,118 @@ export async function addWhiteboardButton(e) {
             breadcrumb.appendChild(button);
         }
     }
+}
+
+// 添加白板按钮到文档树条目
+export function addWhiteboardButtonToFileTreeItem(item: Element) {
+    // 检查是否已经是白板条目或者已经存在按钮
+    if (item.getAttribute('data-type') === 'navigation-whiteboard' || item.querySelector('.st-whiteboard-tree-icon')) {
+        return;
+    }
+
+    // 获取文档的 rootid，通常在 data-id 或 data-node-id 属性中
+    const rootid = item.getAttribute('data-id') || item.getAttribute('data-node-id') || '';
+    if (!rootid) return;
+
+    // 获取标题文本
+    const textEl = item.querySelector('.b3-list-item__text');
+    const titleText = textEl?.textContent || '白板';
+
+    // 创建白板图标按钮
+    const iconBtn = document.createElement('span');
+    iconBtn.className = 'b3-list-item__action st-whiteboard-tree-icon b3-tooltips b3-tooltips__nw';
+    iconBtn.setAttribute('aria-label', '打开白板');
+    iconBtn.innerHTML = '<svg><use xlink:href="#iconSTWhiteboard"></use></svg>';
+
+    // 点击事件：打开白板
+    iconBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const plugin = moduleInstances['M_handwriting'].pluginInstance;
+        const tabId = plugin.name + "steveTool-whiteboard";
+        await openTab({
+            app: (window as any).siyuan.ws.app,
+            custom: {
+                id: tabId,
+                title: titleText,
+                icon: "iconSTWhiteboard",
+                data: {
+                    text: "steveTool-whiteboard" + rootid,
+                    rootid: rootid,
+                },
+            },
+        });
+    });
+
+    // 插入到 "更多" 按钮之前
+    const moreBtn = item.querySelector('span[data-type="more-root"]');
+    if (moreBtn) {
+        item.insertBefore(iconBtn, moreBtn);
+    } else {
+        // 如果没有更多按钮，插入到文本后面
+        const textSpan = item.querySelector('.b3-list-item__text');
+        if (textSpan && textSpan.nextSibling) {
+            item.insertBefore(iconBtn, textSpan.nextSibling);
+        } else {
+            item.appendChild(iconBtn);
+        }
+    }
+}
+
+// 监听文档树变化并注入白板按钮
+export function setupFileTreeObserver() {
+    // 查找文档树容器
+    const findFileTreeContainer = (): HTMLElement | null => {
+        // 尝试多个可能的选择器
+        return document.querySelector('.file-tree') ||
+            document.querySelector('.sy__file') ||
+            document.querySelector('#fileTree') ||
+            document.querySelector('[data-type="file-tree"]') ||
+            document.querySelector('.b3-list--file');
+    };
+
+    const container = findFileTreeContainer();
+    if (!container) return null;
+
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            // 处理新增的节点
+            mutation.addedNodes.forEach((node) => {
+                if (node instanceof HTMLElement) {
+                    // 如果是列表项，直接处理
+                    if (node.classList?.contains('b3-list-item')) {
+                        addWhiteboardButtonToFileTreeItem(node);
+                    }
+                    // 查找子节点中的列表项
+                    node.querySelectorAll?.('.b3-list-item').forEach((item: Element) => {
+                        addWhiteboardButtonToFileTreeItem(item);
+                    });
+                }
+            });
+
+            // 处理属性变化（如 data-id 更新）
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-id') {
+                const target = mutation.target as Element;
+                if (target.classList?.contains('b3-list-item')) {
+                    addWhiteboardButtonToFileTreeItem(target);
+                }
+            }
+        });
+    });
+
+    observer.observe(container, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-id', 'data-node-id']
+    });
+
+    // 对现有项目注入按钮
+    container.querySelectorAll('.b3-list-item').forEach((item: Element) => {
+        addWhiteboardButtonToFileTreeItem(item);
+    });
+
+    return observer;
 }
 
 // 控制元素显示状态的函数
