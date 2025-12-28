@@ -592,6 +592,7 @@ export class TldrawManager {
                                         showMask: true,
                                         blockId: aproblock,
                                         isMain: true,
+                                        isCollapsed: true, // 拖拽进来默认为折叠状态
                                     },
                                 });
                             } else if (blockIdo_rigin.includes('paragraph')) {
@@ -617,6 +618,7 @@ export class TldrawManager {
                                         color: 'black',
                                         showMask: true,
                                         blockId: aproblock,
+                                        isCollapsed: false, // 拖拽进来默认为折叠状态
                                     },
                                 });
                             }
