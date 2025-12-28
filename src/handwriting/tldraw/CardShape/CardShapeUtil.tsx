@@ -384,16 +384,29 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			let backgroundImage: string | undefined;
 			let backgroundColor: string | undefined;
 
-			const urlMatch = titleImg.match(/background-image\s*:\s*url\(["']?([^"')]+)["']?\)/i);
+			// 先检查是否包含 url()（可能是 background 属性中的 url）
+			const urlMatch = titleImg.match(/url\(["']?([^"')]+)["']?\)/i);
 			if (urlMatch) {
 				hasUrl = true;
 				const imgPath = urlMatch[1];
 				imgSrc = `${imgPath}`;
 				backgroundImage = `url(${imgSrc})`;
 			} else {
+				// 尝试从 background-image 属性提取
 				const bgImageMatch = titleImg.match(/background-image\s*:\s*([^;]+);?/i);
 				if (bgImageMatch) {
 					backgroundImage = bgImageMatch[1].trim(); // 支持线性渐变等
+				} else {
+					// 尝试从 background 属性中提取（包含渐变的完整背景定义）
+					// 如: "background: linear-gradient(...)" 或复合 background 定义
+					const bgMatch = titleImg.match(/background\s*:\s*([^;]+)/i);
+					if (bgMatch) {
+						const bgValue = bgMatch[1].trim();
+						// 检查是否包含渐变或图片
+						if (bgValue.includes('gradient') || bgValue.includes('url(')) {
+							backgroundImage = bgValue;
+						}
+					}
 				}
 			}
 
