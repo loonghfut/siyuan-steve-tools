@@ -253,7 +253,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 折叠/展开时记录高度并在展开时恢复
 		useEffect(() => {
 			const prev = prevCollapsedRef.current;
-			const collapsedHeight = Math.max(fontSize * 6, isMainCard ? 260 : 180);
+			const collapsedHeight = Math.max(fontSize * 6, isMainCard ? 260 : 100);
 			const storedHeight = shape.props.preCollapseHeight;
 
 			// 折叠状态下进入编辑：临时恢复到折叠前高度，便于编辑
