@@ -688,7 +688,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							rootId: currentBlockId,
 							render: {
 								background: (shape.props.isMain && tldrawHeaderImage),
-								breadcrumb: shape.props.isMain,
+								breadcrumb: false,
 								gutter: true,
 								title: shape.props.isMain,
 								breadcrumbDocName: shape.props.isMain,
