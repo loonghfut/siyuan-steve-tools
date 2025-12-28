@@ -12,37 +12,28 @@ import { settingdata } from '@/index';
 
 // 扩展的关键样式属性列表
 const EXTENDED_STYLE_PROPS = [
-	// 文本样式
 	'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'font-variant',
 	'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-decoration',
 	'text-transform', 'text-indent', 'vertical-align',
-	// 背景样式
 	'background', 'background-color', 'background-image', 'background-repeat',
 	'background-position', 'background-size', 'background-attachment',
-	// 边框样式
 	'border', 'border-color', 'border-width', 'border-style', 'border-radius',
 	'border-top', 'border-top-color', 'border-top-width', 'border-top-style',
 	'border-bottom', 'border-bottom-color', 'border-bottom-width', 'border-bottom-style',
 	'border-left', 'border-left-color', 'border-left-width', 'border-left-style',
 	'border-right', 'border-right-color', 'border-right-width', 'border-right-style',
-	// 盒模型
 	'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
 	'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
 	'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
 	'box-sizing',
-	// 布局样式
 	'display', 'flex', 'flex-direction', 'flex-wrap', 'flex-flow',
 	'justify-content', 'align-items', 'align-content', 'gap', 'row-gap', 'column-gap',
 	'grid', 'grid-template-columns', 'grid-template-rows', 'grid-template-areas',
 	'grid-column', 'grid-row', 'grid-area',
-	// 定位
 	'position', 'top', 'bottom', 'left', 'right', 'z-index',
-	// 溢出与可见性
 	'overflow', 'overflow-x', 'overflow-y', 'visibility', 'opacity',
-	// 装饰效果
 	'box-shadow', 'text-shadow', 'outline', 'outline-color', 'outline-width', 'outline-style',
 	'filter', 'backdrop-filter',
-	// 其他
 	'white-space', 'word-break', 'overflow-wrap', 'cursor', 'user-select', 'pointer-events',
 ];
 
@@ -278,7 +269,7 @@ function hideScrollbars(container: Element): void {
 /**
  * 从 DOM 复制卡片内容
  */
-function copyCardContentFromDom(shape: ICardShape): string {
+function copyCardContentFromDom(shape: ICardShape, isCollapsed: boolean): string {
 	if (typeof document === 'undefined') return '';
 
 	const host = document.getElementById(shape.id);
@@ -287,16 +278,33 @@ function copyCardContentFromDom(shape: ICardShape): string {
 	const content = host.querySelector('[blockid]') as HTMLElement | null;
 	if (!content) return '';
 
-	const { w, h, fontSize = 16 } = shape.props;
+	const { w, h } = shape.props;
 	const borderWidth = 3;
 	const contentWidth = Math.max(w - borderWidth * 2, 1);
 	const contentHeight = Math.max(h - borderWidth * 2, 1);
 
+	// 查找折叠内容（第一个直接子元素div）
+	let sourceElement: Element | null = null;
+	if (isCollapsed) {
+		// 折叠状态下，查找直接渲染的折叠内容元素
+		const directDivs = Array.from(content.children).filter(
+			child => child instanceof HTMLElement && child.tagName === 'DIV'
+		);
+		if (directDivs.length > 0) {
+			sourceElement = directDivs[0];
+		}
+	}
+
+	// 如果没有找到折叠内容，使用原来的 content
+	if (!sourceElement) {
+		sourceElement = content;
+	}
+
 	// 克隆内容
-	const clone = content.cloneNode(true) as HTMLElement;
+	const clone = sourceElement.cloneNode(true) as HTMLElement;
 
 	// 内联计算样式
-	inlineComputedStyles(content, clone);
+	inlineComputedStyles(sourceElement as Element, clone);
 
 	// 清理不需要的属性
 	ATTRS_TO_REMOVE.forEach((attr) => {
@@ -316,34 +324,9 @@ function copyCardContentFromDom(shape: ICardShape): string {
 	clone.style.height = `${contentHeight}px`;
 	clone.style.pointerEvents = 'none';
 	clone.style.overflow = 'hidden';
-	clone.style.fontSize = `${fontSize}px`;
 	clone.style.boxSizing = 'border-box';
-	clone.style.padding = '0px';
 
 	return clone.outerHTML;
-}
-
-/**
- * 获取折叠状态显示的文本
- */
-function getCollapsedText(blockId: string, w: number, h: number): { text: string; fontSize: number } {
-	let collapsedText = 'Card';
-	if (blockId) {
-		try {
-			const xhr = new XMLHttpRequest();
-			xhr.open('POST', '/api/block/getBlockInfo', false);
-			xhr.setRequestHeader('Content-Type', 'application/json');
-			xhr.send(JSON.stringify({ id: blockId }));
-			if (xhr.status >= 200 && xhr.status < 300) {
-				const res = JSON.parse(xhr.responseText);
-				if (res?.data?.rootTitle) {
-					collapsedText = res.data.rootTitle.slice(0, 10) + (res.data.rootTitle.length > 10 ? '...' : '');
-				}
-			}
-		} catch { }
-	}
-	const fontSize = Math.min(w / 6, h / 2, 24);
-	return { text: collapsedText, fontSize };
 }
 
 /**
@@ -377,38 +360,6 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext): 
 	const contentWidth = Math.max(w - borderWidth * 2, 1);
 	const contentHeight = Math.max(h - borderWidth * 2, 1);
 
-	// 折叠状态
-	if (isCollapsed) {
-		const { text, fontSize: collapsedFontSize } = getCollapsedText(blockId || '', w, h);
-		return (
-			<g>
-				<rect
-					width={w}
-					height={h}
-					fill={fillColor}
-					stroke={strokeColor}
-					strokeWidth={showBorder ? borderWidth : 0}
-					rx={radius}
-					ry={radius}
-				/>
-				<text
-					x={w / 2}
-					y={h / 2}
-					fill={strokeColor}
-					fontSize={collapsedFontSize}
-					dominantBaseline="middle"
-					textAnchor="middle"
-				>
-					{text}
-				</text>
-			</g>
-		);
-	}
-
-	// 直接从 DOM 复制内容
-	const serialized = copyCardContentFromDom(shape);
-	const globalStyles = serialized ? generateGlobalStyles() : '';
-
 	// 裁剪路径 ID
 	const clipId = `clip-${shape.id}`;
 
@@ -425,6 +376,10 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext): 
 			{blockId ? `Block ${blockId.slice(-6)}` : 'Card'}
 		</text>
 	);
+
+	// 直接从 DOM 复制内容（支持折叠和非折叠状态）
+	const serialized = copyCardContentFromDom(shape, isCollapsed);
+	const globalStyles = serialized ? generateGlobalStyles() : '';
 
 	return (
 		<g>
@@ -465,7 +420,7 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext): 
 							width: '100%',
 							height: '100%',
 							overflow: 'hidden',
-							fontSize: `${fontSize}px`,
+							fontSize: isCollapsed ? undefined : `${fontSize}px`,
 							backgroundColor: 'transparent',
 							color: strokeColor,
 						}}
