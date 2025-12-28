@@ -49,7 +49,7 @@ const SingleBlockSizes = new EditorAtom('single-block sizes', (editor) => {
 	return map
 })
 const BORDER_PX = 3 // 与样式、SVG 导出保持一致
-const MIN_HEIGHT = 50
+const MIN_HEIGHT = 30
 
 // ===== 独立的尺寸测量 Hook =====
 // 参考 tldraw 官方示例，将尺寸测量逻辑抽取为可复用的 hook
@@ -123,7 +123,7 @@ function useSingleBlockSize(
 		// 获取实际 DOM 尺寸
 		const contentH = Math.ceil(target.scrollHeight || target.offsetHeight || 0)
 		const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
-		const nextHeight = Math.max(contentH + borderPx * 2, MIN_HEIGHT)
+		const nextHeight = Math.max(contentH , MIN_HEIGHT)
 		const nextWidth = Math.max(shape.props.w, 1)
 
 		// 保存测量的高度
