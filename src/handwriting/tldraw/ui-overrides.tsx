@@ -615,7 +615,7 @@ const CustomStylePanel = track(() => {
                     const assetPath = kernelPath.replace(/^data\//, '')
 
                     const alt = rawName || 'slide'
-                    const md = `[_](${buildTldrawLink(rootId, blockId, title, slideShape.id)})![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}"}`
+                    const md = `![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}" custom-tldraw-link="${buildTldrawLink(rootId || '', blockId || '', title || '', slideShape.id)}" }`
 
                     let fallbackFromUpdateFailure = false
 
