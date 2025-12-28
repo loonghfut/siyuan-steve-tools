@@ -123,7 +123,8 @@ function useSingleBlockSize(
 		// 获取实际 DOM 尺寸
 		const contentH = Math.ceil(target.scrollHeight || target.offsetHeight || 0)
 		const borderPx = shape.props.transparentBackground ? 0 : BORDER_PX
-		const nextHeight = Math.max(contentH , MIN_HEIGHT)
+		const addBorder = settingdata["showCardBorder"] !== false && !shape.props.transparentBackground
+		const nextHeight = Math.max(contentH + (addBorder ? borderPx * 2 : 0), MIN_HEIGHT)
 		const nextWidth = Math.max(shape.props.w, 1)
 
 		// 保存测量的高度
