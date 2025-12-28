@@ -27,6 +27,8 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-exact-arrow-mode": true,
     // 自定义卡片标题内容
     "tldraw-custom-card-title": "",
+    // 文档树显示白板按钮
+    "tldraw-show-in-file-tree": true,
 };
 
 export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -45,6 +47,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "文档块是否渲染题头图", description: "启用文档块题头图渲染", key: "tldraw-header-image", value: ctx.settings["tldraw-header-image"] },
                 { type: "checkbox", title: "启用精确箭头模式", description: "启用后绘制箭头时将使用精确模式", key: "tldraw-exact-arrow-mode", value: ctx.settings["tldraw-exact-arrow-mode"] },
                 { type: "textinput", title: "自定义卡片标题内容", description: "在此输入自定义的卡片标题内容，支持使用变量 ${timestamp}", key: "tldraw-custom-card-title", value: ctx.settings["tldraw-custom-card-title"] },
+                { type: "checkbox", title: "文档树显示白板按钮", description: "在文档树每个条目左侧显示白板图标按钮", key: "tldraw-show-in-file-tree", value: ctx.settings["tldraw-show-in-file-tree"] },
             ]
         },
         {

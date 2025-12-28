@@ -9,6 +9,7 @@ import { addWhiteboardButton, setupFileTreeObserver } from "./function/assist";
 import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
 import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
+import { settingdata } from "@/index";
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -384,8 +385,10 @@ export class M_handwriting {
             }
         });
 
-        // 设置文档树白板按钮观察器
-        this.fileTreeObserver = setupFileTreeObserver();
+        // 设置文档树白板按钮观察器（根据设置决定是否启用）
+        if (settingdata['tldraw-show-in-file-tree'] !== false) {
+            this.fileTreeObserver = setupFileTreeObserver();
+        }
     }
 
     /**
