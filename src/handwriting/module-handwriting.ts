@@ -64,7 +64,7 @@ export class M_handwriting {
 
                 // 解析查询参数
                 const params = new URLSearchParams(queryString);
-                const rootid = params.get('rootid');
+                let rootid = params.get('rootid');
                 const blockid = params.get('blockid');
                 const shapeid = params.get('shapeid');
                 const title = params.get('title') || "画板" + rootid;
@@ -101,8 +101,7 @@ export class M_handwriting {
                         return;
                     }
                     if (docblock.id !== docblock.root_id) {
-                        showMessage('当前块不是根块，请检查');
-                        return;
+                        rootid = docblock.root_id;
                     }
                     if (!id) {
                         showMessage('未找到此blockid对应的块');
