@@ -67,7 +67,9 @@ import { ThemeName } from './MindMapShape/mind-map-constants'
 import { addShapesToLibrary, resetShapeLibraryPanelPosition } from './shapelibrary/shape-library-manager'
 import { ShapeLibraryPanel } from './shapelibrary/ShapeLibraryPanel'
 import { DocOutlinePanel } from './doc-outline/DocOutlinePanel'
+import { ChildDocsPanel } from './doc-outline/ChildDocsPanel'
 import { resetDocOutlinePanelPosition } from './doc-outline/doc-outline-manager'
+import { resetChildDocsPanelPosition } from './doc-outline/child-docs-manager'
 import { IBezierConnectorShape, getConnectorTerminals } from './BezierConnectorShape'
 import { createAndBindShape } from './BezierConnectorShape'
 import { convertConnectorsToArrow, convertConnectorsToBezier } from './utils/connector-convert'
@@ -1499,6 +1501,10 @@ const docOutlineListeners: Set<(isOpen: boolean) => void> = new Set();
 let currentDocId: string | null = null;
 const docIdListeners: Set<(docId: string | null) => void> = new Set();
 
+// 全局子文档面板状态管理
+let childDocsOpenState = false;
+const childDocsListeners: Set<(isOpen: boolean) => void> = new Set();
+
 export function toggleShapeLibrary() {
     shapeLibraryOpenState = !shapeLibraryOpenState;
     shapeLibraryListeners.forEach(listener => listener(shapeLibraryOpenState));
@@ -1512,6 +1518,11 @@ export function toggleDocOutline() {
 export function setDocOutlineDocId(docId: string | null) {
     currentDocId = docId;
     docIdListeners.forEach(listener => listener(currentDocId));
+}
+
+export function toggleChildDocs() {
+    childDocsOpenState = !childDocsOpenState;
+    childDocsListeners.forEach(listener => listener(childDocsOpenState));
 }
 
 export function useShapeLibraryOpen() {
@@ -1551,6 +1562,19 @@ export function useDocOutlineDocId() {
     }, []);
 
     return docId;
+}
+
+export function useChildDocsOpen() {
+    const [isOpen, setIsOpen] = React.useState(childDocsOpenState);
+
+    React.useEffect(() => {
+        childDocsListeners.add(setIsOpen);
+        return () => {
+            childDocsListeners.delete(setIsOpen);
+        };
+    }, []);
+
+    return isOpen;
 }
 
 function CustomQuickActions() {
@@ -1660,6 +1684,24 @@ function CustomQuickActions() {
                         icon="text-align-left"
                         label="文档大纲"
                         onSelect={() => { toggleDocOutline() }}
+                    />
+                </div>
+
+            </div>
+            <div>
+                <div
+                    onMouseDown={(e: any) => {
+                        if (e?.detail === 2) {
+                            try { e.stopPropagation(); e.preventDefault(); } catch (err) { }
+                            resetChildDocsPanelPosition();
+                        }
+                    }}
+                >
+                    <TldrawUiMenuItem
+                        id="child-docs"
+                        icon="folder"
+                        label="子文档"
+                        onSelect={() => { toggleChildDocs() }}
                     />
                 </div>
 
@@ -1890,6 +1932,7 @@ export const components: TLComponents = {
         const editor = useEditor()
         const isLibraryOpen = useShapeLibraryOpen()
         const isDocOutlineOpen = useDocOutlineOpen()
+        const isChildDocsOpen = useChildDocsOpen()
         const docId = useDocOutlineDocId()
 
         // 获取白板绑定的文档ID
@@ -2048,6 +2091,13 @@ export const components: TLComponents = {
                 <DocOutlinePanel
                     isOpen={isDocOutlineOpen}
                     onClose={() => toggleDocOutline()}
+                    docId={boundDocId || null}
+                />
+
+                {/* 子文档面板 */}
+                <ChildDocsPanel
+                    isOpen={isChildDocsOpen}
+                    onClose={() => toggleChildDocs()}
                     docId={boundDocId || null}
                 />
 
