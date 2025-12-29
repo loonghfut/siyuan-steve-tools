@@ -527,7 +527,7 @@ export class TldrawManager {
                             console.debug('拖拽的数据类型', blockIdo_rigin);
                             // 使用正则表达式提取块ID
                             let blockId = '';
-
+                            let docname = '';
                             // 处理文档大纲条目拖放
                             if (e.dataTransfer!.types.includes('application/doc-outline-block')) {
                                 try {
@@ -537,6 +537,19 @@ export class TldrawManager {
                                     console.debug('文档大纲拖放的块ID', blockId);
                                 } catch (err) {
                                     console.error('解析文档大纲拖放数据失败:', err);
+                                    return;
+                                }
+                            } else if (e.dataTransfer!.types.includes('application/child-doc')) {
+                                // 处理子文档拖放
+                                try {
+                                    const data = e.dataTransfer!.getData('application/child-doc');
+                                    const parsed = JSON.parse(data);
+                                    blockId = parsed.docId;
+                                    console.debug('子文档拖放的文档', parsed);
+                                    docname = parsed.docName || '';
+                                    console.debug('子文档拖放', blockId);
+                                } catch (err) {
+                                    console.error('解析子文档拖放数据失败:', err);
                                     return;
                                 }
                             } else if (blockIdo_rigin.startsWith('application/siyuan')) {
@@ -562,7 +575,7 @@ export class TldrawManager {
                             const idid = await api.generateSiyuanID();
                             const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
                             let aproblock: string;
-                            const content = (await api.getBlockKramdown(blockId)).kramdown;
+                            // const content = (await api.getBlockKramdown(blockId)).kramdown;
                             /**
                              * 将 linkMarkdown 插入到 kramdown 内容末尾（但在 IAL/attribute block 之前）
                              * - 如果是 heading 类型（isHeading === true），将 link 插入到最后一行（heading 行）后面： `###### 标题 [🔗](...)`
@@ -570,7 +583,7 @@ export class TldrawManager {
                              */
                             // Use class-level helper to create updated content with link to avoid adding link inside IAL/attribute block
                             // const appendLinkToKramdown = this.appendLinkToKramdown.bind(this);
-                            console.debug("拖拽块的内容", content);
+                            // console.debug("拖拽块的内容", content);
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
@@ -589,6 +602,10 @@ export class TldrawManager {
                                 console.debug("拖拽的是文档大纲块");
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
+                            } else if(blockIdo_rigin.startsWith('application/child-doc')) {
+                                aproblock = blockId;
+                                console.debug("拖拽的是子文档块");
+                                await api.prependBlock("markdown", `((${blockId} '${docname}'))`, this.id)
                             } else {
                                 aproblock = idid as string;
                                 const link = buildTldrawLink(this.id, aproblock, this.title);
@@ -597,7 +614,7 @@ export class TldrawManager {
                             }
                             // 创建新的Card形状
                             // console.debug("创建新的卡片形状",  aproblock[0].doOperations[0].id);
-                            if (blockIdo_rigin.startsWith('application/siyuan-file')) {
+                            if (blockIdo_rigin.startsWith('application/siyuan-file')||blockIdo_rigin.includes('application/child-doc')) {
                                 editor.createShape({
                                     type: 'card',
                                     x: x, // 默认宽度的一半，使形状中心在鼠标位置
