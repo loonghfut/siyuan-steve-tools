@@ -516,20 +516,36 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                 <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--b3-theme-on-background)' }}>
                     文档大纲
                 </span>
-                <button
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); onClose(); }}
-                    style={{
-                        border: 'none',
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        color: 'var(--b3-theme-on-background)',
-                        fontSize: '14px',
-                        padding: '4px 8px',
-                    }}
-                    title="关闭"
-                >
-                    ✕
-                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); loadOutline(); }}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: 'var(--b3-theme-on-background)',
+                            fontSize: '14px',
+                            padding: '4px 8px',
+                        }}
+                        title="刷新"
+                    >
+                        ↻
+                    </button>
+                    <button
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); onClose(); }}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            color: 'var(--b3-theme-on-background)',
+                            fontSize: '14px',
+                            padding: '4px 8px',
+                        }}
+                        title="关闭"
+                    >
+                        ✕
+                    </button>
+                </div>
             </div>
 
             {/* 内容区 */}
