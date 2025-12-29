@@ -11,6 +11,22 @@ import { api } from '@frostime/siyuan-plugin-kits';
 import { getDocOutline } from '@/api/api';
 import { openTab, showMessage } from 'siyuan';
 
+/**
+ * 移除文本中的HTML实体
+ */
+function stripHtmlEntities(text?: string): string {
+    if (!text) return '';
+    return text
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/&apos;/gi, "'")
+        .trim();
+}
+
 interface DocOutlinePanelProps {
     isOpen: boolean;
     onClose: () => void;
@@ -103,11 +119,15 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
             // 转换数据格式
             const transformNode = (node: any): OutlineNode => ({
                 id: node.id,
-                name: node.name,
+                name: stripHtmlEntities(node.name),
                 type: node.type,
                 subType: node.subType,
                 depth: node.depth,
-                blocks: node.blocks,
+                blocks: node.blocks?.map((b: any) => ({
+                    ...b,
+                    name: stripHtmlEntities(b.name),
+                    content: stripHtmlEntities(b.content),
+                })),
                 children: node.children?.map(transformNode),
             });
 
@@ -374,8 +394,8 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                     }}
                     onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = isAdded
-                            ? 'var(--b3-accent-background-light)'
-                            : 'var(--b3-theme-surface-lighter)';
+                            ? 'var(--b3-theme-surface-hover)'
+                            : 'var(--b3-theme-surface-hover)';
                     }}
                     onMouseLeave={(e) => {
                         e.currentTarget.style.backgroundColor = isAdded
@@ -392,7 +412,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: hasChildren ? 'pointer' : 'default',
-                            color: 'var(--b3-theme-on-surface-light)',
+                            color: 'var(--b3-theme-on-background)',
                             fontSize: '12px',
                             userSelect: 'none',
                         }}
@@ -411,7 +431,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--b3-theme-on-surface-light)',
+                        color: 'var(--b3-theme-on-background)',
                         fontSize: '11px',
                         fontWeight: 500,
                     }}>
@@ -423,7 +443,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                         style={{
                             flex: 1,
                             fontSize: '13px',
-                            color: isAdded ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)',
+                            color: isAdded ? 'var(--b3-theme-on-background)' : 'var(--b3-theme-on-background)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
@@ -437,7 +457,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                     {/* 状态指示 */}
                     <span style={{
                         fontSize: '12px',
-                        color: isAdded ? 'var(--b3-theme-primary)' : 'var(--b3-theme-on-surface-light)',
+                        color: isAdded ? 'var(--b3-theme-primary)' : 'var(--b3-theme-on-background)',
                         marginLeft: '4px',
                     }}>
                         {isAdded ? '✓' : ''}
