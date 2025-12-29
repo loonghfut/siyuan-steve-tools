@@ -279,7 +279,7 @@ export class TldrawManager {
             const dataContent = await WhiteboardFileManager.readWhiteboardFile(this.id);
 
             if (dataContent) {
-                console.debug("加载到数据", dataContent);
+                // console.debug("加载到数据", dataContent);
                 // 尝试解析和加载快照
                 try {
                     const data = JSON.parse(dataContent);
@@ -527,7 +527,19 @@ export class TldrawManager {
                             console.debug('拖拽的数据类型', blockIdo_rigin);
                             // 使用正则表达式提取块ID
                             let blockId = '';
-                            if (blockIdo_rigin.startsWith('application/siyuan')) {
+
+                            // 处理文档大纲条目拖放
+                            if (e.dataTransfer!.types.includes('application/doc-outline-block')) {
+                                try {
+                                    const data = e.dataTransfer!.getData('application/doc-outline-block');
+                                    const parsed = JSON.parse(data);
+                                    blockId = parsed.blockId;
+                                    console.debug('文档大纲拖放的块ID', blockId);
+                                } catch (err) {
+                                    console.error('解析文档大纲拖放数据失败:', err);
+                                    return;
+                                }
+                            } else if (blockIdo_rigin.startsWith('application/siyuan')) {
                                 const matches = blockIdo_rigin.match(/(\d{14}-\w{7})/g);
                                 if (matches && matches.length > 0) {
                                     blockId = matches[0]; // 获取第一个匹配的块ID
@@ -572,6 +584,11 @@ export class TldrawManager {
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
+                            } else if (blockIdo_rigin.startsWith('application/doc-outline-block')) {
+                                aproblock = blockId;
+                                console.debug("拖拽的是文档大纲块");
+                                const link = buildTldrawLink(this.id, aproblock, this.title);
+                                await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
                             } else {
                                 aproblock = idid as string;
                                 const link = buildTldrawLink(this.id, aproblock, this.title);

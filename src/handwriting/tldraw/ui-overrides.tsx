@@ -66,6 +66,8 @@ import { IMindMapShape } from './MindMapShape/mind-map-shape-types'
 import { ThemeName } from './MindMapShape/mind-map-constants'
 import { addShapesToLibrary, resetShapeLibraryPanelPosition } from './shapelibrary/shape-library-manager'
 import { ShapeLibraryPanel } from './shapelibrary/ShapeLibraryPanel'
+import { DocOutlinePanel } from './doc-outline/DocOutlinePanel'
+import { resetDocOutlinePanelPosition } from './doc-outline/doc-outline-manager'
 import { IBezierConnectorShape, getConnectorTerminals } from './BezierConnectorShape'
 import { createAndBindShape } from './BezierConnectorShape'
 import { convertConnectorsToArrow, convertConnectorsToBezier } from './utils/connector-convert'
@@ -1491,9 +1493,25 @@ const CustomStylePanel = track(() => {
 let shapeLibraryOpenState = false;
 const shapeLibraryListeners: Set<(isOpen: boolean) => void> = new Set();
 
+// 全局文档大纲面板状态管理
+let docOutlineOpenState = false;
+const docOutlineListeners: Set<(isOpen: boolean) => void> = new Set();
+let currentDocId: string | null = null;
+const docIdListeners: Set<(docId: string | null) => void> = new Set();
+
 export function toggleShapeLibrary() {
     shapeLibraryOpenState = !shapeLibraryOpenState;
     shapeLibraryListeners.forEach(listener => listener(shapeLibraryOpenState));
+}
+
+export function toggleDocOutline() {
+    docOutlineOpenState = !docOutlineOpenState;
+    docOutlineListeners.forEach(listener => listener(docOutlineOpenState));
+}
+
+export function setDocOutlineDocId(docId: string | null) {
+    currentDocId = docId;
+    docIdListeners.forEach(listener => listener(currentDocId));
 }
 
 export function useShapeLibraryOpen() {
@@ -1507,6 +1525,32 @@ export function useShapeLibraryOpen() {
     }, []);
 
     return isOpen;
+}
+
+export function useDocOutlineOpen() {
+    const [isOpen, setIsOpen] = React.useState(docOutlineOpenState);
+
+    React.useEffect(() => {
+        docOutlineListeners.add(setIsOpen);
+        return () => {
+            docOutlineListeners.delete(setIsOpen);
+        };
+    }, []);
+
+    return isOpen;
+}
+
+export function useDocOutlineDocId() {
+    const [docId, setDocId] = React.useState<string | null>(currentDocId);
+
+    React.useEffect(() => {
+        docIdListeners.add(setDocId);
+        return () => {
+            docIdListeners.delete(setDocId);
+        };
+    }, []);
+
+    return docId;
 }
 
 function CustomQuickActions() {
@@ -1598,6 +1642,24 @@ function CustomQuickActions() {
                         icon="bookmark"
                         label="素材库"
                         onSelect={() => { toggleShapeLibrary() }}
+                    />
+                </div>
+
+            </div>
+            <div>
+                <div
+                    onMouseDown={(e: any) => {
+                        if (e?.detail === 2) {
+                            try { e.stopPropagation(); e.preventDefault(); } catch (err) { }
+                            resetDocOutlinePanelPosition();
+                        }
+                    }}
+                >
+                    <TldrawUiMenuItem
+                        id="doc-outline"
+                        icon="text-align-left"
+                        label="文档大纲"
+                        onSelect={() => { toggleDocOutline() }}
                     />
                 </div>
 
@@ -1827,6 +1889,20 @@ export const components: TLComponents = {
     InFrontOfTheCanvas: () => {
         const editor = useEditor()
         const isLibraryOpen = useShapeLibraryOpen()
+        const isDocOutlineOpen = useDocOutlineOpen()
+        const docId = useDocOutlineDocId()
+
+        // 获取白板绑定的文档ID
+        const container = editor.getContainer();
+        const editorElement = container?.closest('.tldraw__editor');
+        const boundDocId = editorElement?.getAttribute('data-tldraw-id');
+
+        // 当绑定的文档ID变化时，更新到全局状态
+        React.useEffect(() => {
+            if (boundDocId) {
+                setDocOutlineDocId(boundDocId);
+            }
+        }, [boundDocId]);
 
         // 获取选中元素信息
         const selectionInfo = useValue(
@@ -1966,6 +2042,13 @@ export const components: TLComponents = {
                 <ShapeLibraryPanel
                     isOpen={isLibraryOpen}
                     onClose={() => toggleShapeLibrary()}
+                />
+
+                {/* 文档大纲面板 */}
+                <DocOutlinePanel
+                    isOpen={isDocOutlineOpen}
+                    onClose={() => toggleDocOutline()}
+                    docId={boundDocId || null}
                 />
 
                 {/* 选中元素的操作按钮 */}
