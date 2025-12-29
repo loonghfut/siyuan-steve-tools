@@ -1699,7 +1699,7 @@ function CustomQuickActions() {
                 >
                     <TldrawUiMenuItem
                         id="child-docs"
-                        icon="folder"
+                        icon="tool-note"
                         label="子文档"
                         onSelect={() => { toggleChildDocs() }}
                     />
