@@ -107,6 +107,47 @@ export async function setNotebookConf(notebook: NotebookId, conf: NotebookConf):
 
 
 // **************************************** File Tree ****************************************
+
+export interface ListDocsFile {
+    path: string;
+    name: string;
+    icon: string;
+    name1: string;
+    alias: string;
+    memo: string;
+    bookmark: string;
+    id: string;
+    count: number;
+    size: number;
+    hSize: string;
+    mtime: number;
+    ctime: number;
+    hMtime: string;
+    hCtime: string;
+    sort: number;
+    subFileCount: number;
+    hidden: boolean;
+    newFlashcardCount: number;
+    dueFlashcardCount: number;
+    flashcardCount: number;
+}
+
+export interface IResListDocsByPath {
+    box: string;
+    files: ListDocsFile[];
+    path: string;
+}
+
+export async function listDocsByPath(app: string, notebook: string, path: string): Promise<IResListDocsByPath> {
+    const data = {
+        app: app,
+        notebook: notebook,
+        path: path
+    };
+    const url = '/api/filetree/listDocsByPath';
+    return request(url, data);
+}
+
 export async function createDocWithMd(notebook: NotebookId, path: string, markdown: string): Promise<DocumentId> {
     let data = {
         notebook: notebook,
