@@ -45,26 +45,50 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
     const contentRef = useRef<HTMLDivElement | null>(null);
     const [docInfo, setDocInfo] = useState<DocInfo | null>(null);
 
+    // 缓存已添加到白板的文档ID，使用 useRef 避免依赖 editor 变化
+    const addedBlockIdsRef = useRef<Set<string>>(new Set());
+
     // 检测文档是否已添加到白板
     const isDocInBoard = useCallback((docId: string): boolean => {
-        const shapes = editor.getCurrentPageShapes();
-        for (const shape of shapes) {
-            const shapeAny = shape as any;
-            if ((shape.type === 'card' || shape.type === 'single-block') &&
-                shapeAny.props?.docId === docId) {
-                return true;
-            }
-        }
-        return false;
-    }, [editor]);
+        return addedBlockIdsRef.current.has(docId);
+    }, []);
 
-    // 获取白板中指定 docId 对应的 shape
+    // 监听 shapes 变化，更新已添加文档ID缓存
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const updateAddedBlockIds = () => {
+            const shapes = editor.getCurrentPageShapes();
+            const addedIds = new Set<string>();
+            for (const shape of shapes) {
+                const shapeAny = shape as any;
+                if ((shape.type === 'card' || shape.type === 'single-block') &&
+                    shapeAny.props?.blockId) {
+                    addedIds.add(shapeAny.props.blockId);
+                }
+            }
+            addedBlockIdsRef.current = addedIds;
+        };
+
+        updateAddedBlockIds();
+
+        // 监听 shapes 变化
+        const cleanup = editor.store.listen(() => {
+            updateAddedBlockIds();
+        }, { scope: 'document', source: 'user' });
+
+        return () => {
+            cleanup();
+        };
+    }, [isOpen, editor]);
+
+    // 获取白板中指定 blockId 对应的 shape
     const getShapeByDocId = useCallback((docId: string) => {
         const shapes = editor.getCurrentPageShapes();
         for (const shape of shapes) {
             const shapeAny = shape as any;
             if ((shape.type === 'card' || shape.type === 'single-block') &&
-                shapeAny.props?.docId === docId) {
+                shapeAny.props?.blockId === docId) {
                 return shape;
             }
         }
