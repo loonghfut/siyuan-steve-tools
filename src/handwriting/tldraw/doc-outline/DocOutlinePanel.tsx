@@ -2,7 +2,7 @@
  * 文档大纲面板组件
  * 显示白板绑定文档的大纲，支持将块添加到白板
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     track,
     useEditor,
@@ -62,22 +62,11 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
     const dragStartRef = useRef({ startX: 0, startY: 0, origLeft: 0, origTop: 0 });
     const contentRef = useRef<HTMLDivElement | null>(null);
 
-    // 检测块是否已添加到白板（直接搜索白板中是否存在该 blockId 的 shape）
-    const isBlockInBoard = useCallback((blockId: string): boolean => {
-        const shapes = editor.getCurrentPageShapes();
-        for (const shape of shapes) {
-            const shapeAny = shape as any;
-            // 检查 card 或 single-block 类型的 shape
-            if ((shape.type === 'card' || shape.type === 'single-block') &&
-                shapeAny.props?.blockId === blockId) {
-                return true;
-            }
-        }
-        return false;
-    }, [editor]);
+    // 已添加到白板的块ID状态
+    const [addedBlockIds, setAddedBlockIds] = useState<Set<string>>(new Set());
 
-    // 获取白板中指定 blockId 对应的 shape
-    const getShapeByBlockId = useCallback((blockId: string) => {
+    // 查找指定 blockId 对应的 shape
+    const findBlockShape = useCallback((blockId: string) => {
         const shapes = editor.getCurrentPageShapes();
         for (const shape of shapes) {
             const shapeAny = shape as any;
@@ -88,6 +77,50 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         }
         return null;
     }, [editor]);
+
+    // 检测块是否已添加到白板
+    const isBlockInBoard = useCallback((blockId: string): boolean => {
+        return addedBlockIds.has(blockId);
+    }, [addedBlockIds]);
+
+    // 获取白板中指定 blockId 对应的 shape
+    const getShapeByBlockId = useCallback((blockId: string) => {
+        return findBlockShape(blockId);
+    }, [findBlockShape]);
+
+    // 收集所有已添加到白板的块ID
+    const collectAddedBlockIds = useCallback(() => {
+        const shapes = editor.getCurrentPageShapes();
+        const addedIds = new Set<string>();
+        for (const shape of shapes) {
+            const shapeAny = shape as any;
+            if ((shape.type === 'card' || shape.type === 'single-block') &&
+                shapeAny.props?.blockId) {
+                addedIds.add(shapeAny.props.blockId);
+            }
+        }
+        return addedIds;
+    }, [editor]);
+
+    // 监听 shapes 变化，更新已添加块ID状态
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const updateAddedBlockIds = () => {
+            setAddedBlockIds(collectAddedBlockIds());
+        };
+
+        updateAddedBlockIds();
+
+        // 监听 shapes 变化
+        const cleanup = editor.store.listen(() => {
+            updateAddedBlockIds();
+        }, { scope: 'document', source: 'user' });
+
+        return () => {
+            cleanup();
+        };
+    }, [isOpen, editor, collectAddedBlockIds]);
 
     // 收集所有大纲节点ID（包含 blocks 中的节点）
     const collectAllNodeIds = useCallback((nodes: OutlineNode[]): string[] => {
@@ -117,7 +150,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
     });
 
     // 加载文档大纲
-    const loadOutline = useCallback(async () => {
+    const loadOutline = useCallback(async (signal?: AbortSignal) => {
         if (!docId) {
             setOutline([]);
             return;
@@ -126,6 +159,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         setLoading(true);
         try {
             const result = await getDocOutline(docId);
+            if (signal?.aborted) return;
             const outlineData = result as any;
 
             // 转换数据格式 - 实际层级在 blocks 中
@@ -146,27 +180,24 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
             const allIds = collectAllNodeIds(transformedOutline);
             setExpandedNodes(new Set(allIds));
         } catch (err) {
+            if (signal?.aborted) return;
             console.error('加载文档大纲失败:', err);
             setOutline([]);
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) {
+                setLoading(false);
+            }
         }
     }, [docId, collectAllNodeIds]);
 
     // 初始化和监听更新
     useEffect(() => {
         if (isOpen && docId) {
-            loadOutline();
+            const controller = new AbortController();
+            loadOutline(controller.signal);
+            return () => controller.abort();
         }
     }, [isOpen, docId, loadOutline]);
-
-    // 监听白板 shapes 变化，更新显示状态
-    useEffect(() => {
-        if (!isOpen || outline.length === 0) return;
-
-        // 强制重新渲染以更新状态
-        setOutline(prev => [...prev]);
-    }, [isOpen, editor, outline.length]);
 
     // 初始化位置
     useEffect(() => {
@@ -394,10 +425,10 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
     };
 
     // 渲染单个节点
-    const renderNode = (node: OutlineNode, depth: number = 0): React.ReactNode => {
+    const renderNode = useCallback((node: OutlineNode, depth: number = 0): React.ReactNode => {
         const hasChildren = node.blocks && node.blocks.length > 0;
         const isExpanded = expandedNodes.has(node.id);
-        const isAdded = isBlockInBoard(node.id);
+        const isAdded = addedBlockIds.has(node.id);
 
         return (
             <div key={node.id} style={{ marginLeft: depth * 12 }}>
@@ -512,7 +543,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                 )}
             </div>
         );
-    };
+    }, [addedBlockIds, expandedNodes, toggleNode, handleClick, handleDragStart]);
 
     if (!isOpen) return null;
 

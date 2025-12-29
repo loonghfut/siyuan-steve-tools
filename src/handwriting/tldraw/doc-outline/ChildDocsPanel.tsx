@@ -2,7 +2,7 @@
  * 子文档面板组件
  * 显示白板绑定文档的子文档列表，支持将子文档添加到白板
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     track,
     useEditor,
@@ -45,42 +45,47 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
     const contentRef = useRef<HTMLDivElement | null>(null);
     const [docInfo, setDocInfo] = useState<DocInfo | null>(null);
 
-    // 缓存已添加到白板的文档ID，使用 useRef 避免依赖 editor 变化
-    const addedBlockIdsRef = useRef<Set<string>>(new Set());
+    // 已添加到白板的文档ID状态
+    const [addedDocIds, setAddedDocIds] = useState<Set<string>>(new Set());
+
+    // 收集所有已添加到白板的文档ID
+    const collectAddedDocIds = useCallback(() => {
+        const shapes = editor.getCurrentPageShapes();
+        const addedIds = new Set<string>();
+        for (const shape of shapes) {
+            const shapeAny = shape as any;
+            if ((shape.type === 'card' || shape.type === 'single-block') &&
+                shapeAny.props?.blockId) {
+                addedIds.add(shapeAny.props.blockId);
+            }
+        }
+        return addedIds;
+    }, [editor]);
 
     // 检测文档是否已添加到白板
     const isDocInBoard = useCallback((docId: string): boolean => {
-        return addedBlockIdsRef.current.has(docId);
-    }, []);
+        return addedDocIds.has(docId);
+    }, [addedDocIds]);
 
-    // 监听 shapes 变化，更新已添加文档ID缓存
+    // 监听 shapes 变化，更新已添加文档ID状态
     useEffect(() => {
         if (!isOpen) return;
 
-        const updateAddedBlockIds = () => {
-            const shapes = editor.getCurrentPageShapes();
-            const addedIds = new Set<string>();
-            for (const shape of shapes) {
-                const shapeAny = shape as any;
-                if ((shape.type === 'card' || shape.type === 'single-block') &&
-                    shapeAny.props?.blockId) {
-                    addedIds.add(shapeAny.props.blockId);
-                }
-            }
-            addedBlockIdsRef.current = addedIds;
+        const updateAddedDocIds = () => {
+            setAddedDocIds(collectAddedDocIds());
         };
 
-        updateAddedBlockIds();
+        updateAddedDocIds();
 
         // 监听 shapes 变化
         const cleanup = editor.store.listen(() => {
-            updateAddedBlockIds();
+            updateAddedDocIds();
         }, { scope: 'document', source: 'user' });
 
         return () => {
             cleanup();
         };
-    }, [isOpen, editor]);
+    }, [isOpen, editor, collectAddedDocIds]);
 
     // 获取白板中指定 blockId 对应的 shape
     const getShapeByDocId = useCallback((docId: string) => {
@@ -96,7 +101,7 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
     }, [editor]);
 
     // 加载子文档列表
-    const loadChildDocs = useCallback(async () => {
+    const loadChildDocs = useCallback(async (signal?: AbortSignal) => {
         if (!docId) {
             setChildDocs([]);
             setDocInfo(null);
@@ -109,6 +114,7 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
 
             // 获取文档信息（获取 box 和路径）
             const docResult = await getDoc(docId);
+            if (signal?.aborted) return;
             console.debug('getDoc 返回结果:', docResult);
 
             const box = (docResult as any).box;
@@ -135,6 +141,7 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
             // 确保路径以 / 结尾
             if (!childPath.endsWith('/')) childPath += '/';
             const result = await listDocsByPath('', box, childPath);
+            if (signal?.aborted) return;
             console.debug('listDocsByPath 返回结果:', result);
 
             const data = result as any;
@@ -158,28 +165,25 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
 
             setDocInfo({ box, path: parentPath });
         } catch (err) {
+            if (signal?.aborted) return;
             console.error('加载子文档失败:', err);
             setChildDocs([]);
             setDocInfo(null);
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) {
+                setLoading(false);
+            }
         }
     }, [docId]);
 
     // 初始化和监听更新
     useEffect(() => {
         if (isOpen && docId) {
-            loadChildDocs();
+            const controller = new AbortController();
+            loadChildDocs(controller.signal);
+            return () => controller.abort();
         }
     }, [isOpen, docId, loadChildDocs]);
-
-    // 监听白板 shapes 变化，更新显示状态
-    useEffect(() => {
-        if (!isOpen || childDocs.length === 0) return;
-
-        // 强制重新渲染以更新状态
-        setChildDocs(prev => [...prev]);
-    }, [isOpen, editor, childDocs.length]);
 
     // 初始化位置
     useEffect(() => {
@@ -369,8 +373,8 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
     }, []);
 
     // 渲染单个文档项
-    const renderDocItem = (doc: ChildDocItem): React.ReactNode => {
-        const isAdded = isDocInBoard(doc.id);
+    const renderDocItem = useCallback((doc: ChildDocItem): React.ReactNode => {
+        const isAdded = addedDocIds.has(doc.id);
 
         return (
             <div key={doc.id} style={{ marginLeft: 0 }}>
@@ -456,7 +460,7 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
                 </div>
             </div>
         );
-    };
+    }, [addedDocIds, handleClick, handleDragStart]);
 
     if (!isOpen) return null;
 
