@@ -12,11 +12,14 @@ import { getDocOutline } from '@/api/api';
 import { openTab, showMessage } from 'siyuan';
 
 /**
- * 移除文本中的HTML实体
+ * 移除文本中的HTML实体和HTML标签
  */
 function stripHtmlEntities(text?: string): string {
     if (!text) return '';
-    return text
+    // 先移除HTML标签
+    const withoutTags = text.replace(/<[^>]*>/g, '');
+    // 再替换HTML实体
+    return withoutTags
         .replace(/&nbsp;/gi, ' ')
         .replace(/&amp;/gi, '&')
         .replace(/&lt;/gi, '<')
@@ -93,31 +96,24 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
             ids.push(n.id);
             // 收集 blocks 中的节点
             if (n.blocks) {
-                n.blocks.forEach(block => {
-                    ids.push(block.id);
-                    if (block.children) {
-                        block.children.forEach(collect);
-                    }
-                });
+                n.blocks.forEach(block => collect(block));
             }
-            // 收集 children 中的节点
-            if (n.children) {
-                n.children.forEach(collect);
-            }
+            // children 已废弃，统一使用 blocks
         };
         nodes.forEach(collect);
         return ids;
     }, []);
 
-    // 递归转换 blocks
+    // 递归转换 blocks（包括 children 中的子项）
     const transformBlock = (block: any): OutlineNode => ({
         id: block.id,
-        name: stripHtmlEntities(block.name),
+        name: stripHtmlEntities(block.content || block.name), // 使用 content 作为标题
         type: block.type,
         subType: block.subType,
         depth: block.depth,
-        blocks: block.blocks?.map(transformBlock),
-        children: block.children?.map(transformBlock),
+        content: stripHtmlEntities(block.content),
+        blocks: block.children?.map(transformBlock), // children 转为 blocks
+        children: null,
     });
 
     // 加载文档大纲
@@ -135,12 +131,12 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
             // 转换数据格式 - 实际层级在 blocks 中
             const transformNode = (node: any): OutlineNode => ({
                 id: node.id,
-                name: stripHtmlEntities(node.name),
+                name: stripHtmlEntities(node.name), // 顶层是文档标题
                 type: node.type,
                 subType: node.subType,
                 depth: node.depth,
-                blocks: node.blocks?.map(transformBlock),
-                children: node.children,
+                blocks: node.blocks?.map(transformBlock), // 递归转换 blocks
+                children: null,
             });
 
             const transformedOutline = outlineData.map(transformNode);
@@ -384,9 +380,22 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         }
     };
 
+    // 获取展开/收起图标
+    const getExpandIcon = (isExpanded: boolean): React.ReactNode => {
+        return (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {isExpanded ? (
+                    <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7"/>
+                ) : (
+                    <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7"/>
+                )}
+            </svg>
+        );
+    };
+
     // 渲染单个节点
     const renderNode = (node: OutlineNode, depth: number = 0): React.ReactNode => {
-        const hasChildren = node.children && node.children.length > 0;
+        const hasChildren = node.blocks && node.blocks.length > 0;
         const isExpanded = expandedNodes.has(node.id);
         const isAdded = isBlockInBoard(node.id);
 
@@ -430,7 +439,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                             if (hasChildren) toggleNode(node.id);
                         }}
                     >
-                        {hasChildren ? (isExpanded ? '▼' : '▶') : ''}
+                        {hasChildren ? getExpandIcon(isExpanded) : null}
                     </span>
 
                     {/* 标题图标 */}
@@ -495,10 +504,10 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                     </span>
                 </div>
 
-                {/* 子节点 */}
+                {/* 子节点 - 使用 blocks 而非 children */}
                 {hasChildren && isExpanded && (
                     <div>
-                        {node.children!.map(child => renderNode(child, depth + 1))}
+                        {node.blocks!.map(child => renderNode(child, depth + 1))}
                     </div>
                 )}
             </div>
