@@ -40,14 +40,9 @@ interface OutlineNode {
     type?: string;
     subType?: string;
     depth?: number;
-    blocks?: {
-        id: string;
-        name?: string;
-        content?: string;
-        type?: string;
-        subType?: string;
-    }[];
-    children?: OutlineNode[];
+    content?: string; // blocks 中的内容字段
+    blocks?: OutlineNode[]; // 递归的大纲块
+    children?: OutlineNode[]; // 备用字段
 }
 
 /**
@@ -91,11 +86,21 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         return null;
     }, [editor]);
 
-    // 收集所有大纲节点ID
+    // 收集所有大纲节点ID（包含 blocks 中的节点）
     const collectAllNodeIds = useCallback((nodes: OutlineNode[]): string[] => {
         const ids: string[] = [];
         const collect = (n: OutlineNode) => {
             ids.push(n.id);
+            // 收集 blocks 中的节点
+            if (n.blocks) {
+                n.blocks.forEach(block => {
+                    ids.push(block.id);
+                    if (block.children) {
+                        block.children.forEach(collect);
+                    }
+                });
+            }
+            // 收集 children 中的节点
             if (n.children) {
                 n.children.forEach(collect);
             }
@@ -103,6 +108,17 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         nodes.forEach(collect);
         return ids;
     }, []);
+
+    // 递归转换 blocks
+    const transformBlock = (block: any): OutlineNode => ({
+        id: block.id,
+        name: stripHtmlEntities(block.name),
+        type: block.type,
+        subType: block.subType,
+        depth: block.depth,
+        blocks: block.blocks?.map(transformBlock),
+        children: block.children?.map(transformBlock),
+    });
 
     // 加载文档大纲
     const loadOutline = useCallback(async () => {
@@ -116,19 +132,15 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
             const result = await getDocOutline(docId);
             const outlineData = result as any;
 
-            // 转换数据格式
+            // 转换数据格式 - 实际层级在 blocks 中
             const transformNode = (node: any): OutlineNode => ({
                 id: node.id,
                 name: stripHtmlEntities(node.name),
                 type: node.type,
                 subType: node.subType,
                 depth: node.depth,
-                blocks: node.blocks?.map((b: any) => ({
-                    ...b,
-                    name: stripHtmlEntities(b.name),
-                    content: stripHtmlEntities(b.content),
-                })),
-                children: node.children?.map(transformNode),
+                blocks: node.blocks?.map(transformBlock),
+                children: node.children,
             });
 
             const transformedOutline = outlineData.map(transformNode);
@@ -381,13 +393,10 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         return (
             <div key={node.id} style={{ marginLeft: depth * 12 }}>
                 <div
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, node)}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         padding: '4px 8px',
-                        cursor: 'grab',
                         borderRadius: '4px',
                         backgroundColor: isAdded ? 'var(--b3-accent-background)' : 'transparent',
                         transition: 'background-color 0.15s',
@@ -447,11 +456,33 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
+                            cursor: 'pointer',
                         }}
                         onClick={() => handleClick(node)}
                         title={`${node.name || '未知标题'}${isAdded ? '（已添加，点击跳转）' : '（点击跳转到文档）'}`}
                     >
                         {node.name || '未知标题'}
+                    </span>
+
+                    {/* 拖拽手柄 */}
+                    <span
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, node)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            width: '20px',
+                            height: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'grab',
+                            color: 'var(--b3-theme-on-surface-light)',
+                            fontSize: '12px',
+                            userSelect: 'none',
+                        }}
+                        title="拖拽添加到白板"
+                    >
+                        ⋮⋮
                     </span>
 
                     {/* 状态指示 */}
