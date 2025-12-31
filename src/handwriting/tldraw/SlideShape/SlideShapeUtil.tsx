@@ -28,6 +28,7 @@ export type SlideShape = TLBaseShape<
 		color: TLDefaultColorStyle
 		screenshot?: string
 		blockId?: string
+		borderStyle?: 'solid' | 'dashed' | 'wavy' // 边框样式：实线、虚线、流动效果
 	}
 >
 
@@ -41,6 +42,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		color: DefaultColorStyle, // 添加 color 属性定义
 		screenshot: T.optional(T.string),
 		blockId: T.optional(T.string),
+		borderStyle: T.optional(T.string) as any, // 边框样式: solid, dashed, wavy
 	}
 	static override migrations = slideShapeMigrations
 
@@ -57,7 +59,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 			h: 480,
 			name: 'New Slide', // 设置默认名称
 			color: 'black', 
-			// version: 1, // 设置默认版本
+			borderStyle: 'dashed', // 默认虚线边框
 		}
 	}
 
@@ -94,6 +96,8 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		const bounds = this.editor.getShapeGeometry(shape).bounds
 		// eslint-disable-next-line react-hooks/rules-of-hooks
 		const zoomLevel = useValue('zoom level', () => this.editor.getZoomLevel(), [this.editor])
+		const borderStyle = shape.props.borderStyle || 'dashed'
+		const strokeColor = theme[shape.props.color].solid
 
 		if (!bounds) return null
 
@@ -111,7 +115,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 						zIndex: 1,
 						fontSize: `calc(12px / ${zoomLevel})`,
 						pointerEvents: 'none',
-						color: theme[shape.props.color].solid,
+						color: strokeColor,
 					}}
 				>
 					{shape.props.name || `Slide`}
@@ -121,43 +125,81 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 					<rect
 						width={shape.props.w}
 						height={shape.props.h}
-						fill={theme[shape.props.color].solid}
+						fill={strokeColor}
 						fillOpacity={0.06}
 					/>
-					<g
-						style={{
-							stroke: theme[shape.props.color].solid,
-							strokeWidth: 'calc(1px * var(--tl-scale))',
-							opacity: 0.5,
-						}}
-						pointerEvents="none"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						{bounds.sides.map((side, i) => {
-							const { strokeDasharray, strokeDashoffset } = getPerfectDashProps(
-								side[0].dist(side[1]),
-								1 / zoomLevel,
-								{
-									style: 'dashed',
-									lengthRatio: 6,
-									forceSolid: zoomLevel < 0.2,
+					{borderStyle === 'wavy' ? (
+						/* 流动效果 - 使用动画虚线 */
+						<g
+							style={{
+								stroke: strokeColor,
+								strokeWidth: 'calc(1.5px * var(--tl-scale))',
+								opacity: 0.8,
+							}}
+							pointerEvents="none"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							{bounds.sides.map((side, i) => {
+								return (
+									<line
+										key={i}
+										x1={side[0].x}
+										y1={side[0].y}
+										x2={side[1].x}
+										y2={side[1].y}
+										strokeDasharray="8 4"
+										className="slide-border-wavy"
+									/>
+								)
+							})}
+							<style>{`
+								.slide-border-wavy {
+									animation: slideBorderFlow 2s linear infinite;
 								}
-							)
+								@keyframes slideBorderFlow {
+									0% { stroke-dashoffset: 0; }
+									100% { stroke-dashoffset: -24; }
+								}
+							`}</style>
+						</g>
+					) : (
+						/* 普通边框 - 实线或虚线 */
+						<g
+							style={{
+								stroke: strokeColor,
+								strokeWidth: 'calc(1px * var(--tl-scale))',
+								opacity: borderStyle === 'dashed' ? 0.5 : 0.8,
+							}}
+							pointerEvents="none"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							{bounds.sides.map((side, i) => {
+								const { strokeDasharray, strokeDashoffset } = getPerfectDashProps(
+									side[0].dist(side[1]),
+									1 / zoomLevel,
+									{
+										style: borderStyle === 'dashed' ? 'dashed' : 'solid',
+										lengthRatio: 6,
+										forceSolid: zoomLevel < 0.2,
+									}
+								)
 
-							return (
-								<line
-									key={i}
-									x1={side[0].x}
-									y1={side[0].y}
-									x2={side[1].x}
-									y2={side[1].y}
-									strokeDasharray={strokeDasharray}
-									strokeDashoffset={strokeDashoffset}
-								/>
-							)
-						})}
-					</g>
+								return (
+									<line
+										key={i}
+										x1={side[0].x}
+										y1={side[0].y}
+										x2={side[1].x}
+										y2={side[1].y}
+										strokeDasharray={strokeDasharray}
+										strokeDashoffset={strokeDashoffset}
+									/>
+								)
+							})}
+						</g>
+					)}
 				</SVGContainer>
 			</>
 		)

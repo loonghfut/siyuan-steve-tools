@@ -8,6 +8,7 @@ const versions = createShapePropsMigrationIds(
     Addv: 1,
     Addcolor: 2,
     Addscreenshot: 3,
+    AddborderStyle: 4,
   }
 )
 
@@ -43,6 +44,18 @@ export const slideShapeMigrations = createShapePropsMigrationSequence({
       },
       down(props) {
         delete props.screenshot
+      },
+    },
+    {
+      id: versions.AddborderStyle,
+      up(props) {
+        // 添加边框样式属性，默认值
+        if (typeof props.borderStyle !== 'string') {
+          props.borderStyle = 'dashed'
+        }
+      },
+      down(props) {
+        delete props.borderStyle
       },
     },
   ],

@@ -379,6 +379,13 @@ const CustomStylePanel = track(() => {
 
     const isSingleSlideSelected = selectedShapes.length === 1 && selectedShapes[0].type === 'slide';
     const slideShape = isSingleSlideSelected ? (selectedShapes[0] as SlideShape) : null;
+    
+    // Slide 边框样式状态
+    const slideBorderStyleValue = React.useMemo<'solid' | 'dashed' | 'wavy' | 'mixed'>(() => {
+        if (!isSingleSlideSelected) return 'dashed'
+        const borderStyle = slideShape?.props?.borderStyle as 'solid' | 'dashed' | 'wavy' | undefined
+        return borderStyle || 'dashed'
+    }, [isSingleSlideSelected, slideShape])
     const selectedCardShapes = React.useMemo(
         () => selectedShapes.filter((shape): shape is ICardShape => shape.type === 'card'),
         [selectedShapes]
@@ -1048,6 +1055,32 @@ const CustomStylePanel = track(() => {
                         onBlur={handleNameBlur}
                         onKeyDown={handleKeyDown}
                         spellCheck={false}
+                    />
+                    {/* 边框样式选择器 */}
+                    <StylePanelDropdownPicker
+                        label="边框样式"
+                        type="menu"
+                        id="slide-border-style"
+                        uiType="slide-border-style"
+                        stylePanelType="slide-border-style"
+                        style={{ id: 'slide-border-style' } as any}
+                        items={[
+                            { value: 'solid', icon: 'dash-solid' },
+                            { value: 'dashed', icon: 'dash-dashed' },
+                            { value: 'wavy', icon: 'blob' },
+                        ]}
+                        value={{ type: 'shared' as const, value: slideBorderStyleValue }}
+                        onValueChange={(_style, nextStyle: any) => {
+                            if (!slideShape) return
+                            const nextStyleStr = nextStyle as 'solid' | 'dashed' | 'wavy'
+                            editor.run(() => {
+                                editor.updateShape({
+                                    id: slideShape.id,
+                                    type: 'slide',
+                                    props: { borderStyle: nextStyleStr },
+                                })
+                            })
+                        }}
                     />
                     <TldrawUiButton
                         type="normal"
