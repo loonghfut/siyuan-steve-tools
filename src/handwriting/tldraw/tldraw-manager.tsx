@@ -480,10 +480,36 @@ export class TldrawManager {
                                 try {
                                     const target = ev.target as HTMLElement | null;
                                     if (!target) return;
-                                    
+
                                     if (this._isDragging) return;
-                                    
+
+                                    // 排除思源编辑器内容
                                     if (target.closest('.protyle-wysiwyg') || target.closest('[contenteditable="true"]')) return;
+
+                                    // 排除 tldraw 自身的形状元素，包括文本框
+                                    // tldraw 的形状有 .tl-shape 类，文本编辑时会有 .tl-text 或 .tl-html-container
+                                    if (target.closest('.tl-shape') ||
+                                        target.closest('.tl-grid') ||
+                                        target.closest('.tl-canvas') ||
+                                        target.closest('.tl-text') ||
+                                        target.closest('.tl-html-container') ||
+                                        target.closest('[data-shape-id]') ||
+                                        target.closest('.tl-scribble') ||
+                                        target.closest('.tl-embed') ||
+                                        target.closest('.tl-connector')) {
+                                        return;
+                                    }
+
+                                    // 排除 tldraw UI 元素
+                                    if (target.closest('.tlui') ||
+                                        target.closest('[data-testid="canvas"]') ||
+                                        target.closest('.tlui-input') ||
+                                        target.closest('.tlui-button') ||
+                                        target.closest('.tlui-tooltip')) {
+                                        return;
+                                    }
+
+                                    // 只有点击画布背景时才清除选区
                                     if (window.getSelection) {
                                         const sel = window.getSelection();
                                         if (sel && !sel.isCollapsed) sel.removeAllRanges();
