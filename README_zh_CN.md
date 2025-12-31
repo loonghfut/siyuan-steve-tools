@@ -40,7 +40,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.32.0 (2025年12月29日)
+### v0.32.1 (2025年12月31日)
 - docs: 更新 v0.31.2 版本的更新日志 (loonghfut)
 - fix(tldraw): 修复画布点击清除选区时误触发的问题 (loonghfut)
 - feat(types): 添加Svelte组件类型声明文件 (loonghfut)
@@ -97,6 +97,12 @@ win端s3同步后，docker端感知s3同步。
 - feat(ChildDocsPanel, DocOutlinePanel): 优化文档添加检测逻辑，使用状态管理替代引用 (loonghfut)
 - feat(CustomQuickActions): 更新子文档菜单项图标为工具笔记 (loonghfut)
 - feat(plugin.json): 更新版本号至0.32.0 (loonghfut)
+- docs: 更新 v0.32.0 版本的更新日志 (loonghfut)
+- fix(M_handwriting): 修复根块 ID 解析逻辑，确保正确处理查询参数 (loonghfut)
+- fix(custom-tldraw.css): 修复样式定义，调整特定元素的背景色和字体颜色 (loonghfut)
+- fix(TldrawManager): 增强点击事件处理，排除特定元素以清除选区 (loonghfut)
+- fix(SlideShapeUtil): 调整填充不透明度，从0.08更改为0.06 (loonghfut)
+- fix: 更新版本号至0.32.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
