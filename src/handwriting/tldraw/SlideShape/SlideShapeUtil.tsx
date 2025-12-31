@@ -122,7 +122,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 						width={shape.props.w}
 						height={shape.props.h}
 						fill={theme[shape.props.color].solid}
-						fillOpacity={0.08}
+						fillOpacity={0.06}
 					/>
 					<g
 						style={{
