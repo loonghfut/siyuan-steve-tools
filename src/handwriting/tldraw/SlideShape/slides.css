@@ -29,4 +29,24 @@
 	font-size: calc(12px * var(--tl-scale));
 	color: var(--color-text);
 	white-space: nowrap;
+	transition: background-color 0.15s ease;
+}
+
+.slide-shape-label:hover {
+	background: var(--color-muted-1);
+}
+
+.slide-shape-name-input {
+	font-family: inherit;
+	font-weight: 500;
+	min-height: 0;
+	line-height: 1.2;
+	box-sizing: border-box;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.slide-shape-name-input:focus {
+	border-color: var(--color-primary) !important;
+	box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
 }

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import {
 	Geometry2d,
 	RecordProps,
@@ -11,9 +11,9 @@ import {
 	getPerfectDashProps,
 	resizeBox,
 	useValue,
-	DefaultColorStyle, // 导入 stopEventPropagation
+	DefaultColorStyle,
 	TLDefaultColorStyle,
-	getDefaultColorTheme, // 导入 useEditor
+	getDefaultColorTheme,
 } from '@tldraw/tldraw'
 import { moveToSlide } from './useSlides'
 import { slideShapeMigrations } from './SlideShapeMigrations'
@@ -99,27 +99,129 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 		const borderStyle = shape.props.borderStyle || 'dashed'
 		const strokeColor = theme[shape.props.color].solid
 
+		// 内联编辑状态
+		const [isEditing, setIsEditing] = useState(false)
+		const [editValue, setEditValue] = useState(shape.props.name || '')
+		const inputRef = useRef<HTMLInputElement>(null)
+
+		// 当shape的name属性变化时，同步到editValue
+		useEffect(() => {
+			if (!isEditing) {
+				setEditValue(shape.props.name || '')
+			}
+		}, [shape.props.name, isEditing])
+
+		// 进入编辑模式时聚焦输入框
+		useEffect(() => {
+			if (isEditing && inputRef.current) {
+				// 使用setTimeout延迟聚焦，让浏览器先处理完点击事件
+				setTimeout(() => {
+					inputRef.current?.focus()
+					inputRef.current?.select()
+				}, 0)
+			}
+		}, [isEditing])
+
+		// 保存名称
+		const saveName = useCallback((newName: string) => {
+			const trimmedName = newName.trim()
+			if (trimmedName !== shape.props.name) {
+				this.editor.updateShape({
+					id: shape.id,
+					type: 'slide',
+					props: { name: trimmedName || 'New Slide' },
+				})
+			}
+			setIsEditing(false)
+		}, [shape.id, shape.props.name])
+
+		// 处理键盘事件
+		const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+			if (e.key === 'Enter') {
+				e.preventDefault()
+				saveName(editValue)
+			} else if (e.key === 'Escape') {
+				setEditValue(shape.props.name || '')
+				setIsEditing(false)
+			}
+		}, [editValue, saveName, shape.props.name])
+
+		// 处理点击进入编辑模式
+		const handleLabelPointerDown = useCallback((e: React.PointerEvent) => {
+			e.stopPropagation()
+			// 不调用preventDefault，让浏览器处理点击事件后再聚焦
+			setIsEditing(true)
+		}, [])
+
+		// 处理输入变化
+		const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+			setEditValue(e.target.value)
+		}, [])
+
+		// 处理失去焦点
+		const handleBlur = useCallback(() => {
+			saveName(editValue)
+		}, [editValue, saveName])
+
 		if (!bounds) return null
+
+		const labelFontSize = `calc(12px / ${zoomLevel})`
+		const labelPadding = `calc(4px / ${zoomLevel})`
 
 		return (
 			<>
-				<div
-					className="slide-shape-label"
-					style={{
-						position: 'absolute',
-						top: `calc(-25px / ${zoomLevel})`,
-						left: 0,
-						width: shape.props.w,
-						textAlign: 'center',
-						cursor: 'default',
-						zIndex: 1,
-						fontSize: `calc(12px / ${zoomLevel})`,
-						pointerEvents: 'none',
-						color: strokeColor,
-					}}
-				>
-					{shape.props.name || `Slide`}
-				</div>
+				{isEditing ? (
+					<input
+						ref={inputRef}
+						className="slide-shape-name-input"
+						type="text"
+						value={editValue}
+						onChange={handleInputChange}
+						onKeyDown={handleKeyDown}
+						onBlur={handleBlur}
+						onClick={(e) => e.stopPropagation()}
+						onPointerDown={(e) => e.stopPropagation()}
+						spellCheck={false}
+						style={{
+							position: 'absolute',
+							top: `calc(-25px / ${zoomLevel})`,
+							left: 0,
+							width: shape.props.w,
+							height: `calc(20px / ${zoomLevel})`,
+							fontSize: labelFontSize,
+							textAlign: 'center',
+							border: '1px solid var(--color-primary)',
+							borderRadius: `calc(var(--radius-2) / ${zoomLevel})`,
+							padding: labelPadding,
+							background: 'var(--color-background)',
+							color: 'var(--color-text)',
+							outline: 'none',
+							zIndex: 10,
+							cursor: 'text',
+						}}
+					/>
+				) : (
+					<div
+						className="slide-shape-label"
+						onPointerDown={handleLabelPointerDown}
+						style={{
+							position: 'absolute',
+							top: `calc(-25px / ${zoomLevel})`,
+							left: 0,
+							width: shape.props.w,
+							textAlign: 'center',
+							cursor: 'text',
+							zIndex: 1,
+							fontSize: labelFontSize,
+							pointerEvents: 'all',
+							color: strokeColor,
+							userSelect: 'none',
+						}}
+						title="点击编辑名称"
+					>
+						{shape.props.name || `Slide`}
+					</div>
+				)}
 
 				<SVGContainer>
 					<rect

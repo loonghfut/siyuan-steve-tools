@@ -505,7 +505,8 @@ export class TldrawManager {
                                         target.closest('[data-testid="canvas"]') ||
                                         target.closest('.tlui-input') ||
                                         target.closest('.tlui-button') ||
-                                        target.closest('.tlui-tooltip')) {
+                                        target.closest('.tlui-tooltip') ||
+                                        target.closest('.slide-shape-name-input')) {
                                         return;
                                     }
 
