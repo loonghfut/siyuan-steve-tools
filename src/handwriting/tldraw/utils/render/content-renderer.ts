@@ -8,6 +8,7 @@
  */
 import { Protyle, ProtyleMethod } from 'siyuan'
 import { scheduleIdleRender, isInteracting } from '../idle-scheduler'
+import { getBlockDOMsWithEmbed } from '@/api/api'
 
 // 用于生成唯一的渲染任务 ID
 let renderTaskIdCounter = 0
@@ -21,6 +22,46 @@ const CDN = undefined // 使用思源默认 CDN
  */
 export async function renderAllContent(container: HTMLElement): Promise<void> {
 	try {
+		// 处理嵌入块
+		const embedNodes = Array.from(
+			container.querySelectorAll('[data-type="NodeBlockQueryEmbed"]')
+		);
+
+		if (embedNodes.length > 0) {
+			const idsToResolve = embedNodes
+				.map((node) => node.getAttribute('data-node-id')?.trim() || '')
+				.filter(Boolean);
+			const uniqueIds = Array.from(new Set(idsToResolve));
+
+			if (uniqueIds.length > 0) {
+				try {
+					const embedDomMap = await getBlockDOMsWithEmbed(uniqueIds);
+					if (embedDomMap) {
+						const buildFragmentFromHtml = (html: string) => {
+							const temp = document.createElement('div');
+							temp.innerHTML = html;
+							const fragment = document.createDocumentFragment();
+							while (temp.firstChild) {
+								fragment.appendChild(temp.firstChild);
+							}
+							return fragment;
+						};
+
+						embedNodes.forEach((node) => {
+							const targetId = node.getAttribute('data-node-id')?.trim();
+							if (!targetId) return;
+							const replacementHtml = embedDomMap[targetId];
+							if (!replacementHtml) return;
+							const fragment = buildFragmentFromHtml(replacementHtml);
+							node.replaceWith(fragment);
+						});
+					}
+				} catch (err) {
+					console.error('获取嵌入 DOM 内容失败:', err);
+				}
+			}
+		}
+
 		// 使用思源的渲染方法
 		ProtyleMethod.mathRender(container, CDN, false)
 		ProtyleMethod.mermaidRender(container, CDN)
