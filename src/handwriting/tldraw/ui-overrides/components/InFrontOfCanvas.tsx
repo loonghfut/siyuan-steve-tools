@@ -3,7 +3,7 @@
  * 包含素材库面板、文档大纲面板、子文档面板和选中元素的浮动操作按钮
  */
 import React from 'react'
-import { useEditor, useValue, TLShapeId } from '@tldraw/tldraw'
+import { useEditor, useValue, TLShapeId, TldrawUiIcon } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
 import { ShapeLibraryPanel } from '../../shapelibrary/ShapeLibraryPanel'
 import { DocOutlinePanel } from '../../doc-outline/DocOutlinePanel'
@@ -159,18 +159,65 @@ export const InFrontOfCanvas: React.FC = () => {
     }, [editor])
 
     const buttonStyle = {
-        width: '32px',
-        height: '32px',
-        margin: '0 4px',
-        borderRadius: '4px',
-        background: 'var(--b3-theme-background)',
-        border: '1px solid var(--b3-border-color)',
-        color: 'var(--b3-theme-on-background)',
+        width: '28px',
+        height: '28px',
+        borderRadius: '6px',
+        background: 'transparent',
+        border: 'none',
+        color: 'var(--b3-theme-on-surface)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)'
+        transition: 'all 0.2s ease',
+    }
+
+    const HoverButton = ({ onClick, title, children, style, active, pending }: any) => {
+        const [hover, setHover] = React.useState(false)
+        
+        const getBackground = () => {
+            if (pending) return 'var(--b3-theme-primary)'
+            if (active) return 'var(--b3-theme-primary-light)'
+            if (hover) return 'var(--b3-list-hover-background)'
+            return 'transparent'
+        }
+
+        const getColor = () => {
+            if (pending) return 'var(--b3-theme-on-primary)'
+            if (active) return 'var(--b3-theme-primary)'
+            return 'var(--b3-theme-on-surface)'
+        }
+
+        return (
+            <button
+                style={{
+                    ...style,
+                    background: getBackground(),
+                    color: getColor(),
+                    boxShadow: pending ? '0 0 0 2px var(--b3-theme-primary-light)' : 'none',
+                }}
+                onMouseEnter={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
+                onClick={onClick}
+                title={title}
+            >
+                {children}
+            </button>
+        )
+    }
+
+    const Icons = {
+        Edit: () => <TldrawUiIcon icon="tool-pencil" small />,
+        Refresh: () => <TldrawUiIcon icon="arrow-cycle" small />,
+        ChevronRight: () => <TldrawUiIcon icon="chevron-right" small />,
+        ChevronDown: () => <TldrawUiIcon icon="chevron-down" small />,
+        FontIncrease: () => <TldrawUiIcon icon="plus" small />,
+        FontDecrease: () => <TldrawUiIcon icon="minus" small />,
+        Plus: () => <TldrawUiIcon icon="tool-text" small />,
+        Link: () => <TldrawUiIcon icon="external-link" small />,
+        Code: () => <TldrawUiIcon icon="code" small />,
+        Zap: () => <TldrawUiIcon icon="arrow-cycle" small />,
+        MousePointer: () => <TldrawUiIcon icon="tool-hand" small />,
     }
 
     return (
@@ -202,24 +249,31 @@ export const InFrontOfCanvas: React.FC = () => {
                         position: 'absolute',
                         top: 0,
                         left: 0,
-                        transform: `translate(${selectionInfo.x + selectionInfo.width / 2 - 115}px, ${selectionInfo.y - 40 + Math.sin(selectionInfo.rotation) * Math.abs(selectionInfo.width)}px)`,
+                        transform: `translate(${selectionInfo.x + selectionInfo.width / 2}px, ${selectionInfo.y - 48 + Math.sin(selectionInfo.rotation) * Math.abs(selectionInfo.width)}px) translateX(-50%)`,
                         display: 'flex',
+                        gap: '4px',
+                        padding: '4px',
+                        borderRadius: '8px',
+                        background: 'var(--b3-theme-surface)',
+                        border: '1px solid var(--b3-border-color)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                         pointerEvents: 'all',
-                        zIndex: 1
+                        zIndex: 1000,
+                        alignItems: 'center'
                     }}
                 >
                     {isCardOrBlock && (
                         <>
-                            <button
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={() => {
                                     editor.setEditingShape(selectionInfo.id)
                                 }}
                                 title="编辑内容"
                             >
-                                ✏️
-                            </button>
-                            <button
+                                <Icons.Edit />
+                            </HoverButton>
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={() => {
                                     const shape = editor.getShape(selectionInfo.id)
@@ -238,9 +292,9 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="刷新卡片"
                             >
-                                🔄
-                            </button>
-                            <button
+                                <Icons.Refresh />
+                            </HoverButton>
+                            <HoverButton
                                 style={{
                                     ...buttonStyle,
                                     display: selectedShape.type === 'card' ? undefined : 'none',
@@ -277,9 +331,9 @@ export const InFrontOfCanvas: React.FC = () => {
                                         : '折叠卡片'
                                 }
                             >
-                                {((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed) ? '▶' : '▼'}
-                            </button>
-                            <button
+                                {((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed) ? <Icons.ChevronRight /> : <Icons.ChevronDown />}
+                            </HoverButton>
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={() => {
                                     const shape = editor.getShape(selectionInfo.id)
@@ -298,9 +352,9 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="放大字体"
                             >
-                                A+
-                            </button>
-                            <button
+                                <Icons.FontIncrease />
+                            </HoverButton>
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={() => {
                                     const shape = editor.getShape(selectionInfo.id)
@@ -319,24 +373,19 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="减小字体"
                             >
-                                A-
-                            </button>
+                                <Icons.FontDecrease />
+                            </HoverButton>
                             {isSingleBlockSelection && (
-                                <button
-                                    style={{
-                                        ...buttonStyle,
-                                        background: isAddPending(editor, selectionInfo.id)
-                                            ? 'var(--b3-accent-background)' : buttonStyle.background,
-                                        boxShadow: isAddPending(editor, selectionInfo.id)
-                                            ? '0 0 0 3px rgba(0, 128, 255, 0.12)' : buttonStyle.boxShadow,
-                                    }}
+                                <HoverButton
+                                    style={buttonStyle}
+                                    pending={isAddPending(editor, selectionInfo.id)}
                                     onClick={() => armAddConnectedSingleBlock(editor, selectionInfo.id)}
                                     title="点击后将在你下一次点击的位置创建关联单块（按住 Ctrl 点击可连续放置；Esc 取消）"
                                 >
-                                    ❇️
-                                </button>
+                                    <Icons.Plus />
+                                </HoverButton>
                             )}
-                            <button
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={async () => {
                                     const shape = editor.getShape(selectionInfo.id)
@@ -357,20 +406,20 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="跳转到笔记"
                             >
-                                🔗
-                            </button>
+                                <Icons.Link />
+                            </HoverButton>
                         </>
                     )}
                     {isJsShapeSelection && (
                         <>
-                            <button
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={() => editor.emit('sttools:editJsShape', selectionInfo.id)}
                                 title="打开脚本编辑器"
                             >
-                                {'</>'}
-                            </button>
-                            <button
+                                <Icons.Code />
+                            </HoverButton>
+                            <HoverButton
                                 style={buttonStyle}
                                 onClick={() => {
                                     editor.emit('sttools:rerunJsShape', selectionInfo.id)
@@ -378,15 +427,11 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="手动重新执行脚本"
                             >
-                                ⚡
-                            </button>
-                            <button
-                                style={{
-                                    ...buttonStyle,
-                                    background: selectedJsShape?.props.interactive === true
-                                        ? 'rgba(59,130,246,0.15)'
-                                        : buttonStyle.background,
-                                }}
+                                <Icons.Zap />
+                            </HoverButton>
+                            <HoverButton
+                                style={buttonStyle}
+                                active={selectedJsShape?.props.interactive === true}
                                 onClick={() => {
                                     const shape = editor.getShape(selectionInfo.id)
                                     if (!shape || shape.type !== 'js-shape') return
@@ -404,8 +449,8 @@ export const InFrontOfCanvas: React.FC = () => {
                                     ? '禁用 DOM 交互 (恢复画布拖拽)'
                                     : '允许 DOM 交互'}
                             >
-                                🖱️
-                            </button>
+                                <Icons.MousePointer />
+                            </HoverButton>
                         </>
                     )}
                 </div>
