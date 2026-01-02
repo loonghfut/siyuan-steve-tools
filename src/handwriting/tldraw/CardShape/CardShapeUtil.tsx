@@ -1,4 +1,4 @@
-import React, { ReactElement, useCallback, useEffect, useRef, useState } from 'react'
+import React, { ReactElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
 	HTMLContainer,
 	Rectangle2d,
@@ -230,6 +230,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
+		const cardRootRef = useRef<HTMLDivElement | null>(null)
+		const lastSizeRef = useRef({ h: shape.props.h })
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
 		const prevCameraRef = useRef<any | null>(null)
 		const hadFocusedRef = useRef(false)
@@ -238,6 +240,27 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
+
+		useLayoutEffect(() => {
+			const el = cardRootRef.current
+			if (!el) return
+			const prevH = lastSizeRef.current.h
+			const nextH = shape.props.h
+			if (prevH === nextH) return
+			if (typeof window !== 'undefined') {
+				const prefersReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+				if (!prefersReduce) {
+					el.animate(
+						[
+							{ height: `${prevH}px`, opacity: isCollapsed ? 1 : 0.9 },
+							{ height: `${nextH}px`, opacity: 1 },
+						],
+						{ duration: 180, easing: 'ease-in-out' }
+					)
+				}
+			}
+			lastSizeRef.current = { h: nextH }
+		}, [shape.props.h, isCollapsed])
 
 		// 检测编辑状态变化：从编辑 -> 非编辑时，使静态预览缓存失效
 		useEffect(() => {
@@ -1037,6 +1060,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		return (
 			<HTMLContainer
+				ref={cardRootRef}
 				onMouseEnter={() => setIsHovered(true)}
 				onMouseLeave={() => setIsHovered(false)}
 				id={shape.id}
@@ -1060,6 +1084,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					padding: 0,
 					border: settingdata["showCardBorder"] ? `3px solid ${theme[shape.props.color].solid}` : 'none', // 添加颜色边框
 					borderRadius: '10px', // 增加圆角
+					transition: 'height 180ms ease-in-out, width 180ms ease-in-out, box-shadow 120ms ease',
 				}}
 				// onDoubleClick={handleDoubleClick}
 				onPointerDown={handlePointerEvent}
@@ -1094,6 +1119,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								boxSizing: 'border-box',
 								color: theme[shape.props.color].solid,
 								overflow: 'hidden',
+								transition: 'opacity 140ms ease, transform 140ms ease',
+								opacity: 1,
+								transform: 'translateY(0)'
 							}}
 						>
 							{tldrawHeaderImage && (
@@ -1146,6 +1174,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								padding: '10px 14px',
 								boxSizing: 'border-box',
 								gap: '10px',
+								transition: 'opacity 140ms ease, transform 140ms ease',
+								opacity: 1,
+								transform: 'translateY(0)'
 							}}>
 								{/* 折叠图标 */}
 								<svg
