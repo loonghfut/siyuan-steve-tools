@@ -30,6 +30,10 @@ let pendingCreationPromise: Promise<string> | null = null;
 const staticPreviewCache = new Map<string, { html: string; fontSize: number }>();
 const MAX_CACHE_SIZE = 50;
 
+// 限制首屏渲染规模，避免一次性插入过多 DOM
+const INITIAL_NODE_LIMIT = 80;
+const INITIAL_TEXT_LIMIT = 8000;
+
 function cacheStaticPreview(blockId: string, html: string, fontSize: number) {
 	if (staticPreviewCache.size >= MAX_CACHE_SIZE) {
 		const firstKey = staticPreviewCache.keys().next().value;
@@ -953,8 +957,79 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 				}
 
-				// 缓存原始 DOM HTML（渲染前）
-				cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
+				// 图片懒加载，避免首屏同步解码
+				previewWrapper.querySelectorAll('img').forEach((img) => {
+					if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy');
+				});
+
+				// 对超大文档做首屏截断，并提供懒加载剩余内容
+				const installIncrementalRender = () => {
+					const children = Array.from(previewWrapper.children);
+					const remainder: Element[] = [];
+					let keptNodes = 0;
+					let keptText = 0;
+
+					for (const node of children) {
+						// 题头与标题区域直接保留
+						if (node.classList.contains('protyle-top') || node.classList.contains('protyle-title')) {
+							continue;
+						}
+						const textLen = (node.textContent || '').length;
+						const hitLimit = keptNodes >= INITIAL_NODE_LIMIT || keptText >= INITIAL_TEXT_LIMIT;
+						if (hitLimit) {
+							remainder.push(node);
+							continue;
+						}
+						keptNodes += 1;
+						keptText += textLen;
+					}
+
+					if (!remainder.length) return true;
+
+					remainder.forEach((n) => previewWrapper.removeChild(n));
+
+					const placeholder = document.createElement('div');
+					placeholder.style.padding = '16px';
+					placeholder.style.textAlign = 'center';
+					placeholder.style.color = 'var(--b3-theme-on-surface, #666)';
+					placeholder.style.opacity = '0.8';
+					placeholder.style.cursor = 'pointer';
+					placeholder.style.userSelect = 'none';
+					placeholder.textContent = '文档较大，点击或滚动以加载剩余内容';
+
+					let loaded = false;
+					const loadRest = async () => {
+						if (loaded || cancelled) return;
+						loaded = true;
+						placeholder.textContent = '正在加载剩余内容...';
+						const frag = document.createDocumentFragment();
+						remainder.forEach((n) => frag.appendChild(n));
+						previewWrapper.insertBefore(frag, placeholder);
+						try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
+						await renderAllContent(previewWrapper);
+						if (placeholder.parentElement === previewWrapper) {
+							previewWrapper.removeChild(placeholder);
+						}
+					};
+
+					placeholder.addEventListener('click', loadRest, { once: true });
+
+					// 当滚动接近占位符时自动加载
+					if ('IntersectionObserver' in window) {
+						const obs = new IntersectionObserver((entries) => {
+							if (entries.some((e) => e.isIntersecting)) {
+								obs.disconnect();
+								loadRest();
+							}
+						}, { root: previewWrapper, rootMargin: '200px' });
+						obs.observe(placeholder);
+					}
+
+					previewWrapper.appendChild(placeholder);
+					return false;
+				};
+
+				const allowCache = installIncrementalRender();
 
 				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
 				staticPreviewRef.current = previewWrapper;
@@ -964,6 +1039,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				await renderAllContent(previewWrapper);
 
 				if (cancelled) return;
+
+				// 仅在未截断时缓存，避免缓存巨大 DOM
+				if (allowCache) {
+					cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
+				}
 			};
 
 			let cancelled = false;
