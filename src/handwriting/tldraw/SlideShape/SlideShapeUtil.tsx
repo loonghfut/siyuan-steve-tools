@@ -227,6 +227,19 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 				</HTMLContainer>
 
 				<SVGContainer>
+					<defs>
+						<style>{`
+							.slide-border-wavy {
+								stroke-dasharray: calc(8px * var(--tl-scale)) calc(4px * var(--tl-scale));
+								stroke-dashoffset: 0;
+								animation: slideBorderFlow 2s linear infinite;
+							}
+							@keyframes slideBorderFlow {
+								0% { stroke-dashoffset: 0; }
+								100% { stroke-dashoffset: calc(-24px * var(--tl-scale)); }
+							}
+						`}</style>
+					</defs>
 					<rect
 						width={shape.props.w}
 						height={shape.props.h}
@@ -253,20 +266,10 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 										y1={side[0].y}
 										x2={side[1].x}
 										y2={side[1].y}
-										strokeDasharray="8 4"
 										className="slide-border-wavy"
 									/>
 								)
 							})}
-							<style>{`
-								.slide-border-wavy {
-									animation: slideBorderFlow 2s linear infinite;
-								}
-								@keyframes slideBorderFlow {
-									0% { stroke-dashoffset: 0; }
-									100% { stroke-dashoffset: -24; }
-								}
-							`}</style>
 						</g>
 					) : (
 						/* 普通边框 - 实线或虚线 */
