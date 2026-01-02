@@ -14,6 +14,8 @@ import {
 	DefaultColorStyle,
 	TLDefaultColorStyle,
 	getDefaultColorTheme,
+	HTMLContainer,
+	stopEventPropagation,
 } from '@tldraw/tldraw'
 import { moveToSlide } from './useSlides'
 import { slideShapeMigrations } from './SlideShapeMigrations'
@@ -148,7 +150,7 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 
 		// 处理点击进入编辑模式
 		const handleLabelPointerDown = useCallback((e: React.PointerEvent) => {
-			e.stopPropagation()
+			stopEventPropagation(e)
 			// 不调用preventDefault，让浏览器处理点击事件后再聚焦
 			setIsEditing(true)
 		}, [])
@@ -170,58 +172,59 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 
 		return (
 			<>
-				{isEditing ? (
-					<input
-						ref={inputRef}
-						className="slide-shape-name-input"
-						type="text"
-						value={editValue}
-						onChange={handleInputChange}
-						onKeyDown={handleKeyDown}
-						onBlur={handleBlur}
-						onClick={(e) => e.stopPropagation()}
-						onPointerDown={(e) => e.stopPropagation()}
-						spellCheck={false}
-						style={{
-							position: 'absolute',
-							top: `calc(-25px / ${zoomLevel})`,
-							left: 0,
-							width: shape.props.w,
-							height: `calc(20px / ${zoomLevel})`,
-							fontSize: labelFontSize,
-							textAlign: 'center',
-							border: '1px solid var(--color-primary)',
-							borderRadius: `calc(var(--radius-2) / ${zoomLevel})`,
-							padding: labelPadding,
-							background: 'var(--color-background)',
-							color: 'var(--color-text)',
-							outline: 'none',
-							zIndex: 10,
-							cursor: 'text',
-						}}
-					/>
-				) : (
-					<div
-						className="slide-shape-label"
-						onPointerDown={handleLabelPointerDown}
-						style={{
-							position: 'absolute',
-							top: `calc(-25px / ${zoomLevel})`,
-							left: 0,
-							width: shape.props.w,
-							textAlign: 'center',
-							cursor: 'text',
-							zIndex: 1,
-							fontSize: labelFontSize,
-							pointerEvents: 'all',
-							color: strokeColor,
-							userSelect: 'none',
-						}}
-						title="点击编辑名称"
-					>
-						{shape.props.name || `Slide`}
-					</div>
-				)}
+				<HTMLContainer style={{ pointerEvents: 'all' }}>
+					{isEditing ? (
+						<input
+							ref={inputRef}
+							className="slide-shape-name-input"
+							type="text"
+							value={editValue}
+							onChange={handleInputChange}
+							onKeyDown={handleKeyDown}
+							onBlur={handleBlur}
+							onPointerDown={stopEventPropagation}
+							spellCheck={false}
+							style={{
+								position: 'absolute',
+								top: `calc(-25px / ${zoomLevel})`,
+								left: 0,
+								width: shape.props.w,
+								height: `calc(20px / ${zoomLevel})`,
+								fontSize: labelFontSize,
+								textAlign: 'center',
+								border: '1px solid var(--color-primary)',
+								borderRadius: `calc(var(--radius-2) / ${zoomLevel})`,
+								padding: labelPadding,
+								background: 'var(--color-background)',
+								color: 'var(--color-text)',
+								outline: 'none',
+								zIndex: 10,
+								cursor: 'text',
+							}}
+						/>
+					) : (
+						<div
+							className="slide-shape-label"
+							onPointerDown={handleLabelPointerDown}
+							style={{
+								position: 'absolute',
+								top: `calc(-25px / ${zoomLevel})`,
+								left: 0,
+								width: shape.props.w,
+								textAlign: 'center',
+								cursor: 'text',
+								zIndex: 1,
+								fontSize: labelFontSize,
+								pointerEvents: 'all',
+								color: strokeColor,
+								userSelect: 'none',
+							}}
+							title="点击编辑名称"
+						>
+							{shape.props.name || `Slide`}
+						</div>
+					)}
+				</HTMLContainer>
 
 				<SVGContainer>
 					<rect
