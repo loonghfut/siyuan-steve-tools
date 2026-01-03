@@ -67,6 +67,9 @@ export const SlidesPanel = track(() => {
 							onPointerDown={(e) => stopEventPropagation(e)}
 							onClick={() => toggleGroup(groupName)}
 						>
+							<span className="slides-group-icon">
+								<TldrawUiIcon icon={isCollapsed ? 'chevron-right' : 'chevron-down'} small />
+							</span>
 							<span className="slides-group-title">{groupName}</span>
 							<span className="slides-group-count">{groupSlides.length}</span>
 						</TldrawUiButton>
@@ -110,9 +113,6 @@ export const SlidesPanel = track(() => {
 						onClick={() => moveToSlide(editor, slide)}
 						title={displayName}
 					>
-						<span className="slides-item-icon">
-							<TldrawUiIcon icon="frame" small />
-						</span>
 						<span className="slides-item-text">{displayName}</span>
 					</TldrawUiButton>
 				)
