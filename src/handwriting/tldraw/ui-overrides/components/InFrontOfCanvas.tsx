@@ -3,7 +3,7 @@
  * 包含素材库面板、文档大纲面板、子文档面板和选中元素的浮动操作按钮
  */
 import React from 'react'
-import { useEditor, useValue, TLShapeId, TldrawUiIcon } from '@tldraw/tldraw'
+import { useEditor, useValue, TldrawUiIcon } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
 import { ShapeLibraryPanel } from '../../shapelibrary/ShapeLibraryPanel'
 import { DocOutlinePanel } from '../../doc-outline/DocOutlinePanel'
@@ -21,6 +21,7 @@ import { CardLikeShape, isCardLikeShape, isOverlayShape } from '../types'
 import type { ICardShape } from '../../CardShape/card-shape-types'
 import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
+import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
 
 export const InFrontOfCanvas: React.FC = () => {
     const editor = useEditor()
@@ -222,6 +223,8 @@ export const InFrontOfCanvas: React.FC = () => {
 
     return (
         <>
+            <SlideFocusOverlay />
+
             {/* 素材库面板 */}
             <ShapeLibraryPanel
                 isOpen={isLibraryOpen}

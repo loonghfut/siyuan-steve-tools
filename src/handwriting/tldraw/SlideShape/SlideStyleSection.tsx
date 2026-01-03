@@ -9,6 +9,7 @@ import { getCursorBlockId } from '@/api/api2'
 import { buildTldrawLink } from '../utils/link-builder'
 import { captureSlideScreenshot } from './captureSlideScreenshot'
 import { settingdata } from '@/index'
+import { $currentSlide, setSlideFocusMode, useCurrentSlide, useSlideFocusMode } from './useSlides'
 import type { SlideShape } from './SlideShapeUtil'
 
 export interface SlideStyleSectionProps {
@@ -29,6 +30,28 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
     title,
 }) => {
     const [isCapturingScreenshot, setIsCapturingScreenshot] = React.useState(false)
+    const isFocusMode = useSlideFocusMode()
+    const currentSlide = useCurrentSlide()
+    const isThisSlideFocused = isFocusMode && currentSlide?.id === slideShape?.id
+
+    const handleToggleFocus = React.useCallback(() => {
+        if (!slideShape) return
+        if (isThisSlideFocused) {
+            setSlideFocusMode(false)
+            return
+        }
+
+        // Set current slide without clearing selection (unlike moveToSlide)
+        $currentSlide.set(slideShape)
+        const bounds = editor.getShapePageBounds(slideShape.id)
+        if (bounds) {
+            editor.zoomToBounds(bounds, {
+                inset: 0,
+                animation: { duration: 400 },
+            })
+        }
+        setSlideFocusMode(true)
+    }, [editor, slideShape, isThisSlideFocused])
 
     const slideBorderStyleValue = React.useMemo<'solid' | 'dashed' | 'wavy' | 'mixed'>(() => {
         if (!isSingleSlideSelected) return 'dashed'
@@ -281,6 +304,14 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     })
                 }}
             />
+			<TldrawUiButton
+				type="normal"
+				onClick={handleToggleFocus}
+				style={{ marginTop: '-8px', width: '100%' }}
+				title={isThisSlideFocused ? '退出聚焦（Esc）' : '聚焦此 Slide（仅显示 Slide 内内容）'}
+			>
+				{isThisSlideFocused ? '退出聚焦' : '聚焦此 Slide'}
+			</TldrawUiButton>
             <TldrawUiButton
                 type="normal"
                 onClick={handleCopyLink}

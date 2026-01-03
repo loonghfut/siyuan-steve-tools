@@ -116,6 +116,15 @@
   background-color: var(--color-low);
 }
 
+/* Slide 聚焦遮罩：只显示 slide 区域，其它区域盖住 */
+.slide-focus-mask {
+  opacity: 1;
+}
+
+.slide-focus-outline {
+  border-radius: 2px;
+}
+
 
 
 /* 如果 'scroll-light' 类没有定义滚动条样式，你可以添加类似下面的规则 (适用于 Webkit 浏览器) */
@@ -381,3 +390,120 @@
   width: 48px;
   height: 48px;
 }
+/* Slides Panel Styling */
+.slides-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+}
+
+.slides-panel--empty {
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    color: var(--color-text-3);
+    font-size: 12px;
+}
+
+.slides-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.slides-group-header {
+    display: flex !important;
+    align-items: center !important;
+    padding: 6px 8px !important;
+    cursor: pointer;
+    user-select: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-1);
+    width: 100%;
+    justify-content: flex-start !important;
+    text-align: left;
+    border-radius: 4px;
+    gap: 6px;
+}
+
+.slides-group-header:hover {
+    background-color: var(--color-muted-2);
+}
+
+.slides-group-icon {
+    display: flex;
+    align-items: center;
+    opacity: 0.7;
+}
+
+.slides-group-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slides-group-count {
+    font-size: 10px;
+    color: var(--color-text-3);
+    background-color: var(--color-muted-2);
+    padding: 1px 5px;
+    border-radius: 10px;
+}
+
+.slides-group-content {
+    display: flex;
+    flex-direction: column;
+    padding-left: 10px;
+    margin-top: 2px;
+    border-left: 1px solid var(--color-divider);
+    margin-left: 12px;
+}
+
+.slides-panel-button {
+    display: flex !important;
+    align-items: center !important;
+    width: 100%;
+    justify-content: flex-start !important;
+    text-align: left;
+    padding: 6px 8px !important;
+    border-radius: 4px;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-text-1);
+    transition: background-color 0.1s ease;
+}
+
+.slides-panel-button:hover {
+    background-color: var(--color-muted-2);
+}
+
+.slides-panel-button.current {
+    background-color: var(--color-muted-1);
+    font-weight: 500;
+}
+
+.slides-panel-button.selected {
+    background-color: var(--color-selected-muted, rgba(61, 138, 255, 0.1));
+    color: var(--color-selected);
+}
+
+.slides-item-icon {
+    display: flex;
+    align-items: center;
+    opacity: 0.6;
+}
+
+.slides-panel-button.selected .slides-item-icon {
+    opacity: 1;
+    color: var(--color-selected);
+}
+
+.slides-item-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+

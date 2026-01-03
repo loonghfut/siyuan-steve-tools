@@ -2,6 +2,15 @@ import { EASINGS, Editor, atom, useEditor, useValue } from '@tldraw/tldraw'
 import { SlideShape } from './SlideShapeUtil'
 
 export const $currentSlide = atom<SlideShape | null>('current slide', null)
+export const $slideFocusMode = atom<boolean>('slide focus mode', false)
+
+export function setSlideFocusMode(enabled: boolean) {
+	$slideFocusMode.set(enabled)
+}
+
+export function toggleSlideFocusMode() {
+	$slideFocusMode.set(!$slideFocusMode.get())
+}
 
 export function moveToSlide(editor: Editor, slide: SlideShape) {
 	const bounds = editor.getShapePageBounds(slide.id)
@@ -21,6 +30,10 @@ export function useSlides() {
 
 export function useCurrentSlide() {
 	return useValue($currentSlide)
+}
+
+export function useSlideFocusMode() {
+	return useValue($slideFocusMode)
 }
 
 export function getSlides(editor: Editor) {

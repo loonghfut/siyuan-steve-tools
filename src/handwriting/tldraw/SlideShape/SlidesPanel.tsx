@@ -44,7 +44,13 @@ export const SlidesPanel = track(() => {
 		setCollapsedGroups(newCollapsed)
 	}
 
-	if (slides.length === 0) return null
+	if (slides.length === 0) {
+		return (
+			<div className="slides-panel slides-panel--empty" onPointerDown={(e) => stopEventPropagation(e)}>
+				<div className="slides-panel-empty-message">No slides</div>
+			</div>
+		)
+	}
 
 	return (
 		<div className="slides-panel scroll-light" onPointerDown={(e) => stopEventPropagation(e)}>
@@ -60,32 +66,16 @@ export const SlidesPanel = track(() => {
 							className="slides-group-header"
 							onPointerDown={(e) => stopEventPropagation(e)}
 							onClick={() => toggleGroup(groupName)}
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								padding: '4px 8px',
-								cursor: 'pointer',
-								userSelect: 'none',
-								fontSize: '12px',
-								fontWeight: 500,
-								color: 'var(--color-text-1)',
-								opacity: 0.8,
-								width: '100%',
-								justifyContent: 'flex-start',
-								textAlign: 'left',
-							}}
 						>
-							<span style={{ marginRight: '4px', display: 'flex', alignItems: 'center' }}>
-								<TldrawUiIcon icon={isCollapsed ? 'chevron-right' : 'chevron-down'} small />
-							</span>
 							<span className="slides-group-title">{groupName}</span>
 							<span className="slides-group-count">{groupSlides.length}</span>
 						</TldrawUiButton>
 
 						{!isCollapsed && (
-							<div className="slides-group-content" style={{ paddingLeft: '12px' }}>
+							<div className="slides-group-content">
 								{groupSlides.map((slide) => {
 									const isSelected = selectedShapes.includes(slide)
+									const isCurrent = currentSlide?.id === slide.id
 									// Display name without group prefix
 									const displayName = slide.props.name?.split('/').slice(1).join('/') || slide.props.name
 
@@ -93,17 +83,11 @@ export const SlidesPanel = track(() => {
 										<TldrawUiButton
 											key={'slides-panel-button:' + slide.id}
 											type="normal"
-											className="slides-panel-button"
+											className={`slides-panel-button ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''}`}
 											onClick={() => moveToSlide(editor, slide)}
-											style={{
-												background: currentSlide?.id === slide.id ? 'var(--color-background)' : 'transparent',
-												outline: isSelected ? 'var(--color-selection-stroke) solid 1.5px' : 'none',
-												width: '100%',
-												justifyContent: 'flex-start',
-												textAlign: 'left',
-											}}
+											title={displayName}
 										>
-											{displayName}
+											<span className="slides-item-text">{displayName}</span>
 										</TldrawUiButton>
 									)
 								})}
@@ -116,21 +100,20 @@ export const SlidesPanel = track(() => {
 			{/* Render Ungrouped Slides */}
 			{groupedSlides.ungrouped.map((slide, i) => {
 				const isSelected = selectedShapes.includes(slide)
+				const isCurrent = currentSlide?.id === slide.id
+				const displayName = slide.props.name || `Slide ${i + 1}`
 				return (
 					<TldrawUiButton
 						key={'slides-panel-button:' + slide.id}
 						type="normal"
-						className="slides-panel-button"
+						className={`slides-panel-button ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''}`}
 						onClick={() => moveToSlide(editor, slide)}
-						style={{
-							background: currentSlide?.id === slide.id ? 'var(--color-background)' : 'transparent',
-							outline: isSelected ? 'var(--color-selection-stroke) solid 1.5px' : 'none',
-							width: '100%',
-							justifyContent: 'flex-start',
-							textAlign: 'left',
-						}}
+						title={displayName}
 					>
-						{slide.props.name || `Slide ${i + 1}`} 
+						<span className="slides-item-icon">
+							<TldrawUiIcon icon="frame" small />
+						</span>
+						<span className="slides-item-text">{displayName}</span>
 					</TldrawUiButton>
 				)
 			})}

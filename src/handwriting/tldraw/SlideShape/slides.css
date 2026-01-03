@@ -68,3 +68,16 @@
 	border-color: var(--color-primary) !important;
 	box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.2);
 }
+
+.slide-focus-overlay {
+	/* Overlay is positioned by component; keep CSS minimal */
+}
+
+.slide-focus-mask {
+	/* Slightly translucent can look nicer, but requirement is hide; keep opaque */
+	opacity: 1;
+}
+
+.slide-focus-outline {
+	border-radius: 2px;
+}
