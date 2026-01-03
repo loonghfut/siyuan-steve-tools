@@ -20,6 +20,24 @@
 	outline-offset: -1px;
 }
 
+.slides-group-header {
+	width: 100%;
+	justify-content: flex-start;
+	text-align: left;
+	pointer-events: all;
+	border-radius: var(--radius-4);
+}
+
+.slides-group-title {
+	flex: 1;
+}
+
+.slides-group-count {
+	margin-left: auto;
+	opacity: 0.5;
+	font-size: 10px;
+}
+
 .slide-shape-label {
 	pointer-events: all;
 	position: absolute;
