@@ -248,7 +248,7 @@ export interface WuCaiPluginSettings {
  * 同步响应基类
  */
 export interface WuCaiResponse<T = any> {
-    /** 响应码: 0=成功 */
+    /** 响应码: 1=成功（注意：不同于思源 API 的 code===0） */
     code: number;
     /** 响应数据 */
     data: T;
@@ -499,11 +499,33 @@ export class WuCaiClient {
      */
     private async post<T>(path: string, data: any): Promise<T> {
         const url = this.buildUrl(path);
+
+        // 五彩协议要求：每个请求 body 都必须注入 v 与 serviceId
+        const payload = {
+            v: WUCAI_VERSION_NUM,
+            serviceId: WUCAI_SERVICE_ID,
+            ...(data || {}),
+        };
+
         const response = await fetch(url, {
             method: 'POST',
             headers: this.getHeaders(),
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
         });
+
+        // 关键 HTTP 约定（sync.ts 提到的行为）
+        if (response.status === 409) {
+            throw new Error('Sync in progress initiated by different client');
+        }
+        if (response.status === 417) {
+            throw new Error('Export is locked. Wait for an hour.');
+        }
+
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            throw new Error(`WuCai HTTP ${response.status}${text ? `: ${text}` : ''}`);
+        }
+
         return response.json();
     }
 
@@ -613,9 +635,7 @@ export class WuCaiSyncManager {
             // 1. 初始化同步
             const initResponse = await this.client.initSync(this.settings.lastCursor2);
             
-            if (initResponse.code !== 0) {
-                throw new Error(initResponse.message || '初始化同步失败');
-            }
+            if (initResponse.code !== 1) throw new Error(initResponse.message || '初始化同步失败');
 
             const { taskStatus, lastCursor2, exportConfig } = initResponse.data;
 
@@ -659,9 +679,7 @@ export class WuCaiSyncManager {
         while (true) {
             const response = await this.client.downloadNotes(currentCursor, '', query);
             
-            if (response.code !== 0) {
-                throw new Error(response.message || '下载笔记失败');
-            }
+            if (response.code !== 1) throw new Error(response.message || '下载笔记失败');
 
             const { notes, lastCursor2 } = response.data;
             const notesCount = notes.length;

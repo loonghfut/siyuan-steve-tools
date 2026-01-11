@@ -1103,3 +1103,37 @@ body.st-invert-mode .emoji {
 
 /* 避免在嵌套对话框等位置出现多重反转 */
 // （已移除空规则占位，避免编译器警告）
+
+/* ===================== 五彩同步模块样式 ===================== */
+
+// 同步中状态 - 旋转动画
+.wucai-syncing {
+    svg {
+        animation: wucai-spin 1.5s linear infinite;
+    }
+}
+
+@keyframes wucai-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+// 同步成功状态 - 绿色高亮
+.wucai-success {
+    svg {
+        color: var(--b3-theme-success) !important;
+        fill: var(--b3-theme-success) !important;
+    }
+}
+
+// 同步失败状态 - 红色高亮
+.wucai-error {
+    svg {
+        color: var(--b3-theme-error) !important;
+        fill: var(--b3-theme-error) !important;
+    }
+}
