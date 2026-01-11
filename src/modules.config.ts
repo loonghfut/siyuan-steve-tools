@@ -8,6 +8,7 @@ import { M_lifelog } from "./lifelog/module-lifelog";
 import { M_Wps } from "./wps/module-wps";
 import { M_Aggregate } from "./aggregate/module-aggregate";
 import { M_Minutiae } from "./minutiae/module-minutiae";
+import { M_Wucai } from "./wucai/module-wucai";
 // 模块配置接口
 export interface ModuleConfig {
     [key: string]: {
@@ -77,6 +78,13 @@ export const MODULE_CONFIG: ModuleConfig = {
         logMessage: 'Minutiae模块加载'
     },
 
+    M_Wucai: {
+        class: M_Wucai,
+        name: 'M_Wucai',
+        settingKey: 'wucai-enable',
+        logMessage: 'Wucai模块加载'
+    },
+
 };
 
 // 导出所有模块类型
@@ -90,4 +98,5 @@ export type ModuleClasses = {
     M_Wps?: M_Wps;
     M_Aggregate?: M_Aggregate;
     M_Minutiae?: M_Minutiae;
+    M_Wucai?: M_Wucai;
 };

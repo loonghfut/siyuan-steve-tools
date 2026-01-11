@@ -10,6 +10,7 @@ import { imageCompressionGroup } from "./imageCompression";
 
 import { aggregateGroup } from "./aggregate";
 import { minutiaeGroup } from "./minutiae";
+import { wucaiGroup } from "./wucai";
 export * from "./types";
 
 export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] {
@@ -23,6 +24,7 @@ export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] 
     wpsGroup(ctx),
     aggregateGroup(ctx),
     minutiaeGroup(ctx),
+    wucaiGroup(ctx),
     commonGroup(ctx),
     ];
 }
