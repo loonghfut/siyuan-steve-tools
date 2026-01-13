@@ -632,6 +632,8 @@ export class WuCaiSyncManager {
         try {
             this.callbacks.onSyncStart?.();
 
+            const savedCursor = (this.settings.lastCursor2 || '').trim();
+
             // 1. 初始化同步
             const initResponse = await this.client.initSync(this.settings.lastCursor2);
             
@@ -639,11 +641,15 @@ export class WuCaiSyncManager {
 
             const { taskStatus, lastCursor2, exportConfig } = initResponse.data;
 
+            const initCursor = (lastCursor2 || '').trim();
+            const effectiveCursor = initCursor || savedCursor || '';
+            this.settings.lastCursor2 = effectiveCursor;
+
             // 检查任务状态
             if (taskStatus === 'SYNCED') {
                 // 已同步完成
-                await this.handleSyncComplete(lastCursor2);
-                return lastCursor2;
+                await this.handleSyncComplete(effectiveCursor);
+                return effectiveCursor;
             }
 
             if (taskStatus === 'EXPIRED') {
@@ -651,7 +657,7 @@ export class WuCaiSyncManager {
             }
 
             // 2. 下载数据
-            const finalCursor = await this.downloadAllNotes(lastCursor2, exportConfig.syquery);
+            const finalCursor = await this.downloadAllNotes(effectiveCursor, exportConfig.syquery);
 
             // 3. 确认同步完成
             await this.client.acknowledgeSync(finalCursor);
@@ -684,21 +690,24 @@ export class WuCaiSyncManager {
             const { notes, lastCursor2 } = response.data;
             const notesCount = notes.length;
 
+            // 服务端可能偶发返回空 cursor，此时必须保留 currentCursor
+            const nextCursor = (lastCursor2 || '').trim() || currentCursor;
+
             // 处理每个笔记
             for (const note of notes) {
                 await this.callbacks.onNoteReceived?.(note);
             }
 
             totalNotes += notesCount;
-            this.callbacks.onProgress?.(totalNotes, -1, lastCursor2);
+            this.callbacks.onProgress?.(totalNotes, -1, nextCursor);
 
             // 没有更多数据，完成同步
             if (notesCount <= 0) {
-                return lastCursor2;
+                return nextCursor;
             }
 
             // 继续下载
-            currentCursor = lastCursor2;
+            currentCursor = nextCursor;
             
             // 避免请求过快
             await new Promise(resolve => setTimeout(resolve, 5000));

@@ -113,6 +113,9 @@ export class WucaiSyncService {
         try {
             const client = new WuCaiClient(this.settings.token, this.settings.clientId);
 
+            // 记录本地传入的游标（插件设置）
+            const savedCursor = (this.settings.lastCursor2 || '').trim();
+
             // 1. 初始化同步
             this.updateState('syncing', '正在连接五彩服务...');
             const initResponse = await client.initSync(this.settings.lastCursor2);
@@ -136,10 +139,11 @@ export class WucaiSyncService {
 
             const { taskStatus, lastCursor2, exportConfig } = initResponse.data;
 
-            // 更新游标
-            if (lastCursor2) {
-                this.settings.lastCursor2 = lastCursor2;
-            }
+            // ✅ 合并游标：服务端可能返回空/空白，此时必须回退到本地已保存游标
+            // 这对应你提到的 getLastCursor(newCursor, savedCursor)
+            const initCursor = (lastCursor2 || '').trim();
+            const effectiveCursor = initCursor || savedCursor || '';
+            this.settings.lastCursor2 = effectiveCursor;
 
             // 检查任务状态
             if (taskStatus === 'SYNCED') {
@@ -148,7 +152,7 @@ export class WucaiSyncService {
                     success: true, 
                     message: '已是最新，无需同步', 
                     syncedCount: 0,
-                    lastCursor: lastCursor2 
+                    lastCursor: effectiveCursor,
                 };
             }
 
@@ -165,7 +169,7 @@ export class WucaiSyncService {
             this.updateState('syncing', '正在下载数据...');
             const finalCursor = await this.downloadAndProcessNotes(
                 client, 
-                lastCursor2, 
+                effectiveCursor,
                 exportConfig?.syquery || ''
             );
 
