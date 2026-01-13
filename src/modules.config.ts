@@ -78,12 +78,12 @@ export const MODULE_CONFIG: ModuleConfig = {
         logMessage: 'Minutiae模块加载'
     },
 
-    M_Wucai: {
-        class: M_Wucai,
-        name: 'M_Wucai',
-        settingKey: 'wucai-enable',
-        logMessage: 'Wucai模块加载'
-    },
+    // M_Wucai: {
+    //     class: M_Wucai,
+    //     name: 'M_Wucai',
+    //     settingKey: 'wucai-enable',
+    //     logMessage: 'Wucai模块加载'
+    // },
 
 };
 
