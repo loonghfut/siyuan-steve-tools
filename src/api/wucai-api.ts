@@ -240,6 +240,20 @@ export interface WuCaiPluginSettings {
     lastCursor2: string;
     /** 导出配置 */
     exportConfig: WuCaiExportConfig;
+
+    // ----------------------------
+    // 本地渲染模板（可选）
+    // 说明：五彩服务端也会返回 exportConfig，但插件侧允许用户覆盖渲染格式。
+    // 这些字段只影响“写入到思源的 Markdown”，不影响增量游标逻辑。
+    // ----------------------------
+    /** 标题（h2）内部文本模板：不需要写 "##" 前缀 */
+    titleTemplate?: string;
+    /** meta 子块模板（用于展示域名/时间/标签/笔记等） */
+    metaTemplate?: string;
+    /** 单条高亮子块模板 */
+    highlightTemplate?: string;
+    /** 查询过滤（优先于服务端 exportConfig.syquery） */
+    localQuery?: string;
     /** 上次同步是否失败 */
     lastSyncFailed: boolean;
 }

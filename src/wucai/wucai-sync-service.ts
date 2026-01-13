@@ -91,6 +91,23 @@ export class WucaiSyncService {
     }
 
     /**
+     * 极简模板渲染：支持 {{key}} 占位符（与项目内 ICS/WPS 模板风格一致）
+     * - 未命中的 key 渲染为空字符串
+     * - 不做复杂逻辑（条件/循环），避免模板能力过强带来的安全与维护成本
+     */
+    private renderTemplate(template: string, data: Record<string, any>): string {
+        const tpl = (template || '').trim();
+        if (!tpl) return '';
+        let out = tpl.replace(/\{\{(\w+)\}\}/g, (_m, k) => {
+            const v = (data as any)[k];
+            return (v === undefined || v === null) ? '' : String(v);
+        });
+        // 清理空行（只包含空白字符的行）
+        out = out.replace(/^\s*[\r\n]/gm, '').replace(/\n\s*\n/g, '\n');
+        return out;
+    }
+
+    /**
      * 开始同步流程
      */
     async startSync(): Promise<WucaiSyncResult> {
@@ -160,7 +177,9 @@ export class WucaiSyncService {
                 throw new Error('五彩同步服务已过期');
             }
 
-            // 保存导出配置
+            // 保存导出配置（服务端）
+            // - 不覆盖本地用户自定义的模板字段（title/meta/highlight/localQuery）
+            // - exportConfig.syquery 仍可作为默认查询条件（若本地未填写）
             if (exportConfig) {
                 this.settings.exportConfig = exportConfig;
             }
@@ -170,7 +189,7 @@ export class WucaiSyncService {
             const finalCursor = await this.downloadAndProcessNotes(
                 client, 
                 effectiveCursor,
-                exportConfig?.syquery || ''
+                (this.settings.localQuery || '').trim() || exportConfig?.syquery || ''
             );
 
             // 3. 确认同步完成
@@ -484,7 +503,7 @@ export class WucaiSyncService {
         for (const hl of highlights) {
             const hlKey = this.buildHighlightKey(remoteId, hl);
             const hlHash = this.buildHighlightHash(hl);
-            const md = this.renderHighlightMarkdown(hl);
+            const md = this.renderHighlightMarkdown(note, hl);
 
             const existingId = await this.findHighlightBlockIdByKey(hlKey);
             if (existingId) {
@@ -518,13 +537,22 @@ export class WucaiSyncService {
 
     private renderHeadingMarkdown(note: NoteEntry): string {
         const ctx = this.buildPageContext(note);
-        const title = ctx.title || '无标题';
+        const titleTpl = (this.settings.titleTemplate || '').trim();
+        const renderedTitle = titleTpl ? this.renderTemplate(titleTpl, ctx as any) : '';
+        const title = (renderedTitle || ctx.title || '无标题').replace(/[\r\n]+/g, ' ').trim();
         const linkPart = ctx.url ? ` [↗](${ctx.url})` : '';
         return `## ${title}${linkPart}`;
     }
 
     private renderMetaMarkdown(note: NoteEntry): string {
         const context = this.buildPageContext(note);
+
+        const metaTpl = (this.settings.metaTemplate || '').trim();
+        if (metaTpl) {
+            // meta 模板由用户完全控制（但建议保留一个“高亮”分隔标题）
+            return this.renderTemplate(metaTpl, context as any);
+        }
+
         const lines: string[] = [];
 
         // 元信息
@@ -553,7 +581,15 @@ export class WucaiSyncService {
         return lines.join('\n');
     }
 
-    private renderHighlightMarkdown(hl: HighlightInfo): string {
+    private renderHighlightMarkdown(note: NoteEntry, hl: HighlightInfo): string {
+        const hlTpl = (this.settings.highlightTemplate || '').trim();
+        if (hlTpl) {
+            // 提供页面级字段（如 title/url/tags），也提供高亮自身字段（note/refurl/...）
+            const pageCtx = this.buildPageContext(note);
+            const data = { ...(pageCtx as any), ...(hl as any) };
+            return this.renderTemplate(hlTpl, data);
+        }
+
         const lines: string[] = [];
 
         if (hl.type === 'image' && hl.imageurl) {

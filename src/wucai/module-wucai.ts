@@ -67,6 +67,10 @@ export class M_Wucai {
         const notebookId = this.settingdata["wucai-notebook"];
         const clientId = this.settingdata["wucai-client-id"];
         const lastCursor = this.settingdata["wucai-last-cursor"] || "";
+        const titleTemplate = this.settingdata["wucai-title-template"] || "";
+        const metaTemplate = this.settingdata["wucai-meta-template"] || "";
+        const highlightTemplate = this.settingdata["wucai-highlight-template"] || "";
+        const localQuery = this.settingdata["wucai-query"] || "";
 
         if (!token) {
             showMessage("请先在设置中配置五彩Token", 3000, "error");
@@ -91,6 +95,10 @@ export class M_Wucai {
                     notename: '',
                     notebook: notebookId,
                     lastCursor2: lastCursor,
+                    titleTemplate,
+                    metaTemplate,
+                    highlightTemplate,
+                    localQuery,
                     exportConfig: {
                         sytitlet: '',
                         sytpl: '',

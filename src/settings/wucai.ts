@@ -18,6 +18,16 @@ export const wucaiDefaults: Record<string, any> = {
     "wucai-last-sync-time": "",
     // 上次同步是否失败
     "wucai-last-sync-failed": false,
+
+    // ===== 渲染模板（留空=使用内置默认格式） =====
+    // 标题模板：只填写标题文本部分（无需写 "##"），支持占位符
+    "wucai-title-template": "",
+    // meta 模板：用于 meta 子块内容（域名/时间/标签/笔记/五彩链接等）
+    "wucai-meta-template": "",
+    // 高亮模板：用于每条高亮子块内容
+    "wucai-highlight-template": "",
+    // 查询过滤：将作为五彩服务端 syquery 传入（留空则使用服务端默认）
+    "wucai-query": "",
 };
 
 // 获取笔记本选项
@@ -109,6 +119,10 @@ export const wucaiGroup = (ctx: BuildContext): SettingGroupDefinition => {
                                 const token = ctx.settings["wucai-token"];
                                 const notebookId = ctx.settings["wucai-notebook"];
                                 const lastCursor = ctx.settings["wucai-last-cursor"] || "";
+                                const titleTemplate = ctx.settings["wucai-title-template"] || "";
+                                const metaTemplate = ctx.settings["wucai-meta-template"] || "";
+                                const highlightTemplate = ctx.settings["wucai-highlight-template"] || "";
+                                const localQuery = ctx.settings["wucai-query"] || "";
 
                                 if (!token) {
                                     showMessage("请先配置五彩Token", 3000, "error");
@@ -130,6 +144,10 @@ export const wucaiGroup = (ctx: BuildContext): SettingGroupDefinition => {
                                             notename: '',
                                             notebook: notebookId,
                                             lastCursor2: lastCursor,
+                                            titleTemplate,
+                                            metaTemplate,
+                                            highlightTemplate,
+                                            localQuery,
                                             exportConfig: {
                                                 sytitlet: '',
                                                 sytpl: '',
@@ -196,6 +214,47 @@ export const wucaiGroup = (ctx: BuildContext): SettingGroupDefinition => {
                         description: "断点续传用的游标，一般无需修改", 
                         key: "wucai-last-cursor", 
                         value: ctx.settings["wucai-last-cursor"] || "" 
+                    },
+
+                    {
+                        type: "textarea",
+                        title: "标题模板",
+                        description:
+                            "可选：自定义写入标题（h2）的文本内容（无需写 ## 前缀）。\n" +
+                            "支持占位符：{{title}} {{url}} {{domain}} {{domain2}} {{tags}} {{alltags}} {{createat}} {{updateat}} {{wucaiurl}}\n" +
+                            "留空使用默认：标题 + (可选)原文链接。",
+                        key: "wucai-title-template",
+                        value: ctx.settings["wucai-title-template"] || "",
+                        direction: "row",
+                    },
+                    {
+                        type: "textarea",
+                        title: "Meta 模板",
+                        description:
+                            "可选：自定义 meta 子块内容（展示域名/时间/标签/页面笔记等）。\n" +
+                            "支持占位符：{{domain}} {{createat}} {{updateat}} {{tags}} {{alltags}} {{pagenote}} {{wucaiurl}} {{url}}\n" +
+                            "留空使用默认内置 meta（含 \"### 高亮\" 分隔）。",
+                        key: "wucai-meta-template",
+                        value: ctx.settings["wucai-meta-template"] || "",
+                        direction: "row",
+                    },
+                    {
+                        type: "textarea",
+                        title: "高亮模板",
+                        description:
+                            "可选：自定义单条高亮子块内容。\n" +
+                            "支持占位符：{{note}} {{annotation}} {{color}} {{refurl}} {{imageurl}} {{type}} 以及页面级占位符如 {{title}} {{url}}\n" +
+                            "留空使用默认格式（文字/图片 + 批注/颜色/定位链接）。",
+                        key: "wucai-highlight-template",
+                        value: ctx.settings["wucai-highlight-template"] || "",
+                        direction: "row",
+                    },
+                    {
+                        type: "textinput",
+                        title: "查询过滤（syquery）",
+                        description: "可选：作为五彩服务端查询条件传入（留空=使用服务端默认）。",
+                        key: "wucai-query",
+                        value: ctx.settings["wucai-query"] || "",
                     },
                 ]
             }
