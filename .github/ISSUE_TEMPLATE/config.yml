@@ -1,5 +1,4 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 关于反馈
-    url: https://github.com/loonghfut/siyuan-steve-tools/blob/main/CONTRIBUTING.md
-    about: 在提交 issue 前请先阅读。
+  - name: 请进群反馈
+    url: https://github.com/loonghfut/siyuan-steve-tools/issues/109
