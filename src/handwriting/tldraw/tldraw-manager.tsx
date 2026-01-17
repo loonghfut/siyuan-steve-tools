@@ -317,6 +317,29 @@ export class TldrawManager {
         }
     }
 
+    // 性能优化：使用更激进的节流策略
+    private _throttledSave: (() => void) | null = null;
+    private _pendingSave = false;
+    private _saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+    private getThrottledSave() {
+        if (!this._throttledSave) {
+            // 使用更激进的节流：500ms内最多保存一次
+            this._throttledSave = throttle(() => {
+                if (this._pendingSave) {
+                    this._pendingSave = false;
+                    this.saveData();
+                }
+            }, 500);
+        }
+        return this._throttledSave;
+    }
+
+    private triggerSave() {
+        this._pendingSave = true;
+        this.getThrottledSave()();
+    }
+
 
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: settingdata['enableDoubleClickCreateSingleBlock'] ? false : true,
@@ -749,18 +772,43 @@ export class TldrawManager {
         // 为识别消息源，生成一个唯一的会话ID
         const sessionId = Date.now().toString() + Math.random().toString(36).slice(2);
 
+        // 性能优化：使用节流减少广播频率
+        let broadcastPending = false;
+        let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
+        let pendingChanges: any = null;
+
+        const flushBroadcast = () => {
+            if (broadcastTimer) {
+                clearTimeout(broadcastTimer);
+                broadcastTimer = null;
+            }
+            if (pendingChanges) {
+                broadcastChannel.postMessage({
+                    changes: pendingChanges,
+                    timestamp: Date.now(),
+                    source: sessionId
+                });
+                pendingChanges = null;
+                broadcastPending = false;
+            }
+        };
+
         // 监听本地变更并广播
         this._realtimeUnsub = this.store.listen(
             (update) => {
                 // 如果当前正在应用远程更改，不广播以避免循环
                 if (this.applyingRemoteChanges) return;
 
-                // 通过广播频道发送更改
-                broadcastChannel.postMessage({
-                    changes: update,
-                    timestamp: Date.now(),
-                    source: sessionId // 使用会话ID标识消息来源
-                });
+                // 性能优化：合并快速连续的操作
+                if (!broadcastPending) {
+                    broadcastPending = true;
+                    pendingChanges = update;
+                    // 16ms后发送，合并同一帧内的多次操作
+                    broadcastTimer = setTimeout(flushBroadcast, 16);
+                } else {
+                    // 合并更新：保留最新的changes
+                    pendingChanges = update;
+                }
             },
             { scope: 'document', source: 'user' } // 只监听用户操作引起的文档变更
         );
@@ -942,10 +990,11 @@ export class TldrawManager {
         container.addEventListener('wheel', handleWheel, { passive: true });
         
         // 使用 store 监听器来检测形状变化（拖动、调整大小等）
+        // 性能优化：增加节流间隔，减少CPU占用
         const unsubscribe = editor.store.listen(
             throttle(() => {
                 checkInteractionState();
-            }, 50),
+            }, 100), // 从50ms增加到100ms，减少CPU占用
             { source: 'user', scope: 'document' }
         );
         
@@ -974,12 +1023,16 @@ export class TldrawManager {
         if (!this.store) return;
 
         // 使用节流函数确保不会过于频繁地保存
+        // 性能优化：使用更激进的节流策略，避免频繁保存
         const throttledSave = throttle(() => {
-            this.saveData();
-        }, 3000); // 3秒节流
+            this.triggerSave();
+        }, 2000); // 2秒节流，减少等待时间
 
-        // 监听存储变化
-        this._autosaveUnsub = this.store.listen(throttledSave);
+        // 监听存储变化，只监听用户操作
+        this._autosaveUnsub = this.store.listen(throttledSave, {
+            scope: 'document',
+            source: 'user' // 只监听用户操作，减少不必要的保存
+        });
     }
 
     private applyThemeToEditor() {
