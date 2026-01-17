@@ -47,7 +47,6 @@ export const SlidesPanel = track(() => {
 	if (slides.length === 0) {
 		return (
 			<div className="slides-panel slides-panel--empty" onPointerDown={(e) => stopEventPropagation(e)}>
-				<div className="slides-panel-empty-message">No slides</div>
 			</div>
 		)
 	}
