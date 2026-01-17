@@ -40,7 +40,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.33.0 (2026年01月03日)
+### v0.33.1 (2026年01月17日)
 - feat(SlideShape): 添加边框样式属性，支持实线、虚线和流动效果 (loonghfut)
 - 1 (loonghfut)
 - feat(SlideShapeUtil): 使用 HTMLContainer 包裹编辑输入，优化事件处理 (loonghfut)
@@ -54,6 +54,16 @@ win端s3同步后，docker端感知s3同步。
 - feat(SlideFocus): 添加幻灯片聚焦模式，优化幻灯片面板样式和交互 (loonghfut)
 - feat(SlidesPanel): 添加分组图标和优化幻灯片项显示 (loonghfut)
 - feat(plugin): 更新版本号至0.33.0 (loonghfut)
+- docs: 更新 v0.33.0 版本的更新日志 (loonghfut)
+- feat(WuCai): 添加五彩服务 API 客户端库及相关接口定义 (loonghfut)
+- feat(Wucai): 添加 Wucai 模块及相关设置和默认值 (loonghfut)
+- feat: Implement WuCai synchronization module with enhanced settings and UI (loonghfut)
+- feat(WuCai): 优化游标处理逻辑以确保同步准确性 (loonghfut)
+- feat(WuCai): 添加自定义渲染模板支持，包括标题、meta 和高亮模板 (loonghfut)
+- feat: 注释掉 Wucai 模块相关配置以暂时禁用该功能 (loonghfut)
+- feat(TldrawManager): 优化性能，通过节流策略减少保存频率和广播频率 (loonghfut)
+- feat(SlidesPanel): 移除空幻灯片提示信息 (loonghfut)
+- feat: 更新版本号至 0.33.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
