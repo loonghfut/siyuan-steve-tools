@@ -493,6 +493,7 @@ ${md}
             <button class="b3-button" data-act="select-all">全选</button>
             <button class="b3-button" data-act="unselect-all">全不选</button>
             <button class="b3-button" data-act="invert">反选</button>
+            <button class="b3-button" data-act="select-today">今日</button>
             <span style="margin-left:auto;font-size:12px;opacity:.7;" data-stat></span>
             <div style="flex-basis:100%;height:0;"></div>
         `;
@@ -564,6 +565,19 @@ ${md}
                 visible.forEach(el => { const cb = el.querySelector('input') as HTMLInputElement; if (!cb.disabled) cb.checked = false; });
             } else if (act === 'invert') {
                 visible.forEach(el => { const cb = el.querySelector('input') as HTMLInputElement; if (!cb.disabled) cb.checked = !cb.checked; });
+            } else if (act === 'select-today') {
+                // 一键选中今日更新的文件
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                visible.forEach(el => {
+                    const cb = el.querySelector('input') as HTMLInputElement;
+                    if (cb.disabled) { cb.checked = false; return; }
+                    const rec = list.find(r => r.link_id === el.dataset.id);
+                    if (!rec) { cb.checked = false; return; }
+                    // 判断时间字段是否包含今日日期
+                    const isToday = rec.time && rec.time.includes(todayStr);
+                    cb.checked = isToday;
+                });
             }
             updateStat();
         });
