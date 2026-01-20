@@ -806,6 +806,7 @@ interface RoamingItem {
   name: string;
   file_type: string;
   file_src: string;
+  time: string;
 }
 
 function normalizeToArray(input: any): any[] {
@@ -834,6 +835,29 @@ function normalizeToArray(input: any): any[] {
   return [];
 }
 
+/**
+ * 格式化时间戳为可读日期时间字符串
+ * @param timestamp 毫秒级时间戳
+ * @returns 格式化后的日期时间字符串，如 "2025-01-20 14:30:25"
+ */
+function formatTimestamp(timestamp: number | string | undefined): string {
+  if (!timestamp) return '';
+  const ts = typeof timestamp === 'string' ? parseInt(timestamp, 10) : timestamp;
+  if (isNaN(ts) || ts <= 0) return '';
+  try {
+    const date = new Date(ts);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const ss = String(date.getSeconds()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+  } catch {
+    return '';
+  }
+}
+
 export function pickRoamingFields(raw: any): RoamingItem[] {
   const arr = normalizeToArray(raw);
   return arr.map(o => ({
@@ -842,5 +866,6 @@ export function pickRoamingFields(raw: any): RoamingItem[] {
     name: o?.name ?? '',
     file_type: o?.file_type ?? '',
     file_src: o?.file_src ?? '',
+    time: formatTimestamp(o?.mtime),
   }));
 }

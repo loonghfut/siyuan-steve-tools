@@ -30,6 +30,7 @@ interface WpsFileRecord {
     name: string;
     file_type: string;
     file_src: string;
+    time: string;
 }
 
 export class WpsFileServ {
@@ -82,7 +83,8 @@ export class WpsFileServ {
                 link_url: fileurl,
                 name: fileurl.split('/').pop() || fileurl,
                 file_type: '',
-                file_src: ''
+                file_src: '',
+                time: ''
             } as WpsFileRecord;
             if (!this.cursorID) {
                 showMessage('未获取到光标位置，无法插入', 1500, 'error');
@@ -119,92 +121,8 @@ export class WpsFileServ {
          * 2. 拦截所有 XMLHttpRequest 请求，检测目标 API
          * 3. 将捕获的请求信息输出到控制台
          */
-        const roamingMonitorSnippet = `(() => {
-            // 常量定义
-            const TARGET_API = 'https://drive.kdocs.cn/api/v3/roaming';
-            const FLAG_KEY = '__ROAMING_MONITOR_INSTALLED__';
-            const LOG_PREFIX = '[RoamingAPI]';
+        const roamingMonitorSnippet = `(()=>{try{if((window as any).__ROAMING_MONITOR_INSTALLED__)return;(window as any).__ROAMING_MONITOR_INSTALLED__=true;const TARGET='https://drive.kdocs.cn/api/v3/roaming';const log=(tag,url,body)=>{try{console.debug('[RoamingAPI]',tag,url,body);}catch(_){} };const of=window.fetch; if(of){window.fetch=async (...args)=>{const r=await of(...args);try{const raw=args[0];const u=typeof raw==='string'?raw:(raw&&raw.url)||''; if(u.includes(TARGET)){r.clone().text().then(t=>log('fetch',u,t)).catch(()=>{});} }catch(_){} return r;};}const oOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,...rest){(this as any).__isRoaming= typeof u==='string' && u.includes(TARGET);return oOpen.call(this,m,u,...rest);};const oSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){if((this as any).__isRoaming){this.addEventListener('load',function(){try{log('xhr',this.responseURL,this.responseText);}catch(_){} });}return oSend.call(this,b);};}catch(e){console.error('roaming monitor inject failed',e);} })();`;
 
-            // 防止重复注入
-            if ((window as any)[FLAG_KEY]) {
-                return;
-            }
-            (window as any)[FLAG_KEY] = true;
-
-            /**
-             * 安全日志输出
-             * @param tag 请求类型标签 (fetch/xhr)
-             * @param url 请求 URL
-             * @param body 响应体内容
-             */
-            const log = (tag: string, url: string, body: string) => {
-                try {
-                    console.debug(LOG_PREFIX, tag, url, body);
-                } catch (_) {
-                    // 静默忽略日志错误
-                }
-            };
-
-            /**
-             * 判断 URL 是否为监控目标 API
-             * @param url 目标 URL
-             */
-            const isTargetApi = (url: string): boolean => {
-                return url.includes(TARGET_API);
-            };
-
-            // ==================== Fetch 拦截 ====================
-            const originalFetch = window.fetch;
-            if (originalFetch) {
-                window.fetch = async (...args: any[]) => {
-                    const response = await originalFetch(...args);
-
-                    try {
-                        // 提取请求 URL
-                        const raw = args[0];
-                        const requestUrl = typeof raw === 'string' 
-                            ? raw 
-                            : (raw && raw.url) || '';
-
-                        // 如果是目标 API，克隆响应并异步获取内容
-                        if (isTargetApi(requestUrl)) {
-                            response.clone()
-                                .text()
-                                .then((text: string) => log('fetch', requestUrl, text))
-                                .catch(() => {});
-                        }
-                    } catch (_) {
-                        // 静默忽略处理错误
-                    }
-
-                    return response;
-                };
-            }
-
-            // ==================== XMLHttpRequest 拦截 ====================
-            const originalOpen = XMLHttpRequest.prototype.open;
-            const originalSend = XMLHttpRequest.prototype.send;
-
-            // 拦截 open 方法，标记请求是否为目标 API
-            XMLHttpRequest.prototype.open = function (method: string, url: string, ...rest: any[]) {
-                (this as any).__isRoaming = typeof url === 'string' && isTargetApi(url);
-                return originalOpen.call(this, method, url, ...rest);
-            };
-
-            // 拦截 send 方法，在请求完成后记录响应
-            XMLHttpRequest.prototype.send = function (body: any) {
-                if ((this as any).__isRoaming) {
-                    this.addEventListener('load', function () {
-                        try {
-                            log('xhr', this.responseURL, this.responseText);
-                        } catch (_) {
-                            // 静默忽略处理错误
-                        }
-                    });
-                }
-                return originalSend.call(this, body);
-            };
-        })();`;
         createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
@@ -395,8 +313,9 @@ export class WpsFileServ {
 
     private defaultWpsTemplate(): string {
         return `### {{name}}
-        
+
 链接： [{{name}}]({{url}})
+时间： {{time}}
 类型： {{file_type}}
 来源： {{file_src}}
 原始链接： {{url}}`;
@@ -456,6 +375,7 @@ export class WpsFileServ {
         const md = this.renderWpsTemplate(tpl, {
             name: rec.name || rec.link_url,
             url: rec.link_url,
+            time: rec.time || '',
             file_type: rec.file_type || '',
             file_src: rec.file_src || ''
         });
@@ -601,7 +521,7 @@ ${md}
                 <div style="flex:1;min-width:0;">
                     <div style="font-weight:500;word-break:break-all;">${rec.name || rec.link_url}</div>
                     <div style="color:var(--b3-theme-on-surface-light);word-break:break-all;">${rec.link_url}</div>
-                    <div style="margin-top:2px;font-size:12px;opacity:.8;">类型: ${rec.file_type || '-'} | 来源: ${rec.file_src || '-'}${already ? ' | <span style="color:var(--b3-protyle-inline-mark-bg);">已存在</span>' : ''}</div>
+                    <div style="margin-top:2px;font-size:12px;opacity:.8;">时间: ${rec.time || '-'} | 类型: ${rec.file_type || '-'} | 来源: ${rec.file_src || '-'}${already ? ' | <span style="color:var(--b3-protyle-inline-mark-bg);">已存在</span>' : ''}</div>
                 </div>`;
             item.addEventListener('mouseenter', () => item.style.borderColor = 'var(--b3-theme-primary)');
             item.addEventListener('mouseleave', () => item.style.borderColor = 'transparent');
@@ -624,7 +544,7 @@ ${md}
                 const id = el.dataset.id;
                 const rec = list.find(r => r.link_id === id);
                 if (!rec) continue;
-                const text = `${rec.name}\n${rec.link_url}\n${rec.file_type}\n${rec.file_src}`.toLowerCase();
+                const text = `${rec.name}\n${rec.link_url}\n${rec.time}\n${rec.file_type}\n${rec.file_src}`.toLowerCase();
                 const show = !kw || text.includes(kw);
                 el.style.display = show ? '' : 'none';
                 if (show) visibleCount++;
