@@ -77,6 +77,8 @@ win端s3同步后，docker端感知s3同步。
 - feat(WpsFileServ): 增加 WPS 云文档漫游 API 监控脚本以捕获 API 请求 (loonghfut)
 - feat(WpsFileServ): 添加时间字段并格式化时间戳为可读字符串 (loonghfut)
 - feat(WpsFileServ): 添加“今日”按钮以一键选中今日更新的文件 (loonghfut)
+- docs: 更新 v0.33.2 版本的更新日志 (loonghfut)
+- fix: 更新版本号至 0.33.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
