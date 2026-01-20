@@ -110,7 +110,101 @@ export class WpsFileServ {
                 showMessage('插入失败', 1800, 'error');
             }
         };
-        const roamingMonitorSnippet = `(()=>{try{if((window as any).__ROAMING_MONITOR_INSTALLED__)return;(window as any).__ROAMING_MONITOR_INSTALLED__=true;const TARGET='https://drive.kdocs.cn/api/v3/roaming';const log=(tag,url,body)=>{try{console.debug('[RoamingAPI]',tag,url,body);}catch(_){} };const of=window.fetch; if(of){window.fetch=async (...args)=>{const r=await of(...args);try{const raw=args[0];const u=typeof raw==='string'?raw:(raw&&raw.url)||''; if(u.includes(TARGET)){r.clone().text().then(t=>log('fetch',u,t)).catch(()=>{});} }catch(_){} return r;};}const oOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u,...rest){(this as any).__isRoaming= typeof u==='string' && u.includes(TARGET);return oOpen.call(this,m,u,...rest);};const oSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){if((this as any).__isRoaming){this.addEventListener('load',function(){try{log('xhr',this.responseURL,this.responseText);}catch(_){} });}return oSend.call(this,b);};}catch(e){console.error('roaming monitor inject failed',e);} })();`;
+        /**
+         * WPS 云文档漫游 API 监控脚本
+         * 用于捕获 WPS 文件的 API 请求，便于调试和数据分析
+         * 
+         * 功能说明：
+         * 1. 拦截所有 fetch 请求，检测目标 API
+         * 2. 拦截所有 XMLHttpRequest 请求，检测目标 API
+         * 3. 将捕获的请求信息输出到控制台
+         */
+        const roamingMonitorSnippet = `(() => {
+            // 常量定义
+            const TARGET_API = 'https://drive.kdocs.cn/api/v3/roaming';
+            const FLAG_KEY = '__ROAMING_MONITOR_INSTALLED__';
+            const LOG_PREFIX = '[RoamingAPI]';
+
+            // 防止重复注入
+            if ((window as any)[FLAG_KEY]) {
+                return;
+            }
+            (window as any)[FLAG_KEY] = true;
+
+            /**
+             * 安全日志输出
+             * @param tag 请求类型标签 (fetch/xhr)
+             * @param url 请求 URL
+             * @param body 响应体内容
+             */
+            const log = (tag: string, url: string, body: string) => {
+                try {
+                    console.debug(LOG_PREFIX, tag, url, body);
+                } catch (_) {
+                    // 静默忽略日志错误
+                }
+            };
+
+            /**
+             * 判断 URL 是否为监控目标 API
+             * @param url 目标 URL
+             */
+            const isTargetApi = (url: string): boolean => {
+                return url.includes(TARGET_API);
+            };
+
+            // ==================== Fetch 拦截 ====================
+            const originalFetch = window.fetch;
+            if (originalFetch) {
+                window.fetch = async (...args: any[]) => {
+                    const response = await originalFetch(...args);
+
+                    try {
+                        // 提取请求 URL
+                        const raw = args[0];
+                        const requestUrl = typeof raw === 'string' 
+                            ? raw 
+                            : (raw && raw.url) || '';
+
+                        // 如果是目标 API，克隆响应并异步获取内容
+                        if (isTargetApi(requestUrl)) {
+                            response.clone()
+                                .text()
+                                .then((text: string) => log('fetch', requestUrl, text))
+                                .catch(() => {});
+                        }
+                    } catch (_) {
+                        // 静默忽略处理错误
+                    }
+
+                    return response;
+                };
+            }
+
+            // ==================== XMLHttpRequest 拦截 ====================
+            const originalOpen = XMLHttpRequest.prototype.open;
+            const originalSend = XMLHttpRequest.prototype.send;
+
+            // 拦截 open 方法，标记请求是否为目标 API
+            XMLHttpRequest.prototype.open = function (method: string, url: string, ...rest: any[]) {
+                (this as any).__isRoaming = typeof url === 'string' && isTargetApi(url);
+                return originalOpen.call(this, method, url, ...rest);
+            };
+
+            // 拦截 send 方法，在请求完成后记录响应
+            XMLHttpRequest.prototype.send = function (body: any) {
+                if ((this as any).__isRoaming) {
+                    this.addEventListener('load', function () {
+                        try {
+                            log('xhr', this.responseURL, this.responseText);
+                        } catch (_) {
+                            // 静默忽略处理错误
+                        }
+                    });
+                }
+                return originalSend.call(this, body);
+            };
+        })();`;
         createWebviewDock_for_wps({
             plugin: this.plugin,
             config: {
