@@ -742,7 +742,10 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             // 在覆盖 innerHTML 前先清理旧 root（防止重复绑定）
             const existing = dock.element.querySelector(`#${containerClass}`) as HTMLElement | null;
             cleanupRoot(existing);
-            options.initRun();
+            // 安全调用 initRun（如果存在）
+            if (typeof options.initRun === 'function') {
+                options.initRun();
+            }
             dock.element.innerHTML = createWebviewHTML(containerClass, url, iframeStyle, zoom);
             const targetElement = dock.element.querySelector(`#${containerClass} webview`);
             setupResizeObserver(targetElement as HTMLElement);
