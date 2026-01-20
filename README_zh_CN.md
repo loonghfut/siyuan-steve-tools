@@ -40,7 +40,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.33.1 (2026年01月17日)
+### v0.33.2 (2026年01月20日)
 - feat(SlideShape): 添加边框样式属性，支持实线、虚线和流动效果 (loonghfut)
 - 1 (loonghfut)
 - feat(SlideShapeUtil): 使用 HTMLContainer 包裹编辑输入，优化事件处理 (loonghfut)
@@ -72,6 +72,11 @@ win端s3同步后，docker端感知s3同步。
 - feat: 更新版本号至 0.33.1 (loonghfut)
 - docs: 更新 v0.33.1 版本的更新日志 (loonghfut)
 - Merge branch 'main-2' of https://github.com/loonghfut/siyuan-steve-tools into main-2 (loonghfut)
+- docs: 更新 v0.33.1 版本的更新日志 (loonghfut)
+- feat(WebviewDock): 安全调用 initRun 方法以防止错误 (loonghfut)
+- feat(WpsFileServ): 增加 WPS 云文档漫游 API 监控脚本以捕获 API 请求 (loonghfut)
+- feat(WpsFileServ): 添加时间字段并格式化时间戳为可读字符串 (loonghfut)
+- feat(WpsFileServ): 添加“今日”按钮以一键选中今日更新的文件 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
