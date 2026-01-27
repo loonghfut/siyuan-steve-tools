@@ -64,7 +64,7 @@ export class WpsFileServ {
             ShowLinkContent,
         };
         // 暴露一个新方法用于在新页签中预览
-        (window as any).wps.OpenPreviewTab = (url: string) => this.openPreviewTab(url);
+        (window as any).wps.OpenPreviewTab = (url: string) => this.openPreviewTab(url,{positon:"right"});
 
 
         const handleWpsFileInsert = async (e: { webview: any; getCurrentUrl: () => string }) => {
@@ -162,6 +162,24 @@ export class WpsFileServ {
     async onLayoutReady() {
         this.WPSfile = window.siyuanWPS;
         // console.debug(this.WPSfile);
+        this.plugin.addTopBar({
+            icon: "iconSTwpsFile",
+            title: "WPS链接",
+            position: "right",
+            callback: async () => {
+                const url = String(this.settingdata?.["wps-file-topbar-url"] || "").trim();
+                if (!url) {
+                    showMessage("请先在设置中配置顶栏按钮链接", 2000, "info");
+                    return;
+                }
+                try {
+                    await this.openPreviewTab(url);
+                } catch (e) {
+                    console.error("打开顶栏链接失败", e);
+                    showMessage("打开链接失败", 2000, "error");
+                }
+            }
+        });
         if (this.WPSfile?.loaded) {
             this.plugin.addTopBar({
                 icon: "iconSTwpsFile",
@@ -241,7 +259,7 @@ export class WpsFileServ {
             label: "新页签预览",
             click: async () => {
                 try {
-                    this.openPreviewTab(info.url, { sourceBlockId: info.id });
+                    this.openPreviewTab(info.url, { sourceBlockId: info.id, positon: "right" });
                 } catch (e) {
                     console.error('打开预览页签失败', e);
                     showMessage('打开预览页签失败', 2000, 'error');
@@ -390,12 +408,12 @@ ${md}
     /**
      * 在新页签中打开 WPS 链接，仅使用 Electron <webview> 嵌入，不添加额外组件/工具栏
      */
-    private async openPreviewTab(url: string, meta?: { sourceBlockId?: string }) {
+    private async openPreviewTab(url: string, meta?: { sourceBlockId?: string, positon?: 'right' | 'bottom' }) {
         if (!url) { showMessage('无效链接', 1500, 'error'); return; }
         const tabId = ':wps-preview-' + Date.now();
         const safeTitle = (url.split(/[?#]/)[0].split('/').pop() || '预览').slice(0, 20);
 
-    // 仅用于作用域引用（当前 CSS 方案无需）
+        // 仅用于作用域引用（当前 CSS 方案无需）
         this.plugin.addTab({
             type: tabId,
             async init() {
@@ -439,7 +457,7 @@ ${md}
                 icon: 'iconSTwpsFile',
                 data: { url, sourceBlockId: meta?.sourceBlockId }
             },
-            position: 'right',
+            position: meta?.positon,
             keepCursor: false,
             openNewTab: true
         });
@@ -453,7 +471,7 @@ ${md}
             if (exist) exist.remove();
             return;
         }
-                const css = `
+        const css = `
 :root[data-theme-mode="dark"] .wps-file-dock-container webview,
 :root[data-theme-mode="dark"] .wps-file-dock-container iframe,
 :root[data-theme-mode="dark"] .st-wps-preview-tab webview,
