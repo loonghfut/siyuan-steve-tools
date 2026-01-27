@@ -30,7 +30,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
         return widths.every((w) => w === first) ? first : 'mixed'
     }, [hasConnectorSelection, selectedConnectorShapes])
 
-    const connectorStrokeStyleState = React.useMemo<'solid' | 'dashed' | 'mixed'>(() => {
+    const connectorStrokeStyleState = React.useMemo<'solid' | 'dashed' | 'flowing' | 'mixed'>(() => {
         if (!hasConnectorSelection) return 'solid'
         const styles = selectedConnectorShapes.map((s) => s.props.strokeStyle ?? 'solid')
         const first = styles[0]
@@ -54,7 +54,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
     )
 
     const handleConnectorStyleChange = React.useCallback(
-        (nextStyle: 'solid' | 'dashed') => {
+        (nextStyle: 'solid' | 'dashed' | 'flowing') => {
             if (!hasConnectorSelection) return
             editor.run(() => {
                 editor.updateShapes(
@@ -254,9 +254,8 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 8 }}>
-                        <span style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>线型</span>
                         <div className="tlui-toggle-button-row" style={{ marginLeft: 8 }}>
-                            {(['solid', 'dashed'] as const).map((style) => {
+                            {(['solid', 'dashed', 'flowing'] as const).map((style) => {
                                 const isMixed = connectorStrokeStyleState === 'mixed'
                                 const isActive = connectorStrokeStyleState === style
                                 return (
@@ -266,7 +265,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                                         className={`tlui-toggle-button ${isActive ? 'tlui-toggle-button--active' : isMixed ? 'tlui-toggle-button--mixed' : ''}`}
                                         onClick={() => handleConnectorStyleChange(style)}
                                     >
-                                        {style === 'solid' ? '实线' : '虚线'}
+                                        {style === 'solid' ? '实线' : style === 'dashed' ? '虚线' : '流动'}
                                     </TldrawUiButton>
                                 )
                             })}

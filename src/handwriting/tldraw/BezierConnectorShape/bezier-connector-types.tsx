@@ -16,7 +16,7 @@ export type IBezierConnectorShape = TLBaseShape<
 		/** 线条宽度 */
 		strokeWidth: number
 		/** 线条样式 */
-		strokeStyle?: 'solid' | 'dashed'
+		strokeStyle?: 'solid' | 'dashed' | 'flowing'
 		/** 标签富文本内容 */
 		richText: TLRichText
 		/** 标签位置（0-1，沿曲线的位置） */

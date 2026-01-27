@@ -315,6 +315,24 @@
   fill: none;
 }
 
+/* 流动线型：虚线偏移动画 */
+.BezierConnectorShape .bezier-connector-path--flowing {
+  stroke-dashoffset: 0;
+  animation: bezier-connector-flow 1.2s linear infinite;
+}
+
+@keyframes bezier-connector-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .BezierConnectorShape .bezier-connector-path--flowing {
+    animation: none;
+  }
+}
+
 /* 标签交互层：用于拖拽与双击编辑 */
 .tl-shape[data-shape-type='bezier-connector'] .bezier-connector-label-overlay {
   /* 不遮挡编辑态的输入框：编辑态时由内联 pointerEvents 控制 */

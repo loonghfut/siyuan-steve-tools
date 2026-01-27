@@ -27,7 +27,7 @@ export const bezierConnectorShapeMigrations = createShapePropsMigrationSequence(
 		{
 			id: versions.AddStrokeStyle,
 			up(props: any) {
-				if (props.strokeStyle !== 'solid' && props.strokeStyle !== 'dashed') {
+				if (props.strokeStyle !== 'solid' && props.strokeStyle !== 'dashed' && props.strokeStyle !== 'flowing') {
 					props.strokeStyle = 'solid'
 				}
 			},

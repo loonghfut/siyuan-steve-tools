@@ -251,6 +251,12 @@ function getConnectionPath(start: VecLike, end: VecLike, startPortId?: string, e
 	return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
 }
 
+function getStrokeDasharray(strokeStyle?: IBezierConnectorShape['props']['strokeStyle']) {
+	if (strokeStyle === 'dashed') return '12 8'
+	if (strokeStyle === 'flowing') return '10 8'
+	return undefined
+}
+
 /**
  * 获取连接的实际端点（考虑绑定关系）
  */
@@ -586,7 +592,8 @@ function renderConnectorPathAndEndpoints(
 	const r = Math.max(3, (props.strokeWidth || 2) + 1)
 	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color || theme.black.solid
 	const strokeStyle = props.strokeStyle ?? 'solid'
-	const strokeDasharray = strokeStyle === 'dashed' ? '12 8' : undefined
+	const strokeDasharray = getStrokeDasharray(strokeStyle)
+	const isFlowing = strokeStyle === 'flowing'
 	// 如果需要高亮或闪烁，先画一条宽的半透明路径作为 glow/halo
 	const highlight = isHighlighted || isFlashing
 	const highlightWidth = Math.max(0, (props.strokeWidth || 2) + (isHighlighted ? 3 : 0) + (isFlashing ? 2 : 0))
@@ -613,6 +620,7 @@ function renderConnectorPathAndEndpoints(
 				strokeLinecap="round"
 				fill="none"
 				strokeDasharray={strokeDasharray}
+				className={isFlowing ? 'bezier-connector-path bezier-connector-path--flowing' : 'bezier-connector-path'}
 				clipPath={clipPathId ? `url(#${clipPathId})` : undefined}
 			/>
 			{start && (
@@ -999,7 +1007,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 					d={getConnectionPath(start, end, startPortId, endPortId)}
 					strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
 					strokeLinecap="round"
-					strokeDasharray={strokeStyle === 'dashed' ? '12 8' : undefined}
+					strokeDasharray={getStrokeDasharray(strokeStyle)}
 					fill="none"
 					clipPath={!isEmpty ? `url(#${clipPathId})` : undefined}
 				/>
