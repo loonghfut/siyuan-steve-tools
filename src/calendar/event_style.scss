@@ -73,15 +73,7 @@ $priority-color-high-background: var(--b3-card-error-background);
         background-color: $background-color-archive;
     }
 }
-.sb,
-.list,
-.li,
-.p {
-    &[custom-ics-event="true"] {
-        background-color: $background-color-info;
-        border: 1px solid $border-color;
-    }
-}
+
 
 #float-calendar-container {
     border-bottom: 2px solid var(--b3-theme-primary);
