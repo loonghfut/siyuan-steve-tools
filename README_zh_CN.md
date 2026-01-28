@@ -40,10 +40,13 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.34.0 (2026年01月27日)
+### v0.34.1 (2026年01月28日)
 - feat(BezierConnector): 添加流动线型样式及相关动画支持 (loonghfut)
 - feat(WpsFileServ): 添加顶栏按钮链接功能以在新页签中预览 (loonghfut)
 - fix: 更新版本号至 0.34.0 (loonghfut)
+- docs: 更新 v0.34.0 版本的更新日志 (loonghfut)
+- refactor: 移除不必要的样式规则以简化代码 (loonghfut)
+- fix: 更新版本号至 0.34.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
