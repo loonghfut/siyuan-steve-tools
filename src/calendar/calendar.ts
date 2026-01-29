@@ -45,6 +45,9 @@ let lastSavedLifelogSlotDuration: string;
 const calendarResizeHandlers = new WeakMap<HTMLElement, () => void>();
 const calendarResizeObservers = new WeakMap<HTMLElement, ResizeObserver>();
 const MIN_CALENDAR_HEIGHT = 320; // Avoid collapsing the calendar when layout space is tight.
+let cachedTagColorMapStr = '';
+let cachedTagColorMap: Record<string, string> = {};
+const textColorCache = new Map<string, string>();
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
 }
@@ -715,8 +718,10 @@ export async function run(
                 }
 
                 /////////////////////思源////////////////////////
+                const specialKeys = new Set(['qqcalendar', 'icsSubscription', 'lifelog', 'recurring']);
+                const needsNormalEvents = filterViewId.some((id) => !specialKeys.has(id));
                 // 1. 获取引用ID（普通事件）
-                av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+                av_ids = needsNormalEvents ? await moduleInstances['M_calendar'].getAVreferenceid() : [];
                 const showRecurring = filterViewId.includes('recurring');
                 // 仅当既没有普通视图引用、又未选择任何特殊来源（QQ/ICS/Lifelog/周期）时才早退
                 if (!av_ids?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription') && !showRecurring) {
@@ -896,7 +901,7 @@ export async function run(
                 if (enableTagColor && tags.length > 0) {
                     // 解析映射
                     const mapStr = (settingdata["cal-tag-color-map"] || "") as string;
-                    const tagColorMap = parseTagColorMap(mapStr);
+                    const tagColorMap = getTagColorMap(mapStr);
 
                     // 取第一个标签做主色
                     const mainTag = String(tags[0]);
@@ -1318,7 +1323,20 @@ function parseTagColorMap(input: string): Record<string, string> {
     return map;
 }
 
+function getTagColorMap(input: string): Record<string, string> {
+    if (input === cachedTagColorMapStr) {
+        return cachedTagColorMap;
+    }
+    cachedTagColorMapStr = input || '';
+    cachedTagColorMap = parseTagColorMap(cachedTagColorMapStr);
+    return cachedTagColorMap;
+}
+
 function guessTextColor(bgColor: string): string {
+    const cached = textColorCache.get(bgColor);
+    if (cached) {
+        return cached;
+    }
     // 借助 DOM 将任意 CSS 颜色解析为 rgb()
     const el = document.createElement('div');
     el.style.color = bgColor;
@@ -1330,10 +1348,14 @@ function guessTextColor(bgColor: string): string {
         const r = parseInt(m[1], 10);
         const g = parseInt(m[2], 10);
         const b = parseInt(m[3], 10);
-        return colourIsLight(r, g, b) ? 'black' : 'white';
+        const result = colourIsLight(r, g, b) ? 'black' : 'white';
+        textColorCache.set(bgColor, result);
+        return result;
     }
     // 兜底
-    return 'var(--b3-theme-on-background)';
+    const fallback = 'var(--b3-theme-on-background)';
+    textColorCache.set(bgColor, fallback);
+    return fallback;
 }
 
 // 添加一个独立的辅助函数来检查事件完成状态

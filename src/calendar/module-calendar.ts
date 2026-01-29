@@ -45,6 +45,8 @@ export class M_calendar {
         this.plugin = plugin;
     }
     private isUpdating: boolean = false;
+    private avIdCache: Map<string, { ts: number; value: string[] }> = new Map();
+    private avIdCacheTTL = 5000;
     /**
      * 对外提供的安全调度更新方法，带去抖。\n
      * 如果当前已有更新计时器在等待，则忽略新的调度请求。\n
@@ -717,6 +719,11 @@ export class M_calendar {
 
     // 从思源数据库中获取日程信息数据库的av-id
     async getAVreferenceid(forwhat: string = '日程') {
+        const cached = this.avIdCache.get(forwhat);
+        const now = Date.now();
+        if (cached && (now - cached.ts) < this.avIdCacheTTL) {
+            return cached.value;
+        }
         const sqlStr = `SELECT markdown
         FROM blocks
         WHERE name = '${forwhat}'
@@ -725,6 +732,7 @@ export class M_calendar {
         const res = await api.sql(sqlStr);
         // steveTools.outlog(res);
         const avIds = res.map(item => extractDataAvId(item.markdown)).filter(id => id !== null);
+        this.avIdCache.set(forwhat, { ts: now, value: avIds });
         // steveTools.outlog(avIds); // 输出: ['20241213113357-m9b143e', ...]
         return avIds;
 

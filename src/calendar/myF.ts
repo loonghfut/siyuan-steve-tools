@@ -203,56 +203,63 @@ export const statusMap = new Proxy({
 });
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
+const VIEW_ID_CACHE_TTL = 5000;
+const VIEW_VALUE_CACHE_TTL = 5000;
+const viewIdCache = new Map<string, { ts: number; data: ViewItem[] }>();
+const viewValueCache = new Map<string, { ts: number; data: any[] }>();
 
 // Get view IDs and names
 export async function getViewId(va_ids: string[]): ViewData {
-    const viewIds_Data: ViewItem[] = [];
-
-    for (const va_id of va_ids) {
+    const now = Date.now();
+    const tasks = va_ids.map(async (va_id) => {
+        const cached = viewIdCache.get(va_id);
+        if (cached && (now - cached.ts) < VIEW_ID_CACHE_TTL) {
+            return cached.data;
+        }
         try {
             const view = await api.renderAttributeView(va_id);
             // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
             const rootname = view.name ? `${view.name}-` : "";
             const rootid = view.id;
-            view.views.forEach(viewItem => {
-                viewIds_Data.push({
-                    rootid: rootid,
-                    viewId: viewItem.id,
-                    name: rootname + viewItem.name
-                });
-            });
-
-            // // steveTools.outlog(viewIds_Data);
+            const data: ViewItem[] = view.views.map((viewItem) => ({
+                rootid: rootid,
+                viewId: viewItem.id,
+                name: rootname + viewItem.name
+            }));
+            viewIdCache.set(va_id, { ts: now, data });
+            return data;
         } catch (error) {
             console.error(`Error processing view ${va_id}:`, error);
+            return [] as ViewItem[];
         }
-    }
+    });
 
-    return viewIds_Data;
+    const results = await Promise.all(tasks);
+    return results.flat();
 }
 
 //获取视图值
 export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type = "normal") {
-    const viewValue_Data = [];
-
-    for (const viewId_Data of viewIds_Data) {
+    const now = Date.now();
+    const tasks = viewIds_Data.map(async (viewId_Data) => {
+        const cacheKey = `${viewId_Data.rootid}::${viewId_Data.viewId}::${isZQ ? 1 : 0}::${type}`;
+        const cached = viewValueCache.get(cacheKey);
+        if (cached && (now - cached.ts) < VIEW_VALUE_CACHE_TTL) {
+            return { from: viewId_Data, data: cached.data };
+        }
         try {
             const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
             // console.debug("viewValue_CHUSHI:::", viewValue);
             const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type);
-            viewValue_Data.push({
-                from: viewId_Data,
-                data: data,
-            });
-            // // steveTools.outlog(viewValue);
-            // // steveTools.outlog("ceshi1", data);
-
-
+            viewValueCache.set(cacheKey, { ts: now, data });
+            return { from: viewId_Data, data };
         } catch (error) {
             console.error(`Error processing view ${viewId_Data.viewId}:`, error);
+            return { from: viewId_Data, data: [] as any[] };
         }
-    }
+    });
 
+    const viewValue_Data = await Promise.all(tasks);
     // console.debug("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
