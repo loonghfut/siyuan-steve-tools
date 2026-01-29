@@ -23,6 +23,13 @@ export class Dida365Service {
     private lastModifiedTime: Map<string, number> = new Map(); // 记录每个任务的最后修改时间戳(didaID -> timestamp)
     private taskSyncLocks: Map<string, boolean> = new Map(); // 任务级别的同步锁(didaID -> isLocked)
     private lastSyncDirection: Map<string, 'siyuan-to-dida' | 'dida-to-siyuan'> = new Map(); // 记录最后同步方向
+    private pendingDidaUpdates: Map<string, number> = new Map(); // 记录本地已发起但可能尚未在滴答生效的任务(didaID -> until)
+    private getDidaUpdateCooldownMs(): number {
+        const raw = (settingdata as any)["cal-dida-sync-cooldown"];
+        const seconds = Number.isFinite(Number(raw)) ? Number(raw) : 30;
+        // 最低 5 秒，避免 0 导致无保护
+        return Math.max(5, seconds) * 1000;
+    }
 
     constructor(token: string, plugin: steveTools) {
         this.plugin = plugin;
@@ -161,6 +168,13 @@ export class Dida365Service {
                 let isUpdate = false;
                 console.debug("防抖等待完成，开始执行同步任务到思源");
                 
+                // 若存在本地更新未确认的任务，稍后再同步，避免覆盖
+                if (this.hasPendingDidaUpdates()) {
+                    console.debug("检测到本地待同步任务，延迟5秒后重试");
+                    this.debouncedSyncTasksToSiyuan(5000);
+                    return;
+                }
+
                 // 检查是否有任务正在被锁定（正在同步中）
                 const hasLockedTasks = Array.from(this.taskSyncLocks.values()).some(locked => locked);
                 if (hasLockedTasks) {
@@ -183,6 +197,47 @@ export class Dida365Service {
         }, delay);
 
         console.debug(`设置防抖同步计时器，将在${delay / 1000}秒后执行（如无新的调用）`);
+    }
+
+    /**
+     * 清理过期的本地待同步标记
+     */
+    private cleanupPendingDidaUpdates(now = Date.now()): void {
+        for (const [id, until] of this.pendingDidaUpdates.entries()) {
+            if (until <= now) {
+                this.pendingDidaUpdates.delete(id);
+            }
+        }
+    }
+
+    /**
+     * 标记某个任务为“本地已更新，等待滴答确认”
+     */
+    private markPendingDidaUpdate(didaId: string, cooldownMs?: number): void {
+        if (!didaId) return;
+        const ttl = cooldownMs ?? this.getDidaUpdateCooldownMs();
+        this.pendingDidaUpdates.set(didaId, Date.now() + ttl);
+    }
+
+    /**
+     * 判断任务是否仍处于本地更新冷却期
+     */
+    private isPendingDidaUpdate(didaId: string): boolean {
+        const until = this.pendingDidaUpdates.get(didaId);
+        if (!until) return false;
+        if (Date.now() > until) {
+            this.pendingDidaUpdates.delete(didaId);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 判断是否仍有本地待同步任务
+     */
+    private hasPendingDidaUpdates(): boolean {
+        this.cleanupPendingDidaUpdates();
+        return this.pendingDidaUpdates.size > 0;
     }
 
     async syncTasksToSiyuan(): Promise<boolean> {
@@ -240,6 +295,12 @@ export class Dida365Service {
             for (const didaTask of didaTasks) {
                 if (!didaTask.id) continue;
 
+                // 若该任务刚由思源侧更新且尚未在滴答确认，跳过以避免覆盖
+                if (this.isPendingDidaUpdate(didaTask.id)) {
+                    console.debug(`任务 [${didaTask.id}] 处于本地更新冷却期，跳过本次同步`);
+                    continue;
+                }
+
                 // 检查任务是否被锁定（正在同步中）
                 if (this.taskSyncLocks.get(didaTask.id)) {
                     console.debug(`任务 [${didaTask.id}] 正在同步中，跳过本次更新`);
@@ -253,9 +314,10 @@ export class Dida365Service {
                     const lastModified = this.lastModifiedTime.get(didaTask.id);
                     const lastDirection = this.lastSyncDirection.get(didaTask.id);
                     const now = Date.now();
+                    const cooldownMs = this.getDidaUpdateCooldownMs();
                     
-                    // 如果最近5秒内刚从思源同步到滴答，跳过反向同步以避免覆盖
-                    if (lastModified && lastDirection === 'siyuan-to-dida' && (now - lastModified) < 5000) {
+                    // 如果最近冷却期内刚从思源同步到滴答，跳过反向同步以避免覆盖
+                    if (lastModified && lastDirection === 'siyuan-to-dida' && (now - lastModified) < cooldownMs) {
                         console.debug(`任务 [${didaTask.id}] 刚从思源同步到滴答（${now - lastModified}ms前），跳过反向同步`);
                         continue;
                     }
@@ -612,6 +674,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         const titleWithSLink = `${originalTitle} [S](siyuan://blocks/${blockId})`;
 
                         // 更新滴答清单任务，添加 S 链接
+                        this.markPendingDidaUpdate(didaTaskId);
                         await this.apiClient.updateTask(didaTaskId, {
                             id: didaTaskId,
                             projectId: cachedTask.projectId,
@@ -674,6 +737,7 @@ ${taskData.描述?.content || "描述：暂无"}
 
                         // 检查滴答任务标题是否需要更新
                         if (cachedTask.title !== titleWithSLink) {
+                            this.markPendingDidaUpdate(didaTaskId);
                             await this.apiClient.updateTask(didaTaskId, {
                                 id: didaTaskId,
                                 projectId: cachedTask.projectId,
@@ -1197,6 +1261,8 @@ ${taskData.描述?.content || "描述：暂无"}
                     // 加锁，防止并发修改
                     this.taskSyncLocks.set(didaTaskId, true);
                     try {
+                        // 标记本地更新，进入冷却期
+                        this.markPendingDidaUpdate(didaTaskId);
                         await this.apiClient.updateTask(didaTaskId, {
                             ...updatePayload,
                             id: didaTaskId,
@@ -1288,6 +1354,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         this.taskCache.set(newDidaTask.id, newDidaTask);
                         this.lastModifiedTime.set(newDidaTask.id, Date.now());
                         this.lastSyncDirection.set(newDidaTask.id, 'siyuan-to-dida');
+                        this.markPendingDidaUpdate(newDidaTask.id);
                         
                         // 将新生成的 didaID 和链接字段写回思源数据库
                         const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID');
@@ -1370,6 +1437,7 @@ ${taskData.描述?.content || "描述：暂无"}
         // 合并两个设置项为一个数组，过滤空值
         // const projectIds = [settingdata["cal-dida-unfinished-list"], settingdata["cal-dida-finished-list"]].filter(Boolean);
         const projectIds = [this.todoListId];
+        const previousCache = new Map(this.taskCache);
         this.taskCache.clear(); // 清空旧缓存
 
         if (projectIds.length === 0) {
@@ -1384,7 +1452,12 @@ ${taskData.描述?.content || "描述：暂无"}
                     allTasks.push(...projectData.tasks);
                     projectData.tasks.forEach(task => {
                         if (task.id) {
-                            this.taskCache.set(task.id, task);
+                            // 若该任务仍处于本地更新冷却期，优先保留旧缓存，避免被旧数据覆盖
+                            if (this.isPendingDidaUpdate(task.id) && previousCache.has(task.id)) {
+                                this.taskCache.set(task.id, previousCache.get(task.id)!);
+                            } else {
+                                this.taskCache.set(task.id, task);
+                            }
                         }
                     });
                 }
