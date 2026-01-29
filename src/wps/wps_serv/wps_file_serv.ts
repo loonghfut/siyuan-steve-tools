@@ -57,6 +57,46 @@ export class WpsFileServ {
                 </symbol>
             `)
 
+        // 注册 WPS 预览页签类型
+        this.plugin.addTab({
+            type: "wps-preview",
+            init() {
+                const { url, sourceBlockId } = this.data || {};
+                if (!url) {
+                    this.element.innerHTML = '<div style="padding:20px;text-align:center;">无效的预览链接</div>';
+                    return;
+                }
+
+                const containerId = 'wps-preview-' + Date.now();
+                const tabElement = this.element as HTMLElement;
+                tabElement.className = 'st-wps-preview-tab';
+                tabElement.style.cssText = 'position:relative;width:100%;height:100%;overflow:hidden;';
+                tabElement.innerHTML = `<div id="${containerId}" style="width:100%;height:100%;"></div>`;
+
+                setTimeout(() => {
+                    const container = document.getElementById(containerId);
+                    if (!container) return;
+
+                    const webview = document.createElement('webview');
+                    webview.setAttribute('src', url);
+                    webview.setAttribute('custom-st-wps-iframe', '1');
+                    webview.style.cssText = 'width:100%;height:100%;border:none;';
+
+                    webview.addEventListener('dom-ready', () => {
+                        console.debug('WPS预览加载完成:', url);
+                    });
+
+                    container.appendChild(webview);
+                }, 100);
+            },
+            async destroy() {
+                console.debug('WPS预览页签已关闭');
+            },
+            resize() {
+                // WPS 预览无需特殊的 resize 处理
+            },
+        })
+
 
         // 初始化全局函数
         window.wps = {
@@ -409,57 +449,26 @@ ${md}
      * 在新页签中打开 WPS 链接，仅使用 Electron <webview> 嵌入，不添加额外组件/工具栏
      */
     private async openPreviewTab(url: string, meta?: { sourceBlockId?: string, positon?: 'right' | 'bottom' }) {
-        if (!url) { showMessage('无效链接', 1500, 'error'); return; }
-        const tabId = ':wps-preview-' + Date.now();
+        if (!url) { 
+            showMessage('无效链接', 1500, 'error'); 
+            return; 
+        }
+        
         const safeTitle = (url.split(/[?#]/)[0].split('/').pop() || '预览').slice(0, 20);
-
-        // 仅用于作用域引用（当前 CSS 方案无需）
-        this.plugin.addTab({
-            type: tabId,
-            async init() {
-                // 清空节点，仅放置一个 webview
-                this.element.innerHTML = '';
-                // 用于 CSS 选择器定位预览区域
-                this.element.classList.add('st-wps-preview-tab');
-                let webviewEl: any;
-                try {
-                    webviewEl = document.createElement('webview') as any;
-                } catch {
-                    webviewEl = null;
-                }
-
-                if (!webviewEl || String(webviewEl.tagName).toLowerCase() !== 'webview') {
-                    // 当前环境不支持 webview
-                    const tip = document.createElement('div');
-                    tip.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--b3-theme-on-background);';
-                    tip.textContent = '当前环境不支持 webview 预览';
-                    this.element.appendChild(tip);
-                    return;
-                }
-
-                try { webviewEl.src = url; } catch { webviewEl.setAttribute('src', url); }
-                webviewEl.style.width = '100%';
-                webviewEl.style.height = '100%';
-                webviewEl.style.border = '0';
-                // 如需弹窗可开启：webviewEl.setAttribute('allowpopups', '');
-                this.element.appendChild(webviewEl);
-            },
-            async destroy() {
-                // 由 DOM 自动回收
-            }
-        });
 
         await openTab({
             app: (window as any).siyuan?.ws?.app,
             custom: {
-                id: this.plugin.name + tabId,
-                title: '预览:' + safeTitle,
                 icon: 'iconSTwpsFile',
-                data: { url, sourceBlockId: meta?.sourceBlockId }
+                title: '预览:' + safeTitle,
+                id: this.plugin.name + 'wps-preview',
+                data: { 
+                    url, 
+                    sourceBlockId: meta?.sourceBlockId 
+                },
             },
             position: meta?.positon,
-            keepCursor: false,
-            openNewTab: true
+            keepCursor: false
         });
     }
 
