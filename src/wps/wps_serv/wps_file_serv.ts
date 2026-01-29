@@ -2,10 +2,10 @@ import { appendBlock, generateSiyuanID, updateBlock } from "@/api/api";
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
 import { ChangeLinkStyle, extractIframeBlockInfo, ShowLinkContent } from "../wps_api";
-import { createWebviewDock_for_wps, getCursorBlockId, } from "@/api/api2";
+import { createWebviewDock_for_wps, getCursorBlockId, pickRoamingFields } from "@/api/api2";
 import { F5, generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
-import { api } from "@frostime/siyuan-plugin-kits";
+import { api, createDailynote } from "@frostime/siyuan-plugin-kits";
 import { confirmDialog } from "@/libs/dialog";
 import { fetchWpsFiles } from "../wps_files_api";
 import { openTab } from "siyuan";
@@ -40,6 +40,9 @@ export class WpsFileServ {
     private cursorID: string;
     private cursorID_b: string;
     private WPSfile?: Window["siyuanWPS"];
+    private bgWebview?: any;
+    private bgRoot?: HTMLElement;
+    private bgInited = false;
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -201,6 +204,7 @@ export class WpsFileServ {
 
     async onLayoutReady() {
         this.WPSfile = window.siyuanWPS;
+        this.ensureBackgroundWpsLoader();
         // console.debug(this.WPSfile);
         this.plugin.addTopBar({
             icon: "iconSTwpsFile",
@@ -217,6 +221,19 @@ export class WpsFileServ {
                 } catch (e) {
                     console.error("打开顶栏链接失败", e);
                     showMessage("打开链接失败", 2000, "error");
+                }
+            }
+        });
+        this.plugin.addTopBar({
+            icon: "iconSTwps",
+            title: "WPS导入日记",
+            position: "right",
+            callback: async () => {
+                try {
+                    await this.importAllCapturedToDailyNote();
+                } catch (e) {
+                    console.error("导入日记失败", e);
+                    showMessage("导入日记失败", 2000, "error");
                 }
             }
         });
@@ -679,10 +696,48 @@ ${md}
         }
     }
 
-    private async insertSelectedWpsRecords(records: WpsFileRecord[], exists?: Set<string>, options?: { allowDuplicates?: boolean }) {
+    async importAllCapturedToDailyNote() {
         try {
-            if (!this.cursorID) { showMessage('未获取到光标位置', 1600, 'error'); return; }
-            const setlocationid = this.cursorID;
+            const w: any = window as any;
+            const rawList: WpsFileRecord[] = Array.isArray(w.wpsdoc) ? w.wpsdoc : [];
+            if (!rawList.length) { showMessage('没有捕获的 WPS 文件数据', 1600, 'info'); return; }
+
+            const notebookId = String(this.settingdata?.["wps-file-daily-notebook"] || '').trim();
+            if (!notebookId) { showMessage('请先在设置中选择“导入到日记的笔记本”', 2000, 'info'); return; }
+
+            const now = new Date();
+            const dailyNoteId = await createDailynote(notebookId, now);
+            if (!dailyNoteId) { showMessage('创建/获取当日日记失败', 2000, 'error'); return; }
+
+            // 去重
+            const map = new Map<string, WpsFileRecord>();
+            for (const r of rawList) { if (r && r.link_id && r.link_url && !map.has(r.link_id)) map.set(r.link_id, r); }
+            const list = Array.from(map.values());
+            if (!list.length) { showMessage('无有效 WPS 文件记录', 1600, 'info'); return; }
+
+            const exists = await this.checkWpsBlockExists();
+            const ui = this.buildWpsImportDialog(list, exists);
+            confirmDialog({
+                title: '选择要导入到日记的 WPS 文件',
+                content: ui.element,
+                width: '700px',
+                height: '560px',
+                confirm: async () => {
+                    const { selected, allowDuplicates } = ui.getSelection();
+                    if (!selected.length) { showMessage('未选择任何可导入项', 1600, 'info'); return; }
+                    await this.insertSelectedWpsRecords(selected.map(s => s.rec), exists, { allowDuplicates }, dailyNoteId);
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            showMessage('打开日记导入面板失败', 2000, 'error');
+        }
+    }
+
+    private async insertSelectedWpsRecords(records: WpsFileRecord[], exists?: Set<string>, options?: { allowDuplicates?: boolean }, targetDocId?: string) {
+        try {
+            const setlocationid = targetDocId || this.cursorID;
+            if (!setlocationid) { showMessage('未获取到插入位置', 1600, 'error'); return; }
             const importedSet = exists || await this.checkWpsBlockExists();
             let imported = 0; let skipped = 0; let failed = 0;
             const allowDup = options?.allowDuplicates;
@@ -752,6 +807,111 @@ ${md}
         } catch (e) {
             console.error('选择导入异常', e);
             showMessage('导入过程发生错误', 2000, 'error');
+        }
+    }
+
+    private ensureBackgroundWpsLoader() {
+        if (this.bgInited) return;
+        if (!this.settingdata?.["wps-file-background-preload"]) return;
+        const url = String(this.settingdata?.["wps-file-weburl"] || '').trim();
+        if (!url) return;
+
+        this.bgInited = true;
+        try {
+            const root = document.createElement('div');
+            root.id = 'st-wps-bg-loader';
+            root.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+            const webview = document.createElement('webview');
+            webview.setAttribute('src', url);
+            webview.setAttribute('style', 'width:1px;height:1px;border:none;');
+            webview.setAttribute('useragent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1');
+            root.appendChild(webview);
+            document.body.appendChild(root);
+
+            const inject = async () => {
+                try {
+                    if (typeof (webview as any).executeJavaScript === 'function') {
+                        await (webview as any).executeJavaScript(this.getRoamingMonitorSnippet());
+                    }
+                } catch (e) {
+                    console.warn('WPS后台注入失败', e);
+                }
+            };
+
+            webview.addEventListener('dom-ready', inject as any);
+            webview.addEventListener('did-finish-load', inject as any);
+            webview.addEventListener('console-message', (e: any) => this.handleRoamingConsoleMessage(e));
+
+            this.bgRoot = root;
+            this.bgWebview = webview;
+        } catch (e) {
+            console.error('初始化WPS后台加载失败', e);
+        }
+    }
+
+    private getRoamingMonitorSnippet() {
+        return `(() => {
+    if (window.__roamingMonitorInstalled) return;
+    window.__roamingMonitorInstalled = true;
+    const TARGET_KEY = '/api/v3/roaming';
+    const emit = (kind, url, body) => {
+        try {
+            if (!url || url.indexOf(TARGET_KEY) === -1) return;
+            const fullBody = typeof body === 'string' ? body : (body + '');
+            const obj = { kind, url, body: fullBody };
+            console.debug('[WPS_Roaming]' + JSON.stringify(obj));
+        } catch (e) { /* ignore */ }
+    };
+    if (window.fetch) {
+        const _fetch = window.fetch;
+        window.fetch = async function(...args) {
+            const res = await _fetch.apply(this, args);
+            try {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const clone = res.clone();
+                clone.text().then(t => emit('fetch', url, t));
+            } catch (e) { /* ignore */ }
+            return res;
+        };
+    }
+    try {
+        const open = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            this.__roaming_url = url;
+            return open.call(this, method, url, ...rest);
+        };
+        const send = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.send = function(body) {
+            this.addEventListener('load', function() {
+                try { emit('xhr', this.__roaming_url, this.responseText); } catch (e) { /* ignore */ }
+            });
+            return send.call(this, body);
+        };
+    } catch (e) { /* ignore */ }
+})();`;
+    }
+
+    private handleRoamingConsoleMessage(e: any) {
+        try {
+            const message = e?.message;
+            if (typeof message !== 'string' || !message.startsWith('[WPS_Roaming]')) return;
+            const jsonStr = message.substring('[WPS_Roaming]'.length);
+            const obj = JSON.parse(jsonStr);
+            if (!obj || !obj.body) return;
+            const newItems = pickRoamingFields(obj.body) || [];
+            const w: any = window as any;
+            if (!Array.isArray(w.wpsdoc)) w.wpsdoc = [];
+            if (newItems.length) {
+                const existingIds = new Set<string>(w.wpsdoc.map((d: any) => d && d.link_id).filter(Boolean));
+                for (const it of newItems) {
+                    if (it && it.link_id && !existingIds.has(it.link_id)) {
+                        w.wpsdoc.push(it);
+                        existingIds.add(it.link_id);
+                    }
+                }
+            }
+        } catch (err) {
+            // ignore parse errors
         }
     }
 }

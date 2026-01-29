@@ -25,6 +25,10 @@ export const wpsDefaults: Record<string, any> = {
     "wps-file-block-template": "",
     // 顶栏按钮打开的新页签链接
     "wps-file-topbar-url": "",
+    // 打开思源时后台预加载 WPS 页面，用于捕获 roaming 数据
+    "wps-file-background-preload": true,
+    // WPS 文件导入到日记的目标笔记本
+    "wps-file-daily-notebook": "",
 };
 
 export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -43,6 +47,8 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "启用 WPS文件管理", description: "文件管理", key: "wps-file-enable", value: ctx.settings["wps-file-enable"] },
                 { type: "textinput", title: "文件夹链接", description: "WPS文件夹链接", key: "wps-file-weburl", value: ctx.settings["wps-file-weburl"] },
                 { type: "textinput", title: "顶栏按钮链接", description: "点击顶栏按钮时打开的新页签链接", key: "wps-file-topbar-url", value: ctx.settings["wps-file-topbar-url"] },
+                { type: "checkbox", title: "后台预加载 WPS 页面", description: "打开思源时在后台加载 WPS 页面并抓取 roaming 数据", key: "wps-file-background-preload", value: ctx.settings["wps-file-background-preload"] },
+                { type: "select", title: "导入到日记的笔记本", description: "用于创建/定位当日日记的笔记本", key: "wps-file-daily-notebook", value: ctx.settings["wps-file-daily-notebook"], options: notebookOptions() },
                 { type: "checkbox", title: "暗色主题下反色预览页面", description: "开启后：当 data-theme-mode=dark 时对嵌入的 webview/iframe 应用反色滤镜（invert+hue-rotate）", key: "wps-webview-invert-dark", value: ctx.settings["wps-webview-invert-dark"] },
                 { type: "checkbox", title: "文件以卡片形式插入", description: "启用后：单条插入与批量导入都会调用 generateLinkCard 生成链接卡片(忽略文本模板)", key: "wps-file-insert-as-card", value: ctx.settings["wps-file-insert-as-card"] },
                 { type: "textarea", title: "文件块模板", description: "自定义导入的文件块模板；支持占位符：{{name}} {{url}} {{file_type}} {{file_src}}。留空使用内置默认模板。", key: "wps-file-block-template", value: ctx.settings["wps-file-block-template"], direction: "row" },
