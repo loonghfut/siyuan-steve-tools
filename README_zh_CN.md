@@ -49,6 +49,7 @@ win端s3同步后，docker端感知s3同步。
 - feat: add Memos sync service for managing memo synchronization with Memos API (loonghfut)
 - feat: 添加按创建时间排序备忘录功能，优化备忘录分组逻辑 (loonghfut)
 - feat: 更新版本号至0.36.0 (loonghfut)
+- docs: 更新 v0.36.0 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
