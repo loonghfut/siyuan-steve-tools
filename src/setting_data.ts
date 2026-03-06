@@ -9,6 +9,7 @@ import { commonDefaults } from "./settings/common";
 
 import { aggregateDefaults } from "./settings/aggregate";
 import { minutiaeDefaults } from "./settings/minutiae";
+import { memosDefaults } from "./settings/memos";
 // import { wucaiDefaults } from "./settings/wucai";
 // 聚合所有模块默认配置
 export const defaultSettings: Record<string, any> = {
@@ -20,6 +21,7 @@ export const defaultSettings: Record<string, any> = {
     ...lifelogDefaults,
     ...wpsDefaults,
     ...commonDefaults,
+    ...memosDefaults,
     // ...wucaiDefaults,
     ...minutiaeDefaults,
     ...aggregateDefaults,

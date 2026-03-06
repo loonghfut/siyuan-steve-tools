@@ -9,6 +9,7 @@ import { M_Wps } from "./wps/module-wps";
 import { M_Aggregate } from "./aggregate/module-aggregate";
 import { M_Minutiae } from "./minutiae/module-minutiae";
 import { M_Wucai } from "./wucai/module-wucai";
+import { M_Memos } from "./memos/module-memos";
 // 模块配置接口
 export interface ModuleConfig {
     [key: string]: {
@@ -85,6 +86,13 @@ export const MODULE_CONFIG: ModuleConfig = {
     //     logMessage: 'Wucai模块加载'
     // },
 
+    M_Memos: {
+        class: M_Memos,
+        name: 'M_Memos',
+        settingKey: 'memos-enable',
+        logMessage: 'Memos模块加载'
+    },
+
 };
 
 // 导出所有模块类型
@@ -99,4 +107,5 @@ export type ModuleClasses = {
     M_Aggregate?: M_Aggregate;
     M_Minutiae?: M_Minutiae;
     M_Wucai?: M_Wucai;
+    M_Memos?: M_Memos;
 };
