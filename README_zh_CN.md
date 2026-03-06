@@ -40,12 +40,15 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.35.0 (2026年01月29日)
-- feat: 添加 WPS 预览页签类型并优化预览逻辑 (loonghfut)
-- feat: 添加缓存机制以优化视图和事件的获取性能 (loonghfut)
-- feat: 添加滴答同步冷却期设置以防止数据覆盖 (loonghfut)
-- feat: 添加后台预加载 WPS 页面和导入到日记的功能 (loonghfut)
-- feat: 更新版本号至 0.35.0 (loonghfut)
+### v0.36.0 (2026年03月06日)
+- feat: 添加桌面浏览器环境支持和空闲休眠功能到 WPS Webview (loonghfut)
+- feat: 添加 WPS 浏览器环境支持和相关属性获取功能 (loonghfut)
+- feat: 优化事件处理和卸载逻辑，增强模块稳定性 (loonghfut)
+- feat: 添加待处理日历事件补丁功能，优化事件更新逻辑 (loonghfut)
+- feat: 添加 Memos 模块及其设置，支持启用选项 (loonghfut)
+- feat: add Memos sync service for managing memo synchronization with Memos API (loonghfut)
+- feat: 添加按创建时间排序备忘录功能，优化备忘录分组逻辑 (loonghfut)
+- feat: 更新版本号至0.36.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
