@@ -131,6 +131,13 @@ interface WebviewExtraOptions {
     onRoamingIntercept?: (data: { kind: string; url: string; body: string }) => void; // 监听 /api/v3/roaming 拦截数据回调
     roamingTransportMode?: 'console' | 'poll'; // webview 与宿主数据传输模式，默认 console
     initRun?: () => void;                 // 初始化运行函数
+    emulateBrowserEnv?: boolean;          // 尽量模拟真实桌面浏览器环境（默认 true）
+    partition?: string;                   // webview partition（默认 persist:st-wps）
+    acceptLanguages?: string;             // 语言偏好，默认 zh-CN,zh,en-US,en
+    webPreferences?: string;              // 覆盖 webpreferences
+    enableSleep?: boolean;                // 是否启用空闲休眠（默认 false）
+    sleepMinutes?: number;                // 空闲休眠阈值（分钟，默认 10）
+    sleepBlankUrl?: string;               // 休眠时加载的空白页（默认 about:blank）
 }
 interface WebviewButtonConfig {
     id?: string;                           // 按钮 id，不含容器前缀；最终实际 id = `${containerClass}-btn-${id}`
@@ -177,9 +184,20 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
         buttons,
         onRoamingIntercept,
         roamingTransportMode = 'console',
+        emulateBrowserEnv = true,
+        partition = 'persist:st-wps',
+        acceptLanguages = 'zh-CN,zh,en-US,en',
+        webPreferences,
+        enableSleep = false,
+        sleepMinutes = 10,
+        sleepBlankUrl = 'about:blank',
     } = options as IframeDockOptions & WebviewExtraOptions;
 
-    const mobileUA = userAgent || "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1";
+    const desktopUA = userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+    const defaultWebPreferences = emulateBrowserEnv
+        ? "javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes"
+        : "contextIsolation, nativeWindowOpen, javascript=yes";
+    const finalWebPreferences = webPreferences || defaultWebPreferences;
 
     const finalButtonText = {
         copy: buttonTexts.copy ?? "复制",
@@ -187,7 +205,13 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
         dev: buttonTexts.dev ?? "调试",
     };
 
+    const escapeHtmlAttr = (s: string) => String(s || '').replace(/&/g, '&amp;').replace(/\"/g, '&quot;');
+
     const createWebviewHTML = (containerClass: string, url: string, style: string, zoom: number) => {
+        const uaAttr = escapeHtmlAttr(desktopUA);
+        const partitionAttr = escapeHtmlAttr(partition);
+        const langAttr = escapeHtmlAttr(acceptLanguages);
+        const webprefsAttr = escapeHtmlAttr(finalWebPreferences);
         if (!enableButtons) {
             return `
             <div id="${containerClass}" class="${containerClass}" style="position: relative; height: 100%; width: 100%; overflow: hidden;">
@@ -195,8 +219,11 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                     src="${url}" 
                     style="${style}; zoom: ${zoom}; position: absolute; inset: 0; width: 100%; height: 100%;"
                     allowpopups
-                    webpreferences="contextIsolation, nativeWindowOpen, javascript=yes"
-                    useragent="${mobileUA}"
+                    partition="${partitionAttr}"
+                    httpreferrer="https://www.kdocs.cn/"
+                    webpreferences="${webprefsAttr}"
+                    useragent="${uaAttr}"
+                    acceptlanguages="${langAttr}"
                 ></webview>
             </div>`;
         }
@@ -227,8 +254,11 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                 src="${url}" 
                 style="${style}; zoom: ${zoom}; position: absolute; inset: 0; width: 100%; height: 100%;"
                 allowpopups
-                webpreferences="contextIsolation, nativeWindowOpen, javascript=yes"
-                useragent="${mobileUA}"
+                partition="${partitionAttr}"
+                httpreferrer="https://www.kdocs.cn/"
+                webpreferences="${webprefsAttr}"
+                useragent="${uaAttr}"
+                acceptlanguages="${langAttr}"
             ></webview>
             <div id="${containerClass}-btns" style="
                 position: absolute; top: 8px; left: 50%; transform: translateX(-50%) translateY(-8px); z-index: 9999; display: flex; gap: 8px; align-items: center; opacity: 0; pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease;">
@@ -250,7 +280,94 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                 try { (rootEl as any).__btnCleanup(); } catch (e) { /* ignore */ }
                 try { delete (rootEl as any).__btnCleanup; } catch (e) { /* ignore */ }
             }
+            // sleep 清理
+            if ((rootEl as any).__sleepCleanup) {
+                try { (rootEl as any).__sleepCleanup(); } catch (e) { /* ignore */ }
+                try { delete (rootEl as any).__sleepCleanup; } catch (e) { /* ignore */ }
+            }
         } catch (e) { /* ignore */ }
+    };
+
+    const bindSleepLifecycle = (rootEl: HTMLElement | null, originalUrl: string) => {
+        if (!enableSleep || !rootEl) return;
+        const webviewEl = rootEl.querySelector('webview') as any | null;
+        if (!webviewEl) return;
+
+        const sleepMs = Math.max(1, sleepMinutes) * 60 * 1000;
+        let lastActive = Date.now();
+        let timer: number | null = null;
+        let sleeping = false;
+        let lastUrl = originalUrl;
+
+        const markActive = () => {
+            lastActive = Date.now();
+            if (sleeping) {
+                wake();
+            }
+        };
+
+        const getCurrentUrl = () => {
+            try {
+                if (typeof webviewEl.getURL === 'function') {
+                    return webviewEl.getURL() || '';
+                }
+                return webviewEl.getAttribute?.('src') || webviewEl.src || '';
+            } catch {
+                return '';
+            }
+        };
+
+        const sleep = () => {
+            if (sleeping) return;
+            try {
+                const current = getCurrentUrl();
+                if (current && current !== sleepBlankUrl) lastUrl = current;
+                webviewEl.setAttribute?.('src', sleepBlankUrl);
+                sleeping = true;
+            } catch (e) {
+                console.warn('webview sleep failed', e);
+            }
+        };
+
+        const wake = () => {
+            if (!sleeping) return;
+            try {
+                webviewEl.setAttribute?.('src', lastUrl || originalUrl);
+                sleeping = false;
+            } catch (e) {
+                console.warn('webview wake failed', e);
+            }
+        };
+
+        const activityEvents: Array<keyof HTMLElementEventMap> = ['mousemove', 'mousedown', 'wheel', 'keydown', 'mouseenter', 'touchstart'];
+        activityEvents.forEach((evt) => rootEl.addEventListener(evt, markActive as EventListener, { passive: true }));
+
+        const onVisibility = () => {
+            if (document.hidden) {
+                if (Date.now() - lastActive > 3000) sleep();
+            } else {
+                markActive();
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+
+        timer = window.setInterval(() => {
+            const idle = Date.now() - lastActive;
+            if (!sleeping && idle >= sleepMs) {
+                sleep();
+            }
+        }, 30 * 1000);
+
+        (rootEl as any).__sleepCleanup = () => {
+            try {
+                if (timer !== null) {
+                    window.clearInterval(timer);
+                    timer = null;
+                }
+                document.removeEventListener('visibilitychange', onVisibility);
+                activityEvents.forEach((evt) => rootEl.removeEventListener(evt, markActive as EventListener));
+            } catch { /* ignore */ }
+        };
     };
 
     const setupResizeObserver = (targetElement: HTMLElement) => {
@@ -734,6 +851,7 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             const targetElement = this.element.querySelector(`#${containerClass} webview`);
             setupResizeObserver(targetElement as HTMLElement);
             bindCopyButton(this.element, containerClass);
+            bindSleepLifecycle(this.element, url);
         },
         init: (dock) => {
             if (url === "") {
@@ -750,6 +868,7 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
             const targetElement = dock.element.querySelector(`#${containerClass} webview`);
             setupResizeObserver(targetElement as HTMLElement);
             bindCopyButton(dock.element, containerClass);
+            bindSleepLifecycle(dock.element, url);
         },
         destroy() {
             console.debug("destroy dock:", type);

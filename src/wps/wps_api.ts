@@ -10,6 +10,9 @@ export async function ChangeLinkStyle(url?: string, blockId?: string) {
 }
 
 export async function ShowLinkContent(url: string) {
+  const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  const cleanupFns: Array<() => void> = [];
+
   // 创建一个带简单工具栏的对话框，内容区用于挂载 webview 或 iframe
   const dialog = new Dialog({
     title: null,
@@ -94,6 +97,7 @@ export async function ShowLinkContent(url: string) {
       // 对话框大小改变时不需要特殊处理，webview/iframe 使用百分比尺寸自适应
     },
   });
+  void dialog;
 
   // 稍等 DOM 挂载
   await new Promise((res) => setTimeout(res, 50));
@@ -121,6 +125,11 @@ export async function ShowLinkContent(url: string) {
       webviewEl.style.width = '100%';
       webviewEl.style.height = '100%';
       webviewEl.style.border = '0';
+      webviewEl.setAttribute('partition', 'persist:st-wps-preview');
+      webviewEl.setAttribute('acceptlanguages', 'zh-CN,zh,en-US,en');
+      webviewEl.setAttribute('httpreferrer', 'https://www.kdocs.cn/');
+      webviewEl.setAttribute('webpreferences', 'javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes');
+      webviewEl.setAttribute('useragent', DESKTOP_UA);
       // 可根据需要设置属性（谨慎设置以免引发安全问题）
       // webviewEl.setAttribute('allowpopups', ''); // 如需弹窗
       container.appendChild(webviewEl);
@@ -133,14 +142,58 @@ export async function ShowLinkContent(url: string) {
       const openBtn = document.getElementById('siyuan-webview-open') as HTMLButtonElement | null;
 
       // 事件绑定（使用 any 以兼容类型）
-      webviewEl.addEventListener?.('did-finish-load', () => {
+      const onDidFinishLoad = () => {
         try {
           if (urlInput) urlInput.value = webviewEl.getURL?.() || url;
         } catch {}
-      });
-      webviewEl.addEventListener?.('did-fail-load', (e: any) => {
+      };
+      const onDidFailLoad = (e: any) => {
         // 加载失败时可显示提示或切换为 iframe（此处仅记录）
         console.warn('webview did-fail-load', e);
+      };
+      webviewEl.addEventListener?.('did-finish-load', onDidFinishLoad);
+      webviewEl.addEventListener?.('did-fail-load', onDidFailLoad);
+      cleanupFns.push(() => {
+        try { webviewEl.removeEventListener?.('did-finish-load', onDidFinishLoad); } catch {}
+        try { webviewEl.removeEventListener?.('did-fail-load', onDidFailLoad); } catch {}
+      });
+
+      // 轻量休眠：预览窗口长期闲置时切到 about:blank，交互后自动唤醒
+      const SLEEP_MS = 5 * 60 * 1000;
+      let lastActiveAt = Date.now();
+      let sleeping = false;
+      let lastUrl = url;
+      const markActive = () => {
+        lastActiveAt = Date.now();
+        if (sleeping) {
+          try {
+            webviewEl.setAttribute('src', lastUrl || url);
+            sleeping = false;
+          } catch {}
+        }
+      };
+      const sleepTimer = window.setInterval(() => {
+        if (sleeping) return;
+        if (Date.now() - lastActiveAt < SLEEP_MS) return;
+        try {
+          const current = webviewEl.getURL?.() || webviewEl.getAttribute?.('src') || '';
+          if (current && current !== 'about:blank') lastUrl = current;
+          webviewEl.setAttribute('src', 'about:blank');
+          sleeping = true;
+        } catch {}
+      }, 30000);
+      const activeEvents: Array<keyof HTMLElementEventMap> = ['mousemove', 'mousedown', 'wheel', 'keydown', 'touchstart'];
+      activeEvents.forEach((evt) => container.addEventListener(evt, markActive as EventListener, { passive: true }));
+      const onVisibility = () => {
+        if (!document.hidden) markActive();
+      };
+      document.addEventListener('visibilitychange', onVisibility);
+      cleanupFns.push(() => {
+        try { window.clearInterval(sleepTimer); } catch {}
+        try { document.removeEventListener('visibilitychange', onVisibility); } catch {}
+        activeEvents.forEach((evt) => {
+          try { container.removeEventListener(evt, markActive as EventListener); } catch {}
+        });
       });
 
       backBtn?.addEventListener('click', () => { try { webviewEl.goBack?.(); } catch {} });
@@ -183,8 +236,23 @@ export async function ShowLinkContent(url: string) {
       backBtn && (backBtn.disabled = true);
       forwardBtn && (forwardBtn.disabled = true);
     }
+
+    // 轮询检测对话框是否已销毁，及时移除监听器/定时器
+    const destroyWatch = window.setInterval(() => {
+      if (container.isConnected) return;
+      window.clearInterval(destroyWatch);
+      for (const fn of cleanupFns) {
+        try { fn(); } catch {}
+      }
+    }, 1000);
+    cleanupFns.push(() => {
+      try { window.clearInterval(destroyWatch); } catch {}
+    });
   } catch (err) {
     // 出错时简单提示
+    for (const fn of cleanupFns) {
+      try { fn(); } catch {}
+    }
     showMessage(`无法预览该链接: ${(err as Error).message || err}`);
   }
 }

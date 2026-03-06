@@ -41,8 +41,12 @@ export class WpsFileServ {
     private cursorID_b: string;
     private WPSfile?: Window["siyuanWPS"];
     private bgWebview?: any;
-    private bgRoot?: HTMLElement;
     private bgInited = false;
+    private bgSleepTimer?: number;
+    private bgSleepMs = 8 * 60 * 1000;
+    private bgLastActiveAt = 0;
+    private bgSleeping = false;
+    private bgCurrentUrl = '';
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -50,6 +54,12 @@ export class WpsFileServ {
 
     async init(settingdata: any) {
         this.settingdata = settingdata;
+        this.bgSleepMs = this.getMinutesSetting('wps-file-background-sleep-minutes', 8) * 60 * 1000;
+        const useRealBrowserEnv = this.settingdata?.["wps-webview-real-browser-env"] !== false;
+        const previewWebviewUA = this.getDesktopUserAgent();
+        const previewWebPreferences = useRealBrowserEnv
+            ? 'javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes'
+            : 'contextIsolation, nativeWindowOpen, javascript=yes';
 
         this.plugin.addIcons(`
                 <symbol id="iconSTwps" viewBox="0 0 32 32">
@@ -64,7 +74,7 @@ export class WpsFileServ {
         this.plugin.addTab({
             type: "wps-preview",
             init() {
-                const { url, sourceBlockId } = this.data || {};
+                const { url } = this.data || {};
                 if (!url) {
                     this.element.innerHTML = '<div style="padding:20px;text-align:center;">无效的预览链接</div>';
                     return;
@@ -83,6 +93,12 @@ export class WpsFileServ {
                     const webview = document.createElement('webview');
                     webview.setAttribute('src', url);
                     webview.setAttribute('custom-st-wps-iframe', '1');
+                    webview.setAttribute('partition', 'persist:st-wps');
+                    webview.setAttribute('acceptlanguages', 'zh-CN,zh,en-US,en');
+                    webview.setAttribute('httpreferrer', 'https://www.kdocs.cn/');
+                    webview.setAttribute('webpreferences', previewWebPreferences);
+                    webview.setAttribute('useragent', previewWebviewUA);
+                    webview.setAttribute('allowpopups', '');
                     webview.style.cssText = 'width:100%;height:100%;border:none;';
 
                     webview.addEventListener('dom-ready', () => {
@@ -187,6 +203,10 @@ export class WpsFileServ {
             iframeStyle: "height: 99vh ; width: 100%;  pointer-events: auto;",
             pointerEventsDelay: 300,
             zoom: 1,
+            emulateBrowserEnv: this.settingdata?.["wps-webview-real-browser-env"] !== false,
+            userAgent: String(this.settingdata?.["wps-webview-user-agent"] || '').trim() || undefined,
+            enableSleep: this.settingdata?.["wps-webview-sleep-enable"] !== false,
+            sleepMinutes: this.getMinutesSetting('wps-webview-sleep-minutes', 10),
             injectJS: ["console.debug('WPS文件加载完成');" + roamingMonitorSnippet]
         });
         // 注入 CSS 实现暗色主题反色（只在设置开启时注入）
@@ -666,6 +686,7 @@ ${md}
     async importAllCapturedToCurrent() {
         // 需求：弹出面板 -> 支持搜索筛选 -> 勾选要导入 -> 执行插入
         try {
+            this.wakeBackgroundWpsLoader();
             const w: any = window as any;
             const rawList: WpsFileRecord[] = Array.isArray(w.wpsdoc) ? w.wpsdoc : [];
             if (!rawList.length) { showMessage('没有捕获的 WPS 文件数据', 1600, 'info'); return; }
@@ -698,6 +719,7 @@ ${md}
 
     async importAllCapturedToDailyNote() {
         try {
+            this.wakeBackgroundWpsLoader();
             const w: any = window as any;
             const rawList: WpsFileRecord[] = Array.isArray(w.wpsdoc) ? w.wpsdoc : [];
             if (!rawList.length) { showMessage('没有捕获的 WPS 文件数据', 1600, 'info'); return; }
@@ -817,6 +839,7 @@ ${md}
         if (!url) return;
 
         this.bgInited = true;
+        this.bgCurrentUrl = url;
         try {
             const root = document.createElement('div');
             root.id = 'st-wps-bg-loader';
@@ -824,7 +847,11 @@ ${md}
             const webview = document.createElement('webview');
             webview.setAttribute('src', url);
             webview.setAttribute('style', 'width:1px;height:1px;border:none;');
-            webview.setAttribute('useragent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A372 Safari/604.1');
+            webview.setAttribute('partition', 'persist:st-wps-bg');
+            webview.setAttribute('acceptlanguages', 'zh-CN,zh,en-US,en');
+            webview.setAttribute('httpreferrer', 'https://www.kdocs.cn/');
+            webview.setAttribute('webpreferences', 'javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes');
+            webview.setAttribute('useragent', this.getDesktopUserAgent());
             root.appendChild(webview);
             document.body.appendChild(root);
 
@@ -841,11 +868,71 @@ ${md}
             webview.addEventListener('dom-ready', inject as any);
             webview.addEventListener('did-finish-load', inject as any);
             webview.addEventListener('console-message', (e: any) => this.handleRoamingConsoleMessage(e));
+            webview.addEventListener('did-start-loading', () => this.touchBackgroundActive());
+            webview.addEventListener('did-stop-loading', () => this.touchBackgroundActive());
 
-            this.bgRoot = root;
             this.bgWebview = webview;
+            this.touchBackgroundActive();
+            this.startBackgroundSleepWatcher();
         } catch (e) {
             console.error('初始化WPS后台加载失败', e);
+        }
+    }
+
+    private getMinutesSetting(key: string, fallback: number): number {
+        const v = Number(this.settingdata?.[key]);
+        if (!Number.isFinite(v) || v <= 0) return fallback;
+        return Math.max(1, v);
+    }
+
+    private getDesktopUserAgent(): string {
+        const custom = String(this.settingdata?.['wps-webview-user-agent'] || '').trim();
+        if (custom) return custom;
+        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+    }
+
+    private touchBackgroundActive() {
+        this.bgLastActiveAt = Date.now();
+    }
+
+    private startBackgroundSleepWatcher() {
+        if (this.bgSleepTimer) {
+            window.clearInterval(this.bgSleepTimer);
+        }
+        this.bgSleepTimer = window.setInterval(() => {
+            if (!this.bgWebview) return;
+            const idleMs = Date.now() - this.bgLastActiveAt;
+            if (!this.bgSleeping && idleMs >= this.bgSleepMs) {
+                this.sleepBackgroundWpsLoader();
+            }
+        }, 30 * 1000);
+    }
+
+    private sleepBackgroundWpsLoader() {
+        if (!this.bgWebview || this.bgSleeping) return;
+        try {
+            const current = typeof this.bgWebview.getURL === 'function' ? this.bgWebview.getURL() : this.bgWebview.getAttribute?.('src');
+            if (current && current !== 'about:blank') {
+                this.bgCurrentUrl = current;
+            }
+            this.bgWebview.setAttribute('src', 'about:blank');
+            this.bgSleeping = true;
+            console.debug('WPS后台预加载已休眠');
+        } catch (e) {
+            console.warn('WPS后台预加载休眠失败', e);
+        }
+    }
+
+    private wakeBackgroundWpsLoader() {
+        if (!this.bgWebview) return;
+        this.touchBackgroundActive();
+        if (!this.bgSleeping) return;
+        try {
+            this.bgWebview.setAttribute('src', this.bgCurrentUrl || String(this.settingdata?.['wps-file-weburl'] || '').trim());
+            this.bgSleeping = false;
+            console.debug('WPS后台预加载已唤醒');
+        } catch (e) {
+            console.warn('WPS后台预加载唤醒失败', e);
         }
     }
 
@@ -893,6 +980,7 @@ ${md}
 
     private handleRoamingConsoleMessage(e: any) {
         try {
+            this.touchBackgroundActive();
             const message = e?.message;
             if (typeof message !== 'string' || !message.startsWith('[WPS_Roaming]')) return;
             const jsonStr = message.substring('[WPS_Roaming]'.length);

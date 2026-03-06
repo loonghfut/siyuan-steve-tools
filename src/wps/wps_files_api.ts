@@ -92,6 +92,7 @@ export async function fetchWpsFiles<T = any>(options: FetchWpsFilesOptions): Pro
     if (!baseUrl) throw new Error("baseUrl 不能为空");
     const queryObj: Record<string, string | number | boolean | undefined> = {
         parentid: parentId,
+        folderid,
         linkgroup: linkGroup,
         include,
         with_link: withLink,

@@ -9,6 +9,14 @@ export const wpsDefaults: Record<string, any> = {
     "wps-file-insert-as-card": false,
     // 暗色主题下对嵌入页面应用反色滤镜
     "wps-webview-invert-dark": false,
+    // 以桌面浏览器环境启用 webview（桌面 UA / 语言偏好 / 持久分区）
+    "wps-webview-real-browser-env": true,
+    // dock 内 webview 空闲休眠
+    "wps-webview-sleep-enable": true,
+    // dock 内 webview 空闲休眠阈值（分钟）
+    "wps-webview-sleep-minutes": 10,
+    // 自定义 UA（留空使用默认桌面 UA）
+    "wps-webview-user-agent": "",
     "wps-pic-enable": false,
     "wps-data-enable": false,
     "wps-airscript-token": "",
@@ -27,6 +35,8 @@ export const wpsDefaults: Record<string, any> = {
     "wps-file-topbar-url": "",
     // 打开思源时后台预加载 WPS 页面，用于捕获 roaming 数据
     "wps-file-background-preload": true,
+    // 后台预加载 webview 空闲休眠阈值（分钟）
+    "wps-file-background-sleep-minutes": 8,
     // WPS 文件导入到日记的目标笔记本
     "wps-file-daily-notebook": "",
 };
@@ -48,6 +58,11 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "文件夹链接", description: "WPS文件夹链接", key: "wps-file-weburl", value: ctx.settings["wps-file-weburl"] },
                 { type: "textinput", title: "顶栏按钮链接", description: "点击顶栏按钮时打开的新页签链接", key: "wps-file-topbar-url", value: ctx.settings["wps-file-topbar-url"] },
                 { type: "checkbox", title: "后台预加载 WPS 页面", description: "打开思源时在后台加载 WPS 页面并抓取 roaming 数据", key: "wps-file-background-preload", value: ctx.settings["wps-file-background-preload"] },
+                { type: "checkbox", title: "WebView 使用桌面浏览器环境", description: "启用后使用桌面 UA + 语言偏好 + 持久分区，尽量贴近真实浏览器行为", key: "wps-webview-real-browser-env", value: ctx.settings["wps-webview-real-browser-env"] },
+                { type: "textinput", title: "自定义 WebView UA", description: "可选；留空使用内置桌面 UA", key: "wps-webview-user-agent", value: ctx.settings["wps-webview-user-agent"] },
+                { type: "checkbox", title: "Dock WebView 空闲休眠", description: "开启后，超过阈值未活动将自动休眠，降低内存占用", key: "wps-webview-sleep-enable", value: ctx.settings["wps-webview-sleep-enable"] },
+                { type: "number", title: "Dock 休眠阈值(分钟)", description: "建议 5~20 分钟", key: "wps-webview-sleep-minutes", value: ctx.settings["wps-webview-sleep-minutes"] },
+                { type: "number", title: "后台预加载休眠阈值(分钟)", description: "后台抓取页空闲超过阈值后进入休眠", key: "wps-file-background-sleep-minutes", value: ctx.settings["wps-file-background-sleep-minutes"] },
                 { type: "select", title: "导入到日记的笔记本", description: "用于创建/定位当日日记的笔记本", key: "wps-file-daily-notebook", value: ctx.settings["wps-file-daily-notebook"], options: notebookOptions() },
                 { type: "checkbox", title: "暗色主题下反色预览页面", description: "开启后：当 data-theme-mode=dark 时对嵌入的 webview/iframe 应用反色滤镜（invert+hue-rotate）", key: "wps-webview-invert-dark", value: ctx.settings["wps-webview-invert-dark"] },
                 { type: "checkbox", title: "文件以卡片形式插入", description: "启用后：单条插入与批量导入都会调用 generateLinkCard 生成链接卡片(忽略文本模板)", key: "wps-file-insert-as-card", value: ctx.settings["wps-file-insert-as-card"] },
