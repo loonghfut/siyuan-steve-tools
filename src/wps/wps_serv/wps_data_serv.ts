@@ -215,10 +215,15 @@ export class WpsDataServ {
         const name = att.fileName || '附件';
         const url = att.url || '';
         if (!url) return name;
-        // if (this.isImageUrl(url, name)) {
-        //     const assetPath = await this.downloadAndStoreImage(url, name).catch(e => console.warn('下载图片失败', url, e));
-        //     return `![${name}](${assetPath})`;
-        // }
+        if (this.settingdata?.['wps-data-download-images'] === true && this.isImageUrl(url, name)) {
+            const assetPath = await this.downloadAndStoreImage(url, name).catch(e => {
+                console.warn('下载图片失败', url, e);
+                return undefined;
+            });
+            if (assetPath) {
+                return `![${name}](${assetPath})`;
+            }
+        }
         if (this.settingdata["wps-file-insert-as-card"]) {
             const siyuanID = await generateSiyuanID()
             const cardHtml = await generateLinkCard(url, [
@@ -295,6 +300,10 @@ export class WpsDataServ {
         }
         output = output.replace(/{{字段列表}}/g, fieldList.join(', '));
         return output;
+    }
+
+    destroy() {
+        this.topBarButton = null;
     }
 
 }

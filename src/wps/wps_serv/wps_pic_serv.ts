@@ -9,6 +9,7 @@ export class WpsPicServ {
     private settingdata: any;
     private plugin: steveTools;
     private protyle: IProtyle;
+    private switchProtyleHandler?: (e: any) => void;
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -17,9 +18,10 @@ export class WpsPicServ {
     async init(settingdata: any) {
         this.settingdata = settingdata;
         // console.debug("WpsPicServ initialized with settings:", this.settingdata);
-        this.plugin.eventBus.on("switch-protyle", (e) => {
+        this.switchProtyleHandler = (e) => {
             this.protyle = e.detail.protyle;
-        });
+        };
+        this.plugin.eventBus.on("switch-protyle", this.switchProtyleHandler);
 
         this.plugin.addTopBar({
             icon: "iconImage",
@@ -109,6 +111,17 @@ export class WpsPicServ {
             };
             reader.readAsDataURL(file);
         });
+    }
+
+    destroy() {
+        if (this.switchProtyleHandler) {
+            try {
+                this.plugin.eventBus.off("switch-protyle", this.switchProtyleHandler);
+            } catch (error) {
+                console.warn("移除 WPS 图片 switch-protyle 监听失败", error);
+            }
+            this.switchProtyleHandler = undefined;
+        }
     }
 
 }

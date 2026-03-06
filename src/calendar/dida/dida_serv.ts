@@ -24,6 +24,9 @@ export class Dida365Service {
     private taskSyncLocks: Map<string, boolean> = new Map(); // 任务级别的同步锁(didaID -> isLocked)
     private lastSyncDirection: Map<string, 'siyuan-to-dida' | 'dida-to-siyuan'> = new Map(); // 记录最后同步方向
     private pendingDidaUpdates: Map<string, number> = new Map(); // 记录本地已发起但可能尚未在滴答生效的任务(didaID -> until)
+    private autoSyncInterval?: number;
+    private initialSyncTimer?: number;
+    private wsMainHandler?: (e: any) => void;
     private getDidaUpdateCooldownMs(): number {
         const raw = (settingdata as any)["cal-dida-sync-cooldown"];
         const seconds = Number.isFinite(Number(raw)) ? Number(raw) : 30;
@@ -75,12 +78,12 @@ export class Dida365Service {
         this.createDock();
         if (settingdata["cal-dida-sync-mode"] === "auto" || settingdata["cal-dida-sync-mode"] === "all") {
             // 自动同步模式，设置定时器
-            setTimeout(async () => {
+            this.initialSyncTimer = window.setTimeout(async () => {
                 if (!this.isSyncing) { // 首次延迟10秒后同步一次
                     await this.syncTasksToSiyuan();
                 }
             }, 10000);
-            setInterval(async () => {
+            this.autoSyncInterval = window.setInterval(async () => {
                 if (!this.isSyncing) { // 仅在未同步时执行
                     await this.syncTasksToSiyuan();
                 }
@@ -1029,11 +1032,15 @@ ${taskData.描述?.content || "描述：暂无"}
          * 设置思源数据库更新的监听器，以实现从思源到滴答清单的同步。
      */
     private setupSiyuanUpdateListener(): void {
-        this.plugin.eventBus.on("ws-main", (e) => {
+        if (this.wsMainHandler) {
+            this.plugin.eventBus.off("ws-main", this.wsMainHandler);
+        }
+        this.wsMainHandler = (e) => {
             if (!this.isSyncing) {
                 this.handleSiyuanUpdate_dalay(e);
             }
-        });
+        };
+        this.plugin.eventBus.on("ws-main", this.wsMainHandler);
     }
 
     /**
@@ -1122,6 +1129,48 @@ ${taskData.描述?.content || "描述：暂无"}
         setTimeout(() => {
             this.handleSiyuanUpdate(e);
         }, 2000); // 延迟2秒
+    }
+
+    destroy() {
+        if (this.initialSyncTimer) {
+            window.clearTimeout(this.initialSyncTimer);
+            this.initialSyncTimer = undefined;
+        }
+        if (this.autoSyncInterval) {
+            window.clearInterval(this.autoSyncInterval);
+            this.autoSyncInterval = undefined;
+        }
+        if (this.syncDebounceTimer) {
+            clearTimeout(this.syncDebounceTimer);
+            this.syncDebounceTimer = null;
+        }
+        if (this.wsMainHandler) {
+            try {
+                this.plugin.eventBus.off("ws-main", this.wsMainHandler);
+            } catch (error) {
+                console.warn("移除滴答 ws-main 监听失败", error);
+            }
+            this.wsMainHandler = undefined;
+        }
+        if (this.netInterceptorHandle) {
+            try {
+                this.netInterceptorHandle.stop();
+            } catch (error) {
+                console.warn("停止滴答网络拦截失败", error);
+            }
+            this.netInterceptorHandle = null;
+        }
+        try {
+            this.linkInterceptor?.destroy?.();
+        } catch (error) {
+            console.warn("销毁滴答链接拦截器失败", error);
+        }
+        this.taskCache.clear();
+        this.creatingDidaIds.clear();
+        this.lastModifiedTime.clear();
+        this.taskSyncLocks.clear();
+        this.lastSyncDirection.clear();
+        this.pendingDidaUpdates.clear();
     }
 
     /**

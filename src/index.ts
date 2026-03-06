@@ -24,7 +24,7 @@ import * as api from "@/api/api";
 // import { ModuleA } from "./libs/moduleA";
 import * as ic from "@/icon"
 import { MODULE_CONFIG, ModuleClasses } from "./modules.config";
-import { check, trackFeatureUsage } from "./stats/public-stats";
+import { check, stopCheck, trackFeatureUsage } from "./stats/public-stats";
 
 // import * as api from "@/api"
 import SettingExample from "@/setting.svelte";
@@ -167,6 +167,18 @@ export default class steveTools extends Plugin {
     }
     async onunload() {
         // 卸载模块
+        for (const moduleName in moduleInstances) {
+            try {
+                await moduleInstances[moduleName]?.onunload?.();
+            } catch (error) {
+                console.error(`卸载模块 ${moduleName} 失败`, error);
+            }
+            delete moduleInstances[moduleName];
+        }
+        if (window.__steveToolsLoadedModules) {
+            window.__steveToolsLoadedModules = {};
+        }
+        stopCheck();
         api.refresh();
         // this.modules.forEach(module => module.onunload());
     document.body.classList.remove("st-invert-mode");

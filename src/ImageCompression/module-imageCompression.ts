@@ -8,6 +8,8 @@ declare const siyuan: any;
 export class M_imageCompression {
     private plugin: steveTools;
     private settingdata: any;
+    private selectionChangeHandler?: () => void;
+    private switchProtyleHandler?: (event: any) => Promise<void>;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
@@ -509,12 +511,33 @@ export class M_imageCompression {
     }
 
     onLayoutReady() {
-        this.plugin.eventBus.on("click-editorcontent", this.handleSelectionChange.bind(this));
-        this.plugin.eventBus.on("switch-protyle", async (event) => {
+        this.selectionChangeHandler = this.handleSelectionChange.bind(this);
+        this.switchProtyleHandler = async (event) => {
             this.M_image_protyle = event.detail.protyle;
             this.cursorID_b = event.detail.protyle.block.id;
             this.cursorID = this.cursorID_b;
             console.debug("switch-image-protyle");
-        });
+        };
+        this.plugin.eventBus.on("click-editorcontent", this.selectionChangeHandler);
+        this.plugin.eventBus.on("switch-protyle", this.switchProtyleHandler);
+    }
+
+    onunload() {
+        if (this.selectionChangeHandler) {
+            try {
+                this.plugin.eventBus.off("click-editorcontent", this.selectionChangeHandler);
+            } catch (error) {
+                console.warn("移除图片压缩 click-editorcontent 监听失败", error);
+            }
+            this.selectionChangeHandler = undefined;
+        }
+        if (this.switchProtyleHandler) {
+            try {
+                this.plugin.eventBus.off("switch-protyle", this.switchProtyleHandler);
+            } catch (error) {
+                console.warn("移除图片压缩 switch-protyle 监听失败", error);
+            }
+            this.switchProtyleHandler = undefined;
+        }
     }
 }

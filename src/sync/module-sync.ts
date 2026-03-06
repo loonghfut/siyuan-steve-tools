@@ -8,10 +8,8 @@ let token = "";
 
 //TODO: 目前只能单向感知，即只能docker端感知到本地端的变化，不能本地端感知到docker端的变化
 export class M_sync {
-    private plugin: steveTools;
-    constructor(plugin: steveTools) {
-        this.plugin = plugin;
-    }
+    private wsMessageHandler?: (e: MessageEvent) => Promise<void>;
+    constructor(_plugin: steveTools) {}
 
     init = async (settingdata) => {
         // steveTools.outlog("同步模块初始化中...");
@@ -20,7 +18,7 @@ export class M_sync {
         token = settingdata["sync-token"];
         // console.debug("url: ", url);
         // console.debug("token: ", token);
-        siyuan.ws.ws.addEventListener('message', async (e) => {
+        this.wsMessageHandler = async (e: MessageEvent) => {
             const msg = JSON.parse(e.data);
             if (msg.cmd === "syncing") {
                 // console.debug(msg);
@@ -61,7 +59,8 @@ export class M_sync {
 
             }
             // console.debug(msg);
-        });
+        };
+        siyuan.ws.ws.addEventListener('message', this.wsMessageHandler);
 
         // steveTools.outlog("同步模块初始化完成");
     }
@@ -74,6 +73,17 @@ export class M_sync {
             showMessage("成功");
         } else {
             showMessage("失败");
+        }
+    }
+
+    onunload() {
+        if (this.wsMessageHandler) {
+            try {
+                siyuan.ws.ws.removeEventListener('message', this.wsMessageHandler);
+            } catch (error) {
+                console.warn('移除同步模块 WebSocket 监听失败', error);
+            }
+            this.wsMessageHandler = undefined;
         }
     }
 

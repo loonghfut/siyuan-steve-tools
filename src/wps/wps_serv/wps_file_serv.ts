@@ -48,6 +48,9 @@ export class WpsFileServ {
     private bgLastActiveAt = 0;
     private bgSleeping = false;
     private bgCurrentUrl = '';
+    private blockIconHandler?: (event: any) => void;
+    private selectionChangeHandler?: () => void;
+    private switchProtyleHandler?: (event: any) => void;
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -224,13 +227,16 @@ export class WpsFileServ {
         this._ensureInvertStyleTag(!!this.settingdata?.["wps-webview-invert-dark"]);
 
         // this.plugin.eventBus.on("open-menu-link", this.blockIconEvent.bind(this));
-        this.plugin.eventBus.on("click-blockicon", this.blockIconEvent.bind(this));
-        this.plugin.eventBus.on("click-editorcontent", this.handleSelectionChange.bind(this));
-        this.plugin.eventBus.on("switch-protyle", async (event) => {
+        this.blockIconHandler = this.blockIconEvent.bind(this);
+        this.selectionChangeHandler = this.handleSelectionChange.bind(this);
+        this.switchProtyleHandler = async (event) => {
             this.cursorID_b = event.detail.protyle.block.id;
             this.cursorID = this.cursorID_b;
             // console.debug("switch-image-protyle");
-        });
+        };
+        this.plugin.eventBus.on("click-blockicon", this.blockIconHandler);
+        this.plugin.eventBus.on("click-editorcontent", this.selectionChangeHandler);
+        this.plugin.eventBus.on("switch-protyle", this.switchProtyleHandler);
     }
 
     async onLayoutReady() {
@@ -1018,6 +1024,67 @@ ${md}
             }
         } catch (err) {
             // ignore parse errors
+        }
+    }
+
+    destroy() {
+        if (this.blockIconHandler) {
+            try {
+                this.plugin.eventBus.off("click-blockicon", this.blockIconHandler);
+            } catch (error) {
+                console.warn("移除 WPS click-blockicon 监听失败", error);
+            }
+            this.blockIconHandler = undefined;
+        }
+        if (this.selectionChangeHandler) {
+            try {
+                this.plugin.eventBus.off("click-editorcontent", this.selectionChangeHandler);
+            } catch (error) {
+                console.warn("移除 WPS click-editorcontent 监听失败", error);
+            }
+            this.selectionChangeHandler = undefined;
+        }
+        if (this.switchProtyleHandler) {
+            try {
+                this.plugin.eventBus.off("switch-protyle", this.switchProtyleHandler);
+            } catch (error) {
+                console.warn("移除 WPS switch-protyle 监听失败", error);
+            }
+            this.switchProtyleHandler = undefined;
+        }
+        if (this.bgSleepTimer) {
+            try {
+                window.clearInterval(this.bgSleepTimer);
+            } catch (error) {
+                console.warn("清理 WPS 后台休眠定时器失败", error);
+            }
+            this.bgSleepTimer = undefined;
+        }
+        const bgRoot = document.getElementById('st-wps-bg-loader');
+        if (bgRoot) {
+            try {
+                bgRoot.remove();
+            } catch (error) {
+                console.warn("移除 WPS 后台 webview 容器失败", error);
+            }
+        }
+        this.bgWebview = undefined;
+        this.bgInited = false;
+        this.bgSleeping = false;
+        this.bgCurrentUrl = '';
+        if ((window as any).wps?.OpenPreviewTab) {
+            try {
+                delete (window as any).wps.OpenPreviewTab;
+            } catch {
+                (window as any).wps.OpenPreviewTab = undefined;
+            }
+        }
+        if ((window as any).wps?.ChangeLinkStyle === ChangeLinkStyle && (window as any).wps?.ShowLinkContent === ShowLinkContent) {
+            try {
+                delete (window as any).wps;
+            } catch {
+                (window as any).wps = undefined;
+            }
         }
     }
 }

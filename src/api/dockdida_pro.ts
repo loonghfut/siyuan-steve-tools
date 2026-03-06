@@ -338,9 +338,11 @@ export function createDidaDock(options: {
 export class DidaLinkInterceptor {
     private dock: any = null;
     private showMessage: (msg: string, timeout?: number, type?: string) => void;
+    private boundClickHandler: (event: MouseEvent) => void;
 
     constructor(showMessage: (msg: string, timeout?: number, type?: string) => void) {
         this.showMessage = showMessage;
+        this.boundClickHandler = this.handleClick.bind(this);
     }
 
     /**
@@ -368,7 +370,8 @@ export class DidaLinkInterceptor {
      */
     private setupLinkInterceptor() {
         // 监听页面点击事件
-        document.addEventListener('click', this.handleClick.bind(this), true);
+        document.removeEventListener('click', this.boundClickHandler, true);
+        document.addEventListener('click', this.boundClickHandler, true);
     }
 
     /**
@@ -468,6 +471,6 @@ export class DidaLinkInterceptor {
      * 销毁拦截器
      */
     destroy() {
-        document.removeEventListener('click', this.handleClick.bind(this), true);
+        document.removeEventListener('click', this.boundClickHandler, true);
     }
 }

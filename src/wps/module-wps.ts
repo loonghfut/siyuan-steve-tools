@@ -10,9 +10,9 @@ import { WpsFileServ } from "./wps_serv/wps_file_serv";
 export class M_Wps {
     private plugin: steveTools;
     private settingdata: any;
-    private wpsPicServ: WpsPicServ;
-    private wpsDataServ: WpsDataServ;
-    private wpsFileServ: WpsFileServ;
+    private wpsPicServ?: WpsPicServ;
+    private wpsDataServ?: WpsDataServ;
+    private wpsFileServ?: WpsFileServ;
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -50,6 +50,21 @@ export class M_Wps {
     }
 
     onunload() {
+        try {
+            this.wpsPicServ?.destroy?.();
+        } catch (error) {
+            console.error("卸载 WpsPicServ 失败", error);
+        }
+        try {
+            this.wpsDataServ?.destroy?.();
+        } catch (error) {
+            console.error("卸载 WpsDataServ 失败", error);
+        }
+        try {
+            this.wpsFileServ?.destroy?.();
+        } catch (error) {
+            console.error("卸载 WpsFileServ 失败", error);
+        }
         console.debug("M_Wps unloaded");
     }
 }

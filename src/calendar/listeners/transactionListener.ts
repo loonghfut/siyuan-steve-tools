@@ -9,7 +9,7 @@ interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
 
 export function registerTransactionListener(plugin: steveTools, M_calendar: M_calendar) {
-  plugin.eventBus.on('ws-main', async (e) => {
+  const wsMainHandler = async (e) => {
     const msg: WsMsg = e.detail;
     // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
     if (settingdata["cal-auto-syncing-update"] == true) {
@@ -52,11 +52,13 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
         refreshKanban();
       }
     }
-  });
+  };
+
+  plugin.eventBus.on('ws-main', wsMainHandler);
 
   // 追加：前端网络请求监听（仅监听 /api/av/* 的成功响应）
   // 用途：在 WebSocket 广播到达前，尽早感知“状态”列的变动并同步 block 自定义属性
-  interceptFetch({
+  const interceptorHandle = interceptFetch({
     filter: (url, method) => method === 'POST' && url.includes('/api/av/'),
     onResponse: async (ctx) => {
       try {
@@ -155,4 +157,17 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
       }
     },
   });
+
+  return () => {
+    try {
+      plugin.eventBus.off('ws-main', wsMainHandler);
+    } catch (error) {
+      console.warn('移除日历 transaction ws-main 监听失败', error);
+    }
+    try {
+      interceptorHandle.stop();
+    } catch (error) {
+      console.warn('停止日历 transaction fetch 拦截失败', error);
+    }
+  };
 }

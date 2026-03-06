@@ -41,6 +41,11 @@ let front: "desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browse
 const calendarinstance: Map<string, Calendar> = new Map();
 export class M_calendar {
     private plugin: steveTools;
+    private loadedProtyleHandler?: () => void;
+    private switchProtyleInitHandler?: () => void;
+    private switchProtyleLayoutHandler?: (e: any) => void;
+    private wsMessageHandler?: (e: { data: string }) => Promise<void>;
+    private unregisterTransactionListener?: () => void;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
@@ -185,9 +190,11 @@ export class M_calendar {
         `);
         this.checkAndCreateEventsFile(eventsPath);
         linkToCalendar = calendarpath2;
-        this.plugin.eventBus.on("loaded-protyle-dynamic", this.avButton.bind(this));
+        this.loadedProtyleHandler = this.avButton.bind(this);
+        this.switchProtyleInitHandler = this.avButton.bind(this);
+        this.plugin.eventBus.on("loaded-protyle-dynamic", this.loadedProtyleHandler);
         // this.plugin.eventBus.on("loaded-protyle-static", this.avButton.bind(this));
-        this.plugin.eventBus.on("switch-protyle", this.avButton.bind(this));
+        this.plugin.eventBus.on("switch-protyle", this.switchProtyleInitHandler);
 
         // // steveTools.outlog(this_settingdata["cal-hand-update"]);
         if (this_settingdata["cal-hand-update"] == true) {
@@ -270,7 +277,7 @@ export class M_calendar {
         if (this_settingdata["cal-auto-update"] == true) {
             // // steveTools.outlog("自动更新日历文件");
             //监听
-            siyuan.ws.ws.addEventListener('message', async (e: { data: string; }) => {
+            this.wsMessageHandler = async (e: { data: string; }) => {
                 if (!islisten) {
                     return;
                 }
@@ -311,7 +318,8 @@ export class M_calendar {
                     }
                     // // steveTools.outlog(msg);
                 }
-            });
+            };
+            siyuan.ws.ws.addEventListener('message', this.wsMessageHandler);
             //// 暂时不用
             // 每15分钟调用一次await this.getEventsFromSiYuanDatabase()
             // setInterval(async () => {
@@ -323,13 +331,14 @@ export class M_calendar {
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
         //实现看板实时更新
         //2025-2-9更新为插件api方式监听（抽离至 listeners/transactionListener.ts）
-        registerTransactionListener(this.plugin, this);
+        this.unregisterTransactionListener = registerTransactionListener(this.plugin, this);
     }
 
     async onLayoutReady() {
-        this.plugin.eventBus.on('switch-protyle', (e) => {
+        this.switchProtyleLayoutHandler = (e) => {
             addquikaddButton(e);
-        });
+        };
+        this.plugin.eventBus.on('switch-protyle', this.switchProtyleLayoutHandler);
 
         //悬浮显示
         if (this_settingdata["cal-show-float-view"]) {
@@ -671,7 +680,52 @@ export class M_calendar {
 
 
     onunload() {
-        // steveTools.outlog("M_calendar unloaded");
+        if (this.loadedProtyleHandler) {
+            try {
+                this.plugin.eventBus.off("loaded-protyle-dynamic", this.loadedProtyleHandler);
+            } catch (error) {
+                console.warn("移除 loaded-protyle-dynamic 监听失败", error);
+            }
+            this.loadedProtyleHandler = undefined;
+        }
+        if (this.switchProtyleInitHandler) {
+            try {
+                this.plugin.eventBus.off("switch-protyle", this.switchProtyleInitHandler);
+            } catch (error) {
+                console.warn("移除日历初始化 switch-protyle 监听失败", error);
+            }
+            this.switchProtyleInitHandler = undefined;
+        }
+        if (this.switchProtyleLayoutHandler) {
+            try {
+                this.plugin.eventBus.off('switch-protyle', this.switchProtyleLayoutHandler);
+            } catch (error) {
+                console.warn("移除日历布局 switch-protyle 监听失败", error);
+            }
+            this.switchProtyleLayoutHandler = undefined;
+        }
+        if (this.wsMessageHandler) {
+            try {
+                siyuan.ws.ws.removeEventListener('message', this.wsMessageHandler);
+            } catch (error) {
+                console.warn("移除日历 WebSocket 监听失败", error);
+            }
+            this.wsMessageHandler = undefined;
+        }
+        if (this.unregisterTransactionListener) {
+            try {
+                this.unregisterTransactionListener();
+            } catch (error) {
+                console.warn("卸载日历事务监听失败", error);
+            }
+            this.unregisterTransactionListener = undefined;
+        }
+        try {
+            DidaService?.destroy?.();
+        } catch (error) {
+            console.warn("销毁滴答服务失败", error);
+        }
+        DidaService = null;
     }
 
     getCalUrl() {
