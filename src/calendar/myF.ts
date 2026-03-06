@@ -1300,7 +1300,11 @@ export async function updateEventInDatabase(
     info: any,
     calendar: Calendar,
     viewValue,
-    is_more_one_day: boolean = false
+    is_more_one_day: boolean = false,
+    options?: {
+        refetchOnSuccess?: boolean;
+        refetchDelayMs?: number;
+    }
 ) {
     // 更新思源数据库中的时间
     const blockId = info.event._def.extendedProps.blockId; // 块 id（展示 / 跳转）
@@ -1339,7 +1343,10 @@ export async function updateEventInDatabase(
 
     api.handleDidaListEvent(rootid, blockId, itemID);
 
-    setTimeout(() => calendar.refetchEvents(), 1000);
+    if (options?.refetchOnSuccess) {
+        const delayMs = Math.max(0, Number(options.refetchDelayMs) || 1000);
+        setTimeout(() => calendar.refetchEvents(), delayMs);
+    }
     sy.showMessage('正在更新事件', -1, "info", "1");
     setTimeout(() => {
         sy.showMessage('已更新事件', 2000, "info", "1");

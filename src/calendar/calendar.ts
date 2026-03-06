@@ -48,8 +48,64 @@ const MIN_CALENDAR_HEIGHT = 320; // Avoid collapsing the calendar when layout sp
 let cachedTagColorMapStr = '';
 let cachedTagColorMap: Record<string, string> = {};
 const textColorCache = new Map<string, string>();
+type PendingCalendarEventPatch = {
+    start: string;
+    end?: string | null;
+    allDay: boolean;
+    expiresAt: number;
+};
+const pendingCalendarEventPatches = new Map<string, PendingCalendarEventPatch>();
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+}
+
+function getPendingCalendarEventKey(blockId?: string, itemId?: string) {
+    if (!blockId) return '';
+    return `${blockId}::${itemId || ''}`;
+}
+
+function rememberPendingCalendarEventPatch(event: any, ttlMs = 6000) {
+    const blockId = event?._def?.extendedProps?.blockId || event?.extendedProps?.blockId;
+    const itemId = event?._def?.extendedProps?.itemID || event?.extendedProps?.itemID;
+    const key = getPendingCalendarEventKey(blockId, itemId);
+    if (!key) return;
+    pendingCalendarEventPatches.set(key, {
+        start: event?.start ? new Date(event.start).toISOString() : '',
+        end: event?.end ? new Date(event.end).toISOString() : null,
+        allDay: !!event?.allDay,
+        expiresAt: Date.now() + ttlMs,
+    });
+}
+
+function forgetPendingCalendarEventPatch(event: any) {
+    const blockId = event?._def?.extendedProps?.blockId || event?.extendedProps?.blockId;
+    const itemId = event?._def?.extendedProps?.itemID || event?.extendedProps?.itemID;
+    const key = getPendingCalendarEventKey(blockId, itemId);
+    if (!key) return;
+    pendingCalendarEventPatches.delete(key);
+}
+
+function applyPendingCalendarEventPatches(events: any[]) {
+    const now = Date.now();
+    for (const [key, patch] of pendingCalendarEventPatches.entries()) {
+        if (patch.expiresAt <= now) {
+            pendingCalendarEventPatches.delete(key);
+        }
+    }
+
+    return events.map((event) => {
+        const ext = event?.extendedProps || {};
+        const key = getPendingCalendarEventKey(ext.blockId, ext.itemID);
+        if (!key) return event;
+        const patch = pendingCalendarEventPatches.get(key);
+        if (!patch) return event;
+        return {
+            ...event,
+            start: patch.start,
+            end: patch.end,
+            allDay: patch.allDay,
+        };
+    });
 }
 export async function init_viewValue(data: { viewId: string, viewName: string }) {
     viewId = data.viewId;
@@ -422,7 +478,18 @@ export async function run(
                 return;
             }
             showDropTimeIndicator(info);
-            myF.updateEventInDatabase(info, calendar, viewValue);
+            try {
+                rememberPendingCalendarEventPatch(info.event, 6000);
+                await myF.updateEventInDatabase(info, calendar, viewValue, false, {
+                    refetchOnSuccess: true,
+                    refetchDelayMs: 2500,
+                });
+            } catch (error) {
+                console.error('拖拽更新事件失败:', error);
+                forgetPendingCalendarEventPatch(info.event);
+                showMessage('更新事件失败', -1, 'error');
+                info.revert();
+            }
 
         },
 
@@ -500,7 +567,18 @@ export async function run(
             }
             // 显示时间刻度线
             showResizeTimeIndicator(info);
-            myF.updateEventInDatabase(info, calendar, viewValue, true);
+            try {
+                rememberPendingCalendarEventPatch(info.event, 6000);
+                await myF.updateEventInDatabase(info, calendar, viewValue, true, {
+                    refetchOnSuccess: true,
+                    refetchDelayMs: 2500,
+                });
+            } catch (error) {
+                console.error('调整事件时长失败:', error);
+                forgetPendingCalendarEventPatch(info.event);
+                showMessage('更新事件失败', -1, 'error');
+                info.revert();
+            }
         },
 
         views: {
@@ -815,6 +893,7 @@ export async function run(
                 }
 
                 // 5. 回调成功
+                allEvents = applyPendingCalendarEventPatches(allEvents);
                 successCallback(allEvents);
                 updatePlanButtonLabel();
             } catch (error) {
