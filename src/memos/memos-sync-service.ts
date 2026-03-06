@@ -485,6 +485,18 @@ export class MemosSyncService {
             }
             groups[dateStr].push(memo);
         }
+
+        for (const dateStr of Object.keys(groups)) {
+            groups[dateStr].sort((left, right) => {
+                const timeDiff = this.getMemoInsertTime(left) - this.getMemoInsertTime(right);
+                if (timeDiff !== 0) {
+                    return timeDiff;
+                }
+
+                return String(left.name || '').localeCompare(String(right.name || ''));
+            });
+        }
+
         return groups;
     }
 
@@ -993,6 +1005,12 @@ export class MemosSyncService {
 
     private getMemoComparableTime(memo: MemosMemo): number {
         const raw = memo.updateTime || memo.displayTime || memo.createTime || new Date().toISOString();
+        const time = new Date(raw).getTime();
+        return Number.isNaN(time) ? 0 : time;
+    }
+
+    private getMemoInsertTime(memo: MemosMemo): number {
+        const raw = memo.createTime || memo.displayTime || memo.updateTime || new Date().toISOString();
         const time = new Date(raw).getTime();
         return Number.isNaN(time) ? 0 : time;
     }
