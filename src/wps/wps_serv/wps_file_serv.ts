@@ -9,6 +9,7 @@ import { api, createDailynote } from "@frostime/siyuan-plugin-kits";
 import { confirmDialog } from "@/libs/dialog";
 import { fetchWpsFiles } from "../wps_files_api";
 import { openTab } from "siyuan";
+import { getWpsBrowserEnvScript, getWpsWebviewAttributes, getWpsWebviewUserAgent } from "../webview_env";
 declare global {
     interface Window {
         wps?: any;
@@ -56,10 +57,17 @@ export class WpsFileServ {
         this.settingdata = settingdata;
         this.bgSleepMs = this.getMinutesSetting('wps-file-background-sleep-minutes', 8) * 60 * 1000;
         const useRealBrowserEnv = this.settingdata?.["wps-webview-real-browser-env"] !== false;
-        const previewWebviewUA = this.getDesktopUserAgent();
-        const previewWebPreferences = useRealBrowserEnv
-            ? 'javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes'
-            : 'contextIsolation, nativeWindowOpen, javascript=yes';
+        const previewWebviewUA = getWpsWebviewUserAgent(this.getDesktopUserAgent());
+        const previewWebviewAttrs = getWpsWebviewAttributes({
+            userAgent: previewWebviewUA,
+            partition: 'persist:st-wps',
+            emulateBrowserEnv: useRealBrowserEnv,
+        });
+        const previewBrowserEnvScript = getWpsBrowserEnvScript({
+            userAgent: previewWebviewUA,
+            partition: 'persist:st-wps',
+            emulateBrowserEnv: useRealBrowserEnv,
+        });
 
         this.plugin.addIcons(`
                 <symbol id="iconSTwps" viewBox="0 0 32 32">
@@ -90,18 +98,21 @@ export class WpsFileServ {
                     const container = document.getElementById(containerId);
                     if (!container) return;
 
-                    const webview = document.createElement('webview');
+                    const webview = document.createElement('webview') as any;
                     webview.setAttribute('src', url);
                     webview.setAttribute('custom-st-wps-iframe', '1');
-                    webview.setAttribute('partition', 'persist:st-wps');
-                    webview.setAttribute('acceptlanguages', 'zh-CN,zh,en-US,en');
-                    webview.setAttribute('httpreferrer', 'https://www.kdocs.cn/');
-                    webview.setAttribute('webpreferences', previewWebPreferences);
-                    webview.setAttribute('useragent', previewWebviewUA);
+                    Object.entries(previewWebviewAttrs).forEach(([key, value]) => {
+                        webview.setAttribute(key, value);
+                    });
                     webview.setAttribute('allowpopups', '');
                     webview.style.cssText = 'width:100%;height:100%;border:none;';
 
                     webview.addEventListener('dom-ready', () => {
+                        try {
+                            webview.executeJavaScript?.(previewBrowserEnvScript);
+                        } catch (e) {
+                            console.warn('WPS预览页签浏览器环境注入失败', e);
+                        }
                         console.debug('WPS预览加载完成:', url);
                     });
 
@@ -847,17 +858,24 @@ ${md}
             const webview = document.createElement('webview');
             webview.setAttribute('src', url);
             webview.setAttribute('style', 'width:1px;height:1px;border:none;');
-            webview.setAttribute('partition', 'persist:st-wps-bg');
-            webview.setAttribute('acceptlanguages', 'zh-CN,zh,en-US,en');
-            webview.setAttribute('httpreferrer', 'https://www.kdocs.cn/');
-            webview.setAttribute('webpreferences', 'javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes');
-            webview.setAttribute('useragent', this.getDesktopUserAgent());
+            Object.entries(getWpsWebviewAttributes({
+                userAgent: this.getDesktopUserAgent(),
+                partition: 'persist:st-wps-bg',
+                emulateBrowserEnv: true,
+            })).forEach(([key, value]) => {
+                webview.setAttribute(key, value);
+            });
             root.appendChild(webview);
             document.body.appendChild(root);
 
             const inject = async () => {
                 try {
                     if (typeof (webview as any).executeJavaScript === 'function') {
+                        await (webview as any).executeJavaScript(getWpsBrowserEnvScript({
+                            userAgent: this.getDesktopUserAgent(),
+                            partition: 'persist:st-wps-bg',
+                            emulateBrowserEnv: true,
+                        }));
                         await (webview as any).executeJavaScript(this.getRoamingMonitorSnippet());
                     }
                 } catch (e) {

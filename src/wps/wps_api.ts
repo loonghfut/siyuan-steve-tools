@@ -1,6 +1,7 @@
 import { updateBlock } from "@/api/api";
 import { NetworkClient } from "@/api/network";
 import { Dialog, showMessage } from "siyuan";
+import { getWpsBrowserEnvScript, getWpsWebviewAttributes, getWpsWebviewUserAgent } from "./webview_env";
 
 //链接卡片函数
 export async function ChangeLinkStyle(url?: string, blockId?: string) {
@@ -10,7 +11,17 @@ export async function ChangeLinkStyle(url?: string, blockId?: string) {
 }
 
 export async function ShowLinkContent(url: string) {
-  const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  const DESKTOP_UA = getWpsWebviewUserAgent();
+  const WEBVIEW_ATTRS = getWpsWebviewAttributes({
+    userAgent: DESKTOP_UA,
+    partition: 'persist:st-wps-preview',
+    emulateBrowserEnv: true,
+  });
+  const BROWSER_ENV_SCRIPT = getWpsBrowserEnvScript({
+    userAgent: DESKTOP_UA,
+    partition: 'persist:st-wps-preview',
+    emulateBrowserEnv: true,
+  });
   const cleanupFns: Array<() => void> = [];
 
   // 创建一个带简单工具栏的对话框，内容区用于挂载 webview 或 iframe
@@ -125,13 +136,11 @@ export async function ShowLinkContent(url: string) {
       webviewEl.style.width = '100%';
       webviewEl.style.height = '100%';
       webviewEl.style.border = '0';
-      webviewEl.setAttribute('partition', 'persist:st-wps-preview');
-      webviewEl.setAttribute('acceptlanguages', 'zh-CN,zh,en-US,en');
-      webviewEl.setAttribute('httpreferrer', 'https://www.kdocs.cn/');
-      webviewEl.setAttribute('webpreferences', 'javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes');
-      webviewEl.setAttribute('useragent', DESKTOP_UA);
+      Object.entries(WEBVIEW_ATTRS).forEach(([key, value]) => {
+        webviewEl.setAttribute(key, value);
+      });
       // 可根据需要设置属性（谨慎设置以免引发安全问题）
-      // webviewEl.setAttribute('allowpopups', ''); // 如需弹窗
+      webviewEl.setAttribute('allowpopups', '');
       container.appendChild(webviewEl);
 
       // 更新地址栏、按钮状态
@@ -144,6 +153,7 @@ export async function ShowLinkContent(url: string) {
       // 事件绑定（使用 any 以兼容类型）
       const onDidFinishLoad = () => {
         try {
+          webviewEl.executeJavaScript?.(BROWSER_ENV_SCRIPT);
           if (urlInput) urlInput.value = webviewEl.getURL?.() || url;
         } catch {}
       };

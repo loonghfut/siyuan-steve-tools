@@ -1,4 +1,5 @@
 import { showMessage } from "siyuan";
+import { getWpsAcceptLanguages, getWpsBrowserEnvScript, getWpsPartition, getWpsWebPreferences, getWpsWebviewUserAgent } from "@/wps/webview_env";
 
 let resizeObserver: ResizeObserver | null = null;
 let resizeTimeout: number = 0;
@@ -193,11 +194,11 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
         sleepBlankUrl = 'about:blank',
     } = options as IframeDockOptions & WebviewExtraOptions;
 
-    const desktopUA = userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
-    const defaultWebPreferences = emulateBrowserEnv
-        ? "javascript=yes,contextIsolation=no,nativeWindowOpen=yes,sandbox=no,webSecurity=yes,spellcheck=yes"
-        : "contextIsolation, nativeWindowOpen, javascript=yes";
+    const desktopUA = getWpsWebviewUserAgent(userAgent);
+    const defaultWebPreferences = getWpsWebPreferences(emulateBrowserEnv);
     const finalWebPreferences = webPreferences || defaultWebPreferences;
+    const finalPartition = getWpsPartition(partition);
+    const finalAcceptLanguages = getWpsAcceptLanguages(acceptLanguages);
 
     const finalButtonText = {
         copy: buttonTexts.copy ?? "复制",
@@ -209,8 +210,8 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
 
     const createWebviewHTML = (containerClass: string, url: string, style: string, zoom: number) => {
         const uaAttr = escapeHtmlAttr(desktopUA);
-        const partitionAttr = escapeHtmlAttr(partition);
-        const langAttr = escapeHtmlAttr(acceptLanguages);
+        const partitionAttr = escapeHtmlAttr(finalPartition);
+        const langAttr = escapeHtmlAttr(finalAcceptLanguages);
         const webprefsAttr = escapeHtmlAttr(finalWebPreferences);
         if (!enableButtons) {
             return `
@@ -489,6 +490,14 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
         if (hideCSS) hideCssArray.push(...(Array.isArray(hideCSS) ? hideCSS : [hideCSS]));
         const extraCssArray: string[] = injectCSS ? (Array.isArray(injectCSS) ? injectCSS : [injectCSS]) : [];
         const jsArray: string[] = injectJS ? (Array.isArray(injectJS) ? injectJS : [injectJS]) : [];
+        const browserEnvScript = emulateBrowserEnv
+            ? getWpsBrowserEnvScript({
+                userAgent: desktopUA,
+                acceptLanguages: finalAcceptLanguages,
+                partition: finalPartition,
+                emulateBrowserEnv,
+            })
+            : '';
 
         // 注入函数：优先使用 webview.insertCSS，退回到 executeJavaScript 插入 <style>
         const performInjection = async () => {
@@ -509,7 +518,8 @@ export function createWebviewDock_for_wps(options: IframeDockOptions & WebviewEx
                         console.error("inject css failed snippet:", cssSnippet, cssErr);
                     }
                 }
-                for (const jsSnippet of jsArray) {
+                const allJsSnippets = browserEnvScript ? [browserEnvScript, ...jsArray] : jsArray;
+                for (const jsSnippet of allJsSnippets) {
                     try {
                         // 简单移除 TS 断言 (as any) / (window as any) / (this as any) 以避免在纯 JS 环境下语法错误
                         let sanitized = jsSnippet;
