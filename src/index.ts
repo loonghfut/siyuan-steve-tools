@@ -206,7 +206,6 @@ export default class steveTools extends Plugin {
             props: {
                 plugin: this,
                 myfile: myfile,
-                setdialog: setdialog,
             }
         });
     }
