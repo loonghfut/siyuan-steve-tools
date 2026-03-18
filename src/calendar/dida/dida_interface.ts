@@ -1,5 +1,5 @@
 
-interface ChecklistItem {
+export interface ChecklistItem {
     id?: string;
     title: string;
     status?: 0 | 1; // Normal: 0, Completed: 1
@@ -13,6 +13,7 @@ export interface Task {
     id?: string;
     projectId: string;
     title: string;
+    kind?: "TEXT" | "NOTE" | "CHECKLIST";
     isAllDay?: boolean;
     completedTime?: string; // "yyyy-MM-dd'T'HH:mm:ssZ"
     content?: string;
@@ -27,7 +28,35 @@ export interface Task {
     status?: 0 | 2; // Normal: 0, Completed: 2
     timeZone?: string;
     tags?: string[]; // Example: ["tag1", "tag2"]
+    etag?: string;
 }
+
+export interface TaskMoveOperation {
+    fromProjectId: string;
+    toProjectId: string;
+    taskId: string;
+}
+
+export interface TaskMoveResult {
+    id: string;
+    etag?: string;
+}
+
+export interface TaskCompletedQuery {
+    projectIds?: string[];
+    startDate?: string;
+    endDate?: string;
+}
+
+export interface TaskFilterQuery {
+    projectIds?: string[];
+    startDate?: string;
+    endDate?: string;
+    priority?: Array<0 | 1 | 3 | 5>;
+    tag?: string[];
+    status?: Array<0 | 2>;
+}
+
 export interface Project {
     id?: string;
     name: string;

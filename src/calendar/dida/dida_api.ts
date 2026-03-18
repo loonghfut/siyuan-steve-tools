@@ -1,4 +1,12 @@
-import { Task, Project, ProjectData } from "./dida_interface";
+import {
+    Task,
+    Project,
+    ProjectData,
+    TaskMoveOperation,
+    TaskMoveResult,
+    TaskCompletedQuery,
+    TaskFilterQuery,
+} from "./dida_interface";
 
 export class Dida365ApiClient {
     private baseUrl = "https://api.dida365.com/open/v1";
@@ -12,11 +20,9 @@ export class Dida365ApiClient {
 
     private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
         const url = `${this.baseUrl}${endpoint}`;
-        const headers = {
-            ...options.headers,
-            'Authorization': `Bearer ${this.token}`,
-            'Content-Type': 'application/json',
-        };
+        const headers = new Headers(options.headers);
+        headers.set('Authorization', `Bearer ${this.token}`);
+        headers.set('Content-Type', 'application/json');
 
         const response = await fetch(url, { ...options, headers });
 
@@ -30,10 +36,12 @@ export class Dida365ApiClient {
             throw new Error(`API request failed with status ${response.status}: ${errorData.message || response.statusText}`);
         }
 
-        if (response.status === 204 || response.headers.get("content-length") === "0") { // No Content
+        const responseText = await response.text();
+        if (!responseText) {
             return null as T;
         }
-        return response.json() as Promise<T>;
+
+        return JSON.parse(responseText) as T;
     }
 
     // Task API
@@ -41,7 +49,7 @@ export class Dida365ApiClient {
         return this.request<Task>(`/project/${projectId}/task/${taskId}`);
     }
 
-    async createTask(taskData: Omit<Task, 'id' | 'status' | 'completedTime'> & { projectId: string }): Promise<Task> {
+    async createTask(taskData: Omit<Task, 'id' | 'status' | 'completedTime' | 'etag'> & { projectId: string }): Promise<Task> {
         return this.request<Task>('/task', {
             method: 'POST',
             body: JSON.stringify(taskData),
@@ -83,6 +91,37 @@ export class Dida365ApiClient {
     async deleteTask(projectId: string, taskId: string): Promise<void> {
         await this.request<null>(`/project/${projectId}/task/${taskId}`, {
             method: 'DELETE',
+        });
+    }
+
+    async completeTask(projectId: string, taskId: string): Promise<void> {
+        await this.request<null>(`/project/${projectId}/task/${taskId}/complete`, {
+            method: 'POST',
+        });
+    }
+
+    async moveTasks(operations: TaskMoveOperation[]): Promise<TaskMoveResult[]> {
+        return this.request<TaskMoveResult[]>('/task/move', {
+            method: 'POST',
+            body: JSON.stringify(operations),
+        });
+    }
+
+    async moveTask(operation: TaskMoveOperation): Promise<TaskMoveResult[]> {
+        return this.moveTasks([operation]);
+    }
+
+    async listCompletedTasks(query: TaskCompletedQuery = {}): Promise<Task[]> {
+        return this.request<Task[]>('/task/completed', {
+            method: 'POST',
+            body: JSON.stringify(query),
+        });
+    }
+
+    async filterTasks(query: TaskFilterQuery = {}): Promise<Task[]> {
+        return this.request<Task[]>('/task/filter', {
+            method: 'POST',
+            body: JSON.stringify(query),
         });
     }
 

@@ -1,6 +1,6 @@
 import { showMessage } from "siyuan";
 import { Dida365ApiClient } from "./dida_api";
-import { Project, Task } from "./dida_interface";
+import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "./dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getAttributeViewBoundBlockIDsByItemIDs, getAttributeViewItemIDsByBoundIDs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
@@ -1566,6 +1566,30 @@ ${taskData.描述?.content || "描述：暂无"}
      */
     public getApiClient(): Dida365ApiClient {
         return this.apiClient;
+    }
+
+    public async getTask(projectId: string, taskId: string): Promise<Task> {
+        return this.apiClient.getTask(projectId, taskId);
+    }
+
+    public async completeTask(projectId: string, taskId: string): Promise<void> {
+        return this.apiClient.completeTask(projectId, taskId);
+    }
+
+    public async moveTasks(operations: TaskMoveOperation[]): Promise<TaskMoveResult[]> {
+        return this.apiClient.moveTasks(operations);
+    }
+
+    public async moveTask(operation: TaskMoveOperation): Promise<TaskMoveResult[]> {
+        return this.apiClient.moveTask(operation);
+    }
+
+    public async listCompletedTasks(query: TaskCompletedQuery = {}): Promise<Task[]> {
+        return this.apiClient.listCompletedTasks(query);
+    }
+
+    public async filterTasks(query: TaskFilterQuery = {}): Promise<Task[]> {
+        return this.apiClient.filterTasks(query);
     }
 
 }
