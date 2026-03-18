@@ -4,7 +4,7 @@ import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, 
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "../myF";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getAttributeViewBoundBlockIDsByItemIDs, getAttributeViewItemIDsByBoundIDs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
-import { formatDateToISO, formatLocalDate } from "./siyuan_api";
+import { formatDateForDida, formatDateToISO, formatLocalDate } from "./siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
 import { extractNewAvId } from "@/api/api3";
@@ -27,6 +27,33 @@ export class Dida365Service {
     private autoSyncInterval?: number;
     private initialSyncTimer?: number;
     private wsMainHandler?: (e: any) => void;
+    private getCompletedTaskRetentionDays(): number {
+        const raw = (settingdata as any)["cal-dida-completed-days"];
+        if (raw === null || raw === undefined || raw === "") {
+            return 15;
+        }
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+            return 15;
+        }
+        return Math.max(0, Math.floor(parsed));
+    }
+
+    private getCompletedTaskQuery(): TaskCompletedQuery {
+        const days = this.getCompletedTaskRetentionDays();
+        const end = new Date();
+        const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+        const query: TaskCompletedQuery = {};
+
+        if (this.todoListId) {
+            query.projectIds = [this.todoListId];
+        }
+
+        query.startDate = formatDateToISO(start);
+        query.endDate = formatDateToISO(end);
+        return query;
+    }
+
     private getDidaUpdateCooldownMs(): number {
         const raw = (settingdata as any)["cal-dida-sync-cooldown"];
         const seconds = Number.isFinite(Number(raw)) ? Number(raw) : 30;
@@ -47,7 +74,6 @@ export class Dida365Service {
         this.isTokenValid();
         console.debug("Dida365Service initialized", this.todoListId);
         this.init();
-
         this.plugin.addIcons(`
             <symbol id="iconSTdida" viewBox="0 0 48 48">
                 ${ic.steveTools_dida}
@@ -252,7 +278,25 @@ export class Dida365Service {
             let isOnline = true;
 
             try {
-                didaTasks = await this.getAllTasks();
+                const activeTasks = await this.getAllTasks();
+                const completedTasks = await this.listCompletedTasks(this.getCompletedTaskQuery());
+                const previousCache = new Map(this.taskCache);
+                for (const task of completedTasks) {
+                    if (!task.id) continue;
+                    if (this.isPendingDidaUpdate(task.id) && previousCache.has(task.id)) {
+                        this.taskCache.set(task.id, previousCache.get(task.id)!);
+                    } else {
+                        this.taskCache.set(task.id, task);
+                    }
+                }
+                const allTasks = [...activeTasks, ...completedTasks];
+                const taskMap = new Map<string, Task>();
+                for (const task of allTasks) {
+                    if (task.id) {
+                        taskMap.set(task.id, task);
+                    }
+                }
+                didaTasks = Array.from(taskMap.values());
                 // console.debug("❤️❤️❤️❤️❤️")
             } catch (error) {
                 // console.debug("💩💩💩💩💩");
@@ -353,7 +397,7 @@ export class Dida365Service {
                 // 检查思源中存在但滴答清单中不存在的任务，将其状态设置为"归档"
                 const tasksToArchive = [];
                 for (const [didaId, existingTask] of existingTasksMap) {
-                    if (!didaTaskIds.has(didaId) && existingTask.状态?.content !== "归档") {
+                    if (!didaTaskIds.has(didaId) && existingTask.状态?.content !== "归档" && existingTask.状态?.content !== "完成") {
                         tasksToArchive.push(existingTask);
                     }
                 }
@@ -509,8 +553,7 @@ export class Dida365Service {
 
         // 转换状态
         const getStatus = (task: Task) => {
-            // 如果标签中包含“完成”，则状态为“完成”
-            if (task.tags?.includes("完成")) {
+            if (task.status === 2) {
                 return "完成";
             } else if (task.tags?.includes("进行中")) {
                 return "进行中";
@@ -1245,8 +1288,8 @@ ${taskData.描述?.content || "描述：暂无"}
                 const updatePayload: Partial<Task> = {};
 
                 // 转换思源数据到滴答格式
-                // 默认值
-                updatePayload.status = 0;
+                // 默认值：未完成；完成状态由 status 字段决定
+                updatePayload.status = siyuanTask.状态?.content === '完成' ? 2 : 0;
                 if (siyuanTask.事件?.content) {
                     // 移除标题中的 D 链接，并添加 S 链接指向思源
                     const originalTitle = this.removeLinksFromTitle(siyuanTask.事件.content);
@@ -1290,19 +1333,15 @@ ${taskData.描述?.content || "描述：暂无"}
                 // 处理状态和标签
                 const newStatus = siyuanTask.状态?.content;
                 // console.debug("标签：：：", siyuanTask.标签?.content);
-                const tagsFromSiyuan = (siyuanTask.标签?.content || []).map((item: any) => item);
+                const tagsFromSiyuan = (siyuanTask.标签?.content || [])
+                    .map((item: any) => item)
+                    .filter((tag: string) => !["完成", "进行中", "未完成", "归档"].includes(tag));
                 // console.debug("标签：：：", tagsFromSiyuan);
-                const statusTags = [];
-                if (newStatus === '完成') {
-                    statusTags.push('完成');
-                } else if (newStatus === '进行中') {
+                const statusTags: string[] = [];
+                if (newStatus === '进行中') {
                     statusTags.push('进行中');
                 } else if (newStatus === '归档') {
                     statusTags.push('归档');
-                }
-                // 如果没有状态标签，则默认为未完成 
-                else {
-                    statusTags.push('未完成');
                 }
                 updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
                 console.debug("❤️❤️❤️❤️更新的任务内容：", updatePayload);
@@ -1383,22 +1422,25 @@ ${taskData.描述?.content || "描述：暂无"}
                                 return undefined;
                             }
                         })(),
-                        // 标签处理优化：合并标签和状态标签
-                        tags: [
-                            ...(siyuanTask.标签?.content || []).map((item: any) => item),
-                            (() => {
-                                const status = siyuanTask.状态?.content;
-                                if (status === '完成') return '完成';
-                                if (status === '进行中') return '进行中';
-                                if (status === '归档') return '归档';
-                                return '未完成';
-                            })()
-                        ],
+                        // 标签处理优化：仅保留普通标签，状态由 status 字段单独表示
+                        tags: (() => {
+                            const normalTags = (siyuanTask.标签?.content || [])
+                                .map((item: any) => item)
+                                .filter((tag: string) => !["完成", "进行中", "未完成", "归档"].includes(tag));
+                            const status = siyuanTask.状态?.content;
+                            const statusTag = status === '进行中' ? '进行中' : status === '归档' ? '归档' : null;
+                            return statusTag ? [...normalTags, statusTag] : normalTags;
+                        })(),
                     };
 
                     const newDidaTask = await this.apiClient.createTask(createTaskPayload);
 
                     if (newDidaTask && newDidaTask.id) {
+                        if (siyuanTask.状态?.content === '完成') {
+                            await this.apiClient.completeTask(newDidaTask.projectId, newDidaTask.id);
+                            newDidaTask.status = 2;
+                            newDidaTask.completedTime = formatDateForDida(Date.now());
+                        }
                         // 立即更新缓存和时间戳
                         this.taskCache.set(newDidaTask.id, newDidaTask);
                         this.lastModifiedTime.set(newDidaTask.id, Date.now());
@@ -1585,7 +1627,8 @@ ${taskData.描述?.content || "描述：暂无"}
     }
 
     public async listCompletedTasks(query: TaskCompletedQuery = {}): Promise<Task[]> {
-        return this.apiClient.listCompletedTasks(query);
+        const finalQuery = Object.keys(query).length > 0 ? query : this.getCompletedTaskQuery();
+        return this.apiClient.listCompletedTasks(finalQuery);
     }
 
     public async filterTasks(query: TaskFilterQuery = {}): Promise<Task[]> {

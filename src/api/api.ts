@@ -1212,10 +1212,12 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
                 },
                 action: string
             };
-            const readyContents = transformBlockData(oldrelation.contents);
+            const relationIds = Array.isArray(oldrelation?.ids) ? oldrelation.ids : [];
+            const relationContents = Array.isArray(oldrelation?.contents) ? oldrelation.contents : [];
+            const readyContents = transformBlockData(relationContents);
             if (action === 'add') {
-                if (!oldrelation.ids.includes(itemID)) {
-                    oldrelation.ids.push(itemID);
+                if (!relationIds.includes(itemID)) {
+                    relationIds.push(itemID);
                     readyContents.push({
                         block: { content: content, id: itemID },
                         isDetached: false,
@@ -1223,9 +1225,9 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
                     });
                 }
             } else if (action === 'remove') {
-                const index = oldrelation.ids.indexOf(itemID);
+                const index = relationIds.indexOf(itemID);
                 if (index !== -1) {
-                    oldrelation.ids.splice(index, 1);
+                    relationIds.splice(index, 1);
                     readyContents.splice(index, 1);
                 }
             } else {
@@ -1233,7 +1235,7 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
             }
             processedValue = {
                 relation: {
-                    blockIDs: oldrelation.ids,
+                    blockIDs: relationIds,
                     contents: readyContents
                 }
             };
