@@ -6,7 +6,7 @@
  * API 文档见 [API_zh_CN.md](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
  */
 
-import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle, showMessage } from "siyuan";
+import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle } from "siyuan";
 import { ISelectOption } from "@/calendar/interface";
 import { settingdata } from "..";
 import { AVManager } from "./db_pro";
@@ -1163,6 +1163,24 @@ async function processCellValue(value: any, type: string, endtime?: string): Pro
 
     switch (type) {
         case 'date':
+            if (value === undefined || value === null || value === '') {
+                console.debug("[属性视图] 日期值为空，按清空字段处理", {
+                    value,
+                    endtime,
+                });
+                processedValue = {
+                    date: {
+                        content: null,
+                        content2: null,
+                        formattedContent: "",
+                        hasEndDate: false,
+                        isNotEmpty: false,
+                        isNotEmpty2: false,
+                        isNotTime: true
+                    }
+                };
+                break;
+            }
             const { start, end } = await getDateTimestamps(value as string);
             processedValue = {
                 date: {

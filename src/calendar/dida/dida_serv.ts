@@ -897,6 +897,19 @@ ${taskData.描述?.content || "描述：暂无"}
      */
     private async updateTaskFields(blockId: string, taskData: any, viewValue: any, itemID: string, existingTask?: any): Promise<void> {
         try {
+            console.debug("[滴答同步] 开始更新思源字段", {
+                blockId,
+                itemID,
+                avId: this.avId,
+                hasExistingTask: !!existingTask,
+                title: taskData?.事件?.content,
+                status: taskData?.状态?.content,
+                priority: taskData?.优先级?.content,
+                hasTime: !!taskData?.开始时间,
+                start: taskData?.开始时间?.start,
+                end: taskData?.开始时间?.end,
+                tags: taskData?.标签?.content,
+            });
             // 获取各字段的 keyID
             const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID');
             const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件');
@@ -943,9 +956,28 @@ ${taskData.描述?.content || "描述：暂无"}
             const oldStart = oldTime?.start || null;
             const oldEnd = oldTime?.end || null;
 
+            console.debug("[滴答同步] 思源时间字段对比", {
+                blockId,
+                itemID,
+                timeKeyID,
+                newTime,
+                oldTime,
+                newStart,
+                newEnd,
+                oldStart,
+                oldEnd,
+            });
+
             if (timeKeyID && (newStart !== oldStart || newEnd !== oldEnd)) {
                 const startTime = newTime?.start ? formatLocalDate(newTime.start) : undefined;
                 const endTime = newTime?.end && newTime?.hasEndDate ? formatLocalDate(newTime.end) : undefined;
+                console.debug("[滴答同步] 准备更新思源时间字段", {
+                    blockId,
+                    itemID,
+                    startTime,
+                    endTime,
+                    hasEndDate: newTime?.hasEndDate,
+                });
                 updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -1000,6 +1032,13 @@ ${taskData.描述?.content || "描述：暂无"}
 
             // 更新描述
             if (descKeyID && taskData.描述?.content && taskData.描述.content !== existingTask?.描述?.content) {
+                console.debug("[滴答同步] 准备更新描述字段", {
+                    blockId,
+                    itemID,
+                    descKeyID,
+                    oldDesc: existingTask?.描述?.content,
+                    newDesc: taskData.描述?.content,
+                });
                 updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -1013,6 +1052,12 @@ ${taskData.描述?.content || "描述：暂无"}
             if (urlKeyID && taskData.链接?.content) {
                 // 更新链接
                 // console.debug("更新链接!!!!!!!!!!!!!!!!!!!：", taskData.链接.content);
+                console.debug("[滴答同步] 准备更新链接字段", {
+                    blockId,
+                    itemID,
+                    urlKeyID,
+                    url: taskData.链接?.content,
+                });
                 updatePromises.push(updateAttrViewCell_pro(
                     blockId,
                     this.avId,
@@ -1223,7 +1268,12 @@ ${taskData.描述?.content || "描述：暂无"}
     handleSiyuanUpdate = async (e: any, blockId = '', itemID = '') => {
         let isDetached: boolean;
         if (e == 'force' && blockId && itemID) {
-            console.debug("fore滴答更新");
+            console.debug("[滴答同步] 强制处理思源更新", {
+                blockId,
+                itemID,
+                avId: this.avId,
+                syncing: this.isSyncing,
+            });
         } else {
             const msg = e.detail;
             if (msg.cmd !== "transactions") return;
@@ -1257,6 +1307,13 @@ ${taskData.描述?.content || "描述：暂无"}
                 console.debug("🚧🚧: blockId", blockId);
                 console.debug("🚧🚧: itemID", itemID);
             }
+            console.debug("[滴答同步] 捕获到思源事务", {
+                action: operation.action,
+                avID,
+                blockId,
+                itemID,
+                isDetached,
+            });
         }
         // return;
         if (isDetached) return;//游离块不支持添加到滴答,后续操作需要绑定块ID
@@ -1269,8 +1326,26 @@ ${taskData.描述?.content || "描述：暂无"}
             const siyuanTask = allTasks.find((task: any) => task.事件?.itemID === itemID);
 
             if (!siyuanTask) {
+                console.debug("[滴答同步] 未找到对应的思源任务行，跳过", {
+                    blockId,
+                    itemID,
+                    totalTasks: allTasks.length,
+                });
                 return;
             }
+
+            console.debug("[滴答同步] 读取到思源任务快照", {
+                blockId,
+                itemID,
+                hasDidaID: !!siyuanTask.didaID?.content,
+                title: siyuanTask.事件?.content,
+                status: siyuanTask.状态?.content,
+                priority: siyuanTask.优先级?.content,
+                hasTime: !!siyuanTask.开始时间,
+                start: siyuanTask.开始时间?.start,
+                end: siyuanTask.开始时间?.end,
+                tags: siyuanTask.标签?.content,
+            });
 
             // 检查是否存在 didaID。如果存在，则为更新操作；否则为创建操作。
             if (siyuanTask.didaID?.content) {
@@ -1306,6 +1381,16 @@ ${taskData.描述?.content || "描述：暂无"}
                 const oldStartISO = cachedTask.startDate;
                 const oldDueISO = cachedTask.dueDate;
                 const timeChanged = newStartISO !== oldStartISO || newDueISO !== oldDueISO;
+
+                console.debug("[滴答同步] 计算滴答更新 payload（时间）", {
+                    blockId,
+                    didaTaskId,
+                    newStartISO,
+                    newDueISO,
+                    oldStartISO,
+                    oldDueISO,
+                    timeChanged,
+                });
 
                 if (siyuanTask.开始时间) {
                     updatePayload.startDate = newStartISO;
@@ -1344,7 +1429,12 @@ ${taskData.描述?.content || "描述：暂无"}
                     statusTags.push('归档');
                 }
                 updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
-                console.debug("❤️❤️❤️❤️更新的任务内容：", updatePayload);
+                console.debug("[滴答同步] 即将写回滴答任务", {
+                    blockId,
+                    didaTaskId,
+                    projectId: currentProjectId,
+                    payload: updatePayload,
+                });
                 if (Object.keys(updatePayload).length > 0) {
                     // 加锁，防止并发修改
                     this.taskSyncLocks.set(didaTaskId, true);
@@ -1433,6 +1523,13 @@ ${taskData.描述?.content || "描述：暂无"}
                         })(),
                     };
 
+                    console.debug("[滴答同步] 即将创建滴答任务", {
+                        blockId,
+                        itemID,
+                        targetProjectId,
+                        payload: createTaskPayload,
+                    });
+
                     const newDidaTask = await this.apiClient.createTask(createTaskPayload);
 
                     if (newDidaTask && newDidaTask.id) {
@@ -1450,6 +1547,14 @@ ${taskData.描述?.content || "描述：暂无"}
                         // 将新生成的 didaID 和链接字段写回思源数据库
                         const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID');
                         const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接');
+
+                        console.debug("[滴答同步] 准备回写思源字段", {
+                            blockId,
+                            itemID,
+                            didaTaskId: newDidaTask.id,
+                            didaIdKeyID,
+                            linkKeyID,
+                        });
 
                         const updatePromises: Promise<any>[] = [];
 
