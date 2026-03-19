@@ -25,7 +25,7 @@ export class Dida365Service {
     private taskSyncLocks: Map<string, boolean> = new Map(); // 任务级别的同步锁(didaID -> isLocked)
     private lastSyncDirection: Map<string, 'siyuan-to-dida' | 'dida-to-siyuan'> = new Map(); // 记录最后同步方向
     private pendingDidaUpdates: Map<string, number> = new Map(); // 记录本地已发起但可能尚未在滴答生效的任务(didaID -> until)
-    private pendingSiyuanConfirmTargets: Map<string, { blockId: string; itemID: string; dueAt: number }> = new Map(); // 待执行的思源->滴答确认检查
+    private pendingSiyuanConfirmTargets: Map<string, { blockId: string; itemID: string; dueAt: number; attempts: number }> = new Map(); // 待执行的思源->滴答确认检查
     private pendingSiyuanConfirmTimer: NodeJS.Timeout | null = null; // 确认检查定时器
     private pendingSiyuanTargets: Map<string, { blockId: string; itemID: string; isDetached: boolean; attempts: number }> = new Map(); // 待同步到滴答的思源任务
     private pendingSiyuanSyncTimer: NodeJS.Timeout | null = null; // 思源待同步队列刷新计时器
@@ -299,6 +299,7 @@ export class Dida365Service {
             blockId: confirmTarget.blockId,
             itemID: confirmTarget.itemID,
             dueAt: previous ? Math.min(previous.dueAt, dueAt) : dueAt,
+            attempts: previous ? previous.attempts : 0,
         });
         this.schedulePendingSiyuanConfirmFlush();
     }
@@ -353,9 +354,23 @@ export class Dida365Service {
         for (const target of dueTargets) {
             this.pendingSiyuanConfirmTargets.delete(`${target.blockId}::${target.itemID}`);
             try {
-                await this.confirmSiyuanTaskToDida(target.blockId, target.itemID);
+                const confirmed = await this.confirmSiyuanTaskToDida(target.blockId, target.itemID);
+                if (!confirmed && target.attempts < 5) {
+                    this.pendingSiyuanConfirmTargets.set(`${target.blockId}::${target.itemID}`, {
+                        ...target,
+                        attempts: target.attempts + 1,
+                        dueAt: Date.now() + 2000,
+                    });
+                }
             } catch (error) {
                 console.warn("执行思源->滴答确认检查失败", error);
+                if (target.attempts < 5) {
+                    this.pendingSiyuanConfirmTargets.set(`${target.blockId}::${target.itemID}`, {
+                        ...target,
+                        attempts: target.attempts + 1,
+                        dueAt: Date.now() + 2000,
+                    });
+                }
             }
         }
 
@@ -1775,6 +1790,7 @@ ${taskData.描述?.content || "描述：暂无"}
                 avId: this.avId,
                 syncing: this.isSyncing,
             });
+            this.enqueueSiyuanConfirmTarget({ blockId, itemID }, 8000);
             await this.processSiyuanUpdateTarget(blockId, itemID);
             return;
         }
@@ -1818,6 +1834,7 @@ ${taskData.描述?.content || "描述：暂无"}
                         itemID: targetItemID,
                         isDetached,
                     });
+                    this.enqueueSiyuanConfirmTarget({ blockId: targetBlockId, itemID: targetItemID }, 8000);
                     this.enqueueSiyuanSyncTarget(targetBlockId, targetItemID, isDetached);
                 }
                 continue;
@@ -1848,6 +1865,7 @@ ${taskData.描述?.content || "描述：暂无"}
                 itemID: targetItemID,
                 isDetached: false,
             });
+            this.enqueueSiyuanConfirmTarget({ blockId: targetBlockId, itemID: targetItemID }, 8000);
             this.enqueueSiyuanSyncTarget(targetBlockId, targetItemID, false);
         }
     };
@@ -1856,6 +1874,9 @@ ${taskData.描述?.content || "描述：暂无"}
      * 处理单个思源任务变更目标，避免事务里多个变更项被覆盖成“只同步首尾”。
      */
     private async processSiyuanUpdateTarget(blockId: string, itemID: string, isDetached = false): Promise<void> {
+        if (blockId && itemID) {
+            this.enqueueSiyuanConfirmTarget({ blockId, itemID }, 8000);
+        }
         if (isDetached) return;//游离块不支持添加到滴答,后续操作需要绑定块ID
         if (!blockId) return;
         try {
