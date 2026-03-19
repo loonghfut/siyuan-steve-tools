@@ -40,16 +40,18 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.36.0 (2026年03月06日)
-- feat: 添加桌面浏览器环境支持和空闲休眠功能到 WPS Webview (loonghfut)
-- feat: 添加 WPS 浏览器环境支持和相关属性获取功能 (loonghfut)
-- feat: 优化事件处理和卸载逻辑，增强模块稳定性 (loonghfut)
-- feat: 添加待处理日历事件补丁功能，优化事件更新逻辑 (loonghfut)
-- feat: 添加 Memos 模块及其设置，支持启用选项 (loonghfut)
-- feat: add Memos sync service for managing memo synchronization with Memos API (loonghfut)
-- feat: 添加按创建时间排序备忘录功能，优化备忘录分组逻辑 (loonghfut)
-- feat: 更新版本号至0.36.0 (loonghfut)
-- docs: 更新 v0.36.0 版本的更新日志 (loonghfut)
+### v0.37.0 (2026年03月19日)
+- Remove unused `setdialog` property (loonghfut)
+- ``` Fix inconsistent indentation and formatting in codebase (loonghfut)
+- 更新 .gitignore，添加 ui-ux-pro-max 目录 (loonghfut)
+- feat: 增加任务管理API，支持任务移动、完成、过滤和列出已完成任务功能 (loonghfut)
+- feat: 添加已完成任务保留天数设置，默认保留15天 (loonghfut)
+- feat: 添加滴答同步调试信息，增强任务更新过程中的日志记录 (loonghfut)
+- feat: 优化任务同步逻辑，增加思源优先的确认同步功能 (loonghfut)
+- feat: 增加思源任务同步队列管理，优化同步逻辑 (loonghfut)
+- feat: 增加思源任务确认检查队列，优化任务创建和同步逻辑 (loonghfut)
+- feat: 增加思源任务确认检查的重试机制，优化确认逻辑 (loonghfut)
+- feat: 更新版本号至0.37.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
