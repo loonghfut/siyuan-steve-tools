@@ -72,22 +72,15 @@ export const aiGroup = (ctx: BuildContext): SettingGroupDefinition => {
 
     // 添加地址列表配置
     items.push({
-        type: "textarea", 
+        type: "custom",
+        component: "ListEditor",
         title: "📝 AI 服务列表（高级设置）", 
-        description: `可以自定义下拉菜单中显示的 AI 服务。每行一条，格式：服务名称|完整网址
-        
-示例格式：
-豆包AI|https://www.doubao.com/chat/
-Kimi|https://kimi.moonshot.cn/
-
-⚠️ 注意事项：
-• 请确保 URL 格式正确（以 http:// 或 https:// 开头）
-• 最后一行保留「自定义|custom」以支持自定义地址功能
-• 修改后需要点击「保存」按钮，侧边栏下拉菜单才会更新`, 
+        description: `可视化编辑 AI 服务列表，支持添加、删除、排序操作`,
         key: "ai-url-list", 
         value: ctx.settings["ai-url-list"], 
-        direction: "row",
-        placeholder: "服务名称|完整网址\n例如：豆包AI|https://www.doubao.com/chat/"
+        direction: "column",
+        columns: ["服务名称", "URL"],
+        separator: "|"
     });
 
     return {

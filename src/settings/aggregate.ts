@@ -95,12 +95,17 @@ export const aggregateGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                     },
                 },
                 {
-                    type: "textarea",
+                    type: "custom",
+                    component: "TemplateEditor",
                     title: "SQL 聚合默认模板",
-                    description: "模板用于渲染 SQL 结果预览和插入文档方式，可使用占位符例如 {{markdown}} {{content}} {{id}}，留空使用默认自动渲染",
+                    description: "可视化编辑 SQL 聚合模板，支持占位符插入和预览",
                     key: "aggregate-sql-preview-template",
                     value: ctx.settings["aggregate-sql-preview-template"] ?? "",
-                    direction: "row",
+                    direction: "column",
+                    placeholders: ["markdown", "content", "id"],
+                    placeholderDescriptions: { "markdown": "Markdown 格式内容", "content": "原始内容", "id": "块 ID" },
+                    placeholderCategories: { "内容格式": ["markdown", "content"], "标识符": ["id"] },
+                    rows: 8
                 },
                 // {
                 //     type: "textinput",

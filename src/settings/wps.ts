@@ -66,7 +66,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "select", title: "导入到日记的笔记本", description: "用于创建/定位当日日记的笔记本", key: "wps-file-daily-notebook", value: ctx.settings["wps-file-daily-notebook"], options: notebookOptions() },
                 { type: "checkbox", title: "暗色主题下反色预览页面", description: "开启后：当 data-theme-mode=dark 时对嵌入的 webview/iframe 应用反色滤镜（invert+hue-rotate）", key: "wps-webview-invert-dark", value: ctx.settings["wps-webview-invert-dark"] },
                 { type: "checkbox", title: "文件以卡片形式插入", description: "启用后：单条插入与批量导入都会调用 generateLinkCard 生成链接卡片(忽略文本模板)", key: "wps-file-insert-as-card", value: ctx.settings["wps-file-insert-as-card"] },
-                { type: "textarea", title: "文件块模板", description: "自定义导入的文件块模板；支持占位符：{{name}} {{url}} {{file_type}} {{file_src}}。留空使用内置默认模板。", key: "wps-file-block-template", value: ctx.settings["wps-file-block-template"], direction: "row" },
+                { type: "custom", component: "TemplateEditor", title: "文件块模板", description: "可视化编辑文件块模板，支持占位符插入和预览", key: "wps-file-block-template", value: ctx.settings["wps-file-block-template"], direction: "column", placeholders: ["name", "url", "file_type", "file_src"], placeholderDescriptions: { "name": "文件名称", "url": "文件链接", "file_type": "文件类型", "file_src": "文件来源" }, placeholderCategories: { "文件信息": ["name", "file_type", "file_src"], "链接": ["url"] }, rows: 6 },
             ]
         },
         {
@@ -96,7 +96,7 @@ export const wpsGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "数据导入脚本链接", description: "多维表格数据导入链接", key: "wps-data-url", value: ctx.settings["wps-data-url"] },
                 { type: "textarea", title: "提取字段列表", description: "要提取的字段，使用英文逗号分隔；附件字段以 (A) 或 （A） 结尾", key: "wps-data-fields", value: ctx.settings["wps-data-fields"], direction: "row" },
                 { type: "select", title: "导入数据笔记本", description: "用于创建/定位当日日记的笔记本", key: "wps-data-notebook", value: ctx.settings["wps-data-notebook"], options: notebookOptions() },
-                { type: "textarea", title: "自定义模板", description: "可选：支持 {{#records}}...{{/records}} 与 {{字段名}}; 无模板则自动生成表格", key: "wps-data-template", value: ctx.settings["wps-data-template"], direction: "row" },
+                { type: "custom", component: "TemplateEditor", title: "自定义模板", description: "可视化编辑数据导入模板，支持占位符插入和预览", key: "wps-data-template", value: ctx.settings["wps-data-template"], direction: "column", placeholders: ["records", "字段名"], placeholderDescriptions: { "records": "记录循环块 {{#records}}...{{/records}}", "字段名": "数据字段名称" }, placeholderCategories: { "循环结构": ["records"], "数据字段": ["字段名"] }, rows: 8 },
                 {
                     type: "button",
                     title: "复制数据导入处理脚本到剪切板",
