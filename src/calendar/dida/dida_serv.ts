@@ -24,6 +24,8 @@ export class Dida365Service {
     private taskSyncLocks: Map<string, boolean> = new Map(); // 任务级别的同步锁(didaID -> isLocked)
     private lastSyncDirection: Map<string, 'siyuan-to-dida' | 'dida-to-siyuan'> = new Map(); // 记录最后同步方向
     private pendingDidaUpdates: Map<string, number> = new Map(); // 记录本地已发起但可能尚未在滴答生效的任务(didaID -> until)
+    private pendingSiyuanTargets: Map<string, { blockId: string; itemID: string; isDetached: boolean; attempts: number }> = new Map(); // 待同步到滴答的思源任务
+    private pendingSiyuanSyncTimer: NodeJS.Timeout | null = null; // 思源待同步队列刷新计时器
     private autoSyncInterval?: number;
     private initialSyncTimer?: number;
     private wsMainHandler?: (e: any) => void;
@@ -275,6 +277,106 @@ export class Dida365Service {
     private hasPendingDidaUpdates(): boolean {
         this.cleanupPendingDidaUpdates();
         return this.pendingDidaUpdates.size > 0;
+    }
+
+    /**
+     * 将思源变更目标加入待同步队列，并在短暂静默后统一刷快照。
+     */
+    private enqueueSiyuanSyncTarget(blockId: string, itemID: string, isDetached = false): void {
+        if (!blockId || !itemID || isDetached) return;
+        const key = `${blockId}::${itemID}`;
+        const previous = this.pendingSiyuanTargets.get(key);
+        this.pendingSiyuanTargets.set(key, {
+            blockId,
+            itemID,
+            isDetached,
+            attempts: previous ? previous.attempts : 0,
+        });
+
+        if (this.pendingSiyuanSyncTimer) {
+            clearTimeout(this.pendingSiyuanSyncTimer);
+        }
+        this.pendingSiyuanSyncTimer = setTimeout(() => {
+            void this.flushPendingSiyuanSyncTargets();
+        }, 1200);
+    }
+
+    /**
+     * 刷新待同步队列：统一读取一次思源快照，逐个同步队列中的任务。
+     */
+    private async flushPendingSiyuanSyncTargets(): Promise<void> {
+        if (this.pendingSiyuanSyncTimer) {
+            clearTimeout(this.pendingSiyuanSyncTimer);
+            this.pendingSiyuanSyncTimer = null;
+        }
+
+        if (this.pendingSiyuanTargets.size === 0) {
+            return;
+        }
+
+        if (this.isSyncing) {
+            this.pendingSiyuanSyncTimer = setTimeout(() => {
+                void this.flushPendingSiyuanSyncTargets();
+            }, 1500);
+            return;
+        }
+
+        const queue = Array.from(this.pendingSiyuanTargets.values());
+        this.pendingSiyuanTargets.clear();
+
+        if (!this.avId) {
+            return;
+        }
+
+        try {
+            const viewData = await this.getAvViewData("刷新待同步思源队列");
+            const allTasks = viewData.flatMap(view => view.data || []);
+            const nextRound: typeof queue = [];
+
+            for (const target of queue) {
+                if (target.isDetached || !target.blockId || !target.itemID) {
+                    continue;
+                }
+
+                const siyuanTask = allTasks.find((task: any) => task.事件?.itemID === target.itemID);
+                if (!siyuanTask) {
+                    if (target.attempts < 5) {
+                        nextRound.push({ ...target, attempts: target.attempts + 1 });
+                    }
+                    continue;
+                }
+
+                console.debug("[滴答同步] 刷新待同步队列中的任务", {
+                    blockId: target.blockId,
+                    itemID: target.itemID,
+                    attempts: target.attempts,
+                });
+
+                const synced = await this.syncSingleSiyuanTaskToDida(siyuanTask, target.blockId, target.itemID, viewData);
+                if (synced) {
+                    this.debouncedSyncTasksToSiyuan(8000, { blockId: target.blockId, itemID: target.itemID });
+                }
+            }
+
+            if (nextRound.length > 0) {
+                for (const target of nextRound) {
+                    const key = `${target.blockId}::${target.itemID}`;
+                    this.pendingSiyuanTargets.set(key, target);
+                }
+                this.pendingSiyuanSyncTimer = setTimeout(() => {
+                    void this.flushPendingSiyuanSyncTargets();
+                }, 1500);
+            }
+        } catch (error) {
+            console.warn("刷新待同步思源队列失败，稍后重试", error);
+            for (const target of queue) {
+                const key = `${target.blockId}::${target.itemID}`;
+                this.pendingSiyuanTargets.set(key, { ...target, attempts: target.attempts + 1 });
+            }
+            this.pendingSiyuanSyncTimer = setTimeout(() => {
+                void this.flushPendingSiyuanSyncTargets();
+            }, 2000);
+        }
     }
 
     /**
@@ -1492,8 +1594,14 @@ ${taskData.描述?.content || "描述：暂无"}
     //（留空占位，无辅助方法）
 
     private async handleSiyuanUpdate_dalay(e) {
+        const detail = e?.detail;
+        const snapshot = {
+            detail: typeof structuredClone === 'function'
+                ? structuredClone(detail)
+                : JSON.parse(JSON.stringify(detail))
+        };
         setTimeout(() => {
-            this.handleSiyuanUpdate(e);
+            void this.handleSiyuanUpdate(snapshot);
         }, 2000); // 延迟2秒
     }
 
@@ -1509,6 +1617,10 @@ ${taskData.描述?.content || "描述：暂无"}
         if (this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
             this.syncDebounceTimer = null;
+        }
+        if (this.pendingSiyuanSyncTimer) {
+            clearTimeout(this.pendingSiyuanSyncTimer);
+            this.pendingSiyuanSyncTimer = null;
         }
         if (this.wsMainHandler) {
             try {
@@ -1537,6 +1649,7 @@ ${taskData.描述?.content || "描述：暂无"}
         this.taskSyncLocks.clear();
         this.lastSyncDirection.clear();
         this.pendingDidaUpdates.clear();
+        this.pendingSiyuanTargets.clear();
     }
 
     /**
@@ -1544,7 +1657,6 @@ ${taskData.描述?.content || "描述：暂无"}
      * 增加强制刷新逻辑
      */
     handleSiyuanUpdate = async (e: any, blockId = '', itemID = '') => {
-        let isDetached: boolean;
         if (e == 'force' && blockId && itemID) {
             console.debug("[滴答同步] 强制处理思源更新", {
                 blockId,
@@ -1552,48 +1664,87 @@ ${taskData.描述?.content || "描述：暂无"}
                 avId: this.avId,
                 syncing: this.isSyncing,
             });
-        } else {
-            const msg = e.detail;
-            if (msg.cmd !== "transactions") return;
-            const operation = msg.data?.[0]?.doOperations?.[0];
+            await this.processSiyuanUpdateTarget(blockId, itemID);
+            return;
+        }
+
+        const msg = e?.detail;
+        if (msg?.cmd !== "transactions") return;
+
+        const operations = (msg.data || []).flatMap((entry: any) => entry?.doOperations || []);
+        if (operations.length === 0) return;
+
+        const processedTargets = new Set<string>();
+        for (const operation of operations) {
             if (!operation || (operation.action !== "updateAttrViewCell" && operation.action !== "updateAttrs" && operation.action !== "insertAttrViewBlock")) {
-                return;
+                continue;
             }
+
             // 检查是否是我们正在监听的数据库
             console.debug("处理思源更新DDD🚧🚧", operation);
             // Calculate the newly added avID by comparing old and new custom-avs
-
-
             const avID = operation.avID || extractNewAvId(operation?.data?.old?.['custom-avs'], operation?.data?.new?.['custom-avs']);
             console.debug("获取到的🚧🚧 avID:", avID);
             if (avID !== this.avId) {
-                return;
+                continue;
             }
 
-            if (operation.action === "insertAttrViewBlock") {//TODO: 暂不支持批量添加情况
-                blockId = operation.srcs[0].id;
-                isDetached = operation.srcs[0].isDetached;
-                itemID = operation.srcs[0].itemID;
-            } else {
-                if (operation.rowID) {
-                    itemID = operation.rowID;
-                    blockId = await getAttributeViewBoundBlockIDsByItemIDs(avID, [operation.rowID]).then(data => data[operation.rowID]);
-                } else if (operation.id) {
-                    blockId = operation.id;
-                    itemID = await getAttributeViewItemIDsByBoundIDs(avID, [operation.id]).then(data => data[operation.id]);
+            if (operation.action === "insertAttrViewBlock") {
+                const srcs = Array.isArray(operation.srcs) ? operation.srcs : [];
+                for (const src of srcs) {
+                    const targetBlockId = src?.id;
+                    const targetItemID = src?.itemID;
+                    const isDetached = !!src?.isDetached;
+                    const targetKey = `${targetBlockId || ''}::${targetItemID || ''}`;
+                    if (!targetBlockId || !targetItemID || processedTargets.has(targetKey)) {
+                        continue;
+                    }
+                    processedTargets.add(targetKey);
+                    console.debug("[滴答同步] 捕获到思源事务", {
+                        action: operation.action,
+                        avID,
+                        blockId: targetBlockId,
+                        itemID: targetItemID,
+                        isDetached,
+                    });
+                    this.enqueueSiyuanSyncTarget(targetBlockId, targetItemID, isDetached);
                 }
-                console.debug("🚧🚧: blockId", blockId);
-                console.debug("🚧🚧: itemID", itemID);
+                continue;
             }
+
+            let targetBlockId = '';
+            let targetItemID = '';
+            if (operation.rowID) {
+                targetItemID = operation.rowID;
+                targetBlockId = await getAttributeViewBoundBlockIDsByItemIDs(avID, [operation.rowID]).then(data => data[operation.rowID]);
+            } else if (operation.id) {
+                targetBlockId = operation.id;
+                targetItemID = await getAttributeViewItemIDsByBoundIDs(avID, [operation.id]).then(data => data[operation.id]);
+            }
+
+            console.debug("🚧🚧: blockId", targetBlockId);
+            console.debug("🚧🚧: itemID", targetItemID);
+
+            const targetKey = `${targetBlockId || ''}::${targetItemID || ''}`;
+            if (!targetBlockId || !targetItemID || processedTargets.has(targetKey)) {
+                continue;
+            }
+            processedTargets.add(targetKey);
             console.debug("[滴答同步] 捕获到思源事务", {
                 action: operation.action,
                 avID,
-                blockId,
-                itemID,
-                isDetached,
+                blockId: targetBlockId,
+                itemID: targetItemID,
+                isDetached: false,
             });
+            this.enqueueSiyuanSyncTarget(targetBlockId, targetItemID, false);
         }
-        // return;
+    };
+
+    /**
+     * 处理单个思源任务变更目标，避免事务里多个变更项被覆盖成“只同步首尾”。
+     */
+    private async processSiyuanUpdateTarget(blockId: string, itemID: string, isDetached = false): Promise<void> {
         if (isDetached) return;//游离块不支持添加到滴答,后续操作需要绑定块ID
         if (!blockId) return;
         try {
@@ -1631,7 +1782,7 @@ ${taskData.描述?.content || "描述：暂无"}
         } catch (error) {
             console.error("从思源同步到滴答失败:", error);
         }
-    };
+    }
 
     /**
      * 在作用域内为所有发出的 fetch 请求打上 dida 标签，供本模块的网络监听识别并跳过。
