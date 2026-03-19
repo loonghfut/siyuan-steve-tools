@@ -34,6 +34,8 @@ win端s3同步后，docker端感知s3同步。
 8. 聚合查询：  
 可视化生成SQL语句，查询思源数据库，支持多条件筛选，排序等功能，支持结果预览和嵌入块。  
 可视化图表生成器（基于数据库，SQL查询）
+9. memos同步：  
+支持与memos的单向同步（memos -> 思源），支持全量同步和增量同步，支持最新memos版本。  
 
 #### 开发动力来源[打赏](https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png) [star](https://github.com/loonghfut/siyuan-steve-tools) 
 
