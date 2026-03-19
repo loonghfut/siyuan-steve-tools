@@ -18,12 +18,15 @@ export class Dida365Service {
     private taskCache: Map<string, Task> = new Map(); // 新增：用于缓存滴答任务
     private isSyncing = false; // 新增同步锁
     private creatingDidaIds: Set<string> = new Set();
+    private pendingSiyuanCreates: Map<string, number> = new Map(); // 记录思源任务正在创建滴答任务的冷却期(blockId -> until)
     private syncDebounceTimer: NodeJS.Timeout | null = null; // 防抖计时器
     private netInterceptorHandle: InterceptorHandle | null = null; // 独立拦截句柄
     private lastModifiedTime: Map<string, number> = new Map(); // 记录每个任务的最后修改时间戳(didaID -> timestamp)
     private taskSyncLocks: Map<string, boolean> = new Map(); // 任务级别的同步锁(didaID -> isLocked)
     private lastSyncDirection: Map<string, 'siyuan-to-dida' | 'dida-to-siyuan'> = new Map(); // 记录最后同步方向
     private pendingDidaUpdates: Map<string, number> = new Map(); // 记录本地已发起但可能尚未在滴答生效的任务(didaID -> until)
+    private pendingSiyuanConfirmTargets: Map<string, { blockId: string; itemID: string; dueAt: number }> = new Map(); // 待执行的思源->滴答确认检查
+    private pendingSiyuanConfirmTimer: NodeJS.Timeout | null = null; // 确认检查定时器
     private pendingSiyuanTargets: Map<string, { blockId: string; itemID: string; isDetached: boolean; attempts: number }> = new Map(); // 待同步到滴答的思源任务
     private pendingSiyuanSyncTimer: NodeJS.Timeout | null = null; // 思源待同步队列刷新计时器
     private autoSyncInterval?: number;
@@ -187,6 +190,12 @@ export class Dida365Service {
      * 优化：添加冷却期检查，避免刚修改后立即反向同步覆盖
      */
     private debouncedSyncTasksToSiyuan(delay = 10000, confirmTarget?: { blockId: string; itemID: string }): void {
+        if (confirmTarget) {
+            this.enqueueSiyuanConfirmTarget(confirmTarget, delay);
+            console.debug("已加入思源->滴答确认检查队列", confirmTarget, "delay=", delay);
+            return;
+        }
+
         // 清除之前的计时器
         if (this.syncDebounceTimer) {
             clearTimeout(this.syncDebounceTimer);
@@ -277,6 +286,101 @@ export class Dida365Service {
     private hasPendingDidaUpdates(): boolean {
         this.cleanupPendingDidaUpdates();
         return this.pendingDidaUpdates.size > 0;
+    }
+
+    /**
+     * 将单条确认检查加入队列，避免连续同步时前一个检查被后一个覆盖。
+     */
+    private enqueueSiyuanConfirmTarget(confirmTarget: { blockId: string; itemID: string }, delay: number): void {
+        const key = `${confirmTarget.blockId}::${confirmTarget.itemID}`;
+        const dueAt = Date.now() + delay;
+        const previous = this.pendingSiyuanConfirmTargets.get(key);
+        this.pendingSiyuanConfirmTargets.set(key, {
+            blockId: confirmTarget.blockId,
+            itemID: confirmTarget.itemID,
+            dueAt: previous ? Math.min(previous.dueAt, dueAt) : dueAt,
+        });
+        this.schedulePendingSiyuanConfirmFlush();
+    }
+
+    /**
+     * 安排下一次确认检查刷新。
+     */
+    private schedulePendingSiyuanConfirmFlush(): void {
+        if (this.pendingSiyuanConfirmTimer) {
+            clearTimeout(this.pendingSiyuanConfirmTimer);
+            this.pendingSiyuanConfirmTimer = null;
+        }
+
+        if (this.pendingSiyuanConfirmTargets.size === 0) {
+            return;
+        }
+
+        const nextDueAt = Math.min(...Array.from(this.pendingSiyuanConfirmTargets.values()).map(target => target.dueAt));
+        const waitMs = Math.max(0, nextDueAt - Date.now());
+        this.pendingSiyuanConfirmTimer = setTimeout(() => {
+            void this.flushPendingSiyuanConfirmTargets();
+        }, waitMs);
+    }
+
+    /**
+     * 刷新待执行的确认检查。
+     */
+    private async flushPendingSiyuanConfirmTargets(): Promise<void> {
+        if (this.pendingSiyuanConfirmTimer) {
+            clearTimeout(this.pendingSiyuanConfirmTimer);
+            this.pendingSiyuanConfirmTimer = null;
+        }
+
+        if (this.pendingSiyuanConfirmTargets.size === 0) {
+            return;
+        }
+
+        const now = Date.now();
+        const dueTargets = Array.from(this.pendingSiyuanConfirmTargets.values()).filter(target => target.dueAt <= now);
+        if (dueTargets.length === 0) {
+            this.schedulePendingSiyuanConfirmFlush();
+            return;
+        }
+
+        if (this.hasPendingDidaUpdates() || Array.from(this.taskSyncLocks.values()).some(locked => locked)) {
+            this.pendingSiyuanConfirmTimer = setTimeout(() => {
+                void this.flushPendingSiyuanConfirmTargets();
+            }, 1500);
+            return;
+        }
+
+        for (const target of dueTargets) {
+            this.pendingSiyuanConfirmTargets.delete(`${target.blockId}::${target.itemID}`);
+            try {
+                await this.confirmSiyuanTaskToDida(target.blockId, target.itemID);
+            } catch (error) {
+                console.warn("执行思源->滴答确认检查失败", error);
+            }
+        }
+
+        this.schedulePendingSiyuanConfirmFlush();
+    }
+
+    /**
+     * 标记某个思源任务正处于“创建滴答任务并等待回写”的窗口期。
+     */
+    private markPendingSiyuanCreate(blockId: string, cooldownMs = 10000): void {
+        if (!blockId) return;
+        this.pendingSiyuanCreates.set(blockId, Date.now() + Math.max(1000, cooldownMs));
+    }
+
+    /**
+     * 判断某个思源任务是否仍处于“创建中”窗口期。
+     */
+    private isPendingSiyuanCreate(blockId: string): boolean {
+        const until = this.pendingSiyuanCreates.get(blockId);
+        if (!until) return false;
+        if (Date.now() > until) {
+            this.pendingSiyuanCreates.delete(blockId);
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -531,10 +635,11 @@ export class Dida365Service {
                 return false;
             }
 
-            if (this.creatingDidaIds.has(blockId)) {
+            if (this.creatingDidaIds.has(blockId) || this.isPendingSiyuanCreate(blockId)) {
                 console.warn(`任务 [${blockId}] 正在创建中，跳过重复处理。`);
                 return false;
             }
+            this.markPendingSiyuanCreate(blockId);
             this.creatingDidaIds.add(blockId);
             try {
                 const latestViewData = await getViewValue([{ rootid: this.avId, viewId: '', name: '' }]);
@@ -1618,6 +1723,10 @@ ${taskData.描述?.content || "描述：暂无"}
             clearTimeout(this.syncDebounceTimer);
             this.syncDebounceTimer = null;
         }
+        if (this.pendingSiyuanConfirmTimer) {
+            clearTimeout(this.pendingSiyuanConfirmTimer);
+            this.pendingSiyuanConfirmTimer = null;
+        }
         if (this.pendingSiyuanSyncTimer) {
             clearTimeout(this.pendingSiyuanSyncTimer);
             this.pendingSiyuanSyncTimer = null;
@@ -1649,7 +1758,9 @@ ${taskData.描述?.content || "描述：暂无"}
         this.taskSyncLocks.clear();
         this.lastSyncDirection.clear();
         this.pendingDidaUpdates.clear();
+        this.pendingSiyuanConfirmTargets.clear();
         this.pendingSiyuanTargets.clear();
+        this.pendingSiyuanCreates.clear();
     }
 
     /**
