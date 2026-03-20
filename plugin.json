@@ -2,15 +2,11 @@
   "name": "siyuan-steve-tools",
   "author": "steve",
   "url": "https://github.com/loonghfut/siyuan-steve-tools",
-  "version": "0.37.0",
+  "version": "0.37.1",
   "minAppVersion": "3.5.1",
   "disabledInPublish": true,
-  "backends": [
-    "all"
-  ],
-  "frontends": [
-    "all"
-  ],
+  "backends": ["all"],
+  "frontends": ["all"],
   "displayName": {
     "default": "STtools",
     "zh_CN": "STtools"
@@ -24,14 +20,7 @@
     "zh_CN": "README_zh_CN.md"
   },
   "funding": {
-    "custom": [
-      "https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png"
-    ]
+    "custom": ["https://pic.imgdb.cn/item/6751b929d0e0a243d4de55a7.png"]
   },
-  "keywords": [
-    "tools",
-    "schedule",
-    "calendar",
-    "st"
-  ]
+  "keywords": ["tools", "schedule", "calendar", "st"]
 }
