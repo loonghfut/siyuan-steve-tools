@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.37.0 (2026年03月19日)
+### v0.37.1 (2026年03月20日)
 - Remove unused `setdialog` property (loonghfut)
 - ``` Fix inconsistent indentation and formatting in codebase (loonghfut)
 - 更新 .gitignore，添加 ui-ux-pro-max 目录 (loonghfut)
@@ -54,6 +54,11 @@ win端s3同步后，docker端感知s3同步。
 - feat: 增加思源任务确认检查队列，优化任务创建和同步逻辑 (loonghfut)
 - feat: 增加思源任务确认检查的重试机制，优化确认逻辑 (loonghfut)
 - feat: 更新版本号至0.37.0 (loonghfut)
+- docs: 更新 v0.37.0 版本的更新日志 (loonghfut)
+- feat: 增加与memos的单向同步功能，支持全量和增量同步 (loonghfut)
+- Add custom components for advanced template and list editing (loonghfut)
+- ``` Add new Svelte components for settings UI (loonghfut)
+- Bump version to 0.37.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
