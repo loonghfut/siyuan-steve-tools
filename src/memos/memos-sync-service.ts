@@ -549,9 +549,6 @@ export class MemosSyncService {
         }
 
         await setBlockAttrs(headingId, this.buildMemoAttrs(memo, remoteId, memoHash));
-        if (!this.hasCustomTemplate()) {
-            await this.upsertMetaBlock(headingId, memo, remoteId);
-        }
         await this.upsertContentBlock(headingId, memo, remoteId);
         await this.syncAttachmentBlocks(headingId, memo, remoteId);
         this.syncedCount += 1;
