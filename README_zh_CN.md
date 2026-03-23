@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.37.1 (2026年03月20日)
+### v0.37.2 (2026年03月23日)
 - Remove unused `setdialog` property (loonghfut)
 - ``` Fix inconsistent indentation and formatting in codebase (loonghfut)
 - 更新 .gitignore，添加 ui-ux-pro-max 目录 (loonghfut)
@@ -59,6 +59,9 @@ win端s3同步后，docker端感知s3同步。
 - Add custom components for advanced template and list editing (loonghfut)
 - ``` Add new Svelte components for settings UI (loonghfut)
 - Bump version to 0.37.1 (loonghfut)
+- docs: 更新 v0.37.1 版本的更新日志 (loonghfut)
+- Stop upserting meta block during sync (loonghfut)
+- Bump plugin version to 0.37.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
