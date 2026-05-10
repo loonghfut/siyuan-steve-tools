@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.37.2 (2026年03月23日)
+### v0.37.3 (2026年05月10日)
 - Remove unused `setdialog` property (loonghfut)
 - ``` Fix inconsistent indentation and formatting in codebase (loonghfut)
 - 更新 .gitignore，添加 ui-ux-pro-max 目录 (loonghfut)
@@ -62,6 +62,9 @@ win端s3同步后，docker端感知s3同步。
 - docs: 更新 v0.37.1 版本的更新日志 (loonghfut)
 - Stop upserting meta block during sync (loonghfut)
 - Bump plugin version to 0.37.2 (loonghfut)
+- docs: 更新 v0.37.2 版本的更新日志 (loonghfut)
+- feat: 添加滴答清单导入模板功能，支持自定义模板编辑 (loonghfut)
+- chore: 更新插件版本至 0.37.3 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
