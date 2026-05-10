@@ -61,6 +61,13 @@ export const calendarDefaults: Record<string, any> = {
     "cal-dida-sync-cooldown": 10,
     // 滴答清单默认提醒（每行一条，如：TRIGGER:-PT5M）
     "cal-dida-default-reminders": "",
+    // 滴答清单导入思源模板（留空则使用默认模板）
+    "cal-dida-import-template": `#### {{didaTitle}}
+
+{: id="{{titleBlockId}}"}
+{{description}}
+
+{: id="{{descriptionBlockId}}"}`,
     // 分享 / 云
     "cal-s3-bucket": "",
     "cal-s3-accessKeyId": "",
@@ -225,6 +232,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "number", title: "已完成任务保留天数", description: "同步最近多少天内完成的任务，默认 15 天", key: "cal-dida-completed-days", value: ctx.settings["cal-dida-completed-days"] },
                 { type: "number", title: "同步冷却期", description: "秒。用于防止刚修改的数据被反向覆盖（最低5秒）", key: "cal-dida-sync-cooldown", value: ctx.settings["cal-dida-sync-cooldown"] },
                 { type: "textarea", title: "默认提醒", description: "创建滴答任务时默认添加的提醒，每行一条；格式为 TRIGGER:ISO-8601 持续时间，如：\nTRIGGER:-PT0S（立即）\nTRIGGER:-PT5M（提前5分钟）\nTRIGGER:-PT30M（提前30分钟）\n留空则不设置提醒。", key: "cal-dida-default-reminders", value: ctx.settings["cal-dida-default-reminders"], direction: "row" },
+                { type: "custom", component: "TemplateEditor", title: "滴答导入模板", description: "可视化编辑滴答清单导入模板，留空则使用默认模板", key: "cal-dida-import-template", value: ctx.settings["cal-dida-import-template"] || calendarDefaults["cal-dida-import-template"], direction: "column", placeholders: ["title", "didaTitle", "description", "content", "status", "statusAttr", "priority", "startDateTime", "endDateTime", "startDate", "endDate", "startDateTimeISO", "endDateTimeISO", "shortStartTime", "shortEndTime", "tags", "tagList", "didaID", "didaLink", "projectId", "blockId", "itemID", "titleBlockId", "descriptionBlockId"], placeholderDescriptions: { "title": "去除链接后的任务标题", "didaTitle": "滴答原始标题（含 D 链接）", "description": "显示用描述（空值时使用默认文案）", "content": "原始描述内容", "status": "状态文本", "statusAttr": "思源块状态属性值", "priority": "优先级文本", "startDateTime": "开始时间（YYYY-MM-DD HH:mm）", "endDateTime": "结束时间（YYYY-MM-DD HH:mm）", "startDate": "开始日期（YYYY-MM-DD）", "endDate": "结束日期（YYYY-MM-DD）", "startDateTimeISO": "开始时间（YYYY-MM-DDTHH:mm）", "endDateTimeISO": "结束时间（YYYY-MM-DDTHH:mm）", "shortStartTime": "开始时间（HH:mm）", "shortEndTime": "结束时间（HH:mm）", "tags": "标签文本（逗号分隔）", "tagList": "标签文本（#形式）", "didaID": "滴答任务 ID", "didaLink": "滴答任务链接", "projectId": "滴答清单项目 ID", "blockId": "思源块 ID", "itemID": "思源数据库行 ID", "titleBlockId": "标题块 ID", "descriptionBlockId": "描述块 ID" }, placeholderCategories: { "内容": ["title", "didaTitle", "description", "content"], "时间": ["startDateTime", "endDateTime", "startDate", "endDate", "startDateTimeISO", "endDateTimeISO", "shortStartTime", "shortEndTime"], "状态标签": ["status", "statusAttr", "priority"], "标签": ["tags", "tagList"], "链接与 ID": ["didaID", "didaLink", "projectId", "blockId", "itemID", "titleBlockId", "descriptionBlockId"] }, rows: 8 },
             ]
         },
     ]

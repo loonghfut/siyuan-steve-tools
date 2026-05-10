@@ -1006,6 +1006,133 @@ export class Dida365Service {
     }
 
     /**
+     * 将滴答任务状态映射为思源块属性值。
+     */
+    private getDidaStatusAttr(status?: string): 'todo' | 'inprogress' | 'done' | 'archive' {
+        switch (status) {
+            case '完成':
+                return 'done';
+            case '进行中':
+                return 'inprogress';
+            case '归档':
+                return 'archive';
+            default:
+                return 'todo';
+        }
+    }
+
+    /**
+     * 格式化模板里使用的日期时间。
+     */
+    private formatDidaTemplateDateTime(timestamp?: number): string {
+        const formatted = formatLocalDate(timestamp as number);
+        return formatted ? formatted.replace('T', ' ') : '';
+    }
+
+    /**
+     * 格式化模板里使用的日期。
+     */
+    private formatDidaTemplateDateOnly(timestamp?: number): string {
+        const formatted = formatLocalDate(timestamp as number);
+        return formatted ? formatted.split('T')[0] : '';
+    }
+
+    /**
+     * 格式化模板里使用的短时间。
+     */
+    private formatDidaTemplateShortTime(timestamp?: number): string {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        if (Number.isNaN(date.getTime())) return '';
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    /**
+     * 极简模板渲染：支持 {{key}} 占位符。
+     */
+    private renderTemplate(template: string, data: Record<string, any>): string {
+        const tpl = (template || '').trim();
+        if (!tpl) return '';
+
+        let result = tpl.replace(/\{\{(\w+)\}\}/g, (_m, key) => {
+            const value = data[key];
+            if (Array.isArray(value)) {
+                return value
+                    .map(item => (item === undefined || item === null) ? '' : String(item))
+                    .filter(Boolean)
+                    .join(', ');
+            }
+            if (value === undefined || value === null || value === '') {
+                return '';
+            }
+            return String(value);
+        });
+
+        // 清理空行（只包含空白字符的行），保持和其他模板模块一致的渲染行为
+        result = result.replace(/^\s*[\r\n]/gm, '').replace(/\n\s*\n/g, '\n');
+        return result;
+    }
+
+    /**
+     * 默认的滴答清单导入思源模板。
+     */
+    private getDefaultDidaImportTemplate(): string {
+        return `#### {{didaTitle}}
+
+{: id="{{titleBlockId}}"}
+{{description}}
+
+{: id="{{descriptionBlockId}}"}`;
+    }
+
+    /**
+     * 构建滴答任务插入思源时的模板数据。
+     */
+    private buildDidaImportTemplateData(taskData: any, blockId: string, itemID: string, titleBlockId: string, descriptionBlockId: string): Record<string, any> {
+        const didaTitle = taskData.事件?.content || '新建任务';
+        const title = this.removeLinksFromTitle(didaTitle);
+        const rawDescription = taskData.描述?.content || '';
+        const displayDescription = rawDescription || '描述：暂无';
+        const startTimestamp = taskData.开始时间?.start;
+        const endTimestamp = taskData.开始时间?.end;
+        const didaLink = taskData.链接?.content || '';
+        const projectIdMatch = didaLink.match(/#p\/([^/]+)\/tasks\/[^)]+/);
+        const tags = (taskData.标签?.content || [])
+            .map((tag: any) => typeof tag === 'string' ? tag : tag?.content)
+            .filter(Boolean);
+        const status = taskData.状态?.content || '未完成';
+
+        return {
+            title,
+            didaTitle,
+            description: displayDescription,
+            content: rawDescription,
+            status,
+            statusAttr: this.getDidaStatusAttr(status),
+            priority: taskData.优先级?.content || '无',
+            startDateTime: this.formatDidaTemplateDateTime(startTimestamp),
+            endDateTime: this.formatDidaTemplateDateTime(endTimestamp),
+            startDateTimeISO: formatLocalDate(startTimestamp) || '',
+            endDateTimeISO: formatLocalDate(endTimestamp) || '',
+            startDate: this.formatDidaTemplateDateOnly(startTimestamp),
+            endDate: this.formatDidaTemplateDateOnly(endTimestamp),
+            shortStartTime: this.formatDidaTemplateShortTime(startTimestamp),
+            shortEndTime: this.formatDidaTemplateShortTime(endTimestamp),
+            tags: tags.join(', '),
+            tagList: tags.map(tag => `#${tag}`).join(' '),
+            didaID: taskData.didaID?.content || '',
+            didaLink,
+            projectId: projectIdMatch?.[1] || '',
+            blockId,
+            itemID,
+            titleBlockId,
+            descriptionBlockId,
+        };
+    }
+
+    /**
      * 解析设置中的默认提醒，支持：
      * - 字符串：以换行或逗号分隔；
      * - 数组：直接使用；
@@ -1159,6 +1286,8 @@ export class Dida365Service {
             // 创建一个新的块
             const blockId = await generateSiyuanID() as string;
             const itemID = await generateSiyuanID() as string;
+            const titleBlockId = await generateSiyuanID() as string;
+            const descriptionBlockId = await generateSiyuanID() as string;
             // 根据配置确定创建位置
             let targetId;
             if (settingdata["cal-create-for-date"]) {
@@ -1176,21 +1305,15 @@ export class Dida365Service {
             }
 
             // 创建块内容
-            const statusCustomAttr = taskData.状态?.content === "完成" ? "done" : "todo";
-            // 提取D链接
-            // const titleWithoutLinks = this.removeLinksFromTitle(taskData.事件?.content || "新建任务");
-            // const dLinkMatch = (taskData.事件?.content || "").match(/\[D\]\(https:\/\/dida365\.com\/webapp\/#q\/all\/tasks\/[^)]+\)/);
-            // const dLink = dLinkMatch ? dLinkMatch[0] : "";
+            const statusCustomAttr = this.getDidaStatusAttr(taskData.状态?.content);
+            const template = String((settingdata as any)["cal-dida-import-template"] || '').trim() || this.getDefaultDidaImportTemplate();
+            const templateData = this.buildDidaImportTemplateData(taskData, blockId, itemID, titleBlockId, descriptionBlockId);
+            const renderedBody = this.renderTemplate(template, templateData).trim() || this.renderTemplate(this.getDefaultDidaImportTemplate(), templateData).trim();
 
             await appendBlock(
                 "markdown",
                 `{{{row
-${"#### " + taskData.事件?.content}
-
-{: id="${await generateSiyuanID() as string}"}
-${taskData.描述?.content || "描述：暂无"}
-
-{: id="${await generateSiyuanID() as string}"}
+${renderedBody}
 }}}
 {: id="${blockId}" custom-st-event="${statusCustomAttr}"}`,
                 targetId
@@ -1266,7 +1389,7 @@ ${taskData.描述?.content || "描述：暂无"}
             });
 
             // 更新块的自定义属性（状态）
-            const statusCustomAttr = newTaskData.状态?.content === "完成" ? "done" : "todo";
+            const statusCustomAttr = this.getDidaStatusAttr(newTaskData.状态?.content);
             await setBlockAttrs(blockId, {
                 "custom-st-event": statusCustomAttr
             });
