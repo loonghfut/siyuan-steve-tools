@@ -84,7 +84,7 @@ export function getPortAtPoint(
 
 		// 根据形状大小动态计算识别范围（与端口 CSS hit area 保持一致的比例）
 		const shapeMargin = bbox
-			? Math.max(20, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.2, 56))
+			? Math.max(16, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.13, 38))
 			: baseMargin
 
 		// 快速过滤：若点不在 bbox + margin 内，跳过该 shape

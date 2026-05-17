@@ -29,7 +29,7 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 			const port = ports?.[portId] ?? null
 			if (!port) return null
 			const bounds = editor.getShapeGeometry(shape).bounds
-			const hitSize = Math.max(20, Math.min(Math.sqrt(bounds.width ** 2 + bounds.height ** 2) * 0.2, 56))
+			const hitSize = Math.max(16, Math.min(Math.sqrt(bounds.width ** 2 + bounds.height ** 2) * 0.13, 38))
 			const colorKey = (shape as any)?.props?.color ?? 'black'
 			const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 			const defaultDotColor = (theme[colorKey] && theme[colorKey].solid) || theme.black.solid
