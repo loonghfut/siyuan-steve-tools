@@ -6,6 +6,7 @@ import { TldrawUiButton, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
 import { getBlockKramdown } from '@/api/api'
 import { parseMarkdownToMindMap } from './mind-map-markdown'
+import { inputDialog } from '@/libs/dialog'
 import type { IMindMapShape } from './mind-map-shape-types'
 
 export interface MindMapBindingUIProps {
@@ -19,15 +20,14 @@ export const MindMapBindingUI: React.FC<MindMapBindingUIProps> = ({ selectedMind
     const isLinked = currentShape?.props?.blockId ? true : false
     const linkedBlockId = currentShape?.props?.blockId || ''
 
-    const [inputBlockId, setInputBlockId] = React.useState('')
     const [isBinding, setIsBinding] = React.useState(false)
 
-    const handleBindBlock = async () => {
+    const doBindBlock = async (blockId: string) => {
         if (!singleSelected || !currentShape) {
             showMessage('请选中单个思维导图', 3000, 'error')
             return
         }
-        const blockIdToUse = inputBlockId.trim()
+        const blockIdToUse = blockId.trim()
         if (!blockIdToUse) {
             showMessage('请输入块ID', 3000, 'error')
             return
@@ -51,7 +51,6 @@ export const MindMapBindingUI: React.FC<MindMapBindingUIProps> = ({ selectedMind
                     refreshNonce: Date.now(),
                 },
             })
-            setInputBlockId('')
             showMessage('已绑定思源块')
         } catch (err) {
             console.error('绑定思源块失败', err)
@@ -100,6 +99,14 @@ export const MindMapBindingUI: React.FC<MindMapBindingUIProps> = ({ selectedMind
         })
     }
 
+    const handleOpenBindDialog = () => {
+        inputDialog({
+            title: '绑定思源块',
+            placeholder: '请输入思源块ID',
+            confirm: (text) => doBindBlock(text),
+        })
+    }
+
     if (!singleSelected) {
         return (
             <div style={{ fontSize: 12, color: 'var(--b3-theme-on-surface-light)', padding: '4px 0' }}>
@@ -142,38 +149,14 @@ export const MindMapBindingUI: React.FC<MindMapBindingUIProps> = ({ selectedMind
                     </TldrawUiButton>
                 </>
             ) : (
-                <>
-                    <input
-                        type="text"
-                        placeholder="输入思源块ID"
-                        value={inputBlockId}
-                        onChange={(e) => setInputBlockId(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleBindBlock()
-                            }
-                        }}
-                        style={{
-                            width: '100%',
-                            padding: '6px 8px',
-                            fontSize: '13px',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: '4px',
-                            backgroundColor: 'var(--color-background)',
-                            color: 'var(--color-text)',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                        }}
-                    />
-                    <TldrawUiButton
-                        type="normal"
-                        onClick={handleBindBlock}
-                        disabled={isBinding || !inputBlockId.trim()}
-                        title="输入思源块ID后点击绑定，将从该块获取 Markdown 内容渲染思维导图"
-                    >
-                        {isBinding ? '绑定中...' : '绑定思源块'}
-                    </TldrawUiButton>
-                </>
+                <TldrawUiButton
+                    type="normal"
+                    onClick={handleOpenBindDialog}
+                    disabled={isBinding}
+                    title="输入思源块ID后点击绑定，将从该块获取 Markdown 内容渲染思维导图"
+                >
+                    {isBinding ? '绑定中...' : '绑定思源块'}
+                </TldrawUiButton>
             )}
         </div>
     )
