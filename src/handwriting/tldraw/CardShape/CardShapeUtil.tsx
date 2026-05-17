@@ -186,6 +186,27 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const refreshNonceRef = useRef(shape.props.refreshNonce);
 		const prevCollapsedRef = useRef(isCollapsed);
 
+		// 稳定引用当前 shape props，供折叠图标点击回调使用，避免 useCallback 依赖 shape.props 导致频繁重建
+		const shapePropsRef = useRef(shape.props);
+		shapePropsRef.current = shape.props;
+
+		const handleUncollapse = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+			e.stopPropagation();
+			e.preventDefault();
+			const props = shapePropsRef.current;
+			const storedHeight = props.preCollapseHeight;
+			this.editor.updateShape({
+				id: shape.id,
+				type: shape.type,
+				props: {
+					...props,
+					isCollapsed: false,
+					h: storedHeight && storedHeight > 0 ? storedHeight : props.h,
+					preCollapseHeight: undefined,
+				},
+			});
+		}, [shape.id, shape.type]);
+
 
 		// 仅在编辑时创建 Protyle 实例
 		const protyleRef = useRef<Protyle | null>(null)
@@ -1258,7 +1279,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								opacity: 1,
 								transform: 'translateY(0)'
 							}}>
-								{/* 折叠图标 */}
+								{/* 折叠图标 — 点击展开 */}
 								<svg
 									width="18"
 									height="18"
@@ -1268,8 +1289,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									strokeWidth="2"
 									strokeLinecap="round"
 									strokeLinejoin="round"
-									style={{ flexShrink: 0, opacity: 0.6 }}
+									style={{ flexShrink: 0, opacity: 0.6, cursor: 'pointer', pointerEvents: 'auto' }}
+									onClick={handleUncollapse}
+									onPointerDown={(e) => e.stopPropagation()}
 								>
+									<title>点击展开</title>
 									<polyline points="4 14 10 14 10 20"></polyline>
 									<polyline points="20 10 14 10 14 4"></polyline>
 									<line x1="14" y1="10" x2="21" y2="3"></line>
