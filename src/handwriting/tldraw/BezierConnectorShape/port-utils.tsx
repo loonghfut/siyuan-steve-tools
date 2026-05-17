@@ -59,9 +59,8 @@ export function getPortAtPoint(
 	port: ShapePort
 	existingConnections: ReturnType<typeof getShapeConnections>
 } | null {
-	// 默认识别范围设大一点以便拖拽时更容易命中（与 CSS 的 pseudo-element 相匹配）
-	const margin = opts?.margin ?? 28
-	const marginSq = margin * margin
+	// 默认基础识别范围（当无法计算形状大小时回退使用）
+	const baseMargin = opts?.margin ?? 28
 
 	// 获取当前页面的所有形状
 	const shapes = editor.getCurrentPageShapes()
@@ -83,39 +82,44 @@ export function getPortAtPoint(
 		const { pagePorts, bbox, portDefs } = cache as { pagePorts: Record<string, VecLike>; bbox: { minX: number; minY: number; maxX: number; maxY: number } | null; portDefs: Record<string, ShapePort> }
 		if (!pagePorts || Object.keys(pagePorts).length === 0) continue
 
+		// 根据形状大小动态计算识别范围（与端口 CSS hit area 保持一致的比例）
+		const shapeMargin = bbox
+			? Math.max(20, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.2, 56))
+			: baseMargin
+
 		// 快速过滤：若点不在 bbox + margin 内，跳过该 shape
 		if (bbox) {
 			if (
-				point.x < bbox.minX - margin ||
-				point.x > bbox.maxX + margin ||
-				point.y < bbox.minY - margin ||
-				point.y > bbox.maxY + margin
+				point.x < bbox.minX - shapeMargin ||
+				point.x > bbox.maxX + shapeMargin ||
+				point.y < bbox.minY - shapeMargin ||
+				point.y > bbox.maxY + shapeMargin
 			) {
 				continue
 			}
 		}
+
+		const marginSq = shapeMargin * shapeMargin
 
 		// 迭代 port
 		const shapePorts = portDefs || getShapePorts(editor, shape) || {}
 		for (const [portId, port] of Object.entries(pagePorts)) {
 			// 若传入了 terminal 过滤条件，则仅匹配对应类型
 			if (opts?.terminal) {
-				// 端口类型信息不在 pagePorts 中，因此需要直接 getShapePorts once
 				const shapePortDef = shapePorts?.[portId]
-				// 如果没找到定义或类型不匹配则跳过
 				if (!shapePortDef || shapePortDef.terminal !== opts.terminal) continue
 			}
 
 			const dx = point.x - port.x
 			const dy = point.y - port.y
 			const distSq = dx * dx + dy * dy
-						if (distSq < marginSq && (!bestResult || distSq < bestResult.distanceSq)) {
-								bestResult = {
-									shapeId: shape.id,
-									port: (shapePorts || {})[portId] as ShapePort,
-									distanceSq: distSq,
-								}
-							}
+			if (distSq < marginSq && (!bestResult || distSq < bestResult.distanceSq)) {
+				bestResult = {
+					shapeId: shape.id,
+					port: (shapePorts || {})[portId] as ShapePort,
+					distanceSq: distSq,
+				}
+			}
 		}
 	}
 

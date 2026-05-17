@@ -11,7 +11,7 @@ import {
 } from './bezier-connector-binding'
 import { getPortAtPoint } from './port-utils'
 import { getShapePorts } from './shape-ports'
-import { resetPortState, setEligiblePortsIfChanged, setHintingPortIfChanged } from './port-state'
+import { setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
 
 /**
  * 端口拖拽信息
@@ -47,7 +47,10 @@ export class PointingPort extends StateNode {
 	}
 
 	override onExit() {
-		resetPortState(this.editor)
+		// 不清除 eligiblePorts：过渡到 dragging_handle 时端口光环应保持可见
+		// eligiblePorts 会在 onHandleDragEnd 或 onPointerUp/onCancel 中清除
+		setHintingPortIfChanged(this.editor, null)
+		setHighlightConnectorIfChanged(this.editor, null)
 		this.info = undefined
 		this.editor.setCursor({ type: 'default', rotation: 0 })
 	}
@@ -182,11 +185,13 @@ export class PointingPort extends StateNode {
 	}
 
 	override onPointerUp(): void {
-		// 点击（非拖拽）处理
+		// 点击（非拖拽）处理：清除端口状态后返回 idle
+		setEligiblePortsIfChanged(this.editor, null)
 		this.parent.transition('idle')
 	}
 
 	override onCancel(): void {
+		setEligiblePortsIfChanged(this.editor, null)
 		this.parent.transition('idle')
 	}
 }

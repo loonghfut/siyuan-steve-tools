@@ -814,7 +814,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		setHintingPortIfChanged(this.editor, null)
 		setHighlightConnectorIfChanged(this.editor, null)
 		// clear eligible ports when not matching
-		setEligiblePortsIfChanged(this.editor, null)
+		// eligiblePorts stay during drag, cleared in onHandleDragEnd
 		pendingBindingTargets.set(connectorId, {
 			kind: 'remove',
 			terminal: draggingTerminal,
