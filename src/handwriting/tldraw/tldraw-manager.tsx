@@ -746,6 +746,13 @@ export class TldrawManager {
                             }
                         });
 
+                        // 每次新建的 slide 形状默认在最底层
+                        editor.sideEffects.registerAfterCreateHandler('shape', (shape) => {
+                            if (shape.type === 'slide') {
+                                editor.sendToBack([shape.id]);
+                            }
+                        });
+
 
                     }}
                     assetUrls={assetUrls}
