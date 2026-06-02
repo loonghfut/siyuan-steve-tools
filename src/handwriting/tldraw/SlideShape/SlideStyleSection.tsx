@@ -2,7 +2,7 @@
  * Slide 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiInput, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
 import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
@@ -60,13 +60,13 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
     }, [isSingleSlideSelected, slideShape])
 
     const handleNameChange = React.useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
+        (value: string) => {
             if (slideShape) {
                 editor.run(() => {
                     editor.updateShape({
                         id: slideShape.id,
                         type: 'slide',
-                        props: { name: e.target.value },
+                        props: { name: value },
                     })
                 })
             }
@@ -74,28 +74,18 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
         [editor, slideShape]
     )
 
-    const handleNameBlur = React.useCallback(
-        (e: React.FocusEvent<HTMLInputElement>) => {
-            if (slideShape && slideShape.props.name !== e.target.value.trim()) {
+    const handleNameTrim = React.useCallback(
+        (value: string) => {
+            const trimmed = value.trim()
+            if (slideShape && slideShape.props.name !== trimmed) {
                 editor.updateShape({
                     id: slideShape.id,
                     type: 'slide',
-                    props: { name: e.target.value.trim() },
+                    props: { name: trimmed },
                 })
             }
         },
         [editor, slideShape]
-    )
-
-    const handleKeyDown = React.useCallback(
-        (e: React.KeyboardEvent<HTMLInputElement>) => {
-            if (e.key === 'Enter') {
-                e.currentTarget.blur()
-            } else if (e.key === 'Escape') {
-                e.currentTarget.blur()
-            }
-        },
-        []
     )
 
     const handleCaptureScreenshot = React.useCallback(async () => {
@@ -270,14 +260,13 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
 
     return (
         <div className="tlui-style-panel__section">
-            <input
-                className="tlui-input slide-name-input"
-                type="text"
+            <TldrawUiInput
                 value={slideShape.props.name}
-                onChange={handleNameChange}
-                onBlur={handleNameBlur}
-                onKeyDown={handleKeyDown}
-                spellCheck={false}
+                onValueChange={handleNameChange}
+                onBlur={handleNameTrim}
+                onCancel={handleNameTrim}
+                onComplete={handleNameTrim}
+                placeholder="幻灯片名称"
             />
             <StylePanelDropdownPicker
                 label="边框样式"

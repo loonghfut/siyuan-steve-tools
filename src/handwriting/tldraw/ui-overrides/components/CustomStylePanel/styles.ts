@@ -2,38 +2,7 @@
  * 样式面板内联 CSS 样式
  */
 export const stylePanelStyles = `
-    .connector-width-input {
-        color: var(--color-text);
-        background: var(--b3-theme-surface);
-        border: 1px solid var(--color-border);
-        border-radius: 8px;
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
-        height: 32px;
-        width: 77px;
-        text-align: right;
-        padding: 0 8px;
-        box-sizing: border-box;
-    }
-    .connector-width-input::placeholder {
-        color: var(--color-text-muted);
-        opacity: 1;
-    }
-    /* 移除 number input 的上下微调按钮 */
-    .connector-width-input::-webkit-outer-spin-button,
-    .connector-width-input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-    /* Firefox */
-    .connector-width-input {
-        -moz-appearance: textfield;
-    }
-    @media (prefers-color-scheme: light) {
-        .connector-width-input::placeholder {
-            color: rgba(0,0,0,0.45);
-        }
-    }
-    /* Color input: remove native swatch background/padding */
+	/* Color input: remove native swatch background/padding */
     .connector-color-input {
         background: transparent;
         padding: 0;

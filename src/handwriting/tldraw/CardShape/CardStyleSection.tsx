@@ -2,7 +2,7 @@
  * Card 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import type { ICardShape, CardRenderMode } from './card-shape-types'
 
 export interface CardStyleSectionProps {
@@ -52,38 +52,30 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
             {showCollapsedTextSettings && <>
                 <div className="tlui-style-panel__section">
                     {/* 折叠后文字大小 */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--tla-color-text-2)', padding: '0 4px' }}>折叠后文字大小</span>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                            {[14, 16, 18, 21, 24, 28].map(size => (
-                                <TldrawUiButton
-                                    key={size}
-                                    type={collapsedTextSizeValue === size ? 'primary' : 'normal'}
-                                    style={{ flex: '1 1 auto', minWidth: '32px', fontSize: '12px' }}
-                                    onClick={() => {
-                                        if (!selectedCardShapes.length) return
-                                        editor.run(() => {
-                                            editor.updateShapes(
-                                                selectedCardShapes.map((shape) => ({
-                                                    id: shape.id,
-                                                    type: 'card',
-                                                    props: { ...shape.props, collapsedTextSize: size },
-                                                }))
-                                            )
-                                        })
-                                    }}
-                                >
-                                    {size}px
-                                </TldrawUiButton>
-                            ))}
-                        </div>
-                    </div>
+                    <TldrawUiSlider
+                        label={`${collapsedTextSizeValue === 'mixed' ? '' : `${collapsedTextSizeValue}px`}`}
+                        title="折叠后文字大小"
+                        min={25}
+                        steps={52}
+                        value={collapsedTextSizeValue === 'mixed' ? null : collapsedTextSizeValue}
+                        onValueChange={(value) => {
+                            if (!selectedCardShapes.length) return
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedCardShapes.map((shape) => ({
+                                        id: shape.id,
+                                        type: 'card',
+                                        props: { ...shape.props, collapsedTextSize: value },
+                                    }))
+                                )
+                            })
+                        }}
+                    />
                 </div>
 
                 <div className="tlui-style-panel__section">
                     {/* 折叠后文字对齐方式 */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--tla-color-text-2)', padding: '0 4px' }}>折叠后文字对齐</span>
                         <div style={{ display: 'flex', gap: '0px' }}>
                             {([
                                 { value: 'left', label: '靠左' },
@@ -108,7 +100,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                     }}
                                     title={label}
                                 >
-                                    <span style={{ fontSize: '10px' }}>{label}</span>
+                                    <span style={{ fontSize: '12px' }}>{label}</span>
                                 </TldrawUiButton>
                             ))}
                         </div>

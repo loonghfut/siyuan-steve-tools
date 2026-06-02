@@ -2,7 +2,7 @@
  * BezierConnector 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, Editor, TLShapeId } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiSlider, Editor, TLShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { IBezierConnectorShape } from './bezier-connector-types'
 import { getConnectorTerminals } from './BezierConnectorShapeUtil'
@@ -236,23 +236,14 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
 
             {hasConnectorSelection && (
                 <div className="tlui-style-panel__section">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                        <span style={{ textAlign: 'right', color: 'var(--color-text-muted)' }}>线宽</span>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <input
-                                className="connector-width-input"
-                                type="number"
-                                min={0.5}
-                                max={12}
-                                step={0.5}
-                                value={connectorStrokeState === 'mixed' ? '' : connectorStrokeState}
-                                placeholder={connectorStrokeState === 'mixed' ? '混合' : undefined}
-                                onChange={(e) => handleConnectorWidthChange(parseFloat(e.target.value))}
-                                style={{ color: 'var(--color-text)' }}
-                            />
-                            <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>px</span>
-                        </div>
-                    </div>
+                    <TldrawUiSlider
+                        label={`线宽${connectorStrokeState === 'mixed' ? '' : ` — ${connectorStrokeState}px`}`}
+                        title="连接线宽度"
+                        min={1}
+                        steps={24}
+                        value={connectorStrokeState === 'mixed' ? null : connectorStrokeState * 2}
+                        onValueChange={(value) => handleConnectorWidthChange(value / 2)}
+                    />
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 8 }}>
                         <div className="tlui-toggle-button-row" style={{ marginLeft: 8 }}>
                             {(['solid', 'dashed', 'flowing'] as const).map((style) => {

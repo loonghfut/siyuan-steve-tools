@@ -1285,8 +1285,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							}}>
 								{/* 折叠图标 — 点击展开 */}
 								<svg
-									width="18"
-									height="18"
+									width={Math.round(collapsedTextSize * 0.85)}
+									height={Math.round(collapsedTextSize * 0.85)}
 									viewBox="0 0 24 24"
 									fill="none"
 									stroke={theme[shape.props.color].solid}

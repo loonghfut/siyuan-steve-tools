@@ -2,7 +2,7 @@
  * 思维导图样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import type { IMindMapShape } from './mind-map-shape-types'
 import type { ThemeName } from './mind-map-constants'
 import { MindMapBindingUI } from './MindMapBindingUI'
@@ -38,45 +38,39 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
         <>
             {/* 字号选择 */}
             <div className="tlui-style-panel__section">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {[16, 18, 20, 24, 28, 32].map(size => (
-                            <TldrawUiButton
-                                key={size}
-                                type={mindMapFontSizeValue === size ? 'primary' : 'normal'}
-                                style={{ flex: '1 1 auto', minWidth: '32px', fontSize: '12px' }}
-                                onClick={() => {
-                                    if (!selectedMindMapShapes.length) return
-                                    const baseFontSize = 14
-                                    const baseNodeWidth = 120
-                                    const baseNodeHeight = 40
-                                    const baseLineWidth = 2
-                                    const scale = size / baseFontSize
-                                    const nodeWidth = Math.round(baseNodeWidth * scale)
-                                    const nodeHeight = Math.round(baseNodeHeight * scale)
-                                    const lineWidth = +(baseLineWidth * scale).toFixed(2)
-                                    editor.run(() => {
-                                        editor.updateShapes(
-                                            selectedMindMapShapes.map((shape) => ({
-                                                id: shape.id,
-                                                type: 'mind-map',
-                                                props: {
-                                                    ...shape.props,
-                                                    fontSize: size,
-                                                    nodeWidth,
-                                                    nodeHeight,
-                                                    lineWidth,
-                                                },
-                                            }))
-                                        )
-                                    })
-                                }}
-                            >
-                                {size}
-                            </TldrawUiButton>
-                        ))}
-                    </div>
-                </div>
+                <TldrawUiSlider
+                    label={`字号${mindMapFontSizeValue === 'mixed' ? '' : ` — ${mindMapFontSizeValue}px`}`}
+                    title="思维导图字号"
+                    min={20}
+                    steps={48}
+                    value={mindMapFontSizeValue === 'mixed' ? null : mindMapFontSizeValue}
+                    onValueChange={(size) => {
+                        if (!selectedMindMapShapes.length) return
+                        const baseFontSize = 14
+                        const baseNodeWidth = 120
+                        const baseNodeHeight = 40
+                        const baseLineWidth = 2
+                        const scale = size / baseFontSize
+                        const nodeWidth = Math.round(baseNodeWidth * scale)
+                        const nodeHeight = Math.round(baseNodeHeight * scale)
+                        const lineWidth = +(baseLineWidth * scale).toFixed(2)
+                        editor.run(() => {
+                            editor.updateShapes(
+                                selectedMindMapShapes.map((shape) => ({
+                                    id: shape.id,
+                                    type: 'mind-map',
+                                    props: {
+                                        ...shape.props,
+                                        fontSize: size,
+                                        nodeWidth,
+                                        nodeHeight,
+                                        lineWidth,
+                                    },
+                                }))
+                            )
+                        })
+                    }}
+                />
             </div>
 
             {/* 主题选择 */}
