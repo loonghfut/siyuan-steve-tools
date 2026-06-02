@@ -29,7 +29,7 @@ export async function check() {
                 return;
             }
             piracyWarnTimer = window.setInterval(() => {
-                showMessage("请支持正版思源!!!，后续插件将不再对盗版思源提供支持", -1, "error");
+                showMessage("请支持正版思源!!!，后续插件将不再对盗版思源提供支持，若不想触发此提示，请使用正版思源或者卸载STtools插件", -1, "error");
             }, 2000);
         }
     }
