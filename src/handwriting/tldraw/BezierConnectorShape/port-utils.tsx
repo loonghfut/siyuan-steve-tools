@@ -62,6 +62,9 @@ export function getPortAtPoint(
 	// 默认基础识别范围（当无法计算形状大小时回退使用）
 	const baseMargin = opts?.margin ?? 28
 
+	// 获取当前画布缩放级别，用于缩放 margin 以保持屏幕空间的 hit area 一致性
+	const zoom = editor.getZoomLevel()
+
 	// 获取当前页面的所有形状
 	const shapes = editor.getCurrentPageShapes()
 
@@ -83,9 +86,12 @@ export function getPortAtPoint(
 		if (!pagePorts || Object.keys(pagePorts).length === 0) continue
 
 		// 根据形状大小动态计算识别范围（与端口 CSS hit area 保持一致的比例）
-		const shapeMargin = bbox
+		// 然后按 zoom 缩放：缩小画布时放大 page-space margin，放大画布时缩小
+		// clamp 8~200 避免极端缩放时 hit area 过大或过小
+		const rawMargin = bbox
 			? Math.max(16, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.13, 38))
 			: baseMargin
+		const shapeMargin = Math.max(8, Math.min(rawMargin / zoom, 200))
 
 		// 快速过滤：若点不在 bbox + margin 内，跳过该 shape
 		if (bbox) {

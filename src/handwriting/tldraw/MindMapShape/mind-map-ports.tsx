@@ -208,14 +208,19 @@ export function MindMapPort({ shapeId, portId, port }: MindMapPortProps) {
     
     const isInput = port.terminal === 'end'
     const scale = isHinting ? 1.4 : 1
-    
+
     // 根据端口位置确定显示的颜色
     const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
     const defaultDotColor = theme.black.solid
-    
+
+    // zoom-aware：端口圆点大小和触发区域跟随画布缩放动态变化
+    const zoom = editor.getZoomLevel()
+    const hitSize = Math.max(8, Math.min(28 / zoom, 200))
+    const dotSize = Math.max(3, Math.min(8 / zoom, 48))
+
     // 只在需要时显示端口（不包括父悬浮状态）
     const shouldShow = isConnected || isEligible || isHinting || isFlashing
-    
+
     return (
         <div
             className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${
@@ -230,7 +235,9 @@ export function MindMapPort({ shapeId, portId, port }: MindMapPortProps) {
                 opacity: shouldShow ? 1 : 0,
                 transition: 'opacity 0.12s ease, transform 0.08s ease-in-out',
                 backgroundColor: isHinting || isEligible ? undefined : defaultDotColor,
-            }}
+                '--port-hit-size': `${hitSize}px`,
+                '--port-dot-size': `${dotSize}px`,
+            } as React.CSSProperties}
             onPointerDown={(e) => {
                 e.stopPropagation()
                 // 切换到端口拖拽状态

@@ -29,11 +29,17 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 			const port = ports?.[portId] ?? null
 			if (!port) return null
 			const bounds = editor.getShapeGeometry(shape).bounds
-			const hitSize = Math.max(16, Math.min(Math.sqrt(bounds.width ** 2 + bounds.height ** 2) * 0.13, 38))
+			const zoom = editor.getZoomLevel()
+			// 基础 hitSize（页面坐标），根据形状大小动态计算
+			const baseHitSize = Math.max(16, Math.min(Math.sqrt(bounds.width ** 2 + bounds.height ** 2) * 0.13, 38))
+			// 基于缩放动态调整 hitSize：缩小画布时自动放大，放大画布时自动缩小
+			const hitSize = Math.max(8, Math.min(baseHitSize / zoom, 200))
+			// 端口圆点大小：基础 8px，跟随缩放保持屏幕视觉一致（clamp 3~48px 页面坐标）
+			const dotSize = Math.max(3, Math.min(8 / zoom, 48))
 			const colorKey = (shape as any)?.props?.color ?? 'black'
 			const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 			const defaultDotColor = (theme[colorKey] && theme[colorKey].solid) || theme.black.solid
-			return { port, hitSize, defaultDotColor }
+			return { port, hitSize, dotSize, defaultDotColor }
 		},
 		[editor, shapeId, portId]
 	)
@@ -62,7 +68,7 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 
 	if (!portData) return null
 
-	const { port, hitSize, defaultDotColor } = portData
+	const { port, hitSize, dotSize, defaultDotColor } = portData
 	const { isHinting, isEligible, isFlashing, isConnected } = portState
 	const isInput = port.terminal === 'end'
 
@@ -112,6 +118,7 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 				transition: 'opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
 				backgroundColor: isHinting || isEligible ? undefined : defaultDotColor,
 				'--port-hit-size': `${hitSize}px`,
+				'--port-dot-size': `${dotSize}px`,
 			} as React.CSSProperties}
 			onPointerDown={() => {
 				editor.setCurrentTool('select.pointing_port', {

@@ -232,11 +232,14 @@
 }
 
 /* 贝塞尔连接器端口样式：小型实心点 */
-/* Small visible dot + larger clickable area (pseudo element) */
+/* Small visible dot + larger clickable area (pseudo element)
+ * Dot size and hit area now scale dynamically with zoom via CSS variables:
+ * --port-dot-size and --port-hit-size (set inline per-port in Port.tsx).
+ */
 .bezier-connector-port {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: var(--port-dot-size, 8px);
+  height: var(--port-dot-size, 8px);
   border-radius: 50%;
   background: var(--color-text-3, var(--color-text));
   border: none;
@@ -248,14 +251,14 @@
   cursor: crosshair;
 }
 
-/* 输入端口（左侧） */
+/* 输入端口（左侧）：居中于形状左边缘 */
 .bezier-connector-port--input {
-  left: -7px;
+  left: calc(var(--port-dot-size, 8px) / -2);
 }
 
-/* 输出端口（右侧） */
+/* 输出端口（右侧）：居中于形状右边缘 */
 .bezier-connector-port--output {
-  right: -7px;
+  right: calc(var(--port-dot-size, 8px) / -2);
 }
 
 /* 被指向时高亮 */
