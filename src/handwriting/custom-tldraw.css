@@ -58,25 +58,20 @@
 
 
 /* 变扁一点：减少高度与字体 */
-[custom-st-tldraw="1"][data-subtype="h6"] {
+/* [custom-st-tldraw="1"][data-subtype="h6"] {
   background-color: #398ecd57;
   color: #f9f9f985 !important;
   display: inline-flex;
   padding: 2px 6px;
-  /* 减少上下内边距以变矮 */
   min-height: 20px;
   max-height: 20px;
   line-height: 16px;
-  /* pointer-events: auto; */
-  /* isolation: isolate; */
   font-size: 12px !important;
-  /* 更小的字号 */
   border-radius: 4px;
-  /* 更平的圆角 */
   box-sizing: border-box;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
+} */
 
 .slide-name-input {
   margin: 8px;

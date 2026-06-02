@@ -17,6 +17,7 @@
     import TagColorMapEditor from '@/settings/components/TagColorMapEditor.svelte';
     import ListEditor from '@/settings/components/ListEditor.svelte';
     import TemplateEditor from '@/settings/components/TemplateEditor.svelte';
+    import StyleEditor from '@/settings/components/StyleEditor.svelte';
 
     export let group: string;
     export let settingItems: ISettingItem[];
@@ -125,6 +126,14 @@
             </div>
         </div>
         {/if}
+        {#if item.type === "custom" && item.component === "StyleEditor"}
+        <div class="b3-label">
+            <div class="fn__flex-1 fn__flex-column">
+                <StyleEditor group={group} key={item.key} value={item.value}
+                  on:changed={(e)=>dispatch('changed', { group, key: item.key, value: e.detail.value })} />
+            </div>
+        </div>
+        {/if}
     {/each}
-    
+
 </div>

@@ -10,6 +10,7 @@ import * as api from "@/api/api";
 import { TLShapeId } from "@tldraw/tldraw";
 import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
 import { settingdata } from "@/index";
+import { buildH6CSS, H6_STYLE_DEFAULTS, type H6StyleConfig } from "@/settings/style-h6";
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -40,7 +41,25 @@ export class M_handwriting {
         return this.plugin;
     }
 
+    private h6StyleEl: HTMLStyleElement | null = null;
+
+    private applyH6Style(css: string) {
+        if (!this.h6StyleEl) {
+            this.h6StyleEl = document.createElement('style');
+            this.h6StyleEl.id = 'st-tldraw-h6-custom';
+            document.head.appendChild(this.h6StyleEl);
+        }
+        this.h6StyleEl.textContent = css || '';
+    }
+
     async init(settingdata) {
+        const h6cfg = settingdata['style-h6-config'];
+        if (h6cfg && typeof h6cfg === 'object') {
+            this.applyH6Style(buildH6CSS(h6cfg as H6StyleConfig));
+        } else if (settingdata['tldraw-h6-style']) {
+            this.applyH6Style(settingdata['tldraw-h6-style']);
+        }
+
         // 添加图标
         this.plugin.addIcons(`
             <symbol id="iconSTWhiteboard" viewBox="0 0 24 24">
@@ -521,6 +540,11 @@ export class M_handwriting {
                 this.dockComponent = null;
             }
         } catch (e) { /* ignore */ }
+        // 移除自定义 h6 样式
+        if (this.h6StyleEl) {
+            this.h6StyleEl.remove();
+            this.h6StyleEl = null;
+        }
     }
 
     private decodeAmpEntities(value: string): string {

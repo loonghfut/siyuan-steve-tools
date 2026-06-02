@@ -1,4 +1,5 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
+import { h6StyleDefaults, h6StyleGroup } from "./style-h6";
 
 export const handwritingDefaults: Record<string, any> = {
     "handwriting-enable": false,
@@ -29,6 +30,7 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-custom-card-title": "",
     // 文档树显示白板按钮
     "tldraw-show-in-file-tree": true,
+    ...h6StyleDefaults,
 };
 
 export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => ({
@@ -50,6 +52,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "文档树显示白板按钮", description: "在文档树每个条目左侧显示白板图标按钮", key: "tldraw-show-in-file-tree", value: ctx.settings["tldraw-show-in-file-tree"] },
             ]
         },
+        h6StyleGroup(ctx),
         {
             name: "高级设置", items: [
                 { type: "select", title: "画板数据块备用创建位置", description: "选择日记本", key: "tl-draw-create-note-id", value: ctx.settings["tl-draw-create-note-id"], options: (() => { const nb = (window as any).siyuan?.notebooks; if (!Array.isArray(nb) || !nb.length) return { "": "无可用日记本" }; return Object.fromEntries(nb.map((n: any) => [n.id, n.name])); })() },
