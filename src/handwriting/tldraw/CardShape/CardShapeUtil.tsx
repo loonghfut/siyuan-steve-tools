@@ -264,11 +264,42 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
 		const prevCameraRef = useRef<any | null>(null)
 		const hadFocusedRef = useRef(false)
+		// 保存编辑前的形状层级索引，用于退出编辑后恢复原层次
+		const originalIndexRef = useRef<string | null>(null)
 
 
 		useEffect(() => {
 			setIsEditingState(isEditing);
 		}, [isEditing]);
+
+		// 编辑时临时置顶，退出编辑后恢复原层次
+		useEffect(() => {
+			if (isEditing) {
+				// 进入编辑：保存原始 index 并用原生方法置顶
+				if (originalIndexRef.current === null) {
+					originalIndexRef.current = shape.index;
+				}
+				try {
+					this.editor.bringToFront([shape.id]);
+				} catch (e) {
+					// ignore
+				}
+			} else {
+				// 退出编辑：恢复原始层次
+				if (originalIndexRef.current !== null) {
+					try {
+						this.editor.updateShapes([{
+							id: shape.id,
+							type: shape.type,
+							index: originalIndexRef.current,
+						}]);
+					} catch (e) {
+						// ignore
+					}
+					originalIndexRef.current = null;
+				}
+			}
+		}, [isEditing, shape.id]);
 
 		useLayoutEffect(() => {
 			const el = cardRootRef.current
