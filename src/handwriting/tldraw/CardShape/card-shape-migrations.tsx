@@ -7,6 +7,7 @@ const versions = createShapePropsMigrationIds(
   {
     Addv: 1,
     AddrefreshNonce:2,
+    AddCollapsedTextStyle: 3,
   }
 )
 
@@ -31,6 +32,16 @@ export const cardShapeMigrations = createShapePropsMigrationSequence({
       },
       down(props) {
         delete props.refreshNonce
+      },
+    },
+    {
+      id: versions.AddCollapsedTextStyle,
+      up(_props) {
+        // 新属性使用默认值，无需显式设置
+      },
+      down(props) {
+        delete props.collapsedTextSize
+        delete props.collapsedTextAlign
       },
     },
   ],

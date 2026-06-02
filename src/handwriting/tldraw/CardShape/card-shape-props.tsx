@@ -15,6 +15,8 @@ export const cardShapeProps: RecordProps<ICardShape> = {
 	refreshNonce: T.optional(T.number), // 添加 refreshNonce 属性
 	isCollapsed: T.optional(T.boolean), // 添加折叠状态属性
 	preCollapseHeight: T.optional(T.number), // 折叠前高度，用于展开时恢复
+	collapsedTextSize: T.optional(T.number), // 折叠后的文字大小
+	collapsedTextAlign: T.optional(T.string), // 折叠后的文字对齐方式：left | center | right
 	// 每张卡片的渲染模式优先级高于全局设置：inherit | static-dom | live-protyle
 	renderMode: T.optional(T.string),
 }
