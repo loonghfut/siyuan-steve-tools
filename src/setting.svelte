@@ -302,10 +302,10 @@
   }
 
   .config__panel > .b3-tab-bar {
-    width: 220px;
+    width: 180px;
     background: var(--b3-theme-surface);
     border-right: 1px solid var(--b3-border-color);
-    padding: 4px 2px;
+    padding: 2px 1px;
   }
 
   .config__tab-wrap {
@@ -358,13 +358,13 @@
 
   .config__panel .b3-list-item {
     border-radius: 6px;
-    margin: 2px 4px;
-    padding: 8px 10px;
+    margin: 1px 3px;
+    padding: 6px 8px;
     transition: all 0.15s ease;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
   }
 
   .config__panel .b3-list-item:hover {
@@ -379,9 +379,9 @@
   }
 
   .sidebar-gate-checkbox {
-    margin-left: auto;
+    margin-left: 6px;
     flex-shrink: 0;
-    transform: scale(0.7);
+    transform: scale(0.66);
     transform-origin: center right;
   }
 
