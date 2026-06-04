@@ -34,6 +34,8 @@ export interface SettingGroupDefinition {
     name: string;
     subGroups?: SettingSubGroupDefinition[];
     items?: ExtendedSettingItem[];
+    /** When true, the first item is NOT extracted to sidebar gate (e.g., commonGroup) */
+    skipGating?: boolean;
 }
 
 export type SettingGroupsBuilder = (ctx: BuildContext) => SettingGroupDefinition[];

@@ -2,6 +2,7 @@
   import { frontEnd, moduleInstances } from "./index";
   import { onMount } from "svelte";
   import SettingPanel from "@/libs/components/setting-panel.svelte";
+  import { FormInput } from "@/libs/components/Form";
   import * as myapi from "@/api/api";
   import { getSettings } from "./setting_data";
   import { buildSettingGroups } from "./settings";
@@ -20,9 +21,55 @@
     items?: ISettingItem[];
     subGroups?: { name: string; items: ISettingItem[] }[];
     activeSubGroup?: string;
+    skipGating?: boolean;
+    enableGateItem?: ISettingItem;
   }
   let groups: ISettingGroup[] = [];
   let focusGroup: string = "";
+
+  /** Extract the first item from a group as the sidebar "enable gate" checkbox */
+  function extractGateFromGroup(g: import("./settings/types").SettingGroupDefinition): {
+    enableGateItem?: ISettingItem;
+    extractedItems?: ISettingItem[];
+    extractedSubGroups?: { name: string; items: ISettingItem[] }[];
+  } {
+    const copyItem = (i: any) => ({ ...i });
+    if (g.skipGating) {
+      return {
+        extractedItems: g.items?.map(copyItem),
+        extractedSubGroups: g.subGroups?.map((sg) => ({
+          name: sg.name,
+          items: sg.items.map(copyItem),
+        })),
+      };
+    }
+    if (g.subGroups && g.subGroups.length > 0) {
+      const firstSG = g.subGroups[0];
+      if (firstSG.items.length > 0) {
+        const [gateItem, ...restItems] = firstSG.items;
+        let modifiedSGs = [
+          { name: firstSG.name, items: restItems.map(copyItem) },
+          ...g.subGroups.slice(1).map((sg) => ({
+            name: sg.name,
+            items: sg.items.map(copyItem),
+          })),
+        ];
+        modifiedSGs = modifiedSGs.filter((sg) => sg.items.length > 0);
+        return {
+          enableGateItem: { ...copyItem(gateItem) },
+          extractedSubGroups: modifiedSGs,
+        };
+      }
+    }
+    if (g.items && g.items.length > 0) {
+      const [gateItem, ...restItems] = g.items;
+      return {
+        enableGateItem: { ...copyItem(gateItem) },
+        extractedItems: restItems.map(copyItem),
+      };
+    }
+    return {};
+  }
 
   /********** Events **********/
   interface ChangeEvent {
@@ -31,7 +78,7 @@
     value: any;
   }
 
-  const onChanged = ({ detail }: CustomEvent<ChangeEvent>) => {
+  const onChanged = ({ detail }: { detail: ChangeEvent }) => {
     console.debug(detail.key, detail.value);
     const setting = settings[detail.key];
     if (setting !== undefined) {
@@ -80,15 +127,18 @@
     if (data) settings = { ...settings, ...data };
     const ctx: BuildContext = { plugin, moduleInstances, frontEnd, settings };
     const built = buildSettingGroups(ctx);
-    groups = built.map((g) => ({
-      name: g.name,
-      items: g.items?.map((i) => ({ ...i })),
-      subGroups: g.subGroups?.map((sg) => ({
-        name: sg.name,
-        items: sg.items.map((i) => ({ ...i })),
-      })),
-      activeSubGroup: g.subGroups?.[0]?.name,
-    }));
+    groups = built.map((g) => {
+      const { enableGateItem, extractedItems, extractedSubGroups } =
+        extractGateFromGroup(g);
+      return {
+        name: g.name,
+        skipGating: (g as any).skipGating === true,
+        enableGateItem,
+        items: extractedItems,
+        subGroups: extractedSubGroups,
+        activeSubGroup: extractedSubGroups?.[0]?.name,
+      };
+    });
     await resolveDynamicOptions(ctx);
     updateGroupItems();
     // Persist merged settings but avoid triggering background switch during initial open
@@ -123,6 +173,12 @@
   function updateGroupItems() {
     groups = groups.map((g) => ({
       ...g,
+      enableGateItem: g.enableGateItem
+        ? {
+            ...g.enableGateItem,
+            value: settings[g.enableGateItem.key] ?? g.enableGateItem.value,
+          }
+        : undefined,
       items: g.items?.map((i) => ({ ...i, value: settings[i.key] ?? i.value })),
       subGroups: g.subGroups?.map((sg) => ({
         ...sg,
@@ -135,6 +191,9 @@
   }
 
   $: currentGroup = groups.find((g) => g.name === focusGroup);
+  $: gateEnabled = currentGroup?.enableGateItem
+    ? currentGroup.enableGateItem.value === true
+    : true;
   $: activeSubGroupItems = currentGroup?.subGroups
     ? currentGroup.subGroups.find(
         (sg) => sg.name === currentGroup.activeSubGroup,
@@ -156,11 +215,40 @@
         on:keydown={() => {}}
       >
         <span class="b3-list-item__text">{group.name}</span>
+        {#if group.enableGateItem}
+          <span class="sidebar-gate-checkbox">
+            <FormInput
+              type="checkbox"
+              key={group.enableGateItem.key}
+              bind:value={group.enableGateItem.value}
+              fnSize={false}
+              on:changed={(e) => {
+                onChanged({
+                  detail: {
+                    group: group.name,
+                    key: e.detail.key,
+                    value: e.detail.value,
+                  },
+                });
+              }}
+            />
+          </span>
+        {/if}
       </li>
     {/each}
   </ul>
   <div class="config__tab-wrap">
-    {#if currentGroup?.subGroups}
+    {#if currentGroup?.enableGateItem && !gateEnabled}
+      <div class="gate-placeholder">
+        <div class="gate-placeholder__icon">⚙️</div>
+        <div class="gate-placeholder__title">
+          {currentGroup.name} 模块未启用
+        </div>
+        <div class="gate-placeholder__desc">
+          请在左侧边栏中开启「{currentGroup.enableGateItem.title}」开关
+        </div>
+      </div>
+    {:else if currentGroup?.subGroups}
       <div class="config__tab-wrap">
         <div class="subgroup-buttons">
           {#each currentGroup.subGroups as subGroup (subGroup.name)}
@@ -214,7 +302,7 @@
   }
 
   .config__panel > .b3-tab-bar {
-    width: 140px;
+    width: 220px;
     background: var(--b3-theme-surface);
     border-right: 1px solid var(--b3-border-color);
     padding: 4px 2px;
@@ -274,6 +362,9 @@
     padding: 8px 10px;
     transition: all 0.15s ease;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .config__panel .b3-list-item:hover {
@@ -285,5 +376,44 @@
     color: var(--b3-theme-on-primary);
     font-weight: 500;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .sidebar-gate-checkbox {
+    margin-left: auto;
+    flex-shrink: 0;
+    transform: scale(0.7);
+    transform-origin: center right;
+  }
+
+  .gate-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--b3-theme-on-surface-light);
+    user-select: none;
+  }
+
+  .gate-placeholder__icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.4;
+  }
+
+  .gate-placeholder__title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--b3-theme-on-surface);
+  }
+
+  .gate-placeholder__desc {
+    font-size: 0.85em;
+    opacity: 0.6;
+    max-width: 280px;
+    line-height: 1.5;
   }
 </style>
