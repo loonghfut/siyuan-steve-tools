@@ -13,9 +13,9 @@
 </script>
 
 {#if direction === "row"}
-    <div class="item-wrap b3-label" data-key="CustomCSS">
+    <div class="st-item-wrap st-item-wrap--row b3-label" data-key="CustomCSS">
         <div class="fn__block">
-            <span class="title">{title}</span>
+            <span class="st-item-title">{title}</span>
             <div class="b3-label__text">{@html description}</div>
             <div class="fn__hr"></div>
             <div style="display: flex; flex-direction: column; gap: 5px; position: relative;">
@@ -24,9 +24,9 @@
         </div>
     </div>
 {:else}
-    <div class="item-wrap fn__flex b3-label config__item">
+    <div class="st-item-wrap st-item-wrap--column fn__flex b3-label config__item">
         <div class="fn__flex-1">
-            <span class="title">{title}</span>
+            <span class="st-item-title">{title}</span>
             <div class="b3-label__text">
                 {@html description}
             </div>
@@ -37,17 +37,36 @@
 {/if}
 
 <style>
-    span.title {
-        font-weight: bold;
-        color: var(--b3-theme-primary)
+    .st-item-title {
+        font-weight: 600;
+        color: var(--b3-theme-primary);
+        font-size: 0.95em;
     }
-    .item-wrap.b3-label {
+    .st-item-wrap.b3-label {
         box-shadow: none !important;
-        padding-bottom: 16px;
-        margin-bottom: 16px;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+        background: transparent;
+        border-radius: 6px;
+        padding: 10px 12px;
+        transition: all 0.15s ease;
+        border: none;
     }
-
-    .item-wrap.b3-label:not(:last-child) {
+    .st-item-wrap.b3-label:hover {
+        background: var(--b3-list-hover);
+        border-color: var(--b3-border-color);
+        box-shadow: none;
+    }
+    .st-item-wrap.b3-label:not(:last-child) {
         border-bottom: 1px solid var(--b3-border-color);
+        margin-bottom: 8px;
+    }
+    .st-item-wrap.b3-label:hover:not(:last-child) {
+        border-bottom-color: var(--b3-border-color);
+    }
+    .st-item-wrap .b3-label__text {
+        font-size: 0.85em;
+        line-height: 1.4;
+        opacity: 0.8;
     }
 </style>

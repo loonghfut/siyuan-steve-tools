@@ -210,28 +210,80 @@
     display: flex;
     flex-direction: row;
     overflow: hidden;
+    border-radius: 8px;
   }
+
   .config__panel > .b3-tab-bar {
-    width: 170px;
+    width: 140px;
+    background: var(--b3-theme-surface);
+    border-right: 1px solid var(--b3-border-color);
+    padding: 4px 2px;
   }
 
   .config__tab-wrap {
     flex: 1;
     height: 100%;
-    overflow: auto; // 添加滚动条
-    padding: 2px; // 添加一些内边距
+    overflow: auto;
+    padding: 0;
+    background: var(--b3-theme-background);
   }
 
   .config__tab-container {
     flex: 1;
-    height: calc(100% - 48px); // 减去子分组按钮的高度
+    height: calc(100% - 36px);
     overflow-y: auto;
+    padding: 8px 12px;
   }
 
-  // 为子分组按钮容器添加样式
   .subgroup-buttons {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--b3-border-color);
+    background: var(--b3-theme-surface);
+  }
+
+  .subgroup-buttons .b3-button {
+    border-radius: 12px;
+    padding: 4px 12px;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    border: 1px solid var(--b3-border-color);
+  }
+
+  .subgroup-buttons .b3-button:hover {
+    background: var(--b3-list-hover);
+  }
+
+  .subgroup-buttons .b3-button--text {
+    background: transparent;
+    color: var(--b3-theme-primary);
+    border-color: transparent;
+  }
+
+  .subgroup-buttons .b3-button--text:hover {
+    background: var(--b3-list-hover);
+    border-color: var(--b3-border-color);
+  }
+
+  .config__panel .b3-list-item {
+    border-radius: 6px;
+    margin: 2px 4px;
+    padding: 8px 10px;
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+
+  .config__panel .b3-list-item:hover {
+    background: var(--b3-list-hover);
+  }
+
+  .config__panel .b3-list-item--focus {
+    background: var(--b3-theme-primary);
+    color: var(--b3-theme-on-primary);
+    font-weight: 500;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   }
 </style>
