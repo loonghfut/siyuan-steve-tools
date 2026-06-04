@@ -42,18 +42,11 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.39.0 (2026年06月02日)
-- fix: 白板：调整工具栏位置样式，确保其在底部显示 (loonghfut)
-- fix: 调整工具栏样式，增加最大宽度和水平滚动支持 (loonghfut)
-- feat: 添加 h6 标题块样式自定义功能，支持实时预览和样式设置 (loonghfut)
-- feat: 添加折叠文字大小和对齐方式设置，支持卡片样式自定义 (loonghfut)
-- feat: 更新样式面板，添加滑块组件以替代输入框，优化折叠文字大小和线宽设置 (loonghfut)
-- feat: 为新建的 slide 形状添加默认在最底层的处理逻辑 (loonghfut)
-- feat: 更新 slide 形状处理逻辑，新增 frame 形状默认在最底层的支持 (loonghfut)
-- feat: 更新警告文案 (loonghfut)
-- feat: 动态调整端口大小和触发区域，支持画布缩放 (loonghfut)
-- feat: 添加编辑模式下形状层级管理，支持退出编辑后恢复原层次 (loonghfut)
-- feat: 更新版本号至 0.39.0 (loonghfut)
+### v0.40.0 (2026年06月04日)
+- feat: 更新表单组件样式，优化布局和交互效果 (loonghfut)
+- feat: 添加侧边栏启用开关功能，支持分组设置的动态提取 (loonghfut)
+- 改进设置体验 (loonghfut)
+- feat: 更新版本号至 0.40.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
