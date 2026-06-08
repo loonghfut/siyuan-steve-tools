@@ -1309,7 +1309,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								justifyContent: collapsedTextAlign === 'right' ? 'flex-end' : collapsedTextAlign === 'center' ? 'center' : 'flex-start',
 								padding: '10px 14px',
 								boxSizing: 'border-box',
-								gap: '10px',
+								gap: collapsedTextAlign === 'center' ? '0px' : '10px',
+								position: 'relative',
 								transition: 'opacity 140ms ease, transform 140ms ease',
 								opacity: 1,
 								transform: 'translateY(0)'
@@ -1324,7 +1325,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									strokeWidth="2"
 									strokeLinecap="round"
 									strokeLinejoin="round"
-									style={{ flexShrink: 0, opacity: 0.6, cursor: 'pointer', pointerEvents: 'auto' }}
+									style={{
+									flexShrink: 0,
+									opacity: 0.6,
+									cursor: 'pointer',
+									pointerEvents: 'auto',
+									...(collapsedTextAlign === 'center'
+										? { position: 'absolute', left: '14px', zIndex: 1 }
+										: {}),
+								}}
 									onClick={handleUncollapse}
 									onPointerDown={(e) => e.stopPropagation()}
 								>
