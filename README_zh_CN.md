@@ -42,11 +42,14 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.40.0 (2026年06月04日)
+### v0.40.1 (2026年06月08日)
 - feat: 更新表单组件样式，优化布局和交互效果 (loonghfut)
 - feat: 添加侧边栏启用开关功能，支持分组设置的动态提取 (loonghfut)
 - 改进设置体验 (loonghfut)
 - feat: 更新版本号至 0.40.0 (loonghfut)
+- docs: 更新 v0.40.0 版本的更新日志 (loonghfut)
+- feat: 调整卡片样式，优化居中对齐时的间距和定位 (loonghfut)
+- feat: 更新版本号至 0.40.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
