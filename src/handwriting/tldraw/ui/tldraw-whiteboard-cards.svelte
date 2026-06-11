@@ -1,8 +1,10 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { showMessage, openTab, Plugin } from 'siyuan';
+    import { showMessage, openTab, Plugin, confirm } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
     import { whiteboardFilesUpdated } from '../whiteboards.store';
+    import { closeTab } from '../tldraw-instance-manager';
+    import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from '../whiteboard-file-manager';
     import type { PreviewShape } from '../utils/whiteboard-utils';
     import { extractDrawingId, parseSyTimestamp, computeBounds, formatTime, projectShape, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from '../utils/whiteboard-utils';
 
@@ -19,6 +21,15 @@
         loadingPreview: boolean; // 缩略图是否加载中
         shapes: PreviewShape[]; // 用于缩略图
         error?: string;      // 预览错误
+        docId?: string;      // 关联文档ID
+        tags?: string[];     // 标签列表
+    }
+
+    interface ContextMenuState {
+        visible: boolean;
+        x: number;
+        y: number;
+        card: WhiteboardCard | null;
     }
 
     let allCards: WhiteboardCard[] = [];
@@ -38,6 +49,8 @@
         title?: string;
         exists?: boolean;
         mtimeNum?: number; // derived from blk.updated/created or doc
+        docId?: string;    // 关联文档ID
+        tags?: string[];   // 标签列表
     }
     let allFileEntries: FileMeta[] = []; // 全部文件条目列表（扩展的元数据）
     let nextIndex = 0; // 下一个批次的起始索引
@@ -49,6 +62,8 @@
     let sentinel: HTMLDivElement; // 触底哨兵元素
     let cardsGridEl: HTMLDivElement; // 网格容器引用（用于滚动检测）
     let prevSortKey = sortKey;
+
+    let contextMenu: ContextMenuState = { visible: false, x: 0, y: 0, card: null };
 
     // 原逻辑拆成两阶段：读取文件列表 + 分批构造卡片
     async function loadWhiteboards() {
@@ -106,6 +121,8 @@
                                 if (blk) {
                                     f.exists = true;
                                     f.blkInfo = blk;
+                                    f.docId = blk.root_id || undefined;
+                                    f.tags = blk.tag ? blk.tag.match(/#([^#]+)#/g)?.map(t => t.replace(/#/g, '')) || [] : [];
                                     if (blk.root_id) {
                                         try {
                                             const docBlk = await api.getBlockByID(blk.root_id);
@@ -192,6 +209,8 @@
             mtime: mtimeNum,
             loadingPreview: false,
             shapes: [],
+            docId: f.docId,
+            tags: f.tags || [],
         } as WhiteboardCard;
     }
 
@@ -327,6 +346,149 @@
         } catch (e) {
             console.error('打开白板失败:', e);
             showMessage('打开白板失败', 3000, 'error');
+        }
+    }
+
+    // ========== 右键菜单 ==========
+
+    function handleContextMenu(event: MouseEvent, card: WhiteboardCard) {
+        event.preventDefault();
+        const menuWidth = 180;
+        const menuHeight = 200;
+        const posX = Math.min(event.clientX, window.innerWidth - menuWidth);
+        const posY = Math.min(event.clientY, window.innerHeight - menuHeight);
+        contextMenu = { visible: true, x: posX, y: posY, card };
+    }
+
+    function closeContextMenu() {
+        contextMenu = { visible: false, x: 0, y: 0, card: null };
+    }
+
+    function handleWindowClick(event: MouseEvent) {
+        if (!contextMenu.visible) return;
+        const target = event.target as HTMLElement;
+        if (target && target.closest('.whiteboard-context-menu')) return;
+        closeContextMenu();
+    }
+
+    function handleWindowKeydown(event: KeyboardEvent) {
+        if (event.key === 'Escape' && contextMenu.visible) {
+            closeContextMenu();
+        }
+    }
+
+    function handleWindowCtxMenu(event: MouseEvent) {
+        if (!event.defaultPrevented && contextMenu.visible) {
+            closeContextMenu();
+        }
+    }
+
+    async function openDocument(card: WhiteboardCard) {
+        if (!card.docId) {
+            showMessage('未找到关联文档', 3000, 'info');
+            return;
+        }
+        try {
+            await openTab({
+                app: plugin.app,
+                doc: {
+                    id: card.docId,
+                    action: ['cb-get-hl', 'cb-get-all'],
+                    zoomIn: false,
+                },
+                keepCursor: false,
+            });
+        } catch (e) {
+            console.error('打开文档失败:', e);
+            showMessage('打开文档失败', 3000, 'error');
+        }
+    }
+
+    async function refreshCard(card: WhiteboardCard) {
+        card.shapes = [];
+        card.error = undefined;
+        card.loadingPreview = false;
+        allCards = allCards;
+        filteredCards = [...filteredCards];
+        await loadPreview(card);
+        showMessage('预览已刷新', 1500, 'info');
+    }
+
+    async function backupCard(card: WhiteboardCard) {
+        try {
+            const results = await WhiteboardFileManager.batchBackupWhiteboards([card.id], {
+                reason: '手动备份',
+                includeTimestamp: true,
+            });
+            const stats = WhiteboardFileManager.getOperationStats(results);
+            if (stats.success > 0) {
+                showMessage(`已备份到 ${WHITEBOARD_TRASH_DIR}`, 3000, 'info');
+            } else {
+                showMessage('备份失败', 3000, 'error');
+            }
+        } catch (e) {
+            console.error('备份失败:', e);
+            showMessage('备份失败', 3000, 'error');
+        }
+    }
+
+    function deleteCard(card: WhiteboardCard) {
+        confirm(
+            '删除确认',
+            `确定要删除白板 "${card.title}" 的数据文件吗？此操作不可恢复！`,
+            async (dialog) => {
+                try {
+                    closeTab(card.id, 'user-delete');
+                    await api.removeFile(card.path);
+
+                    whiteboardFilesUpdated.set({
+                        action: 'delete',
+                        fileName: card.fileName,
+                        drawingId: card.id,
+                        timestamp: Date.now(),
+                    });
+
+                    showMessage(`已删除: ${card.fileName}`, 3000, 'info');
+
+                    setTimeout(async () => {
+                        try {
+                            await api.removeFile(card.path);
+                        } catch (e) {
+                            console.debug('延迟删除重试失败:', card.path, e);
+                        }
+                    }, 2000);
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    showMessage('删除失败', 3000, 'error');
+                }
+                try { dialog && (dialog as any).close && (dialog as any).close(); } catch {}
+            },
+            (dialog) => {
+                try { dialog && (dialog as any).close && (dialog as any).close(); } catch {}
+            }
+        );
+    }
+
+    function handleMenuAction(action: 'board' | 'doc' | 'refresh' | 'backup' | 'delete') {
+        const card = contextMenu.card;
+        if (!card) return;
+        switch (action) {
+            case 'board':
+                openWhiteboard(card).finally(() => closeContextMenu());
+                break;
+            case 'doc':
+                openDocument(card).finally(() => closeContextMenu());
+                break;
+            case 'refresh':
+                refreshCard(card).finally(() => closeContextMenu());
+                break;
+            case 'backup':
+                backupCard(card).finally(() => closeContextMenu());
+                break;
+            case 'delete':
+                deleteCard(card);
+                closeContextMenu();
+                break;
         }
     }
 
@@ -498,6 +660,8 @@
     }
 </script>
 
+<svelte:window on:click={handleWindowClick} on:keydown={handleWindowKeydown} on:contextmenu={handleWindowCtxMenu} />
+
 <div class="whiteboard-card-view">
     <div class="block__icons">
         <div class="block__logo">
@@ -581,6 +745,7 @@
             {#each filteredCards as card (card.path)}
                  <div class="card" role="button" tabindex="0"
                      on:click={() => openWhiteboard(card)}
+                     on:contextmenu={(e) => handleContextMenu(e, card)}
                      on:keydown={(e)=>{ if(e.key==='Enter'|| e.key===' ') { e.preventDefault(); openWhiteboard(card);} }}>
                     <div class="preview-wrapper" use:setupObserver={card}>
                         {#if card.error}
@@ -637,6 +802,33 @@
             {:else}
                 <div class="load-sentinel done">已全部加载 ({allCards.length})</div>
             {/if}
+        </div>
+    {/if}
+
+    {#if contextMenu.visible && contextMenu.card}
+        <div
+            class="whiteboard-context-menu"
+            role="menu"
+            aria-label="白板菜单"
+            tabindex="0"
+            style={`left:${contextMenu.x}px;top:${contextMenu.y}px;`}
+            on:click={(event) => event.stopPropagation()}
+            on:keydown={(event) => event.stopPropagation()}>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('board')}>
+                打开白板
+            </button>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('doc')} disabled={!contextMenu.card.docId}>
+                跳转文档
+            </button>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('refresh')}>
+                刷新预览
+            </button>
+            <button type="button" role="menuitem" on:click={() => handleMenuAction('backup')}>
+                备份
+            </button>
+            <button type="button" role="menuitem" class="danger" on:click={() => handleMenuAction('delete')}>
+                删除
+            </button>
         </div>
     {/if}
 </div>
@@ -880,6 +1072,43 @@
   .doc-title { font-size: 0.74rem; }
   .id-line, .file-line { font-size: 0.66rem; }
   .whiteboard-card-view .search__label { min-width: 100px; }
+}
+
+/* 右键菜单 */
+.whiteboard-context-menu {
+    position: fixed;
+    z-index: 10;
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 8px;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+    min-width: 160px;
+    overflow: hidden;
+}
+
+.whiteboard-context-menu button {
+    border: none;
+    background: none;
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--b3-theme-on-background);
+}
+
+.whiteboard-context-menu button:hover {
+    background: var(--b3-list-hover);
+}
+
+.whiteboard-context-menu button.danger {
+    color: var(--b3-theme-error);
+}
+
+.whiteboard-context-menu button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* 深色模式 */
