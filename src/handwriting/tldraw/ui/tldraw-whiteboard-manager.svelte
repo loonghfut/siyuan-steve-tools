@@ -1038,6 +1038,8 @@
     background: var(--b3-theme-surface);
     border-bottom: 1px solid var(--b3-border-color);
     flex-shrink: 0;
+    position: relative;
+    z-index: 2;
 }
 
 .block__logo {
@@ -1074,6 +1076,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
 }
 
 .selection-counter {
@@ -1098,6 +1103,7 @@
 
 .gallery-scroll {
     flex: 1;
+    min-height: 0;
     overflow: auto;
     padding: 16px 20px 24px;
 }

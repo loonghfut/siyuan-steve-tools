@@ -335,33 +335,35 @@
 </div>
 
 <style>
-/* ... existing styles ... */
     .orphan-manager {
         display: flex;
         flex-direction: column;
         height: 100%;
-        padding: 10px;
+        padding: 12px 16px;
         box-sizing: border-box;
     }
     .manager-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding-bottom: 10px;
-        border-bottom: 1px solid var(--b3-border-color);
-        margin-bottom: 10px;
+        padding-bottom: 12px;
+        margin-bottom: 2px;
+        flex-shrink: 0;
     }
     .manager-header h3 {
         margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--b3-theme-on-background);
+        opacity: 0.9;
     }
     .controls {
         display: flex;
         align-items: center;
-        gap: 10px; /* Use gap for spacing */
+        gap: 8px;
     }
     .search-container {
-        /* Adjust width as needed */
-        min-width: 250px; /* Increased width for longer placeholder */
+        min-width: 240px;
     }
     .list-container {
         flex-grow: 1;
@@ -370,52 +372,71 @@
     .b3-table {
         width: 100%;
         border-collapse: collapse;
+        font-size: 0.8rem;
     }
     .b3-table th, .b3-table td {
-        padding: 8px 12px;
+        padding: 9px 12px;
         text-align: left;
         border-bottom: 1px solid var(--b3-border-color);
-        vertical-align: middle; /* Align cell content vertically */
+        vertical-align: middle;
     }
-     .b3-table th {
-        background-color: var(--b3-theme-surface-light);
+    .b3-table th {
         font-weight: 500;
-        white-space: nowrap; /* Prevent header text wrapping */
+        font-size: 0.7rem;
+        color: var(--b3-theme-on-surface);
+        opacity: 0.6;
+        white-space: nowrap;
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
+    .b3-table tbody tr {
+        transition: background-color 0.12s ease;
+    }
+    .b3-table tbody tr:hover {
+        background-color: var(--b3-list-hover);
     }
     .actions {
         display: flex;
-        gap: 5px; /* Spacing between buttons */
-        flex-wrap: nowrap; /* Prevent buttons from wrapping */
+        gap: 6px;
+        flex-wrap: nowrap;
     }
     .actions button {
-        white-space: nowrap; /* Prevent button text wrapping */
+        white-space: nowrap;
     }
     .loading-indicator, .empty-state {
         text-align: center;
-        padding: 20px;
+        padding: 24px 16px;
         color: var(--b3-theme-on-surface);
+        opacity: 0.55;
+        font-size: 0.85rem;
     }
     .status-checking {
-        color: var(--b3-theme-on-surface-light);
+        color: var(--b3-theme-on-surface);
+        opacity: 0.45;
         font-style: italic;
+        font-size: 0.76rem;
     }
     .status-exists {
-        color: var(--b3-theme-primary); /* Or a green color */
+        color: var(--b3-theme-primary);
+        font-weight: 500;
+        font-size: 0.78rem;
     }
     .status-orphaned {
-        color: var(--b3-theme-error); /* Or an orange/red color */
-        font-weight: bold;
+        color: var(--b3-theme-error);
+        font-weight: 500;
+        font-size: 0.78rem;
     }
     .status-unknown {
-         color: var(--b3-theme-on-surface-light);
+        color: var(--b3-theme-on-surface);
+        opacity: 0.45;
     }
-
-    /* Ensure buttons fit well */
     .b3-button {
-        padding: 4px 8px; /* Smaller padding for table buttons */
-        font-size: 0.9em;
+        padding: 5px 10px;
+        font-size: 0.76rem;
+        border-radius: 6px;
+        transition: all 0.15s ease;
     }
     .b3-button svg {
-        margin-right: 4px;
+        margin-right: 3px;
     }
 </style>
