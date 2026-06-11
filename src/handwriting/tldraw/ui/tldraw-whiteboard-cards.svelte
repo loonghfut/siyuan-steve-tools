@@ -911,6 +911,7 @@
   padding: 0.375rem 0.75rem 1rem;
   overflow-y: auto;
   flex: 1;
+  align-items: start;
 }
 
 /* 卡片 */
@@ -925,6 +926,7 @@
   transition: all 0.2s ease;
   position: relative;
   outline: none;
+  height: fit-content;
 }
 .card:hover {
   transform: translateY(-2px);
