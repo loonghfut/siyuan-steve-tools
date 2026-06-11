@@ -6,28 +6,10 @@
     import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from '../whiteboard-file-manager';
     import { closeTab } from '../tldraw-instance-manager';
     import WhiteboardCard from './whiteboard-card.svelte';
+    import type { WhiteboardItem, PreviewShape } from '../utils/whiteboard-utils';
+    import { extractDrawingId, parseSyTimestamp } from '../utils/whiteboard-utils';
 
     export let plugin: Plugin;
-
-    type PreviewShape = { id?: string; type?: string; x: number; y: number; w: number; h: number };
-
-    interface WhiteboardItem {
-        id: string;
-        fileName: string;
-        path: string;
-        title: string;
-        exists: boolean;
-        blkCreated: number;
-        blkUpdated: number;
-        docCreated: number;
-        docUpdated: number;
-        docId?: string;
-        mtime: number;
-        tags: string[];
-        loadingPreview: boolean;
-        shapes: PreviewShape[];
-        previewError?: string;
-    }
 
     interface TagGroup {
         name: string;
@@ -238,26 +220,6 @@
         }
     });
 
-    function parseSyTimestamp(value?: string | number | null): number {
-        if (!value) return 0;
-        if (typeof value === 'number' && Number.isFinite(value)) return value;
-        if (typeof value === 'string') {
-            const digitsOnly = value.replace(/[^0-9]/g, '');
-            if (digitsOnly.length >= 14) {
-                const y = Number(digitsOnly.slice(0, 4));
-                const m = Number(digitsOnly.slice(4, 6)) - 1;
-                const d = Number(digitsOnly.slice(6, 8));
-                const hh = Number(digitsOnly.slice(8, 10));
-                const mm = Number(digitsOnly.slice(10, 12));
-                const ss = Number(digitsOnly.slice(12, 14));
-                return new Date(y, m, d, hh, mm, ss).getTime();
-            }
-            const numeric = Number(value);
-            if (Number.isFinite(numeric)) return numeric;
-        }
-        return 0;
-    }
-
     async function loadWhiteboards() {
         loading = true;
         allItems = [];
@@ -321,11 +283,6 @@
         } finally {
             loading = false;
         }
-    }
-
-    function extractDrawingId(filename: string): string {
-        const match = filename.match(/^tldraw-data-(.+)\.json$/);
-        return match && match[1] ? match[1] : '未知画板';
     }
 
     function collectAvailableTags() {
@@ -404,25 +361,6 @@
             galleryGroups = [];
         }
     }
-
-    // function formatTime(ms: number): string {
-    //     if (!ms || !Number.isFinite(ms) || ms <= 0) return '-';
-    //     try {
-    //         return new Date(ms).toLocaleString('zh-CN', {
-    //             year: 'numeric',
-    //             month: '2-digit',
-    //             day: '2-digit',
-    //             hour: '2-digit',
-    //             minute: '2-digit',
-    //         });
-    //     } catch {
-    //         return '-';
-    //     }
-    // }
-
-    // function getLatestUpdate(item: WhiteboardItem) {
-    //     return item.blkUpdated || item.docUpdated || item.mtime;
-    // }
 
     async function openWhiteboard(item: WhiteboardItem) {
         if (!item.exists) {
@@ -1168,61 +1106,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 16px;
-}
-
-.card-preview {
-    width: 100%;
-    aspect-ratio: 5 / 3;
-    border-bottom: 1px solid var(--b3-border-color);
-    background: linear-gradient(135deg, rgba(72, 94, 255, 0.08), rgba(72, 94, 255, 0.02));
-    border-radius: 14px 14px 0 0;
-    overflow: hidden;
-}
-
-.preview-hit {
-    width: 100%;
-    height: 100%;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-}
-
-.preview-canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.preview-fallback,
-.preview-empty {
-    font-size: 12px;
-    color: var(--b3-theme-on-surface-light);
-    opacity: 0.8;
-}
-
-.tag-pill.removable {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.remove-tag {
-    border: none;
-    background: transparent;
-    color: inherit;
-    font-size: 14px;
-    line-height: 1;
-    padding: 0 2px;
-    cursor: pointer;
-    opacity: 0.7;
-}
-
-.remove-tag:hover {
-    opacity: 1;
 }
 
 .tag-group {

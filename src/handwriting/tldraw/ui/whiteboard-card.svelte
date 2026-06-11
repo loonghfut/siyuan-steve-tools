@@ -1,23 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    // import type { WhiteboardItem } from './tldraw-whiteboard-manager.svelte';
-    interface WhiteboardItem {
-        id: string;
-        fileName: string;
-        path: string;
-        title: string;
-        exists: boolean;
-        blkCreated: number;
-        blkUpdated: number;
-        docCreated: number;
-        docUpdated: number;
-        docId?: string;
-        mtime: number;
-        tags: string[];
-        loadingPreview: boolean;
-        shapes: PreviewShape[];
-        previewError?: string;
-    }
+    import type { WhiteboardItem} from "../utils/whiteboard-utils";
+    import { computeBounds, projectShape, formatTime, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from "../utils/whiteboard-utils";
 
     export let item: WhiteboardItem;
     export let selectedIds: Set<string>;
@@ -26,83 +10,12 @@
         item: WhiteboardItem,
     ) => { update(newItem: WhiteboardItem): void; destroy(): void };
 
-    type PreviewShape = {
-        id?: string;
-        type?: string;
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-    };
+    // let previewSvgViewBox = "0 0 300 200";
 
-    function computeBounds(shapes: PreviewShape[]) {
-        if (!shapes || shapes.length === 0) {
-            return { minX: 0, minY: 0, width: 300, height: 200 };
-        }
-        let minX = Number.POSITIVE_INFINITY;
-        let minY = Number.POSITIVE_INFINITY;
-        let maxX = Number.NEGATIVE_INFINITY;
-        let maxY = Number.NEGATIVE_INFINITY;
-        shapes.forEach((shape) => {
-            const left = (shape.x || 0) - (shape.w || 0) / 2;
-            const top = (shape.y || 0) - (shape.h || 0) / 2;
-            minX = Math.min(minX, left);
-            minY = Math.min(minY, top);
-            maxX = Math.max(maxX, left + (shape.w || 0));
-            maxY = Math.max(maxY, top + (shape.h || 0));
-        });
-        if (
-            !isFinite(minX) ||
-            !isFinite(minY) ||
-            !isFinite(maxX) ||
-            !isFinite(maxY)
-        ) {
-            return { minX: 0, minY: 0, width: 300, height: 200 };
-        }
-        return {
-            minX,
-            minY,
-            width: Math.max(maxX - minX, 1),
-            height: Math.max(maxY - minY, 1),
-        };
-    }
-
-    function projectShape(
-        shape: PreviewShape,
-        _shapes: PreviewShape[],
-        bounds: ReturnType<typeof computeBounds>,
-        scale: number,
-        pad: number,
-    ) {
-        void _shapes;
-        const cx = shape.x || 0;
-        const cy = shape.y || 0;
-        const w = shape.w || 60;
-        const h = shape.h || 40;
-        const left = cx - w / 2;
-        const top = cy - h / 2;
-        return {
-            x: (left - bounds.minX) * scale + pad,
-            y: (top - bounds.minY) * scale + pad,
-            w: Math.max(w * scale, 1),
-            h: Math.max(h * scale, 1),
-        };
-    }
-
-    function formatTime(ms: number): string {
-        if (!ms || !Number.isFinite(ms) || ms <= 0) return "-";
-        try {
-            return new Date(ms).toLocaleString("zh-CN", {
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-        } catch {
-            return "-";
-        }
-    }
+    // 预览 SVG 计算常量
+    const PREVIEW_W = 300;
+    const PREVIEW_H = 200;
+    const PREVIEW_PAD = SVG_PAD; // 6
 
     function getLatestUpdate(item: WhiteboardItem) {
         return item.blkUpdated || item.docUpdated || item.mtime;
@@ -170,45 +83,43 @@
                 <div class="preview-fallback">生成预览...</div>
             {:else if item.shapes.length > 0}
                 {@const bounds = computeBounds(item.shapes)}
-                {@const viewW = 300 - 12}
-                {@const viewH = 180 - 12}
+                {@const viewW = PREVIEW_W - PREVIEW_PAD * 2}
+                {@const viewH = PREVIEW_H - PREVIEW_PAD * 2}
                 {@const scale = Math.min(
                     viewW / bounds.width,
                     viewH / bounds.height,
                 )}
-                {@const pad = 6}
                 <svg
-                    viewBox="0 0 300 180"
+                    viewBox={`0 0 ${PREVIEW_W} ${PREVIEW_H}`}
                     class="preview-canvas"
                     preserveAspectRatio="xMidYMid meet"
                 >
                     {#each item.shapes as shape}
                         {@const pos = projectShape(
                             shape,
-                            item.shapes,
                             bounds,
                             scale,
-                            pad,
+                            PREVIEW_PAD,
                         )}
                         <rect
                             x={pos.x}
                             y={pos.y}
                             width={pos.w}
                             height={pos.h}
-                            rx="3"
-                            ry="3"
-                            fill="rgba(61,142,255,0.08)"
-                            stroke="rgba(61,142,255,0.35)"
+                            rx={SHAPE_RX}
+                            ry={SHAPE_RX}
+                            fill={SHAPE_FILL}
+                            stroke={SHAPE_STROKE}
                             stroke-width="1"
                         />
                     {/each}
                     <rect
                         x="1"
                         y="1"
-                        width="298"
-                        height="178"
+                        width={PREVIEW_W - 2}
+                        height={PREVIEW_H - 2}
                         fill="none"
-                        stroke="rgba(0,0,0,0.06)"
+                        stroke={BORDER_STROKE}
                     />
                 </svg>
             {:else}
@@ -261,20 +172,29 @@
         position: relative;
         background: var(--b3-theme-surface);
         border: 1px solid var(--b3-border-color);
-        border-radius: 14px;
-        box-shadow: 0 8px 24px rgba(15, 18, 46, 0.08);
+        border-radius: 12px;
+        box-shadow: 0 4px 12px -4px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.06);
         display: flex;
         flex-direction: column;
         transition:
             transform 0.25s ease,
             box-shadow 0.25s ease,
             border-color 0.25s ease;
+        outline: none;
     }
 
     .whiteboard-card:hover {
         transform: translateY(-4px);
-        box-shadow: 0 16px 30px rgba(15, 18, 46, 0.16);
+        box-shadow: 0 10px 20px -6px rgba(0,0,0,0.15), 0 4px 8px -3px rgba(0,0,0,0.12);
         border-color: var(--b3-theme-primary);
+    }
+
+    .whiteboard-card:active {
+        transform: translateY(-1px) scale(.98);
+    }
+
+    .whiteboard-card:focus-visible {
+        box-shadow: 0 0 0 2px var(--b3-theme-primary), 0 6px 16px -6px rgba(0,0,0,0.16);
     }
 
     .whiteboard-card.invalid {
@@ -344,14 +264,14 @@
 
     .card-preview {
         width: 100%;
-        aspect-ratio: 5 / 3;
+        aspect-ratio: 3 / 2;
         border-bottom: 1px solid var(--b3-border-color);
         background: linear-gradient(
             135deg,
-            rgba(72, 94, 255, 0.08),
-            rgba(72, 94, 255, 0.02)
+            var(--b3-theme-background) 0%,
+            var(--b3-theme-surface) 70%
         );
-        border-radius: 14px 14px 0 0;
+        border-radius: 12px 12px 0 0;
         overflow: hidden;
     }
 
@@ -481,5 +401,18 @@
     .tag-edit-btn:hover {
         background: rgba(61, 142, 255, 0.12);
         color: var(--b3-theme-primary);
+    }
+
+    /* 深色模式微调 */
+    @media (prefers-color-scheme: dark) {
+        .whiteboard-card {
+            box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.55);
+        }
+        .whiteboard-card:hover {
+            box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.7);
+        }
+        .card-preview {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+        }
     }
 </style>

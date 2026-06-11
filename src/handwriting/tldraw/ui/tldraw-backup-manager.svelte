@@ -3,6 +3,7 @@
     import { WhiteboardFileManager } from "../whiteboard-file-manager";
     import { showMessage } from "siyuan";
     import * as api from "@/api/api";
+    import { computeBounds, projectShape, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, SHAPE_RX } from "../utils/whiteboard-utils";
 
     // 接收初始画板ID（用于在打开面板时自动过滤到当前画板）
     export let initialDrawingId: string | null = null;
@@ -185,80 +186,6 @@
                 open: state.open ?? previewStates[path]?.open ?? false,
                 ...state,
             },
-        };
-    }
-
-    // helper to compute bounds of shapes array
-    function computeBounds(
-        shapes: Array<{ x: number; y: number; w: number; h: number }>,
-    ) {
-        if (!shapes || shapes.length === 0)
-            return {
-                minX: 0,
-                minY: 0,
-                maxX: 300,
-                maxY: 200,
-                width: 300,
-                height: 200,
-            };
-        let minX = Number.POSITIVE_INFINITY;
-        let minY = Number.POSITIVE_INFINITY;
-        let maxX = Number.NEGATIVE_INFINITY;
-        let maxY = Number.NEGATIVE_INFINITY;
-        for (const s of shapes) {
-            const left = (typeof s.x === "number" ? s.x : 0) - (s.w || 0) / 2;
-            const top = (typeof s.y === "number" ? s.y : 0) - (s.h || 0) / 2;
-            minX = Math.min(minX, left);
-            minY = Math.min(minY, top);
-            maxX = Math.max(maxX, left + (s.w || 0));
-            maxY = Math.max(maxY, top + (s.h || 0));
-        }
-        // fallback if degenerate
-        if (
-            !isFinite(minX) ||
-            !isFinite(minY) ||
-            !isFinite(maxX) ||
-            !isFinite(maxY)
-        )
-            return {
-                minX: 0,
-                minY: 0,
-                maxX: 300,
-                maxY: 200,
-                width: 300,
-                height: 200,
-            };
-        const width = Math.max(maxX - minX, 1);
-        const height = Math.max(maxY - minY, 1);
-        return { minX, minY, maxX, maxY, width, height };
-    }
-
-    // scale shape into a 300x200 box with padding
-    function scaleShape(
-        shape: { x: number; y: number; w: number; h: number },
-        shapes: any[],
-    ) {
-        const bounds = computeBounds(shapes as any);
-        const viewW = 300 - 8; // padding
-        const viewH = 200 - 8;
-        const pad = 4;
-        const sx = viewW / bounds.width;
-        const sy = viewH / bounds.height;
-        const sScale = Math.min(sx, sy);
-        const tx = -bounds.minX * sScale + pad;
-        const ty = -bounds.minY * sScale + pad;
-        // shapes use center-based x/y in tldraw; transform to top-left for display
-        const cx = shape.x || 0;
-        const cy = shape.y || 0;
-        const w = shape.w || 100;
-        const h = shape.h || 60;
-        const left = cx - w / 2;
-        const top = cy - h / 2;
-        return {
-            x: left * sScale + tx,
-            y: top * sScale + ty,
-            w: Math.max(w * sScale, 1),
-            h: Math.max(h * sScale, 1),
         };
     }
 
@@ -717,32 +644,21 @@
                                                                         preserveAspectRatio="xMidYMid meet"
                                                                     >
                                                                         {#if page.shapes && page.shapes.length}
+                                                                            {@const bounds = computeBounds(page.shapes)}
+                                                                            {@const viewW = 300 - SVG_PAD * 2}
+                                                                            {@const viewH = 200 - SVG_PAD * 2}
+                                                                            {@const scale = Math.min(viewW / bounds.width, viewH / bounds.height)}
                                                                             {#each page.shapes as s}
+                                                                                {@const pos = projectShape(s, bounds, scale, SVG_PAD)}
                                                                                 <rect
-                                                                                    x={scaleShape(
-                                                                                        s,
-                                                                                        page.shapes,
-                                                                                    )
-                                                                                        .x}
-                                                                                    y={scaleShape(
-                                                                                        s,
-                                                                                        page.shapes,
-                                                                                    )
-                                                                                        .y}
-                                                                                    width={scaleShape(
-                                                                                        s,
-                                                                                        page.shapes,
-                                                                                    )
-                                                                                        .w}
-                                                                                    height={scaleShape(
-                                                                                        s,
-                                                                                        page.shapes,
-                                                                                    )
-                                                                                        .h}
-                                                                                    rx="3"
-                                                                                    ry="3"
-                                                                                    fill="rgba(20,120,220,0.08)"
-                                                                                    stroke="rgba(20,120,220,0.6)"
+                                                                                    x={pos.x}
+                                                                                    y={pos.y}
+                                                                                    width={pos.w}
+                                                                                    height={pos.h}
+                                                                                    rx={SHAPE_RX}
+                                                                                    ry={SHAPE_RX}
+                                                                                    fill={SHAPE_FILL}
+                                                                                    stroke={SHAPE_STROKE}
                                                                                     stroke-width="1"
                                                                                 />
                                                                             {/each}

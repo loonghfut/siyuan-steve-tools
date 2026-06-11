@@ -3,6 +3,8 @@
     import { showMessage, openTab, Plugin } from 'siyuan';
     import { api } from '@frostime/siyuan-plugin-kits';
     import { whiteboardFilesUpdated } from '../whiteboards.store';
+    import type { PreviewShape } from '../utils/whiteboard-utils';
+    import { extractDrawingId, parseSyTimestamp, computeBounds, formatTime, projectShape, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from '../utils/whiteboard-utils';
 
     // 父层传入 plugin 以便打开白板
     export let plugin: Plugin;
@@ -15,7 +17,7 @@
         exists: boolean;     // 块是否存在
         mtime: number;       // 文件修改时间 (用于排序)
         loadingPreview: boolean; // 缩略图是否加载中
-        shapes: Array<{ id?: string; type?: string; x: number; y: number; w: number; h: number }>; // 用于缩略图
+        shapes: PreviewShape[]; // 用于缩略图
         error?: string;      // 预览错误
     }
 
@@ -126,15 +128,6 @@
                         }
 
                         // compute mtimeNum from blk/doc
-                        const parseSyTimestamp = (ts: string | undefined | null) => {
-                            if (!ts || typeof ts !== 'string') return 0;
-                            const m2 = ts.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
-                            if (!m2) return 0;
-                            const [_, y, mo, d, hh, mm, ss] = m2 as string[];
-                            const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh), Number(mm), Number(ss));
-                            return date.getTime();
-                        };
-
                         let blkUpdated = f.blkInfo && typeof f.blkInfo.updated === 'string' ? parseSyTimestamp(f.blkInfo.updated) : 0;
                         let docUpdated = f.docBlkInfo && typeof f.docBlkInfo.updated === 'string' ? parseSyTimestamp(f.docBlkInfo.updated) : 0;
                         let blkCreated = f.blkInfo && typeof f.blkInfo.created === 'string' ? parseSyTimestamp(f.blkInfo.created) : 0;
@@ -238,14 +231,7 @@
         })();
     }
 
-    function formatTime(ms: number | undefined) {
-        if (!ms || !Number.isFinite(ms) || ms <= 0) return '';
-        try {
-            return new Date(ms).toLocaleString();
-        } catch { return '' }
-    }
-
-    // 滚动检测作为 IntersectionObserver 的补充（某些嵌套滚动环境下 IO 可能不触发）
+// 滚动检测作为 IntersectionObserver 的补充（某些嵌套滚动环境下 IO 可能不触发）
     function handleGridScroll() {
         if (!cardsGridEl || loadingBatch || allLoaded) return;
         const nearBottom = cardsGridEl.scrollTop + cardsGridEl.clientHeight >= cardsGridEl.scrollHeight - 160; // 160px 预加载阈值
@@ -263,13 +249,6 @@
                 await new Promise(r => setTimeout(r, 10));
             }
         })();
-    }
-
-    function extractDrawingId(filename: string): string {
-        const match = filename.match(/^tldraw-data-(.+)\.json$/);
-        const idPattern = /^\d{14}-\w{7}$/;
-        if (match && match[1] && idPattern.test(match[1])) return match[1];
-        return '未知画板';
     }
 
     // 过滤逻辑
@@ -418,33 +397,6 @@
             filteredCards = [...filteredCards];
         }
     }
-
-    // 计算整体边界
-    function computeBounds(shapes: Array<{ x: number; y: number; w: number; h: number }>) {
-        if (!shapes || shapes.length === 0) return { minX: 0, minY: 0, maxX: 300, maxY: 200, width: 300, height: 200 };
-        let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY;
-        for (const s of shapes) {
-            const left = (s.x || 0) - (s.w || 0) / 2;
-            const top = (s.y || 0) - (s.h || 0) / 2;
-            minX = Math.min(minX, left); minY = Math.min(minY, top);
-            maxX = Math.max(maxX, left + (s.w || 0)); maxY = Math.max(maxY, top + (s.h || 0));
-        }
-        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return { minX: 0, minY: 0, maxX: 300, maxY: 200, width: 300, height: 200 };
-        const width = Math.max(maxX - minX, 1); const height = Math.max(maxY - minY, 1);
-        return { minX, minY, maxX, maxY, width, height };
-    }
-
-    function scaleShape(shape: { x: number; y: number; w: number; h: number }, shapes: any[]) {
-        const bounds = computeBounds(shapes as any);
-        const viewW = 300 - 8; const viewH = 200 - 8; const pad = 4;
-        const sx = viewW / bounds.width; const sy = viewH / bounds.height; const sScale = Math.min(sx, sy);
-        const tx = -bounds.minX * sScale + pad; const ty = -bounds.minY * sScale + pad;
-        const cx = shape.x || 0; const cy = shape.y || 0; const w = shape.w || 100; const h = shape.h || 60;
-        const left = cx - w / 2; const top = cy - h / 2;
-        return { x: left * sScale + tx, y: top * sScale + ty, w: Math.max(w * sScale, 1), h: Math.max(h * sScale, 1) };
-    }
-
-    // 已移除下载功能按钮; 保留接口后续可扩展（当前不使用）
 
     // 懒加载缩略图：使用 IntersectionObserver
     let observer: IntersectionObserver;
@@ -638,10 +590,15 @@
                         {:else}
                             <svg viewBox="0 0 300 200" class="preview-svg" preserveAspectRatio="xMidYMid meet">
                                 {#if card.shapes.length > 0}
+                                    {@const bounds = computeBounds(card.shapes)}
+                                    {@const viewW = 300 - SVG_PAD * 2}
+                                    {@const viewH = 200 - SVG_PAD * 2}
+                                    {@const scale = Math.min(viewW / bounds.width, viewH / bounds.height)}
                                     {#each card.shapes as s}
-                                        <rect x={scaleShape(s, card.shapes).x} y={scaleShape(s, card.shapes).y} width={scaleShape(s, card.shapes).w} height={scaleShape(s, card.shapes).h} rx="3" ry="3" fill="rgba(20,120,220,0.08)" stroke="rgba(20,120,220,0.6)" stroke-width="1" />
+                                        {@const pos = projectShape(s, bounds, scale, SVG_PAD)}
+                                        <rect x={pos.x} y={pos.y} width={pos.w} height={pos.h} rx={SHAPE_RX} ry={SHAPE_RX} fill={SHAPE_FILL} stroke={SHAPE_STROKE} stroke-width="1" />
                                     {/each}
-                                    <rect x="0.5" y="0.5" width="299" height="199" fill="none" stroke="rgba(0,0,0,0.06)" />
+                                    <rect x="1" y="1" width="298" height="198" fill="none" stroke={BORDER_STROKE} />
                                 {:else}
                                     <rect x="20" y="20" width="260" height="160" fill="rgba(0,0,0,0.02)" stroke="rgba(0,0,0,0.03)" />
                                 {/if}

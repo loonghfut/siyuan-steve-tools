@@ -4,6 +4,7 @@
     import { api } from "@frostime/siyuan-plugin-kits";
     import { triggerWhiteboardsRefresh } from '../whiteboards.store';
     import { closeTab } from '../tldraw-instance-manager';
+    import { extractDrawingId } from '../utils/whiteboard-utils';
 
     interface WhiteboardFile {
         name: string;       // 文件名 e.g., tldraw-data-2023...-xxxxxxx.json
@@ -111,18 +112,6 @@
             allWhiteboardFiles.forEach(f => f.checking = false);
             applyFilters(); // 最后再刷新一次确保UI正确
         }
-    }
-
-    // 提取画板ID
-    function extractDrawingId(filename: string): string {
-        // 匹配 tldraw-data-ID.json
-        const match = filename.match(/^tldraw-data-(.+)\.json$/);
-        // ID 格式通常是 2023...-xxxxxxx
-        const idPattern = /^\d{14}-\w{7}$/;
-        if (match && match[1] && idPattern.test(match[1])) {
-            return match[1];
-        }
-        return '未知画板';
     }
 
     // 应用搜索和视图过滤
