@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.40.1 (2026年06月08日)
+### v0.40.2 (2026年06月12日)
 - feat: 更新表单组件样式，优化布局和交互效果 (loonghfut)
 - feat: 添加侧边栏启用开关功能，支持分组设置的动态提取 (loonghfut)
 - 改进设置体验 (loonghfut)
@@ -50,6 +50,13 @@ win端s3同步后，docker端感知s3同步。
 - docs: 更新 v0.40.0 版本的更新日志 (loonghfut)
 - feat: 调整卡片样式，优化居中对齐时的间距和定位 (loonghfut)
 - feat: 更新版本号至 0.40.1 (loonghfut)
+- docs: 更新 v0.40.1 版本的更新日志 (loonghfut)
+- feat: 重构白板工具函数，提取公共逻辑并优化组件间共享 (loonghfut)
+- feat: 优化白板管理器和卡片样式，调整间距和层级关系 (loonghfut)
+- feat: 添加右键菜单功能，支持文档跳转、刷新、备份和删除操作 (loonghfut)
+- feat: 调整卡片样式，优化对齐和高度设置 (loonghfut)
+- feat: 优化白板按钮功能，动态获取标题文本 (loonghfut)
+- feat: 更新版本号至0.40.2 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
