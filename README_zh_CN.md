@@ -57,6 +57,7 @@ win端s3同步后，docker端感知s3同步。
 - feat: 调整卡片样式，优化对齐和高度设置 (loonghfut)
 - feat: 优化白板按钮功能，动态获取标题文本 (loonghfut)
 - feat: 更新版本号至0.40.2 (loonghfut)
+- docs: 更新 v0.40.2 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
