@@ -36,10 +36,6 @@ export function addWhiteboardButtonToFileTreeItem(item: Element) {
     const rootid = item.getAttribute('data-id') || item.getAttribute('data-node-id') || '';
     if (!rootid) return;
 
-    // 获取标题文本
-    const textEl = item.querySelector('.b3-list-item__text');
-    const titleText = textEl?.textContent || '白板';
-
     // 创建白板图标按钮
     const iconBtn = document.createElement('span');
     iconBtn.className = 'b3-list-item__action st-whiteboard-tree-icon b3-tooltips b3-tooltips__nw';
@@ -50,6 +46,8 @@ export function addWhiteboardButtonToFileTreeItem(item: Element) {
     iconBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
+        const textEl = item.querySelector('.b3-list-item__text');
+        const titleText = textEl?.textContent || '白板';
         const plugin = moduleInstances['M_handwriting'].pluginInstance;
         const tabId = plugin.name + "steveTool-whiteboard";
         await openTab({
