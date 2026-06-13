@@ -572,11 +572,57 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
 
 //OK解决事件重复问题
 //转换数据格式
+// 预取所有“主事件”块的 kramdown 文本。
+// 原实现会在循环内逐个 await api.getBlockKramdown（串行 N+1，事件多时显著拖慢）。
+// 这里收集所有需要获取的 blockId，一次性 Promise.all 并行拉取，按 blockId 缓存结果。
+// 对空/未传入的 viewData 直接返回空 Map，行为与原循环内跳过逻辑一致。
+async function prefetchKramdownForMainEvents(viewData: any[] | null | undefined): Promise<Map<string, string>> {
+    const cache = new Map<string, string>();
+    if (!viewData || !Array.isArray(viewData)) return cache;
+
+    // 收集所有需要预取的块 id（与原循环内的条件保持一致：块 id 存在且为主事件）
+    const blockIds: string[] = [];
+    for (const view of viewData) {
+        if (!view?.data) continue;
+        for (const item of view.data) {
+            const eventBlockId = item['事件']?.id || '';
+            if (eventBlockId && (item['主事件']?.content || false) && !cache.has(eventBlockId)) {
+                cache.set(eventBlockId, ''); // 占位，避免重复收集
+                blockIds.push(eventBlockId);
+            }
+        }
+    }
+    if (blockIds.length === 0) return cache;
+
+    // 并行获取；单条失败不影响其它条目（与原先 try 包裹的整体语义保持宽松兼容）
+    const results = await Promise.all(
+        blockIds.map(async (blockId) => {
+            try {
+                const res = await api.getBlockKramdown(blockId);
+                return [blockId, res?.kramdown || ''] as const;
+            } catch (e) {
+                console.warn('预取 kramdown 失败:', blockId, e);
+                return [blockId, ''] as const;
+            }
+        })
+    );
+    for (const [blockId, kramdown] of results) {
+        cache.set(blockId, kramdown);
+    }
+    return cache;
+}
+
 export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]): Promise<CalendarEventItem[]> {
     const events: CalendarEventItem[] = [];
     const addedEventIds = new Set<string>();
     const unscheduledCollector: UnscheduledEvent[] = [];
     // console.debug("viewData:::", viewData);
+
+    // 预取所有“主事件”块的 kramdown：原先在循环内逐个 await（串行 N+1），
+    // 改为一次性 Promise.all 并行获取，按 blockId 缓存结果。行为完全等价，仅提升并发度。
+    const kramdownCache = await prefetchKramdownForMainEvents(viewData);
+    const kramdownCache_zq = await prefetchKramdownForMainEvents(viewData_zq);
+
     // 处理普通事件（界面展示与跳转使用块 id，数据库更新使用 itemID）
     for (const view of viewData) {
         for (const item of view.data) {
@@ -629,7 +675,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
 
                 let kramdown = "";
                 if (eventBlockId && (item['主事件']?.content || false)) {
-                    kramdown = (await api.getBlockKramdown(eventBlockId)).kramdown;
+                    kramdown = kramdownCache.get(eventBlockId) || '';
                 }
                 events.push({
                     id: eventBlockId, // FullCalendar 的事件 id 仍使用块 id 方便定位
@@ -753,7 +799,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     // 获取 kramdown 内容
                     let kramdown = "";
                     if (eventBlockId && (item['主事件']?.content || false)) {
-                        kramdown = (await api.getBlockKramdown(eventBlockId)).kramdown;
+                        kramdown = kramdownCache_zq.get(eventBlockId) || '';
                     }
 
                     events.push({
@@ -1354,9 +1400,57 @@ export async function updateEventInDatabase(
 }
 
 
+// keyID 索引缓存：按 viewValue 数组引用建立 “rootid -> fieldName -> keyID” 索引。
+// createEventInDatabase 会对同一 viewValue 连续调用本函数 ~8 次（time/status/.../priority），
+// 原实现每次都 O(n) 双层遍历整棵数据；这里在首次调用时构建一次索引，后续 O(1) 查找。
+// WeakMap 以引用为键，viewValue 被回收后索引自动释放，不会泄漏。
+const keyIdIndexCache = new WeakMap<object, Map<string, Map<string, string>>>();
+
+function buildKeyIdIndex(data: any[]): Map<string, Map<string, string>> {
+    // 外层 Map：rootid -> (fieldName -> keyID)
+    const index = new Map<string, Map<string, string>>();
+    if (!Array.isArray(data)) return index;
+    for (const view of data) {
+        const rootid = view?.from?.rootid;
+        if (!rootid || !view?.data) continue;
+        let perRoot = index.get(rootid);
+        if (!perRoot) {
+            perRoot = new Map();
+            index.set(rootid, perRoot);
+        }
+        for (const item of view.data) {
+            if (!item) continue;
+            for (const fieldName in item) {
+                const keyID = item[fieldName]?.keyID;
+                if (keyID && !perRoot.has(fieldName)) {
+                    perRoot.set(fieldName, keyID);
+                }
+            }
+        }
+    }
+    return index;
+}
+
+function findKeyIDByIndex(viewValue: any[], key: string, rootid: string): string | undefined {
+    let index = keyIdIndexCache.get(viewValue);
+    if (!index) {
+        index = buildKeyIdIndex(viewValue);
+        keyIdIndexCache.set(viewValue, index);
+    }
+    return index.get(rootid)?.get(key);
+}
+
 //TODO：急急优化
 async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string): Promise<string | undefined> {
-    // First try to get keyID from existing viewValue
+    // 优先从 viewValue 已构建的索引中 O(1) 查找（同一 viewValue 多次调用时复用索引）
+    if (Array.isArray(viewValue)) {
+        const existingKeyID = findKeyIDByIndex(viewValue, key, rootid);
+        if (existingKeyID) {
+            return existingKeyID;
+        }
+    }
+
+    // 兜底：若 viewValue 不是数组或未命中，仍按原始线性扫描
     const findKeyID = (data: any[]): string | undefined => {
         for (const view of data) {
             for (const item of view.data) {
@@ -1368,7 +1462,7 @@ async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string
         return undefined;
     };
 
-    const existingKeyID = findKeyID(viewValue);
+    const existingKeyID = Array.isArray(viewValue) ? findKeyID(viewValue) : undefined;
     if (existingKeyID) {
         return existingKeyID;
     }
@@ -1393,7 +1487,7 @@ async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string
 
         const freshViewValue = await getViewValue(viewIDs);
         sy.showMessage('添加事件中，请稍等...', 1, "info", "1");
-        return findKeyID(freshViewValue);
+        return findKeyIDByIndex(freshViewValue, key, rootid) ?? findKeyID(freshViewValue);
     } catch (error) {
         console.error('Error fetching key ID:', error);
         return undefined;

@@ -10,40 +10,91 @@ export class LifelogView {
             }
 
             const events: EventInput[] = [];
+
+            // 构造范围内的日期边界（value 以 'YYYY/MM/DD' 存储，定宽，字典序与时间序一致，
+            // 可直接用字符串范围比较）。
+            const pad = (n: number) => String(n).padStart(2, '0');
+            const fmtDate = (d: Date) => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+            const startDateStr = fmtDate(start);
+            // end 由 FullCalendar 给出为下一段的起点（半开），这里取到 end 前一天即可；
+            // 但原实现用的是 currentDate <= end，为保持行为一致，范围上界直接用 end。
+            const endDateStr = fmtDate(end);
+
+            // 一次性范围查询：拿到范围内所有 lifelog 日期属性对应的块 id + value
+            // （原实现是逐天各发一次 sql，共 N 次往返；这里合并为 1 次）。
+            const rangeQuery = `
+                SELECT DISTINCT block_id, value
+                FROM attributes
+                WHERE name = '${ATTRS.date}'
+                  AND value >= '${startDateStr}'
+                  AND value <= '${endDateStr}'
+            `;
+            const rangeResult = await sql(rangeQuery);
+
+            // 按 dateStr 分组（value 即为 'YYYY/MM/DD'）
+            const blockIdsByDate = new Map<string, string[]>();
+            for (const row of rangeResult || []) {
+                const dateStr = row.value;
+                if (!dateStr) continue;
+                let bucket = blockIdsByDate.get(dateStr);
+                if (!bucket) {
+                    bucket = [];
+                    blockIdsByDate.set(dateStr, bucket);
+                }
+                bucket.push(row.block_id);
+            }
+
+            // 汇总所有需要拉取属性的块 id，一次性并行 getBlockAttrs
+            // （原实现是逐块串行 await，共 N×M 次往返；这里改为并行）。
+            const allBlockIds: string[] = [];
+            for (const ids of blockIdsByDate.values()) {
+                allBlockIds.push(...ids);
+            }
+            const targetAttrs = [ATTRS.date, ATTRS.time, ATTRS.type, ATTRS.content];
+            const attrsMap = new Map<string, Record<string, string>>();
+            if (allBlockIds.length > 0) {
+                const attrsResults = await Promise.all(
+                    allBlockIds.map(async (blockId) => {
+                        try {
+                            const attrs = await getBlockAttrs(blockId);
+                            const relevantAttrs: Record<string, string> = {};
+                            targetAttrs.forEach((attr) => {
+                                if (attrs[attr]) {
+                                    relevantAttrs[attr] = attrs[attr];
+                                }
+                            });
+                            return [blockId, relevantAttrs] as const;
+                        } catch (e) {
+                            return [blockId, {} as Record<string, string>] as const;
+                        }
+                    })
+                );
+                for (const [blockId, relevantAttrs] of attrsResults) {
+                    attrsMap.set(blockId, relevantAttrs);
+                }
+            }
+
+            // 按天顺序处理，保持与原实现一致的 lastDayLastEventEndTime 链式语义。
             const currentDate = new Date(start);
             let lastDayLastEventEndTime = '23:59:59';  // 默认起始时间
 
-            // 循环遍历从开始日期到结束日期的每一天
             while (currentDate <= end) {
-                const dateStr = currentDate.toISOString().split('T')[0].replace(/-/g, '/');
+                const dateStr = fmtDate(currentDate);
+                const blockIds = blockIdsByDate.get(dateStr);
 
-                // 构建当天的 SQL 查询语句
-                const blockIdsQuery = `
-                    SELECT DISTINCT block_id
-                    FROM attributes
-                    WHERE name = '${ATTRS.date}' AND value = '${dateStr}'
-                `;
-
-                const blockIdsResult = await sql(blockIdsQuery);
-                const blockIds = blockIdsResult.map((item: any) => item.block_id);
-
-                if (blockIds.length === 0) {
+                if (!blockIds || blockIds.length === 0) {
                     // 推进到下一天
                     currentDate.setDate(currentDate.getDate() + 1);
                     continue;
                 }
 
+                // 从预取的属性表构造当日条目
                 const groupedData = new Map<string, any>();
                 for (const blockId of blockIds) {
-                    const attrs = await getBlockAttrs(blockId);
-                    const relevantAttrs: Record<string, string> = {};
-                    const targetAttrs = [ATTRS.date, ATTRS.time, ATTRS.type, ATTRS.content];
-                    targetAttrs.forEach((attr) => {
-                        if (attrs[attr]) {
-                            relevantAttrs[attr] = attrs[attr];
-                        }
-                    });
-                    groupedData.set(blockId, relevantAttrs);
+                    const relevantAttrs = attrsMap.get(blockId);
+                    if (relevantAttrs) {
+                        groupedData.set(blockId, relevantAttrs);
+                    }
                 }
 
                 const items = Array.from(groupedData.entries())
@@ -61,7 +112,7 @@ export class LifelogView {
                         // 则需要使用前一天的日期
                         const prevDate = new Date(currentDate);
                         prevDate.setDate(prevDate.getDate() - 1);
-                        eventStartDate = prevDate.toISOString().split('T')[0].replace(/-/g, '/');
+                        eventStartDate = fmtDate(prevDate);
                     } else {
                         eventStartTime = items[i - 1][1][ATTRS.time];
                         eventStartDate = dateStr;

@@ -10,6 +10,19 @@ import { runblockdata_for_sub } from './quickadd';
 let sortableInstances: Sortable[] = []; // 存储所有Sortable实例
 export let allKBEvents: NestedKBCalendarEvent[] = [];
 
+// runblockdata_for_sub 的 memo 缓存：该函数是纯函数（仅依赖 kramdown 字符串），
+// 但在 createCard 里对每张卡片、每次渲染都重新跑正则。事件多时这是显著开销。
+// 按 kramdown 字符串缓存解析结果，同一内容只解析一次。
+const runblockdataForSubCache = new Map<string, { subevent: string, completed: boolean }[]>();
+function runblockdataForSubMemo(content: string): { subevent: string, completed: boolean }[] {
+    let cached = runblockdataForSubCache.get(content);
+    if (cached === undefined) {
+        cached = runblockdata_for_sub(content);
+        runblockdataForSubCache.set(content, cached);
+    }
+    return cached;
+}
+
 export let thisCalendars: Calendar[] = []; // 初始化thisCalendars数组
 let isFilter = true;//OK:解决回调问题
 // let id = '';//渲染protyle用
@@ -85,10 +98,20 @@ const CustomViewConfig = {
         // console.debug("处理后数据allKBEvents", allKBEvents);
         // console.debug("处理后数据", dataArray);
 
+        // 单次遍历按 status 分桶，再分别排序，避免对 dataArray 做 3 次 filter（常数 ↓1/3）。
+        const todo: NestedKBCalendarEvent[] = [];
+        const inProgress: NestedKBCalendarEvent[] = [];
+        const done: NestedKBCalendarEvent[] = [];
+        for (const e of dataArray) {
+            const status = e.extendedProps.status;
+            if (status === '未完成') todo.push(e);
+            else if (status === '进行中') inProgress.push(e);
+            else if (status === '完成') done.push(e);
+        }
         const columns = {
-            todo: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '未完成')),
-            inProgress: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '进行中')),
-            done: myK.sortEvents(dataArray.filter(e => e.extendedProps.status === '完成'))
+            todo: myK.sortEvents(todo),
+            inProgress: myK.sortEvents(inProgress),
+            done: myK.sortEvents(done)
         };
         // console.debug(columns);
 
@@ -119,7 +142,7 @@ const CustomViewConfig = {
             const progressPercent = totalSubtasks ? (completedSubtasks / totalSubtasks) * 100 : 0;
 
             // 添加新的子事件完成进度计算
-            const blockSubEvents = runblockdata_for_sub(event.extendedProps.kramdown || '');
+            const blockSubEvents = runblockdataForSubMemo(event.extendedProps.kramdown || '');
             const totalBlockSubs = blockSubEvents.length;
             const completedBlockSubs = blockSubEvents.filter(sub => sub.completed).length;
             const blockProgressPercent = totalBlockSubs ? (completedBlockSubs / totalBlockSubs) * 100 : 0;
@@ -573,8 +596,9 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
         if (clonedEvent.extendedProps.sub?.ids) {
             clonedEvent.children = clonedEvent.extendedProps.sub.ids
                 .map(id => {
-                    const nestedEvent = eventMap.get(id) ||
-                        allKBEvents.find(e => e.extendedProps.blockId === id);
+                    // 直接从 eventMap 取（O(1)）。eventMap 初始化时已并入 allKBEvents，
+                    // 因此与原先 `|| allKBEvents.find(...)` 的回退语义一致，但避免了线性扫描导致的 O(n²)。
+                    const nestedEvent = eventMap.get(id);
                     return nestedEvent ? { ...nestedEvent } : undefined;
                 })
                 .filter((e): e is NestedKBCalendarEvent => e !== undefined)
@@ -615,12 +639,15 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
 
 export async function destroyAllSortables() {
     sortableInstances.forEach(instance => {
-        // Remove all event listeners and destroy sortable instance
-        if (instance.el) {
-            const clonedEl = instance.el.cloneNode(true);
-            instance.el.parentNode?.replaceChild(clonedEl, instance.el);
+        // 直接调用 destroy()：Sortable 官方接口会移除其内部绑定的监听器与数据。
+        // 原先用 cloneNode(true) 深拷贝整列 DOM 来“剥离”监听器，对大量卡片是显著开销，
+        // 且会丢失 DOM 上其它框架/库挂载的状态。destroy() 已足够清理。
+        try {
+            instance.destroy();
+        } catch (e) {
+            // 单个实例销毁失败不应阻断其余清理
+            console.warn('Sortable destroy 失败:', e);
         }
-        instance.destroy();
     });
     sortableInstances = [];
 }
@@ -647,8 +674,10 @@ const _refreshKanban = async () => {
 
     // 设置加载状态
     const kanbanCards = document.querySelectorAll('.kanban-card');
+    // 销毁所有 Sortable 实例：只需调用一次（原实现放在 forEach 里对每张卡片重复调用，
+    // 由于 sortableInstances 在首次调用后即被清空，后续调用都是空操作，纯属浪费）。
+    await destroyAllSortables();
     kanbanCards.forEach(card => {
-        destroyAllSortables();
         (card as HTMLElement).style.cursor = 'wait';
     });
     // console.debug('ST开始依次刷新日历');

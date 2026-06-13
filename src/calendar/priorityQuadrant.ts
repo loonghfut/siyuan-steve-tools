@@ -21,6 +21,9 @@ const getUrgentThresholdDays = () => {
 
 let dataArray: NestedKBCalendarEvent[] = [];
 let flatEventCache: NestedKBCalendarEvent[] = [];
+// flatEventCache 的 blockId 索引：按 blockId 分组的事件数组，使查找从 O(n) 降为 O(1)。
+// 与 flatEventCache 同步重建（同一处赋值点维护）。
+let flatEventCacheByBlockId: Map<string, NestedKBCalendarEvent[]> = new Map();
 
 const flattenEvents = (events: NestedKBCalendarEvent[]): NestedKBCalendarEvent[] => {
   const result: NestedKBCalendarEvent[] = [];
@@ -38,8 +41,9 @@ const flattenEvents = (events: NestedKBCalendarEvent[]): NestedKBCalendarEvent[]
 
 const findEventInCache = (blockId: string | null, startDate?: string | null): NestedKBCalendarEvent | undefined => {
   if (!blockId) return undefined;
-  const candidates = flatEventCache.filter(e => e.extendedProps.blockId === blockId);
-  if (!candidates.length) return undefined;
+  // 走 blockId 索引（O(1)），替代原先对 flatEventCache 的线性 filter（O(n)）
+  const candidates = flatEventCacheByBlockId.get(blockId);
+  if (!candidates || !candidates.length) return undefined;
   const normalized = startDate?.trim();
   if (!normalized) return candidates[0];
   const match = candidates.find(ev => ev.range?.start instanceof Date && ev.range.start.toISOString().split('T')[0] === normalized);
@@ -187,6 +191,19 @@ const QuadrantViewConfig = {
   dataArray = dataArray.filter(e => e.extendedProps.status !== '归档');
 
     flatEventCache = flattenEvents(dataArray);
+    // 同步重建 blockId 索引（一次遍历），供 findEventInCache 做 O(1) 查找
+    const byBlockId = new Map<string, NestedKBCalendarEvent[]>();
+    for (const ev of flatEventCache) {
+      const id = ev.extendedProps.blockId;
+      if (!id) continue;
+      let bucket = byBlockId.get(id);
+      if (!bucket) {
+        bucket = [];
+        byBlockId.set(id, bucket);
+      }
+      bucket.push(ev);
+    }
+    flatEventCacheByBlockId = byBlockId;
 
     // 四象限分类：
     // 1) 先按优先级固定：高->q1，中->q2，低->q3，无->q4（确保q1含所有高，q3含所有低）

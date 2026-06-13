@@ -48,6 +48,9 @@ const MIN_CALENDAR_HEIGHT = 320; // Avoid collapsing the calendar when layout sp
 let cachedTagColorMapStr = '';
 let cachedTagColorMap: Record<string, string> = {};
 const textColorCache = new Map<string, string>();
+// 农历结果缓存：同一公历日期的农历结果恒定不变，永久缓存（无 TTL）。
+// key 为 'YYYY-MM-DD'，避免每个日历单元格、每次重渲染都重复调用 solarLunar.solar2lunar。
+const lunarCache = new Map<string, any>();
 type PendingCalendarEventPatch = {
     start: string;
     end?: string | null;
@@ -395,8 +398,13 @@ export async function run(
                 // 调试输出
                 // console.debug('Solar date:', year, month, day);
 
-                // 转换为农历
-                const lunar = solarLunar.solar2lunar(year, month, day);
+                // 农历结果对同一公历日期恒定，命中缓存则直接复用，避免重复计算
+                const lunarKey = `${year}-${month}-${day}`;
+                let lunar = lunarCache.get(lunarKey);
+                if (lunar === undefined) {
+                    lunar = solarLunar.solar2lunar(year, month, day);
+                    lunarCache.set(lunarKey, lunar);
+                }
                 // console.debug('Lunar result:', lunar);
 
                 // 添加空值检查
@@ -1031,12 +1039,10 @@ export async function run(
                     info.el.style.textDecoration = 'line-through';
                     if (settingdata["cal-event-color"]) {
                         try {
-                            // 调暗背景色
-                            const uniqueId = info.event.extendedProps.priority as string || '无';
-                            const hash = Array.from(uniqueId).reduce((acc, char) => {
-                                return char.charCodeAt(0) + ((acc << 5) - acc);
-                            }, 0);
-                            const [backgroundColor] = getColors(Math.abs(hash));
+                            // 调暗背景色：复用 getCategoryColor 计算优先级色（内部走 getColors 黄金角哈希，
+                            // 与原先的内联 reduce 哈希算法一致），避免在此重复实现哈希计算。
+                            const priority = info.event.extendedProps.priority as string || '无';
+                            const { background: backgroundColor } = getCategoryColor(priority);
 
                             // 将背景色转换为 RGBA 格式并降低不透明度
                             info.el.style.backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
