@@ -4,9 +4,35 @@ import * as api from '@/api/api';
 import { refreshKanban } from '@/calendar/kanban';
 import { statusMap } from '@/calendar/myF';
 import { interceptFetch } from '@/api/network-interceptor';
+import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
+
+/**
+ * 判断一个 updateAttrs 操作是不是 lifelog 模块自己刚写入的（自反射）。
+ * 命中则跳过全量 refreshKanban —— 因为 lifelog 写完属性后会自己发
+ * LIFELOG_CHANGED_EVENT 通知日历做局部增量更新，再走全量 refresh 是重复劳动。
+ *
+ * 判定条件（任一命中即视为自写）：
+ *   1. op.id 命中 pendingWrittenIds（最可靠）
+ *   2. op.data 里包含 lifelog 专属属性名（custom-lifelog-*），作为兜底：
+ *      多窗口 / 多次连续写入时，pendingWrittenIds 可能已被清理，
+ *      但 lifelog 属性是本插件专属，普通编辑不会写它们。
+ */
+function isLifelogSelfUpdateAttrs(op: WsOp): boolean {
+    const id: string | undefined = op.id;
+    if (id && isLifelogSelfWrite(id)) return true;
+    const data = op.data;
+    if (typeof data === 'string') {
+        // lifelog 自定义属性前缀（custom-lifelog-）。普通用户编辑不会写出这些属性。
+        const lifelogAttrNames = Object.values(ATTRS) as string[];
+        for (const name of lifelogAttrNames) {
+            if (data.includes(name)) return true;
+        }
+    }
+    return false;
+}
 
 export function registerTransactionListener(plugin: steveTools, M_calendar: M_calendar) {
   const wsMainHandler = async (e) => {
@@ -24,6 +50,11 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
     if (!op) return;
     const action = op.action;
     if (action === 'updateAttrs' || action === 'updateAttrViewCell') {
+      // lifelog 自写入引起的 updateAttrs：跳过全量 refreshKanban，
+      // 由 LIFELOG_CHANGED_EVENT 走局部增量更新路径。
+      if (action === 'updateAttrs' && isLifelogSelfUpdateAttrs(op)) {
+        return;
+      }
       M_calendar.avButton();
       refreshKanban();
       if (op.avID && op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID) {

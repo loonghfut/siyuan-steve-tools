@@ -11,8 +11,10 @@ let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export let linkToCalendar = '';
 import * as myF from "./myF";
-import { handleAddButtonClick_Independent, refreshKanban } from "./kanban";
+import { handleAddButtonClick_Independent, refreshKanban, thisCalendars } from "./kanban";
 import { registerTransactionListener } from './listeners/transactionListener';
+import { LIFELOG_CHANGED_EVENT } from '../lifelog/module-lifelog';
+import { LifelogView } from './lifelog-view';
 import { icsFileManager, transformEvents } from './ics/IcsFileManager';
 import { globalOpen2 } from "./myK";
 import { addquikaddButton, getCursorElement } from "./quickadd";
@@ -46,6 +48,13 @@ export class M_calendar {
     private switchProtyleLayoutHandler?: (e: any) => void;
     private wsMessageHandler?: (e: { data: string }) => Promise<void>;
     private unregisterTransactionListener?: () => void;
+    /**
+     * lifelog 增量更新处理器：lifelog 模块写完属性后广播 LIFELOG_CHANGED_EVENT，
+     * 此处 invalidate 对应缓存并做一次 debounced refetch（只补差受影响 block，
+     * 而非全量重取整月）。详见 LifelogView 的缓存机制。
+     */
+    private lifelogChangedHandler?: (e: any) => void;
+    private lifelogRefreshTimer?: ReturnType<typeof setTimeout>;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
@@ -255,6 +264,42 @@ export class M_calendar {
         //实现看板实时更新
         //2025-2-9更新为插件api方式监听（抽离至 listeners/transactionListener.ts）
         this.unregisterTransactionListener = registerTransactionListener(this.plugin, this);
+
+        // lifelog 增量更新接入：lifelog 模块写完属性后会广播此事件，detail.ids 为变更 blockId 列表。
+        // 此处只需：1) invalidate 缓存（让下次 getLifelogEvents 重取这些 block）；
+        //          2) debounced refetch 当前可见的日历实例（仅显示 lifelog 的）。
+        // 不走 transactionListener 的 refreshKanban 全量链路 —— 那个已被
+        // isLifelogSelfUpdateAttrs 过滤掉。
+        this.lifelogChangedHandler = (e) => {
+            const ids: string[] | undefined = e?.detail?.ids;
+            if (ids && ids.length > 0) {
+                LifelogView.invalidate(ids);
+            } else {
+                // 无具体 id（理论上不会发生），保守全量失效
+                LifelogView.invalidateAll();
+            }
+            // debounce：避免短时间内多次写入触发多次 refetch
+            if (this.lifelogRefreshTimer) {
+                clearTimeout(this.lifelogRefreshTimer);
+            }
+            this.lifelogRefreshTimer = setTimeout(() => {
+                this.lifelogRefreshTimer = undefined;
+                try {
+                    // 直接 refetch 当前日历实例：getLifelogEvents 内部会因缓存命中跳过
+                    // 未变更的 block，只重取受影响的少数几条，避免全月 N 次 getBlockAttrs。
+                    for (const cal of thisCalendars) {
+                        if (cal && cal.el && document.body.contains(cal.el)) {
+                            cal.refetchEvents();
+                        }
+                    }
+                } catch (err) {
+                    console.warn('lifelog 增量 refetch 失败:', err);
+                }
+            }, 300);
+        };
+        // eventBus.on/off 的签名限定为 keyof IEventBusMap（思源内置事件），
+        // 自定义事件名需断言。这是思源插件常见做法，eventBus 内部按字符串匹配。
+        (this.plugin.eventBus as any).on(LIFELOG_CHANGED_EVENT, this.lifelogChangedHandler);
     }
 
     async onLayoutReady() {
@@ -621,6 +666,18 @@ export class M_calendar {
                 console.warn("卸载日历事务监听失败", error);
             }
             this.unregisterTransactionListener = undefined;
+        }
+        if (this.lifelogChangedHandler) {
+            try {
+                (this.plugin.eventBus as any).off(LIFELOG_CHANGED_EVENT, this.lifelogChangedHandler);
+            } catch (error) {
+                console.warn("移除 lifelog 变更监听失败", error);
+            }
+            this.lifelogChangedHandler = undefined;
+        }
+        if (this.lifelogRefreshTimer) {
+            clearTimeout(this.lifelogRefreshTimer);
+            this.lifelogRefreshTimer = undefined;
         }
         try {
             DidaService?.destroy?.();

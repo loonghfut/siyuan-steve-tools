@@ -120,7 +120,7 @@ export const lifelogColors = {
 /**
  * 解析 lifelog-type-colors 设置（"类型=颜色\n..." 格式）为 Map。
  */
-function parseLifelogTypeColors(raw: string): Map<string, string> {
+export function parseLifelogTypeColors(raw: string): Map<string, string> {
     const map = new Map<string, string>();
     if (!raw) return map;
     const lines = String(raw).split(/\r?\n/);
@@ -138,6 +138,100 @@ function parseLifelogTypeColors(raw: string): Map<string, string> {
         }
     }
     return map;
+}
+
+// 动态注入的 <style> 标签 id
+const LIFEOLOG_CUSTOM_STYLE_ID = 'lifelog-custom-type-styles';
+
+/**
+ * 将用户自定义的类型颜色生成为 CSS 规则并注入 <style> 标签。
+ *
+ * 作用：让日记段落（[custom-lifelog-type="..."]）也显示用户配置的颜色，
+ * 补足 index.scss 仅覆盖内置类型的不足。
+ *
+ * 规则格式（与 index.scss 现有结构一致）：
+ *   body[data-lifelog-enabled] [data-type="NodeParagraph"][custom-lifelog-type="运动"] {
+ *     border-bottom: 1px solid #4F93D1;
+ *     background-color: rgba(79, 147, 209, 0.05);
+ *   }
+ *
+ * @param colorsRaw lifelog-type-colors 设置原始值（"类型=颜色\n..."）
+ * @param enabled LifeLog 是否启用（false 时移除注入的 style）
+ */
+export function applyLifelogTypeStyles(colorsRaw: string, enabled: boolean): void {
+    const styleId = LIFEOLOG_CUSTOM_STYLE_ID;
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+
+    // 未启用或无配置：移除注入的样式
+    if (!enabled || !colorsRaw) {
+        if (styleEl) styleEl.remove();
+        return;
+    }
+
+    const userMap = parseLifelogTypeColors(colorsRaw);
+    if (userMap.size === 0) {
+        if (styleEl) styleEl.remove();
+        return;
+    }
+
+    const rules: string[] = [];
+    userMap.forEach((color, type) => {
+        // CSS.escape 处理类型名里的特殊字符（如引号、括号）；不支持时退回手动转义
+        const cssEscape: ((s: string) => string) | undefined = (window as any).CSS?.escape;
+        const escapedType = cssEscape
+            ? cssEscape(type)
+            : type.replace(/["\\\n\r]/g, (ch) => '\\' + ch);
+        // 把 hex/rgb 转为 rgba 以便加透明度；失败则直接用原色
+        const rgba = toRgba(color, 0.05);
+        const borderColor = toRgba(color, 1) || color;
+        rules.push(
+            `body[data-lifelog-enabled] [data-type="NodeParagraph"][custom-lifelog-type="${escapedType}"]{` +
+            `border-bottom:1px solid ${borderColor};` +
+            `background-color:${rgba};` +
+            `}`
+        );
+    });
+
+    const cssText = rules.join('\n');
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = cssText;
+}
+
+/**
+ * 把颜色字符串转为 rgba(r,g,b,a) 格式。
+ * 支持 #RGB / #RRGGBB / rgb(r,g,b) / rgba(r,g,b,a)。
+ * 失败返回空字符串。
+ */
+function toRgba(color: string, alpha: number): string {
+    if (!color) return '';
+    const hex = color.trim();
+    // #RGB 或 #RRGGBB
+    if (hex.startsWith('#')) {
+        let r: number, g: number, b: number;
+        if (hex.length === 4) {
+            r = parseInt(hex[1] + hex[1], 16);
+            g = parseInt(hex[2] + hex[2], 16);
+            b = parseInt(hex[3] + hex[3], 16);
+        } else if (hex.length === 7) {
+            r = parseInt(hex.slice(1, 3), 16);
+            g = parseInt(hex.slice(3, 5), 16);
+            b = parseInt(hex.slice(5, 7), 16);
+        } else {
+            return '';
+        }
+        if ([r, g, b].some(v => !Number.isFinite(v))) return '';
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    // rgb(...) / rgba(...)
+    const m = hex.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (m) {
+        return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})`;
+    }
+    return '';
 }
 
 /**

@@ -1,9 +1,24 @@
 import { Plugin } from "siyuan";
 import { getBlockAttrs, setBlockAttrs, getBlockByID } from "../api/api";
+import { applyLifelogTypeStyles } from "./styles/colors";
 
 // 常量定义
 const LIFELOG_PREFIX = 'custom-lifelog-';
 const DAILY_NOTE_ATTR_PREFIX = 'custom-dailynote-';  // 思源 daily note 文档块属性前缀，完整格式: custom-dailynote-YYYYMMDD
+
+/**
+ * 自定义事件名：lifelog 模块写完属性后广播，通知日历侧做"局部刷新"而非全量 refetch。
+ * detail 为变更的 blockId 列表。
+ *
+ * 为什么不用 ws-main：我们自己的 setBlockAttrs 会触发思源再广播一次 transactions
+ * （action=updateAttrs），日历侧 transactionListener 会据此全量 refreshKanban。
+ * 用独立事件名绕开这条全量链路，让日历侧只针对 lifelog block 做增量更新。
+ */
+export const LIFELOG_CHANGED_EVENT = 'steve-tools:lifelog-changed';
+
+// 标记当前正在由本模块写入属性。transactionListener 可据此跳过这些块触发的全量刷新。
+// 用 Set 而不是 boolean，是因为可能批量写多个块。
+const pendingWrittenIds: Set<string> = new Set();
 
 // Export the ATTRS constant
 export const ATTRS = {
@@ -95,6 +110,8 @@ export class M_lifelog {
         if (this.enabled) {
             document.body.setAttribute('data-lifelog-enabled', 'true');
         }
+        // 注入用户自定义类型颜色样式（日记段落着色）
+        applyLifelogTypeStyles(this.settings['lifelog-type-colors'] || '', this.enabled);
         this.plugin.eventBus.on("ws-main", this.wsMainHandler);
         this.debug('LifeLog module loaded and watching');
     }
@@ -103,6 +120,8 @@ export class M_lifelog {
         console.debug('LifeLog module unloading...');
         // 移除属性标记
         document.body.removeAttribute('data-lifelog-enabled');
+        // 移除注入的自定义类型样式
+        applyLifelogTypeStyles('', false);
         this.plugin.eventBus.off("ws-main", this.wsMainHandler);
         this.rootIdCache.clear();
         console.debug('LifeLog module unloaded');
@@ -116,6 +135,8 @@ export class M_lifelog {
         } else {
             document.body.removeAttribute('data-lifelog-enabled');
         }
+        // 用户可能改了类型颜色配置或开关，重新应用样式
+        applyLifelogTypeStyles(this.settings['lifelog-type-colors'] || '', this.settings['lifelog-enable'] === true);
     }
 
     private debug(message: string, ...args: any[]) {
@@ -353,6 +374,15 @@ export class M_lifelog {
 
     private async updateBlockAttrs(updates: any[]) {
         // 并行 setBlockAttrs，单条失败不影响其他
+        const writtenIds: string[] = [];
+        // 提前登记到 pendingWrittenIds，避免下面 setBlockAttrs 广播的 updateAttrs
+        // 被 transactionListener 当成"用户编辑"再次触发全量 refreshKanban。
+        for (const u of updates) {
+            if (u?.id) {
+                pendingWrittenIds.add(u.id);
+                writtenIds.push(u.id);
+            }
+        }
         await Promise.all(
             updates.map(async (update) => {
                 try {
@@ -362,5 +392,32 @@ export class M_lifelog {
                 }
             })
         );
+
+        // 写完后广播一个自定义事件，让日历侧只对受影响的 block 做增量更新，
+        // 而不是触发全量 refetchEvents（原链路会重取整月 N 条 lifelog 属性）。
+        if (writtenIds.length > 0) {
+            try {
+                // eventBus.on/off 的签名限定为 keyof IEventBusMap（思源内置事件），
+                // 自定义事件名需断言。这是思源插件常见做法，eventBus 内部按字符串匹配。
+                const bus = this.plugin.eventBus as any;
+                bus.emit(LIFELOG_CHANGED_EVENT, { ids: writtenIds });
+            } catch (e) {
+                this.warn('LifeLog emit changed event failed:', e);
+            }
+            // 给一个宽松窗口后清理标记：updateAttrs 广播通常会在此期间到达。
+            // 用 setTimeout 而非立即清除，确保 transactionListener 能看到标记。
+            const idsToClean = writtenIds.slice();
+            setTimeout(() => {
+                idsToClean.forEach(id => pendingWrittenIds.delete(id));
+            }, 3000);
+        }
     }
+}
+
+/**
+ * 判断某个 blockId 是否是 lifelog 模块自己刚写入的（用于 transactionListener
+ * 过滤掉自反射的 updateAttrs，避免触发全量 refreshKanban）。
+ */
+export function isLifelogSelfWrite(blockId: string): boolean {
+    return pendingWrittenIds.has(blockId);
 }
