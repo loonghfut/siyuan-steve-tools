@@ -15,6 +15,7 @@
     import NotebookBlacklistEditor from '@/settings/components/NotebookBlacklistEditor.svelte';
     import ColorPicker from '@/settings/components/ColorPicker.svelte';
     import TagColorMapEditor from '@/settings/components/TagColorMapEditor.svelte';
+    import LifelogTypeColorEditor from '@/settings/components/LifelogTypeColorEditor.svelte';
     import ListEditor from '@/settings/components/ListEditor.svelte';
     import TemplateEditor from '@/settings/components/TemplateEditor.svelte';
     import StyleEditor from '@/settings/components/StyleEditor.svelte';
@@ -99,6 +100,14 @@
         <div class="b3-label">
             <div class="fn__flex-1 fn__flex-column">
                 <TagColorMapEditor group={group} key={item.key} value={item.value}
+                  on:changed={(e)=>dispatch('changed', { group, key: item.key, value: e.detail.value })} />
+            </div>
+        </div>
+        {/if}
+        {#if item.type === "custom" && item.component === "LifelogTypeColorEditor"}
+        <div class="b3-label">
+            <div class="fn__flex-1 fn__flex-column">
+                <LifelogTypeColorEditor group={group} key={item.key} value={item.value}
                   on:changed={(e)=>dispatch('changed', { group, key: item.key, value: e.detail.value })} />
             </div>
         </div>

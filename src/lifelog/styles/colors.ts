@@ -43,7 +43,7 @@ export function getCategoryColor(priority: string = '无') {
     };
 }
 
-// 保留原有的 lifelogColors 配置
+// 保留原有的 lifelogColors 配置（作为默认 fallback）
 export const lifelogColors = {
     '固定': {
         border: 'rgb(211, 211, 211)',
@@ -117,6 +117,63 @@ export const lifelogColors = {
     }
 };
 
+/**
+ * 解析 lifelog-type-colors 设置（"类型=颜色\n..." 格式）为 Map。
+ */
+function parseLifelogTypeColors(raw: string): Map<string, string> {
+    const map = new Map<string, string>();
+    if (!raw) return map;
+    const lines = String(raw).split(/\r?\n/);
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        // 支持 = 或 : 分隔
+        const match = trimmed.split(/[:=]/);
+        if (match.length >= 2) {
+            const type = match[0].trim();
+            const color = match.slice(1).join('=').trim();
+            if (type && color) {
+                map.set(type, color);
+            }
+        }
+    }
+    return map;
+}
+
+/**
+ * 根据 lifelog 类型获取日历事件颜色。
+ * 优先级：
+ *   1. 用户配置的 lifelog-type-colors
+ *   2. 内置 lifelogColors 默认表
+ *   3. 按类型名哈希自动生成（复用 getColors）
+ *
+ * @param type lifelog 类型（如 工作/学习/运动）
+ * @param settings 全局 settingdata
+ */
+export function getLifelogColor(type: string, settings: any): { background: string; text: string } {
+    const safeType = type || '固定';
+
+    // 1. 用户自定义映射优先
+    const userMap = parseLifelogTypeColors(settings?.['lifelog-type-colors'] || '');
+    if (userMap.has(safeType)) {
+        const bg = userMap.get(safeType)!;
+        const text = guessTextColorFromHex(bg);
+        return { background: bg, text };
+    }
+
+    // 2. 内置默认表
+    const builtin = lifelogColors[safeType] || lifelogColors['固定'];
+    // 3. 若用户提供了自定义映射但当前类型不在其中，走哈希配色（比内置默认更丰富）
+    if (userMap.size > 0 && !lifelogColors[safeType]) {
+        const hash = Array.from(safeType).reduce((acc, char) => {
+            return char.charCodeAt(0) + ((acc << 5) - acc);
+        }, 0);
+        const [bg, text] = getColors(Math.abs(hash));
+        return { background: bg, text };
+    }
+
+    return { background: builtin.background, text: builtin.text };
+}
 
 function getColors(index: number): string[] {
     const hue = index * 137.508; // use golden angle approximation // Copied from https://stackoverflow.com/a/20129594/13231742
@@ -145,4 +202,21 @@ var colourIsLight = function (r: number, g: number, b: number) { // Copied from 
     // human eye favors green color...
     var a = 1 - (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return (a < 0.5);
+}
+
+// 根据 HEX 颜色猜测前景色（深色背景白字，浅色背景黑字）
+function guessTextColorFromHex(bgColor: string): string {
+    if (!bgColor) return 'black';
+    if (bgColor.startsWith('#')) {
+        const hex = bgColor.length === 4
+            ? `#${bgColor[1]}${bgColor[1]}${bgColor[2]}${bgColor[2]}${bgColor[3]}${bgColor[3]}`
+            : bgColor;
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        if ([r, g, b].some(isNaN)) return 'black';
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? 'black' : 'white';
+    }
+    return 'black';
 }

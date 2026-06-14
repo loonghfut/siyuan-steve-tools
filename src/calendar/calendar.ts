@@ -20,7 +20,7 @@ import { createFloatingCalendar } from './function/createFloatingCalendar';
 import { updateAttrViewCell_pro } from '@/api/api';
 
 //审查ok
-import { getCategoryColor, lifelogColors } from '../lifelog/styles/colors';
+import { getCategoryColor, getLifelogColor } from '../lifelog/styles/colors';
 import { LifelogView } from './lifelog-view';
 import { createViewFilterMenu, initializeGroups } from './initializeGroups';
 import { calendarStatsManager } from './stats';
@@ -483,6 +483,7 @@ export async function run(
                 info.revert();
                 return;
             }
+
             showDropTimeIndicator(info);
             try {
                 rememberPendingCalendarEventPatch(info.event, 6000);
@@ -571,6 +572,7 @@ export async function run(
                 info.revert();
                 return;
             }
+
             // 显示时间刻度线
             showResizeTimeIndicator(info);
             try {
@@ -944,10 +946,11 @@ export async function run(
             const source = info.event.extendedProps.source;
             let colorConfig;
 
-            // 1) lifelog 事件继续使用既有配色
+            // 1) lifelog 事件使用可配置配色（优先用户自定义映射，缺失则走内置默认/哈希配色）
             if (source === 'lifelog') {
                 const type = info.event.extendedProps.logType || '固定';
-                colorConfig = lifelogColors[type] || lifelogColors['固定'];
+                const cfg = getLifelogColor(type, settingdata);
+                colorConfig = { background: cfg.background, text: cfg.text } as any;
             } else {
                 // 2) 如果启用了“按标签上色”并且事件包含标签，则优先使用标签颜色
                 const enableTagColor = settingdata["cal-color-by-tag"];

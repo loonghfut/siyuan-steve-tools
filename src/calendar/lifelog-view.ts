@@ -1,6 +1,16 @@
 import { EventInput } from '@fullcalendar/core';
 import { getBlockAttrs, sql } from '../api/api';
 import { ATTRS } from '../lifelog/module-lifelog';
+import { settingdata } from '@/index';
+
+// 把 "HH:mm" 或 "HH:mm:ss" 拆为 [h, m, s?]；非法值兜底为 0
+function parseTimeParts(time: string): [number, number, number] {
+    const parts = String(time || '').split(':').map(p => parseInt(p, 10));
+    const h = Number.isFinite(parts[0]) ? parts[0] : 0;
+    const m = Number.isFinite(parts[1]) ? parts[1] : 0;
+    const s = Number.isFinite(parts[2]) ? parts[2] : 0;
+    return [h, m, s];
+}
 
 export class LifelogView {
     static async getLifelogEvents(start?: Date, end?: Date): Promise<EventInput[]> {
@@ -16,8 +26,7 @@ export class LifelogView {
             const pad = (n: number) => String(n).padStart(2, '0');
             const fmtDate = (d: Date) => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
             const startDateStr = fmtDate(start);
-            // end 由 FullCalendar 给出为下一段的起点（半开），这里取到 end 前一天即可；
-            // 但原实现用的是 currentDate <= end，为保持行为一致，范围上界直接用 end。
+            // end 由 FullCalendar 给出为下一段的起点（半开），范围上界直接用 end（<=）。
             const endDateStr = fmtDate(end);
 
             // 一次性范围查询：拿到范围内所有 lifelog 日期属性对应的块 id + value
@@ -75,14 +84,26 @@ export class LifelogView {
             }
 
             // 按天顺序处理，保持与原实现一致的 lastDayLastEventEndTime 链式语义。
-            const currentDate = new Date(start);
-            let lastDayLastEventEndTime = '23:59:59';  // 默认起始时间
+            // 受 lifelog-link-across-empty-days 控制：默认 false，跨空天后重置为当天 00:00:00
+            const linkAcrossEmpty = settingdata['lifelog-link-across-empty-days'] === true;
 
-            while (currentDate <= end) {
+            const currentDate = new Date(start);
+            // 默认起始时间统一为 23:59:59（与三段解析对齐）
+            let lastDayLastEventEndTime = '23:59:59';
+            let lastDayHadEvents = false;
+
+            // FullCalendar 的 end 是半开区间，故使用 < end（而非 <=）
+            while (currentDate < end) {
                 const dateStr = fmtDate(currentDate);
                 const blockIds = blockIdsByDate.get(dateStr);
 
                 if (!blockIds || blockIds.length === 0) {
+                    // 跨空天：若不延续，把 lastDayLastEventEndTime 重置为当天 00:00:00，
+                    // 避免下一天首事件从更早某天的结束时间开始（跨多天错位）
+                    if (!linkAcrossEmpty) {
+                        lastDayLastEventEndTime = '00:00:00';
+                    }
+                    lastDayHadEvents = false;
                     // 推进到下一天
                     currentDate.setDate(currentDate.getDate() + 1);
                     continue;
@@ -107,12 +128,18 @@ export class LifelogView {
                     let eventStartTime, eventStartDate;
 
                     if (i === 0) {
-                        eventStartTime = lastDayLastEventEndTime;
+                        // 当天首事件：若不跨空天延续，且上一天无事件，则从当天 00:00:00 开始
+                        eventStartTime = (!linkAcrossEmpty && !lastDayHadEvents) ? '00:00:00' : lastDayLastEventEndTime;
                         // 如果是当天第一个事件且开始时间是前一天的结束时间
                         // 则需要使用前一天的日期
                         const prevDate = new Date(currentDate);
                         prevDate.setDate(prevDate.getDate() - 1);
-                        eventStartDate = fmtDate(prevDate);
+                        // 但若 start 是当天 00:00:00，则 start 仍在当天
+                        if (eventStartTime === '00:00:00') {
+                            eventStartDate = dateStr;
+                        } else {
+                            eventStartDate = fmtDate(prevDate);
+                        }
                     } else {
                         eventStartTime = items[i - 1][1][ATTRS.time];
                         eventStartDate = dateStr;
@@ -123,14 +150,14 @@ export class LifelogView {
 
                     const [startYear, startMonth, startDay] = formattedStartDate.split('-').map(Number);
                     const [endYear, endMonth, endDay] = formattedEndDate.split('-').map(Number);
-                    const [startHour, startMinute] = eventStartTime.split(':').map(Number);
-                    const [endHour, endMinute] = endTime.split(':').map(Number);
+                    const [startHour, startMinute, startSecond] = parseTimeParts(eventStartTime);
+                    const [endHour, endMinute, endSecond] = parseTimeParts(endTime);
 
                     const eventData = {
                         id: blockId,
                         title: `${data[ATTRS.type]}: ${data[ATTRS.content]}`,
-                        start: new Date(startYear, startMonth - 1, startDay, startHour, startMinute),
-                        end: new Date(endYear, endMonth - 1, endDay, endHour, endMinute),
+                        start: new Date(startYear, startMonth - 1, startDay, startHour, startMinute, startSecond),
+                        end: new Date(endYear, endMonth - 1, endDay, endHour, endMinute, endSecond),
                         allDay: false,
                         extendedProps: {
                             type: 'lifelog',
@@ -147,6 +174,7 @@ export class LifelogView {
                 // 如果当天没有事件，保持上一次的lastDayLastEventEndTime不变
                 if (items.length > 0) {
                     lastDayLastEventEndTime = items[items.length - 1][1][ATTRS.time];
+                    lastDayHadEvents = true;
                 }
 
                 currentDate.setDate(currentDate.getDate() + 1);

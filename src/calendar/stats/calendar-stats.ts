@@ -24,6 +24,10 @@ export interface CalendarStatsData {
     eventsByCategory: { [key: string]: number };
     eventsByTag: { [key: string]: number };
 
+    // Lifelog 类型（logType）维度
+    eventsByLogType: { [key: string]: number };
+    durationByLogType: { [key: string]: number }; // 分钟
+
     // 分类/标签-时长与完成率
     durationByCategory: { [key: string]: number }; // 分钟
     durationByTag: { [key: string]: number }; // 分钟
@@ -118,6 +122,8 @@ export class CalendarDataStats {
             eventsBySource: {},
             eventsByCategory: {},
             eventsByTag: {},
+            eventsByLogType: {},
+            durationByLogType: {},
             durationByCategory: {},
             durationByTag: {},
             completedByCategory: {},
@@ -223,6 +229,12 @@ export class CalendarDataStats {
                     const name = tag || '无标签';
                     stats.durationByTag[name] = (stats.durationByTag[name] || 0) + duration;
                 }
+
+                // Lifelog 类型时长累计
+                const logType = event.extendedProps?.logType;
+                if (logType) {
+                    stats.durationByLogType[logType] = (stats.durationByLogType[logType] || 0) + duration;
+                }
             }
         }
         
@@ -250,6 +262,12 @@ export class CalendarDataStats {
             // 分类统计
             const category = event.extendedProps?.category || '无';
             stats.eventsByCategory[category] = (stats.eventsByCategory[category] || 0) + 1;
+
+            // Lifelog 类型计数
+            const logType = event.extendedProps?.logType;
+            if (logType) {
+                stats.eventsByLogType[logType] = (stats.eventsByLogType[logType] || 0) + 1;
+            }
 
             // 分类完成/归档计数
             if (this.isCompletedStatus(status)) {

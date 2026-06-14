@@ -1,8 +1,9 @@
 import { Plugin } from "siyuan";
-import { getBlockAttrs, setBlockAttrs, getHPathByID } from "../api/api";  // 修改导入
+import { getBlockAttrs, setBlockAttrs, getBlockByID } from "../api/api";
 
 // 常量定义
 const LIFELOG_PREFIX = 'custom-lifelog-';
+const DAILY_NOTE_ATTR_PREFIX = 'custom-dailynote-';  // 思源 daily note 文档块属性前缀，完整格式: custom-dailynote-YYYYMMDD
 
 // Export the ATTRS constant
 export const ATTRS = {
@@ -12,13 +13,6 @@ export const ATTRS = {
     content: `${LIFELOG_PREFIX}content`,
     created: `${LIFELOG_PREFIX}created`,
     updated: `${LIFELOG_PREFIX}updated`,
-
-    // 时间格式
-    YYYY_MM_DD: 'YYYY/MM/DD',
-    HH_mm_ss: 'HH:mm:ss',
-    YYYY_MM_DD_HH_mm_ss: 'YYYY/MM/DD HH:mm:ss',
-    YYYY_MM_DD_23_59_59: 'YYYY/MM/DD 23:59:59',
-    YYYY_MM_DD_00_00_00: 'YYYY/MM/DD 00:00:00'
 };
 
 // 实现简单的 debounce 函数
@@ -49,10 +43,45 @@ function formatDateTime(date: Date): string {
     return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
 }
 
+/**
+ * 根据分隔符配置拆分类型与内容。
+ * @param text 不含时间的正文（已去掉开头的 HH:mm）
+ * @param separatorSetting 'full' | 'half' | 'any'（auto 视同 any）
+ * @returns { type, content }
+ *
+ * 规则：
+ * - full: 仅认全角 ：
+ * - half: 仅认半角 :
+ * - any/auto/其它: 二者皆可，优先全角
+ * - 无冒号：type='未分类'，content=完整文本（不丢弃）
+ */
+function splitTypeContent(text: string, separatorSetting: string): { type: string; content: string } {
+    const trimmed = text.trim();
+    let idx = -1;
+    if (separatorSetting === 'full') {
+        idx = trimmed.indexOf('：');
+    } else if (separatorSetting === 'half') {
+        idx = trimmed.indexOf(':');
+    } else {
+        // any / auto / 默认：优先全角，再退回半角
+        idx = trimmed.indexOf('：');
+        if (idx === -1) idx = trimmed.indexOf(':');
+    }
+    if (idx === -1) {
+        return { type: '未分类', content: trimmed };
+    }
+    return {
+        type: trimmed.substring(0, idx),
+        content: trimmed.substring(idx + 1).trim(),
+    };
+}
+
 export class M_lifelog {
     private plugin: Plugin;
     private settings: any;
     public enabled: boolean = false;  // 添加启用状态属性
+    // 段落块ID → 所属文档块ID(rootID) 缓存；段落不会跨文档移动，无需 TTL
+    private rootIdCache: Map<string, string> = new Map();
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
@@ -75,6 +104,7 @@ export class M_lifelog {
         // 移除属性标记
         document.body.removeAttribute('data-lifelog-enabled');
         this.plugin.eventBus.off("ws-main", this.wsMainHandler);
+        this.rootIdCache.clear();
         console.debug('LifeLog module unloaded');
     }
 
@@ -95,26 +125,63 @@ export class M_lifelog {
     }
 
     private warn(message: string, ...args: any[]) {
+        // warn 始终输出（便于排查），debug 才走开关
         if (this.settings['lifelog-debug']) {
             console.warn(message, ...args);
         }
     }
 
-    // 添加一个辅助方法来处理路径获取
-    private async getDocPath(id: string): Promise<string | null> {
+    /**
+     * 通过段落块ID 拿到所属文档块ID（rootID）。带缓存（段落不跨文档移动，无需 TTL）。
+     */
+    private async getRootId(paragraphId: string): Promise<string | null> {
+        const cached = this.rootIdCache.get(paragraphId);
+        if (cached) return cached;
         try {
-            const hPath = await getHPathByID(id);
-            // 检查返回的路径是否有效
-            if (!hPath || hPath.includes('error') || hPath === '/api/filetree/getHPathByID') {
-                this.warn('获取文档路径失败:', id);
-                return null;
+            const block = await getBlockByID(paragraphId);
+            const rootId = block?.root_id;
+            if (rootId) {
+                this.rootIdCache.set(paragraphId, rootId);
+                return rootId;
             }
-            this.debug('LifeLog document path:', hPath);
-            return hPath;
+            return null;
         } catch (err) {
-            this.warn('获取文档路径出错:', err);
+            this.warn('获取 rootID 出错:', err);
             return null;
         }
+    }
+
+    /**
+     * 核心：判断段落所属文档是否为 daily note，并提取日期。
+     *
+     * 通过读文档块(rootID)的属性，找以 custom-dailynote- 开头的属性，
+     * 完整格式 custom-dailynote-YYYYMMDD。命中即判定为日记，日期直接从属性名提取
+     * （YYYYMMDD → YYYY/MM/DD）。这是思源官方 daily note 的标识方式，不依赖文件路径或文件名。
+     *
+     * @returns { docDate: 'YYYY/MM/DD' } 命中；null 非日记或无法确定日期
+     */
+    private async resolveDailyNoteDate(paragraphId: string): Promise<{ docDate: string } | null> {
+        const rootId = await this.getRootId(paragraphId);
+        if (!rootId) return null;
+        try {
+            const docAttrs = await getBlockAttrs(rootId);
+            if (!docAttrs) return null;
+            // 遍历属性名，找 custom-dailynote-YYYYMMDD
+            for (const name of Object.keys(docAttrs)) {
+                if (name.startsWith(DAILY_NOTE_ATTR_PREFIX)) {
+                    const yyyymmdd = name.substring(DAILY_NOTE_ATTR_PREFIX.length);
+                    // 严格校验 8 位数字
+                    if (/^\d{8}$/.test(yyyymmdd)) {
+                        const docDate = `${yyyymmdd.substring(0, 4)}/${yyyymmdd.substring(4, 6)}/${yyyymmdd.substring(6, 8)}`;
+                        this.debug('LifeLog daily note (attr):', rootId, '→', docDate);
+                        return { docDate };
+                    }
+                }
+            }
+        } catch (err) {
+            this.warn('读取文档块属性出错:', err);
+        }
+        return null;
     }
 
     private wsMainHandler = async (data: any) => {
@@ -139,22 +206,13 @@ export class M_lifelog {
                     this.warn('LifeLog: Change missing ID:', change);
                     continue;
                 }
-                const hPath = await this.getDocPath(change.id);
-                if (!hPath) continue;
 
-                const isDaily = hPath.includes('/daily note');
-                if (isDaily) {
-                    // 从路径中提取日期，匹配 YYYY-MM-DD 格式
-                    const dateMatch = hPath.match(/\d{4}-\d{2}-\d{2}/);
-                    if (!dateMatch) {
-                        this.warn('LifeLog: Cannot extract date from path:', hPath);
-                        continue;
-                    }
-                    // 转换日期格式从 YYYY-MM-DD 到 YYYY/MM/DD
-                    const docDate = dateMatch[0].replace(/-/g, '/');
+                // 核心：判断段落所属文档是否为 daily note，并提取日期
+                const daily = await this.resolveDailyNoteDate(change.id);
+                if (daily) {
                     dailyChanges.push({
                         ...change,
-                        docDate
+                        docDate: daily.docDate
                     });
                 }
             }
@@ -196,6 +254,8 @@ export class M_lifelog {
             return;
         }
 
+        const separatorSetting = this.settings['lifelog-time-separator'] || 'any';
+
         // 处理符合条件的段落
         const validParagraphs = [];
         paragraphs.forEach(p => {
@@ -217,41 +277,62 @@ export class M_lifelog {
                 return;
             }
 
-            // 使用完整文本进行精确匹配
-            const timeMatch = text.match(/^(\d{2}:\d{2}(:\d{2})?)\s+(\S[^\n\r]*)?$/);
+            // 使用完整文本进行精确匹配（受 lifelog-allow-seconds 控制）
+            const allowSeconds = this.settings['lifelog-allow-seconds'] !== false;
+            const timeRegex = allowSeconds
+                ? /^(\d{2}:\d{2}(:\d{2})?)\s+(\S[^\n\r]*)?$/
+                : /^(\d{2}:\d{2})\s+(\S[^\n\r]*)?$/;
+            const timeMatch = text.match(timeRegex);
             if (!timeMatch) {
                 this.warn('LifeLog invalid time format:', text);
                 return;
             }
             const time = timeMatch[1];
-            const content = timeMatch[3];
+            const rest = timeMatch[3];
 
-            if (!content) {
+            if (!rest) {
                 this.warn('LifeLog only has time');
                 return;
             }
+
+            // 用可配置分隔符拆分类型与内容（无冒号时 type='未分类'，content=完整文本，不再丢弃）
+            const { type, content } = splitTypeContent(rest, separatorSetting);
 
             validParagraphs.push({
                 ...p,
                 content: text,
                 time,
-                contentWithoutTime: content
+                contentWithoutTime: rest,
+                type,
+                contentText: content,
             });
         });
 
+        if (validParagraphs.length === 0) {
+            this.warn('LifeLog: no valid paragraph after parsing');
+            return;
+        }
+
         // 更新属性
         const ids = validParagraphs.map(p => p.id);
-        // 修改获取属性的方法，使用 API 中的 getBlockAttrs
+        // 并行 getBlockAttrs（参考 lifelog-view 的容错写法）
         const attrs: { [key: string]: any } = {};
-        for (const id of ids) {
-            attrs[id] = await getBlockAttrs(id);
+        const attrsResults = await Promise.all(
+            ids.map(async (id) => {
+                try {
+                    return [id, await getBlockAttrs(id)] as const;
+                } catch (e) {
+                    this.warn('LifeLog getBlockAttrs failed for', id, e);
+                    return [id, {}] as const;
+                }
+            })
+        );
+        for (const [id, val] of attrsResults) {
+            attrs[id] = val;
         }
 
         const updates = [];
         for(const p of validParagraphs) {
-            const colonIndex = p.contentWithoutTime.indexOf('：');
-            const type = p.contentWithoutTime.substring(0, colonIndex);
-            const content = p.contentWithoutTime.substring(colonIndex + 1);
             const now = formatDateTime(new Date());
 
             updates.push({
@@ -259,8 +340,8 @@ export class M_lifelog {
                 attrs: {
                     [ATTRS.time]: p.time,
                     [ATTRS.date]: p.docDate,  // 使用文档的日期
-                    [ATTRS.type]: type,
-                    [ATTRS.content]: content,
+                    [ATTRS.type]: p.type,
+                    [ATTRS.content]: p.contentText,
                     [ATTRS.created]: attrs[p.id]?.[ATTRS.created] || now,
                     [ATTRS.updated]: now
                 }
@@ -271,8 +352,15 @@ export class M_lifelog {
     }, 1000);
 
     private async updateBlockAttrs(updates: any[]) {
-        for (const update of updates) {
-            await setBlockAttrs(update.id, update.attrs);
-        }
+        // 并行 setBlockAttrs，单条失败不影响其他
+        await Promise.all(
+            updates.map(async (update) => {
+                try {
+                    await setBlockAttrs(update.id, update.attrs);
+                } catch (e) {
+                    this.warn('LifeLog setBlockAttrs failed for', update.id, e);
+                }
+            })
+        );
     }
 }

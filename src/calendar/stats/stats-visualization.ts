@@ -247,6 +247,24 @@ export class CalendarStatsVisualization {
             chartsContainer.appendChild(this.createBarChart('标签总时长 Top10（分钟）', tagDurTop, '#8e44ad'));
         }
 
+        // 追加：Lifelog 类型分布（饼图）
+        if (stats.eventsByLogType && Object.keys(stats.eventsByLogType).length) {
+            chartsContainer.appendChild(this.createPieChart(
+                '生活记录类型分布',
+                stats.eventsByLogType,
+                ['#1abc9c', '#2ecc71', '#9b59b6', '#e67e22', '#e74c3c', '#95a5a6', '#3498db', '#f39c12']
+            ));
+        }
+
+        // 追加：Lifelog 类型总时长（柱状图，分钟，按时长降序）
+        if (stats.durationByLogType && Object.keys(stats.durationByLogType).length) {
+            const lifelogDurTop = Object.entries(stats.durationByLogType)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15)
+                .map(([label, value]) => ({ label, value }));
+            chartsContainer.appendChild(this.createBarChart('生活记录类型总时长（分钟）', lifelogDurTop, '#16a085'));
+        }
+
         // 追加：分类完成率Top10（按任务量排序）
         const categoryRateTop = Object.entries(stats.eventsByCategory)
             .sort((a, b) => b[1] - a[1])
