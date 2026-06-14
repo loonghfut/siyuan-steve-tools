@@ -8,8 +8,7 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
-import kanban, { refreshKanban, thisCalendars, update_thisCalendars } from './kanban';
-import priorityQuadrant from './priorityQuadrant';
+import { refreshKanban, thisCalendars, update_thisCalendars } from './kanban';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -125,14 +124,14 @@ export async function run(
     initialView = 'dayGridMonth',
     S_viewID = "",
     cleft = 'prev,next today viewFilter,statsButton,refreshButton',
-    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant,planButton',
+    cright = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,planButton',
     ccenter = 'title',
     elementca?: any,
 ) {
     // 允许用户通过设置覆盖 initialView 与 cright（当使用的是内置默认或未传入时）
     try {
         const DEFAULT_INITIAL = 'dayGridMonth';
-        const DEFAULT_RIGHT = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant';
+        const DEFAULT_RIGHT = 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay';
 
         const configuredInitialView = settingdata?.["cal-default-view"]; // e.g., dayGridMonth
         // 若未传入或仍为内置默认，采用设置值
@@ -227,8 +226,7 @@ export async function run(
             listPlugin,
             multiMonthPlugin,
             rrule,
-            kanban,
-            priorityQuadrant,
+            // kanban and priority/quadrant views removed
         ],
         initialView: initialView,
         navLinks: true,
@@ -595,36 +593,7 @@ export async function run(
                 duration: { weeks: 2 },
                 buttonText: '两周'
             },
-            kanban: {
-                type: 'kanban',
-                buttonText: '月板',
-                duration: { months: 1 },
-            },
-            yearkanban: {
-                type: 'kanban',
-                buttonText: '年板',
-                duration: { years: 1 },
-            },
-            weekkanban: {
-                type: 'kanban',
-                buttonText: '周板',
-                duration: { weeks: 1 },
-            },
-            priorityQuadrant: {
-                type: 'priorityQuadrant',
-                buttonText: '四象限',
-                duration: { months: 1 },
-            },
-            yearpriorityQuadrant: {
-                type: 'priorityQuadrant',
-                buttonText: '年象限',
-                duration: { years: 1 },
-            },
-            weekpriorityQuadrant: {
-                type: 'priorityQuadrant',
-                buttonText: '周象限',
-                duration: { weeks: 1 },
-            },
+            // Removed kanban and quadrant custom views to simplify UI
         },
         customButtons: {
             viewFilter: {

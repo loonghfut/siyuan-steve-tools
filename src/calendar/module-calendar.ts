@@ -117,62 +117,7 @@ export class M_calendar {
                 }
             },
         })
-        this.plugin.addTab({
-            type: "quadrants",
-            async init() {
-                const id = new Date().getTime().toString();
-                let calendar: Calendar
-                this.element.innerHTML = `
-                <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-                calendar = await run(id, settingdata["quadrant-default-view"] || 'priorityQuadrant');
-                this.data.id = id;
-                calendarinstance.set(id, calendar);
-            },
-            async destroy() {
-                console.debug("销毁日历选项卡", this.data.id);
-                const calendar = calendarinstance.get(this.data.id);
-                if (calendar) {
-                    calendar.destroy();
-                    calendarinstance.delete(this.data.id);
-                    console.debug("销毁日历实例", this.data.id);
-                }
-            },
-            resize() {
-                console.debug("resize", this.data.id);
-                const calendar = calendarinstance.get(this.data.id);
-                if (calendar) {
-                    calendar.updateSize();
-                }
-            },
-        })
-        this.plugin.addTab({
-            type: "kanban",
-            async init() {
-                const id = new Date().getTime().toString();
-                let calendar: Calendar
-                this.element.innerHTML = `
-                <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
-                calendar = await run(id, settingdata["kanban-default-view"] || "kanban");
-                this.data.id = id;
-                calendarinstance.set(id, calendar);
-            },
-            async destroy() {
-                console.debug("销毁日历选项卡", this.data.id);
-                const calendar = calendarinstance.get(this.data.id);
-                if (calendar) {
-                    calendar.destroy();
-                    calendarinstance.delete(this.data.id);
-                    console.debug("销毁日历实例", this.data.id);
-                }
-            },
-            resize() {
-                console.debug("resize", this.data.id);
-                const calendar = calendarinstance.get(this.data.id);
-                if (calendar) {
-                    calendar.updateSize();
-                }
-            },
-        })
+        // Quadrants and Kanban tabs removed — these views are deprecated/disabled.
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
         await this.calConfig.load();
@@ -216,7 +161,7 @@ export class M_calendar {
         if (this_settingdata["cal-show-view"] == true) {
             const topBarElement = this.plugin.addTopBar({
                 icon: "iconCalendar",
-                title: "日程看板视图",
+                title: "日程视图",
                 position: "left",
                 callback: async () => {
                     let rect = topBarElement.getBoundingClientRect();
@@ -225,29 +170,7 @@ export class M_calendar {
             });
         }
         let D_calendar: any;
-        this.plugin.addDock({
-            config: {
-                position: "RightTop",
-                size: { width: 250, height: 0 },
-                icon: "iconSTcalKanban",
-                title: "当月看板",
-            },
-            data: null,
-            type: "cal-dock-kanban",
-            resize: async () => {
-                D_calendar.updateSize();
-            },
-            init: async (dock) => {
-                const id = new Date().getTime().toString();
-                dock.element.innerHTML = `
-                <div id="calendar-${id}" class="cal-dock-container" ></div>
-                `;
-                setTimeout(async () => {
-                    D_calendar = await run(id, 'kanban', '', 'title', 'viewFilter,refreshButton', 'prev,next');
-                    refreshKanban();
-                }, 100);
-            },
-        });
+        // Kanban dock removed
 
         let D_calendar_day: any;
         this.plugin.addDock({
@@ -478,28 +401,7 @@ export class M_calendar {
                 }
             }
         });
-        menu.addItem({
-            icon: "iconSTcalKanban",
-            label: "看板视图",
-            click: async () => {
-                if (front == "browser-mobile" || front == "mobile") {
-                    await this.openRiChengViewDialog(true, "", settingdata["kanban-default-view"]);
-                } else {
-                    await this.openRiChengView("kanban");
-                }
-            }
-        });
-        menu.addItem({
-            icon: "iconSTcalKanban",
-            label: "四象限",
-            click: async () => {
-                if (front == "browser-mobile" || front == "mobile") {
-                    await this.openRiChengViewDialog(true, "", settingdata["quadrant-default-view"] || "priorityQuadrant");
-                } else {
-                    await this.openRiChengView(settingdata["quadrant-default-view"] || "priorityQuadrant");
-                }
-            }
-        });
+        // Kanban and Quadrant menu items removed
         if (front == "browser-mobile" || front == "mobile") {
             menu.fullscreen();
         } else {
@@ -634,8 +536,8 @@ export class M_calendar {
         const view = initialView || settingdata["cal-default-view"] || "dayGridMonth";
 
     // 日历视图无需专门判断，落入默认分支即可
-        const kanbanViews = ["kanban", "weekkanban", "yearkanban"];
-        const quadrantViews = ["priorityQuadrant", "weekpriorityQuadrant", "yearpriorityQuadrant"];
+        const kanbanViews: string[] = []; // Kanban views disabled
+        const quadrantViews: string[] = []; // Quadrant views disabled
 
         if (quadrantViews.includes(view)) {
             await openTab({
