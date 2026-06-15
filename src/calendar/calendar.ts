@@ -793,7 +793,10 @@ export async function run(
                 }
 
                 // 2. 获取视图ID
-                const viewIDs = av_ids?.length ? await myF.getViewId(av_ids) : [];
+                const allViewIDs = av_ids?.length ? await myF.getViewId(av_ids) : [];
+                // 在拉取视图数据之前按 filterViewId 过滤：避免为用户未选择的视图也发起
+                // renderAttributeView 网络请求（原先先全量拉取再用 filterViewValue 丢弃，浪费请求）。
+                const viewIDs = allViewIDs.filter(v => filterViewId.includes(v.viewId));
                 // 仅在需要显示周期事件时获取周期视图ID
                 const av_ids_zq = showRecurring ? await moduleInstances['M_calendar'].getAVreferenceid("周期") : [];
                 const viewIDs_zq = (showRecurring && av_ids_zq?.length) ? await myF.getViewId(av_ids_zq) : [];
@@ -805,12 +808,12 @@ export async function run(
                     return;
                 }
 
-                // 3. 获取视图数据
+                // 3. 获取视图数据（viewIDs 已仅含选中视图，不再发起多余请求）
                 viewValue = viewIDs?.length ? await myF.getViewValue(viewIDs) : [];
                 viewValue_zq = (showRecurring && viewIDs_zq?.length) ? await myF.getViewValue(viewIDs_zq, true) : [];
                 // console.debug("View data:", viewValue, "周期", viewValue_zq);
 
-                // 3.5 增加筛选函数
+                // 3.5 二次筛选（viewIDs 已过滤，这里主要保留"未找到匹配的视图"提示）
                 viewValue = await myF.filterViewValue(viewValue, filterViewId);
 
                 // 4. 转换事件数据

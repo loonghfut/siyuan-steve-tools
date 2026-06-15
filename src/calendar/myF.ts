@@ -225,7 +225,13 @@ export const statusMap = new Proxy({
 });
 // Return type using interface
 type ViewData = Promise<ViewItem[]>;
-const VIEW_ID_CACHE_TTL = 5000;
+// viewIdCache 缓存的是「AV 的视图清单（viewId/rootid/name）」——这本质是配置数据，
+// 只有用户新建/删除/重命名视图时才变，变化频率极低。5 秒 TTL 会让每次 refetch（切月、
+// 滚动、拖拽）都对所有 av_id 重新枚举一遍 renderAttributeView，是"只选 1 个视图也触发
+// 多次 renderAttributeView"的主因。延长到 30 秒，视为准静态；需要刷新时走 invalidateViewIdCache。
+const VIEW_ID_CACHE_TTL = 30 * 1000;
+// viewValueCache 缓存的是行数据（事件/时间/状态），变化频繁，保持短 TTL；
+// 自写已通过 patchViewValueRow 行级 patch 维持一致性，外部编辑走 invalidateViewValueCache。
 const VIEW_VALUE_CACHE_TTL = 5000;
 const viewIdCache = new Map<string, { ts: number; data: ViewItem[] }>();
 const viewValueCache = new Map<string, { ts: number; data: any[] }>();
@@ -300,6 +306,19 @@ export function invalidateViewValueCache(avID?: string, viewId?: string): void {
             viewValueCache.delete(key);
         }
     }
+}
+
+/**
+ * 失效 viewIdCache。不传参 → 全部清空；传 avID → 仅清该 av 的视图清单。
+ * AV 的视图清单变化频率极低（新建/删除/重命名视图），默认 30 秒 TTL 已覆盖绝大多数场景，
+ * 仅在确认 AV 结构发生变更（例如外部新增了视图）时才需要手动调用。
+ */
+export function invalidateViewIdCache(avID?: string): void {
+    if (!avID) {
+        viewIdCache.clear();
+        return;
+    }
+    viewIdCache.delete(avID);
 }
 
 // Get view IDs and names
