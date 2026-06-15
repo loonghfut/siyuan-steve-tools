@@ -730,35 +730,49 @@ export function refetchVisibleCalendarsDebounced(delayMs = 200) {
     }, delayMs);
 }
 
-// 单独的定时器，避免与 refetchVisibleCalendarsDebounced 互相覆盖
-const otherRefetchTimers = new WeakMap<object, ReturnType<typeof setTimeout>>();
-const SHARED_OTHER_KEY = { __shared: true };
+// 单一全局定时器 + 累积排除集合：多源并发触发时只一次扫描，不会让每个源的 except 各起一份
+let otherRefetchTimer: ReturnType<typeof setTimeout> | null = null;
+const otherRefetchExcludes = new Set<Calendar>();
+let otherRefetchHasNullCaller = false;
 
 /**
  * 当某个日历实例自写完成 AV 单元格后，FullCalendar 已在该实例本地把事件移好；
  * 但**其他**打开的日历实例（看板、悬浮、分屏）不知道数据变化，UI 会落后。
  *
- * 此函数对"除 except 之外的所有可见日历实例"做一次 refetchEvents：
+ * 此函数对"应该被同步的可见日历实例"做一次 refetchEvents：
  *   - 因为 myF.patchViewValueRow 已把 viewValueCache 更新成新值，refetch 时直接
  *     命中缓存，几乎零网络开销（不会触发 /api/av/renderAttributeView）。
  *   - 不重建 Sortable / 不动滚动 / 不串行等待，开销远低于 refreshKanban。
  *
- * 传 except=null 时刷新所有可见日历（适用于无法标识发起方的场景，例如周期事件完成）。
+ * 排除策略：
+ *   - 传入 Calendar 引用：把它加进排除集合，本次 sweep 不刷新它（发起方自己已用
+ *     setExtendedProp / pendingCalendarEventPatches 等手段保持本地状态）。
+ *   - 传 null：表示发起方未知，所有可见日历都需要刷新——但此时仍尊重已积累的
+ *     排除集合，避免覆盖刚发起拖拽/调整的实例。
+ *   - 多个源同时触发（如 A 拖、B 拖、null 调用），定时器只起一份，到点时刷新
+ *     "可见 ∧ 不在排除集合"的所有实例。这样 N 个并发源不会让无辜实例被刷 N 次。
  */
 export function refetchOtherVisibleCalendars(except: Calendar | null, delayMs = 200) {
-    const key = (except as any) ?? SHARED_OTHER_KEY;
-    const prev = otherRefetchTimers.get(key);
-    if (prev) clearTimeout(prev);
-    const timer = setTimeout(() => {
-        otherRefetchTimers.delete(key);
+    if (except) {
+        otherRefetchExcludes.add(except);
+    } else {
+        otherRefetchHasNullCaller = true;
+    }
+    if (otherRefetchTimer) return; // 已有定时器在排队，不再开新的
+    otherRefetchTimer = setTimeout(() => {
+        otherRefetchTimer = null;
+        const excludes = new Set(otherRefetchExcludes);
+        otherRefetchExcludes.clear();
+        otherRefetchHasNullCaller = false;
         const visible = thisCalendars.filter(c =>
-            c !== except && document.body.contains(c.el)
+            !excludes.has(c) && document.body.contains(c.el)
         );
         for (const c of visible) {
             try { c.refetchEvents(); } catch (e) { console.warn('refetchOther failed', e); }
         }
     }, delayMs);
-    otherRefetchTimers.set(key, timer);
+    // 标记参数读取，避免 TS6133（即便 null 路径不持有 except，仍需要让分支可观察）
+    void otherRefetchHasNullCaller;
 }
 
 const logDebug = (message: string, ...args: any[]) => {

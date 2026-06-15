@@ -2,8 +2,9 @@ import { showMessage, openWindow, Protyle } from "siyuan";
 import { KBCalendarEvent, NestedKBCalendarEvent } from "./interface";
 import * as api from "@/api/api";
 import { allKBEvents } from "./kanban";
-import { showEvent, statusMap } from "./myF";
+import { showEvent, statusMap, patchViewValueRow } from "./myF";
 import { settingdata } from '@/index';
+import { markCalendarBlockWrite } from "./calendar-self-write";
 //更新子级
 ////添加子级
 export async function run_getsubevents(Fr_event: NestedKBCalendarEvent, To_event: NestedKBCalendarEvent) {
@@ -66,8 +67,17 @@ export async function run_changestatus(Fr_event: NestedKBCalendarEvent, newstatu
         Fr_event.extendedProps.statusid,
         Fr_event.extendedProps.itemID,
         newstatus,
-        "select");
+        "select",
+        undefined,
+        { source: 'calendar', reason: 'status' });
     console.debug("status changed to:", newstatus[0].content);
+    // 同步 patch 缓存 + 标记块属性写入，避免 transactionListener 触发刷新级联
+    try {
+        patchViewValueRow(Fr_event.extendedProps.rootid, Fr_event.extendedProps.itemID, {
+            '状态': { content: newstatus[0].content },
+        });
+    } catch (e) { /* ignore */ }
+    markCalendarBlockWrite(Fr_event.publicId, 'status');
     api.setBlockAttrs(Fr_event.publicId, { 'custom-st-event': statusMap[newstatus[0].content] });
     api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId, Fr_event.extendedProps.itemID);
     console.debug("done-updateAttrViewCell_pro-select");
@@ -355,8 +365,15 @@ export async function run_changepriority(Fr_event: NestedKBCalendarEvent, newPri
         Fr_event.extendedProps.priorityid,
         Fr_event.extendedProps.itemID,
         [{ content: newPriority }],
-        "select"
+        "select",
+        undefined,
+        { source: 'calendar', reason: 'status' }
     );
+    try {
+        patchViewValueRow(Fr_event.extendedProps.rootid, Fr_event.extendedProps.itemID, {
+            '优先级': { content: newPriority },
+        });
+    } catch (e) { /* ignore */ }
     api.handleDidaListEvent(Fr_event.extendedProps.rootid, Fr_event.publicId, Fr_event.extendedProps.itemID);
     console.debug("done-updateAttrViewCell_pro-select-priority");
     return true;

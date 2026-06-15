@@ -160,10 +160,16 @@ export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr:
             ));
         }
         await Promise.all(updateTasks);
-        // patch viewValueCache 让缓存与 UI 一致
+        // patch viewValueCache 让缓存与 UI 一致：start 字段必须是毫秒数，与 extractDataFromTable
+        // 存储的 dateValue.content 一致；FullCalendar 那边的 ISO 字符串需要先转成 millis
         try {
+            const startMs = formattedDate ? new Date(formattedDate).getTime() : null;
             patchViewValueRow(event.rootid, event.itemID, {
-                '开始时间': { start: formattedDate, end: null, hasEndDate: false },
+                '开始时间': {
+                    start: Number.isFinite(startMs) ? startMs : null,
+                    end: null,
+                    hasEndDate: false,
+                },
                 '全天': { content: !!allDay },
             });
         } catch (e) { /* ignore cache patch failure */ }
@@ -237,13 +243,29 @@ const viewValueInFlight = new Map<string, Promise<any[]>>();
  * 有多个 cache entry（不同 view / zq 周期表）。row 的 itemID 存在 row['事件'].itemID
  * （见 extractDataFromTable）。fieldPatch 的 key 必须与 row 字段名一致，例如
  * '开始时间'、'全天'、'状态'。值会与原对象浅合并。
+ *
+ * scope:
+ *   'normal'（默认）只 patch 普通视图缓存；
+ *   'zq' 只 patch 周期视图缓存；
+ *   'both' 两者都 patch（仅当确实需要时使用）。
+ * 周期事件的 '完成日期' 字段不存在于普通视图行，若不分隔会向普通缓存注入孤立字段。
  */
-export function patchViewValueRow(avID: string, itemID: string, fieldPatch: Record<string, any>): void {
+export function patchViewValueRow(
+    avID: string,
+    itemID: string,
+    fieldPatch: Record<string, any>,
+    scope: 'normal' | 'zq' | 'both' = 'normal',
+): void {
     if (!avID || !itemID || !fieldPatch) return;
     let touched = 0;
     for (const [key, entry] of viewValueCache) {
-        // cacheKey 形如 `${rootid}::${viewId}::...` —— 只看前缀，避免拆出无关 av
+        // cacheKey 形如 `${rootid}::${viewId}::${isZQ ? 1 : 0}::${type}`
         if (!key.startsWith(`${avID}::`)) continue;
+        // 用 cacheKey 第三段判断 isZQ
+        const segs = key.split('::');
+        const isZQ = segs[2] === '1';
+        if (scope === 'normal' && isZQ) continue;
+        if (scope === 'zq' && !isZQ) continue;
         for (const row of entry.data) {
             if (row?.['事件']?.itemID !== itemID) continue;
             for (const [fieldName, patch] of Object.entries(fieldPatch)) {
@@ -258,7 +280,7 @@ export function patchViewValueRow(avID: string, itemID: string, fieldPatch: Reco
         }
     }
     if (touched > 0) {
-        console.debug(`[CalendarAVCache] patch row av=${avID} item=${itemID} touchedRows=${touched}`, fieldPatch);
+        console.debug(`[CalendarAVCache] patch row av=${avID} item=${itemID} scope=${scope} touchedRows=${touched}`, fieldPatch);
     }
 }
 
@@ -1116,33 +1138,36 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         }
         // 批量更新：不使用 await，让请求积累到队列中
         const updatePromises: Promise<any>[] = [];
+        // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过；
+        // 创建末尾会用 invalidateViewValueCache + refetchVisibleCalendarsDebounced 主动同步 UI
+        const createOpts = { source: 'calendar' as const, reason: 'create' as const };
 
         if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, itemID, categoryData, "select"));
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, itemID, categoryData, "select", undefined, createOpts));
         }
         if (tagsKeyID && tags) {
             const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, tagsKeyID, itemID, tagsData, "mSelect"));
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, tagsKeyID, itemID, tagsData, "mSelect", undefined, createOpts));
         }
         if (noteKeyID && note) {
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, itemID, note, "text"));
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts));
         }
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date"));
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts));
 
         const selectdata: ISelectOption[] = [{ content: status }];
         // console.debug("selectdata", selectdata);
         // 2025/7/5新增默认添加优先级
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select"));
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select"));
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select", undefined, createOpts));
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select", undefined, createOpts));
         // 设置自定义属性
         markCalendarBlockWrite(direct.directid, 'create');
         api.setBlockAttrs(direct.directid, { 'custom-st-event': statusMap[status] });
 
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, itemID, ismain, "checkbox"));
+        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, itemID, ismain, "checkbox", undefined, createOpts));
         // 默认设置为非全天事件
         if (allDayKeyID) {
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, allDayKeyID, itemID, false, "checkbox"));
+            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, allDayKeyID, itemID, false, "checkbox", undefined, createOpts));
         }
 
         // 等待所有更新完成
@@ -1314,8 +1339,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
             ////块时间处理 - 批量更新优化
             const updatePromises2: Promise<any>[] = [];
+            // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过
+            const createOpts2 = { source: 'calendar' as const, reason: 'create' as const };
 
-            updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date"));
+            updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts2));
 
             const selectdata: ISelectOption[] = [{ content: status }];
             const priorityData: ISelectOption[] = [{ content: priority }];
@@ -1324,29 +1351,29 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
             ///////////更新属性////////////////////
             if (noteKeyID && note) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, itemID, note, "text"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts2));
             }
             if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, itemID, categoryData, "select"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, itemID, categoryData, "select", undefined, createOpts2));
             }
             if (tags && tags.length > 0) {
                 const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, tagsKeyID, itemID, tagsData, "mSelect"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, tagsKeyID, itemID, tagsData, "mSelect", undefined, createOpts2));
             }
             if (priority && priorityKeyID && priorityData) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, itemID, priorityData, "select"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, itemID, priorityData, "select", undefined, createOpts2));
             }
             if (status && statusKeyID && selectdata) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, itemID, selectdata, "select"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, itemID, selectdata, "select", undefined, createOpts2));
                 // 设置自定义属性
                 markCalendarBlockWrite(id, 'create');
                 api.setBlockAttrs(id, { 'custom-st-event': statusMap[status] });
             }
             if (checkboxKeyID) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, itemID, ismain, "checkbox"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, itemID, ismain, "checkbox", undefined, createOpts2));
             }
             if (allDayKeyID) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, allDayKeyID, itemID, isAllDay, "checkbox"));
+                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, allDayKeyID, itemID, isAllDay, "checkbox", undefined, createOpts2));
             }
 
             // 等待所有更新完成
@@ -1479,11 +1506,14 @@ export async function updateEventInDatabase(
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', rootid);
     updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, itemID, newStartDate, "date", newEndDate, writeOpts));
 
-    // 如果全天状态发生变化，更新全天属性
+    // 如果全天状态发生变化，更新全天属性。allDayWritten 用于精确控制 cache patch：
+    // 只有真正写入了 DB 的字段才能 patch 缓存，否则缓存会与 DB 不一致。
+    let allDayWritten = false;
     if (isAllDay !== wasAllDay) {
         const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', rootid);
         if (allDayKeyID) {
             updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, allDayKeyID, itemID, isAllDay, "checkbox", undefined, writeOpts));
+            allDayWritten = true;
         } else {
             sy.showMessage("未找到全天字段，无法更新全天属性", 2000, "error");
         }
@@ -1494,15 +1524,25 @@ export async function updateEventInDatabase(
 
     // 行级 patch viewValueCache：让 5 秒 TTL 内的任何 refetch 也能拿到新值，
     // 避免缓存返回旧时间导致 UI 闪回。
+    //
+    // 注意 cache 字段格式：extractDataFromTable 把 SiYuan 的 dateValue.content/content2
+    // 直接存进缓存（数值毫秒），convertToFullCalendarEvents 用 parseInt 解析。
+    // 而 FullCalendar 的 startStr/endStr 是 ISO 字符串。直接写 ISO 进去会被 parseInt
+    // 截成 4 位年份，导致其他日历实例渲染到 1970-01-01。这里转成毫秒。
     try {
-        patchViewValueRow(rootid, itemID, {
-            '开始时间': {
-                start: newStartDate,
-                end: newEndDate || null,
-                hasEndDate: !!newEndDate,
-            },
-            '全天': { content: isAllDay },
-        });
+        const startMs = newStartDate ? new Date(newStartDate).getTime() : null;
+        const endMs = newEndDate ? new Date(newEndDate).getTime() : null;
+        const timePatch: any = {
+            start: Number.isFinite(startMs) ? startMs : null,
+            end: Number.isFinite(endMs) ? endMs : null,
+            hasEndDate: !!endMs,
+        };
+        const fieldPatch: Record<string, any> = { '开始时间': timePatch };
+        // 仅当全天字段确实写入了 DB 才同步 cache，避免 DB 没写但 cache 撒谎
+        if (allDayWritten) {
+            fieldPatch['全天'] = { content: isAllDay };
+        }
+        patchViewValueRow(rootid, itemID, fieldPatch);
     } catch (e) {
         console.warn('[CalendarAVCache] patchViewValueRow failed', e);
     }
@@ -1629,7 +1669,7 @@ function debounce(func: Function, wait: number) {
 }
 
 
-export function changestatus_for_zq(event: CalendarEventExtendedProps, date: string) {
+export function changestatus_for_zq(event: CalendarEventExtendedProps, date: string, originator?: Calendar | null) {
     if (!event.okdayid) {
         sy.showMessage('未找到完成日期列', -1, "error");
         return;
@@ -1655,12 +1695,14 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
     const itemID = event.itemID;
     api.updateAttrViewCell_pro(target, event.rootid, event.okdayid, itemID, newOkday, "text",
         undefined, { source: 'calendar', reason: 'recurring' });
-    // 周期事件完成日字段是 text 列，patch 缓存让本地状态一致
+    // 周期事件完成日字段是 text 列，patch 缓存让本地状态一致——只 patch 周期视图缓存，
+    // 避免 '完成日期' 这个周期专属字段被注入到普通视图缓存里
     try {
-        patchViewValueRow(event.rootid, itemID, { '完成日期': { content: newOkday } });
+        patchViewValueRow(event.rootid, itemID, { '完成日期': { content: newOkday } }, 'zq');
     } catch (e) { /* ignore */ }
-    // 同步所有可见日历实例（周期事件完成态影响 isEventCompleted 判断，需要重渲染）
-    refetchOtherVisibleCalendars(null);
+    // 同步可见日历实例。如果调用方提供了 originator，把它从刷新集合排除（它将在
+    // FullCalendar 下个微任务里自然重渲染 isEventCompleted 状态）
+    refetchOtherVisibleCalendars(originator ?? null);
 }
 
 

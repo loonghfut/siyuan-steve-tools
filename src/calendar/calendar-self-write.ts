@@ -86,7 +86,12 @@ export function markCalendarBlockWrite(
 
 /**
  * 判断单元格写入是否为自写。
- * 优先精确匹配 (avID + itemID + keyID)；否则降级到 row 级匹配。
+ *
+ * 匹配规则（保守 — 避免误吞外部编辑）：
+ * - 当调用方提供了 keyID：仅匹配精确 (avID + itemID + keyID)，不降级到 row。
+ *   这样 6 秒内对同一行的其它字段做的外部编辑不会被误识别为自写。
+ * - 当调用方没有 keyID（某些 ws op 不带）：才降级到 row 级匹配。
+ *
  * 命中不消费——批量回声会多次到达，TTL 自然过期足够。
  */
 export function isCalendarSelfCellWrite(
@@ -99,8 +104,9 @@ export function isCalendarSelfCellWrite(
     sweepExpired(now);
     if (keyID) {
         const m = cellMarks.get(cellKey(avID, itemID, keyID));
-        if (m && m.expiresAt > now) return true;
+        return !!(m && m.expiresAt > now);
     }
+    // 仅在 keyID 缺失（如某些 ws-main op 形态）时才用 row 级降级匹配
     const r = rowMarks.get(rowKey(avID, itemID));
     return !!(r && r.expiresAt > now);
 }

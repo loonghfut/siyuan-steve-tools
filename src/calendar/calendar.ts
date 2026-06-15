@@ -17,7 +17,8 @@ import solarLunar from 'solarlunar';
 import * as myF from './myF';
 import { showMessage } from 'siyuan';
 import { createFloatingCalendar } from './function/createFloatingCalendar';
-import { updateAttrViewCell_pro } from '@/api/api';
+import { updateAttrViewCell_pro, setBlockAttrs } from '@/api/api';
+import { markCalendarBlockWrite } from './calendar-self-write';
 
 //审查ok
 import { getCategoryColor, getLifelogColor } from '../lifelog/styles/colors';
@@ -309,7 +310,7 @@ export async function run(
                         return;
                     }
                     // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                     return;
                 } else {
                     await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
@@ -334,7 +335,7 @@ export async function run(
                         return;
                     }
                     // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                     return;
                 } else {
                     await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
@@ -914,7 +915,7 @@ export async function run(
                                 return;
                             }
                             // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                             return;
                         } else {
                             await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid, null, null, true);
@@ -937,7 +938,7 @@ export async function run(
                                 return;
                             }
                             // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                             return;
                         } else {
                             await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid, null, null, true);
@@ -1282,7 +1283,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                     showMessage('QQ日历事件不支持状态修改', 3000, 'error');
                     return;
                 } else {
-                    // 周期性事件处理
+                    // 周期性事件处理（在模块级 helper 中无法拿到具体 calendar 实例引用）
                     myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
                     showMessage('已将当前日期标记为完成', 3000);
                 }
@@ -1315,6 +1316,15 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                             // patch viewValueCache 让其他可见日历 refetch 时能看到归档态
                             try {
                                 myF.patchViewValueRow(rootid, itemID, { '状态': { content: '归档' } });
+                            } catch (e) { /* ignore */ }
+                            // 显式同步 block 的 custom-st-event 属性。原本由 transactionListener 的
+                            // fetch 拦截器在 batchSet 回包后做（见 transactionListener.ts:194-198），
+                            // 但自写早判跳过了那条路径——必须由发起方自己同步，否则 AV 状态='归档' 但块属性
+                            // 仍是旧值。先 mark 让 ws 回声不再触发 refresh。
+                            try {
+                                const archivedAttr = (myF as any).statusMap?.['归档'] ?? 'archived';
+                                markCalendarBlockWrite(blockId, 'archive');
+                                setBlockAttrs(blockId, { 'custom-st-event': archivedAttr });
                             } catch (e) { /* ignore */ }
                             // 同步其他可见日历
                             refetchOtherVisibleCalendars(null);
