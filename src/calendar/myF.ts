@@ -6,11 +6,13 @@ import { Calendar, DurationInput } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/interface";
-import { refreshKanban } from './kanban';
+import { refreshKanban, refetchOtherVisibleCalendars } from './kanban';
 import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_tags, runblockdata_for_time, runblockdata_for_title } from './quickadd';
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
 import { getRequiredFields } from './fieldConfig';
+import type { CalendarWriteReason } from './calendar-self-write';
+import { markCalendarBlockWrite } from './calendar-self-write';
 
 // ================== 自定义类型补充（轻量，不破坏现有引用） ==================
 // 事件字段解析结果（行中的“事件”列）
@@ -134,13 +136,16 @@ export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr:
         : dateStr;
     try {
         const updateTasks: Promise<any>[] = [];
+        const writeOpts = { source: 'calendar' as const, reason: 'unscheduled' as const };
         updateTasks.push(api.updateAttrViewCell_pro(
             event.blockId,
             event.rootid,
             event.timeKeyID,
             event.itemID,
             formattedDate,
-            'date'
+            'date',
+            undefined,
+            writeOpts,
         ));
         if (event.allDayKeyID) {
             updateTasks.push(api.updateAttrViewCell_pro(
@@ -149,12 +154,23 @@ export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr:
                 event.allDayKeyID,
                 event.itemID,
                 allDay,
-                'checkbox'
+                'checkbox',
+                undefined,
+                writeOpts,
             ));
         }
         await Promise.all(updateTasks);
+        // patch viewValueCache 让缓存与 UI 一致
+        try {
+            patchViewValueRow(event.rootid, event.itemID, {
+                '开始时间': { start: formattedDate, end: null, hasEndDate: false },
+                '全天': { content: !!allDay },
+            });
+        } catch (e) { /* ignore cache patch failure */ }
         removeUnscheduledEvent(event);
         api.handleDidaListEvent(event.rootid, event.blockId, event.itemID);
+        // 同步其他可见日历（drop 回调里已对发起 calendar 自身做了 refetch）
+        refetchOtherVisibleCalendars(null);
         return true;
     } catch (error) {
         console.error('安排事件时出错:', error);
@@ -207,6 +223,62 @@ const VIEW_ID_CACHE_TTL = 5000;
 const VIEW_VALUE_CACHE_TTL = 5000;
 const viewIdCache = new Map<string, { ts: number; data: ViewItem[] }>();
 const viewValueCache = new Map<string, { ts: number; data: any[] }>();
+// "在途请求"映射：当多个日历实例同时刷新时，第一个调用方触发真实网络请求，
+// 后来者直接 await 同一个 Promise，避免 N 个实例 = N 次 /api/av/renderAttributeView。
+// 经典 single-flight / request coalescing 模式。
+const viewIdInFlight = new Map<string, Promise<ViewItem[]>>();
+const viewValueInFlight = new Map<string, Promise<any[]>>();
+
+/**
+ * 行级 patch：自写 AV 单元格成功后，把同一 row 在 viewValueCache 里的对应字段
+ * 直接更新，避免下次 refetch 因为 5 秒 TTL 重发整张 view 拉数据。
+ *
+ * cacheKey 是 `${rootid}::${viewId}::${isZQ ? 1 : 0}::${type}`，所以同一 avID 下可能
+ * 有多个 cache entry（不同 view / zq 周期表）。row 的 itemID 存在 row['事件'].itemID
+ * （见 extractDataFromTable）。fieldPatch 的 key 必须与 row 字段名一致，例如
+ * '开始时间'、'全天'、'状态'。值会与原对象浅合并。
+ */
+export function patchViewValueRow(avID: string, itemID: string, fieldPatch: Record<string, any>): void {
+    if (!avID || !itemID || !fieldPatch) return;
+    let touched = 0;
+    for (const [key, entry] of viewValueCache) {
+        // cacheKey 形如 `${rootid}::${viewId}::...` —— 只看前缀，避免拆出无关 av
+        if (!key.startsWith(`${avID}::`)) continue;
+        for (const row of entry.data) {
+            if (row?.['事件']?.itemID !== itemID) continue;
+            for (const [fieldName, patch] of Object.entries(fieldPatch)) {
+                const orig = row[fieldName];
+                if (orig && typeof orig === 'object' && typeof patch === 'object' && patch !== null) {
+                    row[fieldName] = { ...orig, ...patch };
+                } else {
+                    row[fieldName] = patch;
+                }
+            }
+            touched++;
+        }
+    }
+    if (touched > 0) {
+        console.debug(`[CalendarAVCache] patch row av=${avID} item=${itemID} touchedRows=${touched}`, fieldPatch);
+    }
+}
+
+/**
+ * 失效 viewValueCache。不传参 → 全部清空；传 avID → 仅清该 av 下所有 view；
+ * 同时传 viewId → 精确清除单个 cacheKey。用于无法做行级 patch 的字段写入或外部
+ * SiYuan 编辑感知后的兜底。
+ */
+export function invalidateViewValueCache(avID?: string, viewId?: string): void {
+    if (!avID) {
+        viewValueCache.clear();
+        return;
+    }
+    const prefix = viewId ? `${avID}::${viewId}::` : `${avID}::`;
+    for (const key of Array.from(viewValueCache.keys())) {
+        if (key.startsWith(prefix)) {
+            viewValueCache.delete(key);
+        }
+    }
+}
 
 // Get view IDs and names
 export async function getViewId(va_ids: string[]): ViewData {
@@ -216,22 +288,32 @@ export async function getViewId(va_ids: string[]): ViewData {
         if (cached && (now - cached.ts) < VIEW_ID_CACHE_TTL) {
             return cached.data;
         }
-        try {
-            const view = await api.renderAttributeView(va_id);
-            // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
-            const rootname = view.name ? `${view.name}-` : "";
-            const rootid = view.id;
-            const data: ViewItem[] = view.views.map((viewItem) => ({
-                rootid: rootid,
-                viewId: viewItem.id,
-                name: rootname + viewItem.name
-            }));
-            viewIdCache.set(va_id, { ts: now, data });
-            return data;
-        } catch (error) {
-            console.error(`Error processing view ${va_id}:`, error);
-            return [] as ViewItem[];
-        }
+        // 复用在途请求：避免多实例并发同时打 /api/av/renderAttributeView
+        const inFlight = viewIdInFlight.get(va_id);
+        if (inFlight) return inFlight;
+
+        const promise = (async () => {
+            try {
+                const view = await api.renderAttributeView(va_id);
+                // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
+                const rootname = view.name ? `${view.name}-` : "";
+                const rootid = view.id;
+                const data: ViewItem[] = view.views.map((viewItem) => ({
+                    rootid: rootid,
+                    viewId: viewItem.id,
+                    name: rootname + viewItem.name
+                }));
+                viewIdCache.set(va_id, { ts: Date.now(), data });
+                return data;
+            } catch (error) {
+                console.error(`Error processing view ${va_id}:`, error);
+                return [] as ViewItem[];
+            } finally {
+                viewIdInFlight.delete(va_id);
+            }
+        })();
+        viewIdInFlight.set(va_id, promise);
+        return promise;
     });
 
     const results = await Promise.all(tasks);
@@ -247,20 +329,32 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
         if (cached && (now - cached.ts) < VIEW_VALUE_CACHE_TTL) {
             return { from: viewId_Data, data: cached.data };
         }
-        try {
-            const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
-            // console.debug("viewValue_CHUSHI:::", viewValue);
-            const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type);
-            viewValueCache.set(cacheKey, { ts: now, data });
+        // 复用在途请求：多实例同时 refetch 时只发一次网络请求，后来者复用同一个 Promise
+        const inFlight = viewValueInFlight.get(cacheKey);
+        if (inFlight) {
+            const data = await inFlight;
             return { from: viewId_Data, data };
-        } catch (error) {
-            console.error(`Error processing view ${viewId_Data.viewId}:`, error);
-            return { from: viewId_Data, data: [] as any[] };
         }
+
+        const promise = (async () => {
+            try {
+                const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
+                const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type);
+                viewValueCache.set(cacheKey, { ts: Date.now(), data });
+                return data;
+            } catch (error) {
+                console.error(`Error processing view ${viewId_Data.viewId}:`, error);
+                return [] as any[];
+            } finally {
+                viewValueInFlight.delete(cacheKey);
+            }
+        })();
+        viewValueInFlight.set(cacheKey, promise);
+        const data = await promise;
+        return { from: viewId_Data, data };
     });
 
     const viewValue_Data = await Promise.all(tasks);
-    // console.debug("ceshi2222:::::::::::::2", viewValue_Data);
     return viewValue_Data;
 }
 
@@ -1042,6 +1136,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select"));
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select"));
         // 设置自定义属性
+        markCalendarBlockWrite(direct.directid, 'create');
         api.setBlockAttrs(direct.directid, { 'custom-st-event': statusMap[status] });
 
         updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, itemID, ismain, "checkbox"));
@@ -1052,6 +1147,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
         // 等待所有更新完成
         await Promise.all(updatePromises);
+        // create 新行：失效缓存让后续 refetch 能看到
+        try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
         sy.showMessage('已添加事件', 2000, "info", "1");
         // 滴答更新
         api.handleDidaListEvent(to_db_id, direct.directid, itemID);
@@ -1242,6 +1339,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             if (status && statusKeyID && selectdata) {
                 updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, itemID, selectdata, "select"));
                 // 设置自定义属性
+                markCalendarBlockWrite(id, 'create');
                 api.setBlockAttrs(id, { 'custom-st-event': statusMap[status] });
             }
             if (checkboxKeyID) {
@@ -1253,6 +1351,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
 
             // 等待所有更新完成
             await Promise.all(updatePromises2);
+            // create 是新增行：缓存没有该行，必须显式失效，否则下面的 refetch 会读到不含新事件的旧 cache
+            try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
             // 滴答更新
             api.handleDidaListEvent(to_db_id, id, itemID);
             //////////////////
@@ -1350,6 +1450,7 @@ export async function updateEventInDatabase(
     options?: {
         refetchOnSuccess?: boolean;
         refetchDelayMs?: number;
+        reason?: CalendarWriteReason;
     }
 ) {
     // 更新思源数据库中的时间
@@ -1370,15 +1471,19 @@ export async function updateEventInDatabase(
     // 准备批量更新的promise数组
     const updatePromises: Promise<any>[] = [];
 
+    // 自写选项：默认按 reason 标记并抑制 post-batch refresh，让 FullCalendar 本地状态自然生效。
+    const reason: CalendarWriteReason = options?.reason ?? 'drag';
+    const writeOpts = { source: 'calendar' as const, reason };
+
     // 更新时间
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', rootid);
-    updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, itemID, newStartDate, "date", newEndDate));
+    updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, timeKeyID, itemID, newStartDate, "date", newEndDate, writeOpts));
 
     // 如果全天状态发生变化，更新全天属性
     if (isAllDay !== wasAllDay) {
         const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', rootid);
         if (allDayKeyID) {
-            updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, allDayKeyID, itemID, isAllDay, "checkbox"));
+            updatePromises.push(api.updateAttrViewCell_pro(blockId, rootid, allDayKeyID, itemID, isAllDay, "checkbox", undefined, writeOpts));
         } else {
             sy.showMessage("未找到全天字段，无法更新全天属性", 2000, "error");
         }
@@ -1387,9 +1492,26 @@ export async function updateEventInDatabase(
     // 等待所有更新完成
     await Promise.all(updatePromises);
 
+    // 行级 patch viewValueCache：让 5 秒 TTL 内的任何 refetch 也能拿到新值，
+    // 避免缓存返回旧时间导致 UI 闪回。
+    try {
+        patchViewValueRow(rootid, itemID, {
+            '开始时间': {
+                start: newStartDate,
+                end: newEndDate || null,
+                hasEndDate: !!newEndDate,
+            },
+            '全天': { content: isAllDay },
+        });
+    } catch (e) {
+        console.warn('[CalendarAVCache] patchViewValueRow failed', e);
+    }
+
     api.handleDidaListEvent(rootid, blockId, itemID);
 
-    if (options?.refetchOnSuccess) {
+    // 仅在调用方显式开启时才主动 refetch；默认 false——FullCalendar 已在本地把
+    // 事件移到位，AV 写入也通过自写标记被下游链路忽略，无需多余刷新。
+    if (options?.refetchOnSuccess === true) {
         const delayMs = Math.max(0, Number(options.refetchDelayMs) || 1000);
         setTimeout(() => calendar.refetchEvents(), delayMs);
     }
@@ -1531,7 +1653,14 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
 
     const target = event.blockId; // 优先使用 blockId
     const itemID = event.itemID;
-    api.updateAttrViewCell_pro(target, event.rootid, event.okdayid, itemID, newOkday, "text");
+    api.updateAttrViewCell_pro(target, event.rootid, event.okdayid, itemID, newOkday, "text",
+        undefined, { source: 'calendar', reason: 'recurring' });
+    // 周期事件完成日字段是 text 列，patch 缓存让本地状态一致
+    try {
+        patchViewValueRow(event.rootid, itemID, { '完成日期': { content: newOkday } });
+    } catch (e) { /* ignore */ }
+    // 同步所有可见日历实例（周期事件完成态影响 isEventCompleted 判断，需要重渲染）
+    refetchOtherVisibleCalendars(null);
 }
 
 

@@ -712,6 +712,55 @@ const _refreshKanban = async () => {
 };
 export const refreshKanban = debounce(_refreshKanban, 500);
 
+let visibleRefetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 仅对当前可见的日历实例进行 refetchEvents，不重建 Sortable，不动滚动恢复。
+ * 用于 create / 周期完成等"必须显示新数据但不需要重建看板"的场景，比 refreshKanban
+ * 轻得多（不销毁 Sortable、不暂停 cursor、不顺序 await eventsSet）。
+ */
+export function refetchVisibleCalendarsDebounced(delayMs = 200) {
+    if (visibleRefetchTimer) clearTimeout(visibleRefetchTimer);
+    visibleRefetchTimer = setTimeout(() => {
+        visibleRefetchTimer = null;
+        const visible = thisCalendars.filter(c => document.body.contains(c.el));
+        for (const c of visible) {
+            try { c.refetchEvents(); } catch (e) { console.warn('refetchVisible failed', e); }
+        }
+    }, delayMs);
+}
+
+// 单独的定时器，避免与 refetchVisibleCalendarsDebounced 互相覆盖
+const otherRefetchTimers = new WeakMap<object, ReturnType<typeof setTimeout>>();
+const SHARED_OTHER_KEY = { __shared: true };
+
+/**
+ * 当某个日历实例自写完成 AV 单元格后，FullCalendar 已在该实例本地把事件移好；
+ * 但**其他**打开的日历实例（看板、悬浮、分屏）不知道数据变化，UI 会落后。
+ *
+ * 此函数对"除 except 之外的所有可见日历实例"做一次 refetchEvents：
+ *   - 因为 myF.patchViewValueRow 已把 viewValueCache 更新成新值，refetch 时直接
+ *     命中缓存，几乎零网络开销（不会触发 /api/av/renderAttributeView）。
+ *   - 不重建 Sortable / 不动滚动 / 不串行等待，开销远低于 refreshKanban。
+ *
+ * 传 except=null 时刷新所有可见日历（适用于无法标识发起方的场景，例如周期事件完成）。
+ */
+export function refetchOtherVisibleCalendars(except: Calendar | null, delayMs = 200) {
+    const key = (except as any) ?? SHARED_OTHER_KEY;
+    const prev = otherRefetchTimers.get(key);
+    if (prev) clearTimeout(prev);
+    const timer = setTimeout(() => {
+        otherRefetchTimers.delete(key);
+        const visible = thisCalendars.filter(c =>
+            c !== except && document.body.contains(c.el)
+        );
+        for (const c of visible) {
+            try { c.refetchEvents(); } catch (e) { console.warn('refetchOther failed', e); }
+        }
+    }, delayMs);
+    otherRefetchTimers.set(key, timer);
+}
+
 const logDebug = (message: string, ...args: any[]) => {
     console.debug(`[Kanban] ${message}`, ...args);
 };

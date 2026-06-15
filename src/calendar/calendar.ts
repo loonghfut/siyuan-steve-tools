@@ -8,7 +8,7 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
-import { refreshKanban, thisCalendars, update_thisCalendars } from './kanban';
+import { refreshKanban, refetchOtherVisibleCalendars, thisCalendars, update_thisCalendars } from './kanban';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -487,10 +487,13 @@ export async function run(
             showDropTimeIndicator(info);
             try {
                 rememberPendingCalendarEventPatch(info.event, 6000);
+                // 不再 refetchOnSuccess —— FullCalendar 已本地移动事件，AV 写入由
+                // calendar-self-write 标记体系让下游链路忽略，无需 refetch。
                 await myF.updateEventInDatabase(info, calendar, viewValue, false, {
-                    refetchOnSuccess: true,
-                    refetchDelayMs: 2500,
+                    reason: 'drag',
                 });
+                // 同步其他可见日历实例：myF 已 patch 了 viewValueCache，refetch 命中缓存几乎零开销。
+                refetchOtherVisibleCalendars(calendar);
             } catch (error) {
                 console.error('拖拽更新事件失败:', error);
                 forgetPendingCalendarEventPatch(info.event);
@@ -577,10 +580,11 @@ export async function run(
             showResizeTimeIndicator(info);
             try {
                 rememberPendingCalendarEventPatch(info.event, 6000);
+                // 同 eventDrop：本地已更新，跳过 refetch
                 await myF.updateEventInDatabase(info, calendar, viewValue, true, {
-                    refetchOnSuccess: true,
-                    refetchDelayMs: 2500,
+                    reason: 'resize',
                 });
+                refetchOtherVisibleCalendars(calendar);
             } catch (error) {
                 console.error('调整事件时长失败:', error);
                 forgetPendingCalendarEventPatch(info.event);
@@ -1298,11 +1302,22 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                             statusKeyID,
                             itemID,
                             selectdata,
-                            "select"
+                            "select",
+                            undefined,
+                            { source: 'calendar', reason: 'archive' },
                         ).then(() => {
                             showMessage('已将事件标记为归档', 3000);
-                            // 刷新日历以显示更新后的状态
-                            refreshKanban();
+                            // 本地更新事件状态：FullCalendar 重渲染时 eventDidMount 的归档样式
+                            // 会基于 status 重新应用，无需走 refreshKanban 全量刷新。
+                            try {
+                                info.event.setExtendedProp('status', '归档');
+                            } catch (e) { /* ignore */ }
+                            // patch viewValueCache 让其他可见日历 refetch 时能看到归档态
+                            try {
+                                myF.patchViewValueRow(rootid, itemID, { '状态': { content: '归档' } });
+                            } catch (e) { /* ignore */ }
+                            // 同步其他可见日历
+                            refetchOtherVisibleCalendars(null);
                         }).catch(error => {
                             console.error('更新事件状态失败:', error);
                             showMessage('更新事件状态失败', 3000, 'error');

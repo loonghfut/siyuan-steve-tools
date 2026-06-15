@@ -10,8 +10,27 @@ import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle } from "s
 import { ISelectOption } from "@/calendar/interface";
 import { settingdata } from "..";
 import { AVManager } from "./db_pro";
+import {
+    markCalendarCellWrite,
+    type CalendarWriteReason,
+} from "@/calendar/calendar-self-write";
 // 创建 AVManager 实例 - 可以根据需要进行配置
 const avManager = new AVManager();
+
+/**
+ * AV 单元格写入选项。仅在调用方主动声明 source==='calendar' 时影响行为：
+ * - markSelfWrite (默认 true): 入队即把 (avID, itemID, keyID) 标记为日历自写，
+ *   transactionListener 看到 ws/fetch 回声会跳过 refreshKanban。
+ * - suppressPostRefresh (默认 true): 本批结尾的 refreshAttributeView 跳过——
+ *   若一批里全部为自写，省掉一次全量 refetch；只要混入一条非自写仍会刷新。
+ * 不传 options 时与历史行为完全一致。
+ */
+export interface AVCellWriteOptions {
+    source?: 'calendar' | 'other';
+    reason?: CalendarWriteReason;
+    markSelfWrite?: boolean;
+    suppressPostRefresh?: boolean;
+}
 
 // 请求队列，使用批量处理优化性能
 const cellUpdateQueue: Array<{
@@ -23,6 +42,7 @@ const cellUpdateQueue: Array<{
     value: any;
     type: string;
     endtime?: string;
+    options?: AVCellWriteOptions;
     resolve: (value: any) => void;
     reject: (reason: any) => void;
 }> = [];
@@ -967,7 +987,8 @@ export async function updateAttrViewCell_pro(
         action: string
     },
     type: 'date' | 'select' | 'relation' | 'checkbox' | 'text' | 'mSelect' | 'url',
-    endtime?: string
+    endtime?: string,
+    options?: AVCellWriteOptions,
 ): Promise<any> {
     return new Promise((resolve, reject) => {
         // 将所有请求添加到队列中
@@ -979,9 +1000,21 @@ export async function updateAttrViewCell_pro(
             value,
             type,
             endtime,
+            options,
             resolve,
             reject
         });
+
+        // 日历自写：入队时立刻登记标记。原因：队列有 150-2000ms 延迟，
+        // ws-main 广播可能在 await batchUpdateCells 返回前到达，提前标记保证
+        // transactionListener 命中。
+        if (options?.source === 'calendar' && options.markSelfWrite !== false) {
+            try {
+                markCalendarCellWrite(avID, itemID, keyID, options.reason);
+            } catch (e) {
+                console.warn('[CalendarSelfWrite] markCalendarCellWrite 失败', e);
+            }
+        }
 
         // console.debug(`📝 [队列] 添加单元格更新请求，队列当前长度: ${cellUpdateQueue.length}, avID: ${avID}`);
 
@@ -1092,7 +1125,12 @@ async function processQueue() {
 
                 // console.debug(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
                 // 批量更新完成后的后续处理
-                await handlePostBatchUpdateActions(avID);
+                // 仅当本批"全部"为日历自写且未禁用 suppressPostRefresh 时，跳过 refreshKanban。
+                // 混入任何非自写更新仍触发刷新，保证外部调用方行为不变。
+                const allCalendarSelf = updates.every(u =>
+                    u.options?.source === 'calendar' && u.options.suppressPostRefresh !== false
+                );
+                await handlePostBatchUpdateActions(avID, { skipRefresh: allCalendarSelf });
             } else {
                 // 如果没有有效更新，拒绝所有Promise
                 updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
@@ -1118,8 +1156,12 @@ async function processQueue() {
 }
 
 // 处理批量更新完成后的后续操作
-async function handlePostBatchUpdateActions(avID: string) {
+async function handlePostBatchUpdateActions(avID: string, opts?: { skipRefresh?: boolean }) {
     try {
+        if (opts?.skipRefresh) {
+            console.debug(`[CalendarSelfWrite] skip post-batch refresh for av ${avID}`);
+            return;
+        }
         // 1. 触发视图刷新
         await refreshAttributeView(avID);
 

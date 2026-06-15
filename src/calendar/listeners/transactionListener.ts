@@ -5,6 +5,10 @@ import { refreshKanban } from '@/calendar/kanban';
 import { statusMap } from '@/calendar/myF';
 import { interceptFetch } from '@/api/network-interceptor';
 import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
+import {
+    isCalendarSelfBlockWrite,
+    isCalendarSelfCellWrite,
+} from '@/calendar/calendar-self-write';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
@@ -53,6 +57,17 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
       // lifelog 自写入引起的 updateAttrs：跳过全量 refreshKanban，
       // 由 LIFELOG_CHANGED_EVENT 走局部增量更新路径。
       if (action === 'updateAttrs' && isLifelogSelfUpdateAttrs(op)) {
+        return;
+      }
+      // 日历自写：拖拽/调整大小/状态/归档/周期 等本地已经更新好 UI 的 AV 单元格写入，
+      // 不需要再走全量 refreshKanban。匹配 (avID, rowID, keyID) 三元组或 blockId。
+      if (action === 'updateAttrViewCell'
+          && isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID)) {
+        console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell', op.avID, op.rowID);
+        return;
+      }
+      if (action === 'updateAttrs' && isCalendarSelfBlockWrite(op.id)) {
+        console.debug('[CalendarSelfWrite] skip ws-main updateAttrs', op.id);
         return;
       }
       M_calendar.avButton();
@@ -136,7 +151,11 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
             await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
             return;
           }
-          // 其他列：刷新视图
+          // 其他列：刷新视图——但若是日历自写则跳过
+          if (isCalendarSelfCellWrite(avID, itemID, keyID)) {
+            console.debug('[CalendarSelfWrite] skip network setAttributeViewBlockAttr', avID, itemID);
+            return;
+          }
           try { M_calendar.avButton(); } catch { }
           try { refreshKanban(); } catch { }
           return;
@@ -146,6 +165,14 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
         if (url.includes('/api/av/batchSetAttributeViewBlockAttrs') && Array.isArray(body?.values)) {
           const values: Array<{ keyID: string; itemID: string; value: any } & Record<string, any>> = body.values;
           if (values.length === 0) return;
+          // 日历自写早判：所有 values 都是日历自写时直接 return，省掉 ID 映射 & 字段查询
+          const allCalendarSelf = values.every(v =>
+            isCalendarSelfCellWrite(avID, v.itemID, v.keyID)
+          );
+          if (allCalendarSelf) {
+            console.debug('[CalendarSelfWrite] skip network batchSetAttributeViewBlockAttrs', avID, values.length);
+            return;
+          }
           // 先收集所有涉及的 itemID，并映射到 blockId
           const itemIDs = Array.from(new Set(values.map(v => v.itemID).filter(Boolean)));
           if (itemIDs.length === 0) return;
