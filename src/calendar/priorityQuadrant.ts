@@ -263,7 +263,7 @@ const QuadrantViewConfig = {
               `<span>${event.title}</span>` :
              `<span class="st-ref" style="${titleStyle}" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
             }
-            ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
+            ${isRecurring ? '<span class="recurring-icon" title="周期事件">周期</span>' : ''}
             </h3>
             <div class="kanban-card-meta">
               <span class="kanban-nowToEndTime">${nowToEndTime}</span>
@@ -286,7 +286,7 @@ const QuadrantViewConfig = {
       const total = events.length;
       const done = events.filter(e => e.extendedProps.status === '完成').length;
       const percent = total ? Math.round((done / total) * 100) : 0;
-      const icon = key === 'q1' ? '🔥' : key === 'q2' ? '⭐' : key === 'q3' ? '⏰' : '🌿';
+      const icon = key.toUpperCase();
       return `
       <div class="kanban-column quadrant-${key}">
         <div class="kanban-column-header quadrant-${key}-head">

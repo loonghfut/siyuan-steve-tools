@@ -191,8 +191,6 @@ export function createUnscheduledPanelController(
             const badge = document.createElement('span');
             badge.className = 'st-unscheduled-item__badge st-unscheduled-item__badge--overdue';
             badge.textContent = '过期';
-            // 提供最小化的内联样式保证可见性
-            badge.style.cssText = 'margin-left:6px; padding:0 6px; border-radius:10px; font-size:12px; line-height:18px; height:18px; display:inline-flex; align-items:center; color:#fff; background:#e53935;';
             titleEl.appendChild(badge);
         }
         card.appendChild(titleEl);

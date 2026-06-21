@@ -415,8 +415,6 @@ export async function run(
                 // 创建农历显示元素
                 const lunarEl = document.createElement('a');
                 lunarEl.className = 'fc-daygrid-day-lunar fc-daygrid-day-number';
-                lunarEl.style.fontSize = '1em';
-                lunarEl.style.color = '#666';
                 // lunarEl.setAttribute('data-navlink', '');
                 lunarEl.tabIndex = 0;
 
@@ -635,7 +633,7 @@ export async function run(
             },
             // 刷新
             refreshButton: {
-                text: '🔄️',
+                text: '刷新',
                 click: async function () {
                     try {
                         showMessage('正在刷新视图...', 3000);
@@ -1060,10 +1058,9 @@ export async function run(
             // // steveTools.outlog(info);
             if (info.event.extendedProps.source === 'qqcalendar') {
                 info.el.classList.add('qq-calendar-event');
-                // 添加QQ日历图标
                 const titleEl = info.el.querySelector('.fc-event-title');
                 if (titleEl) {
-                    titleEl.insertAdjacentHTML('afterbegin', '<i class="qq-calendar-icon">📅</i> ');
+                    titleEl.insertAdjacentHTML('afterbegin', '<span class="qq-calendar-badge">QQ</span>');
                 }
             }
             // 添加提示框

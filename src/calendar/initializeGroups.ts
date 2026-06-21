@@ -18,7 +18,7 @@ const defaultGroups: ViewGroup[] = [
     {
         id: 'external',
         name: '外部日历',
-        icon: '📅',
+        icon: '外',
         viewIds: ['qqcalendar', 'icsSubscription'],
         isExpanded: true,
         isHidden: false
@@ -26,7 +26,7 @@ const defaultGroups: ViewGroup[] = [
     {
         id: 'special',
         name: '特殊功能',
-        icon: '⚡',
+        icon: '特',
         viewIds: ['lifelog', 'recurring'],
         isExpanded: true,
         isHidden: false
@@ -62,7 +62,7 @@ export function initializeGroups() {
     // 加载未分组的隐藏状态
     isUngroupedHidden = loadUngroupedVisibility();
 }
-export function createNewGroup(name: string, icon: string = '📁'): ViewGroup {
+export function createNewGroup(name: string, icon: string = ''): ViewGroup {
     const newGroup: ViewGroup = {
         id: Date.now().toString(),
         name,
@@ -121,6 +121,10 @@ function saveUngroupedVisibility() {
     } catch (error) {
         console.error('保存未分组隐藏状态失败:', error);
     }
+}
+function safeGroupIcon(icon?: string): string {
+    if (!icon) return '';
+    return /\p{Extended_Pictographic}/u.test(icon) ? '' : icon;
 }
 export function getUngroupedViews(allViewIds: string[]): string[] {
     const groupedViewIds = new Set();
@@ -237,7 +241,7 @@ export async function createViewFilterMenu(
         });
         
         if (ungroupedItems.length > 0) {
-            createViewGroup('📁 未分组', ungroupedItems, menuContent);
+            createViewGroup('未分组', ungroupedItems, menuContent);
         }
     }
 
@@ -315,7 +319,18 @@ export async function createViewFilterMenu(
         groupHeader.className = 'view-filter-group-header';
         
         const headerText = document.createElement('span');
-        headerText.textContent = `${group.icon || '📁'} ${group.name}`;
+        headerText.className = 'view-filter-group-title';
+        const iconText = safeGroupIcon(group.icon);
+        if (iconText) {
+            const iconEl = document.createElement('span');
+            iconEl.className = 'view-filter-group-mark';
+            iconEl.textContent = iconText;
+            headerText.appendChild(iconEl);
+        }
+        const nameEl = document.createElement('span');
+        nameEl.className = 'view-filter-group-name';
+        nameEl.textContent = group.name;
+        headerText.appendChild(nameEl);
         groupHeader.appendChild(headerText);
 
         // 添加分组操作按钮
@@ -584,7 +599,7 @@ export async function createViewFilterMenu(
             <h4>创建新分组</h4>
             <div class="form-row">
                 <input type="text" class="group-name-input" placeholder="分组名称" />
-                <input type="text" class="group-icon-input" placeholder="图标 (如: 📁)" maxlength="2" />
+                <input type="text" class="group-icon-input" placeholder="标识，如 A" maxlength="2" />
                 <button class="b3-button create-group-btn">创建</button>
             </div>
         `;
@@ -604,7 +619,7 @@ export async function createViewFilterMenu(
             const groupInfo = document.createElement('div');
             groupInfo.className = 'group-info';
             groupInfo.innerHTML = `
-                <span class="group-icon">${group.icon || '📁'}</span>
+                <span class="group-icon">${safeGroupIcon(group.icon)}</span>
                 <span class="group-name">${group.name}</span>
                 <span class="group-count">(${group.viewIds.length}个视图)</span>
                 ${group.isHidden ? '<span class="group-hidden-indicator">（已隐藏）</span>' : ''}
@@ -669,7 +684,7 @@ export async function createViewFilterMenu(
                 const groupInfo = document.createElement('div');
                 groupInfo.className = 'group-info';
                 groupInfo.innerHTML = `
-                    <span class="group-icon">${group.icon || '📁'}</span>
+                    <span class="group-icon">${safeGroupIcon(group.icon)}</span>
                     <span class="group-name">${group.name}</span>
                     <span class="group-count">(${group.viewIds.length}个视图)</span>
                     ${group.isHidden ? '<span class="group-hidden-indicator">（已隐藏）</span>' : ''}
@@ -748,7 +763,7 @@ export async function createViewFilterMenu(
             const ungroupedInfo = document.createElement('div');
             ungroupedInfo.className = 'group-info';
             ungroupedInfo.innerHTML = `
-                <span class="group-icon">📁</span>
+                <span class="group-icon"></span>
                 <span class="group-name">未分组</span>
                 <span class="group-count">(${ungroupedCount}个视图)</span>
                 ${isUngroupedHidden ? '<span class="group-hidden-indicator">（已隐藏）</span>' : ''}
@@ -804,7 +819,7 @@ export async function createViewFilterMenu(
         
         createBtn.onclick = () => {
             const name = nameInput.value.trim();
-            const icon = iconInput.value.trim() || '📁';
+            const icon = safeGroupIcon(iconInput.value.trim());
             
             if (name) {
                 const newGroup = createNewGroup(name, icon);
@@ -846,8 +861,8 @@ export async function createViewFilterMenu(
                     <input type="text" class="edit-group-name" value="${group.name}" />
                 </div>
                 <div class="form-row">
-                    <label>图标:</label>
-                    <input type="text" class="edit-group-icon" value="${group.icon || '📁'}" maxlength="2" />
+                    <label>标识:</label>
+                    <input type="text" class="edit-group-icon" value="${safeGroupIcon(group.icon)}" maxlength="2" />
                 </div>
                 <div class="group-views-section">
                     <h4>分组中的视图</h4>
@@ -970,7 +985,7 @@ export async function createViewFilterMenu(
             
             if (newName) {
                 group.name = newName;
-                group.icon = newIcon || '📁';
+                group.icon = safeGroupIcon(newIcon);
                 saveUserGroups(userGroups);
                 editDialog.remove();
                 onComplete();

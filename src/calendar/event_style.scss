@@ -21,6 +21,11 @@ $priority-color-high: var(--b3-card-error-color);
 $priority-color-low-background: var(--b3-card-success-background);
 $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
+$calendar-radius-sm: 6px;
+$calendar-radius-md: 10px;
+$calendar-radius-lg: 14px;
+$calendar-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+$calendar-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.16);
 
 // 2025/7/6
 
@@ -76,7 +81,15 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 
 #float-calendar-container {
-    border-bottom: 2px solid var(--b3-theme-primary);
+    border: 1px solid var(--b3-border-color);
+    border-radius: $calendar-radius-lg !important;
+    box-shadow: $calendar-shadow-md !important;
+    background-color: var(--b3-theme-background);
+}
+#fcalendar-float-title {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+    border-radius: $calendar-radius-lg $calendar-radius-lg 0 0 !important;
 }
 #fcalendar-float > div.fc-view-harness.fc-view-harness-active > div > div > div{
     max-height: 70vh;
@@ -131,18 +144,39 @@ $priority-color-high-background: var(--b3-card-error-background);
     border-color: var(--b3-card-info-color);
 }
 
+.qq-calendar-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 16px;
+    min-width: 20px;
+    margin-right: 4px;
+    padding: 0 4px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    background-color: var(--b3-card-info-background);
+    color: var(--b3-card-info-color);
+    vertical-align: 1px;
+}
+
+.qq-calendar-event {
+    border-radius: $calendar-radius-md !important;
+}
+
 .st-plan-button-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    margin-left: 8px;
+    min-width: 18px;
+    height: 18px;
+    margin-left: 6px;
     padding: 0 6px;
     border-radius: 999px;
     background-color: var(--b3-card-info-background);
     color: var(--b3-card-info-color);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     line-height: 1;
 }
@@ -157,16 +191,16 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .st-unscheduled-panel {
     position: absolute;
-    top: 3.2rem;
-    right: 1rem;
+    top: 2.8rem;
+    right: 0.75rem;
     width: 260px;
     max-height: min(calc(100vh - 4rem), 520px);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--b3-border-color);
-    border-radius: 12px;
+    border-radius: $calendar-radius-lg;
     background-color: var(--b3-theme-surface);
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
+    box-shadow: $calendar-shadow-md;
     z-index: 20;
     overflow: hidden;
 }
@@ -175,8 +209,9 @@ $priority-color-high-background: var(--b3-card-error-background);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--b3-border-color);
+    font-size: 13px;
     font-weight: 600;
     color: var(--b3-theme-on-background);
     cursor: move;
@@ -200,17 +235,17 @@ $priority-color-high-background: var(--b3-card-error-background);
 .st-unscheduled-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     /* 占据剩余空间，并允许内部滚动区域正确计算高度 */
     flex: 1 1 auto;
     min-height: 0;
-    padding: 12px;
+    padding: 8px;
     box-sizing: border-box;
     background-color: var(--b3-theme-background);
 }
 
 .st-unscheduled-tip {
-    font-size: 0.8em;
+    font-size: 12px;
     color: var(--b3-theme-on-surface-light);
 }
 
@@ -220,8 +255,8 @@ $priority-color-high-background: var(--b3-card-error-background);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding-right: 4px;
+    gap: 6px;
+    padding-right: 2px;
     /* 提升触控与触摸板滚动体验 */
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -230,42 +265,60 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .st-unscheduled-item {
     border: 1px solid var(--b3-border-color);
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: $calendar-radius-md;
+    padding: 8px;
     background-color: var(--b3-theme-surface);
     cursor: grab;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .st-unscheduled-item:hover {
-    border-color: var(--b3-theme-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background-color: var(--b3-list-hover);
+    border-color: var(--b3-theme-primary-light);
+    box-shadow: $calendar-shadow-sm;
 }
 
 .st-unscheduled-item__title {
+    font-size: 13px;
     font-weight: 600;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     color: var(--b3-theme-on-background);
 }
 
 .st-unscheduled-item__meta {
-    font-size: 0.8em;
+    font-size: 11px;
     color: var(--b3-theme-on-surface-light);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .st-unscheduled-item__tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
 }
 
 .st-unscheduled-item__tags span {
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
     background-color: var(--b3-card-info-background);
     color: var(--b3-card-info-color);
-    font-size: 0.75em;
+    font-size: 11px;
+}
+
+.st-unscheduled-item__badge {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.st-unscheduled-item__badge--overdue {
+    color: #fff;
+    background-color: var(--b3-theme-error);
 }
 /* 
  * 拖拽结束后平滑显示弹出框
@@ -291,32 +344,32 @@ $priority-color-high-background: var(--b3-card-error-background);
     position: absolute;
     z-index: 1000;
     background-color: $background-color;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: $calendar-radius-lg;
+    box-shadow: $calendar-shadow-md;
     color: $text-color;
     border: 1px solid $border-color;
-    min-width: 320px;
-    max-width: 450px;
-    max-height: 60vh;
+    min-width: 300px;
+    max-width: 420px;
+    max-height: 58vh;
     overflow: hidden;
 }
 
 .view-filter-header {
-    padding: 12px 16px;
+    padding: 8px;
     border-bottom: 1px solid $border-color;
     background-color: var(--b3-theme-surface);
     display: flex;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
-    
+
     .view-filter-select-all,
     .view-filter-clear-all,
     .view-filter-manage-groups {
-        padding: 4px 12px;
-        font-size: 0.9em;
-        border-radius: 4px;
+        padding: 3px 10px;
+        font-size: 12px;
+        border-radius: $calendar-radius-md;
         flex: 1;
-        min-width: 80px;
+        min-width: 72px;
         
         &:hover {
             background-color: $hover-background-color;
@@ -331,32 +384,62 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .view-filter-content {
-    max-height: 450px;
+    max-height: 420px;
     overflow-y: auto;
+    padding: 4px;
 }
 
 .view-filter-group {
-    border-bottom: 1px solid $border-color;
-    
+    border-bottom: none;
+    margin-bottom: 4px;
+
     &:last-child {
         border-bottom: none;
     }
 }
 
 .view-filter-group-header {
-    padding: 12px 16px;
+    padding: 8px 10px;
+    border-radius: $calendar-radius-md;
     background-color: var(--b3-theme-surface);
     font-weight: 600;
-    font-size: 0.95em;
+    font-size: 13px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.15s ease;
     
     &:hover {
         background-color: $hover-background-color;
     }
+}
+
+.view-filter-group-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.view-filter-group-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--b3-card-info-color);
+    background-color: var(--b3-card-info-background);
+}
+
+.view-filter-group-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .view-filter-group-actions {
@@ -367,8 +450,8 @@ $priority-color-high-background: var(--b3-card-error-background);
     .view-filter-group-select-btn,
     .view-filter-group-deselect-btn {
         padding: 2px 8px;
-        font-size: 0.8em;
-        border-radius: 3px;
+        font-size: 11px;
+        border-radius: $calendar-radius-sm;
         
         &:hover {
             background-color: $hover-background-color;
@@ -428,20 +511,22 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .view-filter-item {
-    padding: 10px 16px;
+    padding: 7px 10px;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.15s ease;
     display: flex;
     align-items: center;
-    gap: 10px;
-    
+    gap: 8px;
+    border-radius: $calendar-radius-md;
+    font-size: 13px;
+
     &:hover {
         background-color: $hover-background-color;
     }
-    
+
     &.view-filter-subitem {
-        padding-left: 32px;
-        font-size: 0.9em;
+        padding-left: 24px;
+        font-size: 12px;
     }
 }
 
@@ -457,16 +542,17 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .view-filter-footer {
-    // padding: 12px 16px;
+    padding: 6px;
     border-top: 1px solid $border-color;
     background-color: var(--b3-theme-surface);
     display: flex;
     justify-content: flex-end;
-    
+
     .b3-button {
-        padding: 6px 16px;
+        padding: 4px 14px;
         flex: 1;
         text-align: center; // 文本居中
+        border-radius: $calendar-radius-md;
     }
 }
 
@@ -486,8 +572,8 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .group-management-content {
     background-color: $background-color;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    border-radius: $calendar-radius-lg;
+    box-shadow: $calendar-shadow-md;
     min-width: 500px;
     max-width: 700px;
     max-height: 80vh;
@@ -497,7 +583,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .group-management-header {
-    padding: 16px 20px;
+    padding: 12px 14px;
     border-bottom: 1px solid $border-color;
     display: flex;
     justify-content: space-between;
@@ -523,16 +609,16 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .group-management-body {
-    padding: 20px;
+    padding: 12px;
     overflow-y: auto;
     flex: 1;
 }
 
 .create-group-form {
-    margin-bottom: 30px;
-    padding: 16px;
+    margin-bottom: 16px;
+    padding: 12px;
     border: 1px solid $border-color;
-    border-radius: 6px;
+    border-radius: $calendar-radius-md;
     background-color: var(--b3-theme-surface);
     
     h4 {
@@ -548,7 +634,7 @@ $priority-color-high-background: var(--b3-card-error-background);
         input {
             padding: 6px 10px;
             border: 1px solid $border-color;
-            border-radius: 4px;
+            border-radius: $calendar-radius-sm;
             background-color: $background-color;
             color: $text-color;
             
@@ -582,9 +668,9 @@ $priority-color-high-background: var(--b3-card-error-background);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 8px 10px;
     border: 1px solid $border-color;
-    border-radius: 6px;
+    border-radius: $calendar-radius-md;
     margin-bottom: 8px;
     background-color: var(--b3-theme-surface);
     
@@ -599,7 +685,17 @@ $priority-color-high-background: var(--b3-card-error-background);
     gap: 10px;
     
     .group-icon {
-        font-size: 1.2em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background-color: var(--b3-card-info-background);
+        color: var(--b3-card-info-color);
     }
     
     .group-name {
@@ -621,7 +717,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     .group-delete-btn {
         padding: 4px 12px;
         font-size: 0.9em;
-        border-radius: 4px;
+        border-radius: $calendar-radius-sm;
     }
     
     .group-edit-btn {
@@ -653,8 +749,8 @@ $priority-color-high-background: var(--b3-card-error-background);
 
 .group-edit-content {
     background-color: $background-color;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    border-radius: $calendar-radius-lg;
+    box-shadow: $calendar-shadow-md;
     min-width: 600px;
     max-width: 800px;
     max-height: 80vh;
@@ -664,7 +760,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .group-edit-header {
-    padding: 16px 20px;
+    padding: 12px 14px;
     border-bottom: 1px solid $border-color;
     display: flex;
     justify-content: space-between;
@@ -678,7 +774,7 @@ $priority-color-high-background: var(--b3-card-error-background);
 }
 
 .group-edit-body {
-    padding: 20px;
+    padding: 12px;
     overflow-y: auto;
     flex: 1;
     
@@ -698,7 +794,7 @@ $priority-color-high-background: var(--b3-card-error-background);
             flex: 1;
             padding: 6px 10px;
             border: 1px solid $border-color;
-            border-radius: 4px;
+            border-radius: $calendar-radius-sm;
             background-color: $background-color;
             color: $text-color;
         }
@@ -719,7 +815,7 @@ $priority-color-high-background: var(--b3-card-error-background);
     .group-views-list,
     .available-views-list {
         border: 1px solid $border-color;
-        border-radius: 6px;
+        border-radius: $calendar-radius-md;
         max-height: 150px;
         overflow-y: auto;
         background-color: var(--b3-theme-surface);

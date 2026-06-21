@@ -51,7 +51,7 @@ export class CalendarStatsVisualization {
 
         // 添加标题
         const title = document.createElement('h2');
-        title.textContent = '📊 日历数据统计';
+        title.textContent = '日历数据统计';
         title.style.cssText = `
             margin: 0 0 20px 0;
             color: var(--b3-theme-on-background);
@@ -92,37 +92,37 @@ export class CalendarStatsVisualization {
             {
                 title: '总事件数',
                 value: stats.totalEvents.toString(),
-                icon: '📅',
+                icon: '总',
                 color: '#3498db'
             },
             {
                 title: '已完成',
                 value: stats.completedEvents.toString(),
-                icon: '✅',
+                icon: '完',
                 color: '#27ae60'
             },
             {
                 title: '待处理',
                 value: stats.pendingEvents.toString(),
-                icon: '⏳',
+                icon: '待',
                 color: '#f39c12'
             },
             {
                 title: '完成率',
                 value: `${stats.completionRate.toFixed(1)}%`,
-                icon: '📈',
+                icon: '率',
                 color: '#9b59b6'
             },
             {
                 title: '周期事件',
                 value: stats.recurringEvents.toString(),
-                icon: '🔄',
+                icon: '周',
                 color: '#e67e22'
             },
             {
                 title: '总时长',
                 value: this.formatDuration(stats.totalEventDuration),
-                icon: '⏱️',
+                icon: '时',
                 color: '#34495e'
             }
         ];
@@ -148,7 +148,7 @@ export class CalendarStatsVisualization {
 
             cardElement.innerHTML = `
                 <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                    <span style="font-size: 20px; margin-right: 8px;">${card.icon}</span>
+                    <span style="display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; margin-right: 8px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 600; color: ${card.color}; background: color-mix(in srgb, ${card.color} 14%, transparent);">${card.icon}</span>
                     <span style="font-size: 14px; color: var(--b3-theme-on-surface-variant);">${card.title}</span>
                 </div>
                 <div style="font-size: 24px; font-weight: bold; color: ${card.color};">${card.value}</div>
@@ -169,7 +169,7 @@ export class CalendarStatsVisualization {
 
         // 添加图表标题
         const title = document.createElement('h3');
-        title.textContent = '📊 可视化图表';
+        title.textContent = '可视化图表';
         title.style.cssText = `
             margin: 0 0 15px 0;
             color: var(--b3-theme-on-background);
@@ -486,7 +486,7 @@ export class CalendarStatsVisualization {
         section.style.cssText = `margin-bottom: 25px;`;
 
         const title = document.createElement('h3');
-        title.textContent = '📋 详细统计';
+        title.textContent = '详细统计';
         title.style.cssText = `
             margin: 0 0 15px 0;
             color: var(--b3-theme-on-background);
@@ -556,15 +556,15 @@ export class CalendarStatsVisualization {
 
         const buttons = [
             {
-                text: '📄 导出JSON',
+                text: '导出 JSON',
                 action: () => this.downloadFile(calendarStats.exportStatsAsJSON(stats), 'calendar-stats.json', 'application/json')
             },
             {
-                text: '📊 导出CSV',
+                text: '导出 CSV',
                 action: () => this.downloadFile(calendarStats.exportStatsAsCSV(stats), 'calendar-stats.csv', 'text/csv')
             },
             {
-                text: '📋 复制摘要',
+                text: '复制摘要',
                 action: () => this.copyToClipboard(calendarStats.getStatsSummary(stats))
             }
         ];

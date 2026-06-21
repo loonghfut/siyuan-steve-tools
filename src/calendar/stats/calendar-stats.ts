@@ -377,12 +377,12 @@ export class CalendarDataStats {
      */
     public getStatsSummary(stats: CalendarStatsData): string {
         const summary = [
-            `📊 日历数据统计报告`,
+            `日历数据统计报告`,
             ``,
-            `📅 统计时间范围：${new Date(stats.dateRange.start).toLocaleDateString()} - ${new Date(stats.dateRange.end).toLocaleDateString()}`,
-            `⏰ 生成时间：${new Date(stats.generatedAt).toLocaleString()}`,
+            `统计时间范围：${new Date(stats.dateRange.start).toLocaleDateString()} - ${new Date(stats.dateRange.end).toLocaleDateString()}`,
+            `生成时间：${new Date(stats.generatedAt).toLocaleString()}`,
             ``,
-            `📈 基础统计：`,
+            `基础统计：`,
             `  • 总事件数：${stats.totalEvents}`,
             `  • 已完成：${stats.completedEvents}`,
             `  • 待处理：${stats.pendingEvents}`,
@@ -390,41 +390,41 @@ export class CalendarDataStats {
             `  • 周期事件：${stats.recurringEvents}`,
             `  • 完成率：${stats.completionRate.toFixed(1)}%`,
             ``,
-            `⏱️ 时间统计：`,
+            `时间统计：`,
             `  • 总时长：${this.formatDuration(stats.totalEventDuration)}`,
             `  • 平均时长：${this.formatDuration(stats.averageEventDuration)}`,
             ``,
-            `🏷️ 优先级分布：`,
+            `优先级分布：`,
             ...Object.entries(stats.eventsByPriority).map(([priority, count]) => `  • ${priority}：${count}`),
             ``,
-            `📊 状态分布：`,
+            `状态分布：`,
             ...Object.entries(stats.eventsByStatus).map(([status, count]) => `  • ${status}：${count}`),
             ``,
-            `🔄 来源分布：`,
+            `来源分布：`,
             ...Object.entries(stats.eventsBySource).map(([source, count]) => `  • ${this.getSourceDisplayName(source)}：${count}`),
             ``,
-            `📦 分类分布：`,
+            `分类分布：`,,
             ...Object.entries(stats.eventsByCategory).map(([category, count]) => `  • ${category}：${count}`),
             ``,
-            `🏷️ 标签（Top 15）：`,
+            `标签（Top 15）：`,,
             ...Object.entries(stats.eventsByTag)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 15)
                 .map(([tag, count]) => `  • ${tag}：${count}`),
             ``,
-            `⏱️ 分类总时长 Top 10：`,
+            `分类总时长 Top 10：`,,
             ...Object.entries(stats.durationByCategory)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 10)
                 .map(([category, minutes]) => `  • ${category}：${this.formatDuration(minutes)}`),
             ``,
-            `⏱️ 标签总时长 Top 10：`,
+            `标签总时长 Top 10：`,,
             ...Object.entries(stats.durationByTag)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 10)
                 .map(([tag, minutes]) => `  • ${tag}：${this.formatDuration(minutes)}`),
             ``,
-            `✅ 分类完成率（Top 10 按任务量）：`,
+            `分类完成率（Top 10 按任务量）：`,
             ...Object.entries(stats.eventsByCategory)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 10)

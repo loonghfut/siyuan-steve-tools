@@ -33,7 +33,7 @@ export function addStatsButtonToCalendar(calendar: any, calendarEl: HTMLElement)
     // 创建统计按钮
     const statsButton = document.createElement('button');
     statsButton.className = 'fc-button fc-button-primary';
-    statsButton.textContent = '📊 统计';
+    statsButton.textContent = '统计';
     statsButton.title = '查看日历数据统计';
     
     // 添加点击事件
@@ -136,7 +136,7 @@ export function addStatsPreviewToCalendar(calendar: any, calendarEl: HTMLElement
         const preview = calendarStatsManager.getStatsPreview(events);
         
         previewContainer.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 4px;">📊 统计概览</div>
+            <div style="font-weight: bold; margin-bottom: 4px;">统计概览</div>
             <div>总计: ${preview.total}</div>
             <div>完成: ${preview.completed}</div>
             <div>待办: ${preview.pending}</div>

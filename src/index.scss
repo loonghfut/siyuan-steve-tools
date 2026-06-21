@@ -19,6 +19,11 @@ $priority-color-high: var(--b3-card-error-color);
 $priority-color-low-background: var(--b3-card-success-background);
 $priority-color-medium-background: var(--b3-card-info-background);
 $priority-color-high-background: var(--b3-card-error-background);
+$calendar-radius-sm: 6px;
+$calendar-radius-md: 10px;
+$calendar-radius-lg: 14px;
+$calendar-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+$calendar-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
 
 .custom-st-status-message {
     color: var(--b3-theme-on-surface);
@@ -40,53 +45,41 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     }
 
     background-color: $background-color !important;
-    padding-left: 10px;
-    padding-right: 10px;
+    padding: 6px 8px;
+    border-radius: $calendar-radius-lg;
 }
 
 //时间条
 .fc-timegrid-event-harness {
-    max-width: 50vh;
+    max-width: none;
 
     * {
         border: none;
     }
 
     .fc-timegrid-event {
-        opacity: 0.70 !important;
-        // :root[data-theme-mode="dark"] {
-        //     filter: brightness(30%);
-        //     transition: filter 0.3s ease;
-        // }
-
-        // :root[data-theme-mode="light"] {
-        //     filter: brightness(100%);
-        //     transition: filter 0.3s ease;
-        // }
-        border-radius: 6px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        opacity: 0.94 !important;
+        border-radius: $calendar-radius-md;
+        box-shadow: none;
+        transition: filter 0.15s ease, box-shadow 0.15s ease;
 
         &:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            filter: brightness(1.03);
+            box-shadow: $calendar-shadow-sm;
         }
 
         .fc-event-main {
-            // padding: 4px 6px;
-
             .fc-event-main-frame {
+                min-height: 18px;
+
                 .fc-event-time {
                     display: none;
-                    // font-weight: 500;
-                    // font-size: 0.9em;
-                    // margin-bottom: 4px;
                 }
 
                 .fc-event-title-container {
                     .fc-event-title {
-                        font-size: 0.95em;
-                        line-height: 1.4;
+                        font-size: 12px;
+                        line-height: 1.25;
                         word-break: break-word;
                     }
                 }
@@ -112,6 +105,8 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 .fc-view-harness {
     .fc-scrollgrid {
         border-color: $border-color !important;
+        border-radius: $calendar-radius-lg;
+        overflow: hidden;
 
     }
 }
@@ -141,29 +136,36 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 
 .fc-header-toolbar {
-    padding: 1rem;
-    margin-bottom: 0.1rem !important;
+    padding: 6px 8px;
+    margin-bottom: 4px !important;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 6px;
 }
 
 // 按钮基本样式
 .fc-button-primary {
-    background-color: $background-color !important;
+    background-color: var(--b3-theme-surface) !important;
     border-color: $border-color !important;
     color: $text-color !important;
-    padding: 0.1em 0.1em !important;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
+    padding: 3px 9px !important;
+    min-height: 26px;
+    border-radius: $calendar-radius-md !important;
+    font-size: 12px;
+    line-height: 20px;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 
     &:hover {
         background-color: $hover-background-color !important;
+        border-color: var(--b3-theme-primary-light) !important;
     }
 
     &.fc-button-active {
-        background-color: $hover-background-color !important;
-        font-weight: bold;
+        background-color: var(--b3-card-info-background) !important;
+        color: var(--b3-card-info-color) !important;
+        border-color: var(--b3-card-info-color) !important;
+        font-weight: 600;
     }
 
     .fc-icon {
@@ -173,22 +175,23 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 // 按钮组样式
 .fc-button-group {
-    gap: 2px;
+    gap: 4px;
 
     .fc-button-primary {
-        border-radius: 4px;
+        border-radius: $calendar-radius-md !important;
 
         &:not(:last-child) {
-            margin-right: 2px;
+            margin-right: 0;
         }
     }
 }
 
 // 标题样式
 .fc-toolbar-title {
-    font-size: 1.25rem !important;
-    font-weight: bold;
-    padding: 0 1rem;
+    font-size: 1rem !important;
+    font-weight: 600;
+    padding: 0 8px;
+    color: var(--b3-theme-on-background);
 }
 
 // 禁用按钮样式
@@ -216,6 +219,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 }
 
 .fc-theme-standard td,
+.fc-theme-standard th,
 .fc-theme-standard {
     border: 1px solid $border-color !important;
 }
@@ -228,6 +232,18 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 .fc-daygrid-day {
     background-color: $background-color;
     color: $text-color;
+    transition: background-color 0.15s ease;
+}
+
+.fc-col-header-cell {
+    background-color: var(--b3-theme-surface);
+}
+
+.fc-col-header-cell-cushion {
+    padding: 6px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--b3-theme-on-surface);
 }
 
 .fc .fc-multimonth-daygrid-table {
@@ -241,10 +257,13 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 .fc-event {
     background-color: $background-color;
     color: $text-color;
+    border-radius: $calendar-radius-md !important;
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    overflow: hidden;
 }
 
 .fc-event:hover {
-    background-color: $hover-background-color;
+    filter: brightness(1.03);
 }
 
 .fc .fc-more-popover {
@@ -324,6 +343,8 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     margin: 0 auto;
     height: calc(88vh);
     border: none !important;
+    border-radius: $calendar-radius-lg;
+    overflow: hidden;
 }
 
 .fc .fc-multimonth-singlecol .fc-multimonth-daygrid-table,
@@ -387,9 +408,9 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
         flex-grow: 1;
         flex-shrink: 1;
         min-height: 0;
-        padding: 4px 8px;
-        border-radius: 4px;
-        transition: all 0.2s ease;
+        padding: 2px 6px;
+        border-radius: $calendar-radius-sm;
+        transition: background-color 0.15s ease;
 
         &:hover {
             background-color: rgba(255, 255, 255, 0.1);
@@ -400,16 +421,30 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 //悬浮
 
+.fc .fc-daygrid-day.fc-day-today,
+.fc .fc-timegrid-col.fc-day-today {
+    background-color: var(--b3-card-info-background);
+}
+
+.fc-daygrid-day-lunar {
+    margin-left: 2px;
+    font-size: 11px;
+    color: var(--b3-theme-on-surface-light);
+    opacity: 0.72;
+    line-height: 1;
+}
+
 .event-tooltip {
     // z-index: 9999 !important;
-    padding: 12px;
-    min-width: 150px;
-    max-width: 400px;
-    background-color: var(--b3-font-background6);
+    padding: 10px;
+    min-width: 180px;
+    max-width: 360px;
+    background-color: var(--b3-theme-surface);
     color: $text-color;
     border: 1px solid $border-color;
-    border-radius: 8px;
-    font-size: 0.8em;
+    border-radius: $calendar-radius-lg;
+    box-shadow: $calendar-shadow-md;
+    font-size: 12px;
 }
 
 .event-tooltip h4 {
@@ -432,28 +467,27 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 // }
 
 .event-tooltip p {
-    margin: 8px 0;
+    margin: 5px 0;
 }
 
 .event-tooltip__title {
-    font-size: 1.5em;
+    display: block;
+    font-size: 1.05em;
     font-weight: 600;
-    margin: 8px 0;
-    padding: 4px 8px;
-    text-align: center;
-    border-radius: 4px;
-    transition: all 0.3s ease;
+    margin: 0 0 8px;
+    padding: 6px 8px;
+    text-align: left;
+    border-radius: $calendar-radius-md;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
     cursor: pointer;
 
     // 添加边框和背景
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid $border-color;
+    background: var(--b3-theme-background);
 
     // 悬浮效果
     &:hover {
-        background: rgba(255, 255, 255, 0.1);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        background: $hover-background-color;
         text-decoration: none;
     }
 

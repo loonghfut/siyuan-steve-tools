@@ -191,7 +191,7 @@ export class CalendarStatsManager {
 
         // 创建一个简单的摘要对话框
         new Dialog({
-            title: "📊 统计摘要",
+            title: "统计摘要",
             content: `<pre style="white-space: pre-wrap; font-family: monospace; padding: 20px; max-height: 400px; overflow-y: auto;">${summary}</pre>`,
             width: "600px",
             disableClose: false,
@@ -256,7 +256,7 @@ export class CalendarStatsManager {
         `;
 
         const button = document.createElement('button');
-        button.textContent = '📊 统计';
+        button.textContent = '统计';
         button.style.cssText = `
             padding: 6px 12px;
             background: var(--b3-theme-primary);
@@ -282,14 +282,14 @@ export class CalendarStatsManager {
         `;
 
         const menuItems = [
-            { text: '📊 详细统计', action: () => this.showStatsDialog(events) },
-            { text: '📋 统计摘要', action: () => this.showStatsSummary(events) },
-            { text: '📅 本月统计', action: () => this.getCurrentMonthStats(events) },
-            { text: '🗓️ 本年统计', action: () => this.getCurrentYearStats(events) },
-            { text: '📈 最近7天', action: () => this.getRecentWeekStats(events) },
-            { text: '📊 最近30天', action: () => this.getRecentMonthStats(events) },
-            { text: '💾 导出JSON', action: () => this.exportStats(events, 'json') },
-            { text: '📄 导出CSV', action: () => this.exportStats(events, 'csv') },
+            { text: '详细统计', action: () => this.showStatsDialog(events) },
+            { text: '统计摘要', action: () => this.showStatsSummary(events) },
+            { text: '本月统计', action: () => this.getCurrentMonthStats(events) },
+            { text: '本年统计', action: () => this.getCurrentYearStats(events) },
+            { text: '最近7天', action: () => this.getRecentWeekStats(events) },
+            { text: '最近30天', action: () => this.getRecentMonthStats(events) },
+            { text: '导出 JSON', action: () => this.exportStats(events, 'json') },
+            { text: '导出 CSV', action: () => this.exportStats(events, 'csv') },
         ];
 
         menuItems.forEach(item => {

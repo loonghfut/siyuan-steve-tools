@@ -218,7 +218,7 @@ const CustomViewConfig = {
                     `<span>${event.title}</span>` :
                     `<span class="st-ref" data-type="block-ref" data-id="${event.extendedProps.blockId}" data-subtype="d">${event.title}</span>`
                 }
-                         ${isRecurring ? '<span class="recurring-icon" title="周期事件">🔄</span>' : ''}
+                         ${isRecurring ? '<span class="recurring-icon" title="周期事件">周期</span>' : ''}
                          </h3>
                         <div class="kanban-card-meta">
                             <span class="kanban-nowToEndTime">${nowToEndTime}</span>
