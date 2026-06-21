@@ -171,6 +171,21 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     .fc-icon {
         font-size: 1em;
     }
+
+    .st-calendar-toolbar-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        line-height: 1;
+    }
+
+    .st-calendar-toolbar-icon svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
 }
 
 // 按钮组样式

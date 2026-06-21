@@ -48,6 +48,9 @@ const MIN_CALENDAR_HEIGHT = 320; // Avoid collapsing the calendar when layout sp
 let cachedTagColorMapStr = '';
 let cachedTagColorMap: Record<string, string> = {};
 const textColorCache = new Map<string, string>();
+const VIEW_FILTER_ICON = 'iconFilter';
+const STATS_ICON = 'iconList';
+const REFRESH_ICON = 'iconRefresh';
 // 农历结果缓存：同一公历日期的农历结果恒定不变，永久缓存（无 TTL）。
 // key 为 'YYYY-MM-DD'，避免每个日历单元格、每次重渲染都重复调用 solarLunar.solar2lunar。
 const lunarCache = new Map<string, any>();
@@ -60,6 +63,25 @@ type PendingCalendarEventPatch = {
 const pendingCalendarEventPatches = new Map<string, PendingCalendarEventPatch>();
 export async function update_av_ids() {
     av_ids = await moduleInstances['M_calendar'].getAVreferenceid();
+}
+
+function replaceToolbarIcon(root: HTMLElement, buttonClass: string, symbolId: string) {
+    const iconEl = root.querySelector<HTMLElement>(`${buttonClass} .fc-icon`);
+    if (!iconEl || iconEl.querySelector('svg')) return;
+
+    iconEl.className = 'fc-icon st-calendar-toolbar-icon';
+    iconEl.innerHTML = `<svg class="b3-icon" aria-hidden="true"><use xlink:href="#${symbolId}"></use></svg>`;
+}
+
+function applyCalendarToolbarIcons(calendarEl: HTMLElement) {
+    const apply = () => {
+        replaceToolbarIcon(calendarEl, '.fc-viewFilter-button', VIEW_FILTER_ICON);
+        replaceToolbarIcon(calendarEl, '.fc-statsButton-button', STATS_ICON);
+        replaceToolbarIcon(calendarEl, '.fc-refreshButton-button', REFRESH_ICON);
+    };
+
+    apply();
+    requestAnimationFrame(apply);
 }
 
 function getPendingCalendarEventKey(blockId?: string, itemId?: string) {
@@ -602,7 +624,8 @@ export async function run(
         },
         customButtons: {
             viewFilter: {
-                text: '视图选择',
+                icon: VIEW_FILTER_ICON,
+                hint: '视图选择',
                 click: async function () {
                     // 初始化分组
                     initializeGroups();
@@ -633,7 +656,8 @@ export async function run(
             },
             // 刷新
             refreshButton: {
-                text: '刷新',
+                icon: REFRESH_ICON,
+                hint: '刷新',
                 click: async function () {
                     try {
                         showMessage('正在刷新视图...', 3000);
@@ -657,7 +681,8 @@ export async function run(
             },
             // 统计功能按钮
             statsButton: {
-                text: '统计',
+                icon: STATS_ICON,
+                hint: '统计',
                 click: async function () {
                     try {
                         // 动态导入统计模块，避免影响主要加载性能
@@ -1107,6 +1132,7 @@ export async function run(
     console.debug("thisCalendars", thisCalendars);
     OUTcalendar = calendar;
     calendar.render();
+    applyCalendarToolbarIcons(calendarEl);
     updatePlanButtonLabel();
     setupCalendarAutoHeight(calendarEl, calendar);
     return calendar;
