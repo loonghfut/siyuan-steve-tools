@@ -36,7 +36,7 @@ export class CalendarStatsManager {
             // 创建对话框
             this.statsDialog = new Dialog({
                 title: null,
-                content: `<div id="calendar-stats-container" style="width: 900px; max-width: 90vw;"></div>`,
+                content: `<div id="calendar-stats-container" class="calendar-stats-dialog"></div>`,
                 width: "auto",
                 height: "auto",
                 disableClose: false,
