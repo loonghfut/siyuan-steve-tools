@@ -435,10 +435,8 @@ export async function run(
                 }
 
                 // 创建农历显示元素
-                const lunarEl = document.createElement('a');
-                lunarEl.className = 'fc-daygrid-day-lunar fc-daygrid-day-number';
-                // lunarEl.setAttribute('data-navlink', '');
-                lunarEl.tabIndex = 0;
+                const lunarEl = document.createElement('span');
+                lunarEl.className = 'fc-daygrid-day-lunar';
 
                 // 设置农历文本和标题
                 let lunarText = '';
@@ -449,12 +447,12 @@ export async function run(
                     lunarEl.title = `${lunar.yearCn}${lunar.monthCn}${lunar.dayCn}`;
                 }
 
-                lunarEl.innerHTML = lunarText;
+                lunarEl.textContent = lunarText;
 
-                // 将农历元素添加到日期单元格中
+                // 将农历元素添加到公历日期后面，避免复用日期数字样式导致错位。
                 const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
-                if (numberEl) {
-                    numberEl.after(lunarEl);
+                if (numberEl && !numberEl.parentElement?.querySelector('.fc-daygrid-day-lunar')) {
+                    numberEl.insertAdjacentElement('afterend', lunarEl);
                 }
             } catch (error) {
                 console.error('农历显示错误:', error);

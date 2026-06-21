@@ -441,12 +441,17 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     background-color: var(--b3-card-info-background);
 }
 
+.fc .fc-daygrid-day-top {
+    align-items: baseline;
+}
+
 .fc-daygrid-day-lunar {
-    margin-left: 2px;
+    margin-left: 4px;
     font-size: 11px;
     color: var(--b3-theme-on-surface-light);
     opacity: 0.72;
     line-height: 1;
+    white-space: nowrap;
 }
 
 .event-tooltip {
