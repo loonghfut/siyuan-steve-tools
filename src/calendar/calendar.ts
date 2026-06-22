@@ -914,6 +914,14 @@ export async function run(
 
         eventDidMount: async function (info) {
             if (!info || !info.event) return;
+            // 给每个事件元素打上一个内部用的 blockId 标记,供 setupWeekHorizontalSwipe
+            // 在拖动过程中 datesSet 重渲染时识别"同一事件在新视图里被重新挂载的副本",
+            // 避免拖动镜像和重渲染源同时显示。与上面的 data-id 互不影响 ——
+            // data-id 是面向外部块引用的可配置行为,这个是组件内部用的。
+            try {
+                const blockRefId = info.event?.extendedProps?.blockId;
+                if (blockRefId) info.el.setAttribute('data-st-block-id', String(blockRefId));
+            } catch (e) { /* ignore */ }
             // 为事件元素本身添加块引用属性，便于外部识别/交互（可配置）
             // 周期事件不添加该属性
             if (settingdata["cal-event-dom-blockref"]) {
@@ -1133,7 +1141,214 @@ export async function run(
     applyCalendarToolbarIcons(calendarEl);
     updatePlanButtonLabel();
     setupCalendarAutoHeight(calendarEl, calendar);
+    setupWeekHorizontalSwipe(calendarEl, calendar);
     return calendar;
+}
+
+// 拖动事件块到日历左/右边缘时,停留一会儿自动翻到上/下一页(周/月等),方便跨页移动事件。
+// 同时给所有日期切换(包括工具栏的 prev/next/today 手动点击)挂上一次淡入位移过渡动画。
+function setupWeekHorizontalSwipe(calendarEl: HTMLElement, calendar: Calendar) {
+    if (!calendarEl) return;
+
+    // 允许拖到边缘自动翻页的视图。月视图也开启 —— 跨月拖事件同样常见。
+    const SUPPORTED_VIEWS = new Set([
+        'timeGridWeek',
+        'timeGridThreeDays',
+        'timeGridDay',
+        'dayGridWeek',
+        'dayGridDay',
+        'dayGridMonth',
+        'multiMonthYear',
+    ]);
+    const EDGE_DRAG_ZONE_PX = 60;    // 离日历边缘多少像素算"触碰边缘"
+    const EDGE_DRAG_DELAY_MS = 500;  // 停留在边缘多久后自动翻页
+    const SLIDE_ENTER_MS = 220;      // 切换日期时的淡入位移时长
+    const SLIDE_OFFSET_PX = 36;      // 淡入起始的横向偏移
+
+    const isSupported = () => SUPPORTED_VIEWS.has(calendar.view?.type);
+    const getHarness = () => calendarEl.querySelector<HTMLElement>('.fc-view-harness');
+
+    // ===== 拖动期间被翻页 → 隐藏新渲染出来的源副本,避免和拖动镜像并存 =====
+    // 思路:eventDragStart/eventResizeStart 时记下 blockId;datesSet 触发的重渲染后,
+    // 把所有匹配 blockId 的 .fc-event 元素 visibility:hidden,直到 drag/resize 结束。
+    let draggingBlockId: string | null = null;
+
+    const hideDraggingEventCopies = () => {
+        if (!draggingBlockId) return;
+        const all = calendarEl.querySelectorAll<HTMLElement>(`[data-st-block-id="${CSS.escape(draggingBlockId)}"]`);
+        all.forEach((el) => {
+            // 跳过 FullCalendar 自己生成的拖动镜像/占位(它带 .fc-event-mirror 或 .fc-event-dragging)
+            if (el.classList.contains('fc-event-mirror') || el.classList.contains('fc-event-dragging')) return;
+            el.style.visibility = 'hidden';
+        });
+    };
+
+    const restoreHiddenEventCopies = () => {
+        const all = calendarEl.querySelectorAll<HTMLElement>('[data-st-block-id]');
+        all.forEach((el) => {
+            if (el.style.visibility === 'hidden') el.style.visibility = '';
+        });
+    };
+
+    // ===== 切换日期时的过渡动画(对所有路径生效:工具栏按钮、edge-drag、programmatic) =====
+    // datesSet 在视图日期范围变化后触发 —— 此时新内容已渲染。
+    // 通过对比新旧 activeStart 决定淡入方向,做一次"从偏移位置滑回原位"的入场动画。
+    let lastActiveStartMs: number | null = null;
+    let enterAnimating = false;
+
+    const runEnterAnimation = (direction: 1 | -1 | 0) => {
+        const harness = getHarness();
+        if (!harness) return;
+        if (enterAnimating) return;
+        enterAnimating = true;
+        // direction 为 0(初始或同日期)时只做淡入,不平移
+        const fromX = direction === 0 ? 0 : (direction > 0 ? SLIDE_OFFSET_PX : -SLIDE_OFFSET_PX);
+        harness.style.transition = 'none';
+        harness.style.transform = `translateX(${fromX}px)`;
+        harness.style.opacity = '0';
+        // 双 rAF 确保起始样式上屏后再切到目标样式,过渡才会真正播放
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                harness.style.transition = `transform ${SLIDE_ENTER_MS}ms ease, opacity ${SLIDE_ENTER_MS}ms ease`;
+                harness.style.transform = 'translateX(0)';
+                harness.style.opacity = '1';
+                window.setTimeout(() => {
+                    harness.style.transition = '';
+                    harness.style.transform = '';
+                    harness.style.opacity = '';
+                    enterAnimating = false;
+                }, SLIDE_ENTER_MS + 20);
+            });
+        });
+    };
+
+    const onDatesSet = (arg: any) => {
+        // arg.view.activeStart 是当前视图覆盖的起始日期
+        try {
+            const nextMs = arg?.view?.activeStart instanceof Date
+                ? arg.view.activeStart.getTime()
+                : (arg?.startStr ? new Date(arg.startStr).getTime() : null);
+            if (nextMs == null || Number.isNaN(nextMs)) return;
+            let dir: 1 | -1 | 0 = 0;
+            if (lastActiveStartMs != null) {
+                if (nextMs > lastActiveStartMs) dir = 1;
+                else if (nextMs < lastActiveStartMs) dir = -1;
+                else dir = 0; // 视图切换但日期未变(切视图类型) —— 仅淡入
+            }
+            lastActiveStartMs = nextMs;
+            runEnterAnimation(dir);
+            // 重渲染后,如果当前正在拖动,需要再次隐藏新视图里出现的源副本。
+            // 用 rAF 等 FullCalendar 把新事件全部 mount 完再扫一遍。
+            if (draggingBlockId) {
+                requestAnimationFrame(() => requestAnimationFrame(hideDraggingEventCopies));
+            }
+        } catch (e) {
+            console.warn('日期切换动画失败:', e);
+        }
+    };
+    calendar.on('datesSet', onDatesSet);
+
+    // ===== edge-drag: 拖事件到边缘自动翻页 =====
+    let edgeDragTimer: number | undefined;
+    let edgeDragDirection: 1 | -1 | 0 = 0;
+    let edgeDragInterval: number | undefined;
+
+    const clearEdgeDrag = () => {
+        if (edgeDragTimer !== undefined) {
+            window.clearTimeout(edgeDragTimer);
+            edgeDragTimer = undefined;
+        }
+        if (edgeDragInterval !== undefined) {
+            window.clearInterval(edgeDragInterval);
+            edgeDragInterval = undefined;
+        }
+        edgeDragDirection = 0;
+    };
+
+    const navigate = (direction: 1 | -1) => {
+        try {
+            direction > 0 ? calendar.next() : calendar.prev();
+        } catch (e) {
+            console.warn('日历翻页失败:', e);
+        }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+        if (!isSupported()) {
+            clearEdgeDrag();
+            return;
+        }
+        const rect = calendarEl.getBoundingClientRect();
+        const relX = e.clientX - rect.left;
+        const nearLeft = relX <= EDGE_DRAG_ZONE_PX && relX >= 0;
+        const nearRight = relX >= rect.width - EDGE_DRAG_ZONE_PX && relX <= rect.width;
+        const newDir: 1 | -1 | 0 = nearLeft ? -1 : nearRight ? 1 : 0;
+
+        if (newDir === 0) {
+            clearEdgeDrag();
+            return;
+        }
+
+        if (newDir !== edgeDragDirection) {
+            clearEdgeDrag();
+            edgeDragDirection = newDir;
+            const dir: 1 | -1 = newDir;
+            edgeDragTimer = window.setTimeout(() => {
+                // 初次等待后翻一页,之后连续翻直到离开边缘
+                navigate(dir);
+                edgeDragInterval = window.setInterval(() => {
+                    navigate(dir);
+                }, EDGE_DRAG_DELAY_MS);
+            }, EDGE_DRAG_DELAY_MS);
+        }
+    };
+
+    const onPointerUp = () => {
+        clearEdgeDrag();
+    };
+
+    // 使用 FullCalendar 的事件钩子来感知拖动开始/结束
+    calendar.on('eventDragStart', (info: any) => {
+        const blockId = info?.event?.extendedProps?.blockId;
+        if (blockId) draggingBlockId = String(blockId);
+        if (!isSupported()) return;
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+    });
+    calendar.on('eventDragStop', (_info: any) => {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        clearEdgeDrag();
+        draggingBlockId = null;
+        restoreHiddenEventCopies();
+    });
+    calendar.on('eventResizeStart', (info: any) => {
+        const blockId = info?.event?.extendedProps?.blockId;
+        if (blockId) draggingBlockId = String(blockId);
+        if (!isSupported()) return;
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+    });
+    calendar.on('eventResizeStop', (_info: any) => {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        clearEdgeDrag();
+        draggingBlockId = null;
+        restoreHiddenEventCopies();
+    });
+
+    // calendar.destroy 已被 setupCalendarAutoHeight 包过一次 —— 这里再叠一层,
+    // 拆掉自己挂的监听器。
+    const originalDestroy = calendar.destroy.bind(calendar);
+    calendar.destroy = () => {
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        try { calendar.off('datesSet', onDatesSet); } catch (e) { /* ignore */ }
+        clearEdgeDrag();
+        draggingBlockId = null;
+        restoreHiddenEventCopies();
+        originalDestroy();
+    };
 }
 
 
