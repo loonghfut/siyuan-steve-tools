@@ -336,589 +336,848 @@ $calendar-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.16);
 //         visibility 0.5s ease-in-out;
 // }
 
+// ===================================================================
+// 视图筛选面板（view filter panel）—— 现代化重写 2026/06
+// 命名空间：.view-filter-menu, .vf-*
+// ===================================================================
 
+// ----- 共享 tokens -----
+$vf-radius-sm: 6px;
+$vf-radius-md: 8px;
+$vf-radius-lg: 12px;
+$vf-gap: 6px;
+$vf-pad: 10px;
 
-// 视图选择菜单
-//视图选择界面
+$vf-border: var(--b3-theme-divider, #{$border-color});
+$vf-bg: var(--b3-theme-background);
+$vf-surface: var(--b3-theme-surface);
+$vf-on-surface: var(--b3-theme-on-surface, var(--b3-theme-on-background));
+$vf-on-surface-light: var(--b3-theme-on-surface-light, rgba(127, 127, 127, 0.7));
+$vf-primary: var(--b3-theme-primary, var(--b3-card-info-color));
+$vf-primary-bg: var(--b3-theme-primary-lightest, var(--b3-card-info-background));
+$vf-danger: var(--b3-card-error-color);
+$vf-danger-bg: var(--b3-card-error-background);
+
+// ----- 主容器 -----
 .view-filter-menu {
     position: absolute;
     z-index: 1000;
-    background-color: $background-color;
-    border-radius: $calendar-radius-lg;
-    box-shadow: $calendar-shadow-md;
-    color: $text-color;
-    border: 1px solid $border-color;
-    min-width: 300px;
-    max-width: 420px;
-    max-height: 58vh;
-    overflow: hidden;
-}
-
-.view-filter-header {
-    padding: 8px;
-    border-bottom: 1px solid $border-color;
-    background-color: var(--b3-theme-surface);
+    width: 320px;
+    max-width: calc(100vw - 16px);
+    max-height: min(72vh, 620px);
     display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    background-color: $vf-bg;
+    border: 1px solid $vf-border;
+    border-radius: $vf-radius-lg;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.04),
+        0 12px 32px rgba(0, 0, 0, 0.18);
+    color: $text-color;
+    overflow: hidden;
+    transform-origin: top left;
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    transition: opacity 0.16s ease, transform 0.16s ease;
 
-    .view-filter-select-all,
-    .view-filter-clear-all,
-    .view-filter-manage-groups {
-        padding: 3px 10px;
-        font-size: 12px;
-        border-radius: $calendar-radius-md;
-        flex: 1;
-        min-width: 72px;
-        
-        &:hover {
-            background-color: $hover-background-color;
-        }
+    &.vf-enter-active {
+        opacity: 1;
+        transform: translateY(0) scale(1);
     }
-    
-    .view-filter-manage-groups {
-        background-color: var(--b3-card-info-background);
-        color: var(--b3-card-info-color);
-        border-color: var(--b3-card-info-color);
-    }
-}
-
-.view-filter-content {
-    max-height: 420px;
-    overflow-y: auto;
-    padding: 4px;
-}
-
-.view-filter-group {
-    border-bottom: none;
-    margin-bottom: 4px;
-
-    &:last-child {
-        border-bottom: none;
+    &.vf-leave {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
     }
 }
 
-.view-filter-group-header {
-    padding: 8px 10px;
-    border-radius: $calendar-radius-md;
-    background-color: var(--b3-theme-surface);
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
+// ----- 头部 -----
+.vf-header {
+    padding: 10px 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid $vf-border;
+    background: linear-gradient(180deg, $vf-surface, transparent);
+}
+
+.vf-title-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: background-color 0.15s ease;
-    
-    &:hover {
-        background-color: $hover-background-color;
+    gap: 8px;
+}
+
+.vf-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    color: $vf-on-surface;
+}
+
+.vf-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 38px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: $vf-primary;
+    background-color: $vf-primary-bg;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &--full {
+        color: var(--b3-card-success-color);
+        background-color: var(--b3-card-success-background);
+    }
+    &--empty {
+        color: $vf-on-surface-light;
+        background-color: transparent;
+        border-color: $vf-border;
     }
 }
 
-.view-filter-group-title {
+.vf-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    .vf-search-icon {
+        position: absolute;
+        left: 9px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: $vf-on-surface-light;
+        display: inline-flex;
+        pointer-events: none;
+    }
+
+    .vf-search-input {
+        flex: 1;
+        height: 30px;
+        padding: 0 10px 0 30px;
+        font-size: 12.5px;
+        line-height: 1;
+        color: $text-color;
+        background-color: $vf-bg;
+        border: 1px solid $vf-border;
+        border-radius: $vf-radius-md;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+
+        &::placeholder { color: $vf-on-surface-light; }
+
+        &:hover { border-color: $vf-on-surface-light; }
+        &:focus {
+            border-color: $vf-primary;
+            box-shadow: 0 0 0 3px rgba(85, 119, 255, 0.12);
+        }
+    }
+}
+
+.vf-actions {
+    display: flex;
+    gap: 6px;
+}
+
+// 通用按钮
+.vf-action-btn {
+    flex: 1;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: $vf-radius-sm;
+    background-color: transparent;
+    color: $vf-on-surface;
+    border: 1px solid $vf-border;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+    user-select: none;
+
+    &:hover {
+        background-color: $hover-background-color;
+        border-color: $vf-on-surface-light;
+    }
+    &:active { transform: translateY(1px); }
+
+    &.vf-action-primary {
+        color: var(--b3-theme-on-primary, #fff);
+        background-color: $vf-primary;
+        border-color: $vf-primary;
+
+        &:hover { filter: brightness(1.08); }
+    }
+    &.vf-action-ghost {
+        background-color: transparent;
+        color: $vf-on-surface-light;
+
+        &:hover { color: $vf-on-surface; }
+    }
+    &.vf-action-danger {
+        color: $vf-danger;
+        border-color: $vf-danger-bg;
+        background-color: transparent;
+
+        &:hover {
+            background-color: $vf-danger-bg;
+            color: $vf-danger;
+        }
+    }
+}
+
+// ----- 克制滚动条占位：默认透明，悬停容器时才显形 -----
+%vf-quiet-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.2s ease;
+
+    &:hover,
+    &:focus-within {
+        scrollbar-color: rgba(127, 127, 127, 0.28) transparent;
+    }
+
+    &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb {
+        background-color: transparent;
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        transition: background-color 0.2s ease;
+    }
+    &:hover::-webkit-scrollbar-thumb {
+        background-color: rgba(127, 127, 127, 0.28);
+    }
+    &::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(127, 127, 127, 0.5);
+    }
+    &::-webkit-scrollbar-corner { background: transparent; }
+}
+
+// ----- 内容区 -----
+.vf-content {
+    @extend %vf-quiet-scroll;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px 6px 8px;
+    overscroll-behavior: contain;
+}
+
+.vf-empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: $vf-on-surface-light;
+    font-size: 12.5px;
+}
+
+// ----- 分组 -----
+.vf-group {
+    margin: 2px 0;
+    border-radius: $vf-radius-md;
+}
+
+.vf-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: $vf-radius-md;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+
+    &:hover { background-color: $hover-background-color; }
+}
+
+.vf-group-title {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     min-width: 0;
+    flex: 1;
 }
 
-.view-filter-group-mark {
+.vf-group-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--b3-card-info-color);
-    background-color: var(--b3-card-info-background);
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: $vf-radius-sm;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: $vf-primary;
+    background-color: $vf-primary-bg;
+    letter-spacing: 0;
+    flex-shrink: 0;
 }
 
-.view-filter-group-name {
+.vf-group-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: $vf-on-surface;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.view-filter-group-actions {
-    display: flex;
-    gap: 4px;
+.vf-group-count {
+    font-size: 11px;
+    font-weight: 500;
+    color: $vf-on-surface-light;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background-color: transparent;
+    transition: color 0.12s ease, background-color 0.12s ease;
+    flex-shrink: 0;
+
+    &--all {
+        color: var(--b3-card-success-color);
+        background-color: var(--b3-card-success-background);
+    }
+    &--none {
+        color: $vf-on-surface-light;
+        opacity: 0.7;
+    }
+}
+
+.vf-group-actions {
+    display: inline-flex;
     align-items: center;
-    
-    .view-filter-group-select-btn,
-    .view-filter-group-deselect-btn {
-        padding: 2px 8px;
+    gap: 4px;
+    flex-shrink: 0;
+
+    .vf-pill {
+        height: 22px;
+        padding: 0 8px;
         font-size: 11px;
-        border-radius: $calendar-radius-sm;
-        
+        font-weight: 500;
+        border-radius: $vf-radius-sm;
+        background-color: transparent;
+        color: $vf-on-surface-light;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.12s ease;
+
         &:hover {
             background-color: $hover-background-color;
+            color: $vf-on-surface;
         }
     }
-    
-    .view-filter-group-select-btn {
-        background-color: var(--b3-card-success-background);
+    .vf-pill-select:hover {
         color: var(--b3-card-success-color);
-        border-color: var(--b3-card-success-color);
+        background-color: var(--b3-card-success-background);
     }
-    
-    .view-filter-group-deselect-btn {
-        background-color: var(--b3-card-warning-background);
+    .vf-pill-clear:hover {
         color: var(--b3-card-warning-color);
-        border-color: var(--b3-card-warning-color);
-    }
-    
-    .view-filter-toggle-icon {
-        font-size: 0.8em;
-        transition: transform 0.2s ease;
-        color: var(--b3-theme-on-surface-light);
-        margin-left: 8px;
+        background-color: var(--b3-card-warning-background);
     }
 }
 
-.view-filter-group-items {
-    background-color: $background-color;
+.vf-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    color: $vf-on-surface-light;
+    transition: transform 0.18s ease;
+
+    &--collapsed { transform: rotate(-90deg); }
 }
 
-.view-filter-subgroup {
-    margin-left: 8px;
-    border-left: 2px solid var(--b3-border-color);
+.vf-group-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 2px 0 4px 4px;
+    padding-left: 6px;
+    border-left: 1.5px dashed rgba(127, 127, 127, 0.18);
+    overflow: hidden;
+    max-height: 1200px;
+    transition: max-height 0.22s ease, opacity 0.18s ease, margin-bottom 0.18s ease;
+
+    &--collapsed {
+        max-height: 0;
+        opacity: 0;
+        margin-bottom: 0;
+        pointer-events: none;
+    }
 }
 
-.view-filter-subgroup-header {
-    padding: 8px 16px;
-    background-color: rgba(128, 128, 128, 0.05);
-    font-weight: 500;
-    font-size: 0.9em;
-    cursor: pointer;
+// ----- 视图项 -----
+.vf-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    
-    &:hover {
-        background-color: $hover-background-color;
-    }
-    
-    .view-filter-toggle-icon {
-        font-size: 0.7em;
-    }
-}
-
-.view-filter-subgroup-items {
-    background-color: $background-color;
-}
-
-.view-filter-item {
-    padding: 7px 10px;
+    gap: 9px;
+    padding: 6px 8px;
+    border-radius: $vf-radius-sm;
     cursor: pointer;
-    transition: background-color 0.15s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: $calendar-radius-md;
-    font-size: 13px;
-
-    &:hover {
-        background-color: $hover-background-color;
-    }
-
-    &.view-filter-subitem {
-        padding-left: 24px;
-        font-size: 12px;
-    }
-}
-
-.view-filter-checkbox {
-    margin: 0;
-    cursor: pointer;
-}
-
-.view-filter-label {
-    cursor: pointer;
-    flex: 1;
+    font-size: 12.5px;
+    color: $vf-on-surface;
+    transition: background-color 0.1s ease;
     user-select: none;
+
+    &:hover { background-color: $hover-background-color; }
+
+    &--checked {
+        color: $vf-on-surface;
+        font-weight: 500;
+    }
 }
 
-.view-filter-footer {
-    padding: 6px;
-    border-top: 1px solid $border-color;
-    background-color: var(--b3-theme-surface);
+.vf-checkbox {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid $vf-on-surface-light;
+    border-radius: 4px;
+    background-color: transparent;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+    flex-shrink: 0;
+
+    &--checked {
+        background-color: $vf-primary;
+        border-color: $vf-primary;
+
+        &::after {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 7px;
+            border: solid #fff;
+            border-width: 0 1.7px 1.7px 0;
+            transform: translateY(-1px) rotate(45deg);
+        }
+    }
+}
+
+.vf-item-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+// ----- 底部 -----
+.vf-footer {
     display: flex;
     justify-content: flex-end;
+    padding: 8px 10px;
+    border-top: 1px solid $vf-border;
+    background-color: $vf-surface;
+}
 
-    .b3-button {
-        padding: 4px 14px;
-        flex: 1;
-        text-align: center; // 文本居中
-        border-radius: $calendar-radius-md;
+.vf-confirm-btn {
+    height: 30px;
+    padding: 0 18px;
+    flex: 1;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--b3-theme-on-primary, #fff);
+    background-color: $vf-primary;
+    border: 1px solid $vf-primary;
+    border-radius: $vf-radius-md;
+    cursor: pointer;
+    transition: filter 0.12s ease, transform 0.06s ease;
+
+    &:hover { filter: brightness(1.08); }
+    &:active { transform: translateY(1px); }
+}
+
+// ----- 图标按钮 -----
+.vf-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background-color: transparent;
+    color: $vf-on-surface-light;
+    border: 1px solid transparent;
+    border-radius: $vf-radius-sm;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+
+    &:hover {
+        background-color: $hover-background-color;
+        color: $vf-on-surface;
     }
 }
 
-// 分组管理对话框
-.group-management-dialog {
+// ===================================================================
+// 对话框（分组管理 / 编辑）
+// ===================================================================
+.vf-dialog-root {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    inset: 0;
     z-index: 2000;
     display: flex;
     align-items: center;
     justify-content: center;
+    background-color: rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.16s ease;
+
+    &--in { opacity: 1; }
+    &--out { opacity: 0; }
+
+    &--edit { z-index: 2100; }
 }
 
-.group-management-content {
-    background-color: $background-color;
-    border-radius: $calendar-radius-lg;
-    box-shadow: $calendar-shadow-md;
-    min-width: 500px;
-    max-width: 700px;
-    max-height: 80vh;
-    overflow: hidden;
+.vf-dialog {
+    width: min(560px, calc(100vw - 32px));
+    max-height: min(80vh, 720px);
     display: flex;
     flex-direction: column;
+    background-color: $vf-bg;
+    border: 1px solid $vf-border;
+    border-radius: $vf-radius-lg;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    transform: translateY(-6px) scale(0.99);
+    transition: transform 0.18s ease;
+
+    .vf-dialog-root--in & { transform: translateY(0) scale(1); }
+    .vf-dialog-root--out & { transform: translateY(-6px) scale(0.99); }
+
+    &--edit { width: min(640px, calc(100vw - 32px)); }
 }
 
-.group-management-header {
-    padding: 12px 14px;
-    border-bottom: 1px solid $border-color;
+.vf-dialog-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    background-color: var(--b3-theme-surface);
-    
-    h3 {
-        margin: 0;
-        color: $text-color;
-    }
-    
-    .group-management-close {
-        padding: 4px 8px;
-        font-size: 1.2em;
-        border: none;
-        background: none;
-        cursor: pointer;
-        
-        &:hover {
-            background-color: $hover-background-color;
-        }
-    }
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 1px solid $vf-border;
 }
 
-.group-management-body {
-    padding: 12px;
-    overflow-y: auto;
+.vf-dialog-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vf-dialog-subtitle {
+    font-size: 11px;
+    color: $vf-on-surface-light;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vf-dialog-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: $vf-on-surface;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vf-dialog-body {
+    @extend %vf-quiet-scroll;
     flex: 1;
-}
-
-.create-group-form {
-    margin-bottom: 16px;
-    padding: 12px;
-    border: 1px solid $border-color;
-    border-radius: $calendar-radius-md;
-    background-color: var(--b3-theme-surface);
-    
-    h4 {
-        margin: 0 0 12px 0;
-        color: $text-color;
-    }
-    
-    .form-row {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        
-        input {
-            padding: 6px 10px;
-            border: 1px solid $border-color;
-            border-radius: $calendar-radius-sm;
-            background-color: $background-color;
-            color: $text-color;
-            
-            &.group-name-input {
-                flex: 1;
-            }
-            
-            &.group-icon-input {
-                width: 60px;
-                text-align: center;
-            }
-        }
-        
-        .create-group-btn {
-            padding: 6px 16px;
-            background-color: var(--b3-card-success-background);
-            color: var(--b3-card-success-color);
-            border-color: var(--b3-card-success-color);
-        }
-    }
-}
-
-.groups-list {
-    h4 {
-        margin: 0 0 16px 0;
-        color: $text-color;
-    }
-}
-
-.group-management-item {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 16px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 10px;
-    border: 1px solid $border-color;
-    border-radius: $calendar-radius-md;
-    margin-bottom: 8px;
-    background-color: var(--b3-theme-surface);
-    
-    &:hover {
-        background-color: $hover-background-color;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.vf-dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px;
+    border-top: 1px solid $vf-border;
+    background-color: $vf-surface;
+
+    .vf-action-btn {
+        flex: 0 0 auto;
+        min-width: 84px;
     }
 }
 
-.group-info {
+// ----- 创建分组卡片 -----
+.vf-create-card {
+    padding: 12px;
+    border: 1px solid $vf-border;
+    border-radius: $vf-radius-md;
+    background-color: $vf-surface;
+}
+
+.vf-create-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: $vf-on-surface-light;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.vf-create-card-row {
+    display: flex;
+    gap: 6px;
+
+    .vf-input {
+        height: 30px;
+    }
+    .vf-create-name { flex: 1; }
+    .vf-create-icon { width: 56px; text-align: center; }
+    .vf-create-btn { flex: 0 0 auto; min-width: 70px; }
+}
+
+.vf-input {
+    padding: 0 10px;
+    font-size: 12.5px;
+    color: $text-color;
+    background-color: $vf-bg;
+    border: 1px solid $vf-border;
+    border-radius: $vf-radius-sm;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &::placeholder { color: $vf-on-surface-light; }
+    &:hover { border-color: $vf-on-surface-light; }
+    &:focus {
+        border-color: $vf-primary;
+        box-shadow: 0 0 0 3px rgba(85, 119, 255, 0.12);
+    }
+    &--error {
+        border-color: $vf-danger;
+        animation: vf-shake 0.32s ease;
+    }
+}
+
+@keyframes vf-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    50%      { transform: translateX(3px); }
+    75%      { transform: translateX(-2px); }
+}
+
+// ----- 分组管理列表 -----
+.vf-manage-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vf-section-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: $vf-on-surface-light;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.vf-section-hint {
+    font-size: 11px;
+    font-weight: 500;
+    color: $vf-on-surface-light;
+    text-transform: none;
+    letter-spacing: 0;
+    opacity: 0.75;
+}
+
+.vf-manage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vf-manage-item {
     display: flex;
     align-items: center;
     gap: 10px;
-    
-    .group-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 18px;
-        height: 18px;
-        padding: 0 5px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 600;
-        background-color: var(--b3-card-info-background);
-        color: var(--b3-card-info-color);
+    padding: 8px 10px;
+    border: 1px solid $vf-border;
+    border-radius: $vf-radius-md;
+    background-color: $vf-bg;
+    transition:
+        border-color 0.15s ease,
+        background-color 0.15s ease,
+        box-shadow 0.15s ease,
+        opacity 0.15s ease,
+        transform 0.12s ease;
+
+    &:hover { border-color: $vf-on-surface-light; }
+
+    &--hidden {
+        opacity: 0.55;
+
+        .vf-manage-name { text-decoration: line-through; }
     }
-    
-    .group-name {
-        font-weight: 500;
-        color: $text-color;
+
+    &--dragging {
+        opacity: 0.35;
+        background-color: $vf-surface;
+        cursor: grabbing;
     }
-    
-    .group-count {
-        font-size: 0.9em;
-        color: var(--b3-theme-on-surface-light);
+
+    &--drop-target {
+        border-color: $vf-primary;
+        box-shadow: 0 0 0 2px rgba(85, 119, 255, 0.18);
     }
 }
 
-.group-actions {
-    display: flex;
-    gap: 8px;
-    
-    .group-edit-btn,
-    .group-delete-btn {
-        padding: 4px 12px;
-        font-size: 0.9em;
-        border-radius: $calendar-radius-sm;
-    }
-    
-    .group-edit-btn {
-        background-color: var(--b3-card-info-background);
-        color: var(--b3-card-info-color);
-        border-color: var(--b3-card-info-color);
-    }
-    
-    .group-delete-btn {
-        background-color: var(--b3-card-error-background);
-        color: var(--b3-card-error-color);
-        border-color: var(--b3-card-error-color);
-    }
-}
-
-// 分组编辑对话框
-.group-edit-dialog {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 3000;
-    display: flex;
+.vf-drag-handle {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 18px;
+    height: 22px;
+    color: $vf-on-surface-light;
+    cursor: grab;
+    flex-shrink: 0;
+    opacity: 0.55;
+    transition: opacity 0.12s ease;
+
+    &:hover { opacity: 1; }
 }
 
-.group-edit-content {
-    background-color: $background-color;
-    border-radius: $calendar-radius-lg;
-    box-shadow: $calendar-shadow-md;
-    min-width: 600px;
-    max-width: 800px;
-    max-height: 80vh;
+.vf-manage-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.vf-manage-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: $vf-on-surface;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vf-manage-meta {
+    font-size: 11.5px;
+    color: $vf-on-surface-light;
+    flex-shrink: 0;
+}
+
+.vf-manage-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+
+    .vf-action-btn {
+        flex: 0 0 auto;
+        height: 26px;
+        padding: 0 10px;
+    }
+}
+
+// ----- 编辑对话框 -----
+.vf-edit-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.vf-edit-field {
     display: flex;
     flex-direction: column;
-}
+    gap: 5px;
+    flex: 1 1 200px;
 
-.group-edit-header {
-    padding: 12px 14px;
-    border-bottom: 1px solid $border-color;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: var(--b3-theme-surface);
-    
-    h3 {
-        margin: 0;
-        color: $text-color;
-    }
-}
-
-.group-edit-body {
-    padding: 12px;
-    overflow-y: auto;
-    flex: 1;
-    
-    .form-row {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        margin-bottom: 16px;
-        
-        label {
-            min-width: 80px;
-            font-weight: 500;
-            color: $text-color;
-        }
-        
-        input {
-            flex: 1;
-            padding: 6px 10px;
-            border: 1px solid $border-color;
-            border-radius: $calendar-radius-sm;
-            background-color: $background-color;
-            color: $text-color;
-        }
-    }
-    
-    .group-views-section,
-    .available-views-section {
-        margin-bottom: 20px;
-        
-        h4 {
-            margin: 0 0 12px 0;
-            color: $text-color;
-            padding-bottom: 8px;
-            border-bottom: 1px solid $border-color;
-        }
-    }
-    
-    .group-views-list,
-    .available-views-list {
-        border: 1px solid $border-color;
-        border-radius: $calendar-radius-md;
-        max-height: 150px;
-        overflow-y: auto;
-        background-color: var(--b3-theme-surface);
-    }
-    
-    .group-edit-actions {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-        padding-top: 16px;
-        border-top: 1px solid $border-color;
-        
-        .save-group-btn {
-            background-color: var(--b3-card-success-background);
-            color: var(--b3-card-success-color);
-            border-color: var(--b3-card-success-color);
-        }
-        
-        .cancel-group-btn {
-            background-color: var(--b3-card-warning-background);
-            color: var(--b3-card-warning-color);
-            border-color: var(--b3-card-warning-color);
-        }
-    }
-}
-
-.edit-view-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    border-bottom: 1px solid $border-color;
-    
-    &:last-child {
-        border-bottom: none;
-    }
-    
-    &:hover {
-        background-color: $hover-background-color;
-    }
-    
-    span {
-        color: $text-color;
-    }
-    
-    button {
-        padding: 4px 8px;
-        font-size: 0.8em;
-        border-radius: 3px;
-        
-        &:hover {
-            opacity: 0.8;
-        }
-    }
-}
-
-// 隐藏分组相关样式
-.group-hidden-indicator {
-    color: var(--b3-theme-on-surface-light);
-    font-size: 0.85em;
-    font-style: italic;
-    margin-left: 8px;
-}
-
-.group-toggle-visibility-btn {
-    background-color: var(--b3-card-info-background);
-    color: var(--b3-card-info-color);
-    border-color: var(--b3-card-info-color);
-    
-    &:hover {
-        background-color: var(--b3-card-info-color);
-        color: var(--b3-card-info-background);
-    }
-}
-
-.group-management-item {
-    .group-info {
-        .group-hidden-indicator {
-            opacity: 0.7;
-        }
-    }
-    
-    &.hidden-group {
-        opacity: 0.6;
-        
-        .group-info {
-            text-decoration: line-through;
-        }
-    }
-}
-
-// 未分组管理区域样式
-.ungrouped-management-section {
-    margin-top: 20px;
-    border-top: 1px solid $border-color;
-    padding-top: 15px;
-    
-    h4 {
-        margin-bottom: 10px;
-        color: $text-color;
+    label {
+        font-size: 11px;
+        color: $vf-on-surface-light;
         font-weight: 600;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+    }
+
+    .vf-input { height: 32px; }
+}
+
+.vf-edit-twocol {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+
+    @media (max-width: 580px) {
+        grid-template-columns: 1fr;
     }
 }
+
+.vf-edit-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.vf-edit-list {
+    @extend %vf-quiet-scroll;
+    border: 1px solid $vf-border;
+    border-radius: $vf-radius-md;
+    background-color: $vf-surface;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vf-edit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: $vf-radius-sm;
+    transition: background-color 0.12s ease;
+
+    &:hover { background-color: $hover-background-color; }
+}
+
+.vf-edit-row-label {
+    font-size: 12.5px;
+    color: $vf-on-surface;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.vf-edit-empty {
+    padding: 16px 8px;
+    text-align: center;
+    font-size: 12px;
+    color: $vf-on-surface-light;
+}
+
+
 
 
 /* 主容器美化 */
