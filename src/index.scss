@@ -41,7 +41,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 [id^="calendarfu-"] {
     td {
-        border-color: $border-color !important;
+        border-color: rgba(127, 127, 127, 0.08) !important;
     }
 
     background-color: $background-color !important;
@@ -97,14 +97,14 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 .fc-scrollgrid-section-header,
 .fc-multimonth-header-table {
     * {
-        border-color: $border-color ;
+        border-color: rgba(127, 127, 127, 0.1);
         background-color: var(--b3-theme-surface);
     }
 }
 
 .fc-view-harness {
     .fc-scrollgrid {
-        border-color: $border-color !important;
+        border-color: rgba(127, 127, 127, 0.1) !important;
         border-radius: $calendar-radius-lg;
         overflow: hidden;
 
@@ -113,21 +113,21 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 .fc-col-header {
     * {
-        border-color: $border-color !important;
+        border-color: rgba(127, 127, 127, 0.1) !important;
     }
 
 }
 
 .fc-multimonth-header-table {
     * {
-        border-color: $border-color !important;
+        border-color: rgba(127, 127, 127, 0.1) !important;
     }
 }
 
 .fc-scroller,
 .fc-view,
 .fc-list-day {
-    border-color: $border-color !important;
+    border-color: rgba(127, 127, 127, 0.1) !important;
 }
 
 .fc table {
@@ -247,6 +247,8 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 .fc-daygrid-day {
     background-color: $background-color;
     color: $text-color;
+    border-radius: 6px;
+    overflow: hidden;
     transition: background-color 0.15s ease;
 }
 
@@ -273,7 +275,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     background-color: $background-color;
     color: $text-color;
     border-radius: $calendar-radius-md !important;
-    border: 1px solid rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.03);
     overflow: hidden;
 }
 
@@ -352,7 +354,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
 
 [id^="calendar-"] {
     td {
-        border-color: $border-color !important;
+        border-color: rgba(127, 127, 127, 0.08) !important;
     }
 
     margin: 0 auto;
