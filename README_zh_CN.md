@@ -54,6 +54,7 @@ win端s3同步后，docker端感知s3同步。
 - feat: 更新版本号至0.42.0 (loonghfut)
 - docs: 更新 v0.42.0 版本的更新日志 (loonghfut)
 - docs: 更新 v0.42.0 版本的更新日志 (loonghfut)
+- docs: 更新 v0.42.0 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
