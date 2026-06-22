@@ -53,6 +53,7 @@ win端s3同步后，docker端感知s3同步。
 - feat(styles): 更新边框颜色和样式，改善日历组件的视觉效果 (loonghfut)
 - feat: 更新版本号至0.42.0 (loonghfut)
 - docs: 更新 v0.42.0 版本的更新日志 (loonghfut)
+- docs: 更新 v0.42.0 版本的更新日志 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
