@@ -42,18 +42,16 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.41.0 (2026年06月15日)
-- feat: 优化日历和看板功能，增加缓存机制以提升性能 (loonghfut)
-- feat: 移除过时的看板和四象限视图，简化用户界面 (loonghfut)
-- fix(tldraw): treat loopback hosts as development (Codex Test)
-- Merge pull request #111 from Mangteng1994/fix/tldraw-loopback (LoongSteve)
-- Merge branch 'main-2' of https://github.com/loonghfut/siyuan-steve-tools into main-2 (loonghfut)
-- feat: enhance Lifelog functionality with customizable type colors and improved stats (loonghfut)
-- feat: 增强 Lifelog 模块，添加缓存机制和增量更新处理，优化性能 (loonghfut)
-- feat: 添加日历自写标记机制，优化 AV 单元格更新处理，减少不必要的全量刷新 (loonghfut)
-- feat: 优化日历模块的自写标记机制，增强状态和优先级更新的缓存同步处理 (loonghfut)
-- feat: 优化视图ID获取和缓存机制，延长视图清单缓存时间，减少不必要的网络请求 (loonghfut)
-- feat: 更新版本号至 0.41.0 (loonghfut)
+### v0.42.0 (2026年06月22日)
+- Refactor calendar components for improved UI and localization (loonghfut)
+- feat: 为日历工具栏添加图标并优化样式 (loonghfut)
+- feat: enhance calendar stats visualization with new hero summary and improved card layout (loonghfut)
+- feat: 优化日历组件的高度调整逻辑，改进性能和可维护性 (loonghfut)
+- feat: 优化农历元素的创建和样式，改善显示效果 (loonghfut)
+- feat(calendar): add view filter panel with group management functionality (loonghfut)
+- feat(calendar): 添加事件拖动时的边缘自动翻页功能及过渡动画 (loonghfut)
+- feat(styles): 更新边框颜色和样式，改善日历组件的视觉效果 (loonghfut)
+- feat: 更新版本号至0.42.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
