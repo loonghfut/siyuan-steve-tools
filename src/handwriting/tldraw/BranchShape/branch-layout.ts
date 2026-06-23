@@ -7,6 +7,7 @@ const DEFAULT_NODE_HEIGHT = 80
 const ROOT_RADIUS = 7
 const MIN_BRANCH_WIDTH = 80
 const MIN_BRANCH_HEIGHT = 40
+const DETACH_DISTANCE_MULTIPLIER = 1.7
 
 type Bounds = {
 	x: number
@@ -65,6 +66,20 @@ function distanceToBranchRoot(editor: Editor, branch: IBranchShape, child: TLSha
 	const dx = edgeX - root.x
 	const dy = clampedY - root.y
 	return Math.hypot(dx, dy)
+}
+
+function distanceToBranchWorkArea(editor: Editor, branch: IBranchShape, child: TLShape) {
+	const childBounds = getPageBounds(editor, child)
+	if (!childBounds) return Number.POSITIVE_INFINITY
+
+	const padding = Math.max(branch.props.snapDistance || 160, 80)
+	const minX = branch.x - padding
+	const minY = branch.y - padding
+	const maxX = branch.x + branch.props.w + padding
+	const maxY = branch.y + branch.props.h + padding
+	const clampedX = Math.max(minX, Math.min(childBounds.centerX, maxX))
+	const clampedY = Math.max(minY, Math.min(childBounds.centerY, maxY))
+	return Math.hypot(childBounds.centerX - clampedX, childBounds.centerY - clampedY)
 }
 
 function normalizeChildIds(editor: Editor, branch: IBranchShape, extraId?: TLShapeId | string) {
@@ -200,6 +215,42 @@ export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	}
 
 	return true
+}
+
+export function updateBranchAttachmentAfterDrag(editor: Editor, shape: TLShape) {
+	if (!isBranchConnectableShape(shape)) return false
+
+	if (attachShapeToNearestBranch(editor, shape)) return true
+
+	const branches = editor
+		.getCurrentPageShapes()
+		.filter((candidate) => candidate.type === 'branch' && ((candidate as IBranchShape).props.childIds || []).includes(shape.id as string)) as IBranchShape[]
+
+	if (branches.length === 0) return false
+
+	let didHandle = false
+	for (const branch of branches) {
+		const detachDistance = Math.max(branch.props.snapDistance || 160, 80) * DETACH_DISTANCE_MULTIPLIER
+		const distance = distanceToBranchWorkArea(editor, branch, shape)
+		if (distance > detachDistance) {
+			const nextChildIds = (branch.props.childIds || []).filter((id) => id !== shape.id)
+			editor.updateShape<IBranchShape>({
+				id: branch.id,
+				type: 'branch',
+				props: {
+					...branch.props,
+					childIds: nextChildIds,
+				},
+			})
+			const updatedBranch = editor.getShape<IBranchShape>(branch.id)
+			if (updatedBranch) layoutBranchChildren(editor, updatedBranch, nextChildIds)
+		} else {
+			layoutBranchChildren(editor, branch)
+		}
+		didHandle = true
+	}
+
+	return didHandle
 }
 
 export function relayoutBranchesContainingShape(editor: Editor, shapeId: TLShapeId) {

@@ -21,7 +21,7 @@ import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContent } from '../utils/render/content-renderer'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
-import { attachShapeToNearestBranch, isShapeInBranch, relayoutBranchesContainingShape } from '../BranchShape'
+import { updateBranchAttachmentAfterDrag } from '../BranchShape'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -1413,11 +1413,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	}
 
 	override onTranslateEnd(_initial: ICardShape, currentShape: ICardShape) {
-		if (!attachShapeToNearestBranch(this.editor, currentShape)) {
-			if (isShapeInBranch(this.editor, currentShape.id)) {
-				relayoutBranchesContainingShape(this.editor, currentShape.id)
-			}
-		}
+		updateBranchAttachmentAfterDrag(this.editor, currentShape)
 	}
 
 	override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {

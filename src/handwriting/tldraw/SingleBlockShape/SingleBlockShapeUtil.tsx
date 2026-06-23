@@ -35,7 +35,7 @@ import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
-import { attachShapeToNearestBranch, isShapeInBranch, relayoutBranchesContainingShape } from '../BranchShape'
+import { updateBranchAttachmentAfterDrag } from '../BranchShape'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
@@ -1193,11 +1193,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	}
 
 	override onTranslateEnd(_initial: ISingleBlockShape, currentShape: ISingleBlockShape) {
-		if (attachShapeToNearestBranch(this.editor, currentShape)) return
-		if (isShapeInBranch(this.editor, currentShape.id)) {
-			relayoutBranchesContainingShape(this.editor, currentShape.id)
-			return
-		}
+		if (updateBranchAttachmentAfterDrag(this.editor, currentShape)) return
 
         // 如果当前 shape 标记为不允许绑定，则跳过创建绑定
         if (currentShape.props.allowBinding === false) return
