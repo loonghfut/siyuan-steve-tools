@@ -18,6 +18,7 @@ export const CustomToolbar: React.FC<any> = (props) => {
     const isSlideSelected = useIsToolSelected(tools['slide'])
     const isJsShapeSelected = useIsToolSelected(tools['js-shape'])
     const isMindMapSelected = useIsToolSelected(tools['mind-map'])
+    const isBranchSelected = useIsToolSelected(tools['branch'])
     const toolbarOrientation = (settingdata?.['tldraw-toolbar-orientation'] as 'vertical' | 'horizontal') || 'vertical'
 
     return (
@@ -28,6 +29,7 @@ export const CustomToolbar: React.FC<any> = (props) => {
             <DefaultToolbarContent />
             <TldrawUiMenuItem {...tools['js-shape']} isSelected={isJsShapeSelected} />
             <TldrawUiMenuItem {...tools['mind-map']} isSelected={isMindMapSelected} />
+            <TldrawUiMenuItem {...tools['branch']} isSelected={isBranchSelected} />
         </DefaultToolbar>
     )
 }

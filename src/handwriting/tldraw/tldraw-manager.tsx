@@ -35,6 +35,8 @@ import { JsShapeUtil } from './JsShape/JsShapeUtil';
 import { JsShapeTool } from './JsShape/JsShapeTool';
 import { MindMapShapeUtil } from './MindMapShape/MindMapShapeUtil';
 import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
+import { BranchShapeUtil } from './BranchShape/BranchShapeUtil';
+import { BranchShapeTool } from './BranchShape/BranchShapeTool';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
@@ -64,9 +66,9 @@ const configuredArrowShapeUtil = ArrowShapeUtil.configure({
 })
 // 从默认形状工具中过滤掉原始的ArrowShapeUtil，避免重复定义
 const filteredDefaultShapeUtils = defaultShapeUtils.filter(util => util.type !== 'arrow')
-const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil, BezierConnectorShapeUtil]
+const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil, BranchShapeUtil, BezierConnectorShapeUtil]
 const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil, BezierConnectorBindingUtil]
-const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool]
+const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool, BranchShapeTool]
 
 /**
  * TldrawManager类，用于管理tldraw实例和操作

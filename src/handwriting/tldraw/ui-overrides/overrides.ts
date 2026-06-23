@@ -47,6 +47,13 @@ export const uiOverrides: TLUiOverrides = {
             kbd: 'm',
             onSelect: () => editor.setCurrentTool('mind-map'),
         }
+        tools.branch = {
+            id: 'branch',
+            icon: 'arrow-right',
+            label: 'Branch',
+            kbd: 't',
+            onSelect: () => editor.setCurrentTool('branch'),
+        }
         return tools
     },
     actions(editor, actions) {
