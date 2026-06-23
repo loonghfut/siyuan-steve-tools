@@ -36,6 +36,7 @@ import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, re
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import {
+	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
@@ -1199,6 +1200,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	override onTranslateStart(shape: ISingleBlockShape) {
 		draggingBranchSingleBlockIds.add(shape.id as string)
+		beginBranchAttachmentDrag(this.editor, shape)
 		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, shape))
 
 		const bindings = this.editor.getBindingsFromShape(shape, 'single-block')

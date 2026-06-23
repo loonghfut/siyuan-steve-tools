@@ -22,6 +22,7 @@ import { renderAllContent } from '../utils/render/content-renderer'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
 import {
+	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
@@ -1424,6 +1425,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 	override onTranslateStart(shape: ICardShape) {
 		draggingBranchCardIds.add(shape.id as string)
+		beginBranchAttachmentDrag(this.editor, shape)
 		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, shape))
 	}
 
