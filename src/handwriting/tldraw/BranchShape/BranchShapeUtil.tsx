@@ -326,9 +326,9 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 								ry={10}
 								fill="none"
 								stroke={accentColor}
-								strokeWidth={2}
-								strokeDasharray="6 5"
-								opacity={0.55}
+								strokeWidth={1.25}
+								strokeDasharray="3 7"
+								opacity={0.22}
 							/>
 						)}
 						<circle
