@@ -26,6 +26,8 @@ export const handwritingDefaults: Record<string, any> = {
     "enableDoubleClickCreateSingleBlock": true,
     // 精确箭头模式
     "tldraw-exact-arrow-mode": true,
+    // 端口悬停触发延时（毫秒）
+    "tldraw-port-hover-delay": 300,
     // 自定义卡片标题内容
     "tldraw-custom-card-title": "",
     // 文档树显示白板按钮
@@ -59,6 +61,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "同步删除(不建议启用)", description: "删除画板块时同步删除笔记块", key: "SyncDelete", value: ctx.settings["SyncDelete"] },
                 { type: "checkbox", title: "全局禁止 JS 块执行脚本", description: "启用后所有 JS 形状将不执行脚本代码（安全模式）", key: "js-shape-disable-execution", value: ctx.settings["js-shape-disable-execution"] },
                 { type: "number", title: "最大激活形状数", description: "限制同时激活的形状数量以节省资源", key: "tldraw-max-active-shapes", value: ctx.settings["tldraw-max-active-shapes"] },
+                { type: "slider", title: "端口悬停触发延时", description: "鼠标停在形状上后，端口显示前的等待时间（毫秒，0 表示立即显示）", key: "tldraw-port-hover-delay", value: ctx.settings["tldraw-port-hover-delay"], slider: { min: 0, max: 5000, step: 250 } },
                 {
                     type: "select", title: "Card 渲染模式", description: "选择非编辑状态如何渲染 Card：性能优先或一致性优先", key: "card-render-mode", value: ctx.settings["card-render-mode"], options: {
                         "static-dom": "性能优先：非编辑为 Protyle 元素（无实例）",

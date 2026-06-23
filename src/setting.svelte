@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { frontEnd, moduleInstances } from "./index";
+  import { frontEnd, moduleInstances, settingdata as runtimeSettingdata } from "./index";
   import { onMount } from "svelte";
   import SettingPanel from "@/libs/components/setting-panel.svelte";
   import { FormInput } from "@/libs/components/Form";
@@ -97,6 +97,7 @@
   }
 
   async function saveSettings(skipBgRefresh = false) {
+    Object.assign(runtimeSettingdata, settings);
     await plugin.saveData(myfile, settings);
     // 更新 LifeLog 模块的设置
     if (moduleInstances["M_lifelog"]) {

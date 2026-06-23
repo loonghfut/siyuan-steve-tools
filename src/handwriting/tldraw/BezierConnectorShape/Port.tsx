@@ -5,6 +5,14 @@ import { getShapePorts } from './shape-ports'
 import { getShapeConnections } from './bezier-connector-binding'
 import { settingdata } from '@/index'
 
+const DEFAULT_PORT_HOVER_DELAY_MS = 300
+
+function getPortHoverDelayMs(): number {
+	const raw = Number(settingdata['tldraw-port-hover-delay'])
+	if (!Number.isFinite(raw)) return DEFAULT_PORT_HOVER_DELAY_MS
+	return Math.max(0, raw)
+}
+
 interface PortProps {
 	shapeId: TLShapeId
 	portId: string
@@ -173,10 +181,11 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 
 		if (parentHovered) {
 			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+			const hoverDelayMs = getPortHoverDelayMs()
 			hoverTimerRef.current = window.setTimeout(() => {
 				hoverTimerRef.current = null
 				setHoveredVisible(true)
-			}, 200)
+			}, hoverDelayMs)
 		} else {
 			if (hoverTimerRef.current) {
 				clearTimeout(hoverTimerRef.current)
