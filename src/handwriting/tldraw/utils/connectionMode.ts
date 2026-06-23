@@ -5,12 +5,13 @@ import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierCo
 import { showMessage } from 'siyuan'
 import { ICardShape } from '../CardShape/card-shape-types'
 import { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
+import { IBranchShape } from '../BranchShape/branch-shape-types'
 
-type ConnectableShape = ICardShape | ISingleBlockShape
+type ConnectableShape = ICardShape | ISingleBlockShape | IBranchShape
 
 // 检查形状是否是可连接的类型
 const isConnectableShape = (shape: any): shape is ConnectableShape => {
-    return shape?.type === 'card' || shape?.type === 'single-block'
+    return shape?.type === 'card' || shape?.type === 'single-block' || shape?.type === 'branch'
 }
 
 // 检查两个形状之间是否已经存在连接

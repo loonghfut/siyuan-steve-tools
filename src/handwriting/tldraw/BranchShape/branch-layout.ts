@@ -2,7 +2,7 @@ import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape, BranchChildShape } from './branch-shape-types'
 import { BranchInteractionHint } from './branch-interaction-state'
 
-const CONNECTABLE_TYPES = new Set(['card', 'single-block'])
+const CONNECTABLE_TYPES = new Set(['card', 'single-block', 'branch'])
 const DEFAULT_NODE_WIDTH = 300
 const DEFAULT_NODE_HEIGHT = 80
 const ROOT_RADIUS = 7
@@ -36,6 +36,32 @@ type BranchDragPreview =
 
 export function isBranchConnectableShape(shape: TLShape | undefined): boolean {
 	return !!shape && CONNECTABLE_TYPES.has(shape.type) && typeof (shape as any).props?.w === 'number'
+}
+
+function isDescendantBranch(editor: Editor, ancestorBranchId: string, candidateId: string, visited = new Set<string>()): boolean {
+	if (ancestorBranchId === candidateId) return true
+	if (visited.has(ancestorBranchId)) return false
+	visited.add(ancestorBranchId)
+
+	const ancestor = editor.getShape<IBranchShape>(ancestorBranchId as TLShapeId)
+	if (!ancestor || ancestor.type !== 'branch') return false
+
+	for (const childId of getAllBranchChildIds(ancestor)) {
+		if (childId === candidateId) return true
+		const child = editor.getShape(childId as TLShapeId)
+		if (child?.type === 'branch' && isDescendantBranch(editor, child.id as string, candidateId, visited)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+function canAttachShapeToBranch(editor: Editor, branch: IBranchShape, shape: TLShape) {
+	if (branch.id === shape.id) return false
+	if (shape.type !== 'branch') return true
+
+	return !isDescendantBranch(editor, shape.id as string, branch.id as string)
 }
 
 function getPageBounds(editor: Editor, shape: TLShape): Bounds | null {
@@ -123,7 +149,7 @@ function normalizeChildIds(editor: Editor, branch: IBranchShape, extraId?: TLSha
 
 	const unique = Array.from(new Set(ids)).filter((id) => {
 		const shape = editor.getShape(id as TLShapeId)
-		return isBranchConnectableShape(shape)
+		return isBranchConnectableShape(shape) && shape?.id !== branch.id
 	})
 
 	return unique
@@ -134,7 +160,7 @@ function normalizeSideChildIds(editor: Editor, branch: IBranchShape, side: Branc
 	if (extraId && !ids.includes(extraId)) ids.push(extraId as string)
 	return Array.from(new Set(ids)).filter((id) => {
 		const shape = editor.getShape(id as TLShapeId)
-		return isBranchConnectableShape(shape)
+		return isBranchConnectableShape(shape) && shape?.id !== branch.id
 	})
 }
 
@@ -159,6 +185,33 @@ function getBranchChildren(editor: Editor, ids: string[]) {
 			return { shape: shape as BranchChildShape, bounds }
 		})
 		.filter(Boolean) as Array<{ shape: BranchChildShape; bounds: Bounds }>
+}
+
+function addBranchDescendantMoveUpdates(
+	editor: Editor,
+	branch: IBranchShape,
+	dx: number,
+	dy: number,
+	updates: any[],
+	movedIds: Set<string>
+) {
+	for (const childId of getAllBranchChildIds(branch)) {
+		if (movedIds.has(childId)) continue
+		const child = editor.getShape(childId as TLShapeId)
+		if (!child) continue
+
+		movedIds.add(childId)
+		updates.push({
+			id: child.id,
+			type: child.type,
+			x: child.x + dx,
+			y: child.y + dy,
+		})
+
+		if (child.type === 'branch') {
+			addBranchDescendantMoveUpdates(editor, child as IBranchShape, dx, dy, updates, movedIds)
+		}
+	}
 }
 
 function removeChildIdFromBranch(branch: IBranchShape, childId: string) {
@@ -233,6 +286,7 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const rootX = oldRootPage.x
 	const rootY = branchY + branchHeight / 2
 	const updates: any[] = []
+	const movedIds = new Set<string>([branch.id as string])
 
 	const placeChildren = (side: BranchSide, sideChildren: Array<{ shape: BranchChildShape; bounds: Bounds }>, totalHeight: number) => {
 		const nodeEdgeX = side === 'left' ? rootX - horizontalGap : rootX + horizontalGap
@@ -243,12 +297,19 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 			cursorY += bounds.h + verticalGap
 
 			if (Math.abs(shape.x - nextX) > 0.5 || Math.abs(shape.y - nextY) > 0.5) {
+				const dx = nextX - shape.x
+				const dy = nextY - shape.y
+				movedIds.add(shape.id as string)
 				updates.push({
 					id: shape.id,
 					type: shape.type,
 					x: nextX,
 					y: nextY,
 				})
+
+				if (shape.type === 'branch') {
+					addBranchDescendantMoveUpdates(editor, shape as IBranchShape, dx, dy, updates, movedIds)
+				}
 			}
 		}
 	}
@@ -357,6 +418,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 
 		if (preview?.mode === 'attach') {
 			const nearest = preview.branch
+			if (!canAttachShapeToBranch(editor, nearest, shape)) continue
 			const nearestDraft = getBranchDraft(editor, drafts, nearest)
 
 			for (const branch of currentBranches) {
@@ -409,6 +471,7 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape): BranchDrag
 	let nearestAttach: { branch: IBranchShape; side: BranchSide; distance: number } | null = null
 
 	for (const branch of branches) {
+		if (!canAttachShapeToBranch(editor, branch, shape)) continue
 		const side = getBranchSideForShape(editor, branch, shape)
 		const distance = distanceToBranchRoot(editor, branch, shape, side)
 		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)

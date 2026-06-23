@@ -24,7 +24,7 @@ export type IBranchShape = TLBaseShape<
 
 export type BranchChildShape = {
 	id: string
-	type: 'card' | 'single-block'
+	type: 'card' | 'single-block' | 'branch'
 	x: number
 	y: number
 	props: {

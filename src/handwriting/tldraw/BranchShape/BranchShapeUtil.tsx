@@ -18,7 +18,7 @@ import {
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { IBranchShape } from './branch-shape-types'
-import { getAllBranchChildIds, getBranchRenderInfo, layoutBranchChildren } from './branch-layout'
+import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
 
 const translateStartState = new Map<
@@ -26,12 +26,52 @@ const translateStartState = new Map<
 	{
 		branchX: number
 		branchY: number
-		children: Array<{ id: string; type: string; x: number; y: number }>
 	}
 >()
+const syncingBranchMoveIds = new Set<string>()
+
+function collectBranchMoveUpdates(
+	editor: any,
+	branch: IBranchShape,
+	dx: number,
+	dy: number,
+	updates: Array<{ id: any; type: any; x: number; y: number }>,
+	suppressedBranchIds: Set<string>,
+	selectedIds: Set<string>,
+	visited = new Set<string>()
+) {
+	for (const childId of getAllBranchChildIds(branch)) {
+		if (visited.has(childId)) continue
+		visited.add(childId)
+
+		const child = editor.getShape(childId as TLShapeId)
+		if (!child) continue
+
+		const isSelected = selectedIds.has(child.id as string)
+		if (!isSelected) {
+			updates.push({
+				id: child.id,
+				type: child.type,
+				x: child.x + dx,
+				y: child.y + dy,
+			})
+
+			if (child.type === 'branch') {
+				suppressedBranchIds.add(child.id as string)
+			}
+		}
+
+		if (child.type === 'branch' && !isSelected) {
+			collectBranchMoveUpdates(editor, child as IBranchShape, dx, dy, updates, suppressedBranchIds, selectedIds, visited)
+		}
+	}
+}
 
 class BranchGeometry2d extends Geometry2d {
-	constructor(private readonly children: Geometry2d[]) {
+	constructor(
+		private readonly children: Geometry2d[],
+		private readonly branchBounds: Box
+	) {
 		super({ isClosed: false, isFilled: false })
 	}
 
@@ -78,11 +118,16 @@ class BranchGeometry2d extends Geometry2d {
 	}
 
 	override getBoundsVertices() {
-		return this.children.flatMap((child) => child.getBoundsVertices())
+		return [
+			new Vec(this.branchBounds.x, this.branchBounds.y),
+			new Vec(this.branchBounds.x + this.branchBounds.width, this.branchBounds.y),
+			new Vec(this.branchBounds.x + this.branchBounds.width, this.branchBounds.y + this.branchBounds.height),
+			new Vec(this.branchBounds.x, this.branchBounds.y + this.branchBounds.height),
+		]
 	}
 
 	override getBounds() {
-		return Box.FromPoints(this.getBoundsVertices())
+		return this.branchBounds
 	}
 
 	getSvgPathData() {
@@ -121,6 +166,10 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 
 	override getBoundsSnapGeometry() {
 		return { points: [] }
+	}
+
+	override canBind() {
+		return true
 	}
 
 	override canEdit() {
@@ -175,7 +224,36 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			)
 		}
 
-		return new BranchGeometry2d(children)
+		return new BranchGeometry2d(
+			children,
+			new Box(0, 0, Math.max(shape.props.w, 1), Math.max(shape.props.h, 1))
+		)
+	}
+
+	override onBeforeUpdate(prev: IBranchShape, next: IBranchShape) {
+		if (!translateStartState.has(next.id) || (prev.x === next.x && prev.y === next.y)) return
+
+		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
+
+		if (syncingBranchMoveIds.has(next.id as string)) return
+
+		const dx = next.x - prev.x
+		const dy = next.y - prev.y
+		if (Math.abs(dx) <= 0.001 && Math.abs(dy) <= 0.001) return
+
+		const updates: Array<{ id: any; type: any; x: number; y: number }> = []
+		const suppressedBranchIds = new Set<string>()
+		const selectedIds = new Set(this.editor.getSelectedShapeIds().map((id) => id as string))
+		collectBranchMoveUpdates(this.editor, prev, dx, dy, updates, suppressedBranchIds, selectedIds)
+
+		if (updates.length === 0) return
+
+		for (const branchId of suppressedBranchIds) syncingBranchMoveIds.add(branchId)
+		try {
+			this.editor.updateShapes(updates)
+		} finally {
+			for (const branchId of suppressedBranchIds) syncingBranchMoveIds.delete(branchId)
+		}
 	}
 
 	override onResize(shape: IBranchShape, info: TLResizeInfo<IBranchShape>) {
@@ -183,50 +261,26 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override onTranslateStart(shape: IBranchShape) {
+		beginBranchAttachmentDrag(this.editor, shape)
 		setBranchInteractionHint({
 			mode: 'move-branch',
 			branchId: shape.id,
 		})
 
-		const children = getAllBranchChildIds(shape)
-			.map((id) => this.editor.getShape(id as TLShapeId))
-			.filter(Boolean)
-			.map((child: any) => ({
-				id: child.id,
-				type: child.type,
-				x: child.x,
-				y: child.y,
-			}))
-
 		translateStartState.set(shape.id, {
 			branchX: shape.x,
 			branchY: shape.y,
-			children,
 		})
 	}
 
 	override onTranslateEnd(initial: IBranchShape, current: IBranchShape) {
 		clearBranchInteractionHint(current.id)
 
-		const start = translateStartState.get(current.id)
 		translateStartState.delete(current.id)
 
-		if (start && start.children.length > 0) {
-			const dx = current.x - start.branchX
-			const dy = current.y - start.branchY
-			if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-				this.editor.updateShapes(
-					start.children.map((child) => ({
-						id: child.id as any,
-						type: child.type as any,
-						x: child.x + dx,
-						y: child.y + dy,
-					}))
-				)
-			}
-		}
-
 		const branch = this.editor.getShape<IBranchShape>(current.id) || current || initial
+		if (updateBranchAttachmentAfterDrag(this.editor, branch)) return
+
 		layoutBranchChildren(this.editor, branch)
 	}
 
@@ -252,6 +306,14 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 
 		return (
 			<SVGContainer className="BranchShape">
+				<rect
+					x={0}
+					y={0}
+					width={Math.max(shape.props.w, 1)}
+					height={Math.max(shape.props.h, 1)}
+					fill="transparent"
+					pointerEvents="none"
+				/>
 				{showHint && (
 					<g pointerEvents="none">
 						{isMovingBranch && (
@@ -350,6 +412,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 
 		return (
 			<g>
+				<rect width={Math.max(shape.props.w, 1)} height={Math.max(shape.props.h, 1)} fill="none" />
 				<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius} />
 				{info.children.map((child) => {
 					const stemDx = child.side === 'left' ? -24 : 24
