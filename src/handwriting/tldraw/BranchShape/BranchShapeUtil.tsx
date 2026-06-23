@@ -18,7 +18,7 @@ import {
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { IBranchShape } from './branch-shape-types'
-import { getBranchRenderInfo, layoutBranchChildren } from './branch-layout'
+import { getAllBranchChildIds, getBranchRenderInfo, layoutBranchChildren } from './branch-layout'
 
 const translateStartState = new Map<
 	string,
@@ -136,6 +136,9 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			h: 40,
 			color: 'black',
 			childIds: [],
+			leftChildIds: [],
+			rightChildIds: [],
+			rootX: 40,
 			direction: 'right',
 			horizontalGap: 96,
 			verticalGap: 28,
@@ -160,7 +163,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		)
 
 		for (const child of info.children) {
-			const stemDx = shape.props.direction === 'left' ? -24 : 24
+			const stemDx = child.side === 'left' ? -24 : 24
 			children.push(
 				new CubicBezier2d({
 					start: new Vec(info.rootX, info.rootY),
@@ -179,7 +182,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override onTranslateStart(shape: IBranchShape) {
-		const children = (shape.props.childIds || [])
+		const children = getAllBranchChildIds(shape)
 			.map((id) => this.editor.getShape(id as TLShapeId))
 			.filter(Boolean)
 			.map((child: any) => ({
@@ -243,7 +246,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				{hasChildren && (
 					<g fill="none" stroke={color} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round">
 						{info.children.map((child) => {
-							const stemDx = shape.props.direction === 'left' ? -24 : 24
+							const stemDx = child.side === 'left' ? -24 : 24
 							const stemX = info.rootX + stemDx
 							const path = [
 								`M ${info.rootX} ${info.rootY}`,
@@ -264,7 +267,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			<g>
 				<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius} />
 				{info.children.map((child) => {
-					const stemDx = shape.props.direction === 'left' ? -24 : 24
+					const stemDx = child.side === 'left' ? -24 : 24
 					const stemX = info.rootX + stemDx
 					const path = [
 						`M ${info.rootX} ${info.rootY}`,

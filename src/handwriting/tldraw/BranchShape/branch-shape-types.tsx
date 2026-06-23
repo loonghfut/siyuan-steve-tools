@@ -8,7 +8,11 @@ export type IBranchShape = TLBaseShape<
 		w: number
 		h: number
 		color: TLDefaultColorStyle
+		/** 旧版兼容字段：等价于右侧连接 */
 		childIds: string[]
+		leftChildIds?: string[]
+		rightChildIds?: string[]
+		rootX?: number
 		direction: string
 		horizontalGap: number
 		verticalGap: number
