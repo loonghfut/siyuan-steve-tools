@@ -9,8 +9,10 @@ const ROOT_RADIUS = 7
 const MIN_BRANCH_WIDTH = 80
 const MIN_BRANCH_HEIGHT = 40
 const DETACH_DISTANCE_MULTIPLIER = 1
+const ATTACH_DELAY_MS = 500
 const activeBranchDragShapeIds = new Set<string>()
 const pendingBranchDragShapes = new Map<string, TLShape>()
+const delayedAttachCandidates = new Map<string, { key: string; since: number }>()
 
 type Bounds = {
 	x: number
@@ -62,6 +64,29 @@ function canAttachShapeToBranch(editor: Editor, branch: IBranchShape, shape: TLS
 	if (shape.type !== 'branch') return true
 
 	return !isDescendantBranch(editor, shape.id as string, branch.id as string)
+}
+
+function nowMs() {
+	return typeof performance !== 'undefined' ? performance.now() : Date.now()
+}
+
+function clearDelayedAttachCandidate(shapeId?: string) {
+	if (shapeId) delayedAttachCandidates.delete(shapeId)
+	else delayedAttachCandidates.clear()
+}
+
+function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; side: BranchSide }) {
+	const shapeId = shape.id as string
+	const key = `${attach.branch.id}:${attach.side}`
+	const current = delayedAttachCandidates.get(shapeId)
+	const now = nowMs()
+
+	if (!current || current.key !== key) {
+		delayedAttachCandidates.set(shapeId, { key, since: now })
+		return false
+	}
+
+	return now - current.since >= ATTACH_DELAY_MS
 }
 
 function getPageBounds(editor: Editor, shape: TLShape): Bounds | null {
@@ -231,7 +256,10 @@ function sameIds(a: string[], b: string[]) {
 
 export function beginBranchAttachmentDrag(editor: Editor, shape: TLShape) {
 	if (!isBranchConnectableShape(shape)) return
-	if (activeBranchDragShapeIds.size === 0) pendingBranchDragShapes.clear()
+	if (activeBranchDragShapeIds.size === 0) {
+		pendingBranchDragShapes.clear()
+		clearDelayedAttachCandidate()
+	}
 
 	const selectedShapes = editor.getSelectedShapes()
 	const dragShapes = selectedShapes.some((selectedShape) => selectedShape.id === shape.id)
@@ -453,6 +481,10 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 		applyDraftToBranch(editor, draft)
 	}
 
+	for (const shape of shapes) {
+		clearDelayedAttachCandidate(shape.id as string)
+	}
+
 	for (const branchId of affectedBranchIds) {
 		const branch = editor.getShape<IBranchShape>(branchId)
 		if (branch) layoutBranchChildren(editor, branch)
@@ -481,12 +513,16 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape): BranchDrag
 	}
 
 	if (nearestAttach) {
+		if (!isDelayedAttachReady(shape, nearestAttach)) return null
+
 		return {
 			mode: 'attach',
 			branch: nearestAttach.branch,
 			side: nearestAttach.side,
 		}
 	}
+
+	clearDelayedAttachCandidate(shape.id as string)
 
 	for (const branch of branches) {
 		if (!getAllBranchChildIds(branch).includes(shape.id as string)) continue

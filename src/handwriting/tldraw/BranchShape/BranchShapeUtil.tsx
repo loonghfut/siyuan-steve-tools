@@ -18,7 +18,7 @@ import {
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { IBranchShape } from './branch-shape-types'
-import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
+import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, isShapeInBranch, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
 
 const translateStartState = new Map<
@@ -299,6 +299,11 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
 		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id
 		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
+		const isConnectedBranch = useValue(
+			`branch-connected-${shape.id}`,
+			() => isShapeInBranch(editor, shape.id),
+			[editor, shape.id]
+		)
 		const activeSide = isAttachTarget ? interactionHint.side : null
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? 10 : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
@@ -314,6 +319,22 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 					fill="transparent"
 					pointerEvents="none"
 				/>
+				{isConnectedBranch && !isMovingBranch && (
+					<rect
+						x={1}
+						y={1}
+						width={Math.max(shape.props.w - 2, 1)}
+						height={Math.max(shape.props.h - 2, 1)}
+						rx={8}
+						ry={8}
+						fill="none"
+						stroke={color}
+						strokeWidth={1.2}
+						strokeDasharray="4 8"
+						opacity={0.8}
+						pointerEvents="none"
+					/>
+				)}
 				{showHint && (
 					<g pointerEvents="none">
 						{isMovingBranch && (
