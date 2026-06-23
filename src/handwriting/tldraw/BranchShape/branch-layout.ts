@@ -1,5 +1,6 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape, BranchChildShape } from './branch-shape-types'
+import { BranchInteractionHint } from './branch-interaction-state'
 
 const CONNECTABLE_TYPES = new Set(['card', 'single-block'])
 const DEFAULT_NODE_WIDTH = 300
@@ -19,6 +20,17 @@ type Bounds = {
 }
 
 type BranchSide = 'left' | 'right'
+
+type BranchDragPreview =
+	| {
+			mode: 'attach'
+			branch: IBranchShape
+			side: BranchSide
+	  }
+	| {
+			mode: 'detach'
+			branch: IBranchShape
+	  }
 
 export function isBranchConnectableShape(shape: TLShape | undefined): boolean {
 	return !!shape && CONNECTABLE_TYPES.has(shape.type) && typeof (shape as any).props?.w === 'number'
@@ -234,26 +246,11 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	if (!isBranchConnectableShape(shape)) return false
 
-	const branches = editor
-		.getCurrentPageShapes()
-		.filter((candidate) => candidate.type === 'branch') as IBranchShape[]
+	const preview = getBranchDragPreview(editor, shape)
+	if (preview?.mode !== 'attach') return false
 
-	let nearest: IBranchShape | null = null
-	let nearestDistance = Number.POSITIVE_INFINITY
-
-	for (const branch of branches) {
-		const side = getBranchSideForShape(editor, branch, shape)
-		const distance = distanceToBranchRoot(editor, branch, shape, side)
-		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
-		if (distance <= snapDistance && distance < nearestDistance) {
-			nearest = branch
-			nearestDistance = distance
-		}
-	}
-
-	if (!nearest) return false
-
-	const side = getBranchSideForShape(editor, nearest, shape)
+	const nearest = preview.branch
+	const side = preview.side
 	const leftChildIds = normalizeSideChildIds(editor, nearest, 'left').filter((id) => id !== shape.id)
 	const rightChildIds = normalizeSideChildIds(editor, nearest, 'right').filter((id) => id !== shape.id)
 	if (side === 'left') leftChildIds.push(shape.id as string)
@@ -276,6 +273,67 @@ export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	}
 
 	return true
+}
+
+export function getBranchDragPreview(editor: Editor, shape: TLShape): BranchDragPreview | null {
+	if (!isBranchConnectableShape(shape)) return null
+
+	const branches = editor
+		.getCurrentPageShapes()
+		.filter((candidate) => candidate.type === 'branch') as IBranchShape[]
+
+	let nearestAttach: { branch: IBranchShape; side: BranchSide; distance: number } | null = null
+
+	for (const branch of branches) {
+		const side = getBranchSideForShape(editor, branch, shape)
+		const distance = distanceToBranchRoot(editor, branch, shape, side)
+		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
+		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
+			nearestAttach = { branch, side, distance }
+		}
+	}
+
+	if (nearestAttach) {
+		return {
+			mode: 'attach',
+			branch: nearestAttach.branch,
+			side: nearestAttach.side,
+		}
+	}
+
+	for (const branch of branches) {
+		if (!getAllBranchChildIds(branch).includes(shape.id as string)) continue
+		const detachDistance = Math.max(branch.props.snapDistance || 160, 80) * DETACH_DISTANCE_MULTIPLIER
+		const distance = distanceToBranchWorkArea(editor, branch, shape)
+		if (distance > detachDistance) {
+			return {
+				mode: 'detach',
+				branch,
+			}
+		}
+	}
+
+	return null
+}
+
+export function getBranchInteractionHintForShape(editor: Editor, shape: TLShape): BranchInteractionHint | null {
+	const preview = getBranchDragPreview(editor, shape)
+	if (!preview) return null
+
+	if (preview.mode === 'attach') {
+		return {
+			mode: 'attach',
+			draggingShapeId: shape.id as string,
+			branchId: preview.branch.id,
+			side: preview.side,
+		}
+	}
+
+	return {
+		mode: 'detach',
+		draggingShapeId: shape.id as string,
+		branchId: preview.branch.id,
+	}
 }
 
 export function updateBranchAttachmentAfterDrag(editor: Editor, shape: TLShape) {

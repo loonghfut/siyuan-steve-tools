@@ -21,11 +21,17 @@ import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContent } from '../utils/render/content-renderer'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
-import { updateBranchAttachmentAfterDrag } from '../BranchShape'
+import {
+	clearBranchInteractionHint,
+	getBranchInteractionHintForShape,
+	setBranchInteractionHint,
+	updateBranchAttachmentAfterDrag,
+} from '../BranchShape'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
 let pendingCreationPromise: Promise<string> | null = null;
+const draggingBranchCardIds = new Set<string>()
 
 // 静态预览 DOM 缓存：避免重复请求
 const staticPreviewCache = new Map<string, { html: string; fontSize: number }>();
@@ -118,6 +124,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	override onBeforeUpdate(prev: ICardShape, next: ICardShape) {
 		if (prev.props.blockId && next.props.blockId === '') {
 			next.props.blockId = prev.props.blockId;
+		}
+
+		if (draggingBranchCardIds.has(next.id as string) && (prev.x !== next.x || prev.y !== next.y)) {
+			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 		}
 	}
 
@@ -1412,7 +1422,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		return resizeBox(shape, info)
 	}
 
+	override onTranslateStart(shape: ICardShape) {
+		draggingBranchCardIds.add(shape.id as string)
+		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, shape))
+	}
+
 	override onTranslateEnd(_initial: ICardShape, currentShape: ICardShape) {
+		draggingBranchCardIds.delete(currentShape.id as string)
+		clearBranchInteractionHint(currentShape.id as string)
 		updateBranchAttachmentAfterDrag(this.editor, currentShape)
 	}
 

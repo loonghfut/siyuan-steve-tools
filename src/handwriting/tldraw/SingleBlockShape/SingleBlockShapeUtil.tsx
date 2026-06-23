@@ -35,10 +35,16 @@ import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
-import { updateBranchAttachmentAfterDrag } from '../BranchShape'
+import {
+	clearBranchInteractionHint,
+	getBranchInteractionHintForShape,
+	setBranchInteractionHint,
+	updateBranchAttachmentAfterDrag,
+} from '../BranchShape'
 
 let isCreatingBlock = false
 let pendingCreationPromise: Promise<string> | null = null
+const draggingBranchSingleBlockIds = new Set<string>()
 
 // ===== DOM 尺寸测量（仅影响高度）=====
 // 用 EditorAtom 存储每个 shape 的测量尺寸，保证 getGeometry 响应式更新
@@ -261,6 +267,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	override onBeforeUpdate(prev: ISingleBlockShape, next: ISingleBlockShape) {
 		if (prev.props.blockId && !next.props.blockId) {
 			next.props.blockId = prev.props.blockId
+		}
+
+		if (draggingBranchSingleBlockIds.has(next.id as string) && (prev.x !== next.x || prev.y !== next.y)) {
+			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 		}
 
 		// 当从允许绑定切换到不允许绑定时，删除已有的 single-block 类型的绑定
@@ -1188,11 +1198,16 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	}
 
 	override onTranslateStart(shape: ISingleBlockShape) {
+		draggingBranchSingleBlockIds.add(shape.id as string)
+		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, shape))
+
 		const bindings = this.editor.getBindingsFromShape(shape, 'single-block')
 		this.editor.deleteBindings(bindings)
 	}
 
 	override onTranslateEnd(_initial: ISingleBlockShape, currentShape: ISingleBlockShape) {
+		draggingBranchSingleBlockIds.delete(currentShape.id as string)
+		clearBranchInteractionHint(currentShape.id as string)
 		if (updateBranchAttachmentAfterDrag(this.editor, currentShape)) return
 
         // 如果当前 shape 标记为不允许绑定，则跳过创建绑定

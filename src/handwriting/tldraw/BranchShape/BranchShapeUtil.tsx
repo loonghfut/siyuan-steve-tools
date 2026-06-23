@@ -19,6 +19,7 @@ import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { IBranchShape } from './branch-shape-types'
 import { getAllBranchChildIds, getBranchRenderInfo, layoutBranchChildren } from './branch-layout'
+import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
 
 const translateStartState = new Map<
 	string,
@@ -182,6 +183,11 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override onTranslateStart(shape: IBranchShape) {
+		setBranchInteractionHint({
+			mode: 'move-branch',
+			branchId: shape.id,
+		})
+
 		const children = getAllBranchChildIds(shape)
 			.map((id) => this.editor.getShape(id as TLShapeId))
 			.filter(Boolean)
@@ -200,6 +206,8 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override onTranslateEnd(initial: IBranchShape, current: IBranchShape) {
+		clearBranchInteractionHint(current.id)
+
 		const start = translateStartState.get(current.id)
 		translateStartState.delete(current.id)
 
@@ -233,15 +241,82 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		)
 		const hasChildren = info.children.length > 0
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
+		const interactionHint = useBranchInteractionHint()
+		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
+		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id
+		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
+		const activeSide = isAttachTarget ? interactionHint.side : null
+		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
+		const rootHaloRadius = info.rootRadius + (isAttachTarget ? 10 : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
+		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
 
 		return (
 			<SVGContainer className="BranchShape">
+				{showHint && (
+					<g pointerEvents="none">
+						{isMovingBranch && (
+							<rect
+								x={1}
+								y={1}
+								width={Math.max(shape.props.w - 2, 1)}
+								height={Math.max(shape.props.h - 2, 1)}
+								rx={10}
+								ry={10}
+								fill="none"
+								stroke={accentColor}
+								strokeWidth={2}
+								strokeDasharray="6 5"
+								opacity={0.55}
+							/>
+						)}
+						<circle
+							cx={info.rootX}
+							cy={info.rootY}
+							r={rootHaloRadius}
+							fill={accentColor}
+							opacity={isDetachTarget ? 0.12 : 0.16}
+						/>
+						<circle
+							cx={info.rootX}
+							cy={info.rootY}
+							r={rootHaloRadius}
+							fill="none"
+							stroke={accentColor}
+							strokeWidth={2}
+							strokeDasharray={isDetachTarget ? '4 4' : undefined}
+							opacity={0.85}
+						/>
+						{isAttachTarget && activeSide && (
+							<path
+								d={[
+									`M ${info.rootX + (activeSide === 'left' ? -14 : 14)} ${info.rootY}`,
+									`L ${info.rootX + (activeSide === 'left' ? -36 : 36)} ${info.rootY}`,
+									`M ${info.rootX + (activeSide === 'left' ? -27 : 27)} ${info.rootY - 8}`,
+									`L ${info.rootX + (activeSide === 'left' ? -36 : 36)} ${info.rootY}`,
+									`L ${info.rootX + (activeSide === 'left' ? -27 : 27)} ${info.rootY + 8}`,
+								].join(' ')}
+								fill="none"
+								stroke={accentColor}
+								strokeWidth={2.5}
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								opacity={0.95}
+							/>
+						)}
+						{isDetachTarget && (
+							<g stroke={accentColor} strokeWidth={2.5} strokeLinecap="round" opacity={0.95}>
+								<line x1={info.rootX - 6} y1={info.rootY - 6} x2={info.rootX + 6} y2={info.rootY + 6} />
+								<line x1={info.rootX + 6} y1={info.rootY - 6} x2={info.rootX - 6} y2={info.rootY + 6} />
+							</g>
+						)}
+					</g>
+				)}
 				<circle
 					cx={info.rootX}
 					cy={info.rootY}
 					r={info.rootRadius}
 					fill={color}
-					opacity={hasChildren ? 1 : 0.9}
+					opacity={hasChildren || showHint ? 1 : 0.9}
 				/>
 				{hasChildren && (
 					<g fill="none" stroke={color} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round">
@@ -252,7 +327,17 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 								`M ${info.rootX} ${info.rootY}`,
 								`C ${stemX} ${info.rootY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
 							].join(' ')
-							return <path key={child.id} d={path} />
+							const isActiveSide = isAttachTarget && activeSide === child.side
+							return (
+								<path
+									key={child.id}
+									d={path}
+									stroke={isDetachTarget || isActiveSide || isMovingBranch ? accentColor : color}
+									strokeWidth={isDetachTarget || isActiveSide || isMovingBranch ? lineWidth + 1.5 : lineWidth}
+									strokeDasharray={isDetachTarget ? '6 5' : undefined}
+									opacity={showHint && !isMovingBranch && !isActiveSide ? 0.45 : 1}
+								/>
+							)
 						})}
 					</g>
 				)}
