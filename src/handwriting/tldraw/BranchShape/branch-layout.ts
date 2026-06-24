@@ -1,6 +1,6 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape, BranchChildShape } from './branch-shape-types'
-import { BranchInteractionHint } from './branch-interaction-state'
+import { BranchInteractionHint, setBranchInteractionHint } from './branch-interaction-state'
 
 const CONNECTABLE_TYPES = new Set(['card', 'single-block', 'branch'])
 const DEFAULT_NODE_WIDTH = 300
@@ -8,11 +8,20 @@ const DEFAULT_NODE_HEIGHT = 80
 const ROOT_RADIUS = 7
 const MIN_BRANCH_WIDTH = 80
 const MIN_BRANCH_HEIGHT = 40
-const DETACH_DISTANCE_MULTIPLIER = 1
+const DETACH_DISTANCE_MULTIPLIER = 0.7
 const ATTACH_DELAY_MS = 500
 const activeBranchDragShapeIds = new Set<string>()
 const pendingBranchDragShapes = new Map<string, TLShape>()
-const delayedAttachCandidates = new Map<string, { key: string; since: number }>()
+const delayedAttachCandidates = new Map<
+	string,
+	{
+		key: string
+		since: number
+		branchId: string
+		side: BranchSide
+		timeoutId: ReturnType<typeof setTimeout> | null
+	}
+>()
 
 type Bounds = {
 	x: number
@@ -71,22 +80,87 @@ function nowMs() {
 }
 
 function clearDelayedAttachCandidate(shapeId?: string) {
-	if (shapeId) delayedAttachCandidates.delete(shapeId)
-	else delayedAttachCandidates.clear()
+	const clearOne = (id: string) => {
+		const current = delayedAttachCandidates.get(id)
+		if (current?.timeoutId) clearTimeout(current.timeoutId)
+		delayedAttachCandidates.delete(id)
+	}
+
+	if (shapeId) {
+		clearOne(shapeId)
+		return
+	}
+
+	for (const id of delayedAttachCandidates.keys()) {
+		clearOne(id)
+	}
 }
 
-function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; side: BranchSide }) {
+function getAttachCandidateKey(attach: { branch: IBranchShape; side: BranchSide }) {
+	return `${attach.branch.id}:${attach.side}`
+}
+
+function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; side: BranchSide }, scheduleHint: boolean) {
 	const shapeId = shape.id as string
-	const key = `${attach.branch.id}:${attach.side}`
+	const key = getAttachCandidateKey(attach)
 	const current = delayedAttachCandidates.get(shapeId)
 	const now = nowMs()
 
 	if (!current || current.key !== key) {
-		delayedAttachCandidates.set(shapeId, { key, since: now })
+		if (current?.timeoutId) clearTimeout(current.timeoutId)
+		const nextCandidate = {
+			key,
+			since: now,
+			branchId: attach.branch.id as string,
+			side: attach.side,
+			timeoutId: null as ReturnType<typeof setTimeout> | null,
+		}
+
+		if (scheduleHint) {
+			nextCandidate.timeoutId = setTimeout(() => {
+				const latest = delayedAttachCandidates.get(shapeId)
+				if (!latest || latest.key !== key) return
+				latest.timeoutId = null
+				if (!activeBranchDragShapeIds.has(shapeId)) return
+				setBranchInteractionHint({
+					mode: 'attach',
+					draggingShapeId: shapeId,
+					branchId: latest.branchId,
+					side: latest.side,
+				})
+			}, ATTACH_DELAY_MS)
+		}
+
+		delayedAttachCandidates.set(shapeId, nextCandidate)
 		return false
 	}
 
+	if (!scheduleHint && current.timeoutId) {
+		clearTimeout(current.timeoutId)
+		current.timeoutId = null
+	}
+
 	return now - current.since >= ATTACH_DELAY_MS
+}
+
+function getNearestAttachCandidate(editor: Editor, shape: TLShape) {
+	const branches = editor
+		.getCurrentPageShapes()
+		.filter((candidate) => candidate.type === 'branch') as IBranchShape[]
+
+	let nearestAttach: { branch: IBranchShape; side: BranchSide; distance: number } | null = null
+
+	for (const branch of branches) {
+		if (!canAttachShapeToBranch(editor, branch, shape)) continue
+		const side = getBranchSideForShape(editor, branch, shape)
+		const distance = distanceToBranchRoot(editor, branch, shape, side)
+		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
+		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
+			nearestAttach = { branch, side, distance }
+		}
+	}
+
+	return nearestAttach
 }
 
 function getPageBounds(editor: Editor, shape: TLShape): Bounds | null {
@@ -423,7 +497,7 @@ function applyDraftToBranch(editor: Editor, draft: BranchIdsDraft) {
 export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	if (!isBranchConnectableShape(shape)) return false
 
-	const preview = getBranchDragPreview(editor, shape)
+	const preview = getBranchDragPreview(editor, shape, { scheduleAttachHint: false })
 	if (preview?.mode !== 'attach') return false
 
 	return updateBranchAttachmentsAfterDrag(editor, [shape])
@@ -442,7 +516,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 	for (const shape of shapes) {
 		if (!isBranchConnectableShape(shape)) continue
 		const childId = shape.id as string
-		const preview = getBranchDragPreview(editor, shape)
+		const preview = getBranchDragPreview(editor, shape, { scheduleAttachHint: false })
 
 		if (preview?.mode === 'attach') {
 			const nearest = preview.branch
@@ -493,27 +567,18 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 	return didHandle
 }
 
-export function getBranchDragPreview(editor: Editor, shape: TLShape): BranchDragPreview | null {
+export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: { scheduleAttachHint?: boolean }): BranchDragPreview | null {
 	if (!isBranchConnectableShape(shape)) return null
 
+	const scheduleAttachHint = options?.scheduleAttachHint ?? true
 	const branches = editor
 		.getCurrentPageShapes()
 		.filter((candidate) => candidate.type === 'branch') as IBranchShape[]
 
-	let nearestAttach: { branch: IBranchShape; side: BranchSide; distance: number } | null = null
-
-	for (const branch of branches) {
-		if (!canAttachShapeToBranch(editor, branch, shape)) continue
-		const side = getBranchSideForShape(editor, branch, shape)
-		const distance = distanceToBranchRoot(editor, branch, shape, side)
-		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
-		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
-			nearestAttach = { branch, side, distance }
-		}
-	}
+	const nearestAttach = getNearestAttachCandidate(editor, shape)
 
 	if (nearestAttach) {
-		if (!isDelayedAttachReady(shape, nearestAttach)) return null
+		if (!isDelayedAttachReady(shape, nearestAttach, scheduleAttachHint)) return null
 
 		return {
 			mode: 'attach',
