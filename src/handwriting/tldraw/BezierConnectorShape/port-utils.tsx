@@ -27,15 +27,16 @@ const shapePagePortsCache = createComputedCache(
 			pagePorts[p.id] = transform.applyToPoint(p)
 		}
 
-		// 计算在页面空间的包围盒（考虑旋转/缩放）
-		const corners = [
-			transform.applyToPoint({ x: bounds.x, y: bounds.y }),
-			transform.applyToPoint({ x: bounds.x + bounds.width, y: bounds.y }),
-			transform.applyToPoint({ x: bounds.x, y: bounds.y + bounds.height }),
-			transform.applyToPoint({ x: bounds.x + bounds.width, y: bounds.y + bounds.height }),
-		]
-		const xs = corners.map((c) => c.x)
-		const ys = corners.map((c) => c.y)
+			// 计算在页面空间的包围盒（考虑旋转/缩放），并包含外移后的端口位置
+			const corners = [
+				transform.applyToPoint({ x: bounds.x, y: bounds.y }),
+				transform.applyToPoint({ x: bounds.x + bounds.width, y: bounds.y }),
+				transform.applyToPoint({ x: bounds.x, y: bounds.y + bounds.height }),
+				transform.applyToPoint({ x: bounds.x + bounds.width, y: bounds.y + bounds.height }),
+			]
+			const bboxPoints = [...corners, ...Object.values(pagePorts)]
+			const xs = bboxPoints.map((c) => c.x)
+			const ys = bboxPoints.map((c) => c.y)
 		const bbox = {
 			minX: Math.min(...xs),
 			minY: Math.min(...ys),

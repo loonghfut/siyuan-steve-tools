@@ -23,35 +23,36 @@ export function getShapePorts(editor: Editor, shape: TLShape): Record<string, Sh
 	}
 
 	const bounds = editor.getShapeGeometry(shape).bounds
+	const portOutset = 4
 
 	// 获取形状的中心坐标
 	const centerY = bounds.height / 2
 	const centerX = bounds.width / 2
 
-	// 支持上下左右四个端口：left/right 保持原有语义；top/bottom 新增
+	// 支持上下左右四个端口：端口外移，避免在形状框内误触
 	return {
 		input: {
 			id: 'input',
-			x: 0, // 左边缘
+			x: -portOutset,
 			y: centerY,
 			terminal: 'end', // 输入端口对应连接的终点
 		},
 		output: {
 			id: 'output',
-			x: bounds.width, // 右边缘
+			x: bounds.width + portOutset,
 			y: centerY,
 			terminal: 'start', // 输出端口对应连接的起点
 		},
 		top: {
 			id: 'top',
 			x: centerX,
-			y: 0,
+			y: -portOutset,
 			terminal: 'end',
 		},
 		bottom: {
 			id: 'bottom',
 			x: centerX,
-			y: bounds.height,
+			y: bounds.height + portOutset,
 			terminal: 'start',
 		},
 	}
