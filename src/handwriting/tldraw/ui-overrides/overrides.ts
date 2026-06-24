@@ -49,7 +49,7 @@ export const uiOverrides: TLUiOverrides = {
         }
         tools.branch = {
             id: 'branch',
-            icon: 'arrow-right',
+            icon: 'branch',
             label: 'Branch',
             kbd: 't',
             onSelect: () => editor.setCurrentTool('branch'),

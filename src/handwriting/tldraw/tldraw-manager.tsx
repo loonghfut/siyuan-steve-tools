@@ -53,6 +53,7 @@ const assetUrls = getAssetUrls({
 try {
     assetUrls.icons['mindmap'] = 'plugins/siyuan-steve-tools/asset/icons/custom/mindmap.svg';
     assetUrls.icons['iconParagraph'] = 'plugins/siyuan-steve-tools/asset/icons/custom/iconParagraph.svg';
+    assetUrls.icons['branch'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch.svg';
 } catch (err) {
     console.warn('无法在 assetUrls 上添加 custom-icon 映射', err);
 }
