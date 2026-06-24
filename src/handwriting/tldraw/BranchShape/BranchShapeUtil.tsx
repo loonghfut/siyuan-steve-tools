@@ -7,11 +7,9 @@ import {
 	Rectangle2d,
 	ShapeUtil,
 	SVGContainer,
-	TLResizeInfo,
 	TLShapeId,
 	Vec,
 	VecLike,
-	resizeBox,
 	getDefaultColorTheme,
 	useValue,
 } from '@tldraw/tldraw'
@@ -21,13 +19,7 @@ import { IBranchShape } from './branch-shape-types'
 import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, isShapeInBranch, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
 
-const translateStartState = new Map<
-	string,
-	{
-		branchX: number
-		branchY: number
-	}
->()
+const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
 
 function collectBranchMoveUpdates(
@@ -231,7 +223,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override onBeforeUpdate(prev: IBranchShape, next: IBranchShape) {
-		if (!translateStartState.has(next.id) || (prev.x === next.x && prev.y === next.y)) return
+		if (!translatingBranchIds.has(next.id) || (prev.x === next.x && prev.y === next.y)) return
 
 		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 
@@ -256,10 +248,6 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		}
 	}
 
-	override onResize(shape: IBranchShape, info: TLResizeInfo<IBranchShape>) {
-		return resizeBox(shape, info)
-	}
-
 	override onTranslateStart(shape: IBranchShape) {
 		beginBranchAttachmentDrag(this.editor, shape)
 		setBranchInteractionHint({
@@ -267,16 +255,13 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			branchId: shape.id,
 		})
 
-		translateStartState.set(shape.id, {
-			branchX: shape.x,
-			branchY: shape.y,
-		})
+		translatingBranchIds.add(shape.id)
 	}
 
 	override onTranslateEnd(initial: IBranchShape, current: IBranchShape) {
 		clearBranchInteractionHint(current.id)
 
-		translateStartState.delete(current.id)
+		translatingBranchIds.delete(current.id)
 
 		const branch = this.editor.getShape<IBranchShape>(current.id) || current || initial
 		if (updateBranchAttachmentAfterDrag(this.editor, branch)) return

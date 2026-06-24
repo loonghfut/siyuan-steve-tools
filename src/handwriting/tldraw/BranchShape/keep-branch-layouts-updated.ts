@@ -1,6 +1,6 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape } from './branch-shape-types'
-import { relayoutBranchesContainingShape } from './branch-layout'
+import { relayoutBranchesContainingShapes } from './branch-layout'
 
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 
@@ -47,9 +47,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		isUpdating = true
 
 		try {
-			for (const shapeId of shapeIds) {
-				relayoutBranchesContainingShape(editor, shapeId as TLShapeId)
-			}
+			relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
 		} finally {
 			isUpdating = false
 		}
