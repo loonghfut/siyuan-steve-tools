@@ -17,6 +17,7 @@ interface CacheEntry {
 	html: string
 	timestamp: number
 	blockId: string
+	fontSize?: number
 }
 
 // 全局 HTML 内容缓存
@@ -27,6 +28,10 @@ const CACHE_TTL_MS = 10 * 60 * 1000
 
 // 最大缓存条目数
 const MAX_CACHE_SIZE = 100
+
+function getCacheKey(blockId: string, fontSize?: number): string {
+	return fontSize ? `${blockId}:${fontSize}` : blockId
+}
 
 // ===== 批量请求队列 =====
 interface PendingRequest {
@@ -69,7 +74,7 @@ async function processBatchQueue(): Promise<void> {
 	// 收集所有需要请求的 blockId（排除已缓存的）
 	const toFetch: Map<string, PendingRequest[]> = new Map()
 	for (const req of currentBatch) {
-		const cached = getCachedHtml(req.blockId)
+		const cached = getCachedHtml(req.blockId, req.fontSize)
 		if (cached) {
 			// 已有缓存，直接返回
 			req.resolve(cached)
@@ -103,7 +108,7 @@ async function processBatchQueue(): Promise<void> {
 			if (dom) {
 				const fontSize = requests[0].fontSize
 				const html = wrapBlockDomHtml(dom, fontSize)
-				setCachedHtml(blockId, html)
+				setCachedHtml(blockId, html, fontSize)
 				for (const req of requests) {
 					req.resolve(html)
 				}
@@ -154,7 +159,7 @@ function scheduleBatchProcessing() {
 export function requestBlockDOM(blockId: string, fontSize: number): Promise<string | null> {
 	return new Promise((resolve) => {
 		// 先检查缓存
-		const cached = getCachedHtml(blockId)
+		const cached = getCachedHtml(blockId, fontSize)
 		if (cached) {
 			resolve(cached)
 			return
@@ -171,8 +176,8 @@ export function requestBlockDOM(blockId: string, fontSize: number): Promise<stri
 /**
  * 获取缓存的 HTML 内容
  */
-export function getCachedHtml(blockId: string): string | null {
-	const entry = htmlCache.get(blockId)
+export function getCachedHtml(blockId: string, fontSize?: number): string | null {
+	const entry = htmlCache.get(getCacheKey(blockId, fontSize))
 	if (!entry) return null
 	
 	// 检查是否过期
@@ -187,7 +192,7 @@ export function getCachedHtml(blockId: string): string | null {
 /**
  * 设置缓存的 HTML 内容
  */
-export function setCachedHtml(blockId: string, html: string): void {
+export function setCachedHtml(blockId: string, html: string, fontSize?: number): void {
 	// 如果缓存已满，移除最旧的条目
 	if (htmlCache.size >= MAX_CACHE_SIZE) {
 		let oldestKey: string | null = null
@@ -203,10 +208,11 @@ export function setCachedHtml(blockId: string, html: string): void {
 		}
 	}
 	
-	htmlCache.set(blockId, {
+	htmlCache.set(getCacheKey(blockId, fontSize), {
 		html,
 		timestamp: Date.now(),
 		blockId,
+		fontSize,
 	})
 }
 
@@ -214,7 +220,11 @@ export function setCachedHtml(blockId: string, html: string): void {
  * 使缓存失效
  */
 export function invalidateCache(blockId: string): void {
-	htmlCache.delete(blockId)
+	for (const [key, entry] of htmlCache) {
+		if (entry.blockId === blockId || key === blockId || key.startsWith(`${blockId}:`)) {
+			htmlCache.delete(key)
+		}
+	}
 }
 
 /**
@@ -306,7 +316,7 @@ export function extractStaticHtml(container: HTMLElement, _fontSize: number): st
 export function cacheFromProtyleHost(blockId: string, host: HTMLElement, fontSize: number): string {
 	const html = extractStaticHtml(host, fontSize)
 	if (!html) return html
-	setCachedHtml(blockId, html)
+	setCachedHtml(blockId, html, fontSize)
 	return html
 }
 
@@ -397,13 +407,13 @@ export function renderSimpleBlockHtml(content: string, fontSize: number): string
 
 export async function preloadBlockContent(blockId: string, fontSize: number): Promise<void> {
 	// 如果已有缓存，跳过
-	if (getCachedHtml(blockId)) return
+	if (getCachedHtml(blockId, fontSize)) return
 	
 	// 优先使用 getBlockDOM API
 	const dom = await getBlockDOM(blockId)
 	if (dom) {
 		const html = wrapBlockDomHtml(dom, fontSize)
-		setCachedHtml(blockId, html)
+		setCachedHtml(blockId, html, fontSize)
 		return
 	}
 	
@@ -411,6 +421,6 @@ export async function preloadBlockContent(blockId: string, fontSize: number): Pr
 	const content = await getBlockContent(blockId)
 	if (content) {
 		const html = renderSimpleBlockHtml(content.content || content.markdown, fontSize)
-		setCachedHtml(blockId, html)
+		setCachedHtml(blockId, html, fontSize)
 	}
 }

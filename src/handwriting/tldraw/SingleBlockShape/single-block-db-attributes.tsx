@@ -3,7 +3,7 @@
  * 提供数据库属性的获取、显示和内联编辑功能
  */
 
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { showMessage } from 'siyuan'
 import { getDatabaseAttributesForBlock, DatabaseAttributeEntry, DatabaseAttributeOptions } from '@/api/database-attributes'
 import { AVManager } from '@/api/db_pro'
@@ -843,6 +843,7 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 	const { blockId, themeColor, shapeWidth, refreshNonce, onRefresh } = props
 	const [dbAttributes, setDbAttributes] = useState<DatabaseAttributeEntry[]>([])
 	const [activeEditKeyID, setActiveEditKeyID] = useState<string | null>(null)
+	const refreshNonceRef = useRef(refreshNonce)
 
 	// 加载数据库属性
 	useEffect(() => {
@@ -852,9 +853,11 @@ export function DbAttributeBar(props: DbAttributeDisplayProps) {
 		}
 
 		let cancelled = false
+		const forceRefresh = refreshNonceRef.current !== refreshNonce
+		refreshNonceRef.current = refreshNonce
 		const options: DatabaseAttributeOptions = {
 			maxEntries: 6,
-			forceRefresh: refreshNonce !== undefined,
+			forceRefresh,
 		}
 
 		getDatabaseAttributesForBlock(blockId, options)

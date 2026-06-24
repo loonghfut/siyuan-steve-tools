@@ -19,6 +19,7 @@ import {
 	invLerp,
 	lerp,
 	VecModel,
+	Editor,
 } from '@tldraw/tldraw'
 import { openAttributePanel, openTab, Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
@@ -43,9 +44,8 @@ import {
 	updateBranchAttachmentAfterDrag,
 } from '../BranchShape'
 
-let isCreatingBlock = false
-let pendingCreationPromise: Promise<string> | null = null
 const draggingBranchSingleBlockIds = new Set<string>()
+const pendingCreationPromises = new Map<string, Promise<string>>()
 
 // ===== DOM 尺寸测量（仅影响高度）=====
 // 用 EditorAtom 存储每个 shape 的测量尺寸，保证 getGeometry 响应式更新
@@ -134,13 +134,13 @@ function findStaticLinkTarget(target: EventTarget | null, root: HTMLElement | nu
 // ===== 独立的尺寸测量 Hook =====
 // 参考 tldraw 官方示例，将尺寸测量逻辑抽取为可复用的 hook
 function useSingleBlockSize(
+	editor: Editor,
 	shape: ISingleBlockShape,
 	containerRef: React.RefObject<HTMLDivElement>,
 	protyleHostRef: React.RefObject<HTMLDivElement | null>,
 	isEditingState: boolean,
 	shouldSkipMeasurement: boolean
 ) {
-	const editor = (window as any).__tldrawEditor || null
 	// 用于在编辑态切换时临时锁定高度，防止闪烁
 	const heightLockRef = useRef(false)
 	const prevEditingRef = useRef(isEditingState)
@@ -385,7 +385,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	component(shape: ISingleBlockShape) {
 		const editor = this.editor
 		// 保存 editor 引用供 useSingleBlockSize hook 使用
-		;(window as any).__tldrawEditor = editor
 		const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 		const isEditing = editor.getEditingShapeId() === shape.id
 		const [isEditingState, setIsEditingState] = useState(isEditing)
@@ -401,6 +400,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const hadFocusedRef = useRef(false)
 		const protyleRef = useRef<Protyle | null>(null)
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
+		const refreshNonceRef = useRef(shape.props.refreshNonce)
 		// 静态 HTML 内容（非编辑态显示）
 		const [staticHtml, setStaticHtml] = useState<string>('')
 		// 静态内容容器的 ref，用于渲染后执行 renderAllContent
@@ -449,7 +449,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		// 使用独立的尺寸测量 hook（自动处理尺寸更新）
 	// 如果有加载错误，跳过测量以避免异常增长
-	useSingleBlockSize(shape, containerRef, protyleHostRef, isEditingState, isLoadingContent || hasLoadError)
+	useSingleBlockSize(editor, shape, containerRef, protyleHostRef, isEditingState, isLoadingContent || hasLoadError)
 		// 检测是否包含属性视图图标（数据库图标）
 		useEffect(() => {
 			let container = containerRef.current
@@ -567,17 +567,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			
 			const blockId = shape.props.blockId
 			if (!blockId) return
+			const fontSize = shape.props.fontSize || 16
 			
 			// 检查视口可见性
 			const shouldLoad = !isViewportCullingEnabled || (isInViewport && canLoad)
 			if (!shouldLoad) return
 			
 			// refreshNonce 变化时强制刷新缓存
-			const forceRefresh = shape.props.refreshNonce !== undefined
+			const forceRefresh = refreshNonceRef.current !== shape.props.refreshNonce
+			refreshNonceRef.current = shape.props.refreshNonce
 			
 			// 尝试从缓存获取（除非需要强制刷新）
 			if (!forceRefresh) {
-				const cached = getCachedHtml(blockId)
+				const cached = getCachedHtml(blockId, fontSize)
 				if (cached) {
 					setStaticHtml(cached)
 					return
@@ -591,7 +593,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			let cancelled = false
 			setIsLoadingContent(true)
 			setHasLoadError(false)
-			const fontSize = shape.props.fontSize || 16
 			
 			// 使用批量请求函数获取 DOM
 			requestBlockDOM(blockId, fontSize).then(async (html) => {
@@ -606,7 +607,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (cancelled) return
 				if (content) {
 					const fallbackHtml = await renderSimpleBlockHtml(content.content || content.markdown, fontSize)
-					setCachedHtml(blockId, fallbackHtml)
+					setCachedHtml(blockId, fallbackHtml, fontSize)
 					setStaticHtml(fallbackHtml)
 					setHasLoadError(false)
 				} else {
@@ -633,13 +634,14 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			
 			// 生成唯一的渲染任务 ID
 			const renderTaskId = `render-static-${shape.id}`
+			let cancelled = false
 			
 			// 使用 requestAnimationFrame 确保 DOM 已更新
 			const rafId = requestAnimationFrame(() => {
 				if (staticContentRef.current) {
 					// 使用空闲调度渲染，在交互时会暂停
-					renderAllContentIdle(staticContentRef.current, 10).then(() => {
-						setIsContentRendered(true)
+					renderAllContentIdle(staticContentRef.current, 10, renderTaskId).then(() => {
+						if (!cancelled) setIsContentRendered(true)
 					}).catch(() => {
 						// 忽略渲染错误
 					})
@@ -647,6 +649,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			})
 			
 			return () => {
+				cancelled = true
 				cancelAnimationFrame(rafId)
 				cancelIdleRender(renderTaskId)
 			}
@@ -692,16 +695,16 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					return null
 				}
 
-				if (isCreatingBlock && pendingCreationPromise) {
+				const pendingCreationPromise = pendingCreationPromises.get(shape.id as string)
+				if (pendingCreationPromise) {
 					try {
 						blockId = await pendingCreationPromise
 					} catch (err) {
 						console.error('等待块创建失败', err)
 					}
 				} else if (!blockId) {
-					isCreatingBlock = true
 					try {
-						pendingCreationPromise = (async () => {
+						const creationPromise = (async () => {
 							const idid = (await api.generateSiyuanID()) as string
 							const link = buildTldrawLink(tldrawId, idid, title)
 							// 将链接保存到自定义属性中
@@ -712,12 +715,12 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							)
 							return redata[0].doOperations[0].id as string
 						})()
-						blockId = await pendingCreationPromise
+						pendingCreationPromises.set(shape.id as string, creationPromise)
+						blockId = await creationPromise
 					} catch (err) {
 						console.error('创建块失败', err)
 					} finally {
-						isCreatingBlock = false
-						setTimeout(() => (pendingCreationPromise = null), 5000)
+						pendingCreationPromises.delete(shape.id as string)
 					}
 				}
 
@@ -1114,15 +1117,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					if (!window.siyuan?.ws?.app) return
 					const data = await (api as any).getBlockAttrs(blockId)
 					const tempContainer = document.createElement('div')
-					const protyle = new Protyle(window.siyuan.ws.app, tempContainer, {
+					const tempProtyle = new Protyle(window.siyuan.ws.app, tempContainer, {
 						blockId,
 						rootId: blockId,
-					}).protyle
+					})
+					const protyle = tempProtyle.protyle
 					openAttributePanel({
 						data,
 						focusName: 'av',
 						protyle,
 					})
+					window.setTimeout(() => {
+						safeDestroyProtyle(tempProtyle)
+					}, 0)
 				} catch (err) {
 					console.error('open attribute panel failed', err)
 					try {
