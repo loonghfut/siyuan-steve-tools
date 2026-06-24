@@ -14,5 +14,6 @@ export const branchShapeProps: RecordProps<IBranchShape> = {
 	verticalGap: T.number,
 	lineWidth: T.number,
 	snapDistance: T.number,
+	showOuterFrame: T.optional(T.boolean),
 	version: T.optional(T.number),
 }

@@ -18,6 +18,7 @@ export type IBranchShape = TLBaseShape<
 		verticalGap: number
 		lineWidth: number
 		snapDistance: number
+		showOuterFrame?: boolean
 		version?: number
 	}
 >

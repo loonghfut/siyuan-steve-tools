@@ -186,7 +186,8 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			verticalGap: 28,
 			lineWidth: 3,
 			snapDistance: 160,
-			version: 1,
+			showOuterFrame: false,
+			version: 2,
 		}
 	}
 
@@ -293,6 +294,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? 10 : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
+		const showOuterFrame = shape.props.showOuterFrame === true
 
 		return (
 			<SVGContainer className="BranchShape">
@@ -304,7 +306,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 					fill="transparent"
 					pointerEvents="none"
 				/>
-				{isConnectedBranch && !isMovingBranch && (
+				{isConnectedBranch && showOuterFrame && !isMovingBranch && (
 					<rect
 						x={1}
 						y={1}
