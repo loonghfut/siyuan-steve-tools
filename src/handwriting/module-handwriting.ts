@@ -217,7 +217,7 @@ export class M_handwriting {
             if (!href) return;
 
             // 只拦截目标前缀，避免影响其他链接
-            if (href.startsWith('https://plugins/siyuan-steve-tools/')) {
+            if (href.startsWith('https://plugins/siyuan-steve-tools/') || href.startsWith('siyuan://plugins/siyuan-steve-tools/')) {
                 e.preventDefault();
                 e.stopPropagation();
                 try {

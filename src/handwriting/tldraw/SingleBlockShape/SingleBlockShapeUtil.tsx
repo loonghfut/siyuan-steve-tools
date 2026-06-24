@@ -20,7 +20,7 @@ import {
 	lerp,
 	VecModel,
 } from '@tldraw/tldraw'
-import { openAttributePanel, Protyle, showMessage, TProtyleAction } from 'siyuan'
+import { openAttributePanel, openTab, Protyle, showMessage, TProtyleAction } from 'siyuan'
 import * as api from '@/api/api'
 import { settingdata } from '@/index'
 import { buildTldrawLink } from '../utils/link-builder';
@@ -58,6 +58,78 @@ const SingleBlockSizes = new EditorAtom('single-block sizes', (editor) => {
 })
 const BORDER_PX = 3 // 与样式、SVG 导出保持一致
 const MIN_HEIGHT = 30
+const SIYUAN_BLOCK_ID_RE = /\b\d{14}-[0-9a-z]{7}\b/i
+const STEVE_TOOLS_PLUGIN_URL_RE = /^(?:https:\/\/|siyuan:\/\/)plugins\/siyuan-steve-tools\//i
+
+function decodeLinkTarget(value: string) {
+	return value
+		.replace(/&amp;/g, '&')
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.trim()
+}
+
+function getSiyuanBlockIdFromLink(rawHref: string): string | null {
+	const href = decodeLinkTarget(rawHref)
+	const directMatch = href.match(/^siyuan:\/\/blocks\/(\d{14}-[0-9a-z]{7})/i)
+	if (directMatch) return directMatch[1]
+	if (/^\d{14}-[0-9a-z]{7}$/i.test(href)) return href
+
+	try {
+		const parsed = new URL(href, window.location.href)
+		const idFromQuery = parsed.searchParams.get('id') || parsed.searchParams.get('blockId')
+		if (idFromQuery && SIYUAN_BLOCK_ID_RE.test(idFromQuery)) return idFromQuery.match(SIYUAN_BLOCK_ID_RE)![0]
+		const idFromHash = parsed.hash.match(SIYUAN_BLOCK_ID_RE)
+		if (idFromHash) return idFromHash[0]
+	} catch {
+		// ignore invalid or relative URLs
+	}
+
+	return null
+}
+
+function isSteveToolsPluginUrl(rawHref: string) {
+	return STEVE_TOOLS_PLUGIN_URL_RE.test(decodeLinkTarget(rawHref))
+}
+
+function clearStaticTextSelection() {
+	try {
+		window.getSelection()?.removeAllRanges()
+	} catch {
+		// ignore
+	}
+}
+
+function findStaticLinkTarget(target: EventTarget | null, root: HTMLElement | null) {
+	if (!(target instanceof HTMLElement) || !root) return null
+
+	let el: HTMLElement | null = target
+	while (el && root.contains(el)) {
+		const dataType = el.getAttribute('data-type') || ''
+		const dataHref = el.getAttribute('data-href') || ''
+		const href = el instanceof HTMLAnchorElement ? el.getAttribute('href') || dataHref : dataHref
+		const nodeId =
+			el.getAttribute('data-id') ||
+			el.getAttribute('data-node-id') ||
+			el.getAttribute('data-av-id') ||
+			''
+
+		if ((dataType.includes('block-ref') || dataType.includes('file-annotation-ref')) && SIYUAN_BLOCK_ID_RE.test(nodeId)) {
+			return { blockId: nodeId.match(SIYUAN_BLOCK_ID_RE)![0], href: '' }
+		}
+
+		if (href) {
+			return { blockId: getSiyuanBlockIdFromLink(href), href: decodeLinkTarget(href) }
+		}
+
+		if (el === root) break
+		el = el.parentElement
+	}
+
+	return null
+}
 
 // ===== 独立的尺寸测量 Hook =====
 // 参考 tldraw 官方示例，将尺寸测量逻辑抽取为可复用的 hook
@@ -959,6 +1031,77 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 		}
 
+		const handleStaticLinkPointerDown = useCallback(
+			(e: React.PointerEvent<HTMLDivElement>) => {
+				if (isEditingState) return
+				if (findStaticLinkTarget(e.target, staticContentRef.current)) {
+					clearStaticTextSelection()
+					e.stopPropagation()
+				}
+			},
+			[isEditingState]
+		)
+
+		const handleStaticLinkDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+			e.preventDefault()
+			e.stopPropagation()
+			clearStaticTextSelection()
+		}, [])
+
+		const handleStaticLinkClick = useCallback(
+			(e: React.MouseEvent<HTMLDivElement>) => {
+				if (isEditingState || e.defaultPrevented) return
+				const target = findStaticLinkTarget(e.target, staticContentRef.current)
+				if (!target) return
+
+				e.preventDefault()
+				e.stopPropagation()
+				clearStaticTextSelection()
+
+				if (target.blockId) {
+					if (!window.siyuan?.ws?.app) return
+					void openTab({
+						app: window.siyuan.ws.app,
+						doc: {
+							id: target.blockId,
+							action: ['cb-get-hl', 'cb-get-all'],
+							zoomIn: false,
+						},
+						position: 'right',
+						keepCursor: false,
+					}).catch((err) => {
+						console.error('jump to linked block failed', err)
+						try {
+							showMessage('跳转到链接块失败', 3000, 'error')
+						} catch {
+							// ignore
+						}
+					})
+					return
+				}
+
+				if (!target.href || target.href === '#') return
+				const href = target.href.startsWith('assets/') ? `/${target.href}` : target.href
+				if (isSteveToolsPluginUrl(href)) return
+
+				try {
+					if (href.startsWith('siyuan://')) {
+						window.location.href = href
+					} else {
+						window.open(href, '_blank', 'noopener')
+					}
+				} catch (err) {
+					console.error('open static link failed', err)
+					try {
+						showMessage('打开链接失败', 3000, 'error')
+					} catch {
+						// ignore
+					}
+				}
+			},
+			[isEditingState]
+		)
+
 		const handleAttrIconClick = useCallback(
 			async (e: React.MouseEvent<HTMLDivElement>) => {
 				e.preventDefault()
@@ -1099,9 +1242,41 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					}}
 				>
 					{/* 非编辑态：显示静态 HTML 内容 */}
+					<style>
+						{`
+							.single-block-static-content,
+							.single-block-static-content .protyle-wysiwyg {
+								pointer-events: none !important;
+								user-select: none !important;
+								-webkit-user-select: none !important;
+							}
+							.single-block-static-content * {
+								pointer-events: none !important;
+								user-select: none !important;
+								-webkit-user-select: none !important;
+								-webkit-user-drag: none !important;
+							}
+							.single-block-static-content a,
+							.single-block-static-content a *,
+							.single-block-static-content [data-href],
+							.single-block-static-content [data-href] *,
+							.single-block-static-content [data-type*="block-ref"],
+							.single-block-static-content [data-type*="block-ref"] *,
+							.single-block-static-content [data-type*="file-annotation-ref"],
+							.single-block-static-content [data-type*="file-annotation-ref"] * {
+								pointer-events: auto !important;
+								cursor: pointer;
+							}
+						`}
+					</style>
 					{!isEditingState && staticHtml && (
-						<div 
+						<div
+							className="single-block-static-content"
 							ref={staticContentRef}
+							onPointerDown={handleStaticLinkPointerDown}
+							onPointerUp={handleStaticLinkPointerDown}
+							onDragStart={handleStaticLinkDragStart}
+							onClick={handleStaticLinkClick}
 							dangerouslySetInnerHTML={{ __html: staticHtml }}
 							style={{
 								width: '100%',
