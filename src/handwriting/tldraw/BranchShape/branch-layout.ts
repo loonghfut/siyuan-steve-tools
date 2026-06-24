@@ -6,8 +6,7 @@ const CONNECTABLE_TYPES = new Set(['card', 'single-block', 'branch'])
 const DEFAULT_NODE_WIDTH = 300
 const DEFAULT_NODE_HEIGHT = 80
 const ROOT_RADIUS = 7
-const MIN_BRANCH_WIDTH = 80
-const MIN_BRANCH_HEIGHT = 40
+const ROOT_DIAMETER = ROOT_RADIUS * 2
 const BRANCH_EDGE_PADDING_X = 0
 const BRANCH_EDGE_PADDING_Y = 0
 const DETACH_DISTANCE_MULTIPLIER = 0.01
@@ -360,16 +359,16 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 		editor.updateShape<IBranchShape>({
 			id: branch.id,
 			type: 'branch',
-			x: oldRootPage.x - MIN_BRANCH_WIDTH / 2,
-			y: oldRootPage.y - MIN_BRANCH_HEIGHT / 2,
+			x: oldRootPage.x - ROOT_RADIUS,
+			y: oldRootPage.y - ROOT_RADIUS,
 			props: {
 				...branch.props,
-				w: MIN_BRANCH_WIDTH,
-				h: MIN_BRANCH_HEIGHT,
+				w: ROOT_DIAMETER,
+				h: ROOT_DIAMETER,
 				childIds: [],
 				leftChildIds: [],
 				rightChildIds: [],
-				rootX: MIN_BRANCH_WIDTH / 2,
+				rootX: ROOT_RADIUS,
 			},
 		})
 		return
@@ -377,14 +376,14 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 
 	const horizontalGap = Math.max(branch.props.horizontalGap || 80, 20)
 	const verticalGap = Math.max(branch.props.verticalGap || 24, 8)
-	const leftWidth = leftChildren.length > 0 ? Math.max(...leftChildren.map(({ bounds }) => bounds.w), DEFAULT_NODE_WIDTH) + horizontalGap + BRANCH_EDGE_PADDING_X : 40
-	const rightWidth = rightChildren.length > 0 ? Math.max(...rightChildren.map(({ bounds }) => bounds.w), DEFAULT_NODE_WIDTH) + horizontalGap + BRANCH_EDGE_PADDING_X : 40
+	const leftWidth = leftChildren.length > 0 ? Math.max(...leftChildren.map(({ bounds }) => bounds.w)) + horizontalGap + BRANCH_EDGE_PADDING_X : 0
+	const rightWidth = rightChildren.length > 0 ? Math.max(...rightChildren.map(({ bounds }) => bounds.w)) + horizontalGap + BRANCH_EDGE_PADDING_X : 0
 	const leftHeight = leftChildren.reduce((sum, { bounds }) => sum + bounds.h, 0) + verticalGap * Math.max(leftChildren.length - 1, 0)
 	const rightHeight = rightChildren.reduce((sum, { bounds }) => sum + bounds.h, 0) + verticalGap * Math.max(rightChildren.length - 1, 0)
-	const branchHeight = Math.max(leftHeight, rightHeight, MIN_BRANCH_HEIGHT) + BRANCH_EDGE_PADDING_Y * 2
-	const branchWidth = Math.max(leftWidth + rightWidth, MIN_BRANCH_WIDTH)
+	const branchHeight = Math.max(leftHeight, rightHeight) + BRANCH_EDGE_PADDING_Y * 2
 	const oldRootPage = getBranchRootPagePoint(branch)
-	const rootLocalX = leftWidth
+	const rootLocalX = Math.max(leftWidth, ROOT_RADIUS)
+	const branchWidth = rootLocalX + Math.max(rightWidth, ROOT_RADIUS)
 	const branchX = oldRootPage.x - rootLocalX
 	const branchY = oldRootPage.y - branchHeight / 2
 	const rootX = oldRootPage.x
