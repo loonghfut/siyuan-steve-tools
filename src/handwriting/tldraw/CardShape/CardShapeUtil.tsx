@@ -11,7 +11,7 @@ import {
 import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
 import { CardRenderMode, ICardShape } from './card-shape-types'
-import { Protyle, showMessage, TProtyleAction } from 'siyuan';
+import { openTab, Protyle, showMessage, TProtyleAction } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
 import { buildTldrawLink } from '../utils/link-builder';
@@ -41,6 +41,87 @@ const MAX_CACHE_SIZE = 50;
 // 限制首屏渲染规模，避免一次性插入过多 DOM
 const INITIAL_NODE_LIMIT = 80;
 const INITIAL_TEXT_LIMIT = 8000;
+const SIYUAN_BLOCK_ID_RE = /\b\d{14}-[0-9a-z]{7}\b/i
+const STEVE_TOOLS_PLUGIN_URL_RE = /^(?:https:\/\/|siyuan:\/\/)plugins\/siyuan-steve-tools\//i
+
+function decodeLinkTarget(value: string) {
+	return value
+		.replace(/&amp;/g, '&')
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.trim()
+}
+
+function getSiyuanBlockIdFromLink(rawHref: string): string | null {
+	const href = decodeLinkTarget(rawHref)
+	const directMatch = href.match(/^siyuan:\/\/blocks\/(\d{14}-[0-9a-z]{7})/i)
+	if (directMatch) return directMatch[1]
+	if (/^\d{14}-[0-9a-z]{7}$/i.test(href)) return href
+
+	try {
+		const parsed = new URL(href, window.location.href)
+		const idFromQuery = parsed.searchParams.get('id') || parsed.searchParams.get('blockId')
+		if (idFromQuery && SIYUAN_BLOCK_ID_RE.test(idFromQuery)) return idFromQuery.match(SIYUAN_BLOCK_ID_RE)![0]
+		const idFromHash = parsed.hash.match(SIYUAN_BLOCK_ID_RE)
+		if (idFromHash) return idFromHash[0]
+	} catch {
+		// ignore invalid or relative URLs
+	}
+
+	return null
+}
+
+function isSteveToolsPluginUrl(rawHref: string) {
+	return STEVE_TOOLS_PLUGIN_URL_RE.test(decodeLinkTarget(rawHref))
+}
+
+function clearStaticTextSelection() {
+	try {
+		window.getSelection()?.removeAllRanges()
+	} catch {
+		// ignore
+	}
+}
+
+function clearStaticTextSelectionSoon() {
+	clearStaticTextSelection()
+	if (typeof requestAnimationFrame === 'function') {
+		requestAnimationFrame(clearStaticTextSelection)
+	} else {
+		window.setTimeout(clearStaticTextSelection, 0)
+	}
+}
+
+function findStaticLinkTarget(target: EventTarget | null, root: HTMLElement | null) {
+	if (!(target instanceof HTMLElement) || !root) return null
+
+	let el: HTMLElement | null = target
+	while (el && root.contains(el)) {
+		const dataType = el.getAttribute('data-type') || ''
+		const dataHref = el.getAttribute('data-href') || ''
+		const href = el instanceof HTMLAnchorElement ? el.getAttribute('href') || dataHref : dataHref
+		const nodeId =
+			el.getAttribute('data-id') ||
+			el.getAttribute('data-node-id') ||
+			el.getAttribute('data-av-id') ||
+			''
+
+		if ((dataType.includes('block-ref') || dataType.includes('file-annotation-ref')) && SIYUAN_BLOCK_ID_RE.test(nodeId)) {
+			return { blockId: nodeId.match(SIYUAN_BLOCK_ID_RE)![0], href: '' }
+		}
+
+		if (href) {
+			return { blockId: getSiyuanBlockIdFromLink(href), href: decodeLinkTarget(href) }
+		}
+
+		if (el === root) break
+		el = el.parentElement
+	}
+
+	return null
+}
 
 function cacheStaticPreview(blockId: string, html: string, fontSize: number) {
 	if (staticPreviewCache.size >= MAX_CACHE_SIZE) {
@@ -230,6 +311,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		// 非编辑态下的静态预览节点（由 Protyle contentElement 克隆而来）
 		const staticPreviewRef = useRef<HTMLElement | null>(null)
+		const staticPreviewHandlersRef = useRef<{
+			target: HTMLElement
+			pointerDown: (event: PointerEvent) => void
+			pointerUp: (event: PointerEvent) => void
+			click: (event: MouseEvent) => void
+			dragStart: (event: DragEvent) => void
+		} | null>(null)
 		// 防止重复销毁：为每个 Protyle 实例设置一个已销毁标记
 		const DESTROYED_MARK = '__st_destroyed__'
 		const safeDestroyProtyle = (pt: Protyle | null | undefined) => {
@@ -239,6 +327,96 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			try { pt.destroy() } catch { }
 			anyPt[DESTROYED_MARK] = true
 		}
+		const removeStaticPreviewLinkHandlers = useCallback((preview?: HTMLElement | null) => {
+			const handlers = staticPreviewHandlersRef.current
+			const target = handlers?.target || preview || staticPreviewRef.current
+			if (!target || !handlers) return
+			target.removeEventListener('pointerdown', handlers.pointerDown, true)
+			target.removeEventListener('pointerup', handlers.pointerUp, true)
+			target.removeEventListener('click', handlers.click, true)
+			target.removeEventListener('dragstart', handlers.dragStart, true)
+			target.classList.remove('card-static-content')
+			staticPreviewHandlersRef.current = null
+		}, [])
+		const openStaticLinkTarget = useCallback((target: { blockId: string | null; href: string }) => {
+			if (target.blockId) {
+				if (!window.siyuan?.ws?.app) return
+				void openTab({
+					app: window.siyuan.ws.app,
+					doc: {
+						id: target.blockId,
+						action: ['cb-get-hl', 'cb-get-all'],
+						zoomIn: false,
+					},
+					position: 'right',
+					keepCursor: false,
+				}).catch((err) => {
+					console.error('jump to card linked block failed', err)
+					try {
+						showMessage('跳转到链接块失败', 3000, 'error')
+					} catch {
+						// ignore
+					}
+				})
+				return
+			}
+
+			if (!target.href || target.href === '#') return
+			const href = target.href.startsWith('assets/') ? `/${target.href}` : target.href
+			if (isSteveToolsPluginUrl(href)) return
+
+			try {
+				if (href.startsWith('siyuan://')) {
+					window.location.href = href
+				} else {
+					window.open(href, '_blank', 'noopener')
+				}
+			} catch (err) {
+				console.error('open card static link failed', err)
+				try {
+					showMessage('打开链接失败', 3000, 'error')
+				} catch {
+					// ignore
+				}
+			}
+		}, [])
+		const installStaticPreviewLinkHandlers = useCallback((preview: HTMLElement) => {
+			removeStaticPreviewLinkHandlers()
+			preview.classList.add('card-static-content')
+			const pointerHandler = (event: PointerEvent) => {
+				if (findStaticLinkTarget(event.target, preview)) {
+					event.preventDefault()
+					clearStaticTextSelectionSoon()
+					event.stopPropagation()
+				}
+			}
+			const clickHandler = (event: MouseEvent) => {
+				if (event.defaultPrevented) return
+				const target = findStaticLinkTarget(event.target, preview)
+				if (!target) return
+				if (!target.blockId && target.href && isSteveToolsPluginUrl(target.href)) return
+				event.preventDefault()
+				event.stopPropagation()
+				clearStaticTextSelectionSoon()
+				openStaticLinkTarget(target)
+			}
+			const dragStartHandler = (event: DragEvent) => {
+				event.preventDefault()
+				event.stopPropagation()
+				clearStaticTextSelectionSoon()
+			}
+			staticPreviewHandlersRef.current = {
+				target: preview,
+				pointerDown: pointerHandler,
+				pointerUp: pointerHandler,
+				click: clickHandler,
+				dragStart: dragStartHandler,
+			}
+			preview.addEventListener('pointerdown', pointerHandler, true)
+			preview.addEventListener('pointerup', pointerHandler, true)
+			preview.addEventListener('click', clickHandler, true)
+			preview.addEventListener('dragstart', dragStartHandler, true)
+		}, [openStaticLinkTarget, removeStaticPreviewLinkHandlers])
 		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
 
@@ -247,6 +425,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				loadHandleRef.current.cancel()
 				loadHandleRef.current = null
 			}
+			removeStaticPreviewLinkHandlers()
 			if (staticPreviewRef.current?.parentElement) {
 				try {
 					staticPreviewRef.current.parentElement.removeChild(staticPreviewRef.current)
@@ -267,7 +446,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 			}
 			protyleHostRef.current = null
-		}, [])
+		}, [removeStaticPreviewLinkHandlers])
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
@@ -757,6 +936,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					const currentContainer = containerRef.current;
 					if (!currentContainer) return;
 					if (staticPreviewRef.current?.parentElement === currentContainer) {
+						removeStaticPreviewLinkHandlers()
 						try {
 							currentContainer.removeChild(staticPreviewRef.current);
 						} catch {
@@ -866,6 +1046,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (cachedHtml) {
 						// 使用缓存的预览
 						if (staticPreviewRef.current?.parentElement === containerRef.current) {
+							removeStaticPreviewLinkHandlers()
 							containerRef.current.removeChild(staticPreviewRef.current);
 						}
 						const wrapper = document.createElement('div');
@@ -882,6 +1063,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							protyleHostRef.current = null;
 
 							staticPreviewRef.current = clone;
+							installStaticPreviewLinkHandlers(clone);
 							containerRef.current.appendChild(clone);
 							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
 							await renderAllContent(clone);
@@ -916,6 +1098,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				// 移除旧的静态预览
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
+					removeStaticPreviewLinkHandlers()
 					containerRef.current.removeChild(staticPreviewRef.current);
 				}
 				// 清理 Protyle host
@@ -1101,6 +1284,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
 				staticPreviewRef.current = previewWrapper;
+				installStaticPreviewLinkHandlers(previewWrapper);
 				containerRef.current.appendChild(previewWrapper);
 				// 先把 protyle-html 转为普通 DOM，再运行后续渲染
 				try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
@@ -1123,6 +1307,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (isEditingState) {
 					// 进入编辑：移除静态预览，创建或复用 Protyle
 					if (staticPreviewRef.current?.parentElement === containerRef.current) {
+						removeStaticPreviewLinkHandlers()
 						containerRef.current.removeChild(staticPreviewRef.current);
 					}
 					staticPreviewRef.current = null;
@@ -1140,6 +1325,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 						containerRef.current.appendChild(protyleHostRef.current);
 					}
+					removeStaticPreviewLinkHandlers()
 					try { protyleRef.current?.enable(); } catch { }
 				} else {
 					// 非编辑
@@ -1153,6 +1339,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							// 普通块：使用 getDoc API 直接获取静态 DOM
 							if (protyleRef.current) {
 								if (protyleHostRef.current?.parentElement) {
+									removeStaticPreviewLinkHandlers()
 									protyleHostRef.current.parentElement.removeChild(protyleHostRef.current);
 								}
 								try { safeDestroyProtyle(protyleRef.current); } catch { }
@@ -1172,6 +1359,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						// 移除可能存在的静态预览
 						if (staticPreviewRef.current?.parentElement === containerRef.current) {
+							removeStaticPreviewLinkHandlers()
 							containerRef.current.removeChild(staticPreviewRef.current);
 						}
 						staticPreviewRef.current = null;
@@ -1180,6 +1368,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							containerRef.current.appendChild(protyleHostRef.current);
 						}
 						// 禁用交互但保留实例
+						if (protyleHostRef.current) {
+							removeStaticPreviewLinkHandlers()
+							installStaticPreviewLinkHandlers(protyleHostRef.current)
+						}
 						try { protyleRef.current?.disable(); } catch { }
 						// 如果刚从编辑状态退出，刷新内容以反映最新编辑
 						if (wasEditing) {
@@ -1239,6 +1431,35 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				onPointerMove={handlePointerEvent}
 				onPointerUp={handlePointerEvent}
 			>
+				<style>
+					{`
+						.card-static-content,
+						.card-static-content .protyle-wysiwyg {
+							pointer-events: none !important;
+							user-select: none !important;
+							-webkit-user-select: none !important;
+							-webkit-touch-callout: none !important;
+						}
+						.card-static-content * {
+							pointer-events: none !important;
+							user-select: none !important;
+							-webkit-user-select: none !important;
+							-webkit-user-drag: none !important;
+							-webkit-touch-callout: none !important;
+						}
+						.card-static-content a,
+						.card-static-content a *,
+						.card-static-content [data-href],
+						.card-static-content [data-href] *,
+						.card-static-content [data-type*="block-ref"],
+						.card-static-content [data-type*="block-ref"] *,
+						.card-static-content [data-type*="file-annotation-ref"],
+						.card-static-content [data-type*="file-annotation-ref"] * {
+							pointer-events: auto !important;
+							cursor: pointer;
+						}
+					`}
+				</style>
 				<div
 					ref={containerRef}
 					blockid={shape.props.blockId}
