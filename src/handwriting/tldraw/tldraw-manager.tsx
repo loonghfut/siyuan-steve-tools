@@ -37,6 +37,7 @@ import { MindMapShapeUtil } from './MindMapShape/MindMapShapeUtil';
 import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { BranchShapeUtil } from './BranchShape/BranchShapeUtil';
 import { BranchShapeTool } from './BranchShape/BranchShapeTool';
+import { keepBranchLayoutsUpdated } from './BranchShape/keep-branch-layouts-updated';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { allEmbeds } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
@@ -470,6 +471,9 @@ export class TldrawManager {
                         
                         // 设置素材库拖放处理程序
                         setupShapeLibraryDropHandler(editor);
+
+                        // 保持 Branch 在子形状尺寸变化后同步重排
+                        keepBranchLayoutsUpdated(editor);
                         
                         // 设置交互状态监听，用于优化拖动时的性能
                         // 在拖动、缩放画布时暂停内容加载和渲染

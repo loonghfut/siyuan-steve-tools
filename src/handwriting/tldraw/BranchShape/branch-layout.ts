@@ -648,13 +648,18 @@ export function updateBranchAttachmentAfterDrag(editor: Editor, shape: TLShape) 
 	return updateBranchAttachmentsAfterDrag(editor, [shape])
 }
 
-export function relayoutBranchesContainingShape(editor: Editor, shapeId: TLShapeId) {
+export function relayoutBranchesContainingShape(editor: Editor, shapeId: TLShapeId, visited = new Set<string>()) {
+	if (visited.has(shapeId as string)) return
+	visited.add(shapeId as string)
+
 	const branches = editor
 		.getCurrentPageShapes()
 		.filter((shape) => shape.type === 'branch' && getAllBranchChildIds(shape as IBranchShape).includes(shapeId as string)) as IBranchShape[]
 
 	for (const branch of branches) {
+		if (visited.has(branch.id as string)) continue
 		layoutBranchChildren(editor, branch)
+		relayoutBranchesContainingShape(editor, branch.id, visited)
 	}
 }
 
