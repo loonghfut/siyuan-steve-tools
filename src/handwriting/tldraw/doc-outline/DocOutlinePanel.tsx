@@ -20,6 +20,13 @@ interface DocOutlinePanelProps {
     selectedMainCard: ICardShape | null;
 }
 
+function outlineNodeToRelationItem(node: OutlineNode): { blockId: string; children?: ReturnType<typeof outlineNodeToRelationItem>[] } {
+    return {
+        blockId: node.id,
+        children: node.blocks?.map(outlineNodeToRelationItem),
+    };
+}
+
 /**
  * 文档大纲面板组件
  */
@@ -340,15 +347,12 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
     const handleInsertAll = useCallback(async () => {
         if (!selectedMainCard || !docId || selectedMainCard.props.blockId !== docId) return;
 
-        const allNodeIds = collectAllOutlineNodeIds(outline)
-            .filter((id, index, arr) => Boolean(id) && arr.indexOf(id) === index);
-
         setInsertingAll(true);
         try {
             const result = insertDocRelations({
                 editor,
                 mainCard: selectedMainCard,
-                items: allNodeIds.map((blockId) => ({ blockId })),
+                items: outline.map(outlineNodeToRelationItem),
                 kind: 'outline-block',
             });
 

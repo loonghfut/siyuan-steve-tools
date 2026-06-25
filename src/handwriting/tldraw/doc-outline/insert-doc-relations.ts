@@ -7,132 +7,210 @@ import { layoutBranchChildren } from '../BranchShape'
 type InsertRelationKind = 'child-doc' | 'outline-block'
 
 type InsertRelationItem = {
-    blockId: string
+	blockId: string
+	children?: InsertRelationItem[]
 }
 
 type InsertDocRelationsOptions = {
-    editor: Editor
-    mainCard: ICardShape
-    items: InsertRelationItem[]
-    kind: InsertRelationKind
+	editor: Editor
+	mainCard: ICardShape
+	items: InsertRelationItem[]
+	kind: InsertRelationKind
 }
 
 type InsertDocRelationsResult = {
-    branchId: TLShapeId | null
-    createdShapeIds: TLShapeId[]
-    skippedCount: number
+	branchId: TLShapeId | null
+	createdShapeIds: TLShapeId[]
+	skippedCount: number
 }
 
 const CHILD_DOC_CARD_PROPS = {
-    w: 500,
-    h: 700,
-    color: 'black' as const,
-    showMask: true,
-    isMain: true,
-    isCollapsed: true,
+	w: 500,
+	h: 700,
+	color: 'black' as const,
+	showMask: true,
+	isMain: true,
+	isCollapsed: true,
 }
 
 const OUTLINE_CARD_PROPS = {
-    w: 300,
-    h: 300,
-    color: 'black' as const,
-    showMask: true,
-    isMain: false,
-    isCollapsed: false,
+	w: 300,
+	h: 300,
+	color: 'black' as const,
+	showMask: true,
+	isMain: false,
+	isCollapsed: false,
 }
 
 const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
-    w: 80,
-    h: 40,
-    color: 'black',
-    childIds: [],
-    leftChildIds: [],
-    rightChildIds: [],
-    rootX: 40,
-    direction: 'right',
-    horizontalGap: 96,
-    verticalGap: 28,
-    lineWidth: 3,
-    snapDistance: 160,
-    showOuterFrame: false,
-    version: 2,
+	w: 80,
+	h: 40,
+	color: 'black',
+	childIds: [],
+	leftChildIds: [],
+	rightChildIds: [],
+	rootX: 40,
+	direction: 'right',
+	horizontalGap: 96,
+	verticalGap: 28,
+	lineWidth: 3,
+	snapDistance: 160,
+	showOuterFrame: false,
+	version: 2,
 }
 
 function getExistingBlockIds(editor: Editor) {
-    const ids = new Set<string>()
-    for (const shape of editor.getCurrentPageShapes()) {
-        if (shape.type !== 'card' && shape.type !== 'single-block') continue
-        const blockId = (shape as any).props?.blockId
-        if (typeof blockId === 'string' && blockId) ids.add(blockId)
-    }
-    return ids
+	const ids = new Set<string>()
+	for (const shape of editor.getCurrentPageShapes()) {
+		if (shape.type !== 'card' && shape.type !== 'single-block') continue
+		const blockId = (shape as any).props?.blockId
+		if (typeof blockId === 'string' && blockId) ids.add(blockId)
+	}
+	return ids
+}
+
+function flattenRelationItems(items: InsertRelationItem[]): InsertRelationItem[] {
+	const result: InsertRelationItem[] = []
+	const visit = (item: InsertRelationItem) => {
+		result.push(item)
+		item.children?.forEach(visit)
+	}
+	items.forEach(visit)
+	return result
+}
+
+function dedupeRelationTree(items: InsertRelationItem[], seen = new Set<string>()): InsertRelationItem[] {
+	const result: InsertRelationItem[] = []
+	for (const item of items) {
+		if (!item.blockId || seen.has(item.blockId)) continue
+		seen.add(item.blockId)
+		result.push({
+			blockId: item.blockId,
+			children: item.children ? dedupeRelationTree(item.children, seen) : undefined,
+		})
+	}
+	return result
+}
+
+function pruneExistingRelationTree(items: InsertRelationItem[], existingBlockIds: Set<string>): InsertRelationItem[] {
+	return items
+		.filter((item) => !existingBlockIds.has(item.blockId))
+		.map((item) => ({
+			blockId: item.blockId,
+			children: item.children ? pruneExistingRelationTree(item.children, existingBlockIds) : undefined,
+		}))
+}
+
+function createBranchShape(id: TLShapeId, rootX: number, rootY: number, props?: Partial<IBranchShape['props']>) {
+	return {
+		id,
+		type: 'branch' as const,
+		x: rootX - (BRANCH_DEFAULT_PROPS.rootX || 40),
+		y: rootY - BRANCH_DEFAULT_PROPS.h / 2,
+		props: {
+			...BRANCH_DEFAULT_PROPS,
+			...props,
+		},
+	}
 }
 
 export function insertDocRelations(options: InsertDocRelationsOptions): InsertDocRelationsResult {
-    const { editor, mainCard, items, kind } = options
-    const existingBlockIds = getExistingBlockIds(editor)
+	const { editor, mainCard, items, kind } = options
+	const existingBlockIds = getExistingBlockIds(editor)
+	const dedupedItems = dedupeRelationTree(items)
+	const allDedupedItems = flattenRelationItems(dedupedItems)
+	const creatableTree =
+		kind === 'outline-block' ? pruneExistingRelationTree(dedupedItems, existingBlockIds) : dedupedItems.filter((item) => !existingBlockIds.has(item.blockId))
+	const allCreatableItems = flattenRelationItems(creatableTree)
+	const skippedCount = allDedupedItems.length - allCreatableItems.length
 
-    const dedupedItems = items.filter((item, index) => {
-        if (!item.blockId) return false
-        return items.findIndex((candidate) => candidate.blockId === item.blockId) === index
-    })
+	if (allCreatableItems.length === 0) {
+		return { branchId: null, createdShapeIds: [], skippedCount }
+	}
 
-    const creatableItems = dedupedItems.filter((item) => !existingBlockIds.has(item.blockId))
-    const skippedCount = dedupedItems.length - creatableItems.length
+	const mainBounds = editor.getShapePageBounds(mainCard.id)
+	const rootX = mainBounds ? mainBounds.center.x : mainCard.x + (mainCard.props.w || 0) / 2
+	const rootY = mainBounds ? mainBounds.center.y : mainCard.y + (mainCard.props.h || 0) / 2
 
-    if (creatableItems.length === 0) {
-        return { branchId: null, createdShapeIds: [], skippedCount }
-    }
+	const createdShapes: Array<any> = []
+	const createdShapeIds: TLShapeId[] = []
+	const branchLayoutIds: TLShapeId[] = []
 
-    const mainBounds = editor.getShapePageBounds(mainCard.id)
-    const rootX = mainBounds ? mainBounds.center.x : mainCard.x + (mainCard.props.w || 0) / 2
-    const rootY = mainBounds ? mainBounds.center.y : mainCard.y + (mainCard.props.h || 0) / 2
+	const createCardShape = (item: InsertRelationItem, index: number) => {
+		const id = createShapeId()
+		const props = kind === 'child-doc' ? CHILD_DOC_CARD_PROPS : OUTLINE_CARD_PROPS
+		const shape = {
+			id,
+			type: 'card' as const,
+			x: rootX + 180,
+			y: rootY + index * 24,
+			props: {
+				...props,
+				blockId: item.blockId,
+			},
+		}
+		createdShapes.push(shape)
+		createdShapeIds.push(id)
+		return shape
+	}
 
-    const branchId = createShapeId()
-    const branchShape = {
-        id: branchId,
-        type: 'branch' as const,
-        x: rootX - (BRANCH_DEFAULT_PROPS.rootX || 40),
-        y: rootY - BRANCH_DEFAULT_PROPS.h / 2,
-        props: {
-            ...BRANCH_DEFAULT_PROPS,
-            childIds: [],
-            leftChildIds: [mainCard.id as string],
-            rightChildIds: [],
-        },
-    }
+	const branchId = createShapeId()
+	const branchShape = createBranchShape(branchId, rootX, rootY, {
+		childIds: [],
+		leftChildIds: [mainCard.id as string],
+		rightChildIds: [],
+	})
+	createdShapes.push(branchShape)
 
-    const cardShapes = creatableItems.map((item, index) => {
-        const id = createShapeId()
-        const isChildDoc = kind === 'child-doc'
-        const props = isChildDoc ? CHILD_DOC_CARD_PROPS : OUTLINE_CARD_PROPS
-        return {
-            id,
-            type: 'card' as const,
-            x: rootX + 180,
-            y: rootY + index * 24,
-            props: {
-                ...props,
-                blockId: item.blockId,
-            },
-        }
-    })
+	if (kind === 'outline-block') {
+		let outlineIndex = 0
+		const buildOutlineNode = (item: InsertRelationItem): string => {
+			const cardShape = createCardShape(item, outlineIndex++)
+			const childItems = item.children || []
+			if (childItems.length === 0) {
+				return cardShape.id as string
+			}
 
-    branchShape.props.childIds = cardShapes.map((shape) => shape.id as string)
-    branchShape.props.rightChildIds = cardShapes.map((shape) => shape.id as string)
+			const childIds = childItems.map(buildOutlineNode)
+			const childBranchId = createShapeId()
+			const childBranch = createBranchShape(childBranchId, cardShape.x + cardShape.props.w / 2, cardShape.y + cardShape.props.h / 2, {
+				childIds,
+				leftChildIds: [cardShape.id as string],
+				rightChildIds: childIds,
+			})
+			createdShapes.push(childBranch)
+			branchLayoutIds.push(childBranchId)
+			return childBranchId as string
+		}
 
-    editor.createShapes([branchShape, ...cardShapes])
+		const rootChildren = creatableTree.map(buildOutlineNode)
+		branchShape.props.childIds = rootChildren
+		branchShape.props.rightChildIds = rootChildren
+	} else {
+		const cardShapes = creatableTree.map((item, index) => createCardShape(item, index))
+		branchShape.props.childIds = cardShapes.map((shape) => shape.id as string)
+		branchShape.props.rightChildIds = cardShapes.map((shape) => shape.id as string)
+	}
 
-    const latestBranch = editor.getShape<IBranchShape>(branchId)
-    if (latestBranch?.type === 'branch') {
-        layoutBranchChildren(editor, latestBranch)
-    } else {
-        showMessage('branch 创建后未能完成布局', 3000, 'error')
-    }
+	editor.createShapes(createdShapes)
 
-    return {
-        branchId,
-        createdShapeIds: cardShapes.map((shape) => shape.id),
-        skippedCount,
-    }
+	for (const layoutId of branchLayoutIds) {
+		const latestChildBranch = editor.getShape<IBranchShape>(layoutId)
+		if (latestChildBranch?.type === 'branch') {
+			layoutBranchChildren(editor, latestChildBranch)
+		}
+	}
+
+	const latestBranch = editor.getShape<IBranchShape>(branchId)
+	if (latestBranch?.type === 'branch') {
+		layoutBranchChildren(editor, latestBranch)
+	} else {
+		showMessage('branch 创建后未能完成布局', 3000, 'error')
+	}
+
+	return {
+		branchId,
+		createdShapeIds,
+		skippedCount,
+	}
 }

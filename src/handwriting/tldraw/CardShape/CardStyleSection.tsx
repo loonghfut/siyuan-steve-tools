@@ -5,13 +5,20 @@ import React from 'react'
 import { TldrawUiButton, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { ICardShape, CardRenderMode } from './card-shape-types'
-import { collectAllOutlineNodeIds, loadChildDocsForDoc, loadOutlineForDoc } from '../doc-outline/doc-outline-data'
+import { loadChildDocsForDoc, loadOutlineForDoc, type OutlineNode } from '../doc-outline/doc-outline-data'
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
 import { sql } from '@/api/api'
 
 export interface CardStyleSectionProps {
     editor: Editor
     selectedCardShapes: ICardShape[]
+}
+
+function outlineNodeToRelationItem(node: OutlineNode): { blockId: string; children?: ReturnType<typeof outlineNodeToRelationItem>[] } {
+    return {
+        blockId: node.id,
+        children: node.blocks?.map(outlineNodeToRelationItem),
+    }
 }
 
 export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
@@ -117,13 +124,10 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         try {
             const outline = await loadOutlineForDoc(selectedMainCard.props.blockId)
 
-            const allNodeIds = collectAllOutlineNodeIds(outline)
-                .filter((id, index, arr) => Boolean(id) && arr.indexOf(id) === index)
-
             const result = insertDocRelations({
                 editor,
                 mainCard: selectedMainCard,
-                items: allNodeIds.map((blockId) => ({ blockId })),
+                items: outline.map(outlineNodeToRelationItem),
                 kind: 'outline-block',
             })
 
