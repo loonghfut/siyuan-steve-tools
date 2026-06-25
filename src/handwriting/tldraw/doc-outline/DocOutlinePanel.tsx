@@ -8,47 +8,16 @@ import {
     useEditor,
 } from '@tldraw/tldraw';
 import { api } from '@frostime/siyuan-plugin-kits';
-import { getDocOutline } from '@/api/api';
 import { openTab, showMessage } from 'siyuan';
 import type { ICardShape } from '../CardShape/card-shape-types';
 import { insertDocRelations } from './insert-doc-relations';
-
-/**
- * 移除文本中的HTML实体和HTML标签
- */
-function stripHtmlEntities(text?: string): string {
-    if (!text) return '';
-    // 先移除HTML标签
-    const withoutTags = text.replace(/<[^>]*>/g, '');
-    // 再替换HTML实体
-    return withoutTags
-        .replace(/&nbsp;/gi, ' ')
-        .replace(/&amp;/gi, '&')
-        .replace(/&lt;/gi, '<')
-        .replace(/&gt;/gi, '>')
-        .replace(/&quot;/gi, '"')
-        .replace(/&#39;/gi, "'")
-        .replace(/&apos;/gi, "'")
-        .trim();
-}
+import { collectAllOutlineNodeIds, loadOutlineForDoc, type OutlineNode } from './doc-outline-data';
 
 interface DocOutlinePanelProps {
     isOpen: boolean;
     onClose: () => void;
     docId: string | null; // 绑定的文档ID
     selectedMainCard: ICardShape | null;
-}
-
-/** 大纲节点类型 */
-interface OutlineNode {
-    id: string;
-    name?: string;
-    type?: string;
-    subType?: string;
-    depth?: number;
-    content?: string; // blocks 中的内容字段
-    blocks?: OutlineNode[]; // 递归的大纲块
-    children?: OutlineNode[]; // 备用字段
 }
 
 /**
@@ -134,33 +103,6 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
         };
     }, [isOpen, editor, collectAddedBlockIds]);
 
-    // 收集所有大纲节点ID（包含 blocks 中的节点）
-    const collectAllNodeIds = useCallback((nodes: OutlineNode[]): string[] => {
-        const ids: string[] = [];
-        const collect = (n: OutlineNode) => {
-            ids.push(n.id);
-            // 收集 blocks 中的节点
-            if (n.blocks) {
-                n.blocks.forEach(block => collect(block));
-            }
-            // children 已废弃，统一使用 blocks
-        };
-        nodes.forEach(collect);
-        return ids;
-    }, []);
-
-    // 递归转换 blocks（包括 children 中的子项）
-    const transformBlock = (block: any): OutlineNode => ({
-        id: block.id,
-        name: stripHtmlEntities(block.content || block.name), // 使用 content 作为标题
-        type: block.type,
-        subType: block.subType,
-        depth: block.depth,
-        content: stripHtmlEntities(block.content),
-        blocks: block.children?.map(transformBlock), // children 转为 blocks
-        children: null,
-    });
-
     // 加载文档大纲
     const loadOutline = useCallback(async (signal?: AbortSignal) => {
         if (!docId) {
@@ -170,26 +112,11 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
 
         setLoading(true);
         try {
-            const result = await getDocOutline(docId);
+            const transformedOutline = await loadOutlineForDoc(docId, signal);
             if (signal?.aborted) return;
-            const outlineData = result as any;
-
-            // 转换数据格式 - 实际层级在 blocks 中
-            const transformNode = (node: any): OutlineNode => ({
-                id: node.id,
-                name: stripHtmlEntities(node.name), // 顶层是文档标题
-                type: node.type,
-                subType: node.subType,
-                depth: node.depth,
-                blocks: node.blocks?.map(transformBlock), // 递归转换 blocks
-                children: null,
-            });
-
-            const transformedOutline = outlineData.map(transformNode);
             setOutline(transformedOutline);
 
-            // 默认展开所有节点
-            const allIds = collectAllNodeIds(transformedOutline);
+            const allIds = collectAllOutlineNodeIds(transformedOutline);
             setExpandedNodes(new Set(allIds));
         } catch (err) {
             if (signal?.aborted) return;
@@ -200,7 +127,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
                 setLoading(false);
             }
         }
-    }, [docId, collectAllNodeIds]);
+    }, [docId]);
 
     // 初始化和监听更新
     useEffect(() => {
@@ -413,7 +340,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
     const handleInsertAll = useCallback(async () => {
         if (!selectedMainCard || !docId || selectedMainCard.props.blockId !== docId) return;
 
-        const allNodeIds = collectAllNodeIds(outline)
+        const allNodeIds = collectAllOutlineNodeIds(outline)
             .filter((id, index, arr) => Boolean(id) && arr.indexOf(id) === index);
 
         setInsertingAll(true);
@@ -443,7 +370,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
         } finally {
             setInsertingAll(false);
         }
-    }, [selectedMainCard, docId, collectAllNodeIds, outline, editor]);
+    }, [selectedMainCard, docId, outline, editor]);
 
     // 获取标题图标
     const getHeadingIcon = (subType?: string): string => {

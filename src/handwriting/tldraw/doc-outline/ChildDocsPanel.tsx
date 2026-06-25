@@ -8,25 +8,16 @@ import {
     useEditor,
 } from '@tldraw/tldraw';
 import { api } from '@frostime/siyuan-plugin-kits';
-import { listDocsByPath, getDoc } from '@/api/api';
 import { openTab, showMessage } from 'siyuan';
 import type { ICardShape } from '../CardShape/card-shape-types';
 import { insertDocRelations } from './insert-doc-relations';
+import { loadChildDocsForDoc, type ChildDocItem } from './doc-outline-data';
 
 interface ChildDocsPanelProps {
     isOpen: boolean;
     onClose: () => void;
     docId: string | null; // 绑定的文档ID
     selectedMainCard: ICardShape | null;
-}
-
-/** 子文档项类型 */
-interface ChildDocItem {
-    id: string;
-    name: string;
-    icon?: string;
-    path: string;
-    box: string;
 }
 
 /**
@@ -115,59 +106,9 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId, selectedMainCard 
 
         setLoading(true);
         try {
-            console.debug('开始加载子文档, docId:', docId);
-
-            // 获取文档信息（获取 box 和路径）
-            const docResult = await getDoc(docId);
+            const docs = await loadChildDocsForDoc(docId, signal);
             if (signal?.aborted) return;
-            console.debug('getDoc 返回结果:', docResult);
-
-            const box = (docResult as any).box;
-            const docPath = (docResult as any).path;
-
-            console.debug('box:', box, 'docPath:', docPath);
-
-            if (!box || !docPath) {
-                console.error('getDoc 返回结果缺少 box 或 path', docResult);
-                throw new Error('getDoc 返回结果不完整');
-            }
-
-            // 构造父文档路径：使用 docPath 的父路径
-            const lastSlashIndex = docPath.lastIndexOf('/');
-            const parentPath = lastSlashIndex > 0 ? docPath.substring(0, lastSlashIndex + 1) : docPath;
-
-            console.debug('获取子文档, box:', box, 'parentPath:', parentPath);
-
-            // 获取子文档列表
-            // 子文档路径应该是当前文档的路径（去掉.sy后缀），而不是父路径
-            let childPath = docPath.endsWith('/') ? docPath : docPath;
-            // 去掉 .sy 后缀
-            childPath = childPath.replace(/\.sy$/, '');
-            // 确保路径以 / 结尾
-            if (!childPath.endsWith('/')) childPath += '/';
-            const result = await listDocsByPath('', box, childPath);
-            if (signal?.aborted) return;
-            console.debug('listDocsByPath 返回结果:', result);
-
-            const data = result as any;
-
-            if (data.files && Array.isArray(data.files)) {
-                const docs: ChildDocItem[] = data.files
-                    .filter((file: any) => file.id) // 只保留有 id 的文档
-                    .map((file: any) => ({
-                        id: file.id,
-                        name: (file.name || '未命名文档').replace(/\.sy$/, ''),
-                        icon: file.icon,
-                        path: file.path,
-                        box: data.box || box,
-                    }));
-                console.debug('解析后的子文档列表:', docs);
-                setChildDocs(docs);
-            } else {
-                console.debug('未找到子文档文件');
-                setChildDocs([]);
-            }
-
+            setChildDocs(docs);
         } catch (err) {
             if (signal?.aborted) return;
             console.error('加载子文档失败:', err);
