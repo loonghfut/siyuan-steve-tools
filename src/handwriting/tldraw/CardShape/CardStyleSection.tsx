@@ -5,8 +5,9 @@ import React from 'react'
 import { TldrawUiButton, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { ICardShape, CardRenderMode } from './card-shape-types'
-import { collectAllOutlineNodeIds, loadChildDocsForDoc, loadOutlineForDoc, type ChildDocItem, type OutlineNode } from '../doc-outline/doc-outline-data'
+import { collectAllOutlineNodeIds, loadChildDocsForDoc, loadOutlineForDoc } from '../doc-outline/doc-outline-data'
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
+import { sql } from '@/api/api'
 
 export interface CardStyleSectionProps {
     editor: Editor
@@ -24,10 +25,6 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         if (!card.props.isMain || !card.props.blockId) return null
         return card
     }, [selectedCardShapes])
-    const [childDocs, setChildDocs] = React.useState<ChildDocItem[]>([])
-    const [outline, setOutline] = React.useState<OutlineNode[]>([])
-    const [loadingChildDocs, setLoadingChildDocs] = React.useState(false)
-    const [loadingOutline, setLoadingOutline] = React.useState(false)
     const [insertingChildDocs, setInsertingChildDocs] = React.useState(false)
     const [insertingOutline, setInsertingOutline] = React.useState(false)
 
@@ -61,56 +58,31 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
     }, [hasCardSelection, selectedCardShapes])
 
     React.useEffect(() => {
-        if (!selectedMainCard?.props.blockId) {
-            setChildDocs([])
-            setOutline([])
-            setLoadingChildDocs(false)
-            setLoadingOutline(false)
-            return
-        }
-
-        const controller = new AbortController()
-        const docId = selectedMainCard.props.blockId
-
-        setLoadingChildDocs(true)
-        setLoadingOutline(true)
-
-        void loadChildDocsForDoc(docId, controller.signal)
-            .then((docs) => {
-                if (controller.signal.aborted) return
-                setChildDocs(docs)
-            })
-            .catch((err) => {
-                if (controller.signal.aborted) return
-                console.error('load child docs for style panel failed', err)
-                setChildDocs([])
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setLoadingChildDocs(false)
-            })
-
-        void loadOutlineForDoc(docId, controller.signal)
-            .then((nodes) => {
-                if (controller.signal.aborted) return
-                setOutline(nodes)
-            })
-            .catch((err) => {
-                if (controller.signal.aborted) return
-                console.error('load outline for style panel failed', err)
-                setOutline([])
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) setLoadingOutline(false)
-            })
-
-        return () => controller.abort()
+        // 主卡片切换时仅重置插入中状态，子文档/大纲数据改为点击对应按钮时再按需加载
+        setInsertingChildDocs(false)
+        setInsertingOutline(false)
     }, [selectedMainCard])
 
     const handleInsertAllChildDocs = React.useCallback(async () => {
-        if (!selectedMainCard) return
+        if (!selectedMainCard?.props.blockId) return
 
         setInsertingChildDocs(true)
         try {
+            const docId = selectedMainCard.props.blockId
+
+            // 先通过原始 SQL 做存在性检查，判断此文档是否有子文档
+            const childRows = await sql(`SELECT * FROM blocks WHERE path like '%${docId}/%' LIMIT 3`)
+            if (!Array.isArray(childRows) || childRows.length === 0) {
+                showMessage('当前文档没有子文档', 3000, 'info')
+                return
+            }
+
+            const childDocs = await loadChildDocsForDoc(docId)
+            if (childDocs.length === 0) {
+                showMessage('无可插入子文档', 3000, 'info')
+                return
+            }
+
             const result = insertDocRelations({
                 editor,
                 mainCard: selectedMainCard,
@@ -136,13 +108,15 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         } finally {
             setInsertingChildDocs(false)
         }
-    }, [selectedMainCard, editor, childDocs])
+    }, [selectedMainCard, editor])
 
     const handleInsertAllOutline = React.useCallback(async () => {
-        if (!selectedMainCard) return
+        if (!selectedMainCard?.props.blockId) return
 
         setInsertingOutline(true)
         try {
+            const outline = await loadOutlineForDoc(selectedMainCard.props.blockId)
+
             const allNodeIds = collectAllOutlineNodeIds(outline)
                 .filter((id, index, arr) => Boolean(id) && arr.indexOf(id) === index)
 
@@ -171,7 +145,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         } finally {
             setInsertingOutline(false)
         }
-    }, [selectedMainCard, editor, outline])
+    }, [selectedMainCard, editor])
 
     if (!hasCardSelection) return null
 
@@ -279,34 +253,22 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                         <div style={{ display: 'flex', gap: '6px' }}>
                             <TldrawUiButton
                                 type="normal"
-                                disabled={loadingChildDocs || insertingChildDocs || childDocs.length === 0}
+                                disabled={insertingChildDocs}
                                 onClick={() => { void handleInsertAllChildDocs() }}
-                                title={
-                                    loadingChildDocs
-                                        ? '正在加载子文档'
-                                        : childDocs.length === 0
-                                            ? '当前没有可插入的子文档'
-                                            : '插入全部子文档'
-                                }
+                                title="插入全部子文档"
                             >
                                 <span style={{ fontSize: '12px' }}>
-                                    {loadingChildDocs ? '加载中...' : insertingChildDocs ? '插入中...' : '插入全部子文档'}
+                                    {insertingChildDocs ? '插入中...' : '插入全部子文档'}
                                 </span>
                             </TldrawUiButton>
                             <TldrawUiButton
                                 type="normal"
-                                disabled={loadingOutline || insertingOutline || outline.length === 0}
+                                disabled={insertingOutline}
                                 onClick={() => { void handleInsertAllOutline() }}
-                                title={
-                                    loadingOutline
-                                        ? '正在加载大纲'
-                                        : outline.length === 0
-                                            ? '当前没有可插入的大纲块'
-                                            : '插入全部大纲'
-                                }
+                                title="插入全部大纲"
                             >
                                 <span style={{ fontSize: '12px' }}>
-                                    {loadingOutline ? '加载中...' : insertingOutline ? '插入中...' : '插入全部大纲'}
+                                    {insertingOutline ? '插入中...' : '插入全部大纲'}
                                 </span>
                             </TldrawUiButton>
                         </div>
