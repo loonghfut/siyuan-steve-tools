@@ -73,6 +73,13 @@ export const InFrontOfCanvas: React.FC = () => {
 
     const selectedShape = selectionInfo ? editor.getShape(selectionInfo.id) : null
     const isValidSelection = selectedShape && isOverlayShape(selectedShape)
+    const selectedMainCard =
+        selectedShape &&
+        selectedShape.type === 'card' &&
+        Boolean((selectedShape as ICardShape).props?.isMain) &&
+        Boolean((selectedShape as ICardShape).props?.blockId)
+            ? (selectedShape as ICardShape)
+            : null
 
     const isSingleBlockSelection = isValidSelection && selectedShape.type === 'single-block'
     const isCardOrBlock = isValidSelection && isCardLikeShape(selectedShape)
@@ -236,6 +243,7 @@ export const InFrontOfCanvas: React.FC = () => {
                 isOpen={isDocOutlineOpen}
                 onClose={() => toggleDocOutline()}
                 docId={boundDocId || null}
+                selectedMainCard={selectedMainCard}
             />
 
             {/* 子文档面板 */}
@@ -243,6 +251,7 @@ export const InFrontOfCanvas: React.FC = () => {
                 isOpen={isChildDocsOpen}
                 onClose={() => toggleChildDocs()}
                 docId={boundDocId || null}
+                selectedMainCard={selectedMainCard}
             />
 
             {/* 选中元素的操作按钮 */}

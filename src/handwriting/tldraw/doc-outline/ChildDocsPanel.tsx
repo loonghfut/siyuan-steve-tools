@@ -2,7 +2,7 @@
  * 子文档面板组件
  * 显示白板绑定文档的子文档列表，支持将子文档添加到白板
  */
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     track,
     useEditor,
@@ -10,11 +10,14 @@ import {
 import { api } from '@frostime/siyuan-plugin-kits';
 import { listDocsByPath, getDoc } from '@/api/api';
 import { openTab, showMessage } from 'siyuan';
+import type { ICardShape } from '../CardShape/card-shape-types';
+import { insertDocRelations } from './insert-doc-relations';
 
 interface ChildDocsPanelProps {
     isOpen: boolean;
     onClose: () => void;
     docId: string | null; // 绑定的文档ID
+    selectedMainCard: ICardShape | null;
 }
 
 /** 子文档项类型 */
@@ -26,24 +29,19 @@ interface ChildDocItem {
     box: string;
 }
 
-interface DocInfo {
-    box: string;
-    path?: string;
-}
-
 /**
  * 子文档面板组件
  */
-export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelProps) => {
+export const ChildDocsPanel = track(({ isOpen, onClose, docId, selectedMainCard }: ChildDocsPanelProps) => {
     const editor = useEditor();
     const [childDocs, setChildDocs] = useState<ChildDocItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [insertingAll, setInsertingAll] = useState(false);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
     const draggingRef = useRef(false);
     const dragStartRef = useRef({ startX: 0, startY: 0, origLeft: 0, origTop: 0 });
     const contentRef = useRef<HTMLDivElement | null>(null);
-    const [docInfo, setDocInfo] = useState<DocInfo | null>(null);
 
     // 已添加到白板的文档ID状态
     const [addedDocIds, setAddedDocIds] = useState<Set<string>>(new Set());
@@ -66,6 +64,14 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
     const isDocInBoard = useCallback((docId: string): boolean => {
         return addedDocIds.has(docId);
     }, [addedDocIds]);
+
+    const canInsertAll = Boolean(
+        selectedMainCard &&
+        docId &&
+        selectedMainCard.props.blockId === docId &&
+        childDocs.length > 0 &&
+        !insertingAll
+    );
 
     // 监听 shapes 变化，更新已添加文档ID状态
     useEffect(() => {
@@ -104,7 +110,6 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
     const loadChildDocs = useCallback(async (signal?: AbortSignal) => {
         if (!docId) {
             setChildDocs([]);
-            setDocInfo(null);
             return;
         }
 
@@ -163,12 +168,10 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
                 setChildDocs([]);
             }
 
-            setDocInfo({ box, path: parentPath });
         } catch (err) {
             if (signal?.aborted) return;
             console.error('加载子文档失败:', err);
             setChildDocs([]);
-            setDocInfo(null);
         } finally {
             if (!signal?.aborted) {
                 setLoading(false);
@@ -202,7 +205,6 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
                             }
                         }
                         // 默认位置：在大纲面板左侧
-                        const width = 260;
                         const left = Math.max(12, window.innerWidth - 900);
                         setPos({ left, top: 60 });
                     }
@@ -220,7 +222,6 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
             if (detail && typeof detail.left === 'number' && typeof detail.top === 'number') {
                 setPos({ left: detail.left, top: detail.top });
             } else {
-                const width = 260;
                 const left = Math.max(12, window.innerWidth - 900);
                 setPos({ left, top: 60 });
             }
@@ -372,6 +373,38 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
         e.dataTransfer.effectAllowed = 'copy';
     }, []);
 
+    const handleInsertAll = useCallback(async () => {
+        if (!selectedMainCard || !docId || selectedMainCard.props.blockId !== docId) return;
+
+        setInsertingAll(true);
+        try {
+            const result = insertDocRelations({
+                editor,
+                mainCard: selectedMainCard,
+                items: childDocs.map((doc) => ({ blockId: doc.id })),
+                kind: 'child-doc',
+            });
+
+            if (result.createdShapeIds.length === 0) {
+                showMessage('无可插入子文档', 3000, 'info');
+                return;
+            }
+
+            showMessage(
+                result.skippedCount > 0
+                    ? `已插入 ${result.createdShapeIds.length} 个子文档，跳过 ${result.skippedCount} 个已存在项`
+                    : `已插入 ${result.createdShapeIds.length} 个子文档`,
+                3000,
+                'info'
+            );
+        } catch (err) {
+            console.error('insert all child docs failed', err);
+            showMessage('插入子文档失败', 3000, 'error');
+        } finally {
+            setInsertingAll(false);
+        }
+    }, [selectedMainCard, docId, editor, childDocs]);
+
     // 渲染单个文档项
     const renderDocItem = useCallback((doc: ChildDocItem): React.ReactNode => {
         const isAdded = addedDocIds.has(doc.id);
@@ -505,6 +538,30 @@ export const ChildDocsPanel = track(({ isOpen, onClose, docId }: ChildDocsPanelP
                     子文档
                 </span>
                 <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); void handleInsertAll(); }}
+                        disabled={!canInsertAll}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: canInsertAll ? 'pointer' : 'not-allowed',
+                            color: canInsertAll ? 'var(--b3-theme-on-background)' : 'var(--b3-theme-on-surface-light)',
+                            fontSize: '12px',
+                            padding: '4px 8px',
+                            opacity: canInsertAll ? 1 : 0.6,
+                        }}
+                        title={
+                            !selectedMainCard
+                                ? '请先选中主文档卡片'
+                                : selectedMainCard.props.blockId !== docId
+                                    ? '当前选中主卡片与面板文档不一致'
+                                    : childDocs.length === 0
+                                        ? '当前没有可插入的子文档'
+                                        : '插入全部子文档'
+                        }
+                    >
+                        {insertingAll ? '插入中...' : '插入全部'}
+                    </button>
                     <button
                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); loadChildDocs(); }}
                         style={{

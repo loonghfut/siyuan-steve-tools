@@ -2,7 +2,7 @@
  * 文档大纲面板组件
  * 显示白板绑定文档的大纲，支持将块添加到白板
  */
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     track,
     useEditor,
@@ -10,6 +10,8 @@ import {
 import { api } from '@frostime/siyuan-plugin-kits';
 import { getDocOutline } from '@/api/api';
 import { openTab, showMessage } from 'siyuan';
+import type { ICardShape } from '../CardShape/card-shape-types';
+import { insertDocRelations } from './insert-doc-relations';
 
 /**
  * 移除文本中的HTML实体和HTML标签
@@ -34,6 +36,7 @@ interface DocOutlinePanelProps {
     isOpen: boolean;
     onClose: () => void;
     docId: string | null; // 绑定的文档ID
+    selectedMainCard: ICardShape | null;
 }
 
 /** 大纲节点类型 */
@@ -51,10 +54,11 @@ interface OutlineNode {
 /**
  * 文档大纲面板组件
  */
-export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePanelProps) => {
+export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard }: DocOutlinePanelProps) => {
     const editor = useEditor();
     const [outline, setOutline] = useState<OutlineNode[]>([]);
     const [loading, setLoading] = useState(false);
+    const [insertingAll, setInsertingAll] = useState(false);
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
     const panelRef = useRef<HTMLDivElement | null>(null);
     const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -82,6 +86,14 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
     const isBlockInBoard = useCallback((blockId: string): boolean => {
         return addedBlockIds.has(blockId);
     }, [addedBlockIds]);
+
+    const canInsertAll = Boolean(
+        selectedMainCard &&
+        docId &&
+        selectedMainCard.props.blockId === docId &&
+        outline.length > 0 &&
+        !insertingAll
+    );
 
     // 获取白板中指定 blockId 对应的 shape
     const getShapeByBlockId = useCallback((blockId: string) => {
@@ -398,6 +410,41 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
         e.dataTransfer.effectAllowed = 'copy';
     }, []);
 
+    const handleInsertAll = useCallback(async () => {
+        if (!selectedMainCard || !docId || selectedMainCard.props.blockId !== docId) return;
+
+        const allNodeIds = collectAllNodeIds(outline)
+            .filter((id, index, arr) => Boolean(id) && arr.indexOf(id) === index);
+
+        setInsertingAll(true);
+        try {
+            const result = insertDocRelations({
+                editor,
+                mainCard: selectedMainCard,
+                items: allNodeIds.map((blockId) => ({ blockId })),
+                kind: 'outline-block',
+            });
+
+            if (result.createdShapeIds.length === 0) {
+                showMessage('无可插入大纲块', 3000, 'info');
+                return;
+            }
+
+            showMessage(
+                result.skippedCount > 0
+                    ? `已插入 ${result.createdShapeIds.length} 个大纲块，跳过 ${result.skippedCount} 个已存在项`
+                    : `已插入 ${result.createdShapeIds.length} 个大纲块`,
+                3000,
+                'info'
+            );
+        } catch (err) {
+            console.error('insert all outline blocks failed', err);
+            showMessage('插入大纲块失败', 3000, 'error');
+        } finally {
+            setInsertingAll(false);
+        }
+    }, [selectedMainCard, docId, collectAllNodeIds, outline, editor]);
+
     // 获取标题图标
     const getHeadingIcon = (subType?: string): string => {
         switch (subType) {
@@ -588,6 +635,30 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId }: DocOutlinePane
                     文档大纲
                 </span>
                 <div style={{ display: 'flex', gap: '4px' }}>
+                    <button
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); void handleInsertAll(); }}
+                        disabled={!canInsertAll}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: canInsertAll ? 'pointer' : 'not-allowed',
+                            color: canInsertAll ? 'var(--b3-theme-on-background)' : 'var(--b3-theme-on-surface-light)',
+                            fontSize: '12px',
+                            padding: '4px 8px',
+                            opacity: canInsertAll ? 1 : 0.6,
+                        }}
+                        title={
+                            !selectedMainCard
+                                ? '请先选中主文档卡片'
+                                : selectedMainCard.props.blockId !== docId
+                                    ? '当前选中主卡片与面板文档不一致'
+                                    : outline.length === 0
+                                        ? '当前没有可插入的大纲块'
+                                        : '插入全部大纲'
+                        }
+                    >
+                        {insertingAll ? '插入中...' : '插入全部'}
+                    </button>
                     <button
                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); loadOutline(); }}
                         style={{
