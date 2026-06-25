@@ -283,6 +283,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
 		const interactionHint = useBranchInteractionHint()
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
+		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
 		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id
 		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
 		const isConnectedBranch = useValue(
@@ -292,7 +293,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		)
 		const activeSide = isAttachTarget ? interactionHint.side : null
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
-		const rootHaloRadius = info.rootRadius + (isAttachTarget ? 10 : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
+		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
 		const showOuterFrame = shape.props.showOuterFrame === true
 

@@ -6,6 +6,7 @@ export type BranchInteractionHint =
 			draggingShapeId: string
 			branchId: string
 			side: 'left' | 'right'
+			targetShapeId?: string
 	  }
 	| {
 			mode: 'detach'
@@ -30,7 +31,8 @@ export function setBranchInteractionHint(nextHint: BranchInteractionHint | null)
 		prev?.mode === nextHint?.mode &&
 		prev?.branchId === nextHint?.branchId &&
 		(prev as any)?.draggingShapeId === (nextHint as any)?.draggingShapeId &&
-		(prev as any)?.side === (nextHint as any)?.side
+		(prev as any)?.side === (nextHint as any)?.side &&
+		(prev as any)?.targetShapeId === (nextHint as any)?.targetShapeId
 
 	if (isSame) return
 	currentHint = nextHint

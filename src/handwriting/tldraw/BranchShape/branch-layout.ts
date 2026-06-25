@@ -18,6 +18,7 @@ const delayedAttachCandidates = new Map<
 		since: number
 		branchId: string
 		side: BranchSide
+		targetShapeId?: string
 		timeoutId: ReturnType<typeof setTimeout> | null
 	}
 >()
@@ -35,11 +36,27 @@ type BranchSide = 'left' | 'right'
 
 type BranchChildEntry = { shape: BranchChildShape; bounds: Bounds }
 
+type BranchAttachToBranchCandidate = {
+	mode: 'attach-to-branch'
+	branch: IBranchShape
+	side: BranchSide
+	distance: number
+}
+
+type BranchAbsorbShapeCandidate = {
+	mode: 'attach-shape-to-dragging-branch'
+	branch: IBranchShape
+	side: BranchSide
+	targetShape: TLShape
+	distance: number
+}
+
 type BranchDragPreview =
 	| {
 			mode: 'attach'
 			branch: IBranchShape
 			side: BranchSide
+			targetShapeId?: string
 	  }
 	| {
 			mode: 'detach'
@@ -87,6 +104,20 @@ function canAttachShapeToBranch(editor: Editor, branch: IBranchShape, shape: TLS
 	return !isDescendantBranch(editor, shape.id as string, branch.id as string)
 }
 
+function getBranchDescendantIds(editor: Editor, branch: IBranchShape, visited = new Set<string>()) {
+	for (const childId of getAllBranchChildIds(branch)) {
+		if (visited.has(childId)) continue
+		visited.add(childId)
+
+		const child = editor.getShape(childId as TLShapeId)
+		if (child?.type === 'branch') {
+			getBranchDescendantIds(editor, child as IBranchShape, visited)
+		}
+	}
+
+	return visited
+}
+
 function nowMs() {
 	return typeof performance !== 'undefined' ? performance.now() : Date.now()
 }
@@ -108,15 +139,30 @@ function clearDelayedAttachCandidate(shapeId?: string) {
 	}
 }
 
-function getAttachCandidateKey(attach: { branch: IBranchShape; side: BranchSide }) {
-	return `${attach.branch.id}:${attach.side}`
+function getAttachCandidateKey(
+	attach:
+		| BranchAttachToBranchCandidate
+		| BranchAbsorbShapeCandidate
+		| { branch: IBranchShape; side: BranchSide; mode?: 'attach-to-branch'; targetShapeId?: string }
+) {
+	const mode = attach.mode ?? 'attach-to-branch'
+	const targetShapeId =
+		'targetShape' in attach ? attach.targetShape.id : 'targetShapeId' in attach ? attach.targetShapeId : undefined
+	return targetShapeId
+		? `${mode}:${attach.branch.id}:${attach.side}:${targetShapeId}`
+		: `${mode}:${attach.branch.id}:${attach.side}`
 }
 
-function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; side: BranchSide }, scheduleHint: boolean) {
+function isDelayedAttachReady(
+	shape: TLShape,
+	attach: BranchAttachToBranchCandidate | BranchAbsorbShapeCandidate,
+	scheduleHint: boolean
+) {
 	const shapeId = shape.id as string
 	const key = getAttachCandidateKey(attach)
 	const current = delayedAttachCandidates.get(shapeId)
 	const now = nowMs()
+	const targetShapeId = attach.mode === 'attach-shape-to-dragging-branch' ? (attach.targetShape.id as string) : undefined
 
 	if (!current || current.key !== key) {
 		if (current?.timeoutId) clearTimeout(current.timeoutId)
@@ -125,6 +171,7 @@ function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; si
 			since: now,
 			branchId: attach.branch.id as string,
 			side: attach.side,
+			targetShapeId,
 			timeoutId: null as ReturnType<typeof setTimeout> | null,
 		}
 
@@ -139,6 +186,7 @@ function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; si
 					draggingShapeId: shapeId,
 					branchId: latest.branchId,
 					side: latest.side,
+					targetShapeId: latest.targetShapeId,
 				})
 			}, ATTACH_DELAY_MS)
 		}
@@ -155,8 +203,12 @@ function isDelayedAttachReady(shape: TLShape, attach: { branch: IBranchShape; si
 	return now - current.since >= ATTACH_DELAY_MS
 }
 
-function getNearestAttachCandidate(editor: Editor, shape: TLShape, branches = getCurrentBranches(editor)) {
-	let nearestAttach: { branch: IBranchShape; side: BranchSide; distance: number } | null = null
+function getNearestAttachCandidate(
+	editor: Editor,
+	shape: TLShape,
+	branches = getCurrentBranches(editor)
+): BranchAttachToBranchCandidate | null {
+	let nearestAttach: BranchAttachToBranchCandidate | null = null
 
 	for (const branch of branches) {
 		if (!canAttachShapeToBranch(editor, branch, shape)) continue
@@ -164,7 +216,46 @@ function getNearestAttachCandidate(editor: Editor, shape: TLShape, branches = ge
 		const distance = distanceToBranchRoot(editor, branch, shape, side)
 		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
 		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
-			nearestAttach = { branch, side, distance }
+			nearestAttach = { mode: 'attach-to-branch', branch, side, distance }
+		}
+	}
+
+	return nearestAttach
+}
+
+function isBranchAbsorbableShape(shape: TLShape | undefined): boolean {
+	return !!shape && (shape.type === 'card' || shape.type === 'single-block') && typeof (shape as any).props?.w === 'number'
+}
+
+function getNearestShapeForDraggingBranch(
+	editor: Editor,
+	draggingBranch: IBranchShape
+): BranchAbsorbShapeCandidate | null {
+	const branchId = draggingBranch.id as string
+	const selectedDragIds = new Set(activeBranchDragShapeIds)
+	selectedDragIds.add(branchId)
+	const descendantIds = getBranchDescendantIds(editor, draggingBranch)
+
+	let nearestAttach: BranchAbsorbShapeCandidate | null = null
+
+	for (const candidate of editor.getCurrentPageShapes()) {
+		if (!isBranchAbsorbableShape(candidate)) continue
+		if (selectedDragIds.has(candidate.id as string)) continue
+		if (descendantIds.has(candidate.id as string)) continue
+
+		const side = getBranchSideForShape(editor, draggingBranch, candidate)
+		const distance = distanceToBranchRoot(editor, draggingBranch, candidate, side)
+		const snapDistance = Math.max(draggingBranch.props.snapDistance || 140, 40)
+		if (distance > snapDistance) continue
+
+		if (!nearestAttach || distance < nearestAttach.distance) {
+			nearestAttach = {
+				mode: 'attach-shape-to-dragging-branch',
+				branch: draggingBranch,
+				side,
+				targetShape: candidate,
+				distance,
+			}
 		}
 	}
 
@@ -218,6 +309,12 @@ function getBranchSideForShape(editor: Editor, branch: IBranchShape, child: TLSh
 function getSideChildIds(branch: IBranchShape, side: BranchSide) {
 	if (side === 'left') return branch.props.leftChildIds || []
 	return branch.props.rightChildIds || branch.props.childIds || []
+}
+
+function getChildSideInBranch(branch: IBranchShape, childId: string): BranchSide | null {
+	if ((branch.props.leftChildIds || []).includes(childId)) return 'left'
+	if ((branch.props.rightChildIds || branch.props.childIds || []).includes(childId)) return 'right'
+	return null
 }
 
 export function getAllBranchChildIds(branch: IBranchShape) {
@@ -492,6 +589,21 @@ function applyDraftToBranch(editor: Editor, draft: BranchIdsDraft) {
 	return true
 }
 
+function sortBranchesForLayout(editor: Editor, branchIds: Iterable<TLShapeId>) {
+	const branches = Array.from(new Set(Array.from(branchIds)))
+		.map((branchId) => editor.getShape<IBranchShape>(branchId))
+		.filter((branch): branch is IBranchShape => !!branch && branch.type === 'branch')
+
+	branches.sort((a, b) => {
+		if (a.id === b.id) return 0
+		if (isDescendantBranch(editor, a.id as string, b.id as string)) return 1
+		if (isDescendantBranch(editor, b.id as string, a.id as string)) return -1
+		return 0
+	})
+
+	return branches
+}
+
 export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	if (!isBranchConnectableShape(shape)) return false
 
@@ -516,18 +628,71 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 
 		if (preview?.mode === 'attach') {
 			const nearest = preview.branch
-			if (!canAttachShapeToBranch(editor, nearest, shape)) continue
+			const attachTargetShapeId = preview.targetShapeId
+			const attachTargetShape = attachTargetShapeId ? editor.getShape(attachTargetShapeId as TLShapeId) : null
+			if (attachTargetShapeId && !attachTargetShape) continue
+			const childShape = attachTargetShape ?? shape
+			const attachChildId = (attachTargetShape?.id as string) || childId
+			if (!canAttachShapeToBranch(editor, nearest, childShape)) continue
 			const nearestDraft = getBranchDraft(editor, drafts, nearest)
+			const containingBranches = currentBranches.filter((branch) => getAllBranchChildIds(branch).includes(attachChildId))
+			const sourceBranch = attachTargetShape
+				? containingBranches.find((branch) => branch.id !== nearest.id) || null
+				: null
+			const isOnlyInNearest = containingBranches.length === 1 && containingBranches[0].id === nearest.id
+			const isAlreadyOnSameSide =
+				preview.side === 'left'
+					? nearestDraft.leftChildIds.includes(attachChildId)
+					: nearestDraft.rightChildIds.includes(attachChildId)
+
+			if (attachTargetShape && isOnlyInNearest && isAlreadyOnSameSide) {
+				continue
+			}
 
 			for (const branch of currentBranches) {
 				const draft = getBranchDraft(editor, drafts, branch)
-				if (!draftContainsChild(draft, childId)) continue
-				if (removeChildFromDraft(draft, childId)) affectedBranchIds.add(branch.id)
+				if (!draftContainsChild(draft, attachChildId)) continue
+				if (removeChildFromDraft(draft, attachChildId)) affectedBranchIds.add(branch.id)
 			}
 
-			if (preview.side === 'left') nearestDraft.leftChildIds.push(childId)
-			else nearestDraft.rightChildIds.push(childId)
+			const alreadyOnLeft = nearestDraft.leftChildIds.includes(attachChildId)
+			const alreadyOnRight = nearestDraft.rightChildIds.includes(attachChildId)
+			if ((preview.side === 'left' && !alreadyOnLeft) || (preview.side === 'right' && !alreadyOnRight)) {
+				if (preview.side === 'left') nearestDraft.leftChildIds.push(attachChildId)
+				else nearestDraft.rightChildIds.push(attachChildId)
+			}
 			affectedBranchIds.add(nearest.id)
+
+			if (attachTargetShape && sourceBranch && canAttachShapeToBranch(editor, sourceBranch, nearest)) {
+				const sourceDraft = getBranchDraft(editor, drafts, sourceBranch)
+				const sourceSide = getChildSideInBranch(sourceBranch, attachChildId) || getBranchSideForShape(editor, sourceBranch, nearest)
+				const nearestBranchId = nearest.id as string
+				const nearestAlreadyOnSourceSide =
+					sourceSide === 'left'
+						? sourceDraft.leftChildIds.includes(nearestBranchId)
+						: sourceDraft.rightChildIds.includes(nearestBranchId)
+				const nearestContainingBranches = currentBranches.filter((branch) =>
+					getAllBranchChildIds(branch).includes(nearestBranchId)
+				)
+				const nearestOnlyInSource =
+					nearestContainingBranches.length === 1 && nearestContainingBranches[0].id === sourceBranch.id
+
+				if (!(nearestOnlyInSource && nearestAlreadyOnSourceSide)) {
+					for (const branch of currentBranches) {
+						const draft = getBranchDraft(editor, drafts, branch)
+						if (!draftContainsChild(draft, nearestBranchId)) continue
+						if (removeChildFromDraft(draft, nearestBranchId)) affectedBranchIds.add(branch.id)
+					}
+
+					if (sourceSide === 'left') {
+						if (!sourceDraft.leftChildIds.includes(nearestBranchId)) sourceDraft.leftChildIds.push(nearestBranchId)
+					} else {
+						if (!sourceDraft.rightChildIds.includes(nearestBranchId)) sourceDraft.rightChildIds.push(nearestBranchId)
+					}
+					affectedBranchIds.add(sourceBranch.id)
+				}
+			}
+
 			didHandle = true
 			continue
 		}
@@ -555,9 +720,8 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 		clearDelayedAttachCandidate(shape.id as string)
 	}
 
-	for (const branchId of affectedBranchIds) {
-		const branch = editor.getShape<IBranchShape>(branchId)
-		if (branch) layoutBranchChildren(editor, branch)
+	for (const branch of sortBranchesForLayout(editor, affectedBranchIds)) {
+		layoutBranchChildren(editor, branch)
 	}
 
 	return didHandle
@@ -569,16 +733,32 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 	const scheduleAttachHint = options?.scheduleAttachHint ?? true
 	const branches = options?.branches ?? getCurrentBranches(editor)
 
-	const nearestAttach = getNearestAttachCandidate(editor, shape, branches)
+	const nearestAttachToBranch = getNearestAttachCandidate(editor, shape, branches)
+	const nearestShapeToDraggingBranch =
+		shape.type === 'branch' ? getNearestShapeForDraggingBranch(editor, shape as IBranchShape) : null
+
+	const nearestAttach =
+		nearestAttachToBranch && nearestShapeToDraggingBranch
+			? nearestAttachToBranch.distance <= nearestShapeToDraggingBranch.distance
+				? nearestAttachToBranch
+				: nearestShapeToDraggingBranch
+			: nearestAttachToBranch || nearestShapeToDraggingBranch
 
 	if (nearestAttach) {
 		if (!isDelayedAttachReady(shape, nearestAttach, scheduleAttachHint)) return null
 
-		return {
-			mode: 'attach',
-			branch: nearestAttach.branch,
-			side: nearestAttach.side,
-		}
+		return nearestAttach.mode === 'attach-shape-to-dragging-branch'
+			? {
+					mode: 'attach',
+					branch: nearestAttach.branch,
+					side: nearestAttach.side,
+					targetShapeId: nearestAttach.targetShape.id as string,
+			  }
+			: {
+					mode: 'attach',
+					branch: nearestAttach.branch,
+					side: nearestAttach.side,
+			  }
 	}
 
 	clearDelayedAttachCandidate(shape.id as string)
@@ -608,6 +788,7 @@ export function getBranchInteractionHintForShape(editor: Editor, shape: TLShape)
 			draggingShapeId: shape.id as string,
 			branchId: preview.branch.id,
 			side: preview.side,
+			targetShapeId: preview.targetShapeId,
 		}
 	}
 
