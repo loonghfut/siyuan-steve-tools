@@ -4,6 +4,7 @@
 import React from 'react'
 import { Editor, TldrawUiButton } from '@tldraw/tldraw'
 import type { IBranchShape } from './branch-shape-types'
+import { detachBranchCompletely } from './branch-layout'
 
 export interface BranchStyleSectionProps {
 	editor: Editor
@@ -53,6 +54,21 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 					}}
 				>
 					<span className="tlui-toggle-icon" style={{ fontSize: '12px' }}>外框</span>
+				</TldrawUiButton>
+				<TldrawUiButton
+					type="normal"
+					className="tlui-toggle-button"
+					onClick={() => {
+						editor.run(() => {
+							for (const shape of selectedBranchShapes) {
+								detachBranchCompletely(editor, shape.id)
+							}
+						})
+					}}
+					title="断开当前 Branch 的所有吸附关系"
+					aria-label="断开所有吸附"
+				>
+					<span className="tlui-toggle-icon" style={{ fontSize: '12px' }}>断开吸附</span>
 				</TldrawUiButton>
 			</div>
 		</div>

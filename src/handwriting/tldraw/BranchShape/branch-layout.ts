@@ -891,6 +891,41 @@ export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
 	}
 }
 
+export function detachBranchCompletely(editor: Editor, branchId: TLShapeId) {
+	const branch = editor.getShape<IBranchShape>(branchId)
+	if (!branch || branch.type !== 'branch') return
+
+	const affectedBranchIds = new Set<TLShapeId>()
+
+	pruneShapeFromBranches(editor, branchId)
+
+	const latestBranch = editor.getShape<IBranchShape>(branchId)
+	if (!latestBranch || latestBranch.type !== 'branch') return
+
+	const childIds = getAllBranchChildIds(latestBranch)
+	if (childIds.length === 0) return
+
+	editor.updateShape<IBranchShape>({
+		id: latestBranch.id,
+		type: 'branch',
+		props: {
+			...latestBranch.props,
+			childIds: [],
+			leftChildIds: [],
+			rightChildIds: [],
+		},
+	})
+	affectedBranchIds.add(latestBranch.id)
+
+	for (const childId of childIds) {
+		affectedBranchIds.add(childId as TLShapeId)
+	}
+
+	for (const affectedBranch of sortBranchesForLayout(editor, affectedBranchIds)) {
+		layoutBranchChildren(editor, affectedBranch)
+	}
+}
+
 export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 	const rootX = getBranchRootLocalX(branch)
 	const rootY = branch.props.h / 2
