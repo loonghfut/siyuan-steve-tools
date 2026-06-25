@@ -2,7 +2,7 @@ import { Editor, TLShapeId, createShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
-import { layoutBranchChildren } from '../BranchShape'
+import { getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
 
 type InsertRelationKind = 'child-doc' | 'outline-block'
 
@@ -114,6 +114,33 @@ function createBranchShape(id: TLShapeId, rootX: number, rootY: number, props?: 
 	}
 }
 
+function getBranchesContainingChild(editor: Editor, childId: string) {
+	return editor
+		.getCurrentPageShapes()
+		.filter((shape): shape is IBranchShape => shape.type === 'branch' && getAllBranchChildIds(shape as IBranchShape).includes(childId))
+}
+
+function replaceChildId(ids: string[] | undefined, oldChildId: string, newChildId: string) {
+	if (!ids) return []
+	return Array.from(new Set(ids.map((id) => (id === oldChildId ? newChildId : id))))
+}
+
+function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: string, newChildId: string) {
+	const leftChildIds = replaceChildId(branch.props.leftChildIds, oldChildId, newChildId)
+	const rightChildIds = replaceChildId(branch.props.rightChildIds || branch.props.childIds, oldChildId, newChildId)
+
+	editor.updateShape<IBranchShape>({
+		id: branch.id,
+		type: 'branch',
+		props: {
+			...branch.props,
+			childIds: rightChildIds,
+			leftChildIds,
+			rightChildIds,
+		},
+	})
+}
+
 export function insertDocRelations(options: InsertDocRelationsOptions): InsertDocRelationsResult {
 	const { editor, mainCard, items, kind } = options
 	const existingBlockIds = getExistingBlockIds(editor)
@@ -135,6 +162,7 @@ export function insertDocRelations(options: InsertDocRelationsOptions): InsertDo
 	const createdShapes: Array<any> = []
 	const createdShapeIds: TLShapeId[] = []
 	const branchLayoutIds: TLShapeId[] = []
+	const sourceBranches = getBranchesContainingChild(editor, mainCard.id as string)
 
 	const createCardShape = (item: InsertRelationItem, index: number) => {
 		const id = createShapeId()
@@ -194,6 +222,10 @@ export function insertDocRelations(options: InsertDocRelationsOptions): InsertDo
 
 	editor.createShapes(createdShapes)
 
+	for (const sourceBranch of sourceBranches) {
+		replaceChildInBranch(editor, sourceBranch, mainCard.id as string, branchId as string)
+	}
+
 	for (const layoutId of branchLayoutIds) {
 		const latestChildBranch = editor.getShape<IBranchShape>(layoutId)
 		if (latestChildBranch?.type === 'branch') {
@@ -206,6 +238,16 @@ export function insertDocRelations(options: InsertDocRelationsOptions): InsertDo
 		layoutBranchChildren(editor, latestBranch)
 	} else {
 		showMessage('branch 创建后未能完成布局', 3000, 'error')
+	}
+
+	for (const sourceBranch of sourceBranches) {
+		const latestSourceBranch = editor.getShape<IBranchShape>(sourceBranch.id)
+		if (latestSourceBranch?.type === 'branch') {
+			layoutBranchChildren(editor, latestSourceBranch)
+		}
+	}
+	if (sourceBranches.length > 0) {
+		relayoutBranchesContainingShapes(editor, sourceBranches.map((branch) => branch.id))
 	}
 
 	return {
