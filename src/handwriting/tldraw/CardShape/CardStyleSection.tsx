@@ -246,29 +246,28 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
 
             {selectedMainCard && (
                 <div className="tlui-style-panel__section">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                            当前文档：已选主卡片 ({selectedMainCard.props.blockId.slice(-6)})
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', gap: '0px' }}>
                             <TldrawUiButton
                                 type="normal"
+                                style={{ flex: '1 1 0', minWidth: '0' }}
                                 disabled={insertingChildDocs}
                                 onClick={() => { void handleInsertAllChildDocs() }}
                                 title="插入全部子文档"
                             >
                                 <span style={{ fontSize: '12px' }}>
-                                    {insertingChildDocs ? '插入中...' : '插入全部子文档'}
+                                    {insertingChildDocs ? '插入中…' : '子文档'}
                                 </span>
                             </TldrawUiButton>
                             <TldrawUiButton
                                 type="normal"
+                                style={{ flex: '1 1 0', minWidth: '0' }}
                                 disabled={insertingOutline}
                                 onClick={() => { void handleInsertAllOutline() }}
-                                title="插入全部大纲"
+                                title="插入全部大纲块"
                             >
                                 <span style={{ fontSize: '12px' }}>
-                                    {insertingOutline ? '插入中...' : '插入全部大纲'}
+                                    {insertingOutline ? '插入中…' : '大纲'}
                                 </span>
                             </TldrawUiButton>
                         </div>
