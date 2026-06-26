@@ -295,7 +295,13 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
-		const showOuterFrame = shape.props.showOuterFrame === true
+		const isAutoFrameEnhanced = info.autoFrame.enabled
+		const showOuterFrame = shape.props.showOuterFrame === true || isAutoFrameEnhanced
+		const outerFrameInset = isAutoFrameEnhanced ? 2 : 1
+		const outerFrameStrokeWidth = isAutoFrameEnhanced ? 2.2 : 1.2
+		const outerFrameOpacity = isAutoFrameEnhanced ? 0.96 : 0.8
+		const outerFrameDasharray = isAutoFrameEnhanced ? '8 4' : '4 8'
+		const outerFrameRx = isAutoFrameEnhanced ? 12 : 8
 
 		return (
 			<SVGContainer className="BranchShape">
@@ -309,17 +315,17 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				/>
 				{isConnectedBranch && showOuterFrame && !isMovingBranch && (
 					<rect
-						x={1}
-						y={1}
-						width={Math.max(shape.props.w - 2, 1)}
-						height={Math.max(shape.props.h - 2, 1)}
-						rx={8}
-						ry={8}
+						x={outerFrameInset}
+						y={outerFrameInset}
+						width={Math.max(shape.props.w - outerFrameInset * 2, 1)}
+						height={Math.max(shape.props.h - outerFrameInset * 2, 1)}
+						rx={outerFrameRx}
+						ry={outerFrameRx}
 						fill="none"
 						stroke={color}
-						strokeWidth={1.2}
-						strokeDasharray="4 8"
-						opacity={0.8}
+						strokeWidth={outerFrameStrokeWidth}
+						strokeDasharray={outerFrameDasharray}
+						opacity={outerFrameOpacity}
 						pointerEvents="none"
 					/>
 				)}

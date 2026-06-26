@@ -9,6 +9,8 @@ const ROOT_RADIUS = 7
 const ROOT_DIAMETER = ROOT_RADIUS * 2
 const DETACH_DISTANCE_MULTIPLIER = 0.01
 const ATTACH_DELAY_MS = 500
+const AUTO_FRAME_MIN_CHILDREN = 2
+const ENHANCED_FRAME_PADDING = 24
 const activeBranchDragShapeIds = new Set<string>()
 const pendingBranchDragShapes = new Map<string, TLShape>()
 const delayedAttachCandidates = new Map<
@@ -35,6 +37,11 @@ type Bounds = {
 type BranchSide = 'left' | 'right'
 
 type BranchChildEntry = { shape: BranchChildShape; bounds: Bounds }
+
+type BranchParentAttachment = {
+	branch: IBranchShape
+	side: BranchSide
+}
 
 type BranchAttachToBranchCandidate = {
 	mode: 'attach-to-branch'
@@ -317,8 +324,53 @@ function getChildSideInBranch(branch: IBranchShape, childId: string): BranchSide
 	return null
 }
 
+function getOppositeBranchSide(side: BranchSide): BranchSide {
+	return side === 'left' ? 'right' : 'left'
+}
+
+function getParentBranchAttachment(editor: Editor, branch: IBranchShape): BranchParentAttachment | null {
+	const childId = branch.id as string
+	for (const candidate of getCurrentBranches(editor)) {
+		if (candidate.id === branch.id) continue
+		const side = getChildSideInBranch(candidate, childId)
+		if (side) {
+			return {
+				branch: candidate,
+				side,
+			}
+		}
+	}
+
+	return null
+}
+
 export function getAllBranchChildIds(branch: IBranchShape) {
 	return Array.from(new Set([...(branch.props.leftChildIds || []), ...(branch.props.rightChildIds || branch.props.childIds || [])]))
+}
+
+export function getBranchAutoFrameState(editor: Editor, branch: IBranchShape) {
+	const parentAttachment = getParentBranchAttachment(editor, branch)
+	if (!parentAttachment) {
+		return {
+			enabled: false,
+			padding: 0,
+			parentBranchId: null,
+			attachedSide: null as BranchSide | null,
+			attachedSideChildCount: 0,
+		}
+	}
+
+	const attachedSide = getOppositeBranchSide(parentAttachment.side)
+	const attachedSideChildCount = normalizeSideChildIds(editor, branch, attachedSide).length
+	const enabled = attachedSideChildCount >= AUTO_FRAME_MIN_CHILDREN
+
+	return {
+		enabled,
+		padding: enabled ? ENHANCED_FRAME_PADDING : 0,
+		parentBranchId: parentAttachment.branch.id as string,
+		attachedSide,
+		attachedSideChildCount,
+	}
 }
 
 function distanceToBranchRoot(editor: Editor, branch: IBranchShape, child: TLShape, side = getBranchSideForShape(editor, branch, child)) {
@@ -447,6 +499,9 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const leftChildren = getBranchChildren(editor, leftIds)
 	const rightChildren = getBranchChildren(editor, rightIds)
 	const children = [...leftChildren, ...rightChildren]
+	const autoFrame = getBranchAutoFrameState(editor, branch)
+	const shouldPadForFrame = children.length > 0 && (autoFrame.enabled || branch.props.showOuterFrame === true)
+	const framePadding = shouldPadForFrame ? ENHANCED_FRAME_PADDING : 0
 
 	if (children.length === 0) {
 		const oldRootPage = getBranchRootPagePoint(branch)
@@ -474,10 +529,11 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const rightWidth = rightChildren.length > 0 ? Math.max(...rightChildren.map(({ bounds }) => bounds.w)) + horizontalGap : 0
 	const leftHeight = leftChildren.reduce((sum, { bounds }) => sum + bounds.h, 0) + verticalGap * Math.max(leftChildren.length - 1, 0)
 	const rightHeight = rightChildren.reduce((sum, { bounds }) => sum + bounds.h, 0) + verticalGap * Math.max(rightChildren.length - 1, 0)
-	const branchHeight = Math.max(leftHeight, rightHeight)
+	const contentHeight = Math.max(leftHeight, rightHeight)
+	const branchHeight = contentHeight + framePadding * 2
 	const oldRootPage = getBranchRootPagePoint(branch)
-	const rootLocalX = Math.max(leftWidth, ROOT_RADIUS)
-	const branchWidth = rootLocalX + Math.max(rightWidth, ROOT_RADIUS)
+	const rootLocalX = Math.max(leftWidth, ROOT_RADIUS) + framePadding
+	const branchWidth = rootLocalX + Math.max(rightWidth, ROOT_RADIUS) + framePadding
 	const branchX = oldRootPage.x - rootLocalX
 	const branchY = oldRootPage.y - branchHeight / 2
 	const rootX = oldRootPage.x
@@ -627,6 +683,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 		const preview = getBranchDragPreview(editor, shape, { scheduleAttachHint: false, branches: currentBranches })
 
 		if (preview?.mode === 'attach') {
+			if (shape.type === 'branch') affectedBranchIds.add(shape.id)
 			const nearest = preview.branch
 			const attachTargetShapeId = preview.targetShapeId
 			const attachTargetShape = attachTargetShapeId ? editor.getShape(attachTargetShapeId as TLShapeId) : null
@@ -705,6 +762,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			const distance = distanceToBranchWorkArea(editor, branch, shape)
 			if (distance > detachDistance) {
 				if (removeChildFromDraft(draft, childId)) affectedBranchIds.add(branch.id)
+				if (shape.type === 'branch') affectedBranchIds.add(shape.id)
 			} else {
 				affectedBranchIds.add(branch.id)
 			}
@@ -929,6 +987,7 @@ export function detachBranchCompletely(editor: Editor, branchId: TLShapeId) {
 export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 	const rootX = getBranchRootLocalX(branch)
 	const rootY = branch.props.h / 2
+	const autoFrame = getBranchAutoFrameState(editor, branch)
 	const children = normalizeChildIds(editor, branch)
 		.map((id) => {
 			const child = editor.getShape(id as TLShapeId)
@@ -958,6 +1017,7 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 		rootX,
 		rootY,
 		rootRadius: ROOT_RADIUS,
+		autoFrame,
 		children,
 	}
 }
