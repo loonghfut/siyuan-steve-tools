@@ -1,6 +1,6 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape } from './branch-shape-types'
-import { relayoutBranchesContainingShapes } from './branch-layout'
+import { pruneShapeFromBranches, relayoutBranchesContainingShapes } from './branch-layout'
 
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 
@@ -30,6 +30,7 @@ function didRelevantBoundsChange(prev: TLShape, next: TLShape) {
 
 export function keepBranchLayoutsUpdated(editor: Editor) {
 	let pendingShapeIds = new Set<string>()
+	let pendingDeletedShapeIds = new Set<string>()
 	let isUpdating = false
 
 	editor.sideEffects.registerAfterChangeHandler('shape', (prev, next, source) => {
@@ -39,15 +40,30 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		pendingShapeIds.add(next.id as string)
 	})
 
+	editor.sideEffects.registerAfterDeleteHandler('shape', (shape, source) => {
+		if (source === 'remote' || isUpdating) return
+		if (!BRANCH_CHILD_TYPES.has(shape.type)) return
+
+		pendingDeletedShapeIds.add(shape.id as string)
+	})
+
 	editor.sideEffects.registerOperationCompleteHandler(() => {
-		if (pendingShapeIds.size === 0 || isUpdating) return
+		if ((pendingShapeIds.size === 0 && pendingDeletedShapeIds.size === 0) || isUpdating) return
 
 		const shapeIds = Array.from(pendingShapeIds)
+		const deletedShapeIds = Array.from(pendingDeletedShapeIds)
 		pendingShapeIds = new Set()
+		pendingDeletedShapeIds = new Set()
 		isUpdating = true
 
 		try {
-			relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
+			for (const shapeId of deletedShapeIds) {
+				pruneShapeFromBranches(editor, shapeId as TLShapeId)
+			}
+
+			if (shapeIds.length > 0) {
+				relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
+			}
 		} finally {
 			isUpdating = false
 		}
