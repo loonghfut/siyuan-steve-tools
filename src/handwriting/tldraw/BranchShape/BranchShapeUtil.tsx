@@ -16,7 +16,7 @@ import {
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { IBranchShape } from './branch-shape-types'
-import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, isShapeInBranch, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
+import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
 
 const translatingBranchIds = new Set<string>()
@@ -286,11 +286,6 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
 		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id
 		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
-		const isConnectedBranch = useValue(
-			`branch-connected-${shape.id}`,
-			() => isShapeInBranch(editor, shape.id),
-			[editor, shape.id]
-		)
 		const activeSide = isAttachTarget ? interactionHint.side : null
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
@@ -313,7 +308,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 					fill="transparent"
 					pointerEvents="none"
 				/>
-				{isConnectedBranch && showOuterFrame && !isMovingBranch && (
+				{showOuterFrame && !isMovingBranch && (
 					<rect
 						x={outerFrameInset}
 						y={outerFrameInset}

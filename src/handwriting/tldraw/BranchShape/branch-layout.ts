@@ -500,7 +500,8 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const rightChildren = getBranchChildren(editor, rightIds)
 	const children = [...leftChildren, ...rightChildren]
 	const autoFrame = getBranchAutoFrameState(editor, branch)
-	const shouldPadForFrame = children.length > 0 && (autoFrame.enabled || branch.props.showOuterFrame === true)
+	const shouldShowOuterFrame = autoFrame.enabled || branch.props.showOuterFrame === true
+	const shouldPadForFrame = children.length > 0 && shouldShowOuterFrame
 	const framePadding = shouldPadForFrame ? ENHANCED_FRAME_PADDING : 0
 
 	if (children.length === 0) {
@@ -939,6 +940,7 @@ export function isShapeInBranch(editor: Editor, shapeId: TLShapeId) {
 export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
 	const branches = getCurrentBranches(editor)
 		.filter((shape) => shape.type === 'branch' && getAllBranchChildIds(shape as IBranchShape).includes(shapeId as string)) as IBranchShape[]
+	const relayoutSourceIds = new Set<TLShapeId>()
 
 	for (const branch of branches) {
 		const nextIds = removeChildIdFromBranch(branch, shapeId as string)
@@ -951,7 +953,14 @@ export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
 			},
 		})
 		const updatedBranch = editor.getShape<IBranchShape>(branch.id)
-		if (updatedBranch) layoutBranchChildren(editor, updatedBranch)
+		if (updatedBranch) {
+			layoutBranchChildren(editor, updatedBranch)
+			relayoutSourceIds.add(updatedBranch.id)
+		}
+	}
+
+	if (relayoutSourceIds.size > 0) {
+		relayoutBranchesContainingShapes(editor, Array.from(relayoutSourceIds))
 	}
 }
 
