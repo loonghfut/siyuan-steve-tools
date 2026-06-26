@@ -349,7 +349,7 @@ export const DocOutlinePanel = track(({ isOpen, onClose, docId, selectedMainCard
 
         setInsertingAll(true);
         try {
-            const result = insertDocRelations({
+            const result = await insertDocRelations({
                 editor,
                 mainCard: selectedMainCard,
                 items: outline.map(outlineNodeToRelationItem),

@@ -90,7 +90,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                 return
             }
 
-            const result = insertDocRelations({
+            const result = await insertDocRelations({
                 editor,
                 mainCard: selectedMainCard,
                 items: childDocs.map((doc) => ({ blockId: doc.id })),
@@ -124,7 +124,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         try {
             const outline = await loadOutlineForDoc(selectedMainCard.props.blockId)
 
-            const result = insertDocRelations({
+            const result = await insertDocRelations({
                 editor,
                 mainCard: selectedMainCard,
                 items: outline.map(outlineNodeToRelationItem),

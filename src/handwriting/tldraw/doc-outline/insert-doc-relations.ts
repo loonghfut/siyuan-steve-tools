@@ -1,8 +1,10 @@
 import { Editor, TLShapeId, createShapeId } from '@tldraw/tldraw'
+import { api } from '@frostime/siyuan-plugin-kits'
 import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
 import { getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
+import { buildTldrawLink } from '../utils/link-builder'
 
 type InsertRelationKind = 'child-doc' | 'outline-block'
 
@@ -141,7 +143,35 @@ function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: 
 	})
 }
 
-export function insertDocRelations(options: InsertDocRelationsOptions): InsertDocRelationsResult {
+function getTldrawMeta(editor: Editor) {
+	const container = editor.getContainer()
+	const editorElement = container?.closest('.tldraw__editor')
+	const rootId = editorElement?.getAttribute('data-tldraw-id') || ''
+	const title = editorElement?.getAttribute('data-tldraw-title') || ''
+	return { rootId, title }
+}
+
+async function syncOutlineBlockAttrs(editor: Editor, blockIds: string[]) {
+	if (blockIds.length === 0) return
+
+	const { rootId, title } = getTldrawMeta(editor)
+	if (!rootId) {
+		console.warn('skip syncing outline block attrs: missing tldraw rootId')
+		return
+	}
+
+	await Promise.all(
+		blockIds.map(async (blockId) => {
+			const link = buildTldrawLink(rootId, blockId, title)
+			await api.setBlockAttrs(blockId, {
+				'custom-tldraw-link': link,
+				'custom-st-tldraw': '1',
+			})
+		})
+	)
+}
+
+export async function insertDocRelations(options: InsertDocRelationsOptions): Promise<InsertDocRelationsResult> {
 	const { editor, mainCard, items, kind } = options
 	const existingBlockIds = getExistingBlockIds(editor)
 	const dedupedItems = dedupeRelationTree(items)
@@ -221,6 +251,15 @@ export function insertDocRelations(options: InsertDocRelationsOptions): InsertDo
 	}
 
 	editor.createShapes(createdShapes)
+
+	if (kind === 'outline-block') {
+		const outlineBlockIds = allCreatableItems.map((item) => item.blockId).filter(Boolean)
+		try {
+			await syncOutlineBlockAttrs(editor, outlineBlockIds)
+		} catch (error) {
+			console.error('sync outline block attrs failed', error)
+		}
+	}
 
 	for (const sourceBranch of sourceBranches) {
 		replaceChildInBranch(editor, sourceBranch, mainCard.id as string, branchId as string)
