@@ -291,12 +291,16 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
 		const isAutoFrameEnhanced = info.autoFrame.enabled
-		const showOuterFrame = shape.props.showOuterFrame === true || isAutoFrameEnhanced
-		const outerFrameInset = isAutoFrameEnhanced ? 2 : 1
-		const outerFrameStrokeWidth = isAutoFrameEnhanced ? 2.2 : 1.2
-		const outerFrameOpacity = isAutoFrameEnhanced ? 0.96 : 0.8
-		const outerFrameDasharray = isAutoFrameEnhanced ? '8 4' : '4 8'
-		const outerFrameRx = isAutoFrameEnhanced ? 12 : 8
+		const showBackground = shape.props.showOuterFrame === true
+		const backgroundInset = isAutoFrameEnhanced ? 2 : 1
+		const backgroundOpacity = isAutoFrameEnhanced ? 0.12 : 0.08
+		const backgroundRx = isAutoFrameEnhanced ? 12 : 8
+		const showAutoOuterFrame = isAutoFrameEnhanced
+		const outerFrameInset = 2
+		const outerFrameStrokeWidth = 2.2
+		const outerFrameOpacity = 0.96
+		const outerFrameDasharray = '8 4'
+		const outerFrameRx = 12
 
 		return (
 			<SVGContainer className="BranchShape">
@@ -308,7 +312,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 					fill="transparent"
 					pointerEvents="none"
 				/>
-				{showOuterFrame && !isMovingBranch && (
+				{showAutoOuterFrame && !isMovingBranch && (
 					<rect
 						x={outerFrameInset}
 						y={outerFrameInset}
@@ -321,6 +325,19 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						strokeWidth={outerFrameStrokeWidth}
 						strokeDasharray={outerFrameDasharray}
 						opacity={outerFrameOpacity}
+						pointerEvents="none"
+					/>
+				)}
+				{showBackground && !isMovingBranch && (
+					<rect
+						x={backgroundInset}
+						y={backgroundInset}
+						width={Math.max(shape.props.w - backgroundInset * 2, 1)}
+						height={Math.max(shape.props.h - backgroundInset * 2, 1)}
+						rx={backgroundRx}
+						ry={backgroundRx}
+						fill={color}
+						opacity={backgroundOpacity}
 						pointerEvents="none"
 					/>
 				)}

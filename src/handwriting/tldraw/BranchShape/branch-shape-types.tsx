@@ -18,6 +18,7 @@ export type IBranchShape = TLBaseShape<
 		verticalGap: number
 		lineWidth: number
 		snapDistance: number
+		/** 兼容旧字段名：样式面板现在用它控制背景，自动外框逻辑独立 */
 		showOuterFrame?: boolean
 		version?: number
 	}
