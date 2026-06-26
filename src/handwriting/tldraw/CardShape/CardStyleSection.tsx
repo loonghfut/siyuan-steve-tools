@@ -7,7 +7,6 @@ import { showMessage } from 'siyuan'
 import type { ICardShape, CardRenderMode } from './card-shape-types'
 import { loadChildDocsForDoc, loadOutlineForDoc, type OutlineNode } from '../doc-outline/doc-outline-data'
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
-import { sql } from '@/api/api'
 import { buildCardCollapseUpdate } from './card-collapse'
 
 export interface CardStyleSectionProps {
@@ -85,16 +84,9 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         try {
             const docId = selectedMainCard.props.blockId
 
-            // 先通过原始 SQL 做存在性检查，判断此文档是否有子文档
-            const childRows = await sql(`SELECT * FROM blocks WHERE path like '%${docId}/%' LIMIT 3`)
-            if (!Array.isArray(childRows) || childRows.length === 0) {
-                showMessage('当前文档没有子文档', 3000, 'info')
-                return
-            }
-
             const childDocs = await loadChildDocsForDoc(docId)
             if (childDocs.length === 0) {
-                showMessage('无可插入子文档', 3000, 'info')
+                showMessage('当前文档没有子文档', 3000, 'info')
                 return
             }
 

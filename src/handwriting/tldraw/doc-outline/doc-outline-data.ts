@@ -1,4 +1,4 @@
-import { getDocOutline, getDoc, listDocsByPath } from '@/api/api'
+import { getDocOutline, getDoc, listDocsByPath, sql } from '@/api/api'
 
 export interface ChildDocItem {
     id: string
@@ -44,8 +44,17 @@ export async function loadChildDocsForDoc(docId: string, signal?: AbortSignal): 
         throw new Error('getDoc result missing box or path')
     }
 
-    let childPath = docPath.endsWith('/') ? docPath : docPath
-    childPath = childPath.replace(/\.sy$/, '')
+    // SQL 预查询：检查是否有子文档，避免空调用 listDocsByPath
+    const parentPath = docPath.replace(/\.sy$/, '')
+    const sqlResult = await sql(
+        `SELECT id FROM blocks WHERE box = '${box}' AND path LIKE '${parentPath}/%.sy' AND type = 'd' LIMIT 1`
+    )
+    if (signal?.aborted) return []
+    if (!Array.isArray(sqlResult) || sqlResult.length === 0) {
+        return []
+    }
+
+    let childPath = docPath.replace(/\.sy$/, '')
     if (!childPath.endsWith('/')) childPath += '/'
 
     const result = await listDocsByPath('', box, childPath)
