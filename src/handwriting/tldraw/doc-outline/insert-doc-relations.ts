@@ -39,7 +39,7 @@ const OUTLINE_CARD_PROPS = {
 	color: 'black' as const,
 	showMask: true,
 	isMain: false,
-	isCollapsed: false,
+	isCollapsed: true,
 }
 
 const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
