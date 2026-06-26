@@ -38,12 +38,6 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 		return values.every((value) => value === first) ? first : 'mixed'
 	}, [hasBranchSelection, selectedBranchShapes])
 
-	const snapDistanceState = React.useMemo<number | 'mixed'>(() => {
-		if (!hasBranchSelection) return 160
-		const values = selectedBranchShapes.map((shape) => shape.props.snapDistance || 160)
-		const first = values[0]
-		return values.every((value) => value === first) ? first : 'mixed'
-	}, [hasBranchSelection, selectedBranchShapes])
 
 	const showOuterFrameState = React.useMemo<boolean | 'mixed'>(() => {
 		if (!hasBranchSelection) return false
