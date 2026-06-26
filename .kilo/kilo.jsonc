@@ -1,0 +1,6 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "commit_message": {
+    "prompt": "使用中文提交信息\n采用 conventional commits 格式 (feat/fix/refactor/docs 等)\n从文件路径提取 scope（如 card、doc-outline、branch）\n祈使语气，简洁描述变更内容"
+  }
+}
