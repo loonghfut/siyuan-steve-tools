@@ -509,7 +509,7 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const rightChildren = getBranchChildren(editor, rightIds)
 	const children = [...leftChildren, ...rightChildren]
 	const autoFrame = getBranchAutoFrameState(editor, branch)
-	const shouldShowBackground = branch.props.showOuterFrame === true
+	const shouldShowBackground = branch.props.showBackground === true
 	const shouldPadForFrame = children.length > 0 && (autoFrame.enabled || shouldShowBackground)
 	const framePadding = shouldPadForFrame ? ENHANCED_FRAME_PADDING : 0
 

@@ -186,8 +186,8 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			verticalGap: 28,
 			lineWidth: 3,
 			snapDistance: 160,
-			showOuterFrame: false,
-			version: 2,
+			showBackground: false,
+			version: 3,
 		}
 	}
 
@@ -291,7 +291,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
 		const isAutoFrameEnhanced = info.autoFrame.enabled
-		const showBackground = shape.props.showOuterFrame === true
+		const showBackground = shape.props.showBackground === true
 		const backgroundInset = isAutoFrameEnhanced ? 2 : 1
 		const backgroundOpacity = isAutoFrameEnhanced ? 0.12 : 0.08
 		const backgroundRx = isAutoFrameEnhanced ? 12 : 8

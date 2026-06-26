@@ -57,8 +57,8 @@ const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
 	verticalGap: 28,
 	lineWidth: 3,
 	snapDistance: 160,
-	showOuterFrame: false,
-	version: 2,
+	showBackground: false,
+	version: 3,
 }
 
 function getExistingBlockIds(editor: Editor) {

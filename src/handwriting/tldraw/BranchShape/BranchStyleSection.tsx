@@ -40,7 +40,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 
 	const showBackgroundState = React.useMemo<boolean | 'mixed'>(() => {
 		if (!hasBranchSelection) return false
-		const values = selectedBranchShapes.map((shape) => shape.props.showOuterFrame === true)
+		const values = selectedBranchShapes.map((shape) => shape.props.showBackground === true)
 		const first = values[0]
 		return values.every((value) => value === first) ? first : 'mixed'
 	}, [hasBranchSelection, selectedBranchShapes])
@@ -125,7 +125,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						className={`tlui-toggle-button ${showBackgroundState === true ? 'tlui-toggle-button--active' : showBackgroundState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
 						onClick={() => {
 							const next = showBackgroundState === 'mixed' ? true : !showBackgroundState
-							updateBranchProps(() => ({ showOuterFrame: next }))
+							updateBranchProps(() => ({ showBackground: next }))
 						}}
 						title="显示或隐藏 Branch 背景"
 						aria-label="Branch 背景"
