@@ -778,8 +778,14 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 		clearDelayedAttachCandidate(shape.id as string)
 	}
 
+	const laidOutBranchIds: TLShapeId[] = []
 	for (const branch of sortBranchesForLayout(editor, affectedBranchIds)) {
 		layoutBranchChildren(editor, branch)
+		laidOutBranchIds.push(branch.id)
+	}
+
+	if (laidOutBranchIds.length > 0) {
+		relayoutBranchesContainingShapes(editor, laidOutBranchIds)
 	}
 
 	return didHandle
