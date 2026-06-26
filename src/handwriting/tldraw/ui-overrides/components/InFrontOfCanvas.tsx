@@ -22,6 +22,7 @@ import type { ICardShape } from '../../CardShape/card-shape-types'
 import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
+import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
 
 export const InFrontOfCanvas: React.FC = () => {
     const editor = useEditor()
@@ -85,6 +86,11 @@ export const InFrontOfCanvas: React.FC = () => {
     const isCardOrBlock = isValidSelection && isCardLikeShape(selectedShape)
     const isJsShapeSelection = isValidSelection && selectedShape.type === 'js-shape'
     const selectedJsShape = isJsShapeSelection ? (selectedShape as IJsShape) : null
+    const selectedCardShapes = useValue(
+        'selected card shapes',
+        () => editor.getSelectedShapes().filter((shape): shape is ICardShape => shape.type === 'card'),
+        [editor]
+    )
 
     // 手形工具点击跳转功能
     const pointerDownPoint = React.useRef<{ x: number; y: number } | null>(null)
@@ -312,29 +318,13 @@ export const InFrontOfCanvas: React.FC = () => {
                                     display: selectedShape.type === 'card' ? undefined : 'none',
                                 }}
                                 onClick={() => {
-                                    const shape = editor.getShape(selectionInfo.id)
-                                    if (!shape || shape.type !== 'card') return
-
-                                    const card = shape as ICardShape
-                                    const collapsed = !!card.props?.isCollapsed
-                                    const nextCollapsed = !collapsed
-                                    const collapsedHeight = Math.max((card.props.fontSize || 16) * 6, card.props.isMain ? 260 : 180)
-                                    const nextProps = {
-                                        ...card.props,
-                                        isCollapsed: nextCollapsed,
-                                    } as ICardShape['props']
-
-                                    if (nextCollapsed) {
-                                        nextProps.preCollapseHeight = card.props.h
-                                        nextProps.h = collapsedHeight
-                                    } else if (card.props.preCollapseHeight && card.props.preCollapseHeight > 0) {
-                                        nextProps.h = card.props.preCollapseHeight
-                                    }
-
-                                    editor.updateShape({
-                                        id: card.id,
-                                        type: 'card',
-                                        props: nextProps,
+                                    if (!selectedCardShapes.length) return
+                                    const allCollapsed = selectedCardShapes.every((shape) => !!shape.props.isCollapsed)
+                                    const nextCollapsed = !allCollapsed
+                                    editor.run(() => {
+                                        editor.updateShapes(
+                                            selectedCardShapes.map((shape) => buildCardCollapseUpdate(shape, nextCollapsed))
+                                        )
                                     })
                                 }}
                                 title={

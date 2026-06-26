@@ -8,6 +8,7 @@ import type { ICardShape, CardRenderMode } from './card-shape-types'
 import { loadChildDocsForDoc, loadOutlineForDoc, type OutlineNode } from '../doc-outline/doc-outline-data'
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
 import { sql } from '@/api/api'
+import { buildCardCollapseUpdate } from './card-collapse'
 
 export interface CardStyleSectionProps {
     editor: Editor
@@ -62,6 +63,13 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         const aligns = selectedCardShapes.map(shape => shape.props.collapsedTextAlign || 'left')
         const first = aligns[0]
         return aligns.every(a => a === first) ? first : 'mixed'
+    }, [hasCardSelection, selectedCardShapes])
+
+    const collapsedState = React.useMemo<boolean | 'mixed'>(() => {
+        if (!hasCardSelection) return false
+        const values = selectedCardShapes.map((shape) => !!shape.props.isCollapsed)
+        const first = values[0]
+        return values.every((value) => value === first) ? first : 'mixed'
     }, [hasCardSelection, selectedCardShapes])
 
     React.useEffect(() => {
@@ -155,6 +163,35 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
 
     return (
         <>
+            <div className="tlui-style-panel__section">
+                <div className="tlui-toggle-button-row">
+                    <TldrawUiButton
+                        type="normal"
+                        className={`tlui-toggle-button ${collapsedState === true ? 'tlui-toggle-button--active' : collapsedState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
+                        onClick={() => {
+                            const nextCollapsed = collapsedState === 'mixed' ? true : !collapsedState
+                            editor.run(() => {
+                                editor.updateShapes(
+                                    selectedCardShapes.map((shape) => buildCardCollapseUpdate(shape, nextCollapsed))
+                                )
+                            })
+                        }}
+                        title={collapsedState === true ? '展开选中的卡片' : '折叠选中的卡片'}
+                        aria-label="切换卡片折叠状态"
+                        style={{
+                            fontWeight: collapsedState === true ? 700 : undefined,
+                            background: collapsedState === true ? 'var(--tl-color-muted-2)' : undefined,
+                            color: collapsedState === true ? 'var(--b3-theme-on-surface, var(--color-text))' : undefined,
+                            opacity: collapsedState === 'mixed' ? 0.85 : undefined,
+                        }}
+                    >
+                        <span className="tlui-toggle-icon" style={{ fontSize: '12px' }}>
+                            {collapsedState === true ? '展开' : '折叠'}
+                        </span>
+                    </TldrawUiButton>
+                </div>
+            </div>
+
             {showCollapsedTextSettings && <>
                 <div className="tlui-style-panel__section">
                     {/* 折叠后文字大小 */}
