@@ -3,6 +3,7 @@ import { IBranchShape } from './branch-shape-types'
 import { pruneShapeFromBranches, relayoutBranchesContainingShapes } from './branch-layout'
 
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
+const REGISTERED_EDITORS = new WeakSet<Editor>()
 
 function getShapeWidth(shape: TLShape) {
 	return typeof (shape as any).props?.w === 'number' ? (shape as any).props.w : null
@@ -29,6 +30,9 @@ function didRelevantBoundsChange(prev: TLShape, next: TLShape) {
 }
 
 export function keepBranchLayoutsUpdated(editor: Editor) {
+	if (REGISTERED_EDITORS.has(editor)) return
+	REGISTERED_EDITORS.add(editor)
+
 	let pendingShapeIds = new Set<string>()
 	let pendingDeletedShapeIds = new Set<string>()
 	let isUpdating = false

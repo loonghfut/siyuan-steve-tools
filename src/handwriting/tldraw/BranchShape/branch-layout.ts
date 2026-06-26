@@ -73,6 +73,8 @@ type BranchDragPreview =
 type BranchDragPreviewOptions = {
 	scheduleAttachHint?: boolean
 	branches?: IBranchShape[]
+	pageShapes?: TLShape[]
+	parentsByChildId?: Map<string, IBranchShape[]>
 }
 
 export function isBranchConnectableShape(shape: TLShape | undefined): boolean {
@@ -213,14 +215,15 @@ function isDelayedAttachReady(
 function getNearestAttachCandidate(
 	editor: Editor,
 	shape: TLShape,
-	branches = getCurrentBranches(editor)
+	branches = getCurrentBranches(editor),
+	shapeBounds = getPageBounds(editor, shape)
 ): BranchAttachToBranchCandidate | null {
 	let nearestAttach: BranchAttachToBranchCandidate | null = null
 
 	for (const branch of branches) {
 		if (!canAttachShapeToBranch(editor, branch, shape)) continue
-		const side = getBranchSideForShape(editor, branch, shape)
-		const distance = distanceToBranchRoot(editor, branch, shape, side)
+		const side = getBranchSideForShape(editor, branch, shape, shapeBounds)
+		const distance = distanceToBranchRoot(editor, branch, shape, side, shapeBounds)
 		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
 		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
 			nearestAttach = { mode: 'attach-to-branch', branch, side, distance }
@@ -236,7 +239,8 @@ function isBranchAbsorbableShape(shape: TLShape | undefined): boolean {
 
 function getNearestShapeForDraggingBranch(
 	editor: Editor,
-	draggingBranch: IBranchShape
+	draggingBranch: IBranchShape,
+	pageShapes = editor.getCurrentPageShapes()
 ): BranchAbsorbShapeCandidate | null {
 	const branchId = draggingBranch.id as string
 	const selectedDragIds = new Set(activeBranchDragShapeIds)
@@ -245,13 +249,14 @@ function getNearestShapeForDraggingBranch(
 
 	let nearestAttach: BranchAbsorbShapeCandidate | null = null
 
-	for (const candidate of editor.getCurrentPageShapes()) {
+	for (const candidate of pageShapes) {
 		if (!isBranchAbsorbableShape(candidate)) continue
 		if (selectedDragIds.has(candidate.id as string)) continue
 		if (descendantIds.has(candidate.id as string)) continue
 
-		const side = getBranchSideForShape(editor, draggingBranch, candidate)
-		const distance = distanceToBranchRoot(editor, draggingBranch, candidate, side)
+		const candidateBounds = getPageBounds(editor, candidate)
+		const side = getBranchSideForShape(editor, draggingBranch, candidate, candidateBounds)
+		const distance = distanceToBranchRoot(editor, draggingBranch, candidate, side, candidateBounds)
 		const snapDistance = Math.max(draggingBranch.props.snapDistance || 140, 40)
 		if (distance > snapDistance) continue
 
@@ -306,8 +311,7 @@ function getBranchRootLocalX(branch: IBranchShape) {
 	return branch.props.rootX ?? branch.props.w / 2
 }
 
-function getBranchSideForShape(editor: Editor, branch: IBranchShape, child: TLShape): BranchSide {
-	const childBounds = getPageBounds(editor, child)
+function getBranchSideForShape(editor: Editor, branch: IBranchShape, child: TLShape, childBounds = getPageBounds(editor, child)): BranchSide {
 	const root = getBranchRootPagePoint(branch)
 	if (!childBounds) return 'right'
 	return childBounds.centerX < root.x ? 'left' : 'right'
@@ -373,20 +377,25 @@ export function getBranchAutoFrameState(editor: Editor, branch: IBranchShape) {
 	}
 }
 
-function distanceToBranchRoot(editor: Editor, branch: IBranchShape, child: TLShape, side = getBranchSideForShape(editor, branch, child)) {
-	const childBounds = getPageBounds(editor, child)
+function distanceToBranchRoot(
+	editor: Editor,
+	branch: IBranchShape,
+	child: TLShape,
+	side?: BranchSide,
+	childBounds = getPageBounds(editor, child)
+) {
 	if (!childBounds) return Number.POSITIVE_INFINITY
 
 	const root = getBranchRootPagePoint(branch)
-	const edgeX = side === 'left' ? childBounds.x + childBounds.w : childBounds.x
+	const resolvedSide = side ?? getBranchSideForShape(editor, branch, child, childBounds)
+	const edgeX = resolvedSide === 'left' ? childBounds.x + childBounds.w : childBounds.x
 	const clampedY = Math.max(childBounds.y, Math.min(root.y, childBounds.y + childBounds.h))
 	const dx = edgeX - root.x
 	const dy = clampedY - root.y
 	return Math.hypot(dx, dy)
 }
 
-function distanceToBranchWorkArea(editor: Editor, branch: IBranchShape, child: TLShape) {
-	const childBounds = getPageBounds(editor, child)
+function distanceToBranchWorkArea(editor: Editor, branch: IBranchShape, child: TLShape, childBounds = getPageBounds(editor, child)) {
 	if (!childBounds) return Number.POSITIVE_INFINITY
 
 	const padding = Math.max(branch.props.snapDistance || 160, 80)
@@ -664,7 +673,13 @@ function sortBranchesForLayout(editor: Editor, branchIds: Iterable<TLShapeId>) {
 export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	if (!isBranchConnectableShape(shape)) return false
 
-	const preview = getBranchDragPreview(editor, shape, { scheduleAttachHint: false })
+	const branches = getCurrentBranches(editor)
+	const preview = getBranchDragPreview(editor, shape, {
+		scheduleAttachHint: false,
+		branches,
+		pageShapes: editor.getCurrentPageShapes(),
+		parentsByChildId: buildBranchParentIndex(branches),
+	})
 	if (preview?.mode !== 'attach') return false
 
 	return updateBranchAttachmentsAfterDrag(editor, [shape])
@@ -674,6 +689,8 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 	const currentBranches = getCurrentBranches(editor)
 	if (currentBranches.length === 0) return false
 
+	const pageShapes = editor.getCurrentPageShapes()
+	const parentsByChildId = buildBranchParentIndex(currentBranches)
 	const drafts = new Map<TLShapeId, BranchIdsDraft>()
 	const affectedBranchIds = new Set<TLShapeId>()
 	let didHandle = false
@@ -681,7 +698,13 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 	for (const shape of shapes) {
 		if (!isBranchConnectableShape(shape)) continue
 		const childId = shape.id as string
-		const preview = getBranchDragPreview(editor, shape, { scheduleAttachHint: false, branches: currentBranches })
+		const shapeBounds = getPageBounds(editor, shape)
+		const preview = getBranchDragPreview(editor, shape, {
+			scheduleAttachHint: false,
+			branches: currentBranches,
+			pageShapes,
+			parentsByChildId,
+		})
 
 		if (preview?.mode === 'attach') {
 			if (shape.type === 'branch') affectedBranchIds.add(shape.id)
@@ -693,7 +716,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			const attachChildId = (attachTargetShape?.id as string) || childId
 			if (!canAttachShapeToBranch(editor, nearest, childShape)) continue
 			const nearestDraft = getBranchDraft(editor, drafts, nearest)
-			const containingBranches = currentBranches.filter((branch) => getAllBranchChildIds(branch).includes(attachChildId))
+			const containingBranches = parentsByChildId.get(attachChildId) || []
 			const sourceBranch = attachTargetShape
 				? containingBranches.find((branch) => branch.id !== nearest.id) || null
 				: null
@@ -729,9 +752,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 					sourceSide === 'left'
 						? sourceDraft.leftChildIds.includes(nearestBranchId)
 						: sourceDraft.rightChildIds.includes(nearestBranchId)
-				const nearestContainingBranches = currentBranches.filter((branch) =>
-					getAllBranchChildIds(branch).includes(nearestBranchId)
-				)
+				const nearestContainingBranches = parentsByChildId.get(nearestBranchId) || []
 				const nearestOnlyInSource =
 					nearestContainingBranches.length === 1 && nearestContainingBranches[0].id === sourceBranch.id
 
@@ -760,7 +781,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			if (!draftContainsChild(draft, childId)) continue
 
 			const detachDistance = Math.max(branch.props.snapDistance || 160, 80) * DETACH_DISTANCE_MULTIPLIER
-			const distance = distanceToBranchWorkArea(editor, branch, shape)
+			const distance = distanceToBranchWorkArea(editor, branch, shape, shapeBounds)
 			if (distance > detachDistance) {
 				if (removeChildFromDraft(draft, childId)) affectedBranchIds.add(branch.id)
 				if (shape.type === 'branch') affectedBranchIds.add(shape.id)
@@ -797,10 +818,13 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 
 	const scheduleAttachHint = options?.scheduleAttachHint ?? true
 	const branches = options?.branches ?? getCurrentBranches(editor)
+	const pageShapes = options?.pageShapes ?? editor.getCurrentPageShapes()
+	const parentsByChildId = options?.parentsByChildId
+	const shapeBounds = getPageBounds(editor, shape)
 
-	const nearestAttachToBranch = getNearestAttachCandidate(editor, shape, branches)
+	const nearestAttachToBranch = getNearestAttachCandidate(editor, shape, branches, shapeBounds)
 	const nearestShapeToDraggingBranch =
-		shape.type === 'branch' ? getNearestShapeForDraggingBranch(editor, shape as IBranchShape) : null
+		shape.type === 'branch' ? getNearestShapeForDraggingBranch(editor, shape as IBranchShape, pageShapes) : null
 
 	const nearestAttach =
 		nearestAttachToBranch && nearestShapeToDraggingBranch
@@ -828,10 +852,13 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 
 	clearDelayedAttachCandidate(shape.id as string)
 
-	for (const branch of branches) {
-		if (!getAllBranchChildIds(branch).includes(shape.id as string)) continue
+	const containingBranches =
+		parentsByChildId?.get(shape.id as string) ??
+		branches.filter((branch) => getAllBranchChildIds(branch).includes(shape.id as string))
+
+	for (const branch of containingBranches) {
 		const detachDistance = Math.max(branch.props.snapDistance || 160, 80) * DETACH_DISTANCE_MULTIPLIER
-		const distance = distanceToBranchWorkArea(editor, branch, shape)
+		const distance = distanceToBranchWorkArea(editor, branch, shape, shapeBounds)
 		if (distance > detachDistance) {
 			return {
 				mode: 'detach',
