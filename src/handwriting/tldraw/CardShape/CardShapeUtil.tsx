@@ -228,7 +228,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			renderMode: 'inherit' as CardRenderMode, // 卡片单独渲染模式: inherit | static-dom | live-protyle
 			// version: 1, // 版本号
 			collapsedTextSize: 21, // 折叠后的文字大小
-			collapsedTextAlign: 'left', // 折叠后的文字对齐方式
+			collapsedTextAlign: 'center', // 折叠后的文字对齐方式
 		}
 	}
 
@@ -263,7 +263,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isCollapsed = shape.props.isCollapsed || false;
 		const isMainCard = Boolean(shape.props.isMain);
 		const collapsedTextSize = shape.props.collapsedTextSize || 21; // 折叠文字大小，默认21px
-		const collapsedTextAlign = shape.props.collapsedTextAlign || 'left'; // 折叠文字对齐，默认左对齐
+		const collapsedTextAlign = shape.props.collapsedTextAlign || 'center'; // 折叠文字对齐，默认居中
 		const headerGradientFallback = `linear-gradient(135deg, ${theme[shape.props.color].solid} 0%, ${theme[shape.props.color].semi} 100%)`;
 
 		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）

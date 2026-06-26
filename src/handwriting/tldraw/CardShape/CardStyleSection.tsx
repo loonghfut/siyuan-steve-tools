@@ -58,8 +58,8 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
 
     // 折叠后的文字对齐方式
     const collapsedTextAlignValue = React.useMemo<string | 'mixed'>(() => {
-        if (!hasCardSelection) return 'left'
-        const aligns = selectedCardShapes.map(shape => shape.props.collapsedTextAlign || 'left')
+        if (!hasCardSelection) return 'center'
+        const aligns = selectedCardShapes.map(shape => shape.props.collapsedTextAlign || 'center')
         const first = aligns[0]
         return aligns.every(a => a === first) ? first : 'mixed'
     }, [hasCardSelection, selectedCardShapes])
