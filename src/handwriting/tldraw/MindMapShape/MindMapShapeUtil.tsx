@@ -9,7 +9,6 @@ import {
     EditorAtom,
     TLShapeId,
     useValue,
-    useEditor,
 } from '@tldraw/tldraw'
 import { mindMapShapeMigrations } from './mind-map-shape-migrations'
 import { mindMapShapeProps } from './mind-map-shape-props'
@@ -19,6 +18,8 @@ import {
     createMindMapNode,
     findNodeById,
     addChildNode,
+    updateNodeText,
+    addSiblingNode,
 } from './mind-map-shape-types'
 import { ThemeName } from './mind-map-constants'
 import { calculateFullLayout } from './mind-map-layout'
@@ -32,7 +33,7 @@ import {
     useNodeSelection,
 } from './mind-map-hooks'
 import { parseMarkdownToMindMap } from './mind-map-markdown'
-import { collectAllNodePorts, MindMapNodePort, MindMapPortsOverlay } from './mind-map-ports'
+import { collectAllNodePorts, MindMapPortsOverlay } from './mind-map-ports'
 import { getBlockMarkdown } from '@/api/api'
 import { showMessage } from 'siyuan'
 
@@ -168,6 +169,34 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             clearDropTarget,
         } = useDragHandlers(rootNode, updateShape)
 
+        // 编辑完成后创建新节点的回调
+        const handleCreateAfterEdit = useCallback((action: 'sibling' | 'child', nodeId: string, text: string) => {
+            const textToSave = text.trim() || '新节点'
+            const newRoot = deepCloneRootNode(rootNode)
+            updateNodeText(newRoot, nodeId, textToSave)
+
+            const newNode = createMindMapNode('新节点')
+            if (action === 'sibling') {
+                addSiblingNode(newRoot, nodeId, newNode)
+            } else {
+                addChildNode(newRoot, nodeId, newNode)
+                const parentNode = findNodeById(newRoot, nodeId)
+                if (parentNode) parentNode.collapsed = false
+            }
+
+            editor.updateShape<IMindMapShape>({
+                id: shape.id,
+                type: 'mind-map',
+                props: {
+                    ...shape.props,
+                    rootNode: newRoot,
+                    selectedNodeId: newNode.id,
+                },
+            })
+            setEditingNodeId(newNode.id)
+            setEditText(newNode.text)
+        }, [editor, shape.id, shape.props, rootNode])
+
         const {
             editingNodeId,
             editText,
@@ -177,7 +206,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             handleFinishEdit,
             handleCancelEdit,
             setEditingNodeId,
-        } = useEditHandlers(rootNode, updateShape)
+            handleEditKeyDown,
+        } = useEditHandlers(rootNode, updateShape, handleCreateAfterEdit)
 
         // 替换整个思维导图根节点的函数
         const replaceRootNode = useCallback((newRootNode: MindMapNode) => {
@@ -208,6 +238,9 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             setConfirmDialog(null)
         }, [])
 
+        // 计算布局方向（提前声明供后续 hooks 使用）
+        const layoutDirection = (direction || 'right') as 'right' | 'left' | 'up' | 'down'
+
         const {
             menuState,
             showColorPicker,
@@ -228,8 +261,6 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             setEditText(text ?? '')
         }, showConfirm)
 
-        
-
         const { handleKeyDown } = useKeyboardHandlers(
             rootNode,
             selectedNodeId,
@@ -237,12 +268,11 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             setEditingNodeId,
             setEditText,
             replaceRootNode,
-            showConfirm
+            showConfirm,
+            layoutDirection
         )
 
-        const { handleSelectNode } = useNodeSelection(rootNode, updateShape)
-
-        
+        const { handleSelectNode, handleToggleCollapse } = useNodeSelection(rootNode, updateShape)
 
         // 编辑节点的处理函数（从上下文菜单调用）
         const handleEditFromMenu = useCallback(() => {
@@ -256,7 +286,6 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         }, [menuState.nodeId, rootNode, setEditingNodeId, setEditText])
 
         // 计算布局（传入方向参数）
-        const layoutDirection = (direction || 'right') as 'right' | 'left' | 'up' | 'down'
         const { layoutTree, contentWidth, contentHeight, offsetX, offsetY, rootAnchor } = calculateFullLayout(
             rootNode,
             nodeHeight,
@@ -270,9 +299,6 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         const allNodePorts = React.useMemo(() => {
             return collectAllNodePorts(layoutTree, offsetX, offsetY)
         }, [layoutTree, offsetX, offsetY])
-
-        // 鼠标悬浮状态，用于控制端口显示
-        const [isHovered, setIsHovered] = useState(false)
 
         // 更新 DOM 尺寸并调整 shape 位置以保持根节点稳定
         const updateDomSizeAndPosition = useCallback(() => {
@@ -308,15 +334,10 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
             }
         }, [editor, shape.id, contentWidth, contentHeight, rootAnchor])
 
-        // 在渲染后更新尺寸
+        // 在渲染后更新尺寸（rootNode 变化时 contentWidth/contentHeight 会变化，从而 updateDomSizeAndPosition 引用变化）
         useLayoutEffect(() => {
             updateDomSizeAndPosition()
         }, [updateDomSizeAndPosition])
-
-        // 当 rootNode 变化时重新计算尺寸
-        useEffect(() => {
-            updateDomSizeAndPosition()
-        }, [rootNode, updateDomSizeAndPosition])
 
         // 绑定思源块时，从块获取 markdown 并渲染
         useEffect(() => {
@@ -533,6 +554,8 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
                                 onEditTextChange={handleEditTextChange}
                                 onFinishEdit={handleFinishEdit}
                                 onCancelEdit={handleCancelEdit}
+                                onEditKeyDown={isLinkedMode ? undefined : handleEditKeyDown}
+                                onToggleCollapse={isLinkedMode ? undefined : handleToggleCollapse}
                             />
                         </g>
                     </svg>

@@ -42,6 +42,8 @@ export interface NodeRenderProps {
     onEditTextChange: (text: string) => void
     onFinishEdit: () => void
     onCancelEdit: () => void
+    onEditKeyDown?: (e: React.KeyboardEvent) => void
+    onToggleCollapse?: (nodeId: string) => void
 }
 
 export interface ColorPickerProps {
@@ -480,6 +482,8 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
     onEditTextChange,
     onFinishEdit,
     onCancelEdit,
+    onEditKeyDown,
+    onToggleCollapse,
 }) => {
     const { node, x, y, width, height } = layout
     const isRoot = level === 0
@@ -723,12 +727,16 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                             onChange={(e) => onEditTextChange(e.target.value)}
                             onBlur={onFinishEdit}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    onFinishEdit()
-                                } else if (e.key === 'Escape') {
-                                    onCancelEdit()
+                                if (onEditKeyDown) {
+                                    onEditKeyDown(e)
+                                } else {
+                                    if (e.key === 'Enter') {
+                                        onFinishEdit()
+                                    } else if (e.key === 'Escape') {
+                                        onCancelEdit()
+                                    }
+                                    e.stopPropagation()
                                 }
-                                e.stopPropagation()
                             }}
                             style={{
                                 width: '100%',
@@ -767,8 +775,46 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     </foreignObject>
                 )}
 
-                {/* 添加子节点按钮 - 有子节点或无子节点时在悬浮或选中时显示 */}
-                { (!isLinkedMode && (isHovered || isSelected)) && (
+                {/* 折叠/展开按钮 - 有子节点时始终显示 */}
+                {node.children.length > 0 && !isLinkedMode && onToggleCollapse && (
+                    <g
+                        transform={(() => {
+                            const offset = btnSize / 2 + 2
+                            switch (direction) {
+                                case 'left':
+                                    return `translate(${width + offset}, ${height / 2})`
+                                case 'down':
+                                    return `translate(${width / 2}, ${-offset})`
+                                case 'up':
+                                    return `translate(${width / 2}, ${height + offset})`
+                                case 'right':
+                                default:
+                                    return `translate(${-offset}, ${height / 2})`
+                            }
+                        })()}
+                        onClick={(e) => { e.stopPropagation(); onToggleCollapse(node.id) }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        style={{ cursor: 'pointer', pointerEvents: 'all' }}
+                    >
+                        <circle
+                            r={btnSize / 2}
+                            fill={bgColor === 'transparent' ? 'var(--b3-theme-background, #ffffff)' : bgColor}
+                            stroke={borderColor}
+                            strokeWidth={1}
+                        />
+                        <text
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize={Math.max(10, btnSize * 0.7)}
+                            fill={textColor}
+                        >
+                            {node.collapsed ? '+' : '−'}
+                        </text>
+                    </g>
+                )}
+
+                {/* 添加子节点按钮 - 悬浮或选中时显示 */}
+                {(!isLinkedMode && (isHovered || isSelected)) && (
                     <g
                         transform={(() => {
                             const btnOffset = COLLAPSE_BUTTON_GAP + btnSize / 2
@@ -832,6 +878,8 @@ export const MindMapNodeRenderer: React.FC<NodeRenderProps> = ({
                     onEditTextChange={onEditTextChange}
                     onFinishEdit={onFinishEdit}
                     onCancelEdit={onCancelEdit}
+                    onEditKeyDown={onEditKeyDown}
+                    onToggleCollapse={onToggleCollapse}
                 />
             ))}
         </React.Fragment>

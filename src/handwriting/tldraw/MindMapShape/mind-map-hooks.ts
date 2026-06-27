@@ -157,7 +157,8 @@ export const useDragHandlers = (
 
 export const useEditHandlers = (
     rootNode: MindMapNode,
-    updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void
+    updateShape: (newRootNode: MindMapNode, newSelectedId?: string) => void,
+    onCreateAfterEdit?: (action: 'sibling' | 'child', editingNodeId: string, editText: string) => void,
 ) => {
     const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
     const [editText, setEditText] = useState('')
@@ -165,15 +166,18 @@ export const useEditHandlers = (
     const handleDoubleClick = useCallback((nodeId: string, text: string, e: React.MouseEvent) => {
         e.stopPropagation()
         e.preventDefault()
-        
+
         setEditingNodeId(nodeId)
         setEditText(text)
     }, [])
 
     const handleFinishEdit = useCallback(() => {
-        if (editingNodeId && editText.trim()) {
+        if (editingNodeId) {
+            const node = findNodeById(rootNode, editingNodeId)
+            const originalText = node?.text ?? ''
+            const textToSave = editText.trim() || originalText || '新节点'
             const newRoot = deepCloneRootNode(rootNode)
-            updateNodeText(newRoot, editingNodeId, editText.trim())
+            updateNodeText(newRoot, editingNodeId, textToSave)
             updateShape(newRoot, editingNodeId)
         }
         setEditingNodeId(null)
@@ -185,15 +189,29 @@ export const useEditHandlers = (
         setEditText('')
     }, [])
 
-    // 当编辑文本发生变化时，实时更新 shape 的文本以触发布局变化
+    // 编辑期间仅更新本地状态，不实时更新 shape，避免布局抖动
     const handleEditTextChange = useCallback((text: string) => {
         setEditText(text)
-        if (editingNodeId) {
-            const newRoot = deepCloneRootNode(rootNode)
-            updateNodeText(newRoot, editingNodeId, text)
-            updateShape(newRoot, editingNodeId)
+    }, [])
+
+    // 编辑输入框中的键盘事件（Enter 保存并创建兄弟节点、Tab 保存并创建子节点）
+    const handleEditKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (!editingNodeId) return
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            e.stopPropagation()
+            onCreateAfterEdit?.('sibling', editingNodeId, editText)
+        } else if (e.key === 'Tab') {
+            e.preventDefault()
+            e.stopPropagation()
+            onCreateAfterEdit?.('child', editingNodeId, editText)
+        } else if (e.key === 'Escape') {
+            e.stopPropagation()
+            handleCancelEdit()
+        } else {
+            e.stopPropagation()
         }
-    }, [editingNodeId, rootNode, updateShape])
+    }, [editingNodeId, editText, onCreateAfterEdit, handleCancelEdit])
 
     return {
         editingNodeId,
@@ -204,6 +222,7 @@ export const useEditHandlers = (
         handleDoubleClick,
         handleFinishEdit,
         handleCancelEdit,
+        handleEditKeyDown,
     }
 }
 
@@ -337,8 +356,11 @@ export const useContextMenu = (
             const newNode = createMindMapNode('新节点')
             addSiblingNode(newRoot, menuState.nodeId, newNode)
             updateShape(newRoot, newNode.id)
+            if (startEdit) {
+                startEdit(newNode.id, newNode.text)
+            }
         }
-    }, [menuState.nodeId, menuState.isRootNode, rootNode, updateShape])
+    }, [menuState.nodeId, menuState.isRootNode, rootNode, updateShape, startEdit])
 
     const handleDelete = useCallback(() => {
         if (menuState.nodeId && !menuState.isRootNode) {
@@ -461,6 +483,8 @@ export const useContextMenu = (
 
 // ===== 键盘事件 Hook =====
 
+export type LayoutDirection = 'right' | 'left' | 'up' | 'down'
+
 export const useKeyboardHandlers = (
     rootNode: MindMapNode,
     selectedNodeId: string | undefined,
@@ -468,14 +492,15 @@ export const useKeyboardHandlers = (
     setEditingNodeId: (id: string | null) => void,
     setEditText: (text: string) => void,
     replaceRootNode?: (newRootNode: MindMapNode) => void,
-    confirm?: (message: string, onConfirm: () => void) => void
+    confirm?: (message: string, onConfirm: () => void) => void,
+    direction: LayoutDirection = 'right',
 ) => {
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Ctrl+Shift+V: 从 Markdown 粘贴并替换整个思维导图
         if (e.ctrlKey && e.shiftKey && e.key === 'V') {
             e.preventDefault()
             e.stopPropagation()
-            
+
             navigator.clipboard.readText().then(text => {
                 if (text && text.trim()) {
                     try {
@@ -499,26 +524,22 @@ export const useKeyboardHandlers = (
         if (e.ctrlKey && !e.shiftKey && e.key === 'v') {
             e.preventDefault()
             e.stopPropagation()
-            
+
             navigator.clipboard.readText().then(text => {
                 if (text && text.trim()) {
                     try {
                         const parsedNode = parseMarkdownToMindMap(text)
                         const newRoot = deepCloneRootNode(rootNode)
                         const targetId = selectedNodeId || rootNode.id
-                        
-                        // 将解析出的节点添加到选中节点（或根节点）下
-                        // 如果解析结果只有根节点文本没有子节点，则直接添加一个节点
+
                         if (parsedNode.children.length === 0) {
                             const newNode = createMindMapNode(parsedNode.text)
                             addChildNode(newRoot, targetId, newNode)
                             updateShape(newRoot, newNode.id)
                         } else {
-                            // 将解析结果的所有子节点添加到目标节点下
                             for (const child of parsedNode.children) {
                                 addChildNode(newRoot, targetId, child)
                             }
-                            // 确保父节点展开
                             const targetNode = findNodeById(newRoot, targetId)
                             if (targetNode) targetNode.collapsed = false
                             updateShape(newRoot, targetId)
@@ -533,12 +554,68 @@ export const useKeyboardHandlers = (
             return
         }
 
+        // 只在有选中节点时处理以下按键
         if (!selectedNodeId) return
-        
+
+        // 获取导航目标节点的辅助函数
+        const getParentOrChild = (navDirection: 'parent' | 'child'): string | null => {
+            const node = findNodeById(rootNode, selectedNodeId!)
+            if (!node) return null
+            if (navDirection === 'parent') {
+                if (selectedNodeId === rootNode.id) return null
+                const parent = findParentNode(rootNode, selectedNodeId!)
+                return parent?.id ?? null
+            } else {
+                if (node.children.length === 0 || node.collapsed) return null
+                return node.children[0].id
+            }
+        }
+
+        const getSibling = (siblingDir: 'prev' | 'next'): string | null => {
+            if (selectedNodeId === rootNode.id) {
+                // 根节点的"兄弟"视为其第一个/最后一个子节点（方便导航）
+                if (siblingDir === 'next' && rootNode.children.length > 0 && !rootNode.collapsed) {
+                    return rootNode.children[0].id
+                }
+                return null
+            }
+            const parent = findParentNode(rootNode, selectedNodeId!)
+            if (!parent) return null
+            const idx = parent.children.findIndex(c => c.id === selectedNodeId)
+            if (idx === -1) return null
+            if (siblingDir === 'prev' && idx > 0) return parent.children[idx - 1].id
+            if (siblingDir === 'next' && idx < parent.children.length - 1) return parent.children[idx + 1].id
+            return null
+        }
+
+        // 根据布局方向映射方向键
+        const getNavTarget = (key: string): string | null => {
+            const isHorizontal = direction === 'left' || direction === 'right'
+            if (isHorizontal) {
+                const toParent = direction === 'right' ? 'ArrowLeft' : 'ArrowRight'
+                const toChild = direction === 'right' ? 'ArrowRight' : 'ArrowLeft'
+                if (key === toParent) return getParentOrChild('parent')
+                if (key === toChild) return getParentOrChild('child')
+                if (key === 'ArrowUp') return getSibling('prev')
+                if (key === 'ArrowDown') return getSibling('next')
+            } else {
+                const toParent = direction === 'down' ? 'ArrowUp' : 'ArrowDown'
+                const toChild = direction === 'down' ? 'ArrowDown' : 'ArrowUp'
+                if (key === toParent) return getParentOrChild('parent')
+                if (key === toChild) return getParentOrChild('child')
+                if (key === 'ArrowLeft') return getSibling('prev')
+                if (key === 'ArrowRight') return getSibling('next')
+            }
+            return null
+        }
+
+        const handledKeys = ['Tab', 'Enter', 'Delete', 'Backspace', ' ', 'F2', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']
+        if (!handledKeys.includes(e.key)) return
+
         e.stopPropagation()
-        
+
         const newRoot = deepCloneRootNode(rootNode)
-        
+
         switch (e.key) {
             case 'Tab': {
                 e.preventDefault()
@@ -547,42 +624,42 @@ export const useKeyboardHandlers = (
                 const parentNode = findNodeById(newRoot, selectedNodeId)
                 if (parentNode) parentNode.collapsed = false
                 updateShape(newRoot, newNode.id)
-                // 进入编辑状态
                 setEditingNodeId(newNode.id)
                 setEditText(newNode.text)
                 break
             }
             case 'Enter': {
                 e.preventDefault()
+                const newNode = createMindMapNode('新节点')
                 if (selectedNodeId === rootNode.id) {
-                    const newNode = createMindMapNode('新节点')
                     addChildNode(newRoot, selectedNodeId, newNode)
                     updateShape(newRoot, newNode.id)
-                    // 进入编辑状态（为根节点添加子节点）
                     setEditingNodeId(newNode.id)
                     setEditText(newNode.text)
                 } else {
-                    const newNode = createMindMapNode('新节点')
                     addSiblingNode(newRoot, selectedNodeId, newNode)
                     updateShape(newRoot, newNode.id)
+                    // 修复：非根节点 Enter 创建兄弟节点后也进入编辑
+                    setEditingNodeId(newNode.id)
+                    setEditText(newNode.text)
                 }
                 break
             }
             case 'Delete':
             case 'Backspace': {
-                    if (selectedNodeId !== rootNode.id) {
-                        e.preventDefault()
-                        const doDelete = () => {
-                            const parent = findParentNode(newRoot, selectedNodeId)
-                            deleteNodeById(newRoot, selectedNodeId)
-                            updateShape(newRoot, parent?.id)
-                        }
-                        if (confirm) {
-                            confirm('确认删除此节点？', doDelete)
-                        } else {
-                            doDelete()
-                        }
+                if (selectedNodeId !== rootNode.id) {
+                    e.preventDefault()
+                    const doDelete = () => {
+                        const parent = findParentNode(newRoot, selectedNodeId)
+                        deleteNodeById(newRoot, selectedNodeId)
+                        updateShape(newRoot, parent?.id)
                     }
+                    if (confirm) {
+                        confirm('确认删除此节点？', doDelete)
+                    } else {
+                        doDelete()
+                    }
+                }
                 break
             }
             case ' ': {
@@ -600,8 +677,19 @@ export const useKeyboardHandlers = (
                 }
                 break
             }
+            case 'ArrowUp':
+            case 'ArrowDown':
+            case 'ArrowLeft':
+            case 'ArrowRight': {
+                e.preventDefault()
+                const targetId = getNavTarget(e.key)
+                if (targetId) {
+                    updateShape(deepCloneRootNode(rootNode), targetId)
+                }
+                break
+            }
         }
-    }, [selectedNodeId, rootNode, updateShape, setEditingNodeId, setEditText, replaceRootNode])
+    }, [selectedNodeId, rootNode, updateShape, setEditingNodeId, setEditText, replaceRootNode, confirm, direction])
 
     return { handleKeyDown }
 }
