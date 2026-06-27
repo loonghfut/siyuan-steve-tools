@@ -21,6 +21,7 @@ import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContent } from '../utils/render/content-renderer'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
+import { getCardCollapsedHeight } from './card-collapse'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -527,7 +528,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 折叠/展开时记录高度并在展开时恢复
 		useEffect(() => {
 			const prev = prevCollapsedRef.current;
-			const collapsedHeight = Math.max(fontSize * 6, isMainCard ? 260 : 100);
+			const collapsedHeight = getCardCollapsedHeight(shape);
 			const storedHeight = shape.props.preCollapseHeight;
 
 			// 折叠状态下进入编辑：临时恢复到折叠前高度，便于编辑

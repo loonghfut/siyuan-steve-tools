@@ -1,8 +1,14 @@
 import type { ICardShape } from './card-shape-types'
 
+export const COLLAPSED_CARD_MIN_HEIGHT = 84
+export const COLLAPSED_MAIN_CARD_MIN_HEIGHT = 300
+
 export function getCardCollapsedHeight(shape: ICardShape) {
 	const fontSize = shape.props.fontSize || 16
-	return Math.max(fontSize * 6, shape.props.isMain ? 260 : 100)
+	return Math.max(
+		fontSize * 6,
+		shape.props.isMain ? COLLAPSED_MAIN_CARD_MIN_HEIGHT : COLLAPSED_CARD_MIN_HEIGHT
+	)
 }
 
 export function buildCardCollapseUpdate(shape: ICardShape, nextCollapsed: boolean) {
