@@ -2,7 +2,7 @@
  * JsShape 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiIcon, Editor } from '@tldraw/tldraw'
 import type { IJsShape } from './js-shape-types'
 
 export interface JsShapeStyleSectionProps {
@@ -30,6 +30,7 @@ export const JsShapeStyleSection: React.FC<JsShapeStyleSectionProps> = ({
             <TldrawUiButton
                 type="normal"
                 title="开启后，渲染出的 DOM 可直接响应点击/拖拽等交互"
+                aria-label="允许交互"
                 onClick={() => {
                     const next = jsInteractiveState === 'mixed' ? true : !jsInteractiveState
                     editor.run(() => {
@@ -43,7 +44,7 @@ export const JsShapeStyleSection: React.FC<JsShapeStyleSectionProps> = ({
                     })
                 }}
             >
-                {jsInteractiveState === 'mixed' ? '⚬ 允许交互' : jsInteractiveState ? '✓ 允许交互' : '允许交互'}
+                <TldrawUiIcon icon="js-interactive" small />
             </TldrawUiButton>
         </div>
     )

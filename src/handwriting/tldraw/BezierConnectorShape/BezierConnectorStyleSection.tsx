@@ -2,7 +2,7 @@
  * BezierConnector 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, TldrawUiSlider, Editor, TLShapeId } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiIcon, TldrawUiSlider, Editor, TLShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { IBezierConnectorShape } from './bezier-connector-types'
 import { getConnectorTerminals } from './BezierConnectorShapeUtil'
@@ -121,7 +121,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                             title="将选中箭头批量转换为曲线连接器（保留文字，尽量保留绑定）"
                             onClick={handleToBezier}
                         >
-                            全部转为曲线
+                            <TldrawUiIcon icon="connector-curve" small />
                         </TldrawUiButton>
                     )}
                     {hasAnyBezier && (
@@ -131,7 +131,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                             title="将选中曲线连接器批量转换为箭头（保留文字，尽量保留绑定）"
                             onClick={handleToArrow}
                         >
-                            全部转为直线
+                            <TldrawUiIcon icon="connector-arrow" small />
                         </TldrawUiButton>
                     )}
                 </div>
@@ -172,7 +172,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                         title="创建并绑定卡片"
                         onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'card')}
                     >
-                        卡片
+                        <TldrawUiIcon icon="quick-card" small />
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="normal"
@@ -180,7 +180,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                         title="创建并绑定单块"
                         onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'single-block')}
                     >
-                        单块
+                        <TldrawUiIcon icon="quick-single-block" small />
                     </TldrawUiButton>
                 </div>
             </div>
@@ -215,7 +215,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                         title="跳转到起点"
                         onClick={() => jumpToShape(terminals.startShapeId)}
                     >
-                        起点
+                        <TldrawUiIcon icon="jump-start" small />
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="normal"
@@ -223,7 +223,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                         title="跳转到终点"
                         onClick={() => jumpToShape(terminals.endShapeId)}
                     >
-                        终点
+                        <TldrawUiIcon icon="jump-end" small />
                     </TldrawUiButton>
                 </div>
             </div>
@@ -256,7 +256,10 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                                         className={`tlui-toggle-button ${isActive ? 'tlui-toggle-button--active' : isMixed ? 'tlui-toggle-button--mixed' : ''}`}
                                         onClick={() => handleConnectorStyleChange(style)}
                                     >
-                                        {style === 'solid' ? '实线' : style === 'dashed' ? '虚线' : '流动'}
+                                        <TldrawUiIcon
+                                            icon={style === 'solid' ? 'connector-solid' : style === 'dashed' ? 'connector-dashed' : 'connector-flow'}
+                                            small
+                                        />
                                     </TldrawUiButton>
                                 )
                             })}

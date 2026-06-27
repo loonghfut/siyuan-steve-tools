@@ -59,6 +59,38 @@ try {
     assetUrls.icons['branch-straight-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-straight-solid.svg';
     assetUrls.icons['branch-curve-dashed'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-curve-dashed.svg';
     assetUrls.icons['branch-frame-floating'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-frame-floating.svg';
+    assetUrls.icons['branch-background'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-background.svg';
+    assetUrls.icons['branch-detach'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-detach.svg';
+    assetUrls.icons['connector-arrow'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-arrow.svg';
+    assetUrls.icons['connector-curve'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-curve.svg';
+    assetUrls.icons['connector-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-solid.svg';
+    assetUrls.icons['connector-dashed'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-dashed.svg';
+    assetUrls.icons['connector-flow'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-flow.svg';
+    assetUrls.icons['quick-card'] = 'plugins/siyuan-steve-tools/asset/icons/custom/quick-card.svg';
+    assetUrls.icons['quick-single-block'] = 'plugins/siyuan-steve-tools/asset/icons/custom/quick-single-block.svg';
+    assetUrls.icons['jump-start'] = 'plugins/siyuan-steve-tools/asset/icons/custom/jump-start.svg';
+    assetUrls.icons['jump-end'] = 'plugins/siyuan-steve-tools/asset/icons/custom/jump-end.svg';
+    assetUrls.icons['card-collapse'] = 'plugins/siyuan-steve-tools/asset/icons/custom/card-collapse.svg';
+    assetUrls.icons['card-expand'] = 'plugins/siyuan-steve-tools/asset/icons/custom/card-expand.svg';
+    assetUrls.icons['text-align-left-custom'] = 'plugins/siyuan-steve-tools/asset/icons/custom/text-align-left-custom.svg';
+    assetUrls.icons['text-align-center-custom'] = 'plugins/siyuan-steve-tools/asset/icons/custom/text-align-center-custom.svg';
+    assetUrls.icons['text-align-right-custom'] = 'plugins/siyuan-steve-tools/asset/icons/custom/text-align-right-custom.svg';
+    assetUrls.icons['child-docs'] = 'plugins/siyuan-steve-tools/asset/icons/custom/child-docs.svg';
+    assetUrls.icons['outline-blocks'] = 'plugins/siyuan-steve-tools/asset/icons/custom/outline-blocks.svg';
+    assetUrls.icons['loading-spinner'] = 'plugins/siyuan-steve-tools/asset/icons/custom/loading-spinner.svg';
+    assetUrls.icons['enter-connect'] = 'plugins/siyuan-steve-tools/asset/icons/custom/enter-connect.svg';
+    assetUrls.icons['transparent-background'] = 'plugins/siyuan-steve-tools/asset/icons/custom/transparent-background.svg';
+    assetUrls.icons['binding-link'] = 'plugins/siyuan-steve-tools/asset/icons/custom/binding-link.svg';
+    assetUrls.icons['arrange-up'] = 'plugins/siyuan-steve-tools/asset/icons/custom/arrange-up.svg';
+    assetUrls.icons['arrange-down'] = 'plugins/siyuan-steve-tools/asset/icons/custom/arrange-down.svg';
+    assetUrls.icons['arrange-left'] = 'plugins/siyuan-steve-tools/asset/icons/custom/arrange-left.svg';
+    assetUrls.icons['arrange-right'] = 'plugins/siyuan-steve-tools/asset/icons/custom/arrange-right.svg';
+    assetUrls.icons['slide-focus'] = 'plugins/siyuan-steve-tools/asset/icons/custom/slide-focus.svg';
+    assetUrls.icons['slide-exit-focus'] = 'plugins/siyuan-steve-tools/asset/icons/custom/slide-exit-focus.svg';
+    assetUrls.icons['copy-link-custom'] = 'plugins/siyuan-steve-tools/asset/icons/custom/copy-link.svg';
+    assetUrls.icons['open-block'] = 'plugins/siyuan-steve-tools/asset/icons/custom/open-block.svg';
+    assetUrls.icons['update-screenshot'] = 'plugins/siyuan-steve-tools/asset/icons/custom/update-screenshot.svg';
+    assetUrls.icons['js-interactive'] = 'plugins/siyuan-steve-tools/asset/icons/custom/js-interactive.svg';
 } catch (err) {
     console.warn('无法在 assetUrls 上添加 custom-icon 映射', err);
 }

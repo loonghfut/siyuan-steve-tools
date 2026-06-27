@@ -2,7 +2,7 @@
  * Card 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiIcon, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { ICardShape, CardRenderMode } from './card-shape-types'
 import { loadChildDocsForDoc, loadOutlineForDoc, type OutlineNode } from '../doc-outline/doc-outline-data'
@@ -177,9 +177,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             opacity: collapsedState === 'mixed' ? 0.85 : undefined,
                         }}
                     >
-                        <span className="tlui-toggle-icon" style={{ fontSize: '12px' }}>
-                            {collapsedState === true ? '展开' : '折叠'}
-                        </span>
+                        <TldrawUiIcon icon={collapsedState === true ? 'card-expand' : 'card-collapse'} small />
                     </TldrawUiButton>
                 </div>
             </div>
@@ -213,9 +211,9 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <div style={{ display: 'flex', gap: '0px' }}>
                             {([
-                                { value: 'left', label: '靠左', icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 3h8M2 6h12M2 9h8M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg> },
-                                { value: 'center', label: '居中', icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10M1 6h14M3 9h10M1 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg> },
-                                { value: 'right', label: '靠右', icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3h8M2 6h12M6 9h8M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg> },
+                                { value: 'left', label: '靠左', icon: 'text-align-left-custom' },
+                                { value: 'center', label: '居中', icon: 'text-align-center-custom' },
+                                { value: 'right', label: '靠右', icon: 'text-align-right-custom' },
                             ] as const).map(({ value, label, icon }) => (
                                 <TldrawUiButton
                                     key={value}
@@ -235,7 +233,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                     }}
                                     title={label}
                                 >
-                                    {icon}
+                                    <TldrawUiIcon icon={icon} small />
                                 </TldrawUiButton>
                             ))}
                         </div>
@@ -288,11 +286,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                 onClick={() => { void handleInsertAllChildDocs() }}
                                 title="插入全部子文档"
                             >
-                                {insertingChildDocs ? (
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="8 4"><animateTransform attributeName="transform" type="rotate" values="0 8 8;360 8 8" dur="0.8s" repeatCount="indefinite" /></circle></svg>
-                                ) : (
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 1.5h6l3 3v8a1 1 0 01-1 1H5a1 1 0 01-1-1v-10a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><path d="M8 8v5M5.5 10.5h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /><path d="M11 1.5v3h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                                )}
+                                <TldrawUiIcon icon={insertingChildDocs ? 'loading-spinner' : 'child-docs'} small />
                             </TldrawUiButton>
                             <TldrawUiButton
                                 type="normal"
@@ -301,11 +295,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                 onClick={() => { void handleInsertAllOutline() }}
                                 title="插入全部大纲块"
                             >
-                                {insertingOutline ? (
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="8 4"><animateTransform attributeName="transform" type="rotate" values="0 8 8;360 8 8" dur="0.8s" repeatCount="indefinite" /></circle></svg>
-                                ) : (
-                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="3" cy="4" r="1.3" fill="currentColor" /><circle cx="3" cy="8" r="1.3" fill="currentColor" /><circle cx="3" cy="12" r="1.3" fill="currentColor" /><path d="M6 4h8M6 8h8M6 12h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
-                                )}
+                                <TldrawUiIcon icon={insertingOutline ? 'loading-spinner' : 'outline-blocks'} small />
                             </TldrawUiButton>
                         </div>
                     </div>

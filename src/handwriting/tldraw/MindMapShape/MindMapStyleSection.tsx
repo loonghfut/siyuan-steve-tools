@@ -2,7 +2,7 @@
  * 思维导图样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiIcon, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import type { IMindMapShape } from './mind-map-shape-types'
 import type { ThemeName } from './mind-map-constants'
 import { MindMapBindingUI } from './MindMapBindingUI'
@@ -113,7 +113,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
                 <div style={{ display: 'flex', gap: '0px' }}>
                     {(['up', 'down', 'left', 'right'] as const).map(dir => {
                         const v = selectedMindMapShapes.length ? selectedMindMapShapes[0].props.direction : 'right'
-                        const icons = { up: '↑', down: '↓', left: '←', right: '→' }
+                        const icons = { up: 'arrange-up', down: 'arrange-down', left: 'arrange-left', right: 'arrange-right' }
                         const titles = { up: '将导图排列到上方', down: '将导图排列到下方', left: '将导图排列到左侧', right: '将导图排列到右侧' }
                         return (
                             <TldrawUiButton
@@ -134,7 +134,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
                                 }}
                                 title={titles[dir]}
                             >
-                                {icons[dir]}
+                                <TldrawUiIcon icon={icons[dir]} small />
                             </TldrawUiButton>
                         )
                     })}

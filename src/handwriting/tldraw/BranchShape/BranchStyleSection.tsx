@@ -2,7 +2,7 @@
  * Branch shape style panel section
  */
 import React from 'react'
-import { Editor, StylePanelDropdownPicker, TLShapeId, TldrawUiButton, TldrawUiSlider } from '@tldraw/tldraw'
+import { Editor, StylePanelDropdownPicker, TLShapeId, TldrawUiButton, TldrawUiIcon, TldrawUiSlider } from '@tldraw/tldraw'
 import type { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { detachBranchCompletely, layoutBranchChildren } from './branch-layout'
 
@@ -211,7 +211,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 							opacity: showBackgroundState === 'mixed' ? 0.85 : undefined,
 						}}
 					>
-						<span className="tlui-toggle-icon" style={{ fontSize: '12px' }}>背景</span>
+						<TldrawUiIcon icon="branch-background" small />
 					</TldrawUiButton>
 					<TldrawUiButton
 						type="normal"
@@ -226,7 +226,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						title="断开当前 Branch 的所有吸附关系"
 						aria-label="断开所有吸附"
 					>
-						<span className="tlui-toggle-icon" style={{ fontSize: '12px' }}>断开吸附</span>
+						<TldrawUiIcon icon="branch-detach" small />
 					</TldrawUiButton>
 				</div>
 			</div>

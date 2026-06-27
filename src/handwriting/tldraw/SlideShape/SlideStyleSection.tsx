@@ -2,7 +2,7 @@
  * Slide 形状样式面板区块
  */
 import React from 'react'
-import { TldrawUiButton, TldrawUiInput, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiIcon, TldrawUiInput, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
 import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
@@ -293,38 +293,47 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     })
                 }}
             />
-			<TldrawUiButton
-				type="normal"
-				onClick={handleToggleFocus}
-				style={{ marginTop: '-8px', width: '100%' }}
-				title={isThisSlideFocused ? '退出聚焦（Esc）' : '聚焦此 Slide（仅显示 Slide 内内容）'}
-			>
-				{isThisSlideFocused ? '退出聚焦' : '聚焦此 Slide'}
-			</TldrawUiButton>
-            <TldrawUiButton
-                type="normal"
-                onClick={handleCopyLink}
-                style={{ marginTop: '-8px', width: '100%' }}
-                disabled={rootId === ''}
-            >
-                复制链接
-            </TldrawUiButton>
-            <TldrawUiButton
-                type="normal"
-                onClick={handleOpenSlideBlock}
-                style={{ marginTop: '-8px', width: '100%' }}
-                disabled={!slideShape.props.blockId}
-            >
-                跳转到笔记
-            </TldrawUiButton>
-            <TldrawUiButton
-                type="normal"
-                onClick={handleCaptureScreenshot}
-                style={{ marginTop: '-8px', width: '100%' }}
-                disabled={isCapturingScreenshot}
-            >
-                {isCapturingScreenshot ? '生成中…' : '更新截图'}
-            </TldrawUiButton>
+            <div style={{ display: 'flex', gap: 0, marginTop: '-8px' }}>
+                <TldrawUiButton
+                    type="normal"
+                    onClick={handleToggleFocus}
+                    style={{ flex: '1 1 0', minWidth: 0 }}
+                    title={isThisSlideFocused ? '退出聚焦（Esc）' : '聚焦此 Slide（仅显示 Slide 内内容）'}
+                    aria-label={isThisSlideFocused ? '退出聚焦' : '聚焦此 Slide'}
+                >
+                    <TldrawUiIcon icon={isThisSlideFocused ? 'slide-exit-focus' : 'slide-focus'} small />
+                </TldrawUiButton>
+                <TldrawUiButton
+                    type="normal"
+                    onClick={handleCopyLink}
+                    style={{ flex: '1 1 0', minWidth: 0 }}
+                    title="复制链接"
+                    aria-label="复制链接"
+                    disabled={rootId === ''}
+                >
+                    <TldrawUiIcon icon="copy-link-custom" small />
+                </TldrawUiButton>
+                <TldrawUiButton
+                    type="normal"
+                    onClick={handleOpenSlideBlock}
+                    style={{ flex: '1 1 0', minWidth: 0 }}
+                    title="跳转到笔记"
+                    aria-label="跳转到笔记"
+                    disabled={!slideShape.props.blockId}
+                >
+                    <TldrawUiIcon icon="open-block" small />
+                </TldrawUiButton>
+                <TldrawUiButton
+                    type="normal"
+                    onClick={handleCaptureScreenshot}
+                    style={{ flex: '1 1 0', minWidth: 0 }}
+                    title={isCapturingScreenshot ? '生成中…' : '更新截图'}
+                    aria-label={isCapturingScreenshot ? '生成中…' : '更新截图'}
+                    disabled={isCapturingScreenshot}
+                >
+                    <TldrawUiIcon icon={isCapturingScreenshot ? 'loading-spinner' : 'update-screenshot'} small />
+                </TldrawUiButton>
+            </div>
         </div>
     )
 }
