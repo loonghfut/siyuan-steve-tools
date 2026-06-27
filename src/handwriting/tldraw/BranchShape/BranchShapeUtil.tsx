@@ -384,7 +384,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const backgroundInset = isAutoFrameEnhanced ? 2 : 1
 		const backgroundOpacity = isAutoFrameEnhanced ? 0.12 : 0.08
 		const backgroundRx = isAutoFrameEnhanced ? 12 : 8
-		const showAutoOuterFrame = isAutoFrameEnhanced
+		const showAutoOuterFrame = isAutoFrameEnhanced && !isFloatingStyle
 		const floatingFrameInset = OUTER_FRAME_INSET
 		const floatingFrameStrokeWidth = OUTER_FRAME_STROKE_WIDTH
 		const floatingFrameOpacity = OUTER_FRAME_OPACITY

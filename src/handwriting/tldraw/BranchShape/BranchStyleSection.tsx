@@ -158,7 +158,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						className={`tlui-toggle-button ${showBackgroundState === true ? 'tlui-toggle-button--active' : showBackgroundState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
 						onClick={() => {
 							const next = showBackgroundState === 'mixed' ? true : !showBackgroundState
-							updateBranchProps(() => ({ showBackground: next }))
+							updateBranchProps(() => ({ showBackground: next }), { relayout: true })
 						}}
 						title="显示或隐藏 Branch 背景"
 						aria-label="Branch 背景"
