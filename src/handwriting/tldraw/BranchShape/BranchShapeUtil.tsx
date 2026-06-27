@@ -23,6 +23,11 @@ const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
 const CURVE_DASHARRAY = '6 5'
 const DETACH_DASHARRAY = '6 5'
+const OUTER_FRAME_INSET = 2
+const OUTER_FRAME_STROKE_WIDTH = 2.2
+const OUTER_FRAME_OPACITY = 0.96
+const OUTER_FRAME_DASHARRAY = '8 4'
+const OUTER_FRAME_RX = 12
 
 type BranchChildRenderInfo = ReturnType<typeof getBranchRenderInfo>['children'][number]
 
@@ -34,6 +39,10 @@ type BranchPathInfo = {
 
 function getBranchLineStyle(shape: IBranchShape): BranchLineStyle {
 	return shape.props.lineStyle ?? 'curve-solid'
+}
+
+function isFloatingFrameStyle(lineStyle: BranchLineStyle) {
+	return lineStyle === 'frame-floating'
 }
 
 function createLinearBezier(start: VecLike, end: VecLike) {
@@ -54,6 +63,11 @@ function getBranchPathInfo(
 	const elbowX = rootX + (child.side === 'left' ? -24 : 24)
 
 	switch (lineStyle) {
+		case 'frame-floating':
+			return {
+				path: '',
+				geometry: [],
+			}
 		case 'straight-solid':
 			return {
 				path: `M ${rootX} ${rootY} L ${child.targetX} ${child.targetY}`,
@@ -264,6 +278,18 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const lineStyle = getBranchLineStyle(shape)
 		const children = []
 
+		if (isFloatingFrameStyle(lineStyle)) {
+			children.push(
+				new Rectangle2d({
+					x: 2,
+					y: 2,
+					width: Math.max(shape.props.w - 4, 1),
+					height: Math.max(shape.props.h - 4, 1),
+					isFilled: false,
+				})
+			)
+		}
+
 		children.push(
 			new Rectangle2d({
 				x: info.rootX - info.rootRadius,
@@ -343,6 +369,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const hasChildren = info.children.length > 0
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
 		const lineStyle = getBranchLineStyle(shape)
+		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
 		const interactionHint = useBranchInteractionHint()
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
 		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
@@ -358,11 +385,13 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const backgroundOpacity = isAutoFrameEnhanced ? 0.12 : 0.08
 		const backgroundRx = isAutoFrameEnhanced ? 12 : 8
 		const showAutoOuterFrame = isAutoFrameEnhanced
-		const outerFrameInset = 2
-		const outerFrameStrokeWidth = 2.2
-		const outerFrameOpacity = 0.96
-		const outerFrameDasharray = '8 4'
-		const outerFrameRx = 12
+		const floatingFrameInset = OUTER_FRAME_INSET
+		const floatingFrameStrokeWidth = OUTER_FRAME_STROKE_WIDTH
+		const floatingFrameOpacity = OUTER_FRAME_OPACITY
+		const floatingFrameDasharray = OUTER_FRAME_DASHARRAY
+		const floatingFrameRx = OUTER_FRAME_RX
+		const floatingRootOuterRadius = info.rootRadius + 5
+		const floatingRootInnerRadius = Math.max(info.rootRadius - 1, 4)
 
 		return (
 			<SVGContainer className="BranchShape">
@@ -376,17 +405,17 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				/>
 				{showAutoOuterFrame && !isMovingBranch && (
 					<rect
-						x={outerFrameInset}
-						y={outerFrameInset}
-						width={Math.max(shape.props.w - outerFrameInset * 2, 1)}
-						height={Math.max(shape.props.h - outerFrameInset * 2, 1)}
-						rx={outerFrameRx}
-						ry={outerFrameRx}
+						x={OUTER_FRAME_INSET}
+						y={OUTER_FRAME_INSET}
+						width={Math.max(shape.props.w - OUTER_FRAME_INSET * 2, 1)}
+						height={Math.max(shape.props.h - OUTER_FRAME_INSET * 2, 1)}
+						rx={OUTER_FRAME_RX}
+						ry={OUTER_FRAME_RX}
 						fill="none"
 						stroke={color}
-						strokeWidth={outerFrameStrokeWidth}
-						strokeDasharray={outerFrameDasharray}
-						opacity={outerFrameOpacity}
+						strokeWidth={OUTER_FRAME_STROKE_WIDTH}
+						strokeDasharray={OUTER_FRAME_DASHARRAY}
+						opacity={OUTER_FRAME_OPACITY}
 						pointerEvents="none"
 					/>
 				)}
@@ -400,6 +429,22 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						ry={backgroundRx}
 						fill={color}
 						opacity={backgroundOpacity}
+						pointerEvents="none"
+					/>
+				)}
+				{isFloatingStyle && (
+					<rect
+						x={floatingFrameInset}
+						y={floatingFrameInset}
+						width={Math.max(shape.props.w - floatingFrameInset * 2, 1)}
+						height={Math.max(shape.props.h - floatingFrameInset * 2, 1)}
+						rx={floatingFrameRx}
+						ry={floatingFrameRx}
+						fill="none"
+						stroke={showHint && !isMovingBranch ? accentColor : color}
+						strokeWidth={showHint && !isMovingBranch ? floatingFrameStrokeWidth + 0.8 : floatingFrameStrokeWidth}
+						strokeDasharray={isDetachTarget ? DETACH_DASHARRAY : floatingFrameDasharray}
+						opacity={floatingFrameOpacity}
 						pointerEvents="none"
 					/>
 				)}
@@ -462,14 +507,42 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						)}
 					</g>
 				)}
-				<circle
-					cx={info.rootX}
-					cy={info.rootY}
-					r={info.rootRadius}
-					fill={color}
-					opacity={hasChildren || showHint ? 1 : 0.9}
-				/>
-				{hasChildren && (
+				{isFloatingStyle ? (
+					<g pointerEvents="none">
+						<circle
+							cx={info.rootX}
+							cy={info.rootY}
+							r={floatingRootOuterRadius}
+							fill={showHint ? accentColor : color}
+							opacity={showHint ? 0.18 : 0.14}
+						/>
+						<circle
+							cx={info.rootX}
+							cy={info.rootY}
+							r={floatingRootOuterRadius}
+							fill="none"
+							stroke={showHint ? accentColor : color}
+							strokeWidth={1.5}
+							opacity={0.55}
+						/>
+						<circle
+							cx={info.rootX}
+							cy={info.rootY}
+							r={floatingRootInnerRadius}
+							fill={showHint ? accentColor : color}
+							opacity={1}
+						/>
+					</g>
+				) : (
+					<circle
+						cx={info.rootX}
+						cy={info.rootY}
+						r={info.rootRadius}
+						fill={color}
+						opacity={hasChildren || showHint ? 1 : 0.9}
+					/>
+				)}
+				{hasChildren && !isFloatingStyle && (
 					<g fill="none" stroke={color} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round">
 						{info.children.map((child) => {
 							const pathInfo = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle)
@@ -498,8 +571,24 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		return (
 			<g>
 				<rect width={Math.max(shape.props.w, 1)} height={Math.max(shape.props.h, 1)} fill="none" />
-				<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius} />
-				{info.children.map((child) => {
+				{lineStyle === 'frame-floating' ? (
+					<>
+						<rect
+							x={2}
+							y={2}
+							width={Math.max(shape.props.w - 4, 1)}
+							height={Math.max(shape.props.h - 4, 1)}
+							rx={OUTER_FRAME_RX}
+							ry={OUTER_FRAME_RX}
+							fill="none"
+						/>
+						<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius + 5} fill="none" />
+						<circle cx={info.rootX} cy={info.rootY} r={Math.max(info.rootRadius - 1, 4)} />
+					</>
+				) : (
+					<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius} />
+				)}
+				{lineStyle !== 'frame-floating' && info.children.map((child) => {
 					const pathInfo = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle)
 					return (
 						<path

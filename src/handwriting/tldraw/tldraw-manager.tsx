@@ -58,6 +58,7 @@ try {
     assetUrls.icons['branch-elbow-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-elbow-solid.svg';
     assetUrls.icons['branch-straight-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-straight-solid.svg';
     assetUrls.icons['branch-curve-dashed'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-curve-dashed.svg';
+    assetUrls.icons['branch-frame-floating'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-frame-floating.svg';
 } catch (err) {
     console.warn('无法在 assetUrls 上添加 custom-icon 映射', err);
 }

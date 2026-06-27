@@ -99,6 +99,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						{ value: 'elbow-solid', icon: 'branch-elbow-solid' },
 						{ value: 'straight-solid', icon: 'branch-straight-solid' },
 						{ value: 'curve-dashed', icon: 'branch-curve-dashed' },
+						{ value: 'frame-floating', icon: 'branch-frame-floating' },
 					]}
 					value={
 						lineStyleState === 'mixed'
@@ -106,7 +107,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 							: { type: 'shared' as const, value: lineStyleState }
 					}
 					onValueChange={(_style, nextValue: any) => {
-						updateBranchProps(() => ({ lineStyle: nextValue as BranchLineStyle }))
+						updateBranchProps(() => ({ lineStyle: nextValue as BranchLineStyle }), { relayout: true })
 					}}
 				/>
 			</div>

@@ -77,6 +77,10 @@ type BranchDragPreviewOptions = {
 	parentsByChildId?: Map<string, IBranchShape[]>
 }
 
+function usesManualFrameStyle(branch: IBranchShape) {
+	return branch.props.lineStyle === 'frame-floating'
+}
+
 export function isBranchConnectableShape(shape: TLShape | undefined): boolean {
 	return !!shape && CONNECTABLE_TYPES.has(shape.type) && typeof (shape as any).props?.w === 'number'
 }
@@ -516,7 +520,7 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const children = [...leftChildren, ...rightChildren]
 	const autoFrame = getBranchAutoFrameState(editor, branch)
 	const shouldShowBackground = branch.props.showBackground === true
-	const shouldPadForFrame = children.length > 0 && (autoFrame.enabled || shouldShowBackground)
+	const shouldPadForFrame = children.length > 0 && (autoFrame.enabled || shouldShowBackground || usesManualFrameStyle(branch))
 	const framePadding = shouldPadForFrame ? ENHANCED_FRAME_PADDING : 0
 
 	if (children.length === 0) {
