@@ -6,6 +6,7 @@ import type { TLShapeId } from '@tldraw/tldraw'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
 import type { IJsShape } from '../JsShape/js-shape-types'
+import type { IBranchShape } from '../BranchShape/branch-shape-types'
 
 // Extend the TLEventMap interface to include custom events
 declare module '@tldraw/tldraw' {
@@ -30,8 +31,8 @@ export const isCardLikeShape = (shape: any): shape is CardLikeShape =>
     shape?.type === 'card' || shape?.type === 'single-block'
 
 /** Card、SingleBlock 或 JsShape 形状类型 */
-export type OverlayShape = CardLikeShape | IJsShape
+export type OverlayShape = CardLikeShape | IBranchShape | IJsShape
 
 /** 检查形状是否为 Overlay 形状（Card、SingleBlock 或 JsShape） */
 export const isOverlayShape = (shape: any): shape is OverlayShape =>
-    isCardLikeShape(shape) || shape?.type === 'js-shape'
+    isCardLikeShape(shape) || shape?.type === 'branch' || shape?.type === 'js-shape'

@@ -23,6 +23,7 @@ import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
 import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
+import { createSingleBlockForBranch } from '../../BranchShape'
 
 export const InFrontOfCanvas: React.FC = () => {
     const editor = useEditor()
@@ -84,6 +85,7 @@ export const InFrontOfCanvas: React.FC = () => {
 
     const isSingleBlockSelection = isValidSelection && selectedShape.type === 'single-block'
     const isCardOrBlock = isValidSelection && isCardLikeShape(selectedShape)
+    const isBranchSelection = isValidSelection && selectedShape.type === 'branch'
     const isJsShapeSelection = isValidSelection && selectedShape.type === 'js-shape'
     const selectedJsShape = isJsShapeSelection ? (selectedShape as IJsShape) : null
     const selectedCardShapes = useValue(
@@ -280,6 +282,34 @@ export const InFrontOfCanvas: React.FC = () => {
                         alignItems: 'center'
                     }}
                 >
+                    {isBranchSelection && (
+                        <>
+                            <HoverButton
+                                style={buttonStyle}
+                                onClick={() => {
+                                    const newShapeId = createSingleBlockForBranch(editor, selectionInfo.id, 'left')
+                                    if (!newShapeId) {
+                                        showMessage('左侧添加单块失败', 3000, 'error')
+                                    }
+                                }}
+                                title="左侧添加单块"
+                            >
+                                <span style={{ fontSize: '11px', fontWeight: 700 }}>+L</span>
+                            </HoverButton>
+                            <HoverButton
+                                style={buttonStyle}
+                                onClick={() => {
+                                    const newShapeId = createSingleBlockForBranch(editor, selectionInfo.id, 'right')
+                                    if (!newShapeId) {
+                                        showMessage('右侧添加单块失败', 3000, 'error')
+                                    }
+                                }}
+                                title="右侧添加单块"
+                            >
+                                <span style={{ fontSize: '11px', fontWeight: 700 }}>+R</span>
+                            </HoverButton>
+                        </>
+                    )}
                     {isCardOrBlock && (
                         <>
                             <HoverButton
