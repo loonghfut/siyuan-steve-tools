@@ -265,6 +265,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isMainCard = Boolean(shape.props.isMain);
 		const collapsedTextSize = shape.props.collapsedTextSize || 21; // 折叠文字大小，默认21px
 		const collapsedTextAlign = shape.props.collapsedTextAlign || 'center'; // 折叠文字对齐，默认居中
+		const collapsedTextLineHeight = 1.4;
+		const collapsedTextAvailableHeight = Math.max(
+			shape.props.h - 20,
+			collapsedTextSize * collapsedTextLineHeight
+		);
+		const collapsedTextLineClamp = Math.max(
+			1,
+			Math.floor(collapsedTextAvailableHeight / (collapsedTextSize * collapsedTextLineHeight))
+		);
 		const headerGradientFallback = `linear-gradient(135deg, ${theme[shape.props.color].solid} 0%, ${theme[shape.props.color].semi} 100%)`;
 
 		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）
@@ -1580,13 +1589,21 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								{/* 内容摘要文字 */}
 								<span style={{
 									flex: 1,
+									minWidth: 0,
 									fontSize: `${collapsedTextSize}px`,
 									fontWeight: 500,
 									color: theme[shape.props.color].solid,
-									wordBreak: 'break-all',
-									lineHeight: 1.4,
+									wordBreak: 'break-word',
+									overflowWrap: 'anywhere',
+									lineHeight: collapsedTextLineHeight,
 									opacity: 0.85,
 									textAlign: collapsedTextAlign as any,
+									overflow: 'hidden',
+									textOverflow: 'ellipsis',
+									display: '-webkit-box',
+									WebkitBoxOrient: 'vertical',
+									WebkitLineClamp: collapsedTextLineClamp,
+									maxHeight: `${collapsedTextLineClamp * collapsedTextSize * collapsedTextLineHeight}px`,
 								}}>
 									{collapsedText}
 								</span>
