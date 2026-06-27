@@ -5,6 +5,8 @@
 import { api } from "@frostime/siyuan-plugin-kits";
 import { Editor, TLShape, TLAsset, TLShapeId, createShapeId, TLAssetId, TLBinding, TLBindingId, createBindingId } from "@tldraw/tldraw";
 import { showMessage } from "siyuan";
+import type { IBranchShape } from "../BranchShape";
+import { layoutBranchChildren, relayoutBranchesContainingShapes } from "../BranchShape";
 
 /** 素材库项目接口 */
 export interface ShapeLibraryItem {
@@ -467,6 +469,21 @@ function replaceIdsInShape(
     };
 
     replaceAssetIds(newShape.props);
+
+    if (newShape.type === 'branch') {
+        const props = (newShape as IBranchShape).props;
+        const replaceBranchChildIds = (ids: string[] | undefined) =>
+            (ids || [])
+                .map(id => shapeIdMap.get(id) as string | undefined)
+                .filter((id): id is string => !!id);
+
+        newShape.props = {
+            ...props,
+            childIds: replaceBranchChildIds(props.childIds),
+            leftChildIds: replaceBranchChildIds(props.leftChildIds),
+            rightChildIds: replaceBranchChildIds(props.rightChildIds || props.childIds),
+        };
+    }
     
     return newShape;
 }
@@ -514,9 +531,7 @@ export function addLibraryItemToCanvas(
         // 按照层级顺序创建形状（先创建父级）
         const sortedShapes = sortShapesByParentage(newShapes, shapeIdMap);
         
-        for (const shape of sortedShapes) {
-            editor.createShape(shape);
-        }
+        editor.createShapes(sortedShapes);
 
         // 恢复绑定关系（连接器与形状的绑定）
         if (item.bindings && item.bindings.length > 0) {
@@ -538,6 +553,19 @@ export function addLibraryItemToCanvas(
         }
 
         // 选中新创建的形状
+        const createdBranchIds = sortedShapes
+            .filter((shape): shape is IBranchShape => shape.type === 'branch')
+            .map(shape => shape.id);
+
+        for (const branchId of createdBranchIds) {
+            const branch = editor.getShape<IBranchShape>(branchId);
+            if (branch?.type === 'branch') layoutBranchChildren(editor, branch);
+        }
+
+        if (createdBranchIds.length > 0) {
+            relayoutBranchesContainingShapes(editor, createdBranchIds);
+        }
+
         editor.select(...Array.from(shapeIdMap.values()));
         
         showMessage(`已添加 ${item.shapes.length} 个形状到画布`);

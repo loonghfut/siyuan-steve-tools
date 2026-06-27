@@ -37,6 +37,59 @@ function getRoundedDeltaKey(dx: number, dy: number) {
 	return `${Math.round(dx * 1000) / 1000}:${Math.round(dy * 1000) / 1000}`
 }
 
+function getShapeBounds(shape: TLShape) {
+	const w = getShapeWidth(shape)
+	const h = getShapeHeight(shape)
+	if (w == null || h == null) return null
+	return {
+		x: shape.x,
+		y: shape.y,
+		w,
+		h,
+		centerY: shape.y + h / 2,
+	}
+}
+
+function inferCreatedBranchChildrenFromLayout(
+	editor: Editor,
+	branch: IBranchShape,
+	createdShapeIds: Set<string>
+) {
+	const branchRootX = branch.x + getBranchRootX(branch)!
+	const horizontalGap = Math.max(branch.props.horizontalGap || 80, 20)
+	const expectedLeftEdgeX = branchRootX - horizontalGap
+	const expectedRightEdgeX = branchRootX + horizontalGap
+	const tolerance = Math.max(2, horizontalGap * 0.05)
+	const leftCandidates: Array<{ id: string; centerY: number }> = []
+	const rightCandidates: Array<{ id: string; centerY: number }> = []
+
+	for (const id of createdShapeIds) {
+		if (id === branch.id) continue
+		const shape = editor.getShape(id as TLShapeId)
+		if (!shape || !isBranchConnectableShape(shape)) continue
+
+		const bounds = getShapeBounds(shape)
+		if (!bounds) continue
+		const isInBranchYRange = bounds.centerY >= branch.y - tolerance && bounds.centerY <= branch.y + branch.props.h + tolerance
+		if (!isInBranchYRange) continue
+
+		if (Math.abs(bounds.x + bounds.w - expectedLeftEdgeX) <= tolerance) {
+			leftCandidates.push({ id, centerY: bounds.centerY })
+		} else if (Math.abs(bounds.x - expectedRightEdgeX) <= tolerance) {
+			rightCandidates.push({ id, centerY: bounds.centerY })
+		}
+	}
+
+	const byCenterY = (a: { centerY: number }, b: { centerY: number }) => a.centerY - b.centerY
+	leftCandidates.sort(byCenterY)
+	rightCandidates.sort(byCenterY)
+
+	return {
+		leftChildIds: leftCandidates.map(({ id }) => id),
+		rightChildIds: rightCandidates.map(({ id }) => id),
+	}
+}
+
 function findCreatedShapeIdRemaps(
 	editor: Editor,
 	branch: IBranchShape,
@@ -115,22 +168,35 @@ function remapCreatedBranchChildren(
 	createdShapeIds: Set<string>
 ) {
 	const idRemaps = findCreatedShapeIdRemaps(editor, branch, createdShapeIds)
-	const remapIds = (ids: string[] | undefined) =>
+	const inferredChildren = idRemaps.size === 0 ? inferCreatedBranchChildrenFromLayout(editor, branch, createdShapeIds) : null
+	const remapIds = (ids: string[] | undefined, fallbackIds: string[] = []) => {
+		let fallbackIndex = 0
+		return (
 		(ids || [])
-			.map((id) => idRemaps.get(id))
-			.filter((id): id is string => !!id && !!editor.getShape(id as TLShapeId))
+			.map((id) => {
+				const remappedId = idRemaps.get(id)
+				if (remappedId && editor.getShape(remappedId as TLShapeId)) return remappedId
+				if (createdShapeIds.has(id) && editor.getShape(id as TLShapeId)) return id
+				const fallbackId = fallbackIds[fallbackIndex++]
+				if (fallbackId && editor.getShape(fallbackId as TLShapeId)) return fallbackId
+				return null
+			})
+			.filter((id): id is string => !!id)
+		)
+	}
 
-	const nextChildIds = remapIds(branch.props.childIds)
-	const nextLeftChildIds = remapIds(branch.props.leftChildIds)
-	const nextRightChildIds = remapIds(branch.props.rightChildIds)
+	const sourceRightChildIds = branch.props.rightChildIds || branch.props.childIds
+	const nextChildIds = remapIds(branch.props.childIds, inferredChildren?.rightChildIds)
+	const nextLeftChildIds = remapIds(branch.props.leftChildIds, inferredChildren?.leftChildIds)
+	const nextRightChildIds = remapIds(sourceRightChildIds, inferredChildren?.rightChildIds)
 
 	const didChange =
 		nextChildIds.length !== (branch.props.childIds || []).length ||
 		nextLeftChildIds.length !== (branch.props.leftChildIds || []).length ||
-		nextRightChildIds.length !== (branch.props.rightChildIds || []).length ||
+		nextRightChildIds.length !== (sourceRightChildIds || []).length ||
 		nextChildIds.some((id, index) => id !== (branch.props.childIds || [])[index]) ||
 		nextLeftChildIds.some((id, index) => id !== (branch.props.leftChildIds || [])[index]) ||
-		nextRightChildIds.some((id, index) => id !== (branch.props.rightChildIds || [])[index])
+		nextRightChildIds.some((id, index) => id !== (sourceRightChildIds || [])[index])
 
 	if (!didChange) return false
 
