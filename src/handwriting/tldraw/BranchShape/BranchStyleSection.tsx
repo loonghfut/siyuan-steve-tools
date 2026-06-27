@@ -2,8 +2,8 @@
  * Branch shape style panel section
  */
 import React from 'react'
-import { Editor, TldrawUiButton, TldrawUiSlider } from '@tldraw/tldraw'
-import type { IBranchShape } from './branch-shape-types'
+import { Editor, StylePanelDropdownPicker, TldrawUiButton, TldrawUiSlider } from '@tldraw/tldraw'
+import type { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { detachBranchCompletely, layoutBranchChildren } from './branch-layout'
 
 export interface BranchStyleSectionProps {
@@ -20,6 +20,13 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 	const lineWidthState = React.useMemo<number | 'mixed'>(() => {
 		if (!hasBranchSelection) return 3
 		const values = selectedBranchShapes.map((shape) => shape.props.lineWidth || 3)
+		const first = values[0]
+		return values.every((value) => value === first) ? first : 'mixed'
+	}, [hasBranchSelection, selectedBranchShapes])
+
+	const lineStyleState = React.useMemo<BranchLineStyle | 'mixed'>(() => {
+		if (!hasBranchSelection) return 'curve-solid'
+		const values = selectedBranchShapes.map((shape) => shape.props.lineStyle || 'curve-solid')
 		const first = values[0]
 		return values.every((value) => value === first) ? first : 'mixed'
 	}, [hasBranchSelection, selectedBranchShapes])
@@ -79,6 +86,31 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 
 	return (
 		<>
+			<div className="tlui-style-panel__section">
+				<StylePanelDropdownPicker
+					label="连接风格"
+					type="menu"
+					id="branch-line-style"
+					uiType="branch-line-style"
+					stylePanelType="branch-line-style"
+					style={{ id: 'branch-line-style' } as any}
+					items={[
+						{ value: 'curve-solid', icon: 'branch-curve-solid' },
+						{ value: 'elbow-solid', icon: 'branch-elbow-solid' },
+						{ value: 'straight-solid', icon: 'branch-straight-solid' },
+						{ value: 'curve-dashed', icon: 'branch-curve-dashed' },
+					]}
+					value={
+						lineStyleState === 'mixed'
+							? { type: 'mixed' as const }
+							: { type: 'shared' as const, value: lineStyleState }
+					}
+					onValueChange={(_style, nextValue: any) => {
+						updateBranchProps(() => ({ lineStyle: nextValue as BranchLineStyle }))
+					}}
+				/>
+			</div>
+
 			<div className="tlui-style-panel__section">
 				<TldrawUiSlider
 					label={`线宽${lineWidthState === 'mixed' ? '' : ` - ${lineWidthState}px`}`}

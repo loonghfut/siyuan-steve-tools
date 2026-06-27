@@ -4,6 +4,7 @@ import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
 import { getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
+import type { BranchLineStyle } from '../BranchShape/branch-shape-types'
 import { buildTldrawLink } from '../utils/link-builder'
 
 type InsertRelationKind = 'child-doc' | 'outline-block'
@@ -56,9 +57,10 @@ const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
 	horizontalGap: 96,
 	verticalGap: 28,
 	lineWidth: 3,
+	lineStyle: 'curve-solid' as BranchLineStyle,
 	snapDistance: 160,
 	showBackground: false,
-	version: 3,
+	version: 4,
 }
 
 function getExistingBlockIds(editor: Editor) {

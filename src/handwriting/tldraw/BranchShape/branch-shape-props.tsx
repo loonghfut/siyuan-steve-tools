@@ -13,6 +13,7 @@ export const branchShapeProps: RecordProps<IBranchShape> = {
 	horizontalGap: T.number,
 	verticalGap: T.number,
 	lineWidth: T.number,
+	lineStyle: T.optional(T.literalEnum('curve-solid', 'elbow-solid', 'straight-solid', 'curve-dashed')),
 	snapDistance: T.number,
 	showBackground: T.optional(T.boolean),
 	version: T.optional(T.number),

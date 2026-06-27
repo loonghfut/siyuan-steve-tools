@@ -4,6 +4,7 @@ const versions = createShapePropsMigrationIds('branch', {
 	AddVersion: 1,
 	AddShowOuterFrame: 2,
 	RenameShowOuterFrameToShowBackground: 3,
+	AddLineStyle: 4,
 })
 
 export const branchShapeMigrations = createShapePropsMigrationSequence({
@@ -39,6 +40,17 @@ export const branchShapeMigrations = createShapePropsMigrationSequence({
 				props.showOuterFrame = props.showOuterFrame ?? props.showBackground ?? false
 				delete props.showBackground
 				props.version = 2
+			},
+		},
+		{
+			id: versions.AddLineStyle,
+			up(props) {
+				props.lineStyle = props.lineStyle ?? 'curve-solid'
+				props.version = 4
+			},
+			down(props) {
+				delete props.lineStyle
+				props.version = 3
 			},
 		},
 	],

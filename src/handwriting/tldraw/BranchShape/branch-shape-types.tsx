@@ -1,6 +1,7 @@
 import { TLBaseShape, TLDefaultColorStyle } from '@tldraw/tldraw'
 
 export type BranchDirection = 'right' | 'left'
+export type BranchLineStyle = 'curve-solid' | 'elbow-solid' | 'straight-solid' | 'curve-dashed'
 
 export type IBranchShape = TLBaseShape<
 	'branch',
@@ -17,6 +18,7 @@ export type IBranchShape = TLBaseShape<
 		horizontalGap: number
 		verticalGap: number
 		lineWidth: number
+		lineStyle?: BranchLineStyle
 		snapDistance: number
 		showBackground?: boolean
 		version?: number

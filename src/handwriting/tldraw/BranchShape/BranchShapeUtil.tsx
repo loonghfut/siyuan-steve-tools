@@ -15,12 +15,79 @@ import {
 } from '@tldraw/tldraw'
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
-import { IBranchShape } from './branch-shape-types'
+import { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
 
 const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
+const CURVE_DASHARRAY = '6 5'
+const DETACH_DASHARRAY = '6 5'
+
+type BranchChildRenderInfo = ReturnType<typeof getBranchRenderInfo>['children'][number]
+
+type BranchPathInfo = {
+	path: string
+	strokeDasharray?: string
+	geometry: CubicBezier2d[]
+}
+
+function getBranchLineStyle(shape: IBranchShape): BranchLineStyle {
+	return shape.props.lineStyle ?? 'curve-solid'
+}
+
+function createLinearBezier(start: VecLike, end: VecLike) {
+	return new CubicBezier2d({
+		start: new Vec(start.x, start.y),
+		cp1: new Vec(start.x, start.y),
+		cp2: new Vec(end.x, end.y),
+		end: new Vec(end.x, end.y),
+	})
+}
+
+function getBranchPathInfo(
+	rootX: number,
+	rootY: number,
+	child: BranchChildRenderInfo,
+	lineStyle: BranchLineStyle
+): BranchPathInfo {
+	const elbowX = rootX + (child.side === 'left' ? -24 : 24)
+
+	switch (lineStyle) {
+		case 'straight-solid':
+			return {
+				path: `M ${rootX} ${rootY} L ${child.targetX} ${child.targetY}`,
+				geometry: [
+					createLinearBezier({ x: rootX, y: rootY }, { x: child.targetX, y: child.targetY }),
+				],
+			}
+		case 'elbow-solid':
+			return {
+				path: `M ${rootX} ${rootY} L ${elbowX} ${rootY} L ${elbowX} ${child.targetY} L ${child.targetX} ${child.targetY}`,
+				geometry: [
+					createLinearBezier({ x: rootX, y: rootY }, { x: elbowX, y: rootY }),
+					createLinearBezier({ x: elbowX, y: rootY }, { x: elbowX, y: child.targetY }),
+					createLinearBezier({ x: elbowX, y: child.targetY }, { x: child.targetX, y: child.targetY }),
+				],
+			}
+		case 'curve-dashed':
+		case 'curve-solid': {
+			const stemX = rootX + (child.side === 'left' ? -24 : 24)
+			return {
+				path: `M ${rootX} ${rootY} C ${stemX} ${rootY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
+				strokeDasharray: lineStyle === 'curve-dashed' ? CURVE_DASHARRAY : undefined,
+				geometry: [
+					new CubicBezier2d({
+						start: new Vec(rootX, rootY),
+						cp1: new Vec(stemX, rootY),
+						cp2: new Vec(child.midX, child.targetY),
+						end: new Vec(child.targetX, child.targetY),
+					}),
+				],
+			}
+		}
+	}
+}
 
 function collectBranchMoveUpdates(
 	editor: any,
@@ -185,14 +252,16 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			horizontalGap: 96,
 			verticalGap: 28,
 			lineWidth: 3,
+			lineStyle: 'curve-solid',
 			snapDistance: 160,
 			showBackground: false,
-			version: 3,
+			version: 4,
 		}
 	}
 
 	getGeometry(shape: IBranchShape) {
 		const info = getBranchRenderInfo(this.editor, shape)
+		const lineStyle = getBranchLineStyle(shape)
 		const children = []
 
 		children.push(
@@ -206,15 +275,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		)
 
 		for (const child of info.children) {
-			const stemDx = child.side === 'left' ? -24 : 24
-			children.push(
-				new CubicBezier2d({
-					start: new Vec(info.rootX, info.rootY),
-					cp1: new Vec(info.rootX + stemDx, info.rootY),
-					cp2: new Vec(child.midX, child.targetY),
-					end: new Vec(child.targetX, child.targetY),
-				})
-			)
+			children.push(...getBranchPathInfo(info.rootX, info.rootY, child, lineStyle).geometry)
 		}
 
 		return new BranchGeometry2d(
@@ -281,6 +342,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		)
 		const hasChildren = info.children.length > 0
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
+		const lineStyle = getBranchLineStyle(shape)
 		const interactionHint = useBranchInteractionHint()
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
 		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
@@ -410,20 +472,15 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				{hasChildren && (
 					<g fill="none" stroke={color} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round">
 						{info.children.map((child) => {
-							const stemDx = child.side === 'left' ? -24 : 24
-							const stemX = info.rootX + stemDx
-							const path = [
-								`M ${info.rootX} ${info.rootY}`,
-								`C ${stemX} ${info.rootY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
-							].join(' ')
+							const pathInfo = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle)
 							const isActiveSide = isAttachTarget && activeSide === child.side
 							return (
 								<path
 									key={child.id}
-									d={path}
+									d={pathInfo.path}
 									stroke={isDetachTarget || isActiveSide || isMovingBranch ? accentColor : color}
 									strokeWidth={isDetachTarget || isActiveSide || isMovingBranch ? lineWidth + 1.5 : lineWidth}
-									strokeDasharray={isDetachTarget ? '6 5' : undefined}
+									strokeDasharray={isDetachTarget ? DETACH_DASHARRAY : pathInfo.strokeDasharray}
 									opacity={showHint && !isMovingBranch && !isActiveSide ? 0.45 : 1}
 								/>
 							)
@@ -436,24 +493,21 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 
 	indicator(shape: IBranchShape) {
 		const info = getBranchRenderInfo(this.editor, shape)
+		const lineStyle = getBranchLineStyle(shape)
 
 		return (
 			<g>
 				<rect width={Math.max(shape.props.w, 1)} height={Math.max(shape.props.h, 1)} fill="none" />
 				<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius} />
 				{info.children.map((child) => {
-					const stemDx = child.side === 'left' ? -24 : 24
-					const stemX = info.rootX + stemDx
-					const path = [
-						`M ${info.rootX} ${info.rootY}`,
-						`C ${stemX} ${info.rootY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
-					].join(' ')
+					const pathInfo = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle)
 					return (
 						<path
 							key={child.id}
-							d={path}
+							d={pathInfo.path}
 							strokeWidth={Math.max(1, (shape.props.lineWidth || 3) - 1)}
 							strokeLinecap="round"
+							strokeDasharray={pathInfo.strokeDasharray}
 							fill="none"
 						/>
 					)
