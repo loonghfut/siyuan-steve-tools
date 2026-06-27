@@ -134,7 +134,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
                                 }}
                                 title={titles[dir]}
                             >
-                                <TldrawUiIcon icon={icons[dir]} small />
+                                <TldrawUiIcon icon={icons[dir]} />
                             </TldrawUiButton>
                         )
                     })}

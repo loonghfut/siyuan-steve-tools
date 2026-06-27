@@ -177,7 +177,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             opacity: collapsedState === 'mixed' ? 0.85 : undefined,
                         }}
                     >
-                        <TldrawUiIcon icon={collapsedState === true ? 'card-expand' : 'card-collapse'} small />
+                        <TldrawUiIcon icon={collapsedState === true ? 'card-expand' : 'card-collapse'} />
                     </TldrawUiButton>
                 </div>
             </div>
@@ -233,7 +233,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                     }}
                                     title={label}
                                 >
-                                    <TldrawUiIcon icon={icon} small />
+                                    <TldrawUiIcon icon={icon} />
                                 </TldrawUiButton>
                             ))}
                         </div>
@@ -286,7 +286,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                 onClick={() => { void handleInsertAllChildDocs() }}
                                 title="插入全部子文档"
                             >
-                                <TldrawUiIcon icon={insertingChildDocs ? 'loading-spinner' : 'child-docs'} small />
+                                <TldrawUiIcon icon={insertingChildDocs ? 'loading-spinner' : 'child-docs'} />
                             </TldrawUiButton>
                             <TldrawUiButton
                                 type="normal"
@@ -295,7 +295,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                 onClick={() => { void handleInsertAllOutline() }}
                                 title="插入全部大纲块"
                             >
-                                <TldrawUiIcon icon={insertingOutline ? 'loading-spinner' : 'outline-blocks'} small />
+                                <TldrawUiIcon icon={insertingOutline ? 'loading-spinner' : 'outline-blocks'} />
                             </TldrawUiButton>
                         </div>
                     </div>
