@@ -2,7 +2,7 @@
  * Branch shape style panel section
  */
 import React from 'react'
-import { Editor, StylePanelDropdownPicker, TldrawUiButton, TldrawUiSlider } from '@tldraw/tldraw'
+import { Editor, StylePanelDropdownPicker, TLShapeId, TldrawUiButton, TldrawUiSlider } from '@tldraw/tldraw'
 import type { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { detachBranchCompletely, layoutBranchChildren } from './branch-layout'
 
@@ -16,6 +16,55 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 	selectedBranchShapes,
 }) => {
 	const hasBranchSelection = selectedBranchShapes.length > 0
+	const pendingRelayoutIdsRef = React.useRef(new Set<string>())
+	const relayoutFrameRef = React.useRef<
+		| { type: 'animation-frame'; id: number }
+		| { type: 'timeout'; id: ReturnType<typeof setTimeout> }
+		| null
+	>(null)
+
+	const cancelPendingRelayout = React.useCallback(() => {
+		const frame = relayoutFrameRef.current
+		if (!frame) return
+		if (frame.type === 'animation-frame' && typeof cancelAnimationFrame === 'function') {
+			cancelAnimationFrame(frame.id)
+		} else if (frame.type === 'timeout') {
+			clearTimeout(frame.id)
+		}
+		relayoutFrameRef.current = null
+	}, [])
+
+	const queueBranchRelayout = React.useCallback(
+		(shapes: IBranchShape[]) => {
+			for (const shape of shapes) pendingRelayoutIdsRef.current.add(shape.id as string)
+			if (relayoutFrameRef.current) return
+
+			const flush = () => {
+				relayoutFrameRef.current = null
+				const branchIds = Array.from(pendingRelayoutIdsRef.current)
+				pendingRelayoutIdsRef.current.clear()
+				if (branchIds.length === 0) return
+
+				editor.run(() => {
+					for (const branchId of branchIds) {
+						const latestShape = editor.getShape(branchId as TLShapeId) as IBranchShape | undefined
+						if (latestShape?.type === 'branch') {
+							layoutBranchChildren(editor, latestShape)
+						}
+					}
+				})
+			}
+
+			if (typeof requestAnimationFrame === 'function') {
+				relayoutFrameRef.current = { type: 'animation-frame', id: requestAnimationFrame(flush) }
+			} else {
+				relayoutFrameRef.current = { type: 'timeout', id: setTimeout(flush, 16) }
+			}
+		},
+		[editor]
+	)
+
+	React.useEffect(() => cancelPendingRelayout, [cancelPendingRelayout])
 
 	const lineWidthState = React.useMemo<number | 'mixed'>(() => {
 		if (!hasBranchSelection) return 3
@@ -69,17 +118,10 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 					}))
 				)
 
-				if (options?.relayout) {
-					for (const shape of selectedBranchShapes) {
-						const latestShape = editor.getShape(shape.id) as IBranchShape | undefined
-						if (latestShape?.type === 'branch') {
-							layoutBranchChildren(editor, latestShape)
-						}
-					}
-				}
+				if (options?.relayout) queueBranchRelayout(selectedBranchShapes)
 			})
 		},
-		[editor, selectedBranchShapes]
+		[editor, queueBranchRelayout, selectedBranchShapes]
 	)
 
 	if (!hasBranchSelection) return null

@@ -20,9 +20,31 @@ export type BranchInteractionHint =
 
 let currentHint: BranchInteractionHint | null = null
 const listeners = new Set<() => void>()
+const branchListeners = new Map<string, Set<() => void>>()
 
 function emit() {
 	for (const listener of listeners) listener()
+}
+
+function emitBranch(branchId: string | undefined) {
+	if (!branchId) return
+	const listenersForBranch = branchListeners.get(branchId)
+	if (!listenersForBranch) return
+	for (const listener of listenersForBranch) listener()
+}
+
+function subscribeToBranch(branchId: string, listener: () => void) {
+	let listenersForBranch = branchListeners.get(branchId)
+	if (!listenersForBranch) {
+		listenersForBranch = new Set()
+		branchListeners.set(branchId, listenersForBranch)
+	}
+
+	listenersForBranch.add(listener)
+	return () => {
+		listenersForBranch.delete(listener)
+		if (listenersForBranch.size === 0) branchListeners.delete(branchId)
+	}
 }
 
 export function setBranchInteractionHint(nextHint: BranchInteractionHint | null) {
@@ -37,6 +59,8 @@ export function setBranchInteractionHint(nextHint: BranchInteractionHint | null)
 	if (isSame) return
 	currentHint = nextHint
 	emit()
+	emitBranch(prev?.branchId)
+	if (nextHint?.branchId !== prev?.branchId) emitBranch(nextHint?.branchId)
 }
 
 export function clearBranchInteractionHint(shapeId?: string) {
@@ -57,5 +81,17 @@ export function useBranchInteractionHint() {
 		},
 		getBranchInteractionHint,
 		getBranchInteractionHint
+	)
+}
+
+export function getBranchInteractionHintForBranch(branchId: string) {
+	return currentHint?.branchId === branchId ? currentHint : null
+}
+
+export function useBranchInteractionHintForBranch(branchId: string) {
+	return useSyncExternalStore(
+		(listener) => subscribeToBranch(branchId, listener),
+		() => getBranchInteractionHintForBranch(branchId),
+		() => getBranchInteractionHintForBranch(branchId)
 	)
 }

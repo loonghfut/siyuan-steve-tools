@@ -17,7 +17,7 @@ import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
-import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHint } from './branch-interaction-state'
+import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHintForBranch } from './branch-interaction-state'
 
 const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
@@ -370,7 +370,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
 		const lineStyle = getBranchLineStyle(shape)
 		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
-		const interactionHint = useBranchInteractionHint()
+		const interactionHint = useBranchInteractionHintForBranch(shape.id as string)
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
 		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
 		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id

@@ -13,6 +13,7 @@ const AUTO_FRAME_MIN_CHILDREN = 2
 const ENHANCED_FRAME_PADDING = 24
 const activeBranchDragShapeIds = new Set<string>()
 const pendingBranchDragShapes = new Map<string, TLShape>()
+let activeBranchDragPreviewOptions: BranchDragPreviewOptions | null = null
 const delayedAttachCandidates = new Map<
 	string,
 	{
@@ -494,11 +495,21 @@ function sameIds(a: string[], b: string[]) {
 	return a.every((id, index) => id === b[index])
 }
 
+function sameNumber(a: number | undefined, b: number, tolerance = 0.001) {
+	return Math.abs((a ?? 0) - b) <= tolerance
+}
+
 export function beginBranchAttachmentDrag(editor: Editor, shape: TLShape) {
 	if (!isBranchConnectableShape(shape)) return
 	if (activeBranchDragShapeIds.size === 0) {
 		pendingBranchDragShapes.clear()
 		clearDelayedAttachCandidate()
+		const branches = getCurrentBranches(editor)
+		activeBranchDragPreviewOptions = {
+			branches,
+			pageShapes: editor.getCurrentPageShapes(),
+			parentsByChildId: buildBranchParentIndex(branches),
+		}
 	}
 
 	const selectedShapes = editor.getSelectedShapes()
@@ -525,18 +536,33 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 
 	if (children.length === 0) {
 		const oldRootPage = getBranchRootPagePoint(branch)
+		const nextX = oldRootPage.x - ROOT_RADIUS
+		const nextY = oldRootPage.y - ROOT_RADIUS
+		const nextChildIds: string[] = []
+		const isUnchanged =
+			sameNumber(branch.x, nextX) &&
+			sameNumber(branch.y, nextY) &&
+			sameNumber(branch.props.w, ROOT_DIAMETER) &&
+			sameNumber(branch.props.h, ROOT_DIAMETER) &&
+			sameNumber(branch.props.rootX, ROOT_RADIUS) &&
+			sameIds(branch.props.childIds || [], nextChildIds) &&
+			sameIds(branch.props.leftChildIds || [], nextChildIds) &&
+			sameIds(branch.props.rightChildIds || [], nextChildIds)
+
+		if (isUnchanged) return
+
 		editor.updateShape<IBranchShape>({
 			id: branch.id,
 			type: 'branch',
-			x: oldRootPage.x - ROOT_RADIUS,
-			y: oldRootPage.y - ROOT_RADIUS,
+			x: nextX,
+			y: nextY,
 			props: {
 				...branch.props,
 				w: ROOT_DIAMETER,
 				h: ROOT_DIAMETER,
-				childIds: [],
-				leftChildIds: [],
-				rightChildIds: [],
+				childIds: nextChildIds,
+				leftChildIds: nextChildIds,
+				rightChildIds: nextChildIds,
 				rootX: ROOT_RADIUS,
 			},
 		})
@@ -589,23 +615,37 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	placeChildren('left', leftChildren, leftHeight)
 	placeChildren('right', rightChildren, rightHeight)
 
-	updates.push({
-		id: branch.id,
-		type: 'branch',
-		x: branchX,
-		y: branchY,
-		props: {
-			...branch.props,
-			w: branchWidth,
-			h: branchHeight,
-			childIds: rightChildren.map(({ shape }) => shape.id),
-			leftChildIds: leftChildren.map(({ shape }) => shape.id),
-			rightChildIds: rightChildren.map(({ shape }) => shape.id),
-			rootX: rootLocalX,
-		},
-	})
+	const nextLeftChildIds = leftChildren.map(({ shape }) => shape.id)
+	const nextRightChildIds = rightChildren.map(({ shape }) => shape.id)
+	const branchChanged =
+		!sameNumber(branch.x, branchX) ||
+		!sameNumber(branch.y, branchY) ||
+		!sameNumber(branch.props.w, branchWidth) ||
+		!sameNumber(branch.props.h, branchHeight) ||
+		!sameNumber(branch.props.rootX, rootLocalX) ||
+		!sameIds(branch.props.childIds || [], nextRightChildIds) ||
+		!sameIds(branch.props.leftChildIds || [], nextLeftChildIds) ||
+		!sameIds(branch.props.rightChildIds || branch.props.childIds || [], nextRightChildIds)
 
-	editor.updateShapes(updates)
+	if (branchChanged) {
+		updates.push({
+			id: branch.id,
+			type: 'branch',
+			x: branchX,
+			y: branchY,
+			props: {
+				...branch.props,
+				w: branchWidth,
+				h: branchHeight,
+				childIds: nextRightChildIds,
+				leftChildIds: nextLeftChildIds,
+				rightChildIds: nextRightChildIds,
+				rootX: rootLocalX,
+			},
+		})
+	}
+
+	if (updates.length > 0) editor.updateShapes(updates)
 }
 
 type BranchIdsDraft = {
@@ -881,7 +921,11 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 }
 
 export function getBranchInteractionHintForShape(editor: Editor, shape: TLShape): BranchInteractionHint | null {
-	const preview = getBranchDragPreview(editor, shape)
+	const preview = getBranchDragPreview(
+		editor,
+		shape,
+		activeBranchDragShapeIds.has(shape.id as string) ? activeBranchDragPreviewOptions ?? undefined : undefined
+	)
 	if (!preview) return null
 
 	if (preview.mode === 'attach') {
@@ -917,6 +961,7 @@ export function updateBranchAttachmentAfterDrag(editor: Editor, shape: TLShape) 
 
 		const shapes = Array.from(pendingBranchDragShapes.values())
 		pendingBranchDragShapes.clear()
+		activeBranchDragPreviewOptions = null
 		return updateBranchAttachmentsAfterDrag(editor, shapes)
 	}
 
