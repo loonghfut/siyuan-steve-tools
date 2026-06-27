@@ -242,6 +242,8 @@ function getNearestShapeForDraggingBranch(
 	draggingBranch: IBranchShape,
 	pageShapes = editor.getCurrentPageShapes()
 ): BranchAbsorbShapeCandidate | null {
+	if (isBranchConnected(editor, draggingBranch)) return null
+
 	const branchId = draggingBranch.id as string
 	const selectedDragIds = new Set(activeBranchDragShapeIds)
 	selectedDragIds.add(branchId)
@@ -346,6 +348,10 @@ function getParentBranchAttachment(editor: Editor, branch: IBranchShape): Branch
 	}
 
 	return null
+}
+
+function isBranchConnected(editor: Editor, branch: IBranchShape) {
+	return getParentBranchAttachment(editor, branch) !== null || getAllBranchChildIds(branch).length > 0
 }
 
 export function getAllBranchChildIds(branch: IBranchShape) {
