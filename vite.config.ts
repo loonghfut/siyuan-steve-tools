@@ -7,7 +7,9 @@ import { svelte } from "@sveltejs/vite-plugin-svelte"
 import zipPack from "vite-plugin-zip-pack";
 import fg from 'fast-glob';
 import vitePluginJavascriptObfuscator from 'vite-plugin-javascript-obfuscator';
+// @ts-ignore -- JS plugin without type declarations
 import vitePluginYamlI18n from './yaml-plugin';
+// @ts-ignore -- JS plugin without type declarations
 import vitePrivateStatsPlugin from './scripts/vite-plugin-private-stats.js';
 
 const env = process.env;
@@ -69,6 +71,15 @@ export default defineConfig({
         "process.env.NODE_ENV": JSON.stringify(env.NODE_ENV)
     },
 
+    css: {
+        preprocessorOptions: {
+            scss: {
+                api: 'modern',
+                silenceDeprecations: ['legacy-js-api']
+            }
+        }
+    },
+
     build: {
         outDir: outputDir,
         emptyOutDir: false,
@@ -81,13 +92,20 @@ export default defineConfig({
             formats: ["cjs"],
         },
         rollupOptions: {
+            onwarn(warning, warn) {
+                // 过滤 @radix-ui 等第三方库的 "use client" 模块级指令警告
+                if (warning.code === 'MODULE_LEVEL_DIRECTIVE' && warning.message?.includes('"use client"')) {
+                    return;
+                }
+                warn(warning);
+            },
             plugins: [
                 patchTldrawLoopbackDev(),
                 ...(isDev ? [
                     livereload(outputDir),
                     {
                         name: 'watch-external',
-                        async buildStart() {
+                        async buildStart(this: { addWatchFile(file: string): void }) {
                             const files = await fg([
                                 'public/i18n/**',
                                 './README*.md',
@@ -116,11 +134,12 @@ export default defineConfig({
 
             output: {
                 entryFileNames: "[name].js",
+                exports: "named",
                 assetFileNames: (assetInfo) => {
                     if (assetInfo.name === "style.css") {
                         return "index.css"
                     }
-                    return assetInfo.name
+                    return assetInfo.name ?? "[name][extname]"
                 },
             },
         },

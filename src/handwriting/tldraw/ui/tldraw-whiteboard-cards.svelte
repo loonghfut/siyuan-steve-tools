@@ -998,16 +998,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.id-line, .file-line {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: .65;
-  font-size: 0.68rem;
-}
-.id-line { font-family: var(--b3-font-family-code, monospace); }
-.file-line { opacity: .5; }
-
 .mtime-line {
     font-size: 0.64rem;
     color: var(--b3-theme-on-surface);
@@ -1072,7 +1062,6 @@
   }
   .meta { padding: 0.45rem 0.55rem 0.55rem; }
   .doc-title { font-size: 0.74rem; }
-  .id-line, .file-line { font-size: 0.66rem; }
   .whiteboard-card-view .search__label { min-width: 100px; }
 }
 

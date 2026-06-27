@@ -58,6 +58,7 @@
     }
 </script>
 
+<!-- svelte-ignore a11y-no-noninteractive-element-to-interactive-role -->
 <article
     class="whiteboard-card"
     class:invalid={!item.exists}
@@ -65,6 +66,7 @@
     on:contextmenu={handleContextMenu}
     role="button"
     tabindex="0"
+    aria-label={item.title}
     on:keydown={(e) => e.key === "Enter" && openWhiteboard()}
 >
     <label class="card-select" aria-label="选择白板">
