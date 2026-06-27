@@ -61,6 +61,8 @@ try {
     assetUrls.icons['branch-frame-floating'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-frame-floating.svg';
     assetUrls.icons['branch-background'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-background.svg';
     assetUrls.icons['branch-detach'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-detach.svg';
+    assetUrls.icons['branch-add-left'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-add-left.svg';
+    assetUrls.icons['branch-add-right'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-add-right.svg';
     assetUrls.icons['connector-arrow'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-arrow.svg';
     assetUrls.icons['connector-curve'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-curve.svg';
     assetUrls.icons['connector-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/connector-solid.svg';

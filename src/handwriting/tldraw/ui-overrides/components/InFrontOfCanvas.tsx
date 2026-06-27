@@ -234,6 +234,8 @@ export const InFrontOfCanvas: React.FC = () => {
         Code: () => <TldrawUiIcon icon="code" small />,
         Zap: () => <TldrawUiIcon icon="arrow-cycle" small />,
         MousePointer: () => <TldrawUiIcon icon="tool-hand" small />,
+        BranchAddLeft: () => <TldrawUiIcon icon="branch-add-left" />,
+        BranchAddRight: () => <TldrawUiIcon icon="branch-add-right" />,
     }
 
     return (
@@ -294,7 +296,7 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="左侧添加单块"
                             >
-                                <span style={{ fontSize: '11px', fontWeight: 700 }}>+L</span>
+                                <Icons.BranchAddLeft />
                             </HoverButton>
                             <HoverButton
                                 style={buttonStyle}
@@ -306,7 +308,7 @@ export const InFrontOfCanvas: React.FC = () => {
                                 }}
                                 title="右侧添加单块"
                             >
-                                <span style={{ fontSize: '11px', fontWeight: 700 }}>+R</span>
+                                <Icons.BranchAddRight />
                             </HoverButton>
                         </>
                     )}
