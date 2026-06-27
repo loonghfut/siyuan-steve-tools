@@ -54,6 +54,10 @@ try {
     assetUrls.icons['mindmap'] = 'plugins/siyuan-steve-tools/asset/icons/custom/mindmap.svg';
     assetUrls.icons['iconParagraph'] = 'plugins/siyuan-steve-tools/asset/icons/custom/iconParagraph.svg';
     assetUrls.icons['branch'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch.svg';
+    assetUrls.icons['branch-curve-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-curve-solid.svg';
+    assetUrls.icons['branch-elbow-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-elbow-solid.svg';
+    assetUrls.icons['branch-straight-solid'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-straight-solid.svg';
+    assetUrls.icons['branch-curve-dashed'] = 'plugins/siyuan-steve-tools/asset/icons/custom/branch-curve-dashed.svg';
 } catch (err) {
     console.warn('无法在 assetUrls 上添加 custom-icon 映射', err);
 }
