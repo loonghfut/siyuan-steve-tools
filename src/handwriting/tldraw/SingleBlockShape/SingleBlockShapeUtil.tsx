@@ -43,6 +43,7 @@ import {
 	getSingleBranchParent,
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
+	syncBranchMoveForRootContent,
 	updateBranchAttachmentAfterDrag,
 } from '../BranchShape'
 
@@ -346,6 +347,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		if (draggingBranchSingleBlockIds.has(next.id as string) && (prev.x !== next.x || prev.y !== next.y)) {
 			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
+			syncBranchMoveForRootContent(this.editor, prev, next)
 		}
 
 		// 当从允许绑定切换到不允许绑定时，删除已有的 single-block 类型的绑定

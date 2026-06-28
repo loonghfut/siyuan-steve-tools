@@ -16,7 +16,7 @@ import {
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { BranchLineStyle, IBranchShape } from './branch-shape-types'
-import { beginBranchAttachmentDrag, getAllBranchChildIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, updateBranchAttachmentAfterDrag } from './branch-layout'
+import { beginBranchAttachmentDrag, getAllBranchAttachedShapeIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, runWithSuppressedRootContentMoveIds, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHintForBranch } from './branch-interaction-state'
 
 const translatingBranchIds = new Set<string>()
@@ -60,7 +60,9 @@ function getBranchPathInfo(
 	child: BranchChildRenderInfo,
 	lineStyle: BranchLineStyle
 ): BranchPathInfo {
-	const elbowX = rootX + (child.side === 'left' ? -24 : 24)
+	const sourceX = child.sourceX ?? rootX
+	const sourceY = child.sourceY ?? rootY
+	const elbowX = sourceX + (child.side === 'left' ? -24 : 24)
 
 	switch (lineStyle) {
 		case 'frame-floating':
@@ -70,30 +72,30 @@ function getBranchPathInfo(
 			}
 		case 'straight-solid':
 			return {
-				path: `M ${rootX} ${rootY} L ${child.targetX} ${child.targetY}`,
+				path: `M ${sourceX} ${sourceY} L ${child.targetX} ${child.targetY}`,
 				geometry: [
-					createLinearBezier({ x: rootX, y: rootY }, { x: child.targetX, y: child.targetY }),
+					createLinearBezier({ x: sourceX, y: sourceY }, { x: child.targetX, y: child.targetY }),
 				],
 			}
 		case 'elbow-solid':
 			return {
-				path: `M ${rootX} ${rootY} L ${elbowX} ${rootY} L ${elbowX} ${child.targetY} L ${child.targetX} ${child.targetY}`,
+				path: `M ${sourceX} ${sourceY} L ${elbowX} ${sourceY} L ${elbowX} ${child.targetY} L ${child.targetX} ${child.targetY}`,
 				geometry: [
-					createLinearBezier({ x: rootX, y: rootY }, { x: elbowX, y: rootY }),
-					createLinearBezier({ x: elbowX, y: rootY }, { x: elbowX, y: child.targetY }),
+					createLinearBezier({ x: sourceX, y: sourceY }, { x: elbowX, y: sourceY }),
+					createLinearBezier({ x: elbowX, y: sourceY }, { x: elbowX, y: child.targetY }),
 					createLinearBezier({ x: elbowX, y: child.targetY }, { x: child.targetX, y: child.targetY }),
 				],
 			}
 		case 'curve-dashed':
 		case 'curve-solid': {
-			const stemX = rootX + (child.side === 'left' ? -24 : 24)
+			const stemX = sourceX + (child.side === 'left' ? -24 : 24)
 			return {
-				path: `M ${rootX} ${rootY} C ${stemX} ${rootY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
+				path: `M ${sourceX} ${sourceY} C ${stemX} ${sourceY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
 				strokeDasharray: lineStyle === 'curve-dashed' ? CURVE_DASHARRAY : undefined,
 				geometry: [
 					new CubicBezier2d({
-						start: new Vec(rootX, rootY),
-						cp1: new Vec(stemX, rootY),
+						start: new Vec(sourceX, sourceY),
+						cp1: new Vec(stemX, sourceY),
 						cp2: new Vec(child.midX, child.targetY),
 						end: new Vec(child.targetX, child.targetY),
 					}),
@@ -113,7 +115,7 @@ function collectBranchMoveUpdates(
 	selectedIds: Set<string>,
 	visited = new Set<string>()
 ) {
-	for (const childId of getAllBranchChildIds(branch)) {
+	for (const childId of getAllBranchAttachedShapeIds(branch)) {
 		if (visited.has(childId)) continue
 		visited.add(childId)
 
@@ -269,7 +271,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			lineStyle: 'curve-solid',
 			snapDistance: 160,
 			showBackground: false,
-			version: 4,
+			version: 5,
 		}
 	}
 
@@ -330,7 +332,10 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 
 		for (const branchId of suppressedBranchIds) syncingBranchMoveIds.add(branchId)
 		try {
-			this.editor.updateShapes(updates)
+			runWithSuppressedRootContentMoveIds(
+				updates.map((update) => update.id as string),
+				() => this.editor.updateShapes(updates)
+			)
 		} finally {
 			for (const branchId of suppressedBranchIds) syncingBranchMoveIds.delete(branchId)
 		}
@@ -370,9 +375,11 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
 		const lineStyle = getBranchLineStyle(shape)
 		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
+		const hasRootContent = !!info.rootShapeId && !!info.rootBounds
 		const interactionHint = useBranchInteractionHintForBranch(shape.id as string)
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
 		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
+		const isRootAttachTarget = isAttachTarget && interactionHint.slot === 'root'
 		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id
 		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
 		const activeSide = isAttachTarget ? interactionHint.side : null
@@ -499,6 +506,21 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 								opacity={0.95}
 							/>
 						)}
+						{(isRootAttachTarget || (hasRootContent && isMovingBranch)) && info.rootBounds && (
+							<rect
+								x={info.rootBounds.x - 5}
+								y={info.rootBounds.y - 5}
+								width={info.rootBounds.w + 10}
+								height={info.rootBounds.h + 10}
+								rx={8}
+								ry={8}
+								fill="none"
+								stroke={accentColor}
+								strokeWidth={2}
+								strokeDasharray="5 4"
+								opacity={0.85}
+							/>
+						)}
 						{isDetachTarget && (
 							<g stroke={accentColor} strokeWidth={2.5} strokeLinecap="round" opacity={0.95}>
 								<line x1={info.rootX - 6} y1={info.rootY - 6} x2={info.rootX + 6} y2={info.rootY + 6} />
@@ -507,7 +529,24 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						)}
 					</g>
 				)}
-				{isFloatingStyle ? (
+				{hasRootContent ? (
+					info.rootBounds ? (
+						<rect
+							x={info.rootBounds.x - 3}
+							y={info.rootBounds.y - 3}
+							width={info.rootBounds.w + 6}
+							height={info.rootBounds.h + 6}
+							rx={8}
+							ry={8}
+							fill="none"
+							stroke={showHint ? accentColor : color}
+							strokeWidth={showHint ? 1.8 : 1.2}
+							strokeDasharray="4 4"
+							opacity={showHint ? 0.65 : 0.22}
+							pointerEvents="none"
+						/>
+					) : null
+				) : isFloatingStyle ? (
 					<g pointerEvents="none">
 						<circle
 							cx={info.rootX}

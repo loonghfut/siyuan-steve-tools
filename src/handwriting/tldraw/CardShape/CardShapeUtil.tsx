@@ -27,6 +27,7 @@ import {
 	clearBranchInteractionHint,
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
+	syncBranchMoveForRootContent,
 	updateBranchAttachmentAfterDrag,
 } from '../BranchShape'
 
@@ -211,6 +212,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		if (draggingBranchCardIds.has(next.id as string) && (prev.x !== next.x || prev.y !== next.y)) {
 			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
+			syncBranchMoveForRootContent(this.editor, prev, next)
 		}
 	}
 

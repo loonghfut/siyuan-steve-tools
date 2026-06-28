@@ -3,7 +3,7 @@ import { api } from '@frostime/siyuan-plugin-kits'
 import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
-import { getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
+import { getAllBranchAttachedShapeIds, getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
 import type { BranchLineStyle } from '../BranchShape/branch-shape-types'
 import { buildTldrawLink } from '../utils/link-builder'
 
@@ -60,7 +60,7 @@ const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
 	lineStyle: 'curve-solid' as BranchLineStyle,
 	snapDistance: 160,
 	showBackground: false,
-	version: 4,
+	version: 5,
 }
 
 function getExistingBlockIds(editor: Editor) {
@@ -121,7 +121,7 @@ function createBranchShape(id: TLShapeId, rootX: number, rootY: number, props?: 
 function getBranchesContainingChild(editor: Editor, childId: string) {
 	return editor
 		.getCurrentPageShapes()
-		.filter((shape): shape is IBranchShape => shape.type === 'branch' && getAllBranchChildIds(shape as IBranchShape).includes(childId))
+		.filter((shape): shape is IBranchShape => shape.type === 'branch' && getAllBranchAttachedShapeIds(shape as IBranchShape).includes(childId))
 }
 
 function replaceChildId(ids: string[] | undefined, oldChildId: string, newChildId: string) {
@@ -141,6 +141,7 @@ function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: 
 			childIds: rightChildIds,
 			leftChildIds,
 			rightChildIds,
+			rootShapeId: branch.props.rootShapeId === oldChildId ? newChildId : branch.props.rootShapeId,
 		},
 	})
 }

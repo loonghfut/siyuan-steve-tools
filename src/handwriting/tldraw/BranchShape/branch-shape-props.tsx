@@ -8,6 +8,7 @@ export const branchShapeProps: RecordProps<IBranchShape> = {
 	childIds: T.arrayOf(T.string),
 	leftChildIds: T.optional(T.arrayOf(T.string)),
 	rightChildIds: T.optional(T.arrayOf(T.string)),
+	rootShapeId: T.optional(T.string),
 	rootX: T.optional(T.number),
 	direction: T.string,
 	horizontalGap: T.number,

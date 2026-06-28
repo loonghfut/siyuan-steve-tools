@@ -5,7 +5,8 @@ export type BranchInteractionHint =
 			mode: 'attach'
 			draggingShapeId: string
 			branchId: string
-			side: 'left' | 'right'
+			side?: 'left' | 'right'
+			slot?: 'root' | 'side'
 			targetShapeId?: string
 	  }
 	| {

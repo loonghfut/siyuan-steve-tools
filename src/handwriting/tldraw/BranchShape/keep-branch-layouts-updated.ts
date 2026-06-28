@@ -174,7 +174,12 @@ function findCreatedShapeIdRemaps(
 	createdShapeIds: Set<string>
 ) {
 	const referencedChildIds = Array.from(
-		new Set([...(branch.props.childIds || []), ...(branch.props.leftChildIds || []), ...(branch.props.rightChildIds || [])])
+		new Set([
+			...(branch.props.childIds || []),
+			...(branch.props.leftChildIds || []),
+			...(branch.props.rightChildIds || []),
+			...(branch.props.rootShapeId ? [branch.props.rootShapeId] : []),
+		])
 	)
 	const createdCandidates = Array.from(createdShapeIds)
 		.filter((id) => id !== branch.id)
@@ -267,6 +272,8 @@ function remapCreatedBranchChildren(
 	const nextChildIds = remapIds(branch.props.childIds, inferredChildren?.rightChildIds)
 	const nextLeftChildIds = remapIds(branch.props.leftChildIds, inferredChildren?.leftChildIds)
 	const nextRightChildIds = remapIds(sourceRightChildIds, inferredChildren?.rightChildIds)
+	const nextRootShapeIds = remapIds(branch.props.rootShapeId ? [branch.props.rootShapeId] : [])
+	const nextRootShapeId = nextRootShapeIds[0]
 
 	const didChange =
 		nextChildIds.length !== (branch.props.childIds || []).length ||
@@ -274,7 +281,8 @@ function remapCreatedBranchChildren(
 		nextRightChildIds.length !== (sourceRightChildIds || []).length ||
 		nextChildIds.some((id, index) => id !== (branch.props.childIds || [])[index]) ||
 		nextLeftChildIds.some((id, index) => id !== (branch.props.leftChildIds || [])[index]) ||
-		nextRightChildIds.some((id, index) => id !== (sourceRightChildIds || [])[index])
+		nextRightChildIds.some((id, index) => id !== (sourceRightChildIds || [])[index]) ||
+		nextRootShapeId !== branch.props.rootShapeId
 
 	if (!didChange) return false
 
@@ -286,6 +294,7 @@ function remapCreatedBranchChildren(
 			childIds: nextChildIds,
 			leftChildIds: nextLeftChildIds,
 			rightChildIds: nextRightChildIds,
+			rootShapeId: nextRootShapeId,
 		},
 	})
 
@@ -309,7 +318,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		if (shape.type !== 'branch') return
 
 		const branch = shape as IBranchShape
-		if ((branch.props.childIds || []).length === 0 && (branch.props.leftChildIds || []).length === 0 && (branch.props.rightChildIds || []).length === 0) {
+		if ((branch.props.childIds || []).length === 0 && (branch.props.leftChildIds || []).length === 0 && (branch.props.rightChildIds || []).length === 0 && !branch.props.rootShapeId) {
 			return
 		}
 

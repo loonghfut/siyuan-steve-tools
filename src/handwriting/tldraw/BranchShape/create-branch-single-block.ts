@@ -20,7 +20,7 @@ const DEFAULT_BRANCH_PROPS: IBranchShape['props'] = {
 	lineStyle: 'curve-solid',
 	snapDistance: 160,
 	showBackground: false,
-	version: 4,
+	version: 5,
 }
 
 function getSideChildIds(branch: IBranchShape, side: BranchChildSide) {

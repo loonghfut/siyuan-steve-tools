@@ -13,6 +13,7 @@ export type IBranchShape = TLBaseShape<
 		childIds: string[]
 		leftChildIds?: string[]
 		rightChildIds?: string[]
+		rootShapeId?: string
 		rootX?: number
 		direction: string
 		horizontalGap: number

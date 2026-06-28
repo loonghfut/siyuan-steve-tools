@@ -4,7 +4,7 @@
 import React from 'react'
 import { Editor, StylePanelDropdownPicker, TLShapeId, TldrawUiButton, TldrawUiIcon, TldrawUiSlider } from '@tldraw/tldraw'
 import type { BranchLineStyle, IBranchShape } from './branch-shape-types'
-import { detachBranchCompletely, layoutBranchChildren } from './branch-layout'
+import { detachBranchCompletely, detachBranchRootShape, layoutBranchChildren } from './branch-layout'
 
 export interface BranchStyleSectionProps {
 	editor: Editor
@@ -212,6 +212,22 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						}}
 					>
 						<TldrawUiIcon icon="branch-background" />
+					</TldrawUiButton>
+					<TldrawUiButton
+						type="normal"
+						className="tlui-toggle-button"
+						onClick={() => {
+							editor.run(() => {
+								for (const shape of selectedBranchShapes) {
+									detachBranchRootShape(editor, shape.id)
+								}
+							})
+						}}
+						title="Detach branch center content"
+						aria-label="Detach branch center content"
+						disabled={!selectedBranchShapes.some((shape) => !!shape.props.rootShapeId)}
+					>
+						<TldrawUiIcon icon="branch-detach" />
 					</TldrawUiButton>
 					<TldrawUiButton
 						type="normal"
