@@ -4,6 +4,38 @@ import { layoutBranchChildren } from './branch-layout'
 
 export type BranchChildSide = 'left' | 'right'
 
+function getSideChildIds(branch: IBranchShape, side: BranchChildSide) {
+	return side === 'left' ? branch.props.leftChildIds || [] : branch.props.rightChildIds || branch.props.childIds || []
+}
+
+function getInitialSingleBlockY(
+	editor: Editor,
+	branch: IBranchShape,
+	side: BranchChildSide,
+	rootY: number,
+	initialHeight: number
+) {
+	const sideChildIds = getSideChildIds(branch, side)
+	const verticalGap = Math.max(branch.props.verticalGap || 24, 8)
+	let maxBottom = Number.NEGATIVE_INFINITY
+
+	for (const childId of sideChildIds) {
+		const childBounds = editor.getShapePageBounds(childId as TLShapeId)
+		if (childBounds) {
+			maxBottom = Math.max(maxBottom, childBounds.y + childBounds.height)
+			continue
+		}
+
+		const child = editor.getShape(childId as TLShapeId)
+		if (!child) continue
+		const childHeight = Math.max(Number((child as any).props?.h) || 0, 0)
+		maxBottom = Math.max(maxBottom, child.y + childHeight)
+	}
+
+	if (!Number.isFinite(maxBottom)) return rootY - initialHeight / 2
+	return maxBottom + verticalGap
+}
+
 export function createSingleBlockForBranch(
 	editor: Editor,
 	branchId: TLShapeId,
@@ -17,6 +49,7 @@ export function createSingleBlockForBranch(
 	const initialWidth = 300
 	const initialHeight = 50
 	const horizontalOffset = side === 'left' ? -initialWidth - 32 : 32
+	const initialY = getInitialSingleBlockY(editor, branch, side, rootY, initialHeight)
 
 	const leftChildIds = [...(branch.props.leftChildIds || [])]
 	const rightChildIds = [...(branch.props.rightChildIds || branch.props.childIds || [])]
@@ -30,7 +63,7 @@ export function createSingleBlockForBranch(
 			id: newShapeId,
 			type: 'single-block',
 			x: rootX + horizontalOffset,
-			y: rootY - initialHeight / 2,
+			y: initialY,
 			props: {
 				w: initialWidth,
 				h: initialHeight,
