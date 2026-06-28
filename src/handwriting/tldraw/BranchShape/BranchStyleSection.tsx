@@ -227,7 +227,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						aria-label="Detach branch center content"
 						disabled={!selectedBranchShapes.some((shape) => !!shape.props.rootShapeId)}
 					>
-						<TldrawUiIcon icon="branch-detach" />
+						<TldrawUiIcon icon="ungroup" />
 					</TldrawUiButton>
 					<TldrawUiButton
 						type="normal"

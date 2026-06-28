@@ -11,6 +11,7 @@ const DETACH_DISTANCE_MULTIPLIER = 0.01
 const ATTACH_DELAY_MS = 500
 const AUTO_FRAME_MIN_CHILDREN = 2
 const ENHANCED_FRAME_PADDING = 24
+const ROOT_ATTACH_DISTANCE_MULTIPLIER = 0.45
 const activeBranchDragShapeIds = new Set<string>()
 const pendingBranchDragShapes = new Map<string, TLShape>()
 const syncingRootContentMoveIds = new Set<string>()
@@ -329,7 +330,7 @@ function getBranchRootShapeCandidate(
 
 		const root = getBranchRootPagePoint(branch)
 		const distance = distanceBetweenPoints(shapeCenter, root)
-		const snapDistance = Math.max(branch.props.snapDistance || 140, 40)
+		const snapDistance = Math.max((branch.props.snapDistance || 140) * ROOT_ATTACH_DISTANCE_MULTIPLIER, 36)
 		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
 			nearestAttach = { mode: 'attach-root-to-branch', branch, distance }
 		}
@@ -400,7 +401,7 @@ function getNearestRootShapeForDraggingBranch(
 		if (!candidateBounds) continue
 
 		const distance = distanceBetweenPoints(root, { x: candidateBounds.centerX, y: candidateBounds.centerY })
-		const snapDistance = Math.max(draggingBranch.props.snapDistance || 140, 40)
+		const snapDistance = Math.max((draggingBranch.props.snapDistance || 140) * ROOT_ATTACH_DISTANCE_MULTIPLIER, 36)
 		if (distance > snapDistance) continue
 
 		if (!nearestAttach || distance < nearestAttach.distance) {
@@ -1155,7 +1156,13 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 	const shapeBounds = getPageBounds(editor, shape)
 
 	const nearestRootAttachToBranch = getBranchRootShapeCandidate(editor, shape, branches, shapeBounds)
-	const nearestAttachToBranch = nearestRootAttachToBranch || getNearestAttachCandidate(editor, shape, branches, shapeBounds)
+	const nearestSideAttachToBranch = getNearestAttachCandidate(editor, shape, branches, shapeBounds)
+	const nearestAttachToBranch =
+		nearestRootAttachToBranch && nearestSideAttachToBranch
+			? nearestRootAttachToBranch.distance <= nearestSideAttachToBranch.distance
+				? nearestRootAttachToBranch
+				: nearestSideAttachToBranch
+			: nearestRootAttachToBranch || nearestSideAttachToBranch
 	const nearestShapeToDraggingBranch =
 		shape.type === 'branch'
 			? getNearestRootShapeForDraggingBranch(editor, shape as IBranchShape, pageShapes) || getNearestShapeForDraggingBranch(editor, shape as IBranchShape, pageShapes)

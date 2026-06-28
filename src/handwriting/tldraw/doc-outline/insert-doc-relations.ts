@@ -3,7 +3,7 @@ import { api } from '@frostime/siyuan-plugin-kits'
 import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
-import { getAllBranchAttachedShapeIds, getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
+import { getAllBranchAttachedShapeIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
 import type { BranchLineStyle } from '../BranchShape/branch-shape-types'
 import { buildTldrawLink } from '../utils/link-builder'
 
@@ -130,8 +130,12 @@ function replaceChildId(ids: string[] | undefined, oldChildId: string, newChildI
 }
 
 function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: string, newChildId: string) {
+	const wasRootChild = branch.props.rootShapeId === oldChildId
 	const leftChildIds = replaceChildId(branch.props.leftChildIds, oldChildId, newChildId)
 	const rightChildIds = replaceChildId(branch.props.rightChildIds || branch.props.childIds, oldChildId, newChildId)
+	if (wasRootChild && !leftChildIds.includes(newChildId) && !rightChildIds.includes(newChildId)) {
+		rightChildIds.push(newChildId)
+	}
 
 	editor.updateShape<IBranchShape>({
 		id: branch.id,
@@ -141,7 +145,7 @@ function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: 
 			childIds: rightChildIds,
 			leftChildIds,
 			rightChildIds,
-			rootShapeId: branch.props.rootShapeId === oldChildId ? newChildId : branch.props.rootShapeId,
+			rootShapeId: wasRootChild ? undefined : branch.props.rootShapeId,
 		},
 	})
 }
