@@ -1,6 +1,12 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape } from './branch-shape-types'
-import { isBranchConnectableShape, layoutBranchChildren, pruneShapeFromBranches, relayoutBranchesContainingShapes } from './branch-layout'
+import {
+	getAllBranchChildIds,
+	isBranchConnectableShape,
+	layoutBranchChildren,
+	pruneShapeFromBranches,
+	relayoutBranchesContainingShapes,
+} from './branch-layout'
 
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 const REGISTERED_EDITORS = new WeakSet<Editor>()
@@ -47,6 +53,78 @@ function getShapeBounds(shape: TLShape) {
 		w,
 		h,
 		centerY: shape.y + h / 2,
+	}
+}
+
+function isPromotableBranchChild(shape: TLShape | undefined) {
+	return !!shape && (shape.type === 'card' || shape.type === 'single-block')
+}
+
+function replaceChildId(ids: string[] | undefined, deletedId: string, replacementId: string) {
+	const sourceIds = ids || []
+	const nextIds: string[] = []
+	let didReplace = false
+
+	for (const id of sourceIds) {
+		if (id === deletedId) {
+			if (!nextIds.includes(replacementId)) nextIds.push(replacementId)
+			didReplace = true
+			continue
+		}
+
+		if (id === replacementId && nextIds.includes(replacementId)) continue
+		nextIds.push(id)
+	}
+
+	return { nextIds, didReplace }
+}
+
+function promoteOnlyChildOfDeletedBranch(editor: Editor, deletedBranch: IBranchShape) {
+	const childIds = getAllBranchChildIds(deletedBranch)
+	if (childIds.length !== 1) return
+
+	const promotedChildId = childIds[0]
+	const promotedChild = editor.getShape(promotedChildId as TLShapeId)
+	if (!isPromotableBranchChild(promotedChild)) return
+
+	const affectedParentIds = new Set<TLShapeId>()
+	const deletedBranchId = deletedBranch.id as string
+
+	for (const candidate of editor.getCurrentPageShapes()) {
+		if (candidate.type !== 'branch' || candidate.id === deletedBranch.id) continue
+
+		const parentBranch = candidate as IBranchShape
+		const leftResult = replaceChildId(parentBranch.props.leftChildIds, deletedBranchId, promotedChildId)
+		const rightResult = replaceChildId(
+			parentBranch.props.rightChildIds || parentBranch.props.childIds || [],
+			deletedBranchId,
+			promotedChildId
+		)
+
+		if (!leftResult.didReplace && !rightResult.didReplace) continue
+
+		editor.updateShape<IBranchShape>({
+			id: parentBranch.id,
+			type: 'branch',
+			props: {
+				...parentBranch.props,
+				childIds: rightResult.nextIds,
+				leftChildIds: leftResult.nextIds,
+				rightChildIds: rightResult.nextIds,
+			},
+		})
+		affectedParentIds.add(parentBranch.id)
+	}
+
+	for (const parentId of affectedParentIds) {
+		const updatedParent = editor.getShape<IBranchShape>(parentId)
+		if (updatedParent?.type === 'branch') {
+			layoutBranchChildren(editor, updatedParent)
+		}
+	}
+
+	if (affectedParentIds.size > 0) {
+		relayoutBranchesContainingShapes(editor, [promotedChildId as TLShapeId, ...Array.from(affectedParentIds)])
 	}
 }
 
@@ -219,7 +297,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 	REGISTERED_EDITORS.add(editor)
 
 	let pendingShapeIds = new Set<string>()
-	let pendingDeletedShapeIds = new Set<string>()
+	let pendingDeletedShapes = new Map<string, TLShape>()
 	let pendingCreatedShapeIds = new Set<string>()
 	let pendingCreatedBranchIds = new Set<string>()
 	let isUpdating = false
@@ -249,14 +327,14 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		if (source === 'remote' || isUpdating) return
 		if (!BRANCH_CHILD_TYPES.has(shape.type)) return
 
-		pendingDeletedShapeIds.add(shape.id as string)
+		pendingDeletedShapes.set(shape.id as string, shape)
 	})
 
 	editor.sideEffects.registerOperationCompleteHandler(() => {
 		if (
 			(
 				pendingShapeIds.size === 0 &&
-				pendingDeletedShapeIds.size === 0 &&
+				pendingDeletedShapes.size === 0 &&
 				pendingCreatedShapeIds.size === 0 &&
 				pendingCreatedBranchIds.size === 0
 			) ||
@@ -266,11 +344,11 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		}
 
 		const shapeIds = Array.from(pendingShapeIds)
-		const deletedShapeIds = Array.from(pendingDeletedShapeIds)
+		const deletedShapes = Array.from(pendingDeletedShapes.values())
 		const createdShapeIds = new Set(pendingCreatedShapeIds)
 		const createdBranchIds = Array.from(pendingCreatedBranchIds)
 		pendingShapeIds = new Set()
-		pendingDeletedShapeIds = new Set()
+		pendingDeletedShapes = new Map()
 		pendingCreatedShapeIds = new Set()
 		pendingCreatedBranchIds = new Set()
 		isUpdating = true
@@ -288,8 +366,11 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 				}
 			}
 
-			for (const shapeId of deletedShapeIds) {
-				pruneShapeFromBranches(editor, shapeId as TLShapeId)
+			for (const shape of deletedShapes) {
+				if (shape.type === 'branch') {
+					promoteOnlyChildOfDeletedBranch(editor, shape as IBranchShape)
+				}
+				pruneShapeFromBranches(editor, shape.id as TLShapeId)
 			}
 
 			if (shapeIds.length > 0) {
