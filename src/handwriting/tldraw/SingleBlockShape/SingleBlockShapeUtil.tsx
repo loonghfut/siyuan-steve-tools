@@ -39,6 +39,8 @@ import { cancelIdleRender } from '../utils/idle-scheduler'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
+	createSiblingSingleInBranch,
+	getSingleBranchParent,
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
 	updateBranchAttachmentAfterDrag,
@@ -926,6 +928,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 						; (event as any).returnValue = false
 					} catch (e) {
 						// ignore
+					}
+					const branchParentInfo = !event.ctrlKey && !event.metaKey ? getSingleBranchParent(editor, shape.id) : null
+					if (branchParentInfo) {
+						const newId = createSiblingSingleInBranch(editor, shape.id)
+						if (!newId) return
+						editor.select(newId)
+						editor.setEditingShape(newId)
+						requestAnimationFrame(() => ensureShapeVisible(newId))
+						return
 					}
 					const offset = 40
 					const width = shape.props.w

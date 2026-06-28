@@ -34,7 +34,13 @@ type Bounds = {
 	centerY: number
 }
 
-type BranchSide = 'left' | 'right'
+export type BranchSide = 'left' | 'right'
+
+export type SingleBranchParentInfo = {
+	branch: IBranchShape
+	side: BranchSide
+	index: number
+}
 
 type BranchChildEntry = { shape: BranchChildShape; bounds: Bounds }
 
@@ -340,6 +346,28 @@ function getChildSideInBranch(branch: IBranchShape, childId: string): BranchSide
 	if ((branch.props.leftChildIds || []).includes(childId)) return 'left'
 	if ((branch.props.rightChildIds || branch.props.childIds || []).includes(childId)) return 'right'
 	return null
+}
+
+export function getSingleBranchParent(editor: Editor, singleId: TLShapeId): SingleBranchParentInfo | null {
+	const matches = getCurrentBranches(editor)
+		.map((branch) => {
+			const side = getChildSideInBranch(branch, singleId as string)
+			if (!side) return null
+
+			const sideChildIds = getSideChildIds(branch, side)
+			const index = sideChildIds.indexOf(singleId as string)
+			if (index === -1) return null
+
+			return {
+				branch,
+				side,
+				index,
+			}
+		})
+		.filter(Boolean) as SingleBranchParentInfo[]
+
+	if (matches.length !== 1) return null
+	return matches[0]
 }
 
 function getOppositeBranchSide(side: BranchSide): BranchSide {
