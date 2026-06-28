@@ -301,7 +301,7 @@ function canBranchWrapRootShape(editor: Editor, branch: IBranchShape, shape: TLS
 	return true
 }
 
-function getBranchWithRootShape(editor: Editor, shapeId: TLShapeId | string, branches = getCurrentBranches(editor)) {
+export function getBranchRootParent(editor: Editor, shapeId: TLShapeId | string, branches = getCurrentBranches(editor)) {
 	const id = shapeId as string
 	return branches.find((branch) => branch.props.rootShapeId === id) || null
 }
@@ -317,6 +317,7 @@ function getBranchRootShapeCandidate(
 	shapeBounds = getPageBounds(editor, shape)
 ): BranchRootAttachCandidate | null {
 	if (!isBranchRootContentShape(shape) || !shapeBounds) return null
+	if (getBranchRootParent(editor, shape.id, branches)) return null
 
 	let nearestAttach: BranchRootAttachCandidate | null = null
 	const shapeCenter = { x: shapeBounds.centerX, y: shapeBounds.centerY }
@@ -395,7 +396,7 @@ function getNearestRootShapeForDraggingBranch(
 		if (!canBranchWrapRootShape(editor, draggingBranch, candidate)) continue
 		if (selectedDragIds.has(candidate.id as string)) continue
 		if (descendantIds.has(candidate.id as string)) continue
-		if (getBranchWithRootShape(editor, candidate.id)) continue
+		if (getBranchRootParent(editor, candidate.id)) continue
 
 		const candidateBounds = getPageBounds(editor, candidate)
 		if (!candidateBounds) continue
@@ -668,7 +669,7 @@ export function syncBranchMoveForRootContent(editor: Editor, prev: TLShape, next
 	if (syncingRootContentMoveIds.has(next.id as string)) return false
 	if (prev.x === next.x && prev.y === next.y) return false
 
-	const branch = getBranchWithRootShape(editor, next.id)
+	const branch = getBranchRootParent(editor, next.id)
 	if (!branch) return false
 
 	const dx = next.x - prev.x
@@ -1102,7 +1103,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			continue
 		}
 
-		const rootParentBranch = getBranchWithRootShape(editor, childId, currentBranches)
+		const rootParentBranch = getBranchRootParent(editor, childId, currentBranches)
 		if (rootParentBranch) {
 			affectedBranchIds.add(rootParentBranch.id)
 			didHandle = true

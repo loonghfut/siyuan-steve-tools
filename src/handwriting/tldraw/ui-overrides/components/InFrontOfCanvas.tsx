@@ -23,7 +23,7 @@ import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
 import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
-import { createSingleBlockForBranch } from '../../BranchShape'
+import { createSingleBlockForBranch, getBranchRootParent } from '../../BranchShape'
 
 export const InFrontOfCanvas: React.FC = () => {
     const editor = useEditor()
@@ -92,6 +92,11 @@ export const InFrontOfCanvas: React.FC = () => {
         'selected card shapes',
         () => editor.getSelectedShapes().filter((shape): shape is ICardShape => shape.type === 'card'),
         [editor]
+    )
+    const rootParentBranch = useValue(
+        'selected root parent branch',
+        () => (isCardOrBlock && selectedShape ? getBranchRootParent(editor, selectedShape.id) : null),
+        [editor, selectedShape?.id, isCardOrBlock]
     )
 
     // 手形工具点击跳转功能
@@ -234,6 +239,7 @@ export const InFrontOfCanvas: React.FC = () => {
         Code: () => <TldrawUiIcon icon="code" small />,
         Zap: () => <TldrawUiIcon icon="arrow-cycle" small />,
         MousePointer: () => <TldrawUiIcon icon="tool-hand" small />,
+        SelectBranch: () => <TldrawUiIcon icon="tool-pointer" small />,
         BranchAddLeft: () => <TldrawUiIcon icon="branch-add-left" />,
         BranchAddRight: () => <TldrawUiIcon icon="branch-add-right" />,
     }
@@ -314,6 +320,17 @@ export const InFrontOfCanvas: React.FC = () => {
                     )}
                     {isCardOrBlock && (
                         <>
+                            {rootParentBranch && (
+                                <HoverButton
+                                    style={buttonStyle}
+                                    onClick={() => {
+                                        editor.select(rootParentBranch.id)
+                                    }}
+                                    title="选中中心所属 Branch"
+                                >
+                                    <Icons.SelectBranch />
+                                </HoverButton>
+                            )}
                             <HoverButton
                                 style={buttonStyle}
                                 onClick={() => {
