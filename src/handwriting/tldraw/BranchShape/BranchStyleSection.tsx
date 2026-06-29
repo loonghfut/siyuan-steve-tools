@@ -4,7 +4,7 @@
 import React from 'react'
 import { Editor, StylePanelDropdownPicker, TLShapeId, TldrawUiButton, TldrawUiIcon, TldrawUiSlider } from '@tldraw/tldraw'
 import type { BranchLineStyle, IBranchShape } from './branch-shape-types'
-import { detachBranchCompletely, detachBranchRootShape, layoutBranchChildren } from './branch-layout'
+import { detachBranchCompletely, detachBranchRootShape, layoutBranchChildren, relayoutBranchesContainingShapes } from './branch-layout'
 
 export interface BranchStyleSectionProps {
 	editor: Editor
@@ -46,11 +46,17 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 				if (branchIds.length === 0) return
 
 				editor.run(() => {
+					const laidOutBranchIds: TLShapeId[] = []
 					for (const branchId of branchIds) {
 						const latestShape = editor.getShape(branchId as TLShapeId) as IBranchShape | undefined
 						if (latestShape?.type === 'branch') {
 							layoutBranchChildren(editor, latestShape)
+							laidOutBranchIds.push(latestShape.id)
 						}
+					}
+
+					if (laidOutBranchIds.length > 0) {
+						relayoutBranchesContainingShapes(editor, laidOutBranchIds)
 					}
 				})
 			}
@@ -108,14 +114,18 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 		) => {
 			editor.run(() => {
 				editor.updateShapes(
-					selectedBranchShapes.map((shape) => ({
-						id: shape.id,
-						type: 'branch',
-						props: {
-							...shape.props,
-							...propsBuilder(shape),
-						},
-					}))
+					selectedBranchShapes
+						.map((shape) => {
+							const latestShape = editor.getShape(shape.id) as IBranchShape | undefined
+							if (latestShape?.type !== 'branch') return null
+
+							return {
+								id: latestShape.id,
+								type: 'branch',
+								props: propsBuilder(latestShape),
+							}
+						})
+						.filter((update): update is { id: TLShapeId; type: 'branch'; props: Partial<IBranchShape['props']> } => !!update)
 				)
 
 				if (options?.relayout) queueBranchRelayout(selectedBranchShapes)

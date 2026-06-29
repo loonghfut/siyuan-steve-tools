@@ -296,7 +296,7 @@ function getBranchRootContent(editor: Editor, branch: IBranchShape) {
 	return { shape, bounds }
 }
 
-function canBranchWrapRootShape(editor: Editor, branch: IBranchShape, shape: TLShape | undefined) {
+function canBranchWrapRootShape(branch: IBranchShape, shape: TLShape | undefined) {
 	if (!isBranchRootContentShape(shape)) return false
 	if (branch.id === shape.id) return false
 	if (branch.props.rootShapeId && branch.props.rootShapeId !== shape.id) return false
@@ -325,7 +325,7 @@ function getBranchRootShapeCandidate(
 	const shapeCenter = { x: shapeBounds.centerX, y: shapeBounds.centerY }
 
 	for (const branch of branches) {
-		if (!canBranchWrapRootShape(editor, branch, shape)) continue
+		if (!canBranchWrapRootShape(branch, shape)) continue
 
 		const currentRootShapeId = branch.props.rootShapeId
 		const alreadyRoot = currentRootShapeId === shape.id
@@ -395,7 +395,7 @@ function getNearestRootShapeForDraggingBranch(
 	let nearestAttach: BranchRootAttachCandidate | null = null
 
 	for (const candidate of pageShapes) {
-		if (!canBranchWrapRootShape(editor, draggingBranch, candidate)) continue
+		if (!canBranchWrapRootShape(draggingBranch, candidate)) continue
 		if (selectedDragIds.has(candidate.id as string)) continue
 		if (descendantIds.has(candidate.id as string)) continue
 		if (getBranchRootParent(editor, candidate.id)) continue
@@ -1012,7 +1012,7 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			const attachChildId = (attachTargetShape?.id as string) || childId
 
 			if (preview.slot === 'root') {
-				if (!canBranchWrapRootShape(editor, nearest, childShape)) continue
+				if (!canBranchWrapRootShape(nearest, childShape)) continue
 				const nearestDraft = getBranchDraft(editor, drafts, nearest)
 				if (nearestDraft.rootShapeId && nearestDraft.rootShapeId !== attachChildId) continue
 				if (nearestDraft.rootShapeId === attachChildId) {
@@ -1351,6 +1351,7 @@ export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
 		if (updatedBranch) {
 			layoutBranchChildren(editor, updatedBranch)
 			relayoutSourceIds.add(updatedBranch.id)
+			if (updatedBranch.props.rootShapeId) relayoutSourceIds.add(updatedBranch.props.rootShapeId as TLShapeId)
 		}
 	}
 
