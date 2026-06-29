@@ -44,6 +44,7 @@ const CUSTOM_ICONS: Record<string, string> = {
     'arrange-down': 'arrange-down.svg',
     'arrange-left': 'arrange-left.svg',
     'arrange-right': 'arrange-right.svg',
+    'fit-width': 'fit-width.svg',
     'slide-focus': 'slide-focus.svg',
     'slide-exit-focus': 'slide-exit-focus.svg',
     'copy-link-custom': 'copy-link.svg',

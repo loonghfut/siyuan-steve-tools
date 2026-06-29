@@ -5,6 +5,7 @@ import React from 'react'
 import { TldrawUiButton, TldrawUiIcon, Editor } from '@tldraw/tldraw'
 import type { ISingleBlockShape } from './single-block-shape-types'
 import { arrangeConnectedSingleBlocks } from '../utils/arrangeSingleBlocks'
+import { fitSingleBlockWidth } from '../utils/fitSingleBlockWidth'
 import { ConnectionModeManager } from '../utils/connectionMode'
 
 export interface SingleBlockStyleSectionProps {
@@ -172,6 +173,18 @@ export const SingleBlockStyleSection: React.FC<SingleBlockStyleSectionProps> = (
                                 }}
                             >
                                 <TldrawUiIcon icon="binding-link" />
+                            </TldrawUiButton>
+
+                            <TldrawUiButton
+                                type="normal"
+                                className="tlui-toggle-button"
+                                onClick={() => {
+                                    fitSingleBlockWidth(editor, selectedSingleBlockShapes)
+                                }}
+                                title="自适应调整宽度：根据内容自动收紧块宽度"
+                                aria-label="自适应宽度"
+                            >
+                                <TldrawUiIcon icon="fit-width" />
                             </TldrawUiButton>
                         </div>
                     </div>
