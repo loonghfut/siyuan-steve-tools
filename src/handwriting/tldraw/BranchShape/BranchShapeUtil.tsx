@@ -315,7 +315,12 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	override onBeforeUpdate(prev: IBranchShape, next: IBranchShape) {
 		if (!translatingBranchIds.has(next.id) || (prev.x === next.x && prev.y === next.y)) return
 
-		setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
+		setBranchInteractionHint(
+			getBranchInteractionHintForShape(this.editor, next) || {
+				mode: 'move-branch',
+				branchId: next.id as string,
+			}
+		)
 
 		if (syncingBranchMoveIds.has(next.id as string)) return
 

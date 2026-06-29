@@ -29,6 +29,7 @@ import {
 	setBranchInteractionHint,
 	syncBranchMoveForRootContent,
 	updateBranchAttachmentAfterDrag,
+	useBranchInteractionHint,
 } from '../BranchShape'
 
 let isCreatingBlock = false;
@@ -211,8 +212,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		}
 
 		if (draggingBranchCardIds.has(next.id as string) && (prev.x !== next.x || prev.y !== next.y)) {
-			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 			syncBranchMoveForRootContent(this.editor, prev, next)
+			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 		}
 	}
 
@@ -248,6 +249,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// const bounds = this.editor.getShapeGeometry(shape).bounds
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
+		const branchInteractionHint = useBranchInteractionHint()
+		const isRootAttachTarget =
+			branchInteractionHint?.mode === 'attach' &&
+			branchInteractionHint.slot === 'root' &&
+			(branchInteractionHint.targetShapeId === shape.id ||
+				(!branchInteractionHint.targetShapeId && branchInteractionHint.draggingShapeId === shape.id))
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		const [isInViewport, setIsInViewport] = useState(true);
 		const [canLoad, setCanLoad] = useState(true); // gating heavy render by global manager
@@ -1418,7 +1425,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					width: '100%',
 					height: '100%',
 					overflow: 'visible', // 改为 visible 以显示端口
-					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
+					boxShadow: isRootAttachTarget
+						? '0 0 0 4px rgba(34, 197, 94, 0.42), 0 0 20px rgba(34, 197, 94, 0.32)'
+						: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
 					border: settingdata["showCardBorder"] ? `3px solid ${theme[shape.props.color].solid}` : 'none', // 添加颜色边框

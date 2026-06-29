@@ -55,6 +55,7 @@ export function setBranchInteractionHint(nextHint: BranchInteractionHint | null)
 		prev?.branchId === nextHint?.branchId &&
 		(prev as any)?.draggingShapeId === (nextHint as any)?.draggingShapeId &&
 		(prev as any)?.side === (nextHint as any)?.side &&
+		(prev as any)?.slot === (nextHint as any)?.slot &&
 		(prev as any)?.targetShapeId === (nextHint as any)?.targetShapeId
 
 	if (isSame) return

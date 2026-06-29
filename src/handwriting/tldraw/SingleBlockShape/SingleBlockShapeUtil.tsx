@@ -45,6 +45,7 @@ import {
 	setBranchInteractionHint,
 	syncBranchMoveForRootContent,
 	updateBranchAttachmentAfterDrag,
+	useBranchInteractionHint,
 } from '../BranchShape'
 
 const draggingBranchSingleBlockIds = new Set<string>()
@@ -346,8 +347,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		}
 
 		if (draggingBranchSingleBlockIds.has(next.id as string) && (prev.x !== next.x || prev.y !== next.y)) {
-			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 			syncBranchMoveForRootContent(this.editor, prev, next)
+			setBranchInteractionHint(getBranchInteractionHintForShape(this.editor, next))
 		}
 
 		// 当从允许绑定切换到不允许绑定时，删除已有的 single-block 类型的绑定
@@ -391,6 +392,12 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// 保存 editor 引用供 useSingleBlockSize hook 使用
 		const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 		const isEditing = editor.getEditingShapeId() === shape.id
+		const branchInteractionHint = useBranchInteractionHint()
+		const isRootAttachTarget =
+			branchInteractionHint?.mode === 'attach' &&
+			branchInteractionHint.slot === 'root' &&
+			(branchInteractionHint.targetShapeId === shape.id ||
+				(!branchInteractionHint.targetShapeId && branchInteractionHint.draggingShapeId === shape.id))
 		const [isEditingState, setIsEditingState] = useState(isEditing)
 		const [isInViewport, setIsInViewport] = useState(true)
 		const [canLoad, setCanLoad] = useState(true)
@@ -1177,7 +1184,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					width: '100%',
 					height: '100%',
 					overflow: 'visible', // 改为 visible 以显示端口
-					boxShadow: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
+					boxShadow: isRootAttachTarget
+						? '0 0 0 4px rgba(34, 197, 94, 0.42), 0 0 20px rgba(34, 197, 94, 0.32)'
+						: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
 					border: settingdata["showCardBorder"] ? (shape.props.transparentBackground ? 'none' : `${borderPx}px solid ${theme[shape.props.color].solid}`) : 'none',
