@@ -60,18 +60,9 @@ type BranchAttachToBranchCandidate = {
 	distance: number
 }
 
-type BranchAbsorbShapeCandidate = {
-	mode: 'attach-shape-to-dragging-branch'
-	branch: IBranchShape
-	side: BranchSide
-	targetShape: TLShape
-	distance: number
-}
-
 type BranchRootAttachCandidate = {
 	mode: 'attach-root-to-branch'
 	branch: IBranchShape
-	targetShape?: TLShape
 	distance: number
 }
 
@@ -145,20 +136,6 @@ function canAttachShapeToBranch(editor: Editor, branch: IBranchShape, shape: TLS
 	return !isDescendantBranch(editor, shape.id as string, branch.id as string)
 }
 
-function getBranchDescendantIds(editor: Editor, branch: IBranchShape, visited = new Set<string>()) {
-	for (const childId of getAllBranchAttachedShapeIds(branch)) {
-		if (visited.has(childId)) continue
-		visited.add(childId)
-
-		const child = editor.getShape(childId as TLShapeId)
-		if (child?.type === 'branch') {
-			getBranchDescendantIds(editor, child as IBranchShape, visited)
-		}
-	}
-
-	return visited
-}
-
 function nowMs() {
 	return typeof performance !== 'undefined' ? performance.now() : Date.now()
 }
@@ -183,13 +160,12 @@ function clearDelayedAttachCandidate(shapeId?: string) {
 function getAttachCandidateKey(
 	attach:
 		| BranchAttachToBranchCandidate
-		| BranchAbsorbShapeCandidate
 		| BranchRootAttachCandidate
 		| { branch: IBranchShape; side?: BranchSide; slot?: BranchAttachmentSlot; mode?: 'attach-to-branch'; targetShapeId?: string }
 ) {
 	const mode = attach.mode ?? 'attach-to-branch'
 	const targetShapeId =
-		'targetShape' in attach ? attach.targetShape.id : 'targetShapeId' in attach ? attach.targetShapeId : undefined
+		'targetShapeId' in attach ? attach.targetShapeId : undefined
 	const side = 'side' in attach ? attach.side : undefined
 	const slot = 'slot' in attach ? attach.slot : undefined
 	return targetShapeId
@@ -199,7 +175,7 @@ function getAttachCandidateKey(
 
 function isDelayedAttachReady(
 	shape: TLShape,
-	attach: BranchAttachToBranchCandidate | BranchAbsorbShapeCandidate | BranchRootAttachCandidate,
+	attach: BranchAttachToBranchCandidate | BranchRootAttachCandidate,
 	scheduleHint: boolean,
 	draggingShapeId = shape.id as string
 ) {
@@ -207,10 +183,6 @@ function isDelayedAttachReady(
 	const key = getAttachCandidateKey(attach)
 	const current = delayedAttachCandidates.get(shapeId)
 	const now = nowMs()
-	const targetShapeId =
-		attach.mode === 'attach-shape-to-dragging-branch' || (attach.mode === 'attach-root-to-branch' && attach.targetShape)
-			? (attach.targetShape.id as string)
-			: undefined
 	const slot: BranchAttachmentSlot = attach.mode === 'attach-root-to-branch' ? 'root' : 'side'
 
 	if (!current || current.key !== key) {
@@ -221,7 +193,7 @@ function isDelayedAttachReady(
 			branchId: attach.branch.id as string,
 			side: 'side' in attach ? attach.side : undefined,
 			slot,
-			targetShapeId,
+			targetShapeId: undefined,
 			timeoutId: null as ReturnType<typeof setTimeout> | null,
 		}
 
@@ -336,84 +308,6 @@ function getBranchRootShapeCandidate(
 		const snapDistance = Math.max((branch.props.snapDistance || 140) * ROOT_ATTACH_DISTANCE_MULTIPLIER, 36)
 		if (distance <= snapDistance && (!nearestAttach || distance < nearestAttach.distance)) {
 			nearestAttach = { mode: 'attach-root-to-branch', branch, distance }
-		}
-	}
-
-	return nearestAttach
-}
-
-function getNearestShapeForDraggingBranch(
-	editor: Editor,
-	draggingBranch: IBranchShape,
-	pageShapes = editor.getCurrentPageShapes()
-): BranchAbsorbShapeCandidate | null {
-	const branchId = draggingBranch.id as string
-	const selectedDragIds = new Set(activeBranchDragShapeIds)
-	selectedDragIds.add(branchId)
-	const descendantIds = getBranchDescendantIds(editor, draggingBranch)
-
-	let nearestAttach: BranchAbsorbShapeCandidate | null = null
-
-	for (const candidate of pageShapes) {
-		if (!isBranchAbsorbableShape(candidate)) continue
-		if (selectedDragIds.has(candidate.id as string)) continue
-		if (descendantIds.has(candidate.id as string)) continue
-
-		const candidateBounds = getPageBounds(editor, candidate)
-		const side = getBranchSideForShape(editor, draggingBranch, candidate, candidateBounds)
-		if (!canBranchAbsorbShapeOnSide(editor, draggingBranch, side)) continue
-		const distance = distanceToBranchRoot(editor, draggingBranch, candidate, side, candidateBounds)
-		const snapDistance = Math.max(draggingBranch.props.snapDistance || 140, 40)
-		if (distance > snapDistance) continue
-
-		if (!nearestAttach || distance < nearestAttach.distance) {
-			nearestAttach = {
-				mode: 'attach-shape-to-dragging-branch',
-				branch: draggingBranch,
-				side,
-				targetShape: candidate,
-				distance,
-			}
-		}
-	}
-
-	return nearestAttach
-}
-
-function getNearestRootShapeForDraggingBranch(
-	editor: Editor,
-	draggingBranch: IBranchShape,
-	pageShapes = editor.getCurrentPageShapes()
-): BranchRootAttachCandidate | null {
-	if (draggingBranch.props.rootShapeId) return null
-
-	const branchId = draggingBranch.id as string
-	const selectedDragIds = new Set(activeBranchDragShapeIds)
-	selectedDragIds.add(branchId)
-	const descendantIds = getBranchDescendantIds(editor, draggingBranch)
-	const root = getBranchRootPagePoint(draggingBranch)
-	let nearestAttach: BranchRootAttachCandidate | null = null
-
-	for (const candidate of pageShapes) {
-		if (!canBranchWrapRootShape(draggingBranch, candidate)) continue
-		if (selectedDragIds.has(candidate.id as string)) continue
-		if (descendantIds.has(candidate.id as string)) continue
-		if (getBranchRootParent(editor, candidate.id)) continue
-
-		const candidateBounds = getPageBounds(editor, candidate)
-		if (!candidateBounds) continue
-
-		const distance = distanceBetweenPoints(root, { x: candidateBounds.centerX, y: candidateBounds.centerY })
-		const snapDistance = Math.max((draggingBranch.props.snapDistance || 140) * ROOT_ATTACH_DISTANCE_MULTIPLIER, 36)
-		if (distance > snapDistance) continue
-
-		if (!nearestAttach || distance < nearestAttach.distance) {
-			nearestAttach = {
-				mode: 'attach-root-to-branch',
-				branch: draggingBranch,
-				targetShape: candidate,
-				distance,
-			}
 		}
 	}
 
@@ -1151,7 +1045,6 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 	const scheduleAttachHint = options?.scheduleAttachHint ?? true
 	const draggingShapeId = options?.draggingShapeId ?? (shape.id as string)
 	const branches = options?.branches ?? getCurrentBranches(editor)
-	const pageShapes = options?.pageShapes ?? editor.getCurrentPageShapes()
 	const parentsByChildId = options?.parentsByChildId
 	const shapeBounds = getPageBounds(editor, shape)
 
@@ -1163,17 +1056,7 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 				? nearestRootAttachToBranch
 				: nearestSideAttachToBranch
 			: nearestRootAttachToBranch || nearestSideAttachToBranch
-	const nearestShapeToDraggingBranch =
-		shape.type === 'branch'
-			? getNearestRootShapeForDraggingBranch(editor, shape as IBranchShape, pageShapes) || getNearestShapeForDraggingBranch(editor, shape as IBranchShape, pageShapes)
-			: null
-
-	const nearestAttach =
-		nearestAttachToBranch && nearestShapeToDraggingBranch
-			? nearestAttachToBranch.distance <= nearestShapeToDraggingBranch.distance
-				? nearestAttachToBranch
-				: nearestShapeToDraggingBranch
-			: nearestAttachToBranch || nearestShapeToDraggingBranch
+	const nearestAttach = nearestAttachToBranch
 
 	if (nearestAttach) {
 		if (!isDelayedAttachReady(shape, nearestAttach, scheduleAttachHint, draggingShapeId)) return null
@@ -1183,24 +1066,15 @@ export function getBranchDragPreview(editor: Editor, shape: TLShape, options?: B
 				mode: 'attach',
 				branch: nearestAttach.branch,
 				slot: 'root',
-				targetShapeId: nearestAttach.targetShape?.id as string | undefined,
 			}
 		}
 
-		return nearestAttach.mode === 'attach-shape-to-dragging-branch'
-			? {
-					mode: 'attach',
-					branch: nearestAttach.branch,
-					side: nearestAttach.side,
-					slot: 'side',
-					targetShapeId: nearestAttach.targetShape.id as string,
-			  }
-			: {
-					mode: 'attach',
-					branch: nearestAttach.branch,
-					side: nearestAttach.side,
-					slot: 'side',
-			  }
+		return {
+			mode: 'attach',
+			branch: nearestAttach.branch,
+			side: nearestAttach.side,
+			slot: 'side',
+		}
 	}
 
 	clearDelayedAttachCandidate(draggingShapeId)
