@@ -742,9 +742,9 @@ export class TldrawManager {
                             }
                         });
 
-                        // 每次新建的 slide 形状默认在最底层
+                        // 每次新建的 slide/frame/branch 形状默认在最底层
                         editor.sideEffects.registerAfterCreateHandler('shape', (shape) => {
-                            if (shape.type === 'slide' || shape.type === 'frame') {
+                            if (shape.type === 'slide' || shape.type === 'frame' || shape.type === 'branch') {
                                 editor.sendToBack([shape.id]);
                             }
                         });
