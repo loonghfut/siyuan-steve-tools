@@ -321,6 +321,34 @@ export const InFrontOfCanvas: React.FC = () => {
                     {isCardOrBlock && (
                         <>
                             {rootParentBranch && (
+                                <>
+                                    <HoverButton
+                                        style={buttonStyle}
+                                        onClick={() => {
+                                            const newShapeId = createSingleBlockForBranch(editor, rootParentBranch.id, 'left')
+                                            if (!newShapeId) {
+                                                showMessage('宸︿晶娣诲姞鍗曞潡澶辫触', 3000, 'error')
+                                            }
+                                        }}
+                                        title="宸︿晶娣诲姞鍗曞潡"
+                                    >
+                                        <Icons.BranchAddLeft />
+                                    </HoverButton>
+                                    <HoverButton
+                                        style={buttonStyle}
+                                        onClick={() => {
+                                            const newShapeId = createSingleBlockForBranch(editor, rootParentBranch.id, 'right')
+                                            if (!newShapeId) {
+                                                showMessage('鍙充晶娣诲姞鍗曞潡澶辫触', 3000, 'error')
+                                            }
+                                        }}
+                                        title="鍙充晶娣诲姞鍗曞潡"
+                                    >
+                                        <Icons.BranchAddRight />
+                                    </HoverButton>
+                                </>
+                            )}
+                            {rootParentBranch && (
                                 <HoverButton
                                     style={buttonStyle}
                                     onClick={() => {
