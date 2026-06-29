@@ -28,6 +28,7 @@ const OUTER_FRAME_STROKE_WIDTH = 2.2
 const OUTER_FRAME_OPACITY = 0.96
 const OUTER_FRAME_DASHARRAY = '8 4'
 const OUTER_FRAME_RX = 12
+const BRANCH_HIT_SLOP = 4
 
 type BranchChildRenderInfo = ReturnType<typeof getBranchRenderInfo>['children'][number]
 
@@ -36,6 +37,11 @@ type BranchPathInfo = {
 	strokeDasharray?: string
 	geometry: CubicBezier2d[]
 }
+
+type BranchHitTarget =
+	| { type: 'geometry'; geometry: Geometry2d; hitWidth: number }
+	| { type: 'rect'; x: number; y: number; w: number; h: number; hitWidth: number; filled?: boolean }
+	| { type: 'circle'; x: number; y: number; r: number; filled?: boolean }
 
 function getBranchLineStyle(shape: IBranchShape): BranchLineStyle {
 	return shape.props.lineStyle ?? 'curve-solid'
@@ -145,6 +151,7 @@ function collectBranchMoveUpdates(
 class BranchGeometry2d extends Geometry2d {
 	constructor(
 		private readonly children: Geometry2d[],
+		private readonly hitTargets: BranchHitTarget[],
 		private readonly branchBounds: Box
 	) {
 		super({ isClosed: false, isFilled: false })
@@ -169,19 +176,19 @@ class BranchGeometry2d extends Geometry2d {
 	}
 
 	override hitTestPoint(point: VecLike, margin = 0, _hitInside = false, filters?: Geometry2dFilters) {
-		return this.children.some((child) => child.hitTestPoint(point, margin, false, filters))
+		return this.hitTargets.some((target) => hitTestBranchTarget(target, point, margin, filters))
 	}
 
 	override distanceToPoint(point: VecLike, _hitInside = false, filters?: Geometry2dFilters) {
 		let distance = Number.POSITIVE_INFINITY
-		for (const child of this.children) {
-			distance = Math.min(distance, child.distanceToPoint(point, false, filters))
+		for (const target of this.hitTargets) {
+			distance = Math.min(distance, distanceToBranchTarget(target, point, filters))
 		}
 		return distance
 	}
 
 	override hitTestLineSegment(A: VecLike, B: VecLike, distance = 0, filters?: Geometry2dFilters) {
-		return this.children.some((child) => child.hitTestLineSegment(A, B, distance, filters))
+		return this.hitTargets.some((target) => hitTestBranchTargetLineSegment(target, A, B, distance, filters))
 	}
 
 	override intersectLineSegment(A: VecLike, B: VecLike, filters?: Geometry2dFilters) {
@@ -208,6 +215,107 @@ class BranchGeometry2d extends Geometry2d {
 	getSvgPathData() {
 		return this.children.map((child, index) => child.getSvgPathData(index === 0)).join(' ')
 	}
+}
+
+function getVisibleStrokeHitWidth(strokeWidth: number) {
+	return Math.max(strokeWidth / 2 + BRANCH_HIT_SLOP, 8)
+}
+
+function distanceToRect(point: VecLike, x: number, y: number, w: number, h: number) {
+	const dx = Math.max(x - point.x, 0, point.x - (x + w))
+	const dy = Math.max(y - point.y, 0, point.y - (y + h))
+	return Math.hypot(dx, dy)
+}
+
+function distanceToRectStroke(point: VecLike, x: number, y: number, w: number, h: number) {
+	const insideX = point.x >= x && point.x <= x + w
+	const insideY = point.y >= y && point.y <= y + h
+	if (insideX && insideY) {
+		return Math.min(point.x - x, x + w - point.x, point.y - y, y + h - point.y)
+	}
+	return distanceToRect(point, x, y, w, h)
+}
+
+function hitTestBranchTarget(
+	target: BranchHitTarget,
+	point: VecLike,
+	margin: number,
+	filters?: Geometry2dFilters
+) {
+	return distanceToBranchTarget(target, point, filters) <= margin
+}
+
+function hitTestBranchTargetLineSegment(
+	target: BranchHitTarget,
+	A: VecLike,
+	B: VecLike,
+	distance: number,
+	filters?: Geometry2dFilters
+) {
+	switch (target.type) {
+		case 'geometry':
+			return target.geometry.hitTestLineSegment(A, B, distance + target.hitWidth, filters)
+		case 'rect':
+			return (
+				lineSegmentIntersectsRect(A, B, target.x, target.y, target.w, target.h) ||
+				distanceToBranchTarget(target, A, filters) <= distance ||
+				distanceToBranchTarget(target, B, filters) <= distance
+			)
+		case 'circle':
+			return distanceToLineSegment(target, A, B) <= target.r + BRANCH_HIT_SLOP + distance
+	}
+}
+
+function distanceToBranchTarget(target: BranchHitTarget, point: VecLike, filters?: Geometry2dFilters) {
+	switch (target.type) {
+		case 'geometry':
+			return Math.max(0, target.geometry.distanceToPoint(point, false, filters) - target.hitWidth)
+		case 'rect': {
+			if (target.filled && distanceToRect(point, target.x, target.y, target.w, target.h) === 0) return 0
+			return Math.max(0, distanceToRectStroke(point, target.x, target.y, target.w, target.h) - target.hitWidth)
+		}
+		case 'circle': {
+			const distanceFromCenter = Math.hypot(point.x - target.x, point.y - target.y)
+			if (target.filled && distanceFromCenter <= target.r) return 0
+			return Math.max(0, Math.abs(distanceFromCenter - target.r) - BRANCH_HIT_SLOP)
+		}
+	}
+}
+
+function lineSegmentIntersectsRect(A: VecLike, B: VecLike, x: number, y: number, w: number, h: number) {
+	if (distanceToRect(A, x, y, w, h) === 0 || distanceToRect(B, x, y, w, h) === 0) return true
+	const corners = [
+		{ x, y },
+		{ x: x + w, y },
+		{ x: x + w, y: y + h },
+		{ x, y: y + h },
+	]
+	return corners.some((corner, index) => {
+		const next = corners[(index + 1) % corners.length]
+		return lineSegmentsIntersect(A, B, corner, next)
+	})
+}
+
+function lineSegmentsIntersect(a1: VecLike, a2: VecLike, b1: VecLike, b2: VecLike) {
+	const d1 = cross(a1, a2, b1)
+	const d2 = cross(a1, a2, b2)
+	const d3 = cross(b1, b2, a1)
+	const d4 = cross(b1, b2, a2)
+	return (
+		((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+		((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+	)
+}
+
+function cross(a: VecLike, b: VecLike, c: VecLike) {
+	return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+}
+
+function distanceToLineSegment(point: VecLike, A: VecLike, B: VecLike) {
+	const lengthSquared = Vec.Dist2(A, B)
+	if (lengthSquared <= 0) return Math.hypot(point.x - A.x, point.y - A.y)
+	const t = Math.max(0, Math.min(1, ((point.x - A.x) * (B.x - A.x) + (point.y - A.y) * (B.y - A.y)) / lengthSquared))
+	return Math.hypot(point.x - (A.x + t * (B.x - A.x)), point.y - (A.y + t * (B.y - A.y)))
 }
 
 export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
@@ -279,35 +387,96 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const info = getBranchRenderInfo(this.editor, shape)
 		const lineStyle = getBranchLineStyle(shape)
 		const children = []
+		const hitTargets: BranchHitTarget[] = []
+		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
+		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
+		const isAutoFrameEnhanced = info.autoFrame.enabled
+		const showBackground = shape.props.showBackground === true
 
-		if (isFloatingFrameStyle(lineStyle)) {
-			children.push(
-				new Rectangle2d({
-					x: 2,
-					y: 2,
-					width: Math.max(shape.props.w - 4, 1),
-					height: Math.max(shape.props.h - 4, 1),
-					isFilled: false,
-				})
-			)
+		if (isAutoFrameEnhanced && !isFloatingStyle) {
+			hitTargets.push({
+				type: 'rect',
+				x: OUTER_FRAME_INSET,
+				y: OUTER_FRAME_INSET,
+				w: Math.max(shape.props.w - OUTER_FRAME_INSET * 2, 1),
+				h: Math.max(shape.props.h - OUTER_FRAME_INSET * 2, 1),
+				hitWidth: getVisibleStrokeHitWidth(OUTER_FRAME_STROKE_WIDTH),
+			})
 		}
 
-		children.push(
-			new Rectangle2d({
+		if (showBackground) {
+			hitTargets.push({
+				type: 'rect',
+				x: isAutoFrameEnhanced ? 2 : 1,
+				y: isAutoFrameEnhanced ? 2 : 1,
+				w: Math.max(shape.props.w - (isAutoFrameEnhanced ? 4 : 2), 1),
+				h: Math.max(shape.props.h - (isAutoFrameEnhanced ? 4 : 2), 1),
+				hitWidth: 0,
+				filled: true,
+			})
+		}
+
+		if (isFloatingStyle) {
+			const frame = new Rectangle2d({
+				x: OUTER_FRAME_INSET,
+				y: OUTER_FRAME_INSET,
+				width: Math.max(shape.props.w - OUTER_FRAME_INSET * 2, 1),
+				height: Math.max(shape.props.h - OUTER_FRAME_INSET * 2, 1),
+				isFilled: false,
+			})
+			children.push(frame)
+			hitTargets.push({
+				type: 'rect',
+				x: OUTER_FRAME_INSET,
+				y: OUTER_FRAME_INSET,
+				w: Math.max(shape.props.w - OUTER_FRAME_INSET * 2, 1),
+				h: Math.max(shape.props.h - OUTER_FRAME_INSET * 2, 1),
+				hitWidth: getVisibleStrokeHitWidth(OUTER_FRAME_STROKE_WIDTH),
+			})
+		}
+
+		if (info.rootBounds) {
+			hitTargets.push({
+				type: 'rect',
+				x: info.rootBounds.x - 3,
+				y: info.rootBounds.y - 3,
+				w: info.rootBounds.w + 6,
+				h: info.rootBounds.h + 6,
+				hitWidth: getVisibleStrokeHitWidth(1.2),
+			})
+		} else {
+			const root = new Rectangle2d({
 				x: info.rootX - info.rootRadius,
 				y: info.rootY - info.rootRadius,
 				width: info.rootRadius * 2,
 				height: info.rootRadius * 2,
 				isFilled: true,
 			})
-		)
+			children.push(root)
+			hitTargets.push({
+				type: 'circle',
+				x: info.rootX,
+				y: info.rootY,
+				r: isFloatingStyle ? info.rootRadius + 5 : info.rootRadius,
+				filled: true,
+			})
+		}
 
 		for (const child of info.children) {
-			children.push(...getBranchPathInfo(info.rootX, info.rootY, child, lineStyle).geometry)
+			const pathGeometry = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle).geometry
+			children.push(...pathGeometry)
+			for (const geometry of pathGeometry) {
+				hitTargets.push({
+					type: 'geometry',
+					geometry,
+					hitWidth: getVisibleStrokeHitWidth(lineWidth),
+				})
+			}
 		}
 
 		return new BranchGeometry2d(
 			children,
+			hitTargets,
 			new Box(0, 0, Math.max(shape.props.w, 1), Math.max(shape.props.h, 1))
 		)
 	}
