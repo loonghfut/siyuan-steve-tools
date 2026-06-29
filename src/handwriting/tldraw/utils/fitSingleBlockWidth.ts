@@ -66,7 +66,8 @@ export function fitSingleBlockWidth(editor: Editor, shapes: ISingleBlockShape[])
             Math.max(MIN_WIDTH, naturalWidth + borderPx * 2)
         )
 
-        if (Math.round(nextWidth) === Math.round(shape.props.w)) continue
+        // 只收缩、不增宽：仅当内容所需宽度小于当前宽度时才调整
+        if (Math.round(nextWidth) >= Math.round(shape.props.w)) continue
 
         updates.push({
             id: shape.id,

@@ -181,7 +181,7 @@ export const SingleBlockStyleSection: React.FC<SingleBlockStyleSectionProps> = (
                                 onClick={() => {
                                     fitSingleBlockWidth(editor, selectedSingleBlockShapes)
                                 }}
-                                title="自适应调整宽度：根据内容自动收紧块宽度"
+                                title="自适应收缩宽度：根据内容紧凑收紧块宽度（只收缩不增宽）"
                                 aria-label="自适应宽度"
                             >
                                 <TldrawUiIcon icon="fit-width" />
