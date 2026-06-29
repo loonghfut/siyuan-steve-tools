@@ -669,13 +669,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// ===== 编辑态专用：创建和管理 Protyle 实例 =====
 		useEffect(() => {
 			if (!isEditingState) {
-				// 退出编辑态时，保存静态快照到缓存并销毁 Protyle
-				if (protyleRef.current && protyleHostRef.current && shape.props.blockId) {
-					const html = cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16)
-					if (html) {
-						setStaticHtml(html)
-					}
-				}
+				// 退出编辑态时：静态快照的保存与 Protyle 的销毁统一在下方 cleanup 中处理，
+				// 因为 React 会先执行上一轮编辑态 effect 的 cleanup（此时 Protyle 仍存在），
+				// 再执行这里的 effect body（此时 Protyle 已被销毁），所以必须在那里保存快照。
 				destroyRuntimeResources()
 				return
 			}
@@ -1033,6 +1029,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 			return () => {
 				disposed = true
+				// 退出编辑态时，在销毁 Protyle 之前先保存静态快照到缓存与本地状态
+				// 必须在此处（cleanup）执行：React 先跑上一轮 effect 的 cleanup（Protyle 仍在），
+				// 再跑新一轮非编辑态 effect 的 body（此时若已销毁则取不到内容）
+				if (protyleRef.current && protyleHostRef.current && shape.props.blockId) {
+					const html = cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16)
+					if (html) {
+						setStaticHtml(html)
+					}
+				}
 				destroyRuntimeResources()
 			}
 		}, [destroyRuntimeResources, isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce])
