@@ -708,9 +708,9 @@ export function runWithSuppressedRootContentMoveIds<T>(shapeIds: Iterable<string
 	}
 }
 
-function removeChildIdFromBranch(branch: IBranchShape, childId: string) {
-	const leftChildIds = (branch.props.leftChildIds || []).filter((id) => id !== childId)
-	const rightChildIds = (branch.props.rightChildIds || branch.props.childIds || []).filter((id) => id !== childId)
+function removeChildIdsFromBranch(branch: IBranchShape, childIds: Set<string>) {
+	const leftChildIds = (branch.props.leftChildIds || []).filter((id) => !childIds.has(id))
+	const rightChildIds = (branch.props.rightChildIds || branch.props.childIds || []).filter((id) => !childIds.has(id))
 	return {
 		leftChildIds,
 		rightChildIds,
@@ -1325,19 +1325,47 @@ export function relayoutBranchesContainingShape(editor: Editor, shapeId: TLShape
 	relayoutBranchesContainingShapes(editor, [shapeId], visited)
 }
 
+export function alignBranchToRootContent(editor: Editor, branch: IBranchShape) {
+	if (!branch.props.rootShapeId) return false
+
+	const rootContent = getBranchRootContent(editor, branch)
+	if (!rootContent) return false
+
+	const rootLocalX = getBranchRootLocalX(branch)
+	const expectedX = rootContent.bounds.centerX - rootLocalX
+	const expectedY = rootContent.bounds.centerY - branch.props.h / 2
+	if (Math.abs(branch.x - expectedX) <= 0.5 && Math.abs(branch.y - expectedY) <= 0.5) return false
+
+	editor.updateShape<IBranchShape>({
+		id: branch.id,
+		type: 'branch',
+		x: expectedX,
+		y: expectedY,
+	})
+
+	return true
+}
+
 export function isShapeInBranch(editor: Editor, shapeId: TLShapeId) {
 	return getCurrentBranches(editor)
 		.some((shape) => shape.type === 'branch' && getAllBranchAttachedShapeIds(shape as IBranchShape).includes(shapeId as string))
 }
 
-export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
+export function pruneShapesFromBranches(editor: Editor, shapeIds: TLShapeId[]) {
+	const deletedIds = new Set(shapeIds.map((shapeId) => shapeId as string))
+	if (deletedIds.size === 0) return
+
 	const branches = getCurrentBranches(editor)
-		.filter((shape) => shape.type === 'branch' && getAllBranchAttachedShapeIds(shape as IBranchShape).includes(shapeId as string)) as IBranchShape[]
+		.filter((shape) =>
+			shape.type === 'branch' && getAllBranchAttachedShapeIds(shape as IBranchShape).some((id) => deletedIds.has(id))
+		) as IBranchShape[]
 	const relayoutSourceIds = new Set<TLShapeId>()
 
 	for (const branch of branches) {
-		const nextIds = removeChildIdFromBranch(branch, shapeId as string)
-		const nextRootShapeId = branch.props.rootShapeId === shapeId ? undefined : branch.props.rootShapeId
+		const nextIds = removeChildIdsFromBranch(branch, deletedIds)
+		const nextRootShapeId = branch.props.rootShapeId && deletedIds.has(branch.props.rootShapeId)
+			? undefined
+			: branch.props.rootShapeId
 		editor.updateShape<IBranchShape>({
 			id: branch.id,
 			type: 'branch',
@@ -1351,13 +1379,16 @@ export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
 		if (updatedBranch) {
 			layoutBranchChildren(editor, updatedBranch)
 			relayoutSourceIds.add(updatedBranch.id)
-			if (updatedBranch.props.rootShapeId) relayoutSourceIds.add(updatedBranch.props.rootShapeId as TLShapeId)
 		}
 	}
 
 	if (relayoutSourceIds.size > 0) {
 		relayoutBranchesContainingShapes(editor, Array.from(relayoutSourceIds))
 	}
+}
+
+export function pruneShapeFromBranches(editor: Editor, shapeId: TLShapeId) {
+	pruneShapesFromBranches(editor, [shapeId])
 }
 
 export function detachBranchCompletely(editor: Editor, branchId: TLShapeId) {
@@ -1421,8 +1452,6 @@ export function detachBranchRootShape(editor: Editor, branchId: TLShapeId) {
 }
 
 export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
-	const rootX = getBranchRootLocalX(branch)
-	const rootY = branch.props.h / 2
 	const autoFrame = getBranchAutoFrameState(editor, branch)
 	const rootContent = getBranchRootContent(editor, branch)
 	const rootBounds = rootContent
@@ -1433,6 +1462,8 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 				h: rootContent.bounds.h,
 		  }
 		: null
+	const rootX = rootBounds ? rootBounds.x + rootBounds.w / 2 : getBranchRootLocalX(branch)
+	const rootY = rootBounds ? rootBounds.y + rootBounds.h / 2 : branch.props.h / 2
 	const children = normalizeChildIds(editor, branch)
 		.map((id) => {
 			const child = editor.getShape(id as TLShapeId)

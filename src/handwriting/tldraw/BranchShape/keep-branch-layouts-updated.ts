@@ -4,7 +4,7 @@ import {
 	getAllBranchChildIds,
 	isBranchConnectableShape,
 	layoutBranchChildren,
-	pruneShapeFromBranches,
+	pruneShapesFromBranches,
 	relayoutBranchesContainingShapes,
 } from './branch-layout'
 
@@ -379,7 +379,10 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 				if (shape.type === 'branch') {
 					promoteOnlyChildOfDeletedBranch(editor, shape as IBranchShape)
 				}
-				pruneShapeFromBranches(editor, shape.id as TLShapeId)
+			}
+
+			if (deletedShapes.length > 0) {
+				pruneShapesFromBranches(editor, deletedShapes.map((shape) => shape.id as TLShapeId))
 			}
 
 			if (shapeIds.length > 0) {

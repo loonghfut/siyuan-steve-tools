@@ -4,7 +4,13 @@
 import React from 'react'
 import { Editor, StylePanelDropdownPicker, TLShapeId, TldrawUiButton, TldrawUiIcon, TldrawUiSlider } from '@tldraw/tldraw'
 import type { BranchLineStyle, IBranchShape } from './branch-shape-types'
-import { detachBranchCompletely, detachBranchRootShape, layoutBranchChildren, relayoutBranchesContainingShapes } from './branch-layout'
+import {
+	alignBranchToRootContent,
+	detachBranchCompletely,
+	detachBranchRootShape,
+	layoutBranchChildren,
+	relayoutBranchesContainingShapes,
+} from './branch-layout'
 
 export interface BranchStyleSectionProps {
 	editor: Editor
@@ -16,61 +22,30 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 	selectedBranchShapes,
 }) => {
 	const hasBranchSelection = selectedBranchShapes.length > 0
-	const pendingRelayoutIdsRef = React.useRef(new Set<string>())
-	const relayoutFrameRef = React.useRef<
-		| { type: 'animation-frame'; id: number }
-		| { type: 'timeout'; id: ReturnType<typeof setTimeout> }
-		| null
-	>(null)
 
-	const cancelPendingRelayout = React.useCallback(() => {
-		const frame = relayoutFrameRef.current
-		if (!frame) return
-		if (frame.type === 'animation-frame' && typeof cancelAnimationFrame === 'function') {
-			cancelAnimationFrame(frame.id)
-		} else if (frame.type === 'timeout') {
-			clearTimeout(frame.id)
-		}
-		relayoutFrameRef.current = null
-	}, [])
+	const relayoutBranchesNow = React.useCallback(
+		(branchIds: TLShapeId[]) => {
+			const laidOutBranchIds: TLShapeId[] = []
+			for (const branchId of Array.from(new Set(branchIds))) {
+				const latestShape = editor.getShape(branchId) as IBranchShape | undefined
+				if (latestShape?.type !== 'branch') continue
 
-	const queueBranchRelayout = React.useCallback(
-		(shapes: IBranchShape[]) => {
-			for (const shape of shapes) pendingRelayoutIdsRef.current.add(shape.id as string)
-			if (relayoutFrameRef.current) return
-
-			const flush = () => {
-				relayoutFrameRef.current = null
-				const branchIds = Array.from(pendingRelayoutIdsRef.current)
-				pendingRelayoutIdsRef.current.clear()
-				if (branchIds.length === 0) return
-
-				editor.run(() => {
-					const laidOutBranchIds: TLShapeId[] = []
-					for (const branchId of branchIds) {
-						const latestShape = editor.getShape(branchId as TLShapeId) as IBranchShape | undefined
-						if (latestShape?.type === 'branch') {
-							layoutBranchChildren(editor, latestShape)
-							laidOutBranchIds.push(latestShape.id)
-						}
-					}
-
-					if (laidOutBranchIds.length > 0) {
-						relayoutBranchesContainingShapes(editor, laidOutBranchIds)
-					}
-				})
+				layoutBranchChildren(editor, latestShape)
+				const laidOutShape = editor.getShape(latestShape.id) as IBranchShape | undefined
+				if (laidOutShape?.type === 'branch') {
+					alignBranchToRootContent(editor, laidOutShape)
+					laidOutBranchIds.push(laidOutShape.id)
+				} else {
+					laidOutBranchIds.push(latestShape.id)
+				}
 			}
 
-			if (typeof requestAnimationFrame === 'function') {
-				relayoutFrameRef.current = { type: 'animation-frame', id: requestAnimationFrame(flush) }
-			} else {
-				relayoutFrameRef.current = { type: 'timeout', id: setTimeout(flush, 16) }
+			if (laidOutBranchIds.length > 0) {
+				relayoutBranchesContainingShapes(editor, laidOutBranchIds)
 			}
 		},
 		[editor]
 	)
-
-	React.useEffect(() => cancelPendingRelayout, [cancelPendingRelayout])
 
 	const lineWidthState = React.useMemo<number | 'mixed'>(() => {
 		if (!hasBranchSelection) return 3
@@ -113,25 +88,27 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 			options?: { relayout?: boolean }
 		) => {
 			editor.run(() => {
-				editor.updateShapes(
-					selectedBranchShapes
-						.map((shape) => {
-							const latestShape = editor.getShape(shape.id) as IBranchShape | undefined
-							if (latestShape?.type !== 'branch') return null
+				const branchIds: TLShapeId[] = []
+				const updates = selectedBranchShapes
+					.map((shape) => {
+						const latestShape = editor.getShape(shape.id) as IBranchShape | undefined
+						if (latestShape?.type !== 'branch') return null
 
-							return {
-								id: latestShape.id,
-								type: 'branch',
-								props: propsBuilder(latestShape),
-							}
-						})
-						.filter((update): update is { id: TLShapeId; type: 'branch'; props: Partial<IBranchShape['props']> } => !!update)
-				)
+						branchIds.push(latestShape.id)
+						return {
+							id: latestShape.id,
+							type: 'branch',
+							props: propsBuilder(latestShape),
+						}
+					})
+					.filter((update): update is { id: TLShapeId; type: 'branch'; props: Partial<IBranchShape['props']> } => !!update)
 
-				if (options?.relayout) queueBranchRelayout(selectedBranchShapes)
+				editor.updateShapes(updates)
+
+				if (options?.relayout) relayoutBranchesNow(branchIds)
 			})
 		},
-		[editor, queueBranchRelayout, selectedBranchShapes]
+		[editor, relayoutBranchesNow, selectedBranchShapes]
 	)
 
 	if (!hasBranchSelection) return null
