@@ -453,21 +453,6 @@ function getBranchRootPagePoint(branch: IBranchShape) {
 	}
 }
 
-function getBranchAttachmentBounds(editor: Editor, branch: IBranchShape): Bounds | null {
-	const rootContent = getBranchRootContent(editor, branch)
-	if (rootContent) return rootContent.bounds
-
-	const root = getBranchRootPagePoint(branch)
-	return {
-		x: root.x - ROOT_RADIUS,
-		y: root.y - ROOT_RADIUS,
-		w: ROOT_DIAMETER,
-		h: ROOT_DIAMETER,
-		centerX: root.x,
-		centerY: root.y,
-	}
-}
-
 function getBranchRootLocalX(branch: IBranchShape) {
 	return branch.props.rootX ?? branch.props.w / 2
 }
@@ -475,10 +460,7 @@ function getBranchRootLocalX(branch: IBranchShape) {
 function getBranchSideForShape(editor: Editor, branch: IBranchShape, child: TLShape, childBounds = getPageBounds(editor, child)): BranchSide {
 	const root = getBranchRootPagePoint(branch)
 	if (!childBounds) return 'right'
-	const attachmentBounds = child.type === 'branch'
-		? getBranchAttachmentBounds(editor, child as IBranchShape) || childBounds
-		: childBounds
-	return attachmentBounds.centerX < root.x ? 'left' : 'right'
+	return childBounds.centerX < root.x ? 'left' : 'right'
 }
 
 function getSideChildIds(branch: IBranchShape, side: BranchSide) {
@@ -578,11 +560,8 @@ function distanceToBranchRoot(
 
 	const root = getBranchRootPagePoint(branch)
 	const resolvedSide = side ?? getBranchSideForShape(editor, branch, child, childBounds)
-	const attachmentBounds = child.type === 'branch'
-		? getBranchAttachmentBounds(editor, child as IBranchShape) || childBounds
-		: childBounds
-	const edgeX = resolvedSide === 'left' ? attachmentBounds.x + attachmentBounds.w : attachmentBounds.x
-	const clampedY = Math.max(attachmentBounds.y, Math.min(root.y, attachmentBounds.y + attachmentBounds.h))
+	const edgeX = resolvedSide === 'left' ? childBounds.x + childBounds.w : childBounds.x
+	const clampedY = Math.max(childBounds.y, Math.min(root.y, childBounds.y + childBounds.h))
 	const dx = edgeX - root.x
 	const dy = clampedY - root.y
 	return Math.hypot(dx, dy)
@@ -591,17 +570,14 @@ function distanceToBranchRoot(
 function distanceToBranchWorkArea(editor: Editor, branch: IBranchShape, child: TLShape, childBounds = getPageBounds(editor, child)) {
 	if (!childBounds) return Number.POSITIVE_INFINITY
 
-	const attachmentBounds = child.type === 'branch'
-		? getBranchAttachmentBounds(editor, child as IBranchShape) || childBounds
-		: childBounds
 	const padding = Math.max(branch.props.snapDistance || 160, 80)
 	const minX = branch.x - padding
 	const minY = branch.y - padding
 	const maxX = branch.x + branch.props.w + padding
 	const maxY = branch.y + branch.props.h + padding
-	const clampedX = Math.max(minX, Math.min(attachmentBounds.centerX, maxX))
-	const clampedY = Math.max(minY, Math.min(attachmentBounds.centerY, maxY))
-	return Math.hypot(attachmentBounds.centerX - clampedX, attachmentBounds.centerY - clampedY)
+	const clampedX = Math.max(minX, Math.min(childBounds.centerX, maxX))
+	const clampedY = Math.max(minY, Math.min(childBounds.centerY, maxY))
+	return Math.hypot(childBounds.centerX - clampedX, childBounds.centerY - clampedY)
 }
 
 function normalizeChildIds(editor: Editor, branch: IBranchShape, extraId?: TLShapeId | string) {
