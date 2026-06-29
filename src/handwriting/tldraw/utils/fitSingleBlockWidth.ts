@@ -19,14 +19,21 @@ const MEASURABLE_ELEMENT_SELECTOR = [
     '.mermaid',
 ].join(',')
 
+type SingleBlockWidthUpdate = { id: ISingleBlockShape['id']; type: 'single-block'; props: { w: number } }
+
 function getNumberStyle(style: CSSStyleDeclaration, prop: string): number {
     const value = Number.parseFloat(style.getPropertyValue(prop))
     return Number.isFinite(value) ? value : 0
 }
 
-function isVisibleElement(el: Element): boolean {
+function isVisibleElement(el: Element, cache?: WeakMap<Element, boolean>): boolean {
+    const cached = cache?.get(el)
+    if (cached !== undefined) return cached
+
     const style = window.getComputedStyle(el)
-    return style.display !== 'none' && style.visibility !== 'hidden'
+    const visible = style.display !== 'none' && style.visibility !== 'hidden'
+    cache?.set(el, visible)
+    return visible
 }
 
 function getRenderedScaleX(contentEl: HTMLElement, rootRect: DOMRect): number {
@@ -47,11 +54,16 @@ function getRightEdgeInLocalPx(rect: DOMRect, rootRect: DOMRect, scaleX: number)
  * scrollWidth / bounding rect，会把右侧空白也算进去。这里改为量文本
  * Range 和图片、公式等实际内容节点，更接近“视觉上需要的宽度”。
  */
-function measureRenderedContentWidth(contentEl: HTMLElement): number {
+function measureRenderedContentWidth(contentEl: HTMLElement, stopAtWidth?: number): number {
     const rootRect = contentEl.getBoundingClientRect()
     if (!rootRect.width) return 0
 
     const scaleX = getRenderedScaleX(contentEl, rootRect)
+    const style = window.getComputedStyle(contentEl)
+    const paddingRight = getNumberStyle(style, 'padding-right')
+    const visibilityCache = new WeakMap<Element, boolean>()
+    const measuredWidth = (right: number) => Math.ceil(right + paddingRight + FIT_GUARD_PX)
+    const stopWidth = Number.isFinite(stopAtWidth) && (stopAtWidth ?? 0) > 0 ? stopAtWidth : undefined
     let maxRight = 0
 
     const walker = document.createTreeWalker(
@@ -62,35 +74,45 @@ function measureRenderedContentWidth(contentEl: HTMLElement): number {
                 if (!node.textContent?.trim()) return NodeFilter.FILTER_REJECT
                 const parent = node.parentElement
                 if (!parent || !contentEl.contains(parent)) return NodeFilter.FILTER_REJECT
-                return isVisibleElement(parent) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+                return isVisibleElement(parent, visibilityCache) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
             },
         }
     )
 
-    let textNode = walker.nextNode()
-    while (textNode) {
-        const range = document.createRange()
-        range.selectNodeContents(textNode)
-        for (const rect of Array.from(range.getClientRects())) {
-            if (rect.width <= 0 || rect.height <= 0) continue
-            maxRight = Math.max(maxRight, getRightEdgeInLocalPx(rect, rootRect, scaleX))
+    const range = document.createRange()
+    try {
+        let textNode = walker.nextNode()
+        while (textNode) {
+            range.selectNodeContents(textNode)
+            const rects = range.getClientRects()
+            for (let i = 0; i < rects.length; i++) {
+                const rect = rects[i]
+                if (rect.width <= 0 || rect.height <= 0) continue
+                maxRight = Math.max(maxRight, getRightEdgeInLocalPx(rect, rootRect, scaleX))
+                const width = measuredWidth(maxRight)
+                if (stopWidth !== undefined && width >= stopWidth) return width
+            }
+            textNode = walker.nextNode()
         }
+    } finally {
         range.detach()
-        textNode = walker.nextNode()
     }
 
-    for (const el of Array.from(contentEl.querySelectorAll(MEASURABLE_ELEMENT_SELECTOR))) {
+    const measurableElements = contentEl.querySelectorAll(MEASURABLE_ELEMENT_SELECTOR)
+    for (let i = 0; i < measurableElements.length; i++) {
+        const el = measurableElements[i]
         if (!(el instanceof HTMLElement) && !(el instanceof SVGElement)) continue
-        if (!isVisibleElement(el)) continue
+        if (!isVisibleElement(el, visibilityCache)) continue
         const rect = el.getBoundingClientRect()
         if (rect.width <= 0 || rect.height <= 0) continue
         maxRight = Math.max(maxRight, getRightEdgeInLocalPx(rect, rootRect, scaleX))
+        const width = measuredWidth(maxRight)
+        if (stopWidth !== undefined && width >= stopWidth) return width
     }
 
     if (!maxRight) return 0
 
-    const style = window.getComputedStyle(contentEl)
-    return Math.ceil(maxRight + getNumberStyle(style, 'padding-right') + FIT_GUARD_PX)
+    return measuredWidth(maxRight)
 }
 
 /**
@@ -112,10 +134,12 @@ function measureNaturalWidth(contentEl: HTMLElement, fontSize: number): number {
     clone.style.pointerEvents = 'none'
 
     document.body.appendChild(clone)
-    // scrollWidth 反映内容不换行时所需的宽度
-    const width = Math.ceil(clone.scrollWidth || clone.offsetWidth || 0)
-    document.body.removeChild(clone)
-    return width
+    try {
+        // scrollWidth 反映内容不换行时所需的宽度
+        return Math.ceil(clone.scrollWidth || clone.offsetWidth || 0)
+    } finally {
+        clone.remove()
+    }
 }
 
 /**
@@ -135,18 +159,19 @@ function findContentElement(shape: ISingleBlockShape): HTMLElement | null {
 export function fitSingleBlockWidth(editor: Editor, shapes: ISingleBlockShape[]) {
     if (!shapes.length) return
 
-    const updates: { id: ISingleBlockShape['id']; type: 'single-block'; props: { w: number } }[] = []
+    const updates: SingleBlockWidthUpdate[] = []
 
     for (const shape of shapes) {
         const contentEl = findContentElement(shape)
         if (!contentEl) continue
 
-        const fontSize = shape.props.fontSize || 16
-        const contentWidth = measureRenderedContentWidth(contentEl) || measureNaturalWidth(contentEl, fontSize)
-        if (!contentWidth) continue
-
         // 内容区为容器宽度减去左右边框
         const borderPx = settingdata["showCardBorder"] !== false && !shape.props.transparentBackground ? BORDER_PX : 0
+        const stopAtWidth = shape.props.w <= MAX_WIDTH ? Math.max(0, shape.props.w - borderPx * 2) : undefined
+        const fontSize = shape.props.fontSize || 16
+        const contentWidth = measureRenderedContentWidth(contentEl, stopAtWidth) || measureNaturalWidth(contentEl, fontSize)
+        if (!contentWidth) continue
+
         const nextWidth = Math.min(
             MAX_WIDTH,
             Math.max(MIN_WIDTH, contentWidth + borderPx * 2)
