@@ -10,6 +10,25 @@ import {
 
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 const REGISTERED_EDITORS = new WeakSet<Editor>()
+const EXPLICIT_CREATED_BRANCH_RELATIONS = new WeakMap<Editor, Set<string>>()
+
+export function markExplicitCreatedBranchRelations(editor: Editor, branchIds: Iterable<TLShapeId | string>) {
+	let ids = EXPLICIT_CREATED_BRANCH_RELATIONS.get(editor)
+	if (!ids) {
+		ids = new Set<string>()
+		EXPLICIT_CREATED_BRANCH_RELATIONS.set(editor, ids)
+	}
+	for (const branchId of branchIds) ids.add(branchId as string)
+}
+
+function consumeExplicitCreatedBranchRelation(editor: Editor, branchId: TLShapeId | string) {
+	const ids = EXPLICIT_CREATED_BRANCH_RELATIONS.get(editor)
+	if (!ids?.has(branchId as string)) return false
+
+	ids.delete(branchId as string)
+	if (ids.size === 0) EXPLICIT_CREATED_BRANCH_RELATIONS.delete(editor)
+	return true
+}
 
 function getShapeWidth(shape: TLShape) {
 	return typeof (shape as any).props?.w === 'number' ? (shape as any).props.w : null
@@ -252,7 +271,11 @@ function remapCreatedBranchChildren(
 ) {
 	const idRemaps = findCreatedShapeIdRemaps(editor, branch, createdShapeIds)
 	const inferredChildren = idRemaps.size === 0 ? inferCreatedBranchChildrenFromLayout(editor, branch, createdShapeIds) : null
-	const remapIds = (ids: string[] | undefined, fallbackIds: string[] = []) => {
+	const remapIds = (
+		ids: string[] | undefined,
+		fallbackIds: string[] = [],
+		options?: { preserveExistingIds?: boolean }
+	) => {
 		let fallbackIndex = 0
 		return (
 		(ids || [])
@@ -260,6 +283,7 @@ function remapCreatedBranchChildren(
 				const remappedId = idRemaps.get(id)
 				if (remappedId && editor.getShape(remappedId as TLShapeId)) return remappedId
 				if (createdShapeIds.has(id) && editor.getShape(id as TLShapeId)) return id
+				if (options?.preserveExistingIds && editor.getShape(id as TLShapeId)) return id
 				const fallbackId = fallbackIds[fallbackIndex++]
 				if (fallbackId && editor.getShape(fallbackId as TLShapeId)) return fallbackId
 				return null
@@ -272,7 +296,7 @@ function remapCreatedBranchChildren(
 	const nextChildIds = remapIds(branch.props.childIds, inferredChildren?.rightChildIds)
 	const nextLeftChildIds = remapIds(branch.props.leftChildIds, inferredChildren?.leftChildIds)
 	const nextRightChildIds = remapIds(sourceRightChildIds, inferredChildren?.rightChildIds)
-	const nextRootShapeIds = remapIds(branch.props.rootShapeId ? [branch.props.rootShapeId] : [])
+	const nextRootShapeIds = remapIds(branch.props.rootShapeId ? [branch.props.rootShapeId] : [], [], { preserveExistingIds: true })
 	const nextRootShapeId = nextRootShapeIds[0]
 
 	const didChange =
@@ -366,6 +390,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 			for (const branchId of createdBranchIds) {
 				const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
 				if (!branch || branch.type !== 'branch') continue
+				if (consumeExplicitCreatedBranchRelation(editor, branchId)) continue
 
 				if (remapCreatedBranchChildren(editor, branch, createdShapeIds)) {
 					const updatedBranch = editor.getShape<IBranchShape>(branch.id)

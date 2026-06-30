@@ -3,7 +3,7 @@ import { api } from '@frostime/siyuan-plugin-kits'
 import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
-import { getAllBranchAttachedShapeIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
+import { getAllBranchAttachedShapeIds, layoutBranchChildren, markExplicitCreatedBranchRelations, relayoutBranchesContainingShapes } from '../BranchShape'
 import type { BranchLineStyle } from '../BranchShape/branch-shape-types'
 import { buildTldrawLink } from '../utils/link-builder'
 
@@ -105,16 +105,27 @@ function pruneExistingRelationTree(items: InsertRelationItem[], existingBlockIds
 		}))
 }
 
-function createBranchShape(id: TLShapeId, rootX: number, rootY: number, props?: Partial<IBranchShape['props']>) {
+function uniqueIds(ids: string[]) {
+	return Array.from(new Set(ids))
+}
+
+function createBranchShape(id: TLShapeId, rootX: number, rootY: number, props: Partial<IBranchShape['props']> = {}) {
+	const rightChildIds = uniqueIds([...(props.rightChildIds || props.childIds || [])])
+	const leftChildIds = uniqueIds([...(props.leftChildIds || [])])
+	const nextProps: IBranchShape['props'] = {
+		...BRANCH_DEFAULT_PROPS,
+		...props,
+		childIds: rightChildIds,
+		leftChildIds,
+		rightChildIds,
+	}
+
 	return {
 		id,
 		type: 'branch' as const,
-		x: rootX - (BRANCH_DEFAULT_PROPS.rootX || 40),
-		y: rootY - BRANCH_DEFAULT_PROPS.h / 2,
-		props: {
-			...BRANCH_DEFAULT_PROPS,
-			...props,
-		},
+		x: rootX - (nextProps.rootX || nextProps.w / 2),
+		y: rootY - nextProps.h / 2,
+		props: nextProps,
 	}
 }
 
@@ -131,11 +142,12 @@ function replaceChildId(ids: string[] | undefined, oldChildId: string, newChildI
 
 function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: string, newChildId: string) {
 	const wasRootChild = branch.props.rootShapeId === oldChildId
-	const leftChildIds = replaceChildId(branch.props.leftChildIds, oldChildId, newChildId)
-	const rightChildIds = replaceChildId(branch.props.rightChildIds || branch.props.childIds, oldChildId, newChildId)
-	if (wasRootChild && !leftChildIds.includes(newChildId) && !rightChildIds.includes(newChildId)) {
-		rightChildIds.push(newChildId)
-	}
+	const leftChildIds = wasRootChild
+		? (branch.props.leftChildIds || []).filter((id) => id !== oldChildId && id !== newChildId)
+		: replaceChildId(branch.props.leftChildIds, oldChildId, newChildId)
+	const rightChildIds = wasRootChild
+		? uniqueIds([...(branch.props.rightChildIds || branch.props.childIds || []).filter((id) => id !== oldChildId && id !== newChildId), newChildId])
+		: replaceChildId(branch.props.rightChildIds || branch.props.childIds, oldChildId, newChildId)
 
 	editor.updateShape<IBranchShape>({
 		id: branch.id,
@@ -221,8 +233,8 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 
 	const branchId = createShapeId()
 	const branchShape = createBranchShape(branchId, rootX, rootY, {
-		childIds: [],
-		leftChildIds: [mainCard.id as string],
+		rootShapeId: mainCard.id as string,
+		leftChildIds: [],
 		rightChildIds: [],
 	})
 	createdShapes.push(branchShape)
@@ -239,7 +251,6 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 			const childIds = childItems.map(buildOutlineNode)
 			const childBranchId = createShapeId()
 			const childBranch = createBranchShape(childBranchId, cardShape.x + cardShape.props.w / 2, cardShape.y + cardShape.props.h / 2, {
-				childIds,
 				leftChildIds: [cardShape.id as string],
 				rightChildIds: childIds,
 			})
@@ -249,24 +260,19 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 		}
 
 		const rootChildren = creatableTree.map(buildOutlineNode)
-		branchShape.props.childIds = rootChildren
-		branchShape.props.rightChildIds = rootChildren
+		branchShape.props.childIds = [...rootChildren]
+		branchShape.props.rightChildIds = [...rootChildren]
 	} else {
 		const cardShapes = creatableTree.map((item, index) => createCardShape(item, index))
-		branchShape.props.childIds = cardShapes.map((shape) => shape.id as string)
-		branchShape.props.rightChildIds = cardShapes.map((shape) => shape.id as string)
+		const rightChildIds = cardShapes.map((shape) => shape.id as string)
+		branchShape.props.childIds = [...rightChildIds]
+		branchShape.props.rightChildIds = [...rightChildIds]
 	}
 
-	editor.createShapes(createdShapes)
+	markExplicitCreatedBranchRelations(editor, [branchId, ...branchLayoutIds])
 
-	if (kind === 'outline-block') {
-		const outlineBlockIds = allCreatableItems.map((item) => item.blockId).filter(Boolean)
-		try {
-			await syncOutlineBlockAttrs(editor, outlineBlockIds)
-		} catch (error) {
-			console.error('sync outline block attrs failed', error)
-		}
-	}
+	editor.run(() => {
+		editor.createShapes(createdShapes)
 
 	for (const sourceBranch of sourceBranches) {
 		replaceChildInBranch(editor, sourceBranch, mainCard.id as string, branchId as string)
@@ -294,6 +300,16 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 	}
 	if (sourceBranches.length > 0) {
 		relayoutBranchesContainingShapes(editor, sourceBranches.map((branch) => branch.id))
+	}
+	})
+
+	if (kind === 'outline-block') {
+		const outlineBlockIds = allCreatableItems.map((item) => item.blockId).filter(Boolean)
+		try {
+			await syncOutlineBlockAttrs(editor, outlineBlockIds)
+		} catch (error) {
+			console.error('sync outline block attrs failed', error)
+		}
 	}
 
 	return {
