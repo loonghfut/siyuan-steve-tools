@@ -23,7 +23,11 @@ import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
 import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
-import { createCenterBranchForCard } from '../../CardShape/create-card-center-branch'
+import {
+    createCenterBranchForCard,
+    deleteEmptyCenterBranchForCard,
+    getEmptyCenterBranchForCard,
+} from '../../CardShape/create-card-center-branch'
 import { createSingleBlockForBranch, getBranchRootParent } from '../../BranchShape'
 
 export const InFrontOfCanvas: React.FC = () => {
@@ -98,6 +102,15 @@ export const InFrontOfCanvas: React.FC = () => {
         'selected root parent branch',
         () => (isCardOrBlock && selectedShape ? getBranchRootParent(editor, selectedShape.id) : null),
         [editor, selectedShape?.id, isCardOrBlock]
+    )
+    const emptyCenterBranch = useValue(
+        'selected empty center branch',
+        () => {
+            if (!selectionInfo) return null
+            const shape = editor.getShape(selectionInfo.id)
+            return shape?.type === 'card' ? getEmptyCenterBranchForCard(editor, shape as ICardShape) : null
+        },
+        [editor, selectionInfo?.id]
     )
     const canCreateCenterBranch = isValidSelection && selectedShape.type === 'card' && !rootParentBranch
 
@@ -243,6 +256,7 @@ export const InFrontOfCanvas: React.FC = () => {
         MousePointer: () => <TldrawUiIcon icon="tool-hand" small />,
         SelectBranch: () => <TldrawUiIcon icon="tool-pointer" small />,
         CenterBranch: () => <TldrawUiIcon icon="branch" />,
+        DetachCenterBranch: () => <TldrawUiIcon icon="branch-detach" />,
         BranchAddLeft: () => <TldrawUiIcon icon="branch-add-left" />,
         BranchAddRight: () => <TldrawUiIcon icon="branch-add-right" />,
     }
@@ -338,6 +352,23 @@ export const InFrontOfCanvas: React.FC = () => {
                                     title="添加 Branch 并中心吸附"
                                 >
                                     <Icons.CenterBranch />
+                                </HoverButton>
+                            )}
+                            {emptyCenterBranch && (
+                                <HoverButton
+                                    style={buttonStyle}
+                                    onClick={() => {
+                                        const shape = editor.getShape(selectionInfo.id)
+                                        if (!shape || shape.type !== 'card') return
+
+                                        const removedBranchId = deleteEmptyCenterBranchForCard(editor, shape as ICardShape)
+                                        if (!removedBranchId) {
+                                            showMessage('取消中心吸附失败：Branch 已吸附其他组件', 3000, 'error')
+                                        }
+                                    }}
+                                    title="取消中心吸附并删除空 Branch"
+                                >
+                                    <Icons.DetachCenterBranch />
                                 </HoverButton>
                             )}
                             {rootParentBranch && (

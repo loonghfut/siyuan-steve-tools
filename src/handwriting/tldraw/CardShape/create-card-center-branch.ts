@@ -1,5 +1,6 @@
 import { Editor, TLShapeId, createShapeId } from '@tldraw/tldraw'
 import {
+	getAllBranchChildIds,
 	getBranchRootParent,
 	layoutBranchChildren,
 	markExplicitCreatedBranchRelations,
@@ -64,14 +65,14 @@ function getRightChildIds(branch: IBranchShape) {
 	return branch.props.rightChildIds || branch.props.childIds || []
 }
 
-function getSideParentBranches(editor: Editor, cardId: string) {
+function getSideParentBranches(editor: Editor, childId: string) {
 	const parents: IBranchShape[] = []
 	for (const shape of editor.getCurrentPageShapes()) {
 		if (shape.type !== 'branch') continue
 
 		const branch = shape as IBranchShape
-		const isLeftChild = (branch.props.leftChildIds || []).includes(cardId)
-		const isRightChild = getRightChildIds(branch).includes(cardId)
+		const isLeftChild = (branch.props.leftChildIds || []).includes(childId)
+		const isRightChild = getRightChildIds(branch).includes(childId)
 		if (isLeftChild || isRightChild) parents.push(branch)
 	}
 	return parents
@@ -95,6 +96,20 @@ function replaceSideChildInBranch(editor: Editor, branch: IBranchShape, oldChild
 			rightChildIds,
 		},
 	})
+}
+
+function hasExistingSideChildren(editor: Editor, branch: IBranchShape) {
+	return getAllBranchChildIds(branch).some((childId) => !!editor.getShape(childId as TLShapeId))
+}
+
+export function getEmptyCenterBranchForCard(editor: Editor, card: ICardShape): IBranchShape | null {
+	const latestCard = editor.getShape<ICardShape>(card.id)
+	if (!latestCard || latestCard.type !== 'card') return null
+
+	const rootParentBranch = getBranchRootParent(editor, latestCard.id)
+	if (!rootParentBranch || hasExistingSideChildren(editor, rootParentBranch)) return null
+
+	return rootParentBranch
 }
 
 export function createCenterBranchForCard(editor: Editor, card: ICardShape): TLShapeId | null {
@@ -141,4 +156,43 @@ export function createCenterBranchForCard(editor: Editor, card: ICardShape): TLS
 	})
 
 	return branchId
+}
+
+export function deleteEmptyCenterBranchForCard(editor: Editor, card: ICardShape): TLShapeId | null {
+	const latestCard = editor.getShape<ICardShape>(card.id)
+	if (!latestCard || latestCard.type !== 'card') return null
+
+	const centerBranch = getEmptyCenterBranchForCard(editor, latestCard)
+	if (!centerBranch) return null
+
+	const centerBranchId = centerBranch.id as string
+	const sideParentBranches = getSideParentBranches(editor, centerBranchId)
+
+	editor.run(() => {
+		for (const parentBranch of sideParentBranches) {
+			const latestParentBranch = editor.getShape<IBranchShape>(parentBranch.id)
+			if (latestParentBranch?.type === 'branch') {
+				replaceSideChildInBranch(editor, latestParentBranch, centerBranchId, latestCard.id as string)
+			}
+		}
+
+		editor.deleteShape(centerBranch.id)
+
+		const relayoutIds: TLShapeId[] = []
+		for (const parentBranch of sideParentBranches) {
+			const latestParentBranch = editor.getShape<IBranchShape>(parentBranch.id)
+			if (latestParentBranch?.type === 'branch') {
+				layoutBranchChildren(editor, latestParentBranch)
+				relayoutIds.push(latestParentBranch.id)
+			}
+		}
+
+		if (relayoutIds.length > 0) {
+			relayoutBranchesContainingShapes(editor, relayoutIds)
+		}
+
+		editor.select(latestCard.id)
+	})
+
+	return centerBranch.id
 }
