@@ -23,6 +23,7 @@ import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
 import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
+import { createCenterBranchForCard } from '../../CardShape/create-card-center-branch'
 import { createSingleBlockForBranch, getBranchRootParent } from '../../BranchShape'
 
 export const InFrontOfCanvas: React.FC = () => {
@@ -98,6 +99,7 @@ export const InFrontOfCanvas: React.FC = () => {
         () => (isCardOrBlock && selectedShape ? getBranchRootParent(editor, selectedShape.id) : null),
         [editor, selectedShape?.id, isCardOrBlock]
     )
+    const canCreateCenterBranch = isValidSelection && selectedShape.type === 'card' && !rootParentBranch
 
     // 手形工具点击跳转功能
     const pointerDownPoint = React.useRef<{ x: number; y: number } | null>(null)
@@ -240,6 +242,7 @@ export const InFrontOfCanvas: React.FC = () => {
         Zap: () => <TldrawUiIcon icon="arrow-cycle" small />,
         MousePointer: () => <TldrawUiIcon icon="tool-hand" small />,
         SelectBranch: () => <TldrawUiIcon icon="tool-pointer" small />,
+        CenterBranch: () => <TldrawUiIcon icon="branch" />,
         BranchAddLeft: () => <TldrawUiIcon icon="branch-add-left" />,
         BranchAddRight: () => <TldrawUiIcon icon="branch-add-right" />,
     }
@@ -320,6 +323,23 @@ export const InFrontOfCanvas: React.FC = () => {
                     )}
                     {isCardOrBlock && (
                         <>
+                            {canCreateCenterBranch && (
+                                <HoverButton
+                                    style={buttonStyle}
+                                    onClick={() => {
+                                        const shape = editor.getShape(selectionInfo.id)
+                                        if (!shape || shape.type !== 'card') return
+
+                                        const newBranchId = createCenterBranchForCard(editor, shape as ICardShape)
+                                        if (!newBranchId) {
+                                            showMessage('创建中心 Branch 失败', 3000, 'error')
+                                        }
+                                    }}
+                                    title="添加 Branch 并中心吸附"
+                                >
+                                    <Icons.CenterBranch />
+                                </HoverButton>
+                            )}
                             {rootParentBranch && (
                                 <>
                                     <HoverButton
