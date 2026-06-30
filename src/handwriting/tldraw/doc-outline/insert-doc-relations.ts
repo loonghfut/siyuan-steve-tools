@@ -251,7 +251,8 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 			const childIds = childItems.map(buildOutlineNode)
 			const childBranchId = createShapeId()
 			const childBranch = createBranchShape(childBranchId, cardShape.x + cardShape.props.w / 2, cardShape.y + cardShape.props.h / 2, {
-				leftChildIds: [cardShape.id as string],
+				rootShapeId: cardShape.id as string,
+				leftChildIds: [],
 				rightChildIds: childIds,
 			})
 			createdShapes.push(childBranch)
