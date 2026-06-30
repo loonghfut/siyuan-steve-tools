@@ -7,6 +7,7 @@ import {
     track,
     useEditor,
     TldrawUiButton,
+    TldrawUiIcon,
 } from '@tldraw/tldraw';
 import { api } from '@frostime/siyuan-plugin-kits';
 import {
@@ -24,6 +25,24 @@ interface ShapeLibraryPanelProps {
     isOpen: boolean;
     onClose: () => void;
 }
+
+const ShapeLibraryLogo = ({ small = false }: { small?: boolean }) => (
+    <svg
+        className={small ? 'shape-library-logo shape-library-logo--small' : 'shape-library-logo'}
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+    >
+        <path d="M12 3 3.8 7.4 12 11.8l8.2-4.4L12 3Z" />
+        <path d="M4 9.7v6.9L12 21v-6.9L4 9.7Z" />
+        <path d="m20 9.7-8 4.4V21l8-4.4V9.7Z" />
+    </svg>
+);
+
+const SearchIcon = () => (
+    <svg className="shape-library-search-icon" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M8.8 3.2a5.6 5.6 0 1 0 3.48 9.99l3.01 3.01 1.06-1.06-3.01-3.01A5.6 5.6 0 0 0 8.8 3.2Zm0 1.5a4.1 4.1 0 1 1 0 8.2 4.1 4.1 0 0 1 0-8.2Z" />
+    </svg>
+);
 
 /**
  * 素材库面板组件
@@ -345,47 +364,44 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
     if (!isOpen) return null;
 
     return (
-            <div
-                ref={panelRef}
-                className="shape-library-panel"
+        <div
+            ref={panelRef}
+            className="shape-library-panel"
             style={{
                 position: 'fixed',
                 top: pos ? `${pos.top}px` : '60px',
                 left: pos ? `${pos.left}px` : undefined,
-                width: '285px',
                 maxHeight: 'calc(100vh - 120px)',
-                backgroundColor: 'var(--b3-theme-surface)',
-                border: '1px solid var(--b3-border-color)',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 zIndex: 99999,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
                 pointerEvents: 'auto',
                 // 阻止滚动链到父容器
                 overscrollBehavior: 'contain',
             }}
-                onWheelCapture={handleWheelCapture}
-                onTouchStartCapture={handleTouchStartCapture}
-                onTouchMoveCapture={handleTouchMoveCapture}
+            onWheelCapture={handleWheelCapture}
+            onTouchStartCapture={handleTouchStartCapture}
+            onTouchMoveCapture={handleTouchMoveCapture}
         >
             {/* 头部 */}
             <div
+                className="shape-library-panel__header"
                 onMouseDown={handleHeaderMouseDown}
                 onTouchStart={handleHeaderTouchStart}
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderBottom: '1px solid var(--b3-border-color)',
-                    cursor: 'grab',
-                }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight:800, fontSize: '14px', color: 'var(--b3-theme-on-background)' }}>素材库</span>
+            >
+                <div className="shape-library-panel__title-row">
+                    <span className="shape-library-panel__mark">
+                        <ShapeLibraryLogo />
+                    </span>
+                    <div className="shape-library-panel__heading">
+                        <span className="shape-library-panel__title">素材库</span>
+                        <span className="shape-library-panel__count">{filteredItems.length} 项</span>
+                    </div>
                     {/* 搜索框（放在标题后面） */}
-                    <div style={{ position: 'relative' }}>
+                    <label
+                        className="shape-library-panel__search"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onTouchStart={(e) => e.stopPropagation()}
+                    >
+                        <SearchIcon />
                         <input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -393,42 +409,27 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                             onTouchStart={(e) => { e.stopPropagation(); }}
                             placeholder="搜索素材"
                             title="搜索素材"
-                            style={{
-                                height: '28px',
-                                width: '120px',
-                                padding: '4px 28px 4px 8px',
-                                borderRadius: '6px',
-                                border: '1px solid var(--b3-border-color)',
-                                backgroundColor: 'var(--b3-theme-surface)',
-                                color: 'var(--b3-theme-on-background)',
-                                fontSize: '12px',
-                                outline: 'none',
-                            }}
                         />
                         {searchQuery && (
                             <button
+                                className="shape-library-icon-button shape-library-icon-button--ghost shape-library-panel__search-clear"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setSearchQuery(''); }}
                                 title="清除搜索"
-                                style={{
-                                    position: 'absolute',
-                                    right: '6px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    border: 'none',
-                                    background: 'transparent',
-                                    cursor: 'pointer',
-                                    color: 'var(--b3-theme-on-surface-light)',
-                                    fontSize: '12px',
-                                }}
+                                aria-label="清除搜索"
                             >
-                                ✕
+                                <TldrawUiIcon icon="cross-2" small />
                             </button>
                         )}
-                    </div>
+                    </label>
                 </div>
-                <div style={{ display: 'flex', gap: '4px', position: 'relative' }}>
+                <div
+                    className="shape-library-panel__actions"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                >
                     <TldrawUiButton
                         type="icon"
+                        className="shape-library-icon-button"
                         title="更多"
                         onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
@@ -436,69 +437,41 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                             setShowMore(v => !v);
                         }}
                     >
-                        ⋯
+                        <TldrawUiIcon icon="dots-horizontal" small />
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="icon"
+                        className="shape-library-icon-button"
                         title="关闭"
                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); onClose(); }}
                     >
-                        ✕
+                        <TldrawUiIcon icon="cross-2" small />
                     </TldrawUiButton>
                     {showMore && (
                         <div
-                            style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: '36px',
-                                width: '140px',
-                                backgroundColor: 'var(--b3-theme-surface)',
-                                border: '1px solid var(--b3-border-color)',
-                                borderRadius: '6px',
-                                boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
-                                zIndex: 100000,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                padding: '6px',
-                                pointerEvents: 'auto',
-                            }}
+                            className="shape-library-panel__menu"
                             onClick={(e) => { e.stopPropagation(); }}
                         >
                             <button
+                                className="shape-library-menu-item"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); handleImport(); }}
-                                style={{
-                                    padding: '6px 8px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                }}
                             >
-                                📥 导入
+                                <TldrawUiIcon icon="download" small />
+                                <span>导入</span>
                             </button>
                             <button
+                                className="shape-library-menu-item"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); handleExport(); }}
-                                style={{
-                                    padding: '6px 8px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                }}
                             >
-                                📤 导出
+                                <TldrawUiIcon icon="share-1" small />
+                                <span>导出</span>
                             </button>
                             <button
+                                className="shape-library-menu-item"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); loadItems(); }}
-                                style={{
-                                    padding: '6px 8px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    textAlign: 'left',
-                                    cursor: 'pointer',
-                                }}
                             >
-                                🔄 刷新
+                                <TldrawUiIcon icon="rotate-cw" small />
+                                <span>刷新</span>
                             </button>
                             {/* 关闭按钮已移到标题栏，保留其余菜单项 */}
                         </div>
@@ -517,54 +490,36 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
 
             {/* 内容区 */}
             <div
+                className="shape-library-panel__content"
                 ref={contentRef}
                 onScroll={handleScroll}
                 onWheel={handleWheel}
                 onTouchMove={handleContentTouchMove}
                 onTouchStart={(e) => { e.stopPropagation(); }}
                 style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '8px',
-                // 阻止滚动链（现代浏览器）
-                overscrollBehavior: 'contain',
-            }}>
+                    // 阻止滚动链（现代浏览器）
+                    overscrollBehavior: 'contain',
+                }}
+            >
                 {loading ? (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '20px',
-                        color: 'var(--b3-theme-on-surface-light)',
-                    }}>
-                        加载中...
+                    <div className="shape-library-empty">
+                        <TldrawUiIcon icon="rotate-cw" />
+                        <span>加载中...</span>
                     </div>
                 ) : (!items || items.length === 0) ? (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '20px',
-                        color: 'var(--b3-theme-on-surface-light)',
-                        fontSize: '13px',
-                    }}>
-                        素材库为空
-                        <br />
-                        <span style={{ fontSize: '12px', opacity: 0.7 }}>
-                            选中形状后右键 → 加入素材库
-                        </span>
+                    <div className="shape-library-empty">
+                        <ShapeLibraryLogo />
+                        <strong>素材库为空</strong>
+                        <span>选中形状后右键加入素材库</span>
                     </div>
                 ) : (filteredItems.length === 0 ? (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '20px',
-                        color: 'var(--b3-theme-on-surface-light)',
-                        fontSize: '13px',
-                    }}>
-                        未找到匹配的素材
-                        <br />
-                        <span style={{ fontSize: '12px', opacity: 0.7 }}>
-                            尝试更改搜索关键词
-                        </span>
+                    <div className="shape-library-empty">
+                        <SearchIcon />
+                        <strong>未找到匹配的素材</strong>
+                        <span>尝试更改搜索关键词</span>
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div className="shape-library-list">
                         {visibleItems.map(item => (
                             <ShapeLibraryItemCard
                                 key={item.id}
@@ -581,19 +536,13 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                             />
                         ))}
                         {/* 结果计数与加载更多 */}
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', paddingTop: '6px' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--b3-theme-on-surface-light)' }}>{visibleItems.length} / {(filteredItems ? filteredItems.length : 0)} 条</span>
+                        <div className="shape-library-panel__pager">
+                            <span>{visibleItems.length} / {(filteredItems ? filteredItems.length : 0)} 条</span>
                             {visibleItems.length < (filteredItems ? filteredItems.length : 0) && (
                                 <button
+                                    className="shape-library-load-more"
                                     onClick={(e) => { e.stopPropagation(); e.preventDefault(); loadMore(); }}
-                                    style={{
-                                        padding: '4px 8px',
-                                        fontSize: '12px',
-                                        borderRadius: '4px',
-                                        border: '1px solid var(--b3-border-color)',
-                                        background: 'var(--b3-theme-surface)',
-                                        cursor: 'pointer',
-                                    }}
+                                    title="加载更多"
                                 >
                                     {isLoadingMore ? '加载中...' : '加载更多'}
                                 </button>
@@ -604,14 +553,9 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
             </div>
 
             {/* 底部提示 */}
-            <div style={{
-                padding: '8px 12px',
-                borderTop: '1px solid var(--b3-border-color)',
-                fontSize: '11px',
-                color: 'var(--b3-theme-on-surface-light)',
-                textAlign: 'center',
-            }}>
-                拖拽素材到画布或点击添加
+            <div className="shape-library-panel__footer">
+                <TldrawUiIcon icon="drag-handle-dots" small />
+                <span>拖拽到画布，或点击插入</span>
             </div>
         </div>
     );
@@ -653,111 +597,41 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
         }
     };
 
-    // 调试日志
-    React.useEffect(() => {
-        console.debug('[素材卡片] 渲染素材:', item.name, '缩略图:', item.thumbnail ? `存在(${item.thumbnail.substring(0, 50)}...)` : '不存在');
-    }, [item.name, item.thumbnail]);
-
     return (
         <div
+            className="shape-library-card"
             draggable
             onDragStart={(e) => onDragStart(e, item)}
-            style={{
-                display: 'flex',
-                flexDirection: 'row',
-                gap: '10px',
-                padding: '10px 12px',
-                backgroundColor: 'var(--b3-theme-background)',
-                borderRadius: '6px',
-                cursor: 'grab',
-                transition: 'background-color 0.15s',
-                border: '1px solid var(--b3-border-color)',
-                pointerEvents: 'auto',
-            }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--b3-theme-surface-lighter)';
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--b3-theme-background)';
-            }}
         >
             {/* 缩略图或占位符 */}
-            <div style={{
-                flexShrink: 0,
-                width: '80px',
-                height: '80px',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                backgroundColor: 'var(--b3-theme-surface)',
-                border: '1px solid var(--b3-border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}>
+            <div className="shape-library-card__thumb">
                 {item.thumbnail ? (
                     <img
                         src={item.thumbnail}
                         alt={item.name}
-                        style={{
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                            objectFit: 'contain',
-                        }}
                     />
                 ) : (
-                    <div style={{
-                        fontSize: '32px',
-                        opacity: 0.3,
-                    }}>
-                        📦
-                    </div>
+                    <ShapeLibraryLogo />
                 )}
             </div>
-            
+
             {/* 信息区域 */}
-            <div style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minWidth: 0, // 允许内容收缩
-            }}>
+            <div className="shape-library-card__body">
                 {/* 名称行 */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '6px',
-                }}>
+                <div className="shape-library-card__name-row">
                     {isEditing ? (
                         <input
+                            className="shape-library-card__rename-input"
                             type="text"
                             value={editingName}
                             onChange={(e) => onEditingNameChange(e.target.value)}
                             onBlur={onSaveRename}
                             onKeyDown={handleKeyDown}
                             autoFocus
-                            style={{
-                                flex: 1,
-                                padding: '2px 6px',
-                                border: '1px solid var(--color-primary)',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                                backgroundColor: 'var(--color-background)',
-                                color: 'var(--color-text)',
-                                outline: 'none',
-                            }}
                         />
                     ) : (
                         <span
-                            style={{
-                                flex: 1,
-                                fontSize: '13px',
-                                fontWeight: 500,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                            }}
+                            className="shape-library-card__name"
                             onDoubleClick={() => onStartRename(item)}
                             title={item.name}
                         >
@@ -767,14 +641,7 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                 </div>
 
                 {/* 信息行 */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '11px',
-                    color: 'var(--b3-theme-on-surface-light)',
-                    marginBottom: '4px',
-                }}>
+                <div className="shape-library-card__meta">
                     <span>
                         {item.shapes.length} 个形状
                         {item.assets.length > 0 && ` · ${item.assets.length} 个资源`}
@@ -782,75 +649,50 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                 </div>
 
                 {/* 操作按钮行 */}
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                <div className="shape-library-card__actions">
                     <button
+                        className="shape-library-icon-button shape-library-icon-button--primary"
                         onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             onClickAdd(item);
                         }}
-                        style={{
-                            padding: '2px 6px',
-                            fontSize: '11px',
-                            backgroundColor: 'var(--b3-theme-primary)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         title="添加到画布"
+                        aria-label="添加到画布"
                     >
-                        添加
+                        <TldrawUiIcon icon="plus" small />
                     </button>
                     <button
+                        className="shape-library-icon-button"
                         onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             onStartRename(item);
                         }}
-                        style={{
-                            padding: '2px 6px',
-                            fontSize: '11px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--b3-theme-on-surface-light)',
-                            border: '1px solid var(--b3-border-color)',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         title="重命名"
+                        aria-label="重命名"
                     >
-                        ✏️
+                        <TldrawUiIcon icon="edit" small />
                     </button>
                     <button
+                        className="shape-library-icon-button shape-library-icon-button--danger"
                         onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             onDelete(item.id, item.name);
                         }}
-                        style={{
-                            padding: '2px 6px',
-                            fontSize: '11px',
-                            backgroundColor: 'transparent',
-                            color: 'var(--b3-theme-on-surface-light)',
-                            border: '1px solid var(--b3-border-color)',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            pointerEvents: 'auto',
-                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         title="删除"
+                        aria-label="删除"
                     >
-                        🗑️
+                        <TldrawUiIcon icon="trash" small />
                     </button>
                 </div>
 
                 {/* 创建时间 */}
-                <div style={{
-                    marginTop: '4px',
-                    fontSize: '10px',
-                    color: 'var(--b3-theme-on-surface-light)',
-                }}>
+                <div className="shape-library-card__date">
                     {new Date(item.createdAt).toLocaleString('zh-CN')}
                 </div>
             </div>
@@ -868,7 +710,7 @@ export const ShapeLibraryButton = track(({ onClick }: { onClick: () => void }) =
             title="素材库"
             onClick={onClick}
         >
-            📦
+            <ShapeLibraryLogo small />
         </TldrawUiButton>
     );
 });
