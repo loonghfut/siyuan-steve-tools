@@ -9,9 +9,80 @@ import { loadChildDocsForDoc, loadOutlineForDoc, type OutlineNode } from '../doc
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
 import { buildCardCollapseUpdate } from './card-collapse'
 
+const COLLAPSED_TEXT_MIN_SIZE = 25
+const COLLAPSED_TEXT_MAX_SIZE = 76
+const COLLAPSED_TEXT_LINE_HEIGHT = 1.4
+const COLLAPSED_TEXT_HORIZONTAL_PADDING = 28
+const COLLAPSED_TEXT_VERTICAL_PADDING = 20
+const COLLAPSED_ICON_SIZE_RATIO = 0.85
+const COLLAPSED_TEXT_GAP = 10
+
 export interface CardStyleSectionProps {
     editor: Editor
     selectedCardShapes: ICardShape[]
+}
+
+function getCollapsedTextElement(shape: ICardShape): HTMLElement | null {
+    const host = document.getElementById(shape.id as string)
+    return (host?.querySelector('[data-card-collapsed-text]') as HTMLElement | null) || null
+}
+
+function canCollapsedTextFit(textEl: HTMLElement, shape: ICardShape, fontSize: number) {
+    const align = shape.props.collapsedTextAlign || 'center'
+    const iconWidth = Math.round(fontSize * COLLAPSED_ICON_SIZE_RATIO)
+    const availableWidth = Math.max(
+        1,
+        shape.props.w -
+            COLLAPSED_TEXT_HORIZONTAL_PADDING -
+            (align === 'center' ? iconWidth : iconWidth + COLLAPSED_TEXT_GAP)
+    )
+    const availableHeight = Math.max(1, shape.props.h - COLLAPSED_TEXT_VERTICAL_PADDING)
+
+    const clone = textEl.cloneNode(true) as HTMLElement
+    clone.style.position = 'absolute'
+    clone.style.left = '-99999px'
+    clone.style.top = '0'
+    clone.style.visibility = 'hidden'
+    clone.style.pointerEvents = 'none'
+    clone.style.width = `${availableWidth}px`
+    clone.style.maxWidth = `${availableWidth}px`
+    clone.style.height = 'auto'
+    clone.style.maxHeight = 'none'
+    clone.style.fontSize = `${fontSize}px`
+    clone.style.lineHeight = `${COLLAPSED_TEXT_LINE_HEIGHT}`
+    clone.style.display = 'block'
+    clone.style.overflow = 'visible'
+    clone.style.textOverflow = 'clip'
+    clone.style.setProperty('-webkit-line-clamp', 'unset')
+    clone.style.setProperty('-webkit-box-orient', 'initial')
+
+    document.body.appendChild(clone)
+    try {
+        return clone.scrollWidth <= availableWidth + 1 && clone.scrollHeight <= availableHeight + 1
+    } finally {
+        clone.remove()
+    }
+}
+
+function getBestCollapsedTextSize(shape: ICardShape): number | null {
+    const textEl = getCollapsedTextElement(shape)
+    if (!textEl) return null
+
+    let low = COLLAPSED_TEXT_MIN_SIZE
+    let high = COLLAPSED_TEXT_MAX_SIZE
+    let best = COLLAPSED_TEXT_MIN_SIZE
+
+    while (low <= high) {
+        const mid = Math.floor((low + high) / 2)
+        if (canCollapsedTextFit(textEl, shape, mid)) {
+            best = mid
+            low = mid + 1
+        } else {
+            high = mid - 1
+        }
+    }
+
+    return best
 }
 
 function outlineNodeToRelationItem(node: OutlineNode): { blockId: string; children?: ReturnType<typeof outlineNodeToRelationItem>[] } {
@@ -70,6 +141,10 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         const first = values[0]
         return values.every((value) => value === first) ? first : 'mixed'
     }, [hasCardSelection, selectedCardShapes])
+
+    const collapsedNormalCardShapes = React.useMemo(() => {
+        return selectedCardShapes.filter((shape) => !shape.props.isMain && shape.props.isCollapsed)
+    }, [selectedCardShapes])
 
     React.useEffect(() => {
         // 主卡片切换时仅重置插入中状态，子文档/大纲数据改为点击对应按钮时再按需加载
@@ -151,6 +226,27 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         }
     }, [selectedMainCard, editor])
 
+    const handleFitCollapsedTextSize = React.useCallback(() => {
+        if (!collapsedNormalCardShapes.length) return
+
+        const updates = collapsedNormalCardShapes.flatMap((shape) => {
+            const nextSize = getBestCollapsedTextSize(shape)
+            if (nextSize === null) return []
+            if (Math.round(shape.props.collapsedTextSize || 21) === nextSize) return []
+            return [{
+                id: shape.id,
+                type: 'card' as const,
+                props: { ...shape.props, collapsedTextSize: nextSize },
+            }]
+        })
+
+        if (!updates.length) return
+
+        editor.run(() => {
+            editor.updateShapes(updates)
+        })
+    }, [collapsedNormalCardShapes, editor])
+
     if (!hasCardSelection) return null
 
     return (
@@ -188,7 +284,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                     <TldrawUiSlider
                         label={`${collapsedTextSizeValue === 'mixed' ? '' : `${collapsedTextSizeValue}px`}`}
                         title="折叠后文字大小"
-                        min={25}
+                        min={COLLAPSED_TEXT_MIN_SIZE}
                         steps={52}
                         value={collapsedTextSizeValue === 'mixed' ? null : collapsedTextSizeValue}
                         onValueChange={(value) => {
@@ -204,6 +300,17 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             })
                         }}
                     />
+                    <div className="tlui-toggle-button-row" style={{ marginTop: '4px' }}>
+                        <TldrawUiButton
+                            type="normal"
+                            className="tlui-toggle-button"
+                            disabled={!collapsedNormalCardShapes.length}
+                            onClick={handleFitCollapsedTextSize}
+                            title="自动调整折叠文字大小"
+                        >
+                            <TldrawUiIcon icon="fit-width" />
+                        </TldrawUiButton>
+                    </div>
                 </div>
 
                 <div className="tlui-style-panel__section">

@@ -1582,7 +1582,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									<line x1="3" y1="21" x2="10" y2="14"></line>
 								</svg>
 								{/* 内容摘要文字 */}
-								<span style={{
+								<span data-card-collapsed-text style={{
 									flex: 1,
 									minWidth: 0,
 									fontSize: `${collapsedTextSize}px`,
