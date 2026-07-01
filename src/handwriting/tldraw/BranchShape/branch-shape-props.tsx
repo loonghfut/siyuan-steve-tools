@@ -1,6 +1,26 @@
 import { DefaultColorStyle, RecordProps, T } from '@tldraw/tldraw'
 import { IBranchShape } from './branch-shape-types'
 
+export function getBranchShapeDefaultProps(): IBranchShape['props'] {
+	return {
+		w: 80,
+		h: 40,
+		color: 'black',
+		childIds: [],
+		leftChildIds: [],
+		rightChildIds: [],
+		rootX: 40,
+		direction: 'right',
+		horizontalGap: 96,
+		verticalGap: 28,
+		lineWidth: 3,
+		lineStyle: 'curve-solid',
+		snapDistance: 160,
+		showBackground: false,
+		version: 5,
+	}
+}
+
 export const branchShapeProps: RecordProps<IBranchShape> = {
 	w: T.number,
 	h: T.number,

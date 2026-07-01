@@ -1,6 +1,24 @@
 import { DefaultColorStyle, RecordProps, T } from '@tldraw/tldraw'
 import { ICardShape } from './card-shape-types'
 
+export function getCardShapeDefaultProps(): ICardShape['props'] {
+	return {
+		w: 300,
+		h: 300,
+		color: 'black',
+		showMask: true,
+		blockId: '',
+		isNewlyCreated: true,
+		fontSize: 16,
+		isMain: false,
+		refreshNonce: Date.now(),
+		isCollapsed: false,
+		renderMode: 'inherit',
+		collapsedTextSize: 21,
+		collapsedTextAlign: 'center',
+	}
+}
+
 // Validation for our custom card shape's props, using one of tldraw's default styles
 export const cardShapeProps: RecordProps<ICardShape> = {
 	w: T.number,

@@ -9,7 +9,7 @@ import {
 	resizeBox,
 } from '@tldraw/tldraw'
 import { cardShapeMigrations } from './card-shape-migrations'
-import { cardShapeProps } from './card-shape-props'
+import { cardShapeProps, getCardShapeDefaultProps } from './card-shape-props'
 import { CardRenderMode, ICardShape } from './card-shape-types'
 import { openTab, Protyle, showMessage, TProtyleAction } from 'siyuan';
 import * as api from '@/api/api';
@@ -218,6 +218,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	}
 
 	getDefaultProps(): ICardShape['props'] {
+		return getCardShapeDefaultProps()
+		/*
 		return {
 			w: 300,
 			h: 300,
@@ -234,6 +236,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			collapsedTextSize: 21, // 折叠后的文字大小
 			collapsedTextAlign: 'center', // 折叠后的文字对齐方式
 		}
+		*/
 	}
 
 	// [5]
