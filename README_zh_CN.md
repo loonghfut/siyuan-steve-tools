@@ -42,7 +42,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.46.0 (2026年07月01日)
+### v0.46.1 (2026年07月01日)
 - feat(tldraw): 优化白板卡片样式与无障碍支持，更新 TypeScript 及 Vite 配置 (loonghfut)
 - feat(mind-map): 支持编辑后快捷创建兄弟/子节点，添加折叠展开按钮 (loonghfut)
 - refactor(branch): 移除分支拖拽全局状态，优化吸附检查逻辑 (loonghfut)
@@ -78,6 +78,9 @@ win端s3同步后，docker端感知s3同步。
 - fix(bezier-connector): 修复选中状态下端口因悬停重复显示的问题 (loonghfut)
 - feat(card): 扩展中心分支创建功能以支持 single-block 形状 (loonghfut)
 - chore(plugin): 升级版本号至 0.46.0 (loonghfut)
+- docs: 更新 v0.46.0 版本的更新日志 (loonghfut)
+- feat(api): 新增 smartInsertBlock 方法，支持根据目标块类型智能选择插入位置 (loonghfut)
+- chore(plugin): 更新版本号至 0.46.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
