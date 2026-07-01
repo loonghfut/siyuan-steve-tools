@@ -268,6 +268,24 @@ export async function insertBlock(
     return request(url, payload);
 }
 
+/**
+ * 智能插入块：若 targetId 为文档块（type='d'）则作为其子块插入（parentID），
+ * 否则作为其后置兄弟块插入（previousID）。
+ */
+export async function smartInsertBlock(dataType: DataType, data: string, targetId: BlockId | DocumentId): Promise<IResdoOperations[]> {
+    let isDoc = false;
+    try {
+        const rows: { type: string }[] = await sql(`SELECT type FROM blocks WHERE id='${String(targetId).replace(/'/g, "''")}' LIMIT 1`);
+        isDoc = rows?.[0]?.type === 'd';
+    } catch (e) {
+        console.warn('查询块类型失败，按普通块插入', e);
+    }
+    if (isDoc) {
+        return insertBlock(dataType, data, undefined, undefined, targetId);
+    }
+    return insertBlock(dataType, data, undefined, targetId);
+}
+
 
 export async function prependBlock(dataType: DataType, data: string, parentID: BlockId | DocumentId): Promise<IResdoOperations[]> {
     let payload = {

@@ -1,4 +1,4 @@
-import { appendBlock, generateSiyuanID, updateBlock } from "@/api/api";
+import { smartInsertBlock, generateSiyuanID, updateBlock } from "@/api/api";
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
 import { ChangeLinkStyle, extractIframeBlockInfo, ShowLinkContent } from "../wps_api";
@@ -173,11 +173,11 @@ export class WpsFileServ {
                         { id: 'tab', title: '新页签预览', text: '🗔', onClick: `window.wps.OpenPreviewTab('${record.link_url}');` }
                     ]);
                     const md = `<div>${cardHtml}</div>\n{: id="${siyuanID}" custom-st-wps="1" custom-wps-id="${record.link_id}" custom-wps-link="${record.link_url}" custom-wps-name="${record.name || ''}"}`;
-                    await appendBlock('markdown', md, this.cursorID);
+                    await smartInsertBlock('markdown', md, this.cursorID);
                     showMessage('已插入卡片', 1200, 'info');
                 } else {
                     const blockMd = this.generateWpsBlock(record);
-                    await appendBlock('markdown', blockMd, this.cursorID);
+                    await smartInsertBlock('markdown', blockMd, this.cursorID);
                     showMessage('已插入链接块', 1200, 'info');
                 }
             } catch (err) {
@@ -406,7 +406,7 @@ export class WpsFileServ {
                 showMessage('未获取到光标位置，无法插入', 1500, 'error');
                 return;
             }
-            appendBlock('markdown', md, this.cursorID);
+            smartInsertBlock('markdown', md, this.cursorID);
             console.debug(md);
             showMessage(`已插入 ${lines.length} 条`, 1500, 'info');
         } catch (e) {
@@ -819,7 +819,7 @@ ${md}
                     }
                 }
                 try {
-                    await appendBlock('markdown', batchContent, setlocationid);
+                    await smartInsertBlock('markdown', batchContent, setlocationid);
                     // 标记已插入并统计
                     for (const rec of toInsert) {
                         importedSet.add(rec.link_id);
