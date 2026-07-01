@@ -32,6 +32,7 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-custom-card-title": "",
     // 文档树显示白板按钮
     "tldraw-show-in-file-tree": true,
+    "tldraw-agent-actions-enable": false,
     ...h6StyleDefaults,
 };
 
@@ -52,6 +53,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "启用精确箭头模式", description: "启用后绘制箭头时将使用精确模式", key: "tldraw-exact-arrow-mode", value: ctx.settings["tldraw-exact-arrow-mode"] },
                 { type: "textinput", title: "自定义卡片标题内容", description: "在此输入自定义的卡片标题内容，支持使用变量 ${timestamp}", key: "tldraw-custom-card-title", value: ctx.settings["tldraw-custom-card-title"] },
                 { type: "checkbox", title: "文档树显示白板按钮", description: "在文档树每个条目左侧显示白板图标按钮", key: "tldraw-show-in-file-tree", value: ctx.settings["tldraw-show-in-file-tree"] },
+                { type: "checkbox", title: "启用思源智能体操作白板", description: "启用后，思源 Agent 可以通过 frontend action 打开、读取并修改 tldraw 白板", key: "tldraw-agent-actions-enable", value: ctx.settings["tldraw-agent-actions-enable"] },
             ]
         },
         h6StyleGroup(ctx),

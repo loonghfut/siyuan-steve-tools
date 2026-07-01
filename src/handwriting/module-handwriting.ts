@@ -11,6 +11,7 @@ import { TLShapeId } from "@tldraw/tldraw";
 import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
 import { settingdata } from "@/index";
 import { buildH6CSS, H6_STYLE_DEFAULTS, type H6StyleConfig } from "@/settings/style-h6";
+import { registerTldrawAgentActions, syncTldrawAgentActions } from "./tldraw/agent-actions";
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -53,6 +54,8 @@ export class M_handwriting {
     }
 
     async init(settingdata) {
+        registerTldrawAgentActions(this.plugin);
+
         const h6cfg = settingdata['style-h6-config'];
         if (h6cfg && typeof h6cfg === 'object') {
             this.applyH6Style(buildH6CSS(h6cfg as H6StyleConfig));
@@ -407,6 +410,10 @@ export class M_handwriting {
         if (settingdata['tldraw-show-in-file-tree'] !== false) {
             this.fileTreeObserver = setupFileTreeObserver();
         }
+    }
+
+    updateSettings(_settingdata: any) {
+        syncTldrawAgentActions(this.plugin);
     }
 
     /**

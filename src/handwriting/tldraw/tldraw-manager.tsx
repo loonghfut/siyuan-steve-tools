@@ -13,8 +13,11 @@ import {
     TLStore,
     Editor,
     TLShapeId,
+    TLShape,
     defaultBindingUtils,
     ArrowShapeUtil,
+    createShapeId,
+    toRichText,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
@@ -1419,6 +1422,183 @@ export class TldrawManager {
         return cardShape?.id || null;
     }
 
+    public getAgentSummary() {
+        const shapes = this.store.query.records('shape').get() || [];
+        const assets = this.store.query.records('asset').get() || [];
+        const pages = this.store.query.records('page').get() || [];
+        const selectedShapeIds = this.editor ? this.editor.getSelectedShapeIds().map(String) : [];
+        const shapeTypeCounts = shapes.reduce<Record<string, number>>((acc, shape: any) => {
+            const type = String(shape.type || 'unknown');
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+        }, {});
+
+        const sampleShapes = shapes.slice(0, 20).map((shape: any) => ({
+            id: String(shape.id),
+            type: String(shape.type),
+            x: Number(shape.x || 0),
+            y: Number(shape.y || 0),
+            props: summarizeShapeProps(shape.props),
+        }));
+
+        return {
+            id: this.id,
+            title: this.title,
+            isOpen: Boolean(this.editor),
+            pageCount: pages.length,
+            shapeCount: shapes.length,
+            assetCount: assets.length,
+            selectedShapeIds,
+            shapeTypeCounts,
+            sampleShapes,
+        };
+    }
+
+    public createAgentShape(options: {
+        kind: 'text' | 'note' | 'rectangle';
+        text?: string;
+        x?: number;
+        y?: number;
+        w?: number;
+        h?: number;
+        color?: string;
+        select?: boolean;
+        zoom?: boolean;
+    }): { shapeId: string; summary: ReturnType<TldrawManager['getAgentSummary']> } {
+        if (!this.editor) {
+            throw new Error('Tldraw editor is not initialized');
+        }
+
+        const kind = options.kind || 'text';
+        const shapeId = createShapeId();
+        const x = finiteNumber(options.x, 0);
+        const y = finiteNumber(options.y, 0);
+        const color = String(options.color || 'black');
+        const text = String(options.text || '');
+
+        if (kind === 'text') {
+            this.editor.createShape({
+                id: shapeId,
+                type: 'text',
+                x,
+                y,
+                props: {
+                    color,
+                    richText: toRichText(text),
+                    autoSize: true,
+                    w: finiteNumber(options.w, 320),
+                },
+            } as any);
+        } else {
+            this.editor.createShape({
+                id: shapeId,
+                type: 'geo',
+                x,
+                y,
+                props: {
+                    geo: kind === 'note' ? 'cloud' : 'rectangle',
+                    color,
+                    richText: toRichText(text),
+                    w: finiteNumber(options.w, kind === 'note' ? 260 : 320),
+                    h: finiteNumber(options.h, kind === 'note' ? 160 : 180),
+                },
+            } as any);
+        }
+
+        if (options.select !== false) {
+            this.editor.select(shapeId);
+        }
+        if (options.zoom) {
+            this.editor.zoomToSelection({ animation: { duration: 300 } });
+        }
+        this.triggerSave();
+
+        return {
+            shapeId: String(shapeId),
+            summary: this.getAgentSummary(),
+        };
+    }
+
+    public selectAgentShape(shapeId: string, zoom = true): { selectedShapeIds: string[] } {
+        if (!this.editor) {
+            throw new Error('Tldraw editor is not initialized');
+        }
+        const id = shapeId as TLShapeId;
+        const shape = this.editor.getShape(id);
+        if (!shape) {
+            throw new Error(`Shape not found: ${shapeId}`);
+        }
+        this.editor.select(id);
+        if (zoom) {
+            this.editor.zoomToSelection({ animation: { duration: 300 } });
+        }
+        return {
+            selectedShapeIds: this.editor.getSelectedShapeIds().map(String),
+        };
+    }
+
+    public updateAgentShape(options: {
+        shapeId: string;
+        x?: number;
+        y?: number;
+        text?: string;
+        w?: number;
+        h?: number;
+        color?: string;
+        select?: boolean;
+        zoom?: boolean;
+    }): { shapeId: string; summary: ReturnType<TldrawManager['getAgentSummary']> } {
+        if (!this.editor) {
+            throw new Error('Tldraw editor is not initialized');
+        }
+        const shape = this.editor.getShape(options.shapeId as TLShapeId) as TLShape | undefined;
+        if (!shape) {
+            throw new Error(`Shape not found: ${options.shapeId}`);
+        }
+
+        const patch: any = {
+            id: shape.id,
+            type: shape.type,
+        };
+        if (typeof options.x === 'number' && Number.isFinite(options.x)) {
+            patch.x = options.x;
+        }
+        if (typeof options.y === 'number' && Number.isFinite(options.y)) {
+            patch.y = options.y;
+        }
+
+        const props: any = {};
+        if (typeof options.text === 'string') {
+            props.richText = toRichText(options.text);
+        }
+        if (typeof options.w === 'number' && Number.isFinite(options.w)) {
+            props.w = options.w;
+        }
+        if (typeof options.h === 'number' && Number.isFinite(options.h)) {
+            props.h = options.h;
+        }
+        if (typeof options.color === 'string' && options.color.trim()) {
+            props.color = options.color.trim();
+        }
+        if (Object.keys(props).length > 0) {
+            patch.props = props;
+        }
+
+        this.editor.updateShape(patch);
+        if (options.select !== false) {
+            this.editor.select(shape.id);
+        }
+        if (options.zoom) {
+            this.editor.zoomToSelection({ animation: { duration: 300 } });
+        }
+        this.triggerSave();
+
+        return {
+            shapeId: String(shape.id),
+            summary: this.getAgentSummary(),
+        };
+    }
+
     /**
      * Helper: find the number of remaining shapes referencing a blockId for specified types
      */
@@ -1643,6 +1823,22 @@ export class TldrawManager {
     }
 
 
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function summarizeShapeProps(props: any): Record<string, unknown> {
+    if (!props || typeof props !== 'object') return {};
+    const out: Record<string, unknown> = {};
+    for (const key of ['w', 'h', 'color', 'geo', 'blockId', 'name', 'text']) {
+        if (props[key] !== undefined) out[key] = props[key];
+    }
+    if (props.richText) {
+        out.richText = '[richText]';
+    }
+    return out;
 }
 
 function isDarkTheme(): boolean {
