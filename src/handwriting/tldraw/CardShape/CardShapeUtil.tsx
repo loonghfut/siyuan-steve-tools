@@ -1474,8 +1474,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						width: '100%',
 						height: '100%',
 						overflow: 'auto', // 内容区域可滚动
-						pointerEvents: isEditingState ? 'all' : 'none',
-						touchAction: isEditingState ? 'auto' : 'none',
+						pointerEvents: isMainCard ? 'none' : isEditingState || isCollapsed ? 'all' : 'none',
+						touchAction: isMainCard ? 'none' : isEditingState || isCollapsed ? 'auto' : 'none',
 						contain: 'strict',
 						padding: '0px',
 					}}
@@ -1483,7 +1483,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					{/* 折叠状态 */}
 					{isCollapsed && !isEditingState && (
 						isMainCard ? (
-							<div style={{
+							<div
+								className="card-shape-collapsed-content"
+								style={{
 								width: '100%',
 								height: '100%',
 								display: 'flex',
@@ -1540,7 +1542,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							</div>
 						</div>
 						) : (
-							<div style={{
+							<div
+								className="card-shape-collapsed-content"
+								style={{
 								width: '100%',
 								height: '100%',
 								display: 'flex',
@@ -1555,6 +1559,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							}}>
 								{/* 折叠图标 — 点击展开 */}
 								<svg
+									className="card-shape-collapsed-toggle-icon"
 									width={Math.round(collapsedTextSize * 0.85)}
 									height={Math.round(collapsedTextSize * 0.85)}
 									viewBox="0 0 24 24"
@@ -1565,9 +1570,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									strokeLinejoin="round"
 									style={{
 									flexShrink: 0,
-									opacity: 0.6,
 									cursor: 'pointer',
-									pointerEvents: 'auto',
 									...(collapsedTextAlign === 'center'
 										? { position: 'absolute', left: '14px', zIndex: 1 }
 										: {}),

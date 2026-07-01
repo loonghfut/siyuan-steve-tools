@@ -923,3 +923,16 @@
     white-space: nowrap;
 }
 
+.card-shape-collapsed-toggle-icon {
+    border-radius: 6px;
+    opacity: 0 !important;
+    transform: scale(0.96);
+    transition: opacity 0.12s ease, background-color 0.12s ease, transform 0.12s ease;
+}
+
+.card-shape-collapsed-content:hover .card-shape-collapsed-toggle-icon {
+    opacity: 0.9 !important;
+    pointer-events: auto !important;
+    transform: scale(1.06);
+}
+
