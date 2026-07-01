@@ -11,20 +11,13 @@ import { api } from '@frostime/siyuan-plugin-kits';
 import { openTab, showMessage } from 'siyuan';
 import type { ICardShape } from '../CardShape/card-shape-types';
 import { insertDocRelations } from './insert-doc-relations';
-import { collectAllOutlineNodeIds, loadOutlineForDoc, type OutlineNode } from './doc-outline-data';
+import { collectAllOutlineNodeIds, loadOutlineForDoc, outlineNodeToRelationItem, type OutlineNode } from './doc-outline-data';
 
 interface DocOutlinePanelProps {
     isOpen: boolean;
     onClose: () => void;
     docId: string | null; // 绑定的文档ID
     selectedMainCard: ICardShape | null;
-}
-
-function outlineNodeToRelationItem(node: OutlineNode): { blockId: string; children?: ReturnType<typeof outlineNodeToRelationItem>[] } {
-    return {
-        blockId: node.id,
-        children: node.blocks?.map(outlineNodeToRelationItem),
-    };
 }
 
 /**

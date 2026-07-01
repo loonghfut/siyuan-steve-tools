@@ -49,6 +49,7 @@ import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import { createAgentBusinessShape } from './agent/shape-ops';
 import type { AgentCreateShapeArgs, AgentCreateShapeResult } from './agent/types';
 import { finiteNumberInRange, normalizeOptionalAgentColor } from './agent/schema';
+import { insertDocOutlineMindmapForAgent, type AgentDocOutlineBoardOptions } from './agent/doc-to-board';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -1462,6 +1463,19 @@ export class TldrawManager {
 
         const result = createAgentBusinessShape(this.editor, options);
         this.syncAgentCreatedBlockAttrs(result);
+        this.triggerSave();
+        return {
+            ...result,
+            summary: this.getAgentSummary(),
+        };
+    }
+
+    public async insertDocOutlineMindmapForAgent(options: AgentDocOutlineBoardOptions) {
+        if (!this.editor) {
+            throw new Error('Tldraw editor is not initialized');
+        }
+
+        const result = await insertDocOutlineMindmapForAgent(this.editor, options);
         this.triggerSave();
         return {
             ...result,

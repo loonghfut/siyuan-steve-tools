@@ -5,6 +5,8 @@ import { WHITEBOARD_STORAGE_DIR, WhiteboardFileManager } from './whiteboard-file
 import { getAllInstanceIds, getInstance } from './tldraw-instance-manager';
 import { buildTldrawLink } from './utils/link-builder';
 import { booleanArgWithFallback, clampNumber, numberArg, parseCreateShapeArgs, stringArg } from './agent/args';
+import { loadOutlineForDoc } from './doc-outline/doc-outline-data';
+import { summarizeOutline } from './agent/doc-to-board';
 
 type AgentActionResult = Promise<{ result?: string; error?: string }>;
 type AddAgentAction = (options: {
@@ -107,6 +109,57 @@ export function registerTldrawAgentActions(plugin: Plugin) {
                     return { error: `Whiteboard file not found: ${whiteboardId}` };
                 }
                 return { result: JSON.stringify(summarizeSavedSnapshot(whiteboardId, content), null, 2) };
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
+        },
+    });
+
+    addAgentAction.call(plugin, {
+        name: 'siyuan_read_doc_outline_for_tldraw',
+        description: 'Read a SiYuan document outline for planning a tldraw mindmap. Required args: docId string. Optional args: maxNodes number. Returns heading/block IDs, titles, depth, type, and subType. Use these block IDs when creating cards or branches.',
+        handler: async (args) => {
+            const disabled = disabledResult();
+            if (disabled) return disabled;
+            const docId = stringArg(args.docId || args.id || args.rootId || args.whiteboardId);
+            if (!docId) return { error: 'missing required argument: docId' };
+
+            try {
+                const maxNodes = clampNumber(args.maxNodes, 1, 500, 120);
+                const outline = await loadOutlineForDoc(docId);
+                return {
+                    result: JSON.stringify({
+                        docId,
+                        outlineNodeCount: countOutlineNodes(outline),
+                        outline: summarizeOutline(outline, maxNodes),
+                    }, null, 2),
+                };
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
+        },
+    });
+
+    addAgentAction.call(plugin, {
+        name: 'tldraw_insert_doc_outline_mindmap',
+        description: 'Insert the outline blocks of a SiYuan document into its open STtools tldraw whiteboard as a branch/mindmap layout. Required args: docId string. Optional args: whiteboardId string defaults to docId, mainShapeId string, select boolean, zoom boolean. If the document main card is missing, the plugin creates it. Existing block cards are skipped.',
+        handler: async (args) => {
+            const disabled = disabledResult();
+            if (disabled) return disabled;
+            const docId = stringArg(args.docId || args.blockId || args.rootId || args.id);
+            if (!docId) return { error: 'missing required argument: docId' };
+            const whiteboardId = stringArg(args.whiteboardId) || docId;
+            const instance = getInstance(whiteboardId);
+            if (!instance) return { error: `Whiteboard ${whiteboardId} is not open. Call tldraw_open_whiteboard first.` };
+
+            try {
+                const inserted = await instance.insertDocOutlineMindmapForAgent({
+                    docId,
+                    mainShapeId: stringArg(args.mainShapeId || args.shapeId),
+                    select: booleanArgWithFallback(args.select, true),
+                    zoom: booleanArgWithFallback(args.zoom, true),
+                });
+                return { result: JSON.stringify(inserted, null, 2) };
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -234,6 +287,16 @@ function summarizeProps(props: any): Record<string, unknown> {
     }
     if (props.richText) out.richText = '[richText]';
     return out;
+}
+
+function countOutlineNodes(nodes: Array<{ blocks?: any[] }>): number {
+    let count = 0;
+    const visit = (node: { blocks?: any[] }) => {
+        count += 1;
+        node.blocks?.forEach(visit);
+    };
+    nodes.forEach(visit);
+    return count;
 }
 
 function stringifyError(error: unknown): string {

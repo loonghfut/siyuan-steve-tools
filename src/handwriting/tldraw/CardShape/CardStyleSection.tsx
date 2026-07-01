@@ -5,7 +5,7 @@ import React from 'react'
 import { TldrawUiButton, TldrawUiIcon, TldrawUiSlider, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import type { ICardShape, CardRenderMode } from './card-shape-types'
-import { loadChildDocsForDoc, loadOutlineForDoc, type OutlineNode } from '../doc-outline/doc-outline-data'
+import { loadChildDocsForDoc, loadOutlineForDoc, outlineNodeToRelationItem } from '../doc-outline/doc-outline-data'
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
 import { buildCardCollapseUpdate } from './card-collapse'
 
@@ -108,13 +108,6 @@ function getBestCollapsedTextSize(shape: ICardShape, measureRoot: HTMLElement): 
 
     clone.remove()
     return best
-}
-
-function outlineNodeToRelationItem(node: OutlineNode): { blockId: string; children?: ReturnType<typeof outlineNodeToRelationItem>[] } {
-    return {
-        blockId: node.id,
-        children: node.blocks?.map(outlineNodeToRelationItem),
-    }
 }
 
 export const CardStyleSection: React.FC<CardStyleSectionProps> = ({

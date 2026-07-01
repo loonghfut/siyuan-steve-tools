@@ -112,3 +112,10 @@ export function collectAllOutlineNodeIds(nodes: OutlineNode[]): string[] {
     nodes.forEach(collect)
     return ids
 }
+
+export function outlineNodeToRelationItem(node: OutlineNode): { blockId: string; children?: ReturnType<typeof outlineNodeToRelationItem>[] } {
+    return {
+        blockId: node.id,
+        children: node.blocks?.map(outlineNodeToRelationItem),
+    }
+}
