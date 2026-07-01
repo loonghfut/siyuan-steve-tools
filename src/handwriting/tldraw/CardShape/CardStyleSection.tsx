@@ -17,6 +17,12 @@ const COLLAPSED_TEXT_VERTICAL_PADDING = 20
 const COLLAPSED_ICON_SIZE_RATIO = 0.85
 const COLLAPSED_TEXT_GAP = 10
 
+type CardCollapsedTextSizeUpdate = {
+    id: ICardShape['id']
+    type: 'card'
+    props: ICardShape['props']
+}
+
 export interface CardStyleSectionProps {
     editor: Editor
     selectedCardShapes: ICardShape[]
@@ -27,46 +33,64 @@ function getCollapsedTextElement(shape: ICardShape): HTMLElement | null {
     return (host?.querySelector('[data-card-collapsed-text]') as HTMLElement | null) || null
 }
 
-function canCollapsedTextFit(textEl: HTMLElement, shape: ICardShape, fontSize: number) {
+function createCollapsedTextMeasureRoot() {
+    const root = document.createElement('div')
+    root.style.position = 'absolute'
+    root.style.left = '-99999px'
+    root.style.top = '0'
+    root.style.visibility = 'hidden'
+    root.style.pointerEvents = 'none'
+    root.style.contain = 'layout style size'
+    document.body.appendChild(root)
+    return root
+}
+
+function getCollapsedTextAvailableSize(shape: ICardShape, fontSize: number) {
     const align = shape.props.collapsedTextAlign || 'center'
     const iconWidth = Math.round(fontSize * COLLAPSED_ICON_SIZE_RATIO)
-    const availableWidth = Math.max(
-        1,
+    return {
+        width: Math.max(
+            1,
         shape.props.w -
             COLLAPSED_TEXT_HORIZONTAL_PADDING -
             (align === 'center' ? iconWidth : iconWidth + COLLAPSED_TEXT_GAP)
-    )
-    const availableHeight = Math.max(1, shape.props.h - COLLAPSED_TEXT_VERTICAL_PADDING)
+        ),
+        height: Math.max(1, shape.props.h - COLLAPSED_TEXT_VERTICAL_PADDING),
+    }
+}
 
+function createCollapsedTextMeasureElement(textEl: HTMLElement, measureRoot: HTMLElement) {
     const clone = textEl.cloneNode(true) as HTMLElement
-    clone.style.position = 'absolute'
-    clone.style.left = '-99999px'
-    clone.style.top = '0'
+    clone.removeAttribute('id')
+    clone.style.position = 'static'
     clone.style.visibility = 'hidden'
     clone.style.pointerEvents = 'none'
-    clone.style.width = `${availableWidth}px`
-    clone.style.maxWidth = `${availableWidth}px`
     clone.style.height = 'auto'
     clone.style.maxHeight = 'none'
-    clone.style.fontSize = `${fontSize}px`
     clone.style.lineHeight = `${COLLAPSED_TEXT_LINE_HEIGHT}`
     clone.style.display = 'block'
     clone.style.overflow = 'visible'
     clone.style.textOverflow = 'clip'
     clone.style.setProperty('-webkit-line-clamp', 'unset')
     clone.style.setProperty('-webkit-box-orient', 'initial')
-
-    document.body.appendChild(clone)
-    try {
-        return clone.scrollWidth <= availableWidth + 1 && clone.scrollHeight <= availableHeight + 1
-    } finally {
-        clone.remove()
-    }
+    measureRoot.appendChild(clone)
+    return clone
 }
 
-function getBestCollapsedTextSize(shape: ICardShape): number | null {
+function canCollapsedTextFitWithClone(clone: HTMLElement, shape: ICardShape, fontSize: number) {
+    const availableSize = getCollapsedTextAvailableSize(shape, fontSize)
+    clone.style.width = `${availableSize.width}px`
+    clone.style.maxWidth = `${availableSize.width}px`
+    clone.style.fontSize = `${fontSize}px`
+
+    return clone.scrollWidth <= availableSize.width + 1 && clone.scrollHeight <= availableSize.height + 1
+}
+
+function getBestCollapsedTextSize(shape: ICardShape, measureRoot: HTMLElement): number | null {
     const textEl = getCollapsedTextElement(shape)
     if (!textEl) return null
+
+    const clone = createCollapsedTextMeasureElement(textEl, measureRoot)
 
     let low = COLLAPSED_TEXT_MIN_SIZE
     let high = COLLAPSED_TEXT_MAX_SIZE
@@ -74,7 +98,7 @@ function getBestCollapsedTextSize(shape: ICardShape): number | null {
 
     while (low <= high) {
         const mid = Math.floor((low + high) / 2)
-        if (canCollapsedTextFit(textEl, shape, mid)) {
+        if (canCollapsedTextFitWithClone(clone, shape, mid)) {
             best = mid
             low = mid + 1
         } else {
@@ -82,6 +106,7 @@ function getBestCollapsedTextSize(shape: ICardShape): number | null {
         }
     }
 
+    clone.remove()
     return best
 }
 
@@ -229,16 +254,23 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
     const handleFitCollapsedTextSize = React.useCallback(() => {
         if (!collapsedNormalCardShapes.length) return
 
-        const updates = collapsedNormalCardShapes.flatMap((shape) => {
-            const nextSize = getBestCollapsedTextSize(shape)
-            if (nextSize === null) return []
-            if (Math.round(shape.props.collapsedTextSize || 21) === nextSize) return []
-            return [{
-                id: shape.id,
-                type: 'card' as const,
-                props: { ...shape.props, collapsedTextSize: nextSize },
-            }]
-        })
+        const measureRoot = createCollapsedTextMeasureRoot()
+        const updates: CardCollapsedTextSizeUpdate[] = []
+
+        try {
+            for (const shape of collapsedNormalCardShapes) {
+                const nextSize = getBestCollapsedTextSize(shape, measureRoot)
+                if (nextSize === null) continue
+                if (Math.round(shape.props.collapsedTextSize || 21) === nextSize) continue
+                updates.push({
+                    id: shape.id,
+                    type: 'card' as const,
+                    props: { ...shape.props, collapsedTextSize: nextSize },
+                })
+            }
+        } finally {
+            measureRoot.remove()
+        }
 
         if (!updates.length) return
 
