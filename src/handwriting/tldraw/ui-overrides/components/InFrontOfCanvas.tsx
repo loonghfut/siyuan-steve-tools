@@ -24,11 +24,13 @@ import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
 import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
 import {
+    createCenterBranchForShape,
     createCenterBranchForCard,
     deleteEmptyCenterBranchForCard,
     getEmptyCenterBranchForCard,
 } from '../../CardShape/create-card-center-branch'
 import { createSingleBlockForBranch, getBranchRootParent } from '../../BranchShape'
+import type { ISingleBlockShape } from '../../SingleBlockShape/single-block-shape-types'
 
 export const InFrontOfCanvas: React.FC = () => {
     const editor = useEditor()
@@ -116,7 +118,10 @@ export const InFrontOfCanvas: React.FC = () => {
         },
         [editor, selectionInfo?.id]
     )
-    const canCreateCenterBranch = isValidSelection && selectedShape.type === 'card' && !rootParentBranch
+    const canCreateCenterBranch =
+        isValidSelection &&
+        (selectedShape.type === 'card' || selectedShape.type === 'single-block') &&
+        !rootParentBranch
 
     // 手形工具点击跳转功能
     const pointerDownPoint = React.useRef<{ x: number; y: number } | null>(null)
@@ -346,9 +351,12 @@ export const InFrontOfCanvas: React.FC = () => {
                                     style={buttonStyle}
                                     onClick={() => {
                                         const shape = editor.getShape(selectionInfo.id)
-                                        if (!shape || shape.type !== 'card') return
+                                        if (!shape || (shape.type !== 'card' && shape.type !== 'single-block')) return
 
-                                        const newBranchId = createCenterBranchForCard(editor, shape as ICardShape)
+                                        const newBranchId =
+                                            shape.type === 'card'
+                                                ? createCenterBranchForCard(editor, shape as ICardShape)
+                                                : createCenterBranchForShape(editor, shape as ISingleBlockShape)
                                         if (!newBranchId) {
                                             showMessage('创建中心 Branch 失败', 3000, 'error')
                                         }

@@ -8,6 +8,9 @@ import {
 } from '../BranchShape'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
 import type { ICardShape } from './card-shape-types'
+import type { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
+
+type CenterBranchRootShape = ICardShape | ISingleBlockShape
 
 const DEFAULT_BRANCH_PROPS: IBranchShape['props'] = {
 	w: 80,
@@ -31,8 +34,8 @@ function uniqueIds(ids: string[]) {
 	return Array.from(new Set(ids))
 }
 
-function getCardCenter(editor: Editor, card: ICardShape) {
-	const bounds = editor.getShapePageBounds(card.id)
+function getShapeCenter(editor: Editor, shape: CenterBranchRootShape) {
+	const bounds = editor.getShapePageBounds(shape.id)
 	if (bounds) {
 		return {
 			x: bounds.center.x,
@@ -41,15 +44,15 @@ function getCardCenter(editor: Editor, card: ICardShape) {
 	}
 
 	return {
-		x: card.x + (card.props.w || 0) / 2,
-		y: card.y + (card.props.h || 0) / 2,
+		x: shape.x + (shape.props.w || 0) / 2,
+		y: shape.y + (shape.props.h || 0) / 2,
 	}
 }
 
-function createBranchShapeForCard(id: TLShapeId, card: ICardShape, center: { x: number; y: number }) {
+function createBranchShapeForRootShape(id: TLShapeId, shape: CenterBranchRootShape, center: { x: number; y: number }) {
 	const props: IBranchShape['props'] = {
 		...DEFAULT_BRANCH_PROPS,
-		rootShapeId: card.id as string,
+		rootShapeId: shape.id as string,
 	}
 
 	return {
@@ -112,15 +115,15 @@ export function getEmptyCenterBranchForCard(editor: Editor, card: ICardShape): I
 	return rootParentBranch
 }
 
-export function createCenterBranchForCard(editor: Editor, card: ICardShape): TLShapeId | null {
-	const latestCard = editor.getShape<ICardShape>(card.id)
-	if (!latestCard || latestCard.type !== 'card') return null
-	if (getBranchRootParent(editor, latestCard.id)) return null
+export function createCenterBranchForShape(editor: Editor, shape: CenterBranchRootShape): TLShapeId | null {
+	const latestShape = editor.getShape<CenterBranchRootShape>(shape.id)
+	if (!latestShape || (latestShape.type !== 'card' && latestShape.type !== 'single-block')) return null
+	if (getBranchRootParent(editor, latestShape.id)) return null
 
 	const branchId = createShapeId()
-	const sideParentBranches = getSideParentBranches(editor, latestCard.id as string)
-	const center = getCardCenter(editor, latestCard)
-	const branchShape = createBranchShapeForCard(branchId, latestCard, center)
+	const sideParentBranches = getSideParentBranches(editor, latestShape.id as string)
+	const center = getShapeCenter(editor, latestShape)
+	const branchShape = createBranchShapeForRootShape(branchId, latestShape, center)
 
 	markExplicitCreatedBranchRelations(editor, [branchId])
 
@@ -130,7 +133,7 @@ export function createCenterBranchForCard(editor: Editor, card: ICardShape): TLS
 		for (const parentBranch of sideParentBranches) {
 			const latestParentBranch = editor.getShape<IBranchShape>(parentBranch.id)
 			if (latestParentBranch?.type === 'branch') {
-				replaceSideChildInBranch(editor, latestParentBranch, latestCard.id as string, branchId as string)
+				replaceSideChildInBranch(editor, latestParentBranch, latestShape.id as string, branchId as string)
 			}
 		}
 
@@ -152,10 +155,14 @@ export function createCenterBranchForCard(editor: Editor, card: ICardShape): TLS
 			relayoutBranchesContainingShapes(editor, relayoutIds)
 		}
 
-		editor.select(latestCard.id)
+		editor.select(latestShape.id)
 	})
 
 	return branchId
+}
+
+export function createCenterBranchForCard(editor: Editor, card: ICardShape): TLShapeId | null {
+	return createCenterBranchForShape(editor, card)
 }
 
 export function deleteEmptyCenterBranchForCard(editor: Editor, card: ICardShape): TLShapeId | null {
