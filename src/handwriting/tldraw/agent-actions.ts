@@ -115,7 +115,7 @@ export function registerTldrawAgentActions(plugin: Plugin) {
 
     addAgentAction.call(plugin, {
         name: 'tldraw_create_shape',
-        description: 'Create STtools tldraw business shapes on an open whiteboard. Required args: whiteboardId string, kind "card"|"single-block"|"branch". For card/single-block optional args: blockId, x, y, w, h, color, select, zoom. For branch optional args: x, y, rootShapeId or root, childShapeIds, children, leftChildren, rightChildren, direction, horizontalGap, verticalGap, lineStyle, lineWidth, snapDistance, showBackground. Children may be existing shape IDs or objects like {shapeId} / {kind:"card"|"single-block"|"branch", blockId, side}. The plugin creates missing business nodes, attaches them to the branch, lays out branch children, selects the branch, and returns all created/attached IDs.',
+        description: 'Create STtools tldraw business shapes on an open whiteboard. Required args: whiteboardId string, kind "card"|"single-block"|"branch". For card/single-block optional args: blockId, x, y, w, h, color, select, zoom. Color must be one of black, grey, light-violet, violet, blue, light-blue, yellow, orange, green, light-green, light-red, red, white; unsupported colors are normalized. For branch optional args: x, y, rootShapeId or root, childShapeIds, children, leftChildren, rightChildren, direction, horizontalGap, verticalGap, lineStyle, lineWidth, snapDistance, showBackground. lineStyle must be curve-solid, elbow-solid, straight-solid, curve-dashed, or frame-floating. Children may be existing shape IDs or objects like {shapeId} / {kind:"card"|"single-block"|"branch", blockId, side}. The plugin creates missing business nodes, attaches them to the branch, lays out branch children, selects the branch, and returns all created/attached IDs.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
@@ -135,7 +135,7 @@ export function registerTldrawAgentActions(plugin: Plugin) {
 
     addAgentAction.call(plugin, {
         name: 'tldraw_update_shape',
-        description: 'Update a shape on an open STtools tldraw whiteboard. Required args: whiteboardId string, shapeId string. Optional args: text, x, y, w, h, color, select boolean, zoom boolean.',
+        description: 'Update position and supported visual props of an STtools business shape on an open tldraw whiteboard. Required args: whiteboardId string, shapeId string. Optional args: x, y, w, h, color, select boolean, zoom boolean. Color must be a tldraw color name; unsupported colors are normalized. Do not pass text for card, single-block, or branch; their content comes from bound SiYuan blocks.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
@@ -149,7 +149,6 @@ export function registerTldrawAgentActions(plugin: Plugin) {
             try {
                 const updated = instance.updateAgentShape({
                     shapeId,
-                    text: typeof args.text === 'string' ? args.text : undefined,
                     x: numberArg(args.x),
                     y: numberArg(args.y),
                     w: numberArg(args.w),

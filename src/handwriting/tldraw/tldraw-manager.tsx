@@ -16,7 +16,6 @@ import {
     TLShape,
     defaultBindingUtils,
     ArrowShapeUtil,
-    toRichText,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
@@ -49,6 +48,7 @@ import { registerInstance, unregisterInstance } from './tldraw-instance-manager'
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import { createAgentBusinessShape } from './agent/shape-ops';
 import type { AgentCreateShapeArgs, AgentCreateShapeResult } from './agent/types';
+import { finiteNumberInRange, normalizeOptionalAgentColor } from './agent/schema';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -1491,7 +1491,6 @@ export class TldrawManager {
         shapeId: string;
         x?: number;
         y?: number;
-        text?: string;
         w?: number;
         h?: number;
         color?: string;
@@ -1510,26 +1509,14 @@ export class TldrawManager {
             id: shape.id,
             type: shape.type,
         };
-        if (typeof options.x === 'number' && Number.isFinite(options.x)) {
-            patch.x = options.x;
+        if (options.x !== undefined) {
+            patch.x = finiteNumberInRange(options.x, shape.x, -100000, 100000);
         }
-        if (typeof options.y === 'number' && Number.isFinite(options.y)) {
-            patch.y = options.y;
+        if (options.y !== undefined) {
+            patch.y = finiteNumberInRange(options.y, shape.y, -100000, 100000);
         }
 
-        const props: any = {};
-        if (typeof options.text === 'string') {
-            props.richText = toRichText(options.text);
-        }
-        if (typeof options.w === 'number' && Number.isFinite(options.w)) {
-            props.w = options.w;
-        }
-        if (typeof options.h === 'number' && Number.isFinite(options.h)) {
-            props.h = options.h;
-        }
-        if (typeof options.color === 'string' && options.color.trim()) {
-            props.color = options.color.trim();
-        }
+        const props = buildAgentShapePropsPatch(shape, options);
         if (Object.keys(props).length > 0) {
             patch.props = props;
         }
@@ -1804,6 +1791,29 @@ function summarizeShapeProps(props: any): Record<string, unknown> {
         out.richText = '[richText]';
     }
     return out;
+}
+
+function buildAgentShapePropsPatch(shape: TLShape, options: {
+    w?: number;
+    h?: number;
+    color?: string;
+}): Record<string, unknown> {
+    const props: Record<string, unknown> = {};
+    const supportsSize = shape.type === 'card' || shape.type === 'single-block' || shape.type === 'branch';
+    const supportsColor = supportsSize;
+
+    if (supportsSize && options.w !== undefined) {
+        props.w = finiteNumberInRange(options.w, Number((shape as any).props?.w) || 300, 1, 4000);
+    }
+    if (supportsSize && options.h !== undefined) {
+        props.h = finiteNumberInRange(options.h, Number((shape as any).props?.h) || 300, 1, 4000);
+    }
+    if (supportsColor && options.color !== undefined) {
+        const color = normalizeOptionalAgentColor(options.color);
+        if (color) props.color = color;
+    }
+
+    return props;
 }
 
 function isDarkTheme(): boolean {

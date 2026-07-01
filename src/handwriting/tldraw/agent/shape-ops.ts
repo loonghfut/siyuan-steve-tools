@@ -1,9 +1,10 @@
-import { Editor, TLDefaultColorStyle, TLShapeId, createShapeId } from '@tldraw/tldraw'
+import { Editor, TLShapeId, createShapeId } from '@tldraw/tldraw'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
 import { layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape/branch-layout'
 import type { AgentBranchSide, AgentCreateShapeArgs, AgentCreateShapeResult, AgentCreatedNode, AgentNodeKind, AgentShapeRef } from './types'
+import { finiteNumberInRange, normalizeAgentColor, normalizeBranchLineStyle } from './schema'
 
 const DEFAULT_CARD_WIDTH = 300
 const DEFAULT_CARD_HEIGHT = 300
@@ -69,9 +70,9 @@ function createCard(editor: Editor, options: {
         x: finiteNumber(options.x, 0),
         y: finiteNumber(options.y, 0),
         props: {
-            w: finiteNumber(options.w, isMain ? 500 : DEFAULT_CARD_WIDTH),
-            h: finiteNumber(options.h, isMain ? 700 : DEFAULT_CARD_HEIGHT),
-            color: colorArg(options.color),
+            w: finiteNumberInRange(options.w, isMain ? 500 : DEFAULT_CARD_WIDTH, 1, 4000),
+            h: finiteNumberInRange(options.h, isMain ? 700 : DEFAULT_CARD_HEIGHT, 1, 4000),
+            color: normalizeAgentColor(options.color),
             showMask: options.showMask !== false,
             blockId: options.blockId || '',
             isMain,
@@ -97,9 +98,9 @@ function createSingleBlock(editor: Editor, options: {
         x: finiteNumber(options.x, 0),
         y: finiteNumber(options.y, 0),
         props: {
-            w: finiteNumber(options.w, DEFAULT_SINGLE_WIDTH),
-            h: finiteNumber(options.h, DEFAULT_SINGLE_HEIGHT),
-            color: colorArg(options.color),
+            w: finiteNumberInRange(options.w, DEFAULT_SINGLE_WIDTH, 1, 4000),
+            h: finiteNumberInRange(options.h, DEFAULT_SINGLE_HEIGHT, 1, 4000),
+            color: normalizeAgentColor(options.color),
             blockId: options.blockId || '',
             isNewlyCreated: !options.blockId,
         },
@@ -166,18 +167,18 @@ function createBranchNode(editor: Editor, options: AgentCreateShapeArgs, context
         props: {
             w: DEFAULT_BRANCH_WIDTH,
             h: DEFAULT_BRANCH_HEIGHT,
-            color: colorArg(options.color),
+            color: normalizeAgentColor(options.color),
             childIds: [...rightChildIds],
             leftChildIds,
             rightChildIds,
             rootShapeId,
             rootX: DEFAULT_BRANCH_WIDTH / 2,
             direction: options.direction || 'right',
-            horizontalGap: finiteNumber(options.horizontalGap, DEFAULT_BRANCH_HORIZONTAL_GAP),
-            verticalGap: finiteNumber(options.verticalGap, DEFAULT_BRANCH_VERTICAL_GAP),
-            lineWidth: finiteNumber(options.lineWidth, 3),
-            lineStyle: options.lineStyle as any || 'curve-solid',
-            snapDistance: finiteNumber(options.snapDistance, 160),
+            horizontalGap: finiteNumberInRange(options.horizontalGap, DEFAULT_BRANCH_HORIZONTAL_GAP, 20, 2000),
+            verticalGap: finiteNumberInRange(options.verticalGap, DEFAULT_BRANCH_VERTICAL_GAP, 8, 1000),
+            lineWidth: finiteNumberInRange(options.lineWidth, 3, 1, 24),
+            lineStyle: normalizeBranchLineStyle(options.lineStyle),
+            snapDistance: finiteNumberInRange(options.snapDistance, 160, 40, 2000),
             showBackground: options.showBackground === true,
             version: 5,
         },
@@ -361,8 +362,4 @@ function getShapeCenter(editor: Editor, shapeId: string): { x: number; y: number
     const w = Number(props.w) || DEFAULT_CARD_WIDTH
     const h = Number(props.h) || DEFAULT_SINGLE_HEIGHT
     return { x: shape.x + w / 2, y: shape.y + h / 2 }
-}
-
-function colorArg(value: unknown): TLDefaultColorStyle {
-    return (typeof value === 'string' && value.trim() ? value.trim() : 'black') as TLDefaultColorStyle
 }
