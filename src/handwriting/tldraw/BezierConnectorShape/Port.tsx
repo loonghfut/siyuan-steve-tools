@@ -145,6 +145,14 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLShapeId; parentHovered?: boolean }) {
 	const editor = useEditor()
 
+	// 当形状已被选中时，不再因悬停触发端口显示（此时浮动操作按钮栏已展示）
+	const isSelected = useValue(
+		'is-shape-selected',
+		() => editor.getSelectedShapeIds().includes(shapeId),
+		[editor, shapeId]
+	)
+	const effectiveParentHovered = parentHovered && !isSelected
+
 	const ports = useValue(
 		'ports',
 		() => {
@@ -179,7 +187,7 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 			return
 		}
 
-		if (parentHovered) {
+		if (effectiveParentHovered) {
 			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
 			const hoverDelayMs = getPortHoverDelayMs()
 			hoverTimerRef.current = window.setTimeout(() => {
@@ -193,7 +201,7 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 			}
 			setHoveredVisible(false)
 		}
-	}, [parentHovered, editor])
+	}, [effectiveParentHovered, editor])
 
 	const visible = useValue('overlay-visible', () => {
 		// 当工具为 hand 时，隐藏端口
@@ -212,14 +220,14 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 			if (!eligible.excludeShapeIds?.has(shapeId)) return true
 		}
 		return false
-	}, [editor, shapeId, parentHovered, ports, hoveredVisible])
+	}, [editor, shapeId, effectiveParentHovered, ports, hoveredVisible])
 
 	if (!ports || !visible) return null
 
 	return (
 		<div className="bezier-connector-ports-overlay">
 			{Object.keys(ports).map((portId) => (
-				<Port key={portId} shapeId={shapeId} portId={portId} parentHovered={parentHovered} />
+				<Port key={portId} shapeId={shapeId} portId={portId} parentHovered={effectiveParentHovered} />
 			))}
 		</div>
 	)
