@@ -16,7 +16,6 @@ import {
     TLShape,
     defaultBindingUtils,
     ArrowShapeUtil,
-    createShapeId,
     toRichText,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
@@ -48,6 +47,8 @@ import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
 import { registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
+import { createAgentBusinessShape } from './agent/shape-ops';
+import type { AgentCreateShapeArgs, AgentCreateShapeResult } from './agent/types';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -1454,67 +1455,16 @@ export class TldrawManager {
         };
     }
 
-    public createAgentShape(options: {
-        kind: 'text' | 'note' | 'rectangle';
-        text?: string;
-        x?: number;
-        y?: number;
-        w?: number;
-        h?: number;
-        color?: string;
-        select?: boolean;
-        zoom?: boolean;
-    }): { shapeId: string; summary: ReturnType<TldrawManager['getAgentSummary']> } {
+    public createAgentShape(options: AgentCreateShapeArgs): AgentCreateShapeResult & { summary: ReturnType<TldrawManager['getAgentSummary']> } {
         if (!this.editor) {
             throw new Error('Tldraw editor is not initialized');
         }
 
-        const kind = options.kind || 'text';
-        const shapeId = createShapeId();
-        const x = finiteNumber(options.x, 0);
-        const y = finiteNumber(options.y, 0);
-        const color = String(options.color || 'black');
-        const text = String(options.text || '');
-
-        if (kind === 'text') {
-            this.editor.createShape({
-                id: shapeId,
-                type: 'text',
-                x,
-                y,
-                props: {
-                    color,
-                    richText: toRichText(text),
-                    autoSize: true,
-                    w: finiteNumber(options.w, 320),
-                },
-            } as any);
-        } else {
-            this.editor.createShape({
-                id: shapeId,
-                type: 'geo',
-                x,
-                y,
-                props: {
-                    geo: kind === 'note' ? 'cloud' : 'rectangle',
-                    color,
-                    richText: toRichText(text),
-                    w: finiteNumber(options.w, kind === 'note' ? 260 : 320),
-                    h: finiteNumber(options.h, kind === 'note' ? 160 : 180),
-                },
-            } as any);
-        }
-
-        if (options.select !== false) {
-            this.editor.select(shapeId);
-        }
-        if (options.zoom) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
+        const result = createAgentBusinessShape(this.editor, options);
+        this.syncAgentCreatedBlockAttrs(result);
         this.triggerSave();
-
         return {
-            shapeId: String(shapeId),
+            ...result,
             summary: this.getAgentSummary(),
         };
     }
@@ -1605,6 +1555,25 @@ export class TldrawManager {
     private countRemainingShapesReferencingBlock(editor: Editor, blockId: string, types: string[]): number {
         const allShapes = editor.store.query.records('shape').get();
         return allShapes.filter(s => types.includes(s.type) && (s as ICardShape).props?.blockId === blockId).length;
+    }
+
+    private syncAgentCreatedBlockAttrs(result: AgentCreateShapeResult) {
+        const nodes = result.createdNodes || [];
+        const linkedNodes = nodes.filter((node) =>
+            node.blockId && (node.kind === 'card' || node.kind === 'single-block')
+        );
+        if (linkedNodes.length === 0) return;
+
+        void Promise.all(linkedNodes.map(async (node) => {
+            const blockId = node.blockId as string;
+            const link = buildTldrawLink(this.id, blockId, this.title, node.id);
+            const attrs = node.kind === 'single-block'
+                ? { 'custom-tldraw-link': link, 'custom-st-tldraw-single': '1' }
+                : { 'custom-tldraw-link': link, 'custom-st-tldraw': '1' };
+            await api.setBlockAttrs(blockId, attrs);
+        })).catch((error) => {
+            console.error('sync agent-created tldraw block attrs failed', error);
+        });
     }
 
     /**
@@ -1823,10 +1792,6 @@ export class TldrawManager {
     }
 
 
-}
-
-function finiteNumber(value: unknown, fallback: number): number {
-    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function summarizeShapeProps(props: any): Record<string, unknown> {

@@ -4,6 +4,7 @@ import { settingdata } from '@/index';
 import { WHITEBOARD_STORAGE_DIR, WhiteboardFileManager } from './whiteboard-file-manager';
 import { getAllInstanceIds, getInstance } from './tldraw-instance-manager';
 import { buildTldrawLink } from './utils/link-builder';
+import { booleanArgWithFallback, clampNumber, numberArg, parseCreateShapeArgs, stringArg } from './agent/args';
 
 type AgentActionResult = Promise<{ result?: string; error?: string }>;
 type AddAgentAction = (options: {
@@ -114,7 +115,7 @@ export function registerTldrawAgentActions(plugin: Plugin) {
 
     addAgentAction.call(plugin, {
         name: 'tldraw_create_shape',
-        description: 'Create a basic shape on an open STtools tldraw whiteboard. Required args: whiteboardId string, kind "text"|"note"|"rectangle". Optional args: text, x, y, w, h, color, select boolean, zoom boolean. Open the whiteboard first if this returns not open.',
+        description: 'Create STtools tldraw business shapes on an open whiteboard. Required args: whiteboardId string, kind "card"|"single-block"|"branch". For card/single-block optional args: blockId, x, y, w, h, color, select, zoom. For branch optional args: x, y, rootShapeId or root, childShapeIds, children, leftChildren, rightChildren, direction, horizontalGap, verticalGap, lineStyle, lineWidth, snapDistance, showBackground. Children may be existing shape IDs or objects like {shapeId} / {kind:"card"|"single-block"|"branch", blockId, side}. The plugin creates missing business nodes, attaches them to the branch, lays out branch children, selects the branch, and returns all created/attached IDs.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
@@ -123,20 +124,8 @@ export function registerTldrawAgentActions(plugin: Plugin) {
             const instance = getInstance(whiteboardId);
             if (!instance) return { error: `Whiteboard ${whiteboardId} is not open. Call tldraw_open_whiteboard first.` };
 
-            const rawKind = stringArg(args.kind) || 'text';
-            const kind = rawKind === 'note' || rawKind === 'rectangle' ? rawKind : 'text';
             try {
-                const created = instance.createAgentShape({
-                    kind,
-                    text: stringArg(args.text),
-                    x: numberArg(args.x),
-                    y: numberArg(args.y),
-                    w: numberArg(args.w),
-                    h: numberArg(args.h),
-                    color: stringArg(args.color),
-                    select: booleanArg(args.select, true),
-                    zoom: booleanArg(args.zoom, false),
-                });
+                const created = instance.createAgentShape(parseCreateShapeArgs(args));
                 return { result: JSON.stringify(created, null, 2) };
             } catch (error) {
                 return { error: stringifyError(error) };
@@ -166,8 +155,8 @@ export function registerTldrawAgentActions(plugin: Plugin) {
                     w: numberArg(args.w),
                     h: numberArg(args.h),
                     color: stringArg(args.color),
-                    select: booleanArg(args.select, true),
-                    zoom: booleanArg(args.zoom, false),
+                    select: booleanArgWithFallback(args.select, true),
+                    zoom: booleanArgWithFallback(args.zoom, false),
                 });
                 return { result: JSON.stringify(updated, null, 2) };
             } catch (error) {
@@ -190,7 +179,7 @@ export function registerTldrawAgentActions(plugin: Plugin) {
             if (!instance) return { error: `Whiteboard ${whiteboardId} is not open. Call tldraw_open_whiteboard first.` };
 
             try {
-                const selected = instance.selectAgentShape(shapeId, booleanArg(args.zoom, true));
+                const selected = instance.selectAgentShape(shapeId, booleanArgWithFallback(args.zoom, true));
                 return { result: JSON.stringify(selected, null, 2) };
             } catch (error) {
                 return { error: stringifyError(error) };
@@ -246,26 +235,6 @@ function summarizeProps(props: any): Record<string, unknown> {
     }
     if (props.richText) out.richText = '[richText]';
     return out;
-}
-
-function stringArg(value: unknown): string | undefined {
-    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function numberArg(value: unknown): number | undefined {
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
-    return undefined;
-}
-
-function booleanArg(value: unknown, fallback: boolean): boolean {
-    return typeof value === 'boolean' ? value : fallback;
-}
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
-    const n = numberArg(value);
-    if (typeof n !== 'number') return fallback;
-    return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
 function stringifyError(error: unknown): string {
