@@ -90,6 +90,10 @@ export const InFrontOfCanvas: React.FC = () => {
 
     const isSingleBlockSelection = isValidSelection && selectedShape.type === 'single-block'
     const isCardOrBlock = isValidSelection && isCardLikeShape(selectedShape)
+    const isCollapsedCard =
+        isValidSelection &&
+        selectedShape.type === 'card' &&
+        Boolean((selectedShape as ICardShape).props?.isCollapsed)
     const isBranchSelection = isValidSelection && selectedShape.type === 'branch'
     const isJsShapeSelection = isValidSelection && selectedShape.type === 'js-shape'
     const selectedJsShape = isJsShapeSelection ? (selectedShape as IJsShape) : null
@@ -464,7 +468,10 @@ export const InFrontOfCanvas: React.FC = () => {
                                 {((editor.getShape(selectionInfo.id) as ICardShape | undefined)?.props?.isCollapsed) ? <Icons.ChevronRight /> : <Icons.ChevronDown />}
                             </HoverButton>
                             <HoverButton
-                                style={buttonStyle}
+                                style={{
+                                    ...buttonStyle,
+                                    display: isCollapsedCard ? 'none' : undefined,
+                                }}
                                 onClick={() => {
                                     const shape = editor.getShape(selectionInfo.id)
                                     if (!isCardLikeShape(shape)) return
@@ -485,7 +492,10 @@ export const InFrontOfCanvas: React.FC = () => {
                                 <Icons.FontIncrease />
                             </HoverButton>
                             <HoverButton
-                                style={buttonStyle}
+                                style={{
+                                    ...buttonStyle,
+                                    display: isCollapsedCard ? 'none' : undefined,
+                                }}
                                 onClick={() => {
                                     const shape = editor.getShape(selectionInfo.id)
                                     if (!isCardLikeShape(shape)) return
