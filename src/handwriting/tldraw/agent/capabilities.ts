@@ -3,6 +3,7 @@ export function getTldrawAgentCapabilities() {
         version: 1,
         enabled: true,
         read: [
+            'tldraw_get_interaction_context',
             'tldraw_list_whiteboards',
             'tldraw_get_summary',
             'tldraw_get_shape_details',
@@ -40,6 +41,7 @@ export function getTldrawAgentCapabilities() {
         safetyRules: [
             'Agent actions must be enabled in plugin settings.',
             'Most write actions require the whiteboard to be open, so the user can observe the change.',
+            'Agents should call tldraw_get_interaction_context before using whiteboard tools, then prefer the focused whiteboard and current selection unless the user requested another target.',
             'Batch shape operations are capped at 50 items.',
             'Shape deletion is dry-run by default and requires confirm:true to execute.',
             'Linked SiYuan block shapes are protected from deletion unless allowLinkedBlockShapes:true is explicitly passed.',

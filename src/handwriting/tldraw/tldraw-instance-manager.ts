@@ -10,6 +10,8 @@ import type { Tab } from 'siyuan';
  * 全局TldrawManager实例注册表
  */
 const instanceRegistry = new Map<string, TldrawManager>();
+const instanceFocusTimes = new Map<string, number>();
+let focusedInstanceId: string | null = null;
 
 /**
  * 全局Tab实例注册表（白板ID -> Tab）
@@ -24,6 +26,9 @@ const tabRegistry = new Map<string, Tab>();
 export function registerInstance(id: string, instance: TldrawManager): void {
     console.debug(`注册白板实例: ${id}`);
     instanceRegistry.set(id, instance);
+    if (!focusedInstanceId) {
+        markFocusedInstance(id);
+    }
 }
 
 /**
@@ -33,6 +38,10 @@ export function registerInstance(id: string, instance: TldrawManager): void {
 export function unregisterInstance(id: string): void {
     console.debug(`注销白板实例: ${id}`);
     instanceRegistry.delete(id);
+    instanceFocusTimes.delete(id);
+    if (focusedInstanceId === id) {
+        focusedInstanceId = getMostRecentlyFocusedOpenInstanceId();
+    }
 }
 
 /**
@@ -87,6 +96,37 @@ export function hasInstance(id: string): boolean {
  */
 export function getAllInstanceIds(): string[] {
     return Array.from(instanceRegistry.keys());
+}
+
+export function markFocusedInstance(id: string): void {
+    if (!instanceRegistry.has(id)) return;
+    focusedInstanceId = id;
+    instanceFocusTimes.set(id, Date.now());
+}
+
+export function getFocusedInstanceId(): string | null {
+    if (focusedInstanceId && instanceRegistry.has(focusedInstanceId)) {
+        return focusedInstanceId;
+    }
+    focusedInstanceId = getMostRecentlyFocusedOpenInstanceId();
+    return focusedInstanceId;
+}
+
+export function getInstanceFocusedAt(id: string): number | undefined {
+    return instanceFocusTimes.get(id);
+}
+
+function getMostRecentlyFocusedOpenInstanceId(): string | null {
+    let bestId: string | null = null;
+    let bestTime = -1;
+    for (const id of instanceRegistry.keys()) {
+        const time = instanceFocusTimes.get(id) || 0;
+        if (time > bestTime) {
+            bestId = id;
+            bestTime = time;
+        }
+    }
+    return bestId;
 }
 
 /**

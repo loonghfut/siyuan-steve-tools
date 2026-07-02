@@ -12,6 +12,7 @@ import { createDeleteShapesAction } from './delete-shapes';
 import { createDeleteWhiteboardFileAction } from './delete-whiteboard-file';
 import { createDuplicateShapesAction } from './duplicate-shapes';
 import { createGetAgentCapabilitiesAction } from './get-agent-capabilities';
+import { createGetInteractionContextAction } from './get-interaction-context';
 import { createGetShapeDetailsAction } from './get-shape-details';
 import { createGetSnapshotSummaryAction } from './get-snapshot-summary';
 import { createGetSummaryAction } from './get-summary';
@@ -32,8 +33,9 @@ import { createZoomToShapesAction } from './zoom-to-shapes';
 
 export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
     const context: AgentActionContext = { plugin };
-    return [
+    const actions = [
         createGetAgentCapabilitiesAction(),
+        createGetInteractionContextAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
         createGetSummaryAction(),
@@ -63,4 +65,19 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
         createConvertConnectorsAction(),
         createSelectShapeAction(),
     ];
+    return actions.map(withInteractionContextRequirement);
+}
+
+function withInteractionContextRequirement(action: AgentActionDefinition): AgentActionDefinition {
+    if (
+        action.name === 'tldraw_get_interaction_context' ||
+        action.name === 'tldraw_get_agent_capabilities'
+    ) {
+        return action;
+    }
+
+    return {
+        ...action,
+        description: `${action.description} Before calling this action, call tldraw_get_interaction_context to sense the focused whiteboard and current selection; use focusedWhiteboardId as whiteboardId unless the user explicitly requested another target.`,
+    };
 }

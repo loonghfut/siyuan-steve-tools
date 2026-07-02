@@ -43,7 +43,7 @@ import { tldrawkey } from '@/../my/key';
 import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
 import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
-import { registerInstance, unregisterInstance } from './tldraw-instance-manager';
+import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import * as agentOps from './agent/manager-ops';
 import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentShapeUpdatePatch } from './agent/types';
@@ -87,6 +87,7 @@ export class TldrawManager {
     private _autosaveUnsub: (() => void) | null = null;
     private _realtimeUnsub: (() => void) | null = null;
     private _broadcastChannel: BroadcastChannel | null = null;
+    private _focusTrackingCleanup: (() => void) | null = null;
     private _destroying = false;
     private _destroyed = false;
     private _mouseDownPos: { x: number; y: number } | null = null;
@@ -374,6 +375,7 @@ export class TldrawManager {
                     embeds={allEmbeds}
                     onMount={(editor) => {
                         this.editor = editor;
+                        this.setupAgentFocusTracking(editor);
                         editor.user.updateUserPreferences({ isSnapMode:  settingdata['isSnapMode'] || false })
                         this.applyThemeToEditor();
                         this.setupThemeObserver();
@@ -1297,6 +1299,15 @@ export class TldrawManager {
 
         // 取消订阅 store listeners / 广播频道
         try {
+            if (this._focusTrackingCleanup) {
+                this._focusTrackingCleanup();
+                this._focusTrackingCleanup = null;
+            }
+        } catch (err) {
+            console.warn('cleanup agent focus tracking failed', err);
+        }
+
+        try {
             if (this._autosaveUnsub) {
                 this._autosaveUnsub();
                 this._autosaveUnsub = null;
@@ -1432,6 +1443,34 @@ export class TldrawManager {
             triggerSave: () => this.triggerSave(),
             findShapeByBlockId: (blockId) => this.findShapeByBlockId(blockId),
         };
+    }
+
+    private setupAgentFocusTracking(editor: Editor) {
+        try {
+            if (this._focusTrackingCleanup) {
+                this._focusTrackingCleanup();
+                this._focusTrackingCleanup = null;
+            }
+
+            const container = editor.getContainer();
+            const markFocused = () => markFocusedInstance(this.id);
+            const events: Array<keyof HTMLElementEventMap> = [
+                'pointerdown',
+                'mousedown',
+                'focusin',
+                'keydown',
+                'wheel',
+                'touchstart',
+            ];
+
+            markFocused();
+            events.forEach((eventName) => container.addEventListener(eventName, markFocused, true));
+            this._focusTrackingCleanup = () => {
+                events.forEach((eventName) => container.removeEventListener(eventName, markFocused, true));
+            };
+        } catch (error) {
+            console.warn('setup agent focus tracking failed', error);
+        }
     }
 
     public getAgentSummary() {
