@@ -2,10 +2,14 @@ import type {
 	AgentBranchChildRef,
 	AgentBranchCreateArgs,
 	AgentBranchSide,
+	AgentBasicShapeCreateArgs,
+	AgentConnectorCreateArgs,
+	AgentConnectorKind,
 	AgentCardCreateArgs,
 	AgentCreateKind,
 	AgentCreateShapeArgs,
 	AgentSingleBlockCreateArgs,
+	AgentShapeUpdatePatch,
 } from './types'
 import { normalizeAgentColor, normalizeBranchLineStyle } from './schema'
 
@@ -19,6 +23,58 @@ export function parseCreateShapeArgs(args: Record<string, unknown>): AgentCreate
 		return parseSingleBlockCreateArgs(args)
 	}
 	return parseBranchCreateArgs(args)
+}
+
+export function parseCreateBasicShapeArgs(args: Record<string, unknown>): AgentBasicShapeCreateArgs {
+	const kind = parseBasicKind(args.kind)
+	return {
+		kind,
+		x: numberArg(args.x),
+		y: numberArg(args.y),
+		w: numberArg(args.w),
+		h: numberArg(args.h),
+		color: colorArg(args.color),
+		text: stringArg(args.text),
+		geo: stringArg(args.geo),
+		name: stringArg(args.name),
+		blockId: stringArg(args.blockId),
+		direction: parseMindMapDirection(args.direction),
+		theme: stringArg(args.theme),
+		select: booleanArg(args.select),
+		zoom: booleanArg(args.zoom),
+	}
+}
+
+export function parseCreateConnectorArgs(args: Record<string, unknown>): AgentConnectorCreateArgs {
+	return {
+		kind: parseConnectorKind(args.kind),
+		startShapeId: stringArg(args.startShapeId || args.fromShapeId || args.sourceShapeId),
+		endShapeId: stringArg(args.endShapeId || args.toShapeId || args.targetShapeId),
+		start: pointArg(args.start),
+		end: pointArg(args.end),
+		color: colorArg(args.color),
+		text: stringArg(args.text),
+		strokeWidth: numberArg(args.strokeWidth || args.lineWidth),
+		select: booleanArg(args.select),
+		zoom: booleanArg(args.zoom),
+	}
+}
+
+export function parseShapeUpdatePatch(args: Record<string, unknown>): AgentShapeUpdatePatch {
+	const shapeId = stringArg(args.shapeId)
+	if (!shapeId) throw new Error('missing required argument: shapeId')
+	return {
+		shapeId,
+		x: numberArg(args.x),
+		y: numberArg(args.y),
+		w: numberArg(args.w),
+		h: numberArg(args.h),
+		color: stringArg(args.color),
+		text: stringArg(args.text),
+		name: stringArg(args.name),
+		select: booleanArg(args.select),
+		zoom: booleanArg(args.zoom),
+	}
 }
 
 export function stringArg(value: unknown): string | undefined {
@@ -44,6 +100,21 @@ export function clampNumber(value: unknown, min: number, max: number, fallback: 
 	const n = numberArg(value)
 	if (typeof n !== 'number') return fallback
 	return Math.max(min, Math.min(max, Math.floor(n)))
+}
+
+export function shapeIdArrayArg(value: unknown): string[] {
+	if (typeof value === 'string' && value.trim()) return [value.trim()]
+	if (!Array.isArray(value)) return []
+	const out = value.map(stringArg).filter(Boolean) as string[]
+	return Array.from(new Set(out))
+}
+
+export function pointArg(value: unknown): { x: number; y: number } | undefined {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+	const obj = value as Record<string, unknown>
+	const x = numberArg(obj.x)
+	const y = numberArg(obj.y)
+	return x === undefined || y === undefined ? undefined : { x, y }
 }
 
 function parseCardCreateArgs(args: Record<string, unknown>): AgentCardCreateArgs {
@@ -104,6 +175,36 @@ function parseKind(value: unknown): AgentCreateKind {
 	const raw = stringArg(value)
 	if (raw === 'card' || raw === 'single-block' || raw === 'branch') return raw
 	throw new Error('kind must be "card", "single-block", or "branch"')
+}
+
+function parseBasicKind(value: unknown): AgentBasicShapeCreateArgs['kind'] {
+	const raw = stringArg(value)
+	if (
+		raw === 'text' ||
+		raw === 'note' ||
+		raw === 'geo' ||
+		raw === 'arrow' ||
+		raw === 'line' ||
+		raw === 'draw' ||
+		raw === 'highlight' ||
+		raw === 'frame' ||
+		raw === 'bezier-connector' ||
+		raw === 'slide' ||
+		raw === 'mind-map' ||
+		raw === 'js-shape'
+	) return raw
+	throw new Error('kind must be "text", "note", "geo", "arrow", "line", "draw", "highlight", "frame", "bezier-connector", "slide", "mind-map", or "js-shape"')
+}
+
+function parseConnectorKind(value: unknown): AgentConnectorKind | undefined {
+	const raw = stringArg(value)
+	if (raw === 'arrow' || raw === 'bezier-connector') return raw
+	return undefined
+}
+
+function parseMindMapDirection(value: unknown): AgentBasicShapeCreateArgs['direction'] {
+	const raw = stringArg(value)
+	return raw === 'left' || raw === 'right' || raw === 'both' ? raw : undefined
 }
 
 function parseSide(value: unknown): AgentBranchSide | undefined {
