@@ -800,7 +800,23 @@ function resolveAgentConnectorEndpoints(editor: Editor, options: AgentConnectorC
     if (!end && endShapeId) end = getAgentShapeCenter(editor, endShapeId);
     if (!start || !end) throw new Error('connector requires start/end points or startShapeId/endShapeId');
 
-    return { start, end, startShapeId, endShapeId, startPortId, endPortId };
+    return {
+        start: toPlainAgentPoint(start),
+        end: toPlainAgentPoint(end),
+        startShapeId,
+        endShapeId,
+        startPortId,
+        endPortId,
+    };
+}
+
+function toPlainAgentPoint(point: { x: number; y: number }) {
+    const x = Number(point.x);
+    const y = Number(point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw new Error('connector endpoint must have finite x and y coordinates');
+    }
+    return { x, y };
 }
 
 function buildAgentArrowBindings(arrowId: TLShapeId, endpoints: ReturnType<typeof resolveAgentConnectorEndpoints>) {
