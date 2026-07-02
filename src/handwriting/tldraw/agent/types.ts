@@ -144,6 +144,7 @@ export type AgentShapeUpdatePatch = AgentSelectionOptions & {
 	w?: number
 	h?: number
 	color?: string
+	isCollapsed?: boolean
 	text?: string
 	name?: string
 }

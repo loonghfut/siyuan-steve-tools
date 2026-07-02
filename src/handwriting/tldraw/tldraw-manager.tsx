@@ -1557,7 +1557,7 @@ export class TldrawManager {
         return agentOps.saveAgentWhiteboard(this.getAgentRuntime());
     }
 
-    public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; select?: boolean; zoom?: boolean }) {
+    public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; isCollapsed?: boolean; select?: boolean; zoom?: boolean }) {
         return agentOps.updateAgentShape(this.getAgentRuntime(), options);
     }
 

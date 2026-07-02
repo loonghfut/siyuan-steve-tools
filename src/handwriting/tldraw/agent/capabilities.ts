@@ -5,7 +5,7 @@ export function getTldrawAgentCapabilities() {
         agentPrompt: [
             'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. First read interaction context, then use focused whiteboard and current selection unless the user names another target.',
             'Prefer semantic STtools shapes over generic drawings: card for a document/heading block, single-block for one paragraph block, branch for mind-map-like relationships between cards/blocks, bezier-connector for labeled relationships, slide for presentation areas, mind-map for editable topic trees or markdown-derived outlines, js-shape only as a safe placeholder.',
-            'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
+            'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
         ],
         read: [
             'tldraw_get_interaction_context',
@@ -82,7 +82,7 @@ export function getTldrawAgentCapabilities() {
                 ],
                 operations: [
                     'Create standalone or linked card.',
-                    'Move/resize/recolor with tldraw_update_shape or batch_update.',
+                    'Move/resize/recolor and expand/collapse with tldraw_update_shape or batch_update using isCollapsed:false/true.',
                     'Connect to other shapes with tldraw_create_connector.',
                     'Use as branch root or branch child; child objects can set card-specific isMain/isCollapsed/showMask.',
                 ],

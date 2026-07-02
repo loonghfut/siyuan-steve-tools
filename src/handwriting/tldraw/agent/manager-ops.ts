@@ -13,6 +13,8 @@ import * as api from '@/api/api';
 import { WhiteboardFileManager } from '../whiteboard-file-manager';
 import { createOrUpdateConnectorBinding } from '../BezierConnectorShape';
 import { getBestPortPair, getPortPagePosition } from '../BezierConnectorShape/port-utils';
+import { getCardCollapsedHeight } from '../CardShape/card-collapse';
+import type { ICardShape } from '../CardShape/card-shape-types';
 import { createMindMapNode } from '../MindMapShape/mind-map-shape-types';
 import { DEFAULT_SCRIPT } from '../JsShape/static';
 import { buildTldrawLink } from '../utils/link-builder';
@@ -154,6 +156,7 @@ export function updateAgentShape(runtime: AgentManagerRuntime, options: {
     w?: number;
     h?: number;
     color?: string;
+    isCollapsed?: boolean;
     select?: boolean;
     zoom?: boolean;
 }) {
@@ -629,7 +632,7 @@ async function validateAgentLinkedBlockId(blockId: string | undefined, kind: 'ca
 function summarizeShapeProps(props: any, editor?: Editor): Record<string, unknown> {
     if (!props || typeof props !== 'object') return {};
     const out: Record<string, unknown> = {};
-    for (const key of ['w', 'h', 'color', 'geo', 'name', 'text']) {
+    for (const key of ['w', 'h', 'color', 'geo', 'name', 'text', 'isMain', 'isCollapsed', 'showMask']) {
         if (props[key] !== undefined) out[key] = props[key];
     }
     if (props.blockId !== undefined) {
@@ -656,6 +659,7 @@ function buildAgentShapePropsPatch(shape: TLShape, options: {
     w?: number;
     h?: number;
     color?: string;
+    isCollapsed?: boolean;
 }): Record<string, unknown> {
     const props: Record<string, unknown> = {};
     const supportsSize = ['card', 'single-block', 'branch', 'geo', 'note', 'text', 'frame', 'slide', 'mind-map', 'js-shape'].includes(shape.type);
@@ -671,8 +675,34 @@ function buildAgentShapePropsPatch(shape: TLShape, options: {
         const color = normalizeOptionalAgentColor(options.color);
         if (color) props.color = color;
     }
+    if (options.isCollapsed !== undefined) {
+        if (shape.type !== 'card') {
+            throw new Error('isCollapsed is only supported for card shapes');
+        }
+        applyAgentCardCollapseProps(shape as ICardShape, props, options.isCollapsed);
+    }
 
     return props;
+}
+
+function applyAgentCardCollapseProps(shape: ICardShape, props: Record<string, unknown>, nextCollapsed: boolean) {
+    const currentProps = shape.props;
+    const currentlyCollapsed = Boolean(currentProps.isCollapsed);
+    const requestedHeight = typeof props.h === 'number' ? props.h : undefined;
+    props.isCollapsed = nextCollapsed;
+
+    if (nextCollapsed) {
+        if (!currentlyCollapsed || requestedHeight !== undefined || !currentProps.preCollapseHeight) {
+            props.preCollapseHeight = requestedHeight ?? currentProps.h;
+        }
+        props.h = getCardCollapsedHeight(shape);
+        return;
+    }
+
+    props.preCollapseHeight = undefined;
+    if (currentlyCollapsed && requestedHeight === undefined && currentProps.preCollapseHeight && currentProps.preCollapseHeight > 0) {
+        props.h = finiteNumberInRange(currentProps.preCollapseHeight, currentProps.h, 1, 4000);
+    }
 }
 
 function buildAgentTextPropsPatch(shape: TLShape, options: { text?: string; name?: string }): Record<string, unknown> {
