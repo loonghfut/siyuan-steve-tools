@@ -2,6 +2,7 @@ import { Plugin } from 'siyuan';
 import { settingdata } from '@/index';
 import { getTldrawAgentActions } from './agent/actions';
 import type { AgentActionDefinition, AgentActionResult } from './agent/actions/shared';
+import { getInstance } from './tldraw-instance-manager';
 
 type AddAgentAction = (options: {
     name: string;
@@ -28,7 +29,15 @@ export function registerTldrawAgentActions(plugin: Plugin) {
     for (const action of getTldrawAgentActions(plugin)) {
         addAgentAction.call(plugin, {
             ...action,
-            handler: (args, app) => action.handler(stripFrontendActionArgs(args), app),
+            handler: async (args, app) => {
+                const cleanedArgs = stripFrontendActionArgs(args);
+                const endAgentActivity = beginAgentActivityForArgs(cleanedArgs);
+                try {
+                    return await action.handler(cleanedArgs, app);
+                } finally {
+                    endAgentActivity();
+                }
+            },
         } as AgentActionDefinition);
     }
 
@@ -45,3 +54,26 @@ function stripFrontendActionArgs(args: Record<string, unknown>): Record<string, 
     delete cleaned.action;
     return cleaned;
 }
+
+function beginAgentActivityForArgs(args: Record<string, unknown>): () => void {
+    const whiteboardId = stringValue(args.whiteboardId || args.id || args.rootId);
+    if (!whiteboardId) return noop;
+
+    const instance = getInstance(whiteboardId) as unknown as {
+        beginAgentActivity?: () => () => void;
+    } | undefined;
+    if (!instance || typeof instance.beginAgentActivity !== 'function') return noop;
+
+    try {
+        return instance.beginAgentActivity();
+    } catch (error) {
+        console.warn('Failed to show tldraw agent activity indicator', error);
+        return noop;
+    }
+}
+
+function stringValue(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function noop() {}

@@ -88,6 +88,9 @@ export class TldrawManager {
     private _realtimeUnsub: (() => void) | null = null;
     private _broadcastChannel: BroadcastChannel | null = null;
     private _focusTrackingCleanup: (() => void) | null = null;
+    private _agentActivityDepth = 0;
+    private _agentActivityClearTimer: ReturnType<typeof setTimeout> | null = null;
+    private _agentActivityStartedAt = 0;
     private _destroying = false;
     private _destroyed = false;
     private _mouseDownPos: { x: number; y: number } | null = null;
@@ -119,6 +122,8 @@ export class TldrawManager {
     private async initialize() {
         if (this._destroyed) return;
         // 清空container中的旧内容（如果有）
+        this.clearAgentActivityIndicator();
+
         this.container.innerHTML = '';
         const root = document.createElement('div');
         root.style.width = '100%';
@@ -1276,6 +1281,7 @@ export class TldrawManager {
     public async destroy(options?: { skipSave?: boolean; reason?: string }) {
         if (this._destroyed || this._destroying) return;
         this._destroying = true;
+        this.clearAgentActivityIndicator();
 
         // 销毁前保存当前状态（数据文件已被删除时必须跳过，否则会被重新写回）
         if (!options?.skipSave) {
@@ -1431,6 +1437,56 @@ export class TldrawManager {
         );
 
         return cardShape?.id || null;
+    }
+
+    public beginAgentActivity(): () => void {
+        if (this._destroyed || this._destroying) return () => {};
+
+        const minVisibleMs = 900;
+        let ended = false;
+        this._agentActivityDepth += 1;
+        this._agentActivityStartedAt = Date.now();
+
+        if (this._agentActivityClearTimer) {
+            clearTimeout(this._agentActivityClearTimer);
+            this._agentActivityClearTimer = null;
+        }
+        this.setAgentActivityVisible(true);
+
+        return () => {
+            if (ended) return;
+            ended = true;
+            this._agentActivityDepth = Math.max(0, this._agentActivityDepth - 1);
+            if (this._agentActivityDepth > 0) return;
+
+            const elapsed = Date.now() - this._agentActivityStartedAt;
+            const delay = Math.max(0, minVisibleMs - elapsed);
+            this._agentActivityClearTimer = setTimeout(() => {
+                this._agentActivityClearTimer = null;
+                if (this._agentActivityDepth === 0) {
+                    this.setAgentActivityVisible(false);
+                }
+            }, delay);
+        };
+    }
+
+    private setAgentActivityVisible(visible: boolean) {
+        const element = this.container.querySelector('.tldraw__editor') as HTMLElement | null;
+        this.container.classList.toggle('st-tldraw-agent-active', visible);
+        this.container.toggleAttribute('data-st-agent-active', visible);
+        if (element) {
+            element.classList.toggle('st-tldraw-agent-active', visible);
+            element.toggleAttribute('data-st-agent-active', visible);
+        }
+    }
+
+    private clearAgentActivityIndicator() {
+        if (this._agentActivityClearTimer) {
+            clearTimeout(this._agentActivityClearTimer);
+            this._agentActivityClearTimer = null;
+        }
+        this._agentActivityDepth = 0;
+        this.setAgentActivityVisible(false);
     }
 
     private getAgentRuntime(): agentOps.AgentManagerRuntime {
