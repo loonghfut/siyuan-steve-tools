@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createCreateShapeAction(): AgentActionDefinition {
     return {
         name: 'tldraw_create_shape',
-        description: 'Create an STtools business shape on an open whiteboard. Required args: whiteboardId, kind "card"|"single-block"|"branch". All shape props have safe defaults; only pass optional overrides you actually need: x, y, w, h, color, blockId, select, zoom. Card-only optional: isMain, isCollapsed, showMask. Branch optional: rootShapeId, childIds, children, leftChildren, rightChildren, direction, horizontalGap, verticalGap, lineStyle, lineWidth, snapDistance, showBackground. Branch children may be existing shape IDs or objects like {shapeId} / {kind:"card"|"single-block", blockId, side}. Unknown args are rejected.',
+        description: 'Create an STtools business shape on an open whiteboard. Required args: whiteboardId, kind "card"|"single-block"|"branch". All shape props have safe defaults; only pass optional overrides you actually need: x, y, w, h, color, blockId, select, zoom default true. Card-only optional: isMain, isCollapsed, showMask. Branch optional: rootShapeId, childIds, children, leftChildren, rightChildren, direction, horizontalGap, verticalGap, lineStyle, lineWidth, snapDistance, showBackground. Branch children may be existing shape IDs or objects like {shapeId} / {kind:"card"|"single-block", blockId, side}. Unknown args are rejected.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

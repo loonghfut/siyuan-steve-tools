@@ -45,7 +45,7 @@ function finalizeSelection(editor: Editor, focusedId: TLShapeId, options: { sele
 	if (options.select !== false) {
 		editor.setSelectedShapes([focusedId])
 	}
-	if (options.zoom) {
+	if (options.zoom !== false) {
 		editor.zoomToSelection({ animation: { duration: 300 } })
 	}
 }

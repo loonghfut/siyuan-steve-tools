@@ -1482,7 +1482,7 @@ export class TldrawManager {
         return agentOps.updateAgentShapesBatch(this.getAgentRuntime(), options);
     }
 
-    public deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean }) {
+    public async deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean }) {
         return agentOps.deleteAgentShapes(this.getAgentRuntime(), options);
     }
 

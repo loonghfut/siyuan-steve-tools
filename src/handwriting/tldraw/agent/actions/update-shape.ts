@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createUpdateShapeAction(): AgentActionDefinition {
     return {
         name: 'tldraw_update_shape',
-        description: 'Update position and supported visual props of an STtools business shape on an open tldraw whiteboard. Required args: whiteboardId string, shapeId string. Optional args: x, y, w, h, color, select boolean, zoom boolean. Color must be a tldraw color name; unsupported colors are normalized. Do not pass text for card, single-block, or branch; their content comes from bound SiYuan blocks.',
+        description: 'Update position and supported visual props of an STtools business shape on an open tldraw whiteboard. Required args: whiteboardId string, shapeId string. Optional args: x, y, w, h, color, select boolean, zoom boolean default true. Color must be a tldraw color name; unsupported colors are normalized. Do not pass text for card, single-block, or branch; their content comes from bound SiYuan blocks.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
@@ -26,7 +26,7 @@ export function createUpdateShapeAction(): AgentActionDefinition {
                     h: numberArg(args.h),
                     color: stringArg(args.color),
                     select: booleanArgWithFallback(args.select, true),
-                    zoom: booleanArgWithFallback(args.zoom, false),
+                    zoom: booleanArgWithFallback(args.zoom, true),
                 });
                 return jsonResult(updated);
             } catch (error) {

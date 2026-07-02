@@ -168,7 +168,7 @@ export function updateAgentShape(runtime: AgentManagerRuntime, options: {
 
     editor.updateShape(patch);
     if (options.select !== false) editor.select(shape.id);
-    if (options.zoom) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false) editor.zoomToSelection({ animation: { duration: 300 } });
     runtime.triggerSave();
 
     return { shapeId: String(shape.id), summary: getAgentSummary(runtime) };
@@ -319,12 +319,12 @@ export function updateAgentShapesBatch(runtime: AgentManagerRuntime, options: {
 
     if (updates.length) editor.updateShapes(updates);
     if (options.select !== false && updatedShapeIds.length) editor.setSelectedShapes(updatedShapeIds as TLShapeId[]);
-    if (options.zoom && updatedShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false && updatedShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
     runtime.triggerSave();
     return { updatedShapeIds, skipped, summary: getAgentSummary(runtime) };
 }
 
-export function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
+export async function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     confirm?: boolean;
     allowLinkedBlockShapes?: boolean;
@@ -356,7 +356,9 @@ export function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
         };
     }
 
+    let backup: Awaited<ReturnType<typeof backupAgentWhiteboard>> | null = null;
     if (deletable.length) {
+        backup = await backupAgentWhiteboard(runtime, { reason: 'agent-delete-shapes' });
         editor.deleteShapes(deletable);
         runtime.triggerSave();
     }
@@ -364,6 +366,7 @@ export function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
         dryRun: false,
         deletedShapeIds: deletable.map(String),
         blocked,
+        backup,
         summary: getAgentSummary(runtime),
     };
 }
@@ -852,7 +855,7 @@ function getAgentShapeCenter(editor: Editor, shapeId: TLShapeId) {
 
 function finalizeAgentSelection(editor: Editor, focusedId: TLShapeId, options: { select?: boolean; zoom?: boolean }) {
     if (options.select !== false) editor.setSelectedShapes([focusedId]);
-    if (options.zoom) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false) editor.zoomToSelection({ animation: { duration: 300 } });
 }
 
 function isLinkedBlockShape(shape: TLShape) {
