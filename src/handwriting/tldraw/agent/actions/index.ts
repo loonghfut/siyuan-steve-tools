@@ -7,6 +7,7 @@ import { createConvertConnectorsAction } from './convert-connectors';
 import { createCreateBasicShapeAction } from './create-basic-shape';
 import { createCreateConnectorAction } from './create-connector';
 import { createCreateShapeAction } from './create-shape';
+import { createCreateSummaryChildDocWhiteboardAction } from './create-summary-child-doc-whiteboard';
 import { createDeleteShapesAction } from './delete-shapes';
 import { createDeleteWhiteboardFileAction } from './delete-whiteboard-file';
 import { createDuplicateShapesAction } from './duplicate-shapes';
@@ -38,6 +39,7 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
         createGetSummaryAction(),
         createReadDocOutlineAction(),
         createInsertDocOutlineMindmapAction(),
+        createCreateSummaryChildDocWhiteboardAction(context),
         createCreateShapeAction(),
         createGetShapeDetailsAction(),
         createGetSnapshotSummaryAction(),

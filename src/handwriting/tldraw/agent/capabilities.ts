@@ -31,6 +31,7 @@ export function getTldrawAgentCapabilities() {
             'tldraw_lock_shapes',
             'tldraw_convert_connectors',
             'tldraw_insert_doc_outline_mindmap',
+            'siyuan_create_summary_child_doc_whiteboard',
         ],
         destructive: [
             'tldraw_delete_shapes',
