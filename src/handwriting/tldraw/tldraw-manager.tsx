@@ -13,13 +13,8 @@ import {
     TLStore,
     Editor,
     TLShapeId,
-    TLShape,
     defaultBindingUtils,
     ArrowShapeUtil,
-    createShapeId,
-    getIndices,
-    toRichText,
-    renderPlaintextFromRichText,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
 import '../custom-tldraw.css';
@@ -50,15 +45,9 @@ import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
 import { registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
-import { createAgentBusinessShape } from './agent/shape-ops';
-import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentCreateShapeResult, AgentShapeSummary, AgentShapeUpdatePatch } from './agent/types';
-import { finiteNumberInRange, normalizeOptionalAgentColor } from './agent/schema';
-import { insertDocOutlineMindmapForAgent, type AgentDocOutlineBoardOptions } from './agent/doc-to-board';
-import { createOrUpdateConnectorBinding } from './BezierConnectorShape';
-import { getBestPortPair, getPortPagePosition } from './BezierConnectorShape/port-utils';
-import { convertConnectorsToArrow, convertConnectorsToBezier } from './utils/connector-convert';
-import { createMindMapNode } from './MindMapShape/mind-map-shape-types';
-import { DEFAULT_SCRIPT } from './JsShape/static';
+import * as agentOps from './agent/manager-ops';
+import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentShapeUpdatePatch } from './agent/types';
+import type { AgentDocOutlineBoardOptions } from './agent/doc-to-board';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -1433,648 +1422,106 @@ export class TldrawManager {
         return cardShape?.id || null;
     }
 
-    public getAgentSummary() {
-        const shapes = this.store.query.records('shape').get() || [];
-        const assets = this.store.query.records('asset').get() || [];
-        const pages = this.store.query.records('page').get() || [];
-        const selectedShapeIds = this.editor ? this.editor.getSelectedShapeIds().map(String) : [];
-        const shapeTypeCounts = shapes.reduce<Record<string, number>>((acc, shape: any) => {
-            const type = String(shape.type || 'unknown');
-            acc[type] = (acc[type] || 0) + 1;
-            return acc;
-        }, {});
-
-        const sampleShapes = shapes.slice(0, 20).map((shape: any) => ({
-            id: String(shape.id),
-            type: String(shape.type),
-            x: Number(shape.x || 0),
-            y: Number(shape.y || 0),
-            props: summarizeShapeProps(shape.props),
-        }));
-
+    private getAgentRuntime(): agentOps.AgentManagerRuntime {
         return {
             id: this.id,
             title: this.title,
-            isOpen: Boolean(this.editor),
-            pageCount: pages.length,
-            shapeCount: shapes.length,
-            assetCount: assets.length,
-            selectedShapeIds,
-            shapeTypeCounts,
-            sampleShapes,
+            editor: this.editor ?? null,
+            store: this.store,
+            saveData: () => this.saveData(),
+            triggerSave: () => this.triggerSave(),
+            findShapeByBlockId: (blockId) => this.findShapeByBlockId(blockId),
         };
     }
 
-    public createAgentShape(options: AgentCreateShapeArgs): AgentCreateShapeResult & { summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
+    public getAgentSummary() {
+        return agentOps.getAgentSummary(this.getAgentRuntime());
+    }
 
-        const result = createAgentBusinessShape(this.editor, options);
-        this.syncAgentCreatedBlockAttrs(result);
-        this.triggerSave();
-        return {
-            ...result,
-            summary: this.getAgentSummary(),
-        };
+    public createAgentShape(options: AgentCreateShapeArgs) {
+        return agentOps.createAgentShape(this.getAgentRuntime(), options);
     }
 
     public async insertDocOutlineMindmapForAgent(options: AgentDocOutlineBoardOptions) {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-
-        const result = await insertDocOutlineMindmapForAgent(this.editor, options);
-        this.triggerSave();
-        return {
-            ...result,
-            summary: this.getAgentSummary(),
-        };
+        return agentOps.insertDocOutlineMindmap(this.getAgentRuntime(), options);
     }
 
-    public selectAgentShape(shapeId: string, zoom = true): { selectedShapeIds: string[] } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const id = shapeId as TLShapeId;
-        const shape = this.editor.getShape(id);
-        if (!shape) {
-            throw new Error(`Shape not found: ${shapeId}`);
-        }
-        this.editor.select(id);
-        if (zoom) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
-        return {
-            selectedShapeIds: this.editor.getSelectedShapeIds().map(String),
-        };
+    public selectAgentShape(shapeId: string, zoom = true) {
+        return agentOps.selectAgentShape(this.getAgentRuntime(), shapeId, zoom);
     }
 
-    public navigateAgentToBlock(options: {
-        blockId: string;
-        shapeId?: string;
-        zoom?: boolean;
-    }): { found: boolean; shapeId: string | null; selectedShapeIds: string[] } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const shapeId = (options.shapeId as TLShapeId | undefined) || this.findShapeByBlockId(options.blockId);
-        if (!shapeId) {
-            return { found: false, shapeId: null, selectedShapeIds: this.editor.getSelectedShapeIds().map(String) };
-        }
-        const shape = this.editor.getShape(shapeId);
-        if (!shape) {
-            return { found: false, shapeId: String(shapeId), selectedShapeIds: this.editor.getSelectedShapeIds().map(String) };
-        }
-        this.editor.select(shapeId);
-        if (options.zoom !== false) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
-        return {
-            found: true,
-            shapeId: String(shapeId),
-            selectedShapeIds: this.editor.getSelectedShapeIds().map(String),
-        };
+    public navigateAgentToBlock(options: { blockId: string; shapeId?: string; zoom?: boolean }) {
+        return agentOps.navigateAgentToBlock(this.getAgentRuntime(), options);
     }
 
-    public zoomAgentToShapes(options: {
-        shapeIds: string[];
-    }): { zoomedShapeIds: string[] } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
-            .filter((id) => this.editor.getShape(id as TLShapeId)) as TLShapeId[];
-        if (ids.length) {
-            this.editor.setSelectedShapes(ids);
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
-        return { zoomedShapeIds: ids.map(String) };
+    public zoomAgentToShapes(options: { shapeIds: string[] }) {
+        return agentOps.zoomAgentToShapes(this.getAgentRuntime(), options);
     }
 
-    public async saveAgentWhiteboard(): Promise<{ success: boolean; summary: ReturnType<TldrawManager['getAgentSummary']> }> {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        await this.saveData();
-        return {
-            success: true,
-            summary: this.getAgentSummary(),
-        };
+    public async saveAgentWhiteboard() {
+        return agentOps.saveAgentWhiteboard(this.getAgentRuntime());
     }
 
-    public updateAgentShape(options: {
-        shapeId: string;
-        x?: number;
-        y?: number;
-        w?: number;
-        h?: number;
-        color?: string;
-        select?: boolean;
-        zoom?: boolean;
-    }): { shapeId: string; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const shape = this.editor.getShape(options.shapeId as TLShapeId) as TLShape | undefined;
-        if (!shape) {
-            throw new Error(`Shape not found: ${options.shapeId}`);
-        }
-
-        const patch: any = {
-            id: shape.id,
-            type: shape.type,
-        };
-        if (options.x !== undefined) {
-            patch.x = finiteNumberInRange(options.x, shape.x, -100000, 100000);
-        }
-        if (options.y !== undefined) {
-            patch.y = finiteNumberInRange(options.y, shape.y, -100000, 100000);
-        }
-
-        const props = buildAgentShapePropsPatch(shape, options);
-        if (Object.keys(props).length > 0) {
-            patch.props = props;
-        }
-
-        this.editor.updateShape(patch);
-        if (options.select !== false) {
-            this.editor.select(shape.id);
-        }
-        if (options.zoom) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
-        this.triggerSave();
-
-        return {
-            shapeId: String(shape.id),
-            summary: this.getAgentSummary(),
-        };
+    public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; select?: boolean; zoom?: boolean }) {
+        return agentOps.updateAgentShape(this.getAgentRuntime(), options);
     }
 
-    public getAgentShapeDetails(options: {
-        shapeIds?: string[];
-        type?: string;
-        limit?: number;
-        includeBindings?: boolean;
-    }): { shapes: AgentShapeSummary[]; totalMatched: number; truncated: boolean } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-
-        const ids = new Set((options.shapeIds || []).filter(Boolean));
-        const limit = finiteNumberInRange(options.limit, 40, 1, 200);
-        const shapes = this.editor.getCurrentPageShapes().filter((shape) => {
-            if (ids.size && !ids.has(String(shape.id))) return false;
-            if (options.type && shape.type !== options.type) return false;
-            return true;
-        });
-
-        return {
-            shapes: shapes.slice(0, limit).map((shape) => summarizeAgentShape(this.editor, shape, options.includeBindings === true)),
-            totalMatched: shapes.length,
-            truncated: shapes.length > limit,
-        };
+    public getAgentShapeDetails(options: { shapeIds?: string[]; type?: string; limit?: number; includeBindings?: boolean }) {
+        return agentOps.getAgentShapeDetails(this.getAgentRuntime(), options);
     }
 
-    public createAgentBasicShape(options: AgentBasicShapeCreateArgs): { createdShapeIds: string[]; selectedShapeIds: string[]; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const id = createShapeId();
-        const x = finiteNumberInRange(options.x, 0, -100000, 100000);
-        const y = finiteNumberInRange(options.y, 0, -100000, 100000);
-        const color = options.color ?? 'black';
-        const text = clampAgentText(options.text || defaultAgentText(options.kind), 2000);
-        const shape = buildAgentBasicShape(id, options, x, y, color, text);
-
-        this.editor.createShape(shape as any);
-        finalizeAgentSelection(this.editor, id, options);
-        this.triggerSave();
-
-        return {
-            createdShapeIds: [String(id)],
-            selectedShapeIds: options.select === false ? [] : [String(id)],
-            summary: this.getAgentSummary(),
-        };
+    public createAgentBasicShape(options: AgentBasicShapeCreateArgs) {
+        return agentOps.createAgentBasicShape(this.getAgentRuntime(), options);
     }
 
-    public createAgentConnector(options: AgentConnectorCreateArgs): { createdShapeIds: string[]; selectedShapeIds: string[]; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-
-        const connectorKind = options.kind || 'bezier-connector';
-        const id = createShapeId();
-        const endpoints = resolveAgentConnectorEndpoints(this.editor, options);
-        const color = options.color ?? 'black';
-        const richText = toRichText(clampAgentText(options.text || '', 500));
-
-        if (connectorKind === 'arrow') {
-            const origin = {
-                x: Math.min(endpoints.start.x, endpoints.end.x),
-                y: Math.min(endpoints.start.y, endpoints.end.y),
-            };
-            this.editor.createShape({
-                id,
-                type: 'arrow',
-                x: origin.x,
-                y: origin.y,
-                props: {
-                    color,
-                    start: { x: endpoints.start.x - origin.x, y: endpoints.start.y - origin.y },
-                    end: { x: endpoints.end.x - origin.x, y: endpoints.end.y - origin.y },
-                    richText,
-                    arrowheadStart: 'none',
-                    arrowheadEnd: 'arrow',
-                },
-            } as any);
-            const bindings = buildAgentArrowBindings(id, endpoints);
-            if (bindings.length) this.editor.createBindings(bindings as any);
-        } else {
-            this.editor.createShape({
-                id,
-                type: 'bezier-connector',
-                x: 0,
-                y: 0,
-                props: {
-                    start: endpoints.start,
-                    end: endpoints.end,
-                    color,
-                    strokeWidth: finiteNumberInRange(options.strokeWidth, 3, 1, 16),
-                    strokeStyle: 'solid',
-                    richText,
-                    labelPosition: 0.5,
-                    font: 'draw',
-                    size: 'm',
-                    scale: 1,
-                },
-            } as any);
-            if (endpoints.startShapeId && endpoints.startPortId) {
-                createOrUpdateConnectorBinding(this.editor, id, endpoints.startShapeId, {
-                    portId: endpoints.startPortId,
-                    terminal: 'start',
-                });
-            }
-            if (endpoints.endShapeId && endpoints.endPortId) {
-                createOrUpdateConnectorBinding(this.editor, id, endpoints.endShapeId, {
-                    portId: endpoints.endPortId,
-                    terminal: 'end',
-                });
-            }
-        }
-
-        finalizeAgentSelection(this.editor, id, options);
-        try { this.editor.sendToBack([id]); } catch {}
-        this.triggerSave();
-
-        return {
-            createdShapeIds: [String(id)],
-            selectedShapeIds: options.select === false ? [] : [String(id)],
-            summary: this.getAgentSummary(),
-        };
+    public createAgentConnector(options: AgentConnectorCreateArgs) {
+        return agentOps.createAgentConnector(this.getAgentRuntime(), options);
     }
 
-    public updateAgentShapesBatch(options: {
-        patches: AgentShapeUpdatePatch[];
-        select?: boolean;
-        zoom?: boolean;
-    }): { updatedShapeIds: string[]; skipped: Array<{ shapeId: string; reason: string }>; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const patches = options.patches.slice(0, 50);
-        const updates: any[] = [];
-        const updatedShapeIds: string[] = [];
-        const skipped: Array<{ shapeId: string; reason: string }> = [];
-
-        for (const item of patches) {
-            const shape = this.editor.getShape(item.shapeId as TLShapeId) as TLShape | undefined;
-            if (!shape) {
-                skipped.push({ shapeId: item.shapeId, reason: 'shape not found' });
-                continue;
-            }
-            const patch: any = { id: shape.id, type: shape.type };
-            if (item.x !== undefined) patch.x = finiteNumberInRange(item.x, shape.x, -100000, 100000);
-            if (item.y !== undefined) patch.y = finiteNumberInRange(item.y, shape.y, -100000, 100000);
-            const props = buildAgentShapePropsPatch(shape, item);
-            const extraProps = buildAgentTextPropsPatch(shape, item);
-            patch.props = { ...props, ...extraProps };
-            if (Object.keys(patch.props).length === 0) delete patch.props;
-            updates.push(patch);
-            updatedShapeIds.push(String(shape.id));
-        }
-
-        if (updates.length) this.editor.updateShapes(updates);
-        if (options.select !== false && updatedShapeIds.length) {
-            this.editor.setSelectedShapes(updatedShapeIds as TLShapeId[]);
-        }
-        if (options.zoom && updatedShapeIds.length) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
-        this.triggerSave();
-        return { updatedShapeIds, skipped, summary: this.getAgentSummary() };
+    public updateAgentShapesBatch(options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean }) {
+        return agentOps.updateAgentShapesBatch(this.getAgentRuntime(), options);
     }
 
-    public deleteAgentShapes(options: {
-        shapeIds: string[];
-        confirm?: boolean;
-        allowLinkedBlockShapes?: boolean;
-    }): { dryRun: boolean; deletedShapeIds: string[]; blocked: Array<{ shapeId: string; reason: string }>; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const requestedIds = Array.from(new Set(options.shapeIds)).slice(0, 50);
-        const deletable: TLShapeId[] = [];
-        const blocked: Array<{ shapeId: string; reason: string }> = [];
-
-        for (const shapeId of requestedIds) {
-            const shape = this.editor.getShape(shapeId as TLShapeId) as TLShape | undefined;
-            if (!shape) {
-                blocked.push({ shapeId, reason: 'shape not found' });
-                continue;
-            }
-            if (!options.allowLinkedBlockShapes && isLinkedBlockShape(shape)) {
-                blocked.push({ shapeId, reason: 'linked SiYuan block shape requires allowLinkedBlockShapes=true' });
-                continue;
-            }
-            deletable.push(shape.id);
-        }
-
-        if (options.confirm !== true) {
-            return {
-                dryRun: true,
-                deletedShapeIds: deletable.map(String),
-                blocked,
-                summary: this.getAgentSummary(),
-            };
-        }
-
-        if (deletable.length) {
-            this.editor.deleteShapes(deletable);
-            this.triggerSave();
-        }
-        return {
-            dryRun: false,
-            deletedShapeIds: deletable.map(String),
-            blocked,
-            summary: this.getAgentSummary(),
-        };
+    public deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean }) {
+        return agentOps.deleteAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public convertAgentConnectors(options: {
-        shapeIds: string[];
-        to: 'arrow' | 'bezier-connector';
-    }): { convertedShapeIds: string[]; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const ids = options.shapeIds.slice(0, 50).map((id) => id as TLShapeId);
-        const converted = options.to === 'arrow'
-            ? convertConnectorsToArrow(this.editor, ids)
-            : convertConnectorsToBezier(this.editor, ids);
-        if (converted.length) this.triggerSave();
-        return {
-            convertedShapeIds: converted.map(String),
-            summary: this.getAgentSummary(),
-        };
+    public convertAgentConnectors(options: { shapeIds: string[]; to: 'arrow' | 'bezier-connector' }) {
+        return agentOps.convertAgentConnectors(this.getAgentRuntime(), options);
     }
 
-    public getAgentBoardSnapshotSummary(): {
-        id: string;
-        pageCount: number;
-        shapeCount: number;
-        assetCount: number;
-        storeRecordCount: number;
-        approxJsonBytes: number;
-        pages: Array<{ id: string; name?: string; index?: string }>;
-    } {
-        const snapshot = getSnapshot(this.store);
-        const records = Object.values((snapshot as any)?.store || {}) as any[];
-        const pages = records.filter((record) => record?.typeName === 'page' || String(record?.id || '').startsWith('page:'));
-        const shapes = records.filter((record) => record?.typeName === 'shape' || String(record?.id || '').startsWith('shape:'));
-        const assets = records.filter((record) => record?.typeName === 'asset' || String(record?.id || '').startsWith('asset:'));
-        const json = JSON.stringify(snapshot);
-        return {
-            id: this.id,
-            pageCount: pages.length,
-            shapeCount: shapes.length,
-            assetCount: assets.length,
-            storeRecordCount: records.length,
-            approxJsonBytes: json.length,
-            pages: pages.slice(0, 50).map((page) => ({
-                id: String(page.id || ''),
-                name: page.name ? String(page.name) : undefined,
-                index: page.index ? String(page.index) : undefined,
-            })),
-        };
+    public getAgentBoardSnapshotSummary() {
+        return agentOps.getAgentBoardSnapshotSummary(this.getAgentRuntime());
     }
 
     public async backupAgentWhiteboard(options: { reason?: string } = {}) {
-        const snapshot = getSnapshot(this.store);
-        const jsonData = JSON.stringify(snapshot);
-        const result = await WhiteboardFileManager.backupWhiteboardData(this.id, jsonData, {
-            reason: clampAgentText(options.reason || 'agent-backup', 80),
-        } as any);
-        return {
-            ...result,
-            snapshot: this.getAgentBoardSnapshotSummary(),
-        };
+        return agentOps.backupAgentWhiteboard(this.getAgentRuntime(), options);
     }
 
-    public duplicateAgentShapes(options: {
-        shapeIds: string[];
-        offsetX?: number;
-        offsetY?: number;
-        select?: boolean;
-        zoom?: boolean;
-    }): { duplicatedShapeIds: string[]; blocked: Array<{ shapeId: string; reason: string }>; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const ids = Array.from(new Set(options.shapeIds)).slice(0, 50);
-        const existing = ids.filter((id) => this.editor.getShape(id as TLShapeId)).map((id) => id as TLShapeId);
-        const blocked = ids
-            .filter((id) => !this.editor.getShape(id as TLShapeId))
-            .map((shapeId) => ({ shapeId, reason: 'shape not found' }));
-        if (!existing.length) return { duplicatedShapeIds: [], blocked, summary: this.getAgentSummary() };
-
-        const dx = finiteNumberInRange(options.offsetX, 32, -4000, 4000);
-        const dy = finiteNumberInRange(options.offsetY, 32, -4000, 4000);
-        const beforeIds = new Set(this.editor.getCurrentPageShapes().map((shape) => String(shape.id)));
-        const duplicate = (this.editor as any).duplicateShapes;
-        let duplicated: TLShape[] = [];
-        if (typeof duplicate === 'function') {
-            duplicate.call(this.editor, existing);
-            duplicated = this.editor
-                .getCurrentPageShapes()
-                .filter((shape) => !beforeIds.has(String(shape.id))) as TLShape[];
-            if ((dx !== 0 || dy !== 0) && duplicated.length) {
-                this.editor.updateShapes(duplicated.map((shape) => ({
-                    id: shape.id,
-                    type: shape.type,
-                    x: Number(shape.x || 0) + dx,
-                    y: Number(shape.y || 0) + dy,
-                })) as any);
-            }
-        } else {
-            const creates = existing
-                .map((id) => this.editor.getShape(id))
-                .filter(Boolean)
-                .map((shape: any) => ({
-                    id: createShapeId(),
-                    type: shape.type,
-                    x: Number(shape.x || 0) + dx,
-                    y: Number(shape.y || 0) + dy,
-                    props: JSON.parse(JSON.stringify(shape.props || {})),
-                }));
-            this.editor.createShapes(creates as any);
-            duplicated = creates.map((shape) => this.editor.getShape(shape.id)).filter(Boolean) as TLShape[];
-        }
-        const duplicatedShapeIds = duplicated.map((shape) => String(shape.id));
-        if (options.select !== false && duplicatedShapeIds.length) {
-            this.editor.setSelectedShapes(duplicatedShapeIds as TLShapeId[]);
-        }
-        if (options.zoom && duplicatedShapeIds.length) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
-        }
-        this.triggerSave();
-        return { duplicatedShapeIds, blocked, summary: this.getAgentSummary() };
+    public duplicateAgentShapes(options: { shapeIds: string[]; offsetX?: number; offsetY?: number; select?: boolean; zoom?: boolean }) {
+        return agentOps.duplicateAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public arrangeAgentShapes(options: {
-        shapeIds: string[];
-        operation: AgentArrangeOperation;
-    }): { arrangedShapeIds: string[]; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
-            .filter((id) => this.editor.getShape(id as TLShapeId)) as TLShapeId[];
-        if (!ids.length) return { arrangedShapeIds: [], summary: this.getAgentSummary() };
-        const methodByOperation: Record<AgentArrangeOperation, string> = {
-            front: 'bringToFront',
-            back: 'sendToBack',
-            forward: 'bringForward',
-            backward: 'sendBackward',
-        };
-        const methodName = methodByOperation[options.operation];
-        const method = (this.editor as any)[methodName];
-        if (typeof method !== 'function') {
-            throw new Error(`${methodName} API is unavailable in current tldraw editor`);
-        }
-        method.call(this.editor, ids);
-        this.triggerSave();
-        return { arrangedShapeIds: ids.map(String), summary: this.getAgentSummary() };
+    public arrangeAgentShapes(options: { shapeIds: string[]; operation: AgentArrangeOperation }) {
+        return agentOps.arrangeAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public alignAgentShapes(options: {
-        shapeIds: string[];
-        operation: AgentAlignOperation;
-    }): { alignedShapeIds: string[]; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const shapes = Array.from(new Set(options.shapeIds)).slice(0, 50)
-            .map((id) => this.editor.getShape(id as TLShapeId))
-            .filter(Boolean) as TLShape[];
-        if (shapes.length < 2) return { alignedShapeIds: shapes.map((shape) => String(shape.id)), summary: this.getAgentSummary() };
-
-        const boxes = shapes.map((shape) => {
-            const bounds = this.editor.getShapePageBounds(shape.id);
-            const w = bounds?.width || Number((shape as any).props?.w) || 1;
-            const h = bounds?.height || Number((shape as any).props?.h) || 1;
-            return {
-                shape,
-                x: bounds?.x ?? Number(shape.x || 0),
-                y: bounds?.y ?? Number(shape.y || 0),
-                w,
-                h,
-            };
-        });
-        const updates = buildAgentAlignUpdates(boxes, options.operation);
-        if (updates.length) {
-            this.editor.updateShapes(updates as any);
-            this.triggerSave();
-        }
-        return { alignedShapeIds: shapes.map((shape) => String(shape.id)), summary: this.getAgentSummary() };
+    public alignAgentShapes(options: { shapeIds: string[]; operation: AgentAlignOperation }) {
+        return agentOps.alignAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public groupAgentShapes(options: {
-        shapeIds: string[];
-        ungroup?: boolean;
-        select?: boolean;
-    }): { shapeIds: string[]; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
-            .filter((id) => this.editor.getShape(id as TLShapeId)) as TLShapeId[];
-        if (!ids.length) return { shapeIds: [], summary: this.getAgentSummary() };
-
-        const methodName = options.ungroup ? 'ungroupShapes' : 'groupShapes';
-        const method = (this.editor as any)[methodName];
-        if (typeof method !== 'function') {
-            throw new Error(`${methodName} API is unavailable in current tldraw editor`);
-        }
-        method.call(this.editor, ids);
-        if (options.select !== false) {
-            this.editor.setSelectedShapes(ids);
-        }
-        this.triggerSave();
-        return { shapeIds: ids.map(String), summary: this.getAgentSummary() };
+    public groupAgentShapes(options: { shapeIds: string[]; ungroup?: boolean; select?: boolean }) {
+        return agentOps.groupAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public lockAgentShapes(options: {
-        shapeIds: string[];
-        locked: boolean;
-    }): { shapeIds: string[]; locked: boolean; summary: ReturnType<TldrawManager['getAgentSummary']> } {
-        if (!this.editor) {
-            throw new Error('Tldraw editor is not initialized');
-        }
-        const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
-            .filter((id) => this.editor.getShape(id as TLShapeId)) as TLShapeId[];
-        if (!ids.length) return { shapeIds: [], locked: options.locked, summary: this.getAgentSummary() };
-
-        const methodName = options.locked ? 'lockShapes' : 'unlockShapes';
-        const method = (this.editor as any)[methodName];
-        if (typeof method === 'function') {
-            method.call(this.editor, ids);
-        } else {
-            this.editor.updateShapes(ids.map((id) => {
-                const shape = this.editor.getShape(id) as TLShape;
-                return { id, type: shape.type, isLocked: options.locked } as any;
-            }));
-        }
-        this.triggerSave();
-        return { shapeIds: ids.map(String), locked: options.locked, summary: this.getAgentSummary() };
+    public lockAgentShapes(options: { shapeIds: string[]; locked: boolean }) {
+        return agentOps.lockAgentShapes(this.getAgentRuntime(), options);
     }
 
-    /**
-     * Helper: find the number of remaining shapes referencing a blockId for specified types
-     */
+
     private countRemainingShapesReferencingBlock(editor: Editor, blockId: string, types: string[]): number {
         const allShapes = editor.store.query.records('shape').get();
         return allShapes.filter(s => types.includes(s.type) && (s as ICardShape).props?.blockId === blockId).length;
-    }
-
-    private syncAgentCreatedBlockAttrs(result: AgentCreateShapeResult) {
-        const nodes = result.createdNodes || [];
-        const linkedNodes = nodes.filter((node) =>
-            node.blockId && (node.kind === 'card' || node.kind === 'single-block')
-        );
-        if (linkedNodes.length === 0) return;
-
-        void Promise.all(linkedNodes.map(async (node) => {
-            const blockId = node.blockId as string;
-            const link = buildTldrawLink(this.id, blockId, this.title, node.id);
-            const attrs = node.kind === 'single-block'
-                ? { 'custom-tldraw-link': link, 'custom-st-tldraw-single': '1' }
-                : { 'custom-tldraw-link': link, 'custom-st-tldraw': '1' };
-            await api.setBlockAttrs(blockId, attrs);
-        })).catch((error) => {
-            console.error('sync agent-created tldraw block attrs failed', error);
-        });
     }
 
     /**
@@ -2293,352 +1740,6 @@ export class TldrawManager {
     }
 
 
-}
-
-function summarizeShapeProps(props: any, editor?: Editor): Record<string, unknown> {
-    if (!props || typeof props !== 'object') return {};
-    const out: Record<string, unknown> = {};
-    for (const key of ['w', 'h', 'color', 'geo', 'blockId', 'name', 'text']) {
-        if (props[key] !== undefined) out[key] = props[key];
-    }
-    if (props.richText) {
-        out.richText = '[richText]';
-        if (editor) {
-            try {
-                out.richTextPlain = clampAgentText(renderPlaintextFromRichText(editor, props.richText), 500);
-            } catch {}
-        }
-    }
-    return out;
-}
-
-function buildAgentShapePropsPatch(shape: TLShape, options: {
-    w?: number;
-    h?: number;
-    color?: string;
-    text?: string;
-    name?: string;
-}): Record<string, unknown> {
-    const props: Record<string, unknown> = {};
-    const supportsSize = ['card', 'single-block', 'branch', 'geo', 'note', 'text', 'frame', 'slide', 'mind-map', 'js-shape'].includes(shape.type);
-    const supportsColor = ['card', 'single-block', 'branch', 'geo', 'note', 'text', 'frame', 'draw', 'highlight', 'slide', 'mind-map', 'js-shape', 'arrow', 'line', 'bezier-connector'].includes(shape.type);
-
-    if (supportsSize && options.w !== undefined) {
-        props.w = finiteNumberInRange(options.w, Number((shape as any).props?.w) || 300, 1, 4000);
-    }
-    if (supportsSize && options.h !== undefined) {
-        props.h = finiteNumberInRange(options.h, Number((shape as any).props?.h) || 300, 1, 4000);
-    }
-    if (supportsColor && options.color !== undefined) {
-        const color = normalizeOptionalAgentColor(options.color);
-        if (color) props.color = color;
-    }
-
-    return props;
-}
-
-function buildAgentTextPropsPatch(shape: TLShape, options: { text?: string; name?: string }): Record<string, unknown> {
-    const props: Record<string, unknown> = {};
-    if (options.text !== undefined) {
-        const text = clampAgentText(options.text, 2000);
-        if (shape.type === 'text' || shape.type === 'note' || shape.type === 'arrow' || shape.type === 'bezier-connector') {
-            props.richText = toRichText(text);
-        } else if (shape.type === 'mind-map') {
-            props.rootNode = {
-                ...((shape as any).props?.rootNode || createMindMapNode()),
-                text,
-            };
-        }
-    }
-    if (options.name !== undefined && shape.type === 'slide') {
-        props.name = clampAgentText(options.name, 120) || 'New Slide';
-    }
-    return props;
-}
-
-function summarizeAgentShape(editor: Editor, shape: TLShape, includeBindings = false): AgentShapeSummary {
-    const summary: AgentShapeSummary = {
-        id: String(shape.id),
-        type: String(shape.type),
-        x: Number(shape.x || 0),
-        y: Number(shape.y || 0),
-        rotation: Number((shape as any).rotation || 0),
-        parentId: String((shape as any).parentId || ''),
-        index: String((shape as any).index || ''),
-        props: summarizeShapeProps((shape as any).props, editor),
-    };
-    if (includeBindings) {
-        summary.bindings = [
-            ...((editor as any).getBindingsFromShape?.(shape.id, 'arrow') || []),
-            ...((editor as any).getBindingsFromShape?.(shape.id, 'bezier-connector') || []),
-        ].map(summarizeAgentBinding);
-    }
-    return summary;
-}
-
-function summarizeAgentBinding(binding: any) {
-    return {
-        id: String(binding?.id || ''),
-        type: String(binding?.type || ''),
-        fromId: String(binding?.fromId || ''),
-        toId: String(binding?.toId || ''),
-        props: binding?.props || {},
-    };
-}
-
-function buildAgentBasicShape(id: TLShapeId, options: AgentBasicShapeCreateArgs, x: number, y: number, color: any, text: string) {
-    const w = finiteNumberInRange(options.w, defaultAgentWidth(options.kind), 1, 4000);
-    const h = finiteNumberInRange(options.h, defaultAgentHeight(options.kind), 1, 4000);
-    if (options.kind === 'text') {
-        return { id, type: 'text', x, y, props: { richText: toRichText(text), color, w, size: 'm', font: 'draw', scale: 1 } };
-    }
-    if (options.kind === 'note') {
-        return { id, type: 'note', x, y, props: { richText: toRichText(text), color, size: 'm', font: 'draw', align: 'middle', verticalAlign: 'middle', growY: 0 } };
-    }
-    if (options.kind === 'geo') {
-        return { id, type: 'geo', x, y, props: { w, h, geo: normalizeAgentGeo(options.geo), color, fill: 'none', dash: 'draw', size: 'm', font: 'draw', richText: toRichText(text), align: 'middle', verticalAlign: 'middle', growY: 0 } };
-    }
-    if (options.kind === 'arrow') {
-        return { id, type: 'arrow', x, y, props: { color, start: { x: 0, y: 0 }, end: { x: w, y: h }, richText: toRichText(text), arrowheadStart: 'none', arrowheadEnd: 'arrow' } };
-    }
-    if (options.kind === 'line') {
-        const [start, end] = getIndices(2);
-        return {
-            id,
-            type: 'line',
-            x,
-            y,
-            props: {
-                color,
-                dash: 'draw',
-                size: 'm',
-                spline: 'line',
-                scale: 1,
-                points: {
-                    [start]: { id: start, index: start, x: 0, y: 0 },
-                    [end]: { id: end, index: end, x: w, y: h },
-                },
-            },
-        };
-    }
-    if (options.kind === 'frame') {
-        return { id, type: 'frame', x, y, props: { w, h, name: clampAgentText(options.name || text || 'Frame', 120) } };
-    }
-    if (options.kind === 'draw') {
-        return {
-            id,
-            type: 'draw',
-            x,
-            y,
-            props: {
-                color,
-                fill: 'none',
-                dash: 'draw',
-                size: options.kind === 'highlight' ? 'xl' : 'm',
-                isComplete: true,
-                isClosed: false,
-                isPen: false,
-                segments: [
-                    {
-                        type: 'free',
-                        points: [
-                            { x: 0, y: 0, z: 0.5 },
-                            { x: w * 0.35, y: h * 0.2, z: 0.5 },
-                            { x: w * 0.7, y: h * 0.8, z: 0.5 },
-                            { x: w, y: h, z: 0.5 },
-                        ],
-                    },
-                ],
-            },
-        };
-    }
-    if (options.kind === 'highlight') {
-        return {
-            id,
-            type: 'highlight',
-            x,
-            y,
-            props: {
-                color,
-                size: 'm',
-                isComplete: true,
-                isPen: false,
-                scale: 1,
-                segments: [
-                    {
-                        type: 'free',
-                        points: [
-                            { x: 0, y: h * 0.5, z: 0.5 },
-                            { x: w * 0.33, y: h * 0.45, z: 0.5 },
-                            { x: w * 0.66, y: h * 0.55, z: 0.5 },
-                            { x: w, y: h * 0.5, z: 0.5 },
-                        ],
-                    },
-                ],
-            },
-        };
-    }
-    if (options.kind === 'bezier-connector') {
-        return { id, type: 'bezier-connector', x: 0, y: 0, props: { start: { x, y }, end: { x: x + w, y: y + h }, color, strokeWidth: 3, strokeStyle: 'solid', richText: toRichText(text), labelPosition: 0.5, font: 'draw', size: 'm', scale: 1 } };
-    }
-    if (options.kind === 'slide') {
-        return { id, type: 'slide', x, y, props: { w, h, color, name: clampAgentText(options.name || text || 'New Slide', 120), blockId: options.blockId, borderStyle: 'dashed' } };
-    }
-    if (options.kind === 'mind-map') {
-        return { id, type: 'mind-map', x, y, props: { w, h, color, rootNode: createMindMapNode(text || '中心主题'), horizontalGap: 50, verticalGap: 20, nodeWidth: 120, nodeHeight: 36, fontSize: 14, lineWidth: 2, direction: options.direction || 'right', theme: options.theme || 'default', blockId: options.blockId, version: 1, refreshNonce: Date.now() } };
-    }
-    return { id, type: 'js-shape', x, y, props: { w, h, color, script: DEFAULT_SCRIPT, autoRun: false, interactive: false, restrictDom: true, data: JSON.stringify({ createdBy: 'siyuan-agent', note: clampAgentText(text, 500) }) } };
-}
-
-function resolveAgentConnectorEndpoints(editor: Editor, options: AgentConnectorCreateArgs) {
-    let start = options.start;
-    let end = options.end;
-    let startShapeId = options.startShapeId as TLShapeId | undefined;
-    let endShapeId = options.endShapeId as TLShapeId | undefined;
-    let startPortId: string | undefined;
-    let endPortId: string | undefined;
-
-    if (startShapeId && endShapeId) {
-        if (!editor.getShape(startShapeId)) throw new Error(`Start shape not found: ${startShapeId}`);
-        if (!editor.getShape(endShapeId)) throw new Error(`End shape not found: ${endShapeId}`);
-        const ports = getBestPortPair(editor, startShapeId, endShapeId);
-        startPortId = ports.sourcePortId;
-        endPortId = ports.targetPortId;
-        start = getPortPagePosition(editor, startShapeId, startPortId) || getAgentShapeCenter(editor, startShapeId);
-        end = getPortPagePosition(editor, endShapeId, endPortId) || getAgentShapeCenter(editor, endShapeId);
-    }
-
-    if (!start && startShapeId) start = getAgentShapeCenter(editor, startShapeId);
-    if (!end && endShapeId) end = getAgentShapeCenter(editor, endShapeId);
-    if (!start || !end) throw new Error('connector requires start/end points or startShapeId/endShapeId');
-
-    return { start, end, startShapeId, endShapeId, startPortId, endPortId };
-}
-
-function buildAgentArrowBindings(arrowId: TLShapeId, endpoints: ReturnType<typeof resolveAgentConnectorEndpoints>) {
-    const bindings: any[] = [];
-    if (endpoints.startShapeId) {
-        bindings.push({
-            fromId: arrowId,
-            toId: endpoints.startShapeId,
-            type: 'arrow',
-            props: { terminal: 'start', normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false, isPrecise: false },
-        });
-    }
-    if (endpoints.endShapeId) {
-        bindings.push({
-            fromId: arrowId,
-            toId: endpoints.endShapeId,
-            type: 'arrow',
-            props: { terminal: 'end', normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false, isPrecise: false },
-        });
-    }
-    return bindings;
-}
-
-function getAgentShapeCenter(editor: Editor, shapeId: TLShapeId) {
-    const bounds = editor.getShapePageBounds(shapeId);
-    if (bounds) return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
-    const shape = editor.getShape(shapeId) as any;
-    if (!shape) throw new Error(`Shape not found: ${shapeId}`);
-    const w = Number(shape.props?.w) || 300;
-    const h = Number(shape.props?.h) || 120;
-    return { x: Number(shape.x || 0) + w / 2, y: Number(shape.y || 0) + h / 2 };
-}
-
-function finalizeAgentSelection(editor: Editor, focusedId: TLShapeId, options: { select?: boolean; zoom?: boolean }) {
-    if (options.select !== false) editor.setSelectedShapes([focusedId]);
-    if (options.zoom) editor.zoomToSelection({ animation: { duration: 300 } });
-}
-
-function isLinkedBlockShape(shape: TLShape) {
-    return Boolean((shape as any).props?.blockId && ['card', 'single-block', 'slide', 'mind-map'].includes(shape.type));
-}
-
-function clampAgentText(value: string, maxLength: number) {
-    return String(value || '').slice(0, maxLength);
-}
-
-function defaultAgentText(kind: AgentBasicShapeCreateArgs['kind']) {
-    if (kind === 'mind-map') return '中心主题';
-    if (kind === 'slide') return 'New Slide';
-    if (kind === 'js-shape') return 'Agent-created JS placeholder';
-    return '';
-}
-
-function defaultAgentWidth(kind: AgentBasicShapeCreateArgs['kind']) {
-    if (kind === 'slide') return 720;
-    if (kind === 'mind-map') return 800;
-    if (kind === 'js-shape') return 320;
-    if (kind === 'text') return 240;
-    if (kind === 'note') return 220;
-    if (kind === 'frame') return 640;
-    return 300;
-}
-
-function defaultAgentHeight(kind: AgentBasicShapeCreateArgs['kind']) {
-    if (kind === 'slide') return 480;
-    if (kind === 'mind-map') return 500;
-    if (kind === 'js-shape') return 220;
-    if (kind === 'text') return 80;
-    if (kind === 'note') return 220;
-    if (kind === 'frame') return 360;
-    return 160;
-}
-
-function normalizeAgentGeo(value?: string) {
-    const allowed = new Set(['rectangle', 'ellipse', 'triangle', 'diamond', 'pentagon', 'hexagon', 'octagon', 'star', 'cloud', 'x-box', 'check-box', 'heart']);
-    return value && allowed.has(value) ? value : 'rectangle';
-}
-
-function buildAgentAlignUpdates(
-    boxes: Array<{ shape: TLShape; x: number; y: number; w: number; h: number }>,
-    operation: AgentAlignOperation
-) {
-    const left = Math.min(...boxes.map((box) => box.x));
-    const right = Math.max(...boxes.map((box) => box.x + box.w));
-    const top = Math.min(...boxes.map((box) => box.y));
-    const bottom = Math.max(...boxes.map((box) => box.y + box.h));
-    const centerX = left + (right - left) / 2;
-    const centerY = top + (bottom - top) / 2;
-
-    if (operation === 'distribute-x') {
-        const sorted = [...boxes].sort((a, b) => a.x - b.x);
-        if (sorted.length < 3) return [];
-        const totalWidth = sorted.reduce((sum, box) => sum + box.w, 0);
-        const gap = (right - left - totalWidth) / (sorted.length - 1);
-        let cursor = left;
-        return sorted.map((box) => {
-            const update = { id: box.shape.id, type: box.shape.type, x: cursor, y: box.shape.y };
-            cursor += box.w + gap;
-            return update;
-        });
-    }
-
-    if (operation === 'distribute-y') {
-        const sorted = [...boxes].sort((a, b) => a.y - b.y);
-        if (sorted.length < 3) return [];
-        const totalHeight = sorted.reduce((sum, box) => sum + box.h, 0);
-        const gap = (bottom - top - totalHeight) / (sorted.length - 1);
-        let cursor = top;
-        return sorted.map((box) => {
-            const update = { id: box.shape.id, type: box.shape.type, x: box.shape.x, y: cursor };
-            cursor += box.h + gap;
-            return update;
-        });
-    }
-
-    return boxes.map((box) => {
-        let x = Number(box.shape.x || 0);
-        let y = Number(box.shape.y || 0);
-        if (operation === 'left') x = left;
-        if (operation === 'center-x') x = centerX - box.w / 2;
-        if (operation === 'right') x = right - box.w;
-        if (operation === 'top') y = top;
-        if (operation === 'center-y') y = centerY - box.h / 2;
-        if (operation === 'bottom') y = bottom - box.h;
-        return { id: box.shape.id, type: box.shape.type, x, y };
-    });
 }
 
 function isDarkTheme(): boolean {
