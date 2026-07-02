@@ -80,8 +80,9 @@ export function getAgentSummary(runtime: AgentManagerRuntime) {
     };
 }
 
-export function createAgentShape(runtime: AgentManagerRuntime, options: AgentCreateShapeArgs) {
+export async function createAgentShape(runtime: AgentManagerRuntime, options: AgentCreateShapeArgs) {
     const editor = requireEditor(runtime);
+    await validateAgentCreateShapeBlockIds(options);
     const result = createAgentBusinessShape(editor, options);
     syncAgentCreatedBlockAttrs(runtime, result);
     runtime.triggerSave();
@@ -590,6 +591,52 @@ function syncAgentCreatedBlockAttrs(runtime: AgentManagerRuntime, result: AgentC
     })).catch((error) => {
         console.error('sync agent-created tldraw block attrs failed', error);
     });
+}
+
+async function validateAgentCreateShapeBlockIds(options: AgentCreateShapeArgs) {
+    if (options.kind === 'card') {
+        await validateAgentLinkedBlockId(options.blockId, 'card');
+        return;
+    }
+    if (options.kind === 'single-block') {
+        await validateAgentLinkedBlockId(options.blockId, 'single-block');
+        return;
+    }
+
+    const refs = [
+        ...(options.children || []),
+        ...(options.leftChildren || []),
+        ...(options.rightChildren || []),
+    ];
+    for (const shapeId of options.childIds || []) {
+        refs.push({ shapeId });
+    }
+    for (const ref of refs) {
+        if (!ref || typeof ref === 'string') continue;
+        if (ref.shapeId) continue;
+        await validateAgentLinkedBlockId(ref.blockId, ref.kind || 'single-block');
+    }
+}
+
+async function validateAgentLinkedBlockId(blockId: string | undefined, kind: 'card' | 'single-block') {
+    if (!blockId) return;
+    if (!/^\d{14}-[0-9a-z]{7}$/.test(blockId)) {
+        throw new Error(`${kind} blockId is not a valid SiYuan block id`);
+    }
+
+    const block = await api.getBlockByID(blockId);
+    if (!block) {
+        throw new Error(`${kind} blockId not found: ${blockId}`);
+    }
+
+    const type = String((block as any).type || '');
+    if (kind === 'card') {
+        if (type === 'd' || type === 'h') return;
+        throw new Error(`card blockId must point to a document or heading block; got type "${type || 'unknown'}"`);
+    }
+    if (type !== 'p') {
+        throw new Error(`single-block blockId must point to a paragraph block; got type "${type || 'unknown'}"`);
+    }
 }
 
 function summarizeShapeProps(props: any, editor?: Editor): Record<string, unknown> {

@@ -1438,7 +1438,7 @@ export class TldrawManager {
         return agentOps.getAgentSummary(this.getAgentRuntime());
     }
 
-    public createAgentShape(options: AgentCreateShapeArgs) {
+    public async createAgentShape(options: AgentCreateShapeArgs) {
         return agentOps.createAgentShape(this.getAgentRuntime(), options);
     }
 
