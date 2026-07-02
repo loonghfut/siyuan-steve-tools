@@ -13,7 +13,90 @@ import type {
 } from './types'
 import { normalizeAgentColor, normalizeBranchLineStyle } from './schema'
 
+const COMMON_WHITEBOARD_ARG_KEYS = ['whiteboardId', 'id', 'rootId']
+
+const CREATE_SHAPE_ARG_KEYS = [
+	...COMMON_WHITEBOARD_ARG_KEYS,
+	'kind',
+	'x',
+	'y',
+	'w',
+	'h',
+	'color',
+	'blockId',
+	'isMain',
+	'isCollapsed',
+	'showMask',
+	'rootShapeId',
+	'childIds',
+	'children',
+	'leftChildren',
+	'rightChildren',
+	'direction',
+	'horizontalGap',
+	'verticalGap',
+	'lineStyle',
+	'lineWidth',
+	'snapDistance',
+	'showBackground',
+	'select',
+	'zoom',
+]
+
+const CREATE_BASIC_SHAPE_ARG_KEYS = [
+	...COMMON_WHITEBOARD_ARG_KEYS,
+	'kind',
+	'x',
+	'y',
+	'w',
+	'h',
+	'color',
+	'text',
+	'geo',
+	'name',
+	'blockId',
+	'direction',
+	'theme',
+	'select',
+	'zoom',
+]
+
+const CREATE_CONNECTOR_ARG_KEYS = [
+	...COMMON_WHITEBOARD_ARG_KEYS,
+	'kind',
+	'startShapeId',
+	'endShapeId',
+	'fromShapeId',
+	'toShapeId',
+	'sourceShapeId',
+	'targetShapeId',
+	'shapeId',
+	'shapeIds',
+	'start',
+	'end',
+	'color',
+	'text',
+	'strokeWidth',
+	'lineWidth',
+	'select',
+	'zoom',
+]
+
+const SHAPE_UPDATE_PATCH_ARG_KEYS = [
+	'shapeId',
+	'x',
+	'y',
+	'w',
+	'h',
+	'color',
+	'text',
+	'name',
+	'select',
+	'zoom',
+]
+
 export function parseCreateShapeArgs(args: Record<string, unknown>): AgentCreateShapeArgs {
+	assertKnownArgs(args, CREATE_SHAPE_ARG_KEYS, 'tldraw_create_shape')
 	const kind = parseKind(args.kind)
 
 	if (kind === 'card') {
@@ -26,6 +109,7 @@ export function parseCreateShapeArgs(args: Record<string, unknown>): AgentCreate
 }
 
 export function parseCreateBasicShapeArgs(args: Record<string, unknown>): AgentBasicShapeCreateArgs {
+	assertKnownArgs(args, CREATE_BASIC_SHAPE_ARG_KEYS, 'tldraw_create_basic_shape')
 	const kind = parseBasicKind(args.kind)
 	return {
 		kind,
@@ -46,10 +130,13 @@ export function parseCreateBasicShapeArgs(args: Record<string, unknown>): AgentB
 }
 
 export function parseCreateConnectorArgs(args: Record<string, unknown>): AgentConnectorCreateArgs {
+	assertKnownArgs(args, CREATE_CONNECTOR_ARG_KEYS, 'tldraw_create_connector')
+	const shapeIds = shapeIdArrayArg(args.shapeIds || args.shapeId)
 	return {
 		kind: parseConnectorKind(args.kind),
-		startShapeId: stringArg(args.startShapeId || args.fromShapeId || args.sourceShapeId),
-		endShapeId: stringArg(args.endShapeId || args.toShapeId || args.targetShapeId),
+		startShapeId: stringArg(args.startShapeId || args.fromShapeId || args.sourceShapeId) || shapeIds[0],
+		endShapeId: stringArg(args.endShapeId || args.toShapeId || args.targetShapeId) || shapeIds[1],
+		shapeIds,
 		start: pointArg(args.start),
 		end: pointArg(args.end),
 		color: colorArg(args.color),
@@ -61,6 +148,7 @@ export function parseCreateConnectorArgs(args: Record<string, unknown>): AgentCo
 }
 
 export function parseShapeUpdatePatch(args: Record<string, unknown>): AgentShapeUpdatePatch {
+	assertKnownArgs(args, SHAPE_UPDATE_PATCH_ARG_KEYS, 'shape patch')
 	const shapeId = stringArg(args.shapeId)
 	if (!shapeId) throw new Error('missing required argument: shapeId')
 	return {
@@ -74,6 +162,14 @@ export function parseShapeUpdatePatch(args: Record<string, unknown>): AgentShape
 		name: stringArg(args.name),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
+	}
+}
+
+export function assertKnownArgs(args: Record<string, unknown>, allowedKeys: readonly string[], context: string) {
+	const allowed = new Set(allowedKeys)
+	const unknown = Object.keys(args).filter((key) => !allowed.has(key))
+	if (unknown.length > 0) {
+		throw new Error(`${context} received unsupported argument(s): ${unknown.join(', ')}`)
 	}
 }
 

@@ -129,6 +129,7 @@ export type AgentConnectorCreateArgs = AgentSelectionOptions & {
 	kind?: AgentConnectorKind
 	startShapeId?: string
 	endShapeId?: string
+	shapeIds?: string[]
 	start?: { x: number; y: number }
 	end?: { x: number; y: number }
 	color?: TLDefaultColorStyle

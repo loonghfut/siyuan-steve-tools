@@ -1,4 +1,4 @@
-import { booleanArgWithFallback, numberArg, shapeIdArrayArg } from '../args';
+import { assertKnownArgs, booleanArgWithFallback, numberArg, shapeIdArrayArg } from '../args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from './shared';
 
 export function createDuplicateShapesAction(): AgentActionDefinition {
@@ -8,6 +8,11 @@ export function createDuplicateShapesAction(): AgentActionDefinition {
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            try {
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'offsetX', 'offsetY', 'select', 'zoom'], 'tldraw_duplicate_shapes');
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
             const target = requireOpenWhiteboard(args);
             if (target.error) return { error: target.error };
             const shapeIds = shapeIdArrayArg(args.shapeIds || args.shapeId);

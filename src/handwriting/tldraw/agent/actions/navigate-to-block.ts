@@ -1,4 +1,4 @@
-import { booleanArgWithFallback, stringArg } from '../args';
+import { assertKnownArgs, booleanArgWithFallback, stringArg } from '../args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from './shared';
 
 export function createNavigateToBlockAction(): AgentActionDefinition {
@@ -8,6 +8,11 @@ export function createNavigateToBlockAction(): AgentActionDefinition {
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            try {
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'blockId', 'shapeId', 'zoom'], 'tldraw_navigate_to_block');
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
             const target = requireOpenWhiteboard(args);
             if (target.error) return { error: target.error };
             const blockId = stringArg(args.blockId);

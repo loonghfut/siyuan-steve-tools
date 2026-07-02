@@ -1,4 +1,4 @@
-import { shapeIdArrayArg, stringArg } from '../args';
+import { assertKnownArgs, shapeIdArrayArg, stringArg } from '../args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from './shared';
 
 export function createConvertConnectorsAction(): AgentActionDefinition {
@@ -8,6 +8,11 @@ export function createConvertConnectorsAction(): AgentActionDefinition {
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            try {
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'to'], 'tldraw_convert_connectors');
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
             const target = requireOpenWhiteboard(args);
             if (target.error) return { error: target.error };
             const shapeIds = shapeIdArrayArg(args.shapeIds || args.shapeId);

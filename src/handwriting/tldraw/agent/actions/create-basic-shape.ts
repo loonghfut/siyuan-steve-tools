@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createCreateBasicShapeAction(): AgentActionDefinition {
     return {
         name: 'tldraw_create_basic_shape',
-        description: 'Create safe non-business tldraw shapes on an open whiteboard. Required args: whiteboardId string, kind "text"|"note"|"geo"|"arrow"|"line"|"draw"|"highlight"|"frame"|"bezier-connector"|"slide"|"mind-map"|"js-shape". Optional args: x, y, w, h, color, text, geo, name, direction, theme, select, zoom. Line is implemented as an arrow shape without arrowheads. JS shape creation uses a restricted placeholder; custom script content is not accepted.',
+        description: 'Create a safe built-in/custom tldraw shape on an open whiteboard. Required args: whiteboardId, kind "text"|"note"|"geo"|"arrow"|"line"|"draw"|"highlight"|"frame"|"bezier-connector"|"slide"|"mind-map"|"js-shape". All other props have defaults; only pass optional overrides you need: x, y, w, h, color, text, geo, name, direction, theme, select, zoom. Line is an arrow without arrowheads. JS shape uses a restricted placeholder; script content is not accepted. Unknown args are rejected.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

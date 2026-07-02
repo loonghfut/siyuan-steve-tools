@@ -1,4 +1,4 @@
-import { booleanArgWithFallback, parseShapeUpdatePatch } from '../args';
+import { assertKnownArgs, booleanArgWithFallback, parseShapeUpdatePatch } from '../args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from './shared';
 
 export function createBatchUpdateShapesAction(): AgentActionDefinition {
@@ -8,6 +8,11 @@ export function createBatchUpdateShapesAction(): AgentActionDefinition {
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            try {
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'patches', 'select', 'zoom'], 'tldraw_batch_update_shapes');
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
             const target = requireOpenWhiteboard(args);
             if (target.error) return { error: target.error };
             if (!Array.isArray(args.patches)) return { error: 'missing required argument: patches array' };

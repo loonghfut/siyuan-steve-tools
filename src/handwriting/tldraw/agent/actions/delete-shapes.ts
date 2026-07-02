@@ -1,4 +1,4 @@
-import { booleanArgWithFallback, shapeIdArrayArg } from '../args';
+import { assertKnownArgs, booleanArgWithFallback, shapeIdArrayArg } from '../args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from './shared';
 
 export function createDeleteShapesAction(): AgentActionDefinition {
@@ -8,6 +8,11 @@ export function createDeleteShapesAction(): AgentActionDefinition {
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            try {
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'confirm', 'allowLinkedBlockShapes'], 'tldraw_delete_shapes');
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
             const target = requireOpenWhiteboard(args);
             if (target.error) return { error: target.error };
             const shapeIds = shapeIdArrayArg(args.shapeIds || args.shapeId);

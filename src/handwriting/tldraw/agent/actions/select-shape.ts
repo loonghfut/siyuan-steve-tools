@@ -1,4 +1,4 @@
-import { booleanArgWithFallback, stringArg } from '../args';
+import { assertKnownArgs, booleanArgWithFallback, stringArg } from '../args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from './shared';
 
 export function createSelectShapeAction(): AgentActionDefinition {
@@ -8,6 +8,11 @@ export function createSelectShapeAction(): AgentActionDefinition {
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            try {
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'zoom'], 'tldraw_select_shape');
+            } catch (error) {
+                return { error: stringifyError(error) };
+            }
             const target = requireOpenWhiteboard(args);
             if (target.error) return { error: target.error };
             const shapeId = stringArg(args.shapeId);
