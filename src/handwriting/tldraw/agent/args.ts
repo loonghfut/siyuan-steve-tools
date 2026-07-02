@@ -14,6 +14,7 @@ import type {
 import { normalizeAgentColor, normalizeBranchLineStyle } from './schema'
 
 const COMMON_WHITEBOARD_ARG_KEYS = ['whiteboardId', 'id', 'rootId']
+const INTERNAL_AGENT_ARG_KEYS = ['action']
 
 const CREATE_SHAPE_ARG_KEYS = [
 	...COMMON_WHITEBOARD_ARG_KEYS,
@@ -167,7 +168,8 @@ export function parseShapeUpdatePatch(args: Record<string, unknown>): AgentShape
 
 export function assertKnownArgs(args: Record<string, unknown>, allowedKeys: readonly string[], context: string) {
 	const allowed = new Set(allowedKeys)
-	const unknown = Object.keys(args).filter((key) => !allowed.has(key))
+	const internal = new Set(INTERNAL_AGENT_ARG_KEYS)
+	const unknown = Object.keys(args).filter((key) => !allowed.has(key) && !internal.has(key))
 	if (unknown.length > 0) {
 		throw new Error(`${context} received unsupported argument(s): ${unknown.join(', ')}`)
 	}

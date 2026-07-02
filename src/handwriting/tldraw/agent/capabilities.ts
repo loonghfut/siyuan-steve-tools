@@ -34,6 +34,22 @@ export function getTldrawAgentCapabilities() {
             'tldraw_insert_doc_outline_mindmap',
             'siyuan_create_summary_child_doc_whiteboard',
         ],
+        toolSelectionHints: {
+            createBusinessShapes: {
+                action: 'tldraw_create_shape',
+                kinds: ['card', 'single-block', 'branch'],
+                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'card', x: 100, y: 100, zoom: false },
+            },
+            createBasicShapes: {
+                action: 'tldraw_create_basic_shape',
+                kinds: ['note', 'text', 'geo', 'arrow', 'line', 'draw', 'highlight', 'frame', 'bezier-connector', 'slide', 'mind-map', 'js-shape'],
+                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'note', x: 100, y: 100, text: 'test', zoom: false },
+            },
+            createConnectorsBetweenShapes: {
+                action: 'tldraw_create_connector',
+                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', shapeIds: ['shape:<source>', 'shape:<target>'], text: 'label', zoom: false },
+            },
+        },
         destructive: [
             'tldraw_delete_shapes',
             'tldraw_delete_whiteboard_file',

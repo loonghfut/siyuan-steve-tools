@@ -26,7 +26,10 @@ export function registerTldrawAgentActions(plugin: Plugin) {
     }
 
     for (const action of getTldrawAgentActions(plugin)) {
-        addAgentAction.call(plugin, action as AgentActionDefinition);
+        addAgentAction.call(plugin, {
+            ...action,
+            handler: (args, app) => action.handler(stripFrontendActionArgs(args), app),
+        } as AgentActionDefinition);
     }
 
     registered = true;
@@ -34,4 +37,11 @@ export function registerTldrawAgentActions(plugin: Plugin) {
 
 export function syncTldrawAgentActions(plugin: Plugin) {
     registerTldrawAgentActions(plugin);
+}
+
+function stripFrontendActionArgs(args: Record<string, unknown>): Record<string, unknown> {
+    if (!args || typeof args !== 'object') return {};
+    const cleaned = { ...args };
+    delete cleaned.action;
+    return cleaned;
 }
