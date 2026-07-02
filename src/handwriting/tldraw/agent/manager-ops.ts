@@ -23,6 +23,7 @@ import { insertDocOutlineMindmapForAgent, type AgentDocOutlineBoardOptions } fro
 import { finiteNumberInRange, normalizeOptionalAgentColor } from './schema';
 import { createAgentBusinessShape } from './shape-ops';
 import { summarizeSnapshotObject } from './snapshot-summary';
+import { executeAgentPlan, type AgentPlanApplyOptions } from './plan-runner';
 import type {
     AgentAlignOperation,
     AgentArrangeOperation,
@@ -147,6 +148,21 @@ export async function saveAgentWhiteboard(runtime: AgentManagerRuntime) {
     requireEditor(runtime);
     await runtime.saveData();
     return { success: true, summary: getAgentSummary(runtime) };
+}
+
+export async function applyAgentPlan(runtime: AgentManagerRuntime, options: AgentPlanApplyOptions) {
+    requireEditor(runtime);
+    return executeAgentPlan(options, {
+        getSummary: () => getAgentSummary(runtime),
+        createShape: (shapeOptions) => createAgentShape(runtime, shapeOptions),
+        createBasicShape: (shapeOptions) => createAgentBasicShape(runtime, shapeOptions),
+        createConnector: (connectorOptions) => createAgentConnector(runtime, connectorOptions),
+        updateShapesBatch: (updateOptions) => updateAgentShapesBatch(runtime, updateOptions),
+        getShapeDetails: (detailOptions) => getAgentShapeDetails(runtime, detailOptions),
+        selectShape: (shapeId, zoom) => selectAgentShape(runtime, shapeId, zoom),
+        zoomToShapes: (zoomOptions) => zoomAgentToShapes(runtime, zoomOptions),
+        save: () => saveAgentWhiteboard(runtime),
+    });
 }
 
 export function updateAgentShape(runtime: AgentManagerRuntime, options: {

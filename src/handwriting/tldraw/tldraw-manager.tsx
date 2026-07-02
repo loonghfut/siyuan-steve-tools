@@ -48,6 +48,7 @@ import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import * as agentOps from './agent/manager-ops';
 import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentShapeUpdatePatch } from './agent/types';
 import type { AgentDocOutlineBoardOptions } from './agent/doc-to-board';
+import type { AgentPlanApplyOptions } from './agent/plan-runner';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -1555,6 +1556,10 @@ export class TldrawManager {
 
     public async saveAgentWhiteboard() {
         return agentOps.saveAgentWhiteboard(this.getAgentRuntime());
+    }
+
+    public async applyAgentPlan(options: AgentPlanApplyOptions) {
+        return agentOps.applyAgentPlan(this.getAgentRuntime(), options);
     }
 
     public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; isCollapsed?: boolean; select?: boolean; zoom?: boolean }) {

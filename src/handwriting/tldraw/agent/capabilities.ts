@@ -3,9 +3,13 @@ export function getTldrawAgentCapabilities() {
         version: 1,
         enabled: true,
         agentPrompt: [
-            'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. First read interaction context, then use focused whiteboard and current selection unless the user names another target.',
+            'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Prefer tldraw_apply_plan for most whiteboard edits; it automatically uses the focused whiteboard when whiteboardId is omitted and supports $selection/$created/$last references.',
+            'Use low-level tldraw actions only when tldraw_apply_plan cannot express the requested edit or you need precise one-off control.',
             'Prefer semantic STtools shapes over generic drawings: card for a document/heading block, single-block for one paragraph block, branch for mind-map-like relationships between cards/blocks, bezier-connector for labeled relationships, slide for presentation areas, mind-map for editable topic trees or markdown-derived outlines, js-shape only as a safe placeholder.',
             'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
+        ],
+        preferred: [
+            'tldraw_apply_plan',
         ],
         read: [
             'tldraw_get_interaction_context',
@@ -25,6 +29,7 @@ export function getTldrawAgentCapabilities() {
             'tldraw_save_whiteboard',
         ],
         createEditLayout: [
+            'tldraw_apply_plan',
             'tldraw_create_shape',
             'tldraw_create_basic_shape',
             'tldraw_create_connector',
@@ -40,6 +45,21 @@ export function getTldrawAgentCapabilities() {
             'siyuan_create_summary_child_doc_whiteboard',
         ],
         toolSelectionHints: {
+            preferredPlan: {
+                action: 'tldraw_apply_plan',
+                purpose: 'Default entrypoint for creating, connecting, updating, laying out, focusing, and saving through a safe JSON plan.',
+                references: ['$selection', '$selection[0]', '$created.name', '$created.name[0]', '$last'],
+                exampleArgs: {
+                    goal: 'Arrange the current selection into a horizontal flow',
+                    steps: [
+                        { op: 'layout', target: '$selection', style: 'row', gap: 96 },
+                        { op: 'connect', from: '$selection[0]', to: '$selection[1]', text: 'next' },
+                        { op: 'focus', target: '$selection' },
+                    ],
+                    save: true,
+                    zoom: true,
+                },
+            },
             createBusinessShapes: {
                 action: 'tldraw_create_shape',
                 kinds: ['card', 'single-block', 'branch'],
@@ -275,6 +295,7 @@ export function getTldrawAgentCapabilities() {
             'arrow/line/draw/highlight/frame: use for lightweight visual markup. Use connector tools instead when relationships should bind to shapes.',
         ],
         layoutRecipes: [
+            'For most edits: use tldraw_apply_plan with steps. It can create notes/cards, connect shapes, update labels, layout selections, focus results, and save in one call.',
             'For a document map: create a main card for the document, create single-block leaves or child cards, then create a branch with rootShapeId and children/leftChildren/rightChildren.',
             'For concept links: get shape details, then create a bezier connector with shapeIds and a short text label.',
             'For presentation: create slide frames first, place content inside them, then use select/zoom or slide UI focus.',
@@ -287,7 +308,8 @@ export function getTldrawAgentCapabilities() {
         safetyRules: [
             'Agent actions must be enabled in plugin settings.',
             'Most write actions require the whiteboard to be open, so the user can observe the change.',
-            'Agents should call tldraw_get_interaction_context before using whiteboard tools, then prefer the focused whiteboard and current selection unless the user requested another target.',
+            'Prefer tldraw_apply_plan before low-level create/update/connect/layout actions. It has a 50-write cap, supports dryRun, and blocks script/raw mutation/delete operations.',
+            'For low-level tools, call tldraw_get_interaction_context first, then prefer the focused whiteboard and current selection unless the user requested another target. tldraw_apply_plan can usually omit whiteboardId and use the focused whiteboard directly.',
             'Use tldraw_create_shape for STtools business shapes (card, single-block, branch); use tldraw_create_basic_shape for note, text, geo, arrow, line, frame, and similar basic shapes.',
             'Batch shape operations are capped at 50 items.',
             'Shape deletion is dry-run by default and requires confirm:true to execute.',
@@ -301,6 +323,7 @@ export function getTldrawAgentCapabilities() {
             'Restoring/importing a whiteboard backup through Agent is blocked because it overwrites current data.',
             'Arbitrary raw store/props mutation is blocked.',
             'Agent-supplied JavaScript execution is blocked.',
+            'tldraw_apply_plan cannot set script, autoRun, data, props, rootNode, or other raw custom shape internals.',
             'Full snapshot JSON exfiltration is blocked; create a backup file instead.',
             'Direct SiYuan block content deletion/update through tldraw actions is blocked.',
             'External asset insertion is blocked until upload, size, and type validation are implemented.',
