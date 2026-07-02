@@ -20,6 +20,7 @@ import { convertConnectorsToArrow, convertConnectorsToBezier } from '../utils/co
 import { insertDocOutlineMindmapForAgent, type AgentDocOutlineBoardOptions } from './doc-to-board';
 import { finiteNumberInRange, normalizeOptionalAgentColor } from './schema';
 import { createAgentBusinessShape } from './shape-ops';
+import { summarizeSnapshotObject } from './snapshot-summary';
 import type {
     AgentAlignOperation,
     AgentArrangeOperation,
@@ -64,7 +65,7 @@ export function getAgentSummary(runtime: AgentManagerRuntime) {
         type: String(shape.type),
         x: Number(shape.x || 0),
         y: Number(shape.y || 0),
-        props: summarizeShapeProps(shape.props),
+        props: summarizeShapeProps(shape.props, runtime.editor || undefined),
     }));
 
     return {
@@ -390,23 +391,9 @@ export function convertAgentConnectors(runtime: AgentManagerRuntime, options: {
 
 export function getAgentBoardSnapshotSummary(runtime: AgentManagerRuntime) {
     const snapshot = getSnapshot(runtime.store);
-    const records = Object.values((snapshot as any)?.store || {}) as any[];
-    const pages = records.filter((record) => record?.typeName === 'page' || String(record?.id || '').startsWith('page:'));
-    const shapes = records.filter((record) => record?.typeName === 'shape' || String(record?.id || '').startsWith('shape:'));
-    const assets = records.filter((record) => record?.typeName === 'asset' || String(record?.id || '').startsWith('asset:'));
-    const json = JSON.stringify(snapshot);
     return {
-        id: runtime.id,
-        pageCount: pages.length,
-        shapeCount: shapes.length,
-        assetCount: assets.length,
-        storeRecordCount: records.length,
-        approxJsonBytes: json.length,
-        pages: pages.slice(0, 50).map((page) => ({
-            id: String(page.id || ''),
-            name: page.name ? String(page.name) : undefined,
-            index: page.index ? String(page.index) : undefined,
-        })),
+        ...summarizeSnapshotObject(runtime.id, snapshot, 'open-editor'),
+        isOpen: Boolean(runtime.editor),
     };
 }
 
@@ -642,15 +629,24 @@ async function validateAgentLinkedBlockId(blockId: string | undefined, kind: 'ca
 function summarizeShapeProps(props: any, editor?: Editor): Record<string, unknown> {
     if (!props || typeof props !== 'object') return {};
     const out: Record<string, unknown> = {};
-    for (const key of ['w', 'h', 'color', 'geo', 'blockId', 'name', 'text']) {
+    for (const key of ['w', 'h', 'color', 'geo', 'name', 'text']) {
         if (props[key] !== undefined) out[key] = props[key];
+    }
+    if (props.blockId !== undefined) {
+        out.blockId = props.blockId || null;
+        out.isLinkedBlock = Boolean(props.blockId);
     }
     if (props.richText) {
         out.richText = '[richText]';
+        const fallbackPlain = plainTextFromRichText(props.richText);
         if (editor) {
             try {
-                out.richTextPlain = clampAgentText(renderPlaintextFromRichText(editor, props.richText), 500);
-            } catch {}
+                out.richTextPlain = clampAgentText(renderPlaintextFromRichText(editor, props.richText) || fallbackPlain, 500);
+            } catch {
+                if (fallbackPlain) out.richTextPlain = clampAgentText(fallbackPlain, 500);
+            }
+        } else if (fallbackPlain) {
+            out.richTextPlain = clampAgentText(fallbackPlain, 500);
         }
     }
     return out;
@@ -902,7 +898,13 @@ function getAgentShapeCenter(editor: Editor, shapeId: TLShapeId) {
 
 function finalizeAgentSelection(editor: Editor, focusedId: TLShapeId, options: { select?: boolean; zoom?: boolean }) {
     if (options.select !== false) editor.setSelectedShapes([focusedId]);
-    if (options.zoom !== false) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false) {
+        try {
+            editor.zoomToSelection({ animation: { duration: 300 } });
+        } catch (error) {
+            console.warn('agent zoomToSelection failed after create/update', error);
+        }
+    }
 }
 
 function isLinkedBlockShape(shape: TLShape) {
@@ -911,6 +913,27 @@ function isLinkedBlockShape(shape: TLShape) {
 
 function clampAgentText(value: string, maxLength: number) {
     return String(value || '').slice(0, maxLength);
+}
+
+function plainTextFromRichText(value: unknown): string {
+    const parts: string[] = [];
+    const visit = (node: any) => {
+        if (!node) return;
+        if (typeof node === 'string') {
+            parts.push(node);
+            return;
+        }
+        if (Array.isArray(node)) {
+            node.forEach(visit);
+            return;
+        }
+        if (typeof node === 'object') {
+            if (typeof node.text === 'string') parts.push(node.text);
+            if (Array.isArray(node.content)) node.content.forEach(visit);
+        }
+    };
+    visit(value);
+    return parts.join('');
 }
 
 function defaultAgentText(kind: AgentBasicShapeCreateArgs['kind']) {

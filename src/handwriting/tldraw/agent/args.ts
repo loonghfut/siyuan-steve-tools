@@ -270,7 +270,7 @@ function parseBranchCreateArgs(args: Record<string, unknown>): AgentBranchCreate
 function parseKind(value: unknown): AgentCreateKind {
 	const raw = stringArg(value)
 	if (raw === 'card' || raw === 'single-block' || raw === 'branch') return raw
-	throw new Error('kind must be "card", "single-block", or "branch"')
+	throw new Error('kind must be "card", "single-block", or "branch"; use tldraw_create_basic_shape for note/text/geo/arrow/line/frame and other basic shapes')
 }
 
 function parseBasicKind(value: unknown): AgentBasicShapeCreateArgs['kind'] {

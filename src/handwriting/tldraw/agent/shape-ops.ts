@@ -46,6 +46,10 @@ function finalizeSelection(editor: Editor, focusedId: TLShapeId, options: { sele
 		editor.setSelectedShapes([focusedId])
 	}
 	if (options.zoom !== false) {
-		editor.zoomToSelection({ animation: { duration: 300 } })
+		try {
+			editor.zoomToSelection({ animation: { duration: 300 } })
+		} catch (error) {
+			console.warn('agent zoomToSelection failed after create shape', error)
+		}
 	}
 }

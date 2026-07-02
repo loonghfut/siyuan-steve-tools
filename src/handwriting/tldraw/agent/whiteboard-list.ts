@@ -2,6 +2,7 @@ import * as api from '@/api/api';
 import { WHITEBOARD_STORAGE_DIR, WhiteboardFileManager } from '../whiteboard-file-manager';
 import { getAllInstanceIds, getInstance } from '../tldraw-instance-manager';
 import { buildTldrawLink } from '../utils/link-builder';
+import { extractSnapshotRecordSummary, parseSnapshotContent } from './snapshot-summary';
 import {
     booleanArgWithFallback,
     clampNumber,
@@ -291,18 +292,8 @@ async function getWhiteboardListSnapshotSummary(
 }
 
 function summarizeSavedSnapshotForList(content: string, includeShapeSamples: boolean) {
-    const data = JSON.parse(content);
-    const store = data?.store || {};
-    const records = Object.values(store) as any[];
-    const shapes = records.filter((record) => record?.typeName === 'shape' || String(record?.id || '').startsWith('shape:'));
-    const pages = records.filter((record) => record?.typeName === 'page' || String(record?.id || '').startsWith('page:'));
-    const assets = records.filter((record) => record?.typeName === 'asset' || String(record?.id || '').startsWith('asset:'));
-    const shapeTypeCounts = shapes.reduce<Record<string, number>>((acc, shape: any) => {
-        const type = String(shape.type || 'unknown');
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-    }, {});
-    const linkedBlockShapeCount = shapes.filter((shape: any) => typeof shape?.props?.blockId === 'string' && shape.props.blockId).length;
+    const data = parseSnapshotContent(content);
+    const { records, shapes, pages, assets, shapeTypeCounts, linkedBlockShapeCount } = extractSnapshotRecordSummary(data);
     return {
         source: 'saved-file',
         pageCount: pages.length,
@@ -337,8 +328,12 @@ function summarizeShapeSampleForList(shape: any) {
 function summarizeListShapeProps(props: any): Record<string, unknown> {
     if (!props || typeof props !== 'object') return {};
     const out: Record<string, unknown> = {};
-    for (const key of ['w', 'h', 'color', 'geo', 'blockId', 'isMain', 'isCollapsed']) {
+    for (const key of ['w', 'h', 'color', 'geo', 'isMain', 'isCollapsed']) {
         if (props[key] !== undefined) out[key] = props[key];
+    }
+    if (props.blockId !== undefined) {
+        out.blockId = props.blockId || null;
+        out.isLinkedBlock = Boolean(props.blockId);
     }
     if (props.text !== undefined) out.hasText = true;
     if (props.richText !== undefined) out.hasRichText = true;

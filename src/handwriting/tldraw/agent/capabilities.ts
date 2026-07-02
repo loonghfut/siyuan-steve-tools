@@ -42,6 +42,7 @@ export function getTldrawAgentCapabilities() {
             'Agent actions must be enabled in plugin settings.',
             'Most write actions require the whiteboard to be open, so the user can observe the change.',
             'Agents should call tldraw_get_interaction_context before using whiteboard tools, then prefer the focused whiteboard and current selection unless the user requested another target.',
+            'Use tldraw_create_shape for STtools business shapes (card, single-block, branch); use tldraw_create_basic_shape for note, text, geo, arrow, line, frame, and similar basic shapes.',
             'Batch shape operations are capped at 50 items.',
             'Shape deletion is dry-run by default and requires confirm:true to execute.',
             'Linked SiYuan block shapes are protected from deletion unless allowLinkedBlockShapes:true is explicitly passed.',
