@@ -96,7 +96,7 @@ export function getTldrawAgentCapabilities() {
                     h: 'height, default 300',
                     color: 'tldraw color name or hex-like value normalized to nearest tldraw color',
                     blockId: 'optional SiYuan document or heading block id for referencing existing content',
-                    contentMarkdown: 'optional Markdown body for creating new card content; mutually exclusive with blockId',
+                    contentMarkdown: 'optional Markdown for creating new card content; if it starts with a heading, the heading is used/deduplicated as the bound card heading; mutually exclusive with blockId',
                     title: 'optional title for a newly-created card heading; if omitted, the manual card title template/timestamp is used',
                     isMain: 'true for a main document card with stronger title/header presentation',
                     isCollapsed: 'true to show a compact summary/title state instead of full content',

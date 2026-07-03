@@ -708,10 +708,10 @@ async function createAgentCardBlockForContent(runtime: AgentManagerRuntime, opti
     contentMarkdown?: string;
 }) {
     const blockId = await api.generateSiyuanID() as string;
-    const title = renderAgentCardTitle(options.title);
+    const content = normalizeAgentCardContent(options);
     const link = buildTldrawLink(runtime.id, blockId, runtime.title);
     const headingMarkdown = [
-        `###### ${title}`,
+        `${'#'.repeat(content.headingLevel)} ${content.title}`,
         `{: id="${blockId}" custom-st-tldraw="1" custom-tldraw-link="${escapeBlockAttr(link)}" }`,
         '',
         '{: custom-st-tldraw-none="1" }',
@@ -720,11 +720,58 @@ async function createAgentCardBlockForContent(runtime: AgentManagerRuntime, opti
 
     const appendResult = await api.appendBlock('markdown', headingMarkdown, runtime.id);
     const appendedBlockId = extractFirstOperationId(appendResult) || blockId;
-    const body = String(options.contentMarkdown || '').trim();
-    if (body) {
-        await api.insertBlock('markdown', body, undefined, appendedBlockId);
+    if (content.bodyMarkdown) {
+        await api.insertBlock('markdown', content.bodyMarkdown, undefined, appendedBlockId);
     }
     return appendedBlockId;
+}
+
+function normalizeAgentCardContent(options: {
+    title?: string;
+    contentMarkdown?: string;
+}) {
+    const explicitTitle = String(options.title || '').trim();
+    const rawContent = String(options.contentMarkdown || '').trim();
+    const leadingHeading = parseLeadingMarkdownHeading(rawContent);
+
+    if (explicitTitle) {
+        const bodyMarkdown = leadingHeading && normalizeHeadingText(leadingHeading.text) === normalizeHeadingText(explicitTitle)
+            ? rawContent.slice(leadingHeading.raw.length).trimStart()
+            : rawContent;
+        return {
+            title: explicitTitle,
+            headingLevel: 6,
+            bodyMarkdown,
+        };
+    }
+
+    if (leadingHeading) {
+        return {
+            title: leadingHeading.text,
+            headingLevel: leadingHeading.level,
+            bodyMarkdown: rawContent.slice(leadingHeading.raw.length).trimStart(),
+        };
+    }
+
+    return {
+        title: renderAgentCardTitle(),
+        headingLevel: 6,
+        bodyMarkdown: rawContent,
+    };
+}
+
+function parseLeadingMarkdownHeading(markdown: string): { raw: string; level: number; text: string } | null {
+    const match = markdown.match(/^(#{1,6})[ \t]+(.+?)[ \t]*(?:#+[ \t]*)?(?:\r?\n|$)/);
+    if (!match) return null;
+    return {
+        raw: match[0],
+        level: match[1].length,
+        text: match[2].trim(),
+    };
+}
+
+function normalizeHeadingText(value: string) {
+    return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function renderAgentCardTitle(title?: string) {
