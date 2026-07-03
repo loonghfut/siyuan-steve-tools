@@ -46,7 +46,7 @@ import { setInteracting } from './utils/idle-scheduler';
 import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import * as agentOps from './agent/operations/manager-ops';
-import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentShapeUpdatePatch } from './agent/core/types';
+import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeUpdatePatch } from './agent/core/types';
 import type { AgentDocOutlineBoardOptions } from './agent/documents/doc-to-board';
 import type { AgentPlanApplyOptions } from './agent/planning/plan-runner';
 const assetUrls = createAssetUrlsWithCustomIcons();
@@ -1530,8 +1530,8 @@ export class TldrawManager {
         }
     }
 
-    public getAgentSummary() {
-        return agentOps.getAgentSummary(this.getAgentRuntime());
+    public getAgentSummary(options?: { includeShapeSamples?: boolean; sampleLimit?: number }) {
+        return agentOps.getAgentSummary(this.getAgentRuntime(), options);
     }
 
     public async createAgentShape(options: AgentCreateShapeArgs) {
@@ -1562,7 +1562,7 @@ export class TldrawManager {
         return agentOps.applyAgentPlan(this.getAgentRuntime(), options);
     }
 
-    public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; isCollapsed?: boolean; select?: boolean; zoom?: boolean }) {
+    public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; isCollapsed?: boolean; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) {
         return agentOps.updateAgentShape(this.getAgentRuntime(), options);
     }
 
@@ -1578,11 +1578,11 @@ export class TldrawManager {
         return agentOps.createAgentConnector(this.getAgentRuntime(), options);
     }
 
-    public updateAgentShapesBatch(options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean }) {
+    public updateAgentShapesBatch(options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) {
         return agentOps.updateAgentShapesBatch(this.getAgentRuntime(), options);
     }
 
-    public async deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean }) {
+    public async deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean; resultMode?: AgentResultMode }) {
         return agentOps.deleteAgentShapes(this.getAgentRuntime(), options);
     }
 
@@ -1598,23 +1598,23 @@ export class TldrawManager {
         return agentOps.backupAgentWhiteboard(this.getAgentRuntime(), options);
     }
 
-    public duplicateAgentShapes(options: { shapeIds: string[]; offsetX?: number; offsetY?: number; select?: boolean; zoom?: boolean }) {
+    public duplicateAgentShapes(options: { shapeIds: string[]; offsetX?: number; offsetY?: number; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) {
         return agentOps.duplicateAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public arrangeAgentShapes(options: { shapeIds: string[]; operation: AgentArrangeOperation }) {
+    public arrangeAgentShapes(options: { shapeIds: string[]; operation: AgentArrangeOperation; resultMode?: AgentResultMode }) {
         return agentOps.arrangeAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public alignAgentShapes(options: { shapeIds: string[]; operation: AgentAlignOperation }) {
+    public alignAgentShapes(options: { shapeIds: string[]; operation: AgentAlignOperation; resultMode?: AgentResultMode }) {
         return agentOps.alignAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public groupAgentShapes(options: { shapeIds: string[]; ungroup?: boolean; select?: boolean }) {
+    public groupAgentShapes(options: { shapeIds: string[]; ungroup?: boolean; select?: boolean; resultMode?: AgentResultMode }) {
         return agentOps.groupAgentShapes(this.getAgentRuntime(), options);
     }
 
-    public lockAgentShapes(options: { shapeIds: string[]; locked: boolean }) {
+    public lockAgentShapes(options: { shapeIds: string[]; locked: boolean; resultMode?: AgentResultMode }) {
         return agentOps.lockAgentShapes(this.getAgentRuntime(), options);
     }
 

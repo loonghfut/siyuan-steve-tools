@@ -1,15 +1,15 @@
-import { assertKnownArgs, shapeIdArrayArg, stringArg } from '../../core/args';
+import { assertKnownArgs, resultModeArg, shapeIdArrayArg, stringArg } from '../../core/args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from '../shared';
 
 export function createArrangeShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_arrange_shapes',
-        description: 'Adjust z-order for up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[], operation "front"|"back"|"forward"|"backward".',
+        description: 'Adjust z-order for up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[], operation "front"|"back"|"forward"|"backward". Optional args: resultMode "compact"|"full" default compact.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'operation'], 'tldraw_arrange_shapes');
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'operation', 'resultMode'], 'tldraw_arrange_shapes');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -22,7 +22,7 @@ export function createArrangeShapesAction(): AgentActionDefinition {
                 return { error: 'operation must be "front", "back", "forward", or "backward"' };
             }
             try {
-                return jsonResult(target.instance.arrangeAgentShapes({ shapeIds, operation }));
+                return jsonResult(target.instance.arrangeAgentShapes({ shapeIds, operation, resultMode: resultModeArg(args.resultMode) }));
             } catch (error) {
                 return { error: stringifyError(error) };
             }

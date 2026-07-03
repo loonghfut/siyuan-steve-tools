@@ -2,6 +2,7 @@ import type {
     AgentBasicShapeCreateArgs,
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
+    AgentResultMode,
     AgentShapeSummary,
     AgentShapeUpdatePatch,
 } from '../core/types';
@@ -24,6 +25,7 @@ export type AgentPlanApplyOptions = {
     select?: boolean;
     zoom?: boolean;
     save?: boolean;
+    resultMode?: AgentResultMode;
 };
 
 export type AgentPlanAdapter = {
@@ -31,7 +33,7 @@ export type AgentPlanAdapter = {
     createShape: (options: AgentCreateShapeArgs) => Promise<{ createdShapeIds?: string[]; [key: string]: unknown }>;
     createBasicShape: (options: AgentBasicShapeCreateArgs) => { createdShapeIds?: string[]; [key: string]: unknown };
     createConnector: (options: AgentConnectorCreateArgs) => { createdShapeIds?: string[]; [key: string]: unknown };
-    updateShapesBatch: (options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean }) => unknown;
+    updateShapesBatch: (options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) => unknown;
     getShapeDetails: (options: { shapeIds?: string[]; limit?: number; includeBindings?: boolean }) => { shapes: AgentShapeSummary[] };
     selectShape: (shapeId: string, zoom?: boolean) => unknown;
     zoomToShapes: (options: { shapeIds: string[] }) => unknown;
@@ -94,17 +96,18 @@ export async function executeAgentPlan(options: AgentPlanApplyOptions, adapter: 
     }
 
     const finalSummary = adapter.getSummary();
-    return {
+    const output: Record<string, unknown> = {
         goal: stringArg(options.goal),
         dryRun: options.dryRun === true,
         writeCount,
         saved,
-        normalizedSteps,
-        results,
         created: state.created,
         lastShapeIds: state.lastShapeIds,
         summary: finalSummary,
     };
+    if (options.dryRun === true || options.resultMode === 'full') output.normalizedSteps = normalizedSteps;
+    if (options.resultMode === 'full') output.results = results;
+    return output;
 }
 
 function normalizeSteps(value: unknown): Record<string, unknown>[] {
@@ -264,6 +267,7 @@ async function executeNormalizedStep(
         const args = { ...(step.args as Record<string, unknown>) };
         args.select = stepSelect(step, options, false);
         args.zoom = stepZoom(step, options, false);
+        args.resultMode = options.resultMode;
         const result = BUSINESS_CREATE_KINDS.has(String(args.kind))
             ? await adapter.createShape(args as AgentCreateShapeArgs)
             : adapter.createBasicShape(args as AgentBasicShapeCreateArgs);
@@ -276,6 +280,7 @@ async function executeNormalizedStep(
         const args = { ...(step.args as Record<string, unknown>) };
         args.select = stepSelect(step, options, false);
         args.zoom = stepZoom(step, options, false);
+        args.resultMode = options.resultMode;
         const result = adapter.createConnector(args as AgentConnectorCreateArgs);
         const createdShapeIds = normalizeShapeIds(result.createdShapeIds);
         recordCreated(step.as, createdShapeIds, state);
@@ -288,6 +293,7 @@ async function executeNormalizedStep(
             patches,
             select: stepSelect(step, options, false),
             zoom: stepZoom(step, options, false),
+            resultMode: options.resultMode,
         });
         state.lastShapeIds = patches.map((patch) => patch.shapeId);
         return result;
@@ -301,6 +307,7 @@ async function executeNormalizedStep(
             patches,
             select: stepSelect(step, options, false),
             zoom: stepZoom(step, options, false),
+            resultMode: options.resultMode,
         });
         state.lastShapeIds = patches.map((patch) => patch.shapeId);
         return result;

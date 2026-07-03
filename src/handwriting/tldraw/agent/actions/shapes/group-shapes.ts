@@ -1,15 +1,15 @@
-import { assertKnownArgs, booleanArgWithFallback, shapeIdArrayArg } from '../../core/args';
+import { assertKnownArgs, booleanArgWithFallback, resultModeArg, shapeIdArrayArg } from '../../core/args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from '../shared';
 
 export function createGroupShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_group_shapes',
-        description: 'Group or ungroup up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: ungroup boolean, select boolean. Uses tldraw editor group APIs only when available.',
+        description: 'Group or ungroup up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: ungroup boolean, select boolean, resultMode "compact"|"full" default compact. Uses tldraw editor group APIs only when available.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'ungroup', 'select'], 'tldraw_group_shapes');
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'ungroup', 'select', 'resultMode'], 'tldraw_group_shapes');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -22,6 +22,7 @@ export function createGroupShapesAction(): AgentActionDefinition {
                     shapeIds,
                     ungroup: booleanArgWithFallback(args.ungroup, false),
                     select: booleanArgWithFallback(args.select, true),
+                    resultMode: resultModeArg(args.resultMode),
                 });
                 return jsonResult(grouped);
             } catch (error) {

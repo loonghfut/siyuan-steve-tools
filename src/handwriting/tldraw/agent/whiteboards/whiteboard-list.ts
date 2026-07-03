@@ -105,7 +105,7 @@ export async function listWhiteboardsForAgent(args: Record<string, unknown>): Ag
         const selected = sorted.slice(0, limit);
         const whiteboards = await mapWithConcurrency(selected, 4, async (item, index) => {
             const instance = getInstance(item.id);
-            const liveSummary = instance ? instance.getAgentSummary() : null;
+            const liveSummary = instance ? instance.getAgentSummary({ includeShapeSamples }) : null;
             const snapshotSummary = index < summaryLimit
                 ? preloadedSnapshots.get(item.id) || await getWhiteboardListSnapshotSummary(item.id, liveSummary, includeShapeSamples)
                 : undefined;

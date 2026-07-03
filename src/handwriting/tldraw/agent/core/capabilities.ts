@@ -4,10 +4,11 @@ export function getTldrawAgentCapabilities() {
         enabled: true,
         agentPrompt: [
             'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Prefer tldraw_apply_plan for most whiteboard edits; it automatically uses the focused whiteboard when whiteboardId is omitted and supports $selection/$created/$last references.',
+            'Keep tool results compact. Use resultMode:"full", tldraw_get_summary includeShapeSamples:true, or tldraw_get_shape_details only when debugging or when exact bounds/details are necessary.',
             'Use low-level tldraw actions only when tldraw_apply_plan cannot express the requested edit or you need precise one-off control.',
             'Default shape preference: use card, single-block, text, bezier-connector, and frame first. Unless the user explicitly asks for another shape type or the task clearly requires it, avoid note, geo, arrow, line, draw, highlight, branch, slide, mind-map, and js-shape.',
             'Prefer semantic STtools shapes over generic drawings: card for a document/heading block or substantial content, single-block for one paragraph block or compact atomic item, text for unlinked labels/annotations, bezier-connector for labeled relationships, and frame for grouping or visual boundaries.',
-            'When creating multiple entity shapes, use returned bounds or tldraw_get_shape_details bounds to reason about occupied area. The create tools auto-avoid overlap for entity shapes, but explicit layout steps with generous gaps are still preferred for structured results.',
+            'When creating multiple entity shapes, rely on tldraw_apply_plan aliases such as $created.name, $last, and $selection instead of repeating raw shape IDs. Use returned focused bounds or tldraw_get_shape_details bounds only when exact spatial planning is needed.',
             'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
         ],
         preferred: [
@@ -51,6 +52,7 @@ export function getTldrawAgentCapabilities() {
                 action: 'tldraw_apply_plan',
                 purpose: 'Default entrypoint for creating, connecting, updating, laying out, focusing, and saving through a safe JSON plan.',
                 references: ['$selection', '$selection[0]', '$created.name', '$created.name[0]', '$last'],
+                resultMode: 'compact by default; use full only for debugging',
                 exampleArgs: {
                     goal: 'Arrange the current selection into a horizontal flow',
                     steps: [

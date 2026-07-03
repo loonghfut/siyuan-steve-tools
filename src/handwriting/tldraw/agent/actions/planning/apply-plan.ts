@@ -1,17 +1,17 @@
 import { getFocusedInstanceId, getInstance } from '../../../tldraw-instance-manager';
-import { assertKnownArgs, booleanArg, stringArg } from '../../core/args';
+import { assertKnownArgs, booleanArg, resultModeArg, stringArg } from '../../core/args';
 import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition } from '../shared';
 import type { AgentPlanApplyOptions } from '../../planning/plan-runner';
 
 export function createApplyPlanAction(): AgentActionDefinition {
     return {
         name: 'tldraw_apply_plan',
-        description: 'Preferred high-level STtools tldraw Agent entrypoint. Apply a safe JSON whiteboard plan to the focused/open whiteboard. Optional args: whiteboardId string defaults to focused whiteboard, goal string, dryRun boolean, select boolean, zoom boolean, save boolean. Required args: steps array. Supported step ops: create, connect, update, layout, focus, save. Supports references like "$selection", "$selection[0]", "$created.name", and "$last". This action does not execute JavaScript, raw store mutation, deletion, or direct SiYuan block content edits.',
+        description: 'Preferred high-level STtools tldraw Agent entrypoint. Apply a safe JSON whiteboard plan to the focused/open whiteboard. Optional args: whiteboardId string defaults to focused whiteboard, goal string, dryRun boolean, select boolean, zoom boolean, save boolean, resultMode "compact"|"full" default compact. Required args: steps array. Supported step ops: create, connect, update, layout, focus, save. Supports references like "$selection", "$selection[0]", "$created.name", and "$last". Compact results omit per-step results and shape samples; use full only for debugging. This action does not execute JavaScript, raw store mutation, deletion, or direct SiYuan block content edits.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'goal', 'steps', 'dryRun', 'select', 'zoom', 'save'], 'tldraw_apply_plan');
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'goal', 'steps', 'dryRun', 'select', 'zoom', 'save', 'resultMode'], 'tldraw_apply_plan');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -35,6 +35,7 @@ export function createApplyPlanAction(): AgentActionDefinition {
                     select: booleanArg(args.select),
                     zoom: booleanArg(args.zoom),
                     save: booleanArg(args.save),
+                    resultMode: resultModeArg(args.resultMode),
                 };
                 return jsonResult(await instance.applyAgentPlan(options));
             } catch (error) {

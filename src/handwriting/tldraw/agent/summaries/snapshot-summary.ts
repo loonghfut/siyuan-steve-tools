@@ -8,10 +8,10 @@ export type SnapshotRecordSummary = {
     linkedBlockShapeCount: number;
 };
 
-export function summarizeSavedSnapshot(whiteboardId: string, content: string) {
+export function summarizeSavedSnapshot(whiteboardId: string, content: string, options: { includeShapeSamples?: boolean; sampleLimit?: number } = {}) {
     const data = parseSnapshotContent(content);
     const { records, shapes, pages, assets, shapeTypeCounts, linkedBlockShapeCount } = extractSnapshotRecordSummary(data);
-    return {
+    const summary: Record<string, unknown> = {
         id: whiteboardId,
         isOpen: false,
         pageCount: pages.length,
@@ -21,15 +21,23 @@ export function summarizeSavedSnapshot(whiteboardId: string, content: string) {
         approxJsonBytes: content.length,
         shapeTypeCounts,
         linkedBlockShapeCount,
-        sampleShapes: shapes.slice(0, 20).map((shape: any) => ({
+    };
+
+    if (options.includeShapeSamples === true) {
+        const sampleLimit = typeof options.sampleLimit === 'number' && Number.isFinite(options.sampleLimit)
+            ? Math.max(0, Math.min(200, Math.floor(options.sampleLimit)))
+            : 20;
+        summary.sampleShapes = shapes.slice(0, sampleLimit).map((shape: any) => ({
             id: String(shape.id),
             type: String(shape.type),
             x: Number(shape.x || 0),
             y: Number(shape.y || 0),
             bounds: summarizeShapeBounds(shape),
             props: summarizeProps(shape.props),
-        })),
-    };
+        }));
+    }
+
+    return summary;
 }
 
 export function summarizeSnapshotObject(whiteboardId: string, snapshot: unknown, source?: string) {

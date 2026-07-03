@@ -1,15 +1,15 @@
-import { assertKnownArgs, booleanArgWithFallback, shapeIdArrayArg } from '../../core/args';
+import { assertKnownArgs, booleanArgWithFallback, resultModeArg, shapeIdArrayArg } from '../../core/args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from '../shared';
 
 export function createLockShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_lock_shapes',
-        description: 'Lock or unlock up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: locked boolean, defaults true.',
+        description: 'Lock or unlock up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: locked boolean defaults true, resultMode "compact"|"full" default compact.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'locked'], 'tldraw_lock_shapes');
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'locked', 'resultMode'], 'tldraw_lock_shapes');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -21,6 +21,7 @@ export function createLockShapesAction(): AgentActionDefinition {
                 return jsonResult(target.instance.lockAgentShapes({
                     shapeIds,
                     locked: booleanArgWithFallback(args.locked, true),
+                    resultMode: resultModeArg(args.resultMode),
                 }));
             } catch (error) {
                 return { error: stringifyError(error) };

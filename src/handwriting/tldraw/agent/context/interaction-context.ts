@@ -16,8 +16,8 @@ export function getAgentInteractionContext(options: AgentInteractionContextOptio
         const instance = getInstance(id)
         const summary = instance?.getAgentSummary()
         const selectedShapeIds = (summary?.selectedShapeIds || []) as string[]
-        const selectedShapeLimit = Math.max(0, Math.min(options.selectedShapeLimit ?? 20, 50))
-        const selectedShapeDetails = options.includeSelectedShapeDetails === false ||
+        const selectedShapeLimit = Math.max(0, Math.min(options.selectedShapeLimit ?? 5, 50))
+        const selectedShapeDetails = options.includeSelectedShapeDetails !== true ||
             !instance ||
             selectedShapeLimit === 0 ||
             selectedShapeIds.length === 0

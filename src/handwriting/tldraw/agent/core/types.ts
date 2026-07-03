@@ -6,6 +6,7 @@ export type AgentBranchSide = 'left' | 'right'
 export type AgentNodeKind = AgentCreateKind
 export type AgentBasicShapeKind = 'text' | 'note' | 'geo' | 'arrow' | 'line' | 'draw' | 'highlight' | 'frame' | 'bezier-connector' | 'slide' | 'mind-map' | 'js-shape'
 export type AgentConnectorKind = 'arrow' | 'bezier-connector'
+export type AgentResultMode = 'compact' | 'full'
 
 export type AgentSafetyOptions = {
 	confirm?: boolean
@@ -15,6 +16,7 @@ export type AgentSafetyOptions = {
 export type AgentSelectionOptions = {
 	select?: boolean
 	zoom?: boolean
+	resultMode?: AgentResultMode
 }
 
 export type AgentCardCreateArgs = AgentSelectionOptions & {

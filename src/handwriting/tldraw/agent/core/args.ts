@@ -5,6 +5,7 @@ import type {
 	AgentBasicShapeCreateArgs,
 	AgentConnectorCreateArgs,
 	AgentConnectorKind,
+	AgentResultMode,
 	AgentCardCreateArgs,
 	AgentCreateKind,
 	AgentCreateShapeArgs,
@@ -15,6 +16,7 @@ import { normalizeAgentColor, normalizeBranchLineStyle } from './schema'
 
 const COMMON_WHITEBOARD_ARG_KEYS = ['whiteboardId', 'id', 'rootId']
 const INTERNAL_AGENT_ARG_KEYS = ['action']
+const RESULT_MODE_ARG_KEYS = ['resultMode']
 
 const CREATE_SHAPE_ARG_KEYS = [
 	...COMMON_WHITEBOARD_ARG_KEYS,
@@ -44,6 +46,7 @@ const CREATE_SHAPE_ARG_KEYS = [
 	'showBackground',
 	'select',
 	'zoom',
+	...RESULT_MODE_ARG_KEYS,
 ]
 
 const CREATE_BASIC_SHAPE_ARG_KEYS = [
@@ -62,6 +65,7 @@ const CREATE_BASIC_SHAPE_ARG_KEYS = [
 	'theme',
 	'select',
 	'zoom',
+	...RESULT_MODE_ARG_KEYS,
 ]
 
 const CREATE_CONNECTOR_ARG_KEYS = [
@@ -83,6 +87,7 @@ const CREATE_CONNECTOR_ARG_KEYS = [
 	'lineWidth',
 	'select',
 	'zoom',
+	...RESULT_MODE_ARG_KEYS,
 ]
 
 const SHAPE_UPDATE_PATCH_ARG_KEYS = [
@@ -130,6 +135,7 @@ export function parseCreateBasicShapeArgs(args: Record<string, unknown>): AgentB
 		theme: stringArg(args.theme),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
+		resultMode: resultModeArg(args.resultMode),
 	}
 }
 
@@ -148,6 +154,7 @@ export function parseCreateConnectorArgs(args: Record<string, unknown>): AgentCo
 		strokeWidth: numberArg(args.strokeWidth || args.lineWidth),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
+		resultMode: resultModeArg(args.resultMode),
 	}
 }
 
@@ -198,6 +205,12 @@ export function booleanArgWithFallback(value: unknown, fallback: boolean): boole
 	return typeof value === 'boolean' ? value : fallback
 }
 
+export function resultModeArg(value: unknown): AgentResultMode | undefined {
+	const raw = stringArg(value)
+	if (raw === 'compact' || raw === 'full') return raw
+	return undefined
+}
+
 export function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
 	const n = numberArg(value)
 	if (typeof n !== 'number') return fallback
@@ -235,6 +248,7 @@ function parseCardCreateArgs(args: Record<string, unknown>): AgentCardCreateArgs
 		showMask: booleanArg(args.showMask),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
+		resultMode: resultModeArg(args.resultMode),
 	}
 }
 
@@ -251,6 +265,7 @@ function parseSingleBlockCreateArgs(args: Record<string, unknown>): AgentSingleB
 		title: stringArg(args.title),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
+		resultMode: resultModeArg(args.resultMode),
 	}
 }
 
@@ -274,6 +289,7 @@ function parseBranchCreateArgs(args: Record<string, unknown>): AgentBranchCreate
 		color: colorArg(args.color),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
+		resultMode: resultModeArg(args.resultMode),
 	}
 }
 

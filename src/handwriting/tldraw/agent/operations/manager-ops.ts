@@ -36,6 +36,7 @@ import type {
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
     AgentCreateShapeResult,
+    AgentResultMode,
     AgentShapeSummary,
     AgentSingleBlockCreateArgs,
     AgentShapeUpdatePatch,
@@ -43,6 +44,25 @@ import type {
 
 type AgentShapeBounds = { x: number; y: number; w: number; h: number };
 type AgentCreateLayoutKind = AgentCreateShapeArgs['kind'] | AgentBasicShapeCreateArgs['kind'];
+export type AgentSummaryOptions = { includeShapeSamples?: boolean; sampleLimit?: number };
+export type AgentSummary = {
+    id: string;
+    title: string;
+    isOpen: boolean;
+    pageCount: number;
+    shapeCount: number;
+    assetCount: number;
+    selectedShapeIds: string[];
+    shapeTypeCounts: Record<string, number>;
+    sampleShapes?: Array<{
+        id: string;
+        type: string;
+        x: number;
+        y: number;
+        bounds: AgentShapeBounds;
+        props: Record<string, unknown>;
+    }>;
+};
 
 const AGENT_ENTITY_CREATE_SHAPES = new Set([
     'card',
@@ -75,7 +95,7 @@ function requireEditor(runtime: AgentManagerRuntime): Editor {
     return runtime.editor;
 }
 
-export function getAgentSummary(runtime: AgentManagerRuntime) {
+export function getAgentSummary(runtime: AgentManagerRuntime, options: AgentSummaryOptions = {}): AgentSummary {
     const shapes = runtime.store.query.records('shape').get() || [];
     const assets = runtime.store.query.records('asset').get() || [];
     const pages = runtime.store.query.records('page').get() || [];
@@ -86,16 +106,7 @@ export function getAgentSummary(runtime: AgentManagerRuntime) {
         return acc;
     }, {});
 
-    const sampleShapes = shapes.slice(0, 20).map((shape: any) => ({
-        id: String(shape.id),
-        type: String(shape.type),
-        x: Number(shape.x || 0),
-        y: Number(shape.y || 0),
-        bounds: runtime.editor ? getAgentShapeBounds(runtime.editor, shape as TLShape) : getFallbackShapeBounds(shape as TLShape),
-        props: summarizeShapeProps(shape.props, runtime.editor || undefined),
-    }));
-
-    return {
+    const summary: AgentSummary = {
         id: runtime.id,
         title: runtime.title,
         isOpen: Boolean(runtime.editor),
@@ -104,8 +115,25 @@ export function getAgentSummary(runtime: AgentManagerRuntime) {
         assetCount: assets.length,
         selectedShapeIds,
         shapeTypeCounts,
-        sampleShapes,
     };
+
+    if (options.includeShapeSamples === true) {
+        const sampleLimit = finiteNumberInRange(options.sampleLimit, 20, 0, 200);
+        summary.sampleShapes = shapes.slice(0, sampleLimit).map((shape: any) => ({
+            id: String(shape.id),
+            type: String(shape.type),
+            x: Number(shape.x || 0),
+            y: Number(shape.y || 0),
+            bounds: runtime.editor ? getAgentShapeBounds(runtime.editor, shape as TLShape) : getFallbackShapeBounds(shape as TLShape),
+            props: summarizeShapeProps(shape.props, runtime.editor || undefined),
+        }));
+    }
+
+    return summary;
+}
+
+function getAgentResultSummary(runtime: AgentManagerRuntime, resultMode?: AgentResultMode) {
+    return getAgentSummary(runtime, { includeShapeSamples: resultMode === 'full' });
 }
 
 export async function createAgentShape(runtime: AgentManagerRuntime, options: AgentCreateShapeArgs) {
@@ -116,7 +144,7 @@ export async function createAgentShape(runtime: AgentManagerRuntime, options: Ag
     const result = createAgentBusinessShape(editor, layoutOptions);
     syncAgentCreatedBlockAttrs(runtime, result);
     runtime.triggerSave();
-    return { ...result, ...buildCreatedBoundsResult(editor, result.createdShapeIds), summary: getAgentSummary(runtime) };
+    return { ...result, ...buildCreatedBoundsResult(editor, result.createdShapeIds), summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export async function insertDocOutlineMindmap(runtime: AgentManagerRuntime, options: AgentDocOutlineBoardOptions) {
@@ -179,7 +207,7 @@ export async function saveAgentWhiteboard(runtime: AgentManagerRuntime) {
 export async function applyAgentPlan(runtime: AgentManagerRuntime, options: AgentPlanApplyOptions) {
     requireEditor(runtime);
     return executeAgentPlan(options, {
-        getSummary: () => getAgentSummary(runtime),
+        getSummary: () => getAgentResultSummary(runtime, options.resultMode),
         createShape: (shapeOptions) => createAgentShape(runtime, shapeOptions),
         createBasicShape: (shapeOptions) => createAgentBasicShape(runtime, shapeOptions),
         createConnector: (connectorOptions) => createAgentConnector(runtime, connectorOptions),
@@ -201,6 +229,7 @@ export function updateAgentShape(runtime: AgentManagerRuntime, options: {
     isCollapsed?: boolean;
     select?: boolean;
     zoom?: boolean;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const shape = editor.getShape(options.shapeId as TLShapeId) as TLShape | undefined;
@@ -218,7 +247,7 @@ export function updateAgentShape(runtime: AgentManagerRuntime, options: {
     if (options.zoom !== false) editor.zoomToSelection({ animation: { duration: 300 } });
     runtime.triggerSave();
 
-    return { shapeId: String(shape.id), summary: getAgentSummary(runtime) };
+    return { shapeId: String(shape.id), summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export function getAgentShapeDetails(runtime: AgentManagerRuntime, options: {
@@ -269,7 +298,7 @@ export function createAgentBasicShape(runtime: AgentManagerRuntime, options: Age
         selectedShapeIds: options.select === false ? [] : [String(id)],
         createdShapeBounds: buildCreatedShapeBoundsMap(editor, [String(id)]),
         focusedShapeBounds: getAgentShapeBoundsById(editor, id),
-        summary: getAgentSummary(runtime),
+        summary: getAgentResultSummary(runtime, options.resultMode),
     };
 }
 
@@ -342,7 +371,7 @@ export function createAgentConnector(runtime: AgentManagerRuntime, options: Agen
     return {
         createdShapeIds: [String(id)],
         selectedShapeIds: options.select === false ? [] : [String(id)],
-        summary: getAgentSummary(runtime),
+        summary: getAgentResultSummary(runtime, options.resultMode),
     };
 }
 
@@ -350,6 +379,7 @@ export function updateAgentShapesBatch(runtime: AgentManagerRuntime, options: {
     patches: AgentShapeUpdatePatch[];
     select?: boolean;
     zoom?: boolean;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const patches = options.patches.slice(0, 50);
@@ -378,13 +408,14 @@ export function updateAgentShapesBatch(runtime: AgentManagerRuntime, options: {
     if (options.select !== false && updatedShapeIds.length) editor.setSelectedShapes(updatedShapeIds as TLShapeId[]);
     if (options.zoom !== false && updatedShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
     runtime.triggerSave();
-    return { updatedShapeIds, skipped, summary: getAgentSummary(runtime) };
+    return { updatedShapeIds, skipped, summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export async function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     confirm?: boolean;
     allowLinkedBlockShapes?: boolean;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const requestedIds = Array.from(new Set(options.shapeIds)).slice(0, 50);
@@ -409,7 +440,7 @@ export async function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
             dryRun: true,
             deletedShapeIds: deletable.map(String),
             blocked,
-            summary: getAgentSummary(runtime),
+            summary: getAgentResultSummary(runtime, options.resultMode),
         };
     }
 
@@ -424,7 +455,7 @@ export async function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
         deletedShapeIds: deletable.map(String),
         blocked,
         backup,
-        summary: getAgentSummary(runtime),
+        summary: getAgentResultSummary(runtime, options.resultMode),
     };
 }
 
@@ -470,6 +501,7 @@ export function duplicateAgentShapes(runtime: AgentManagerRuntime, options: {
     offsetY?: number;
     select?: boolean;
     zoom?: boolean;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const ids = Array.from(new Set(options.shapeIds)).slice(0, 50);
@@ -477,7 +509,7 @@ export function duplicateAgentShapes(runtime: AgentManagerRuntime, options: {
     const blocked = ids
         .filter((id) => !editor.getShape(id as TLShapeId))
         .map((shapeId) => ({ shapeId, reason: 'shape not found' }));
-    if (!existing.length) return { duplicatedShapeIds: [], blocked, summary: getAgentSummary(runtime) };
+    if (!existing.length) return { duplicatedShapeIds: [], blocked, summary: getAgentResultSummary(runtime, options.resultMode) };
 
     const dx = finiteNumberInRange(options.offsetX, 32, -4000, 4000);
     const dy = finiteNumberInRange(options.offsetY, 32, -4000, 4000);
@@ -515,17 +547,18 @@ export function duplicateAgentShapes(runtime: AgentManagerRuntime, options: {
     if (options.select !== false && duplicatedShapeIds.length) editor.setSelectedShapes(duplicatedShapeIds as TLShapeId[]);
     if (options.zoom && duplicatedShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
     runtime.triggerSave();
-    return { duplicatedShapeIds, blocked, summary: getAgentSummary(runtime) };
+    return { duplicatedShapeIds, blocked, summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export function arrangeAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     operation: AgentArrangeOperation;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
         .filter((id) => editor.getShape(id as TLShapeId)) as TLShapeId[];
-    if (!ids.length) return { arrangedShapeIds: [], summary: getAgentSummary(runtime) };
+    if (!ids.length) return { arrangedShapeIds: [], summary: getAgentResultSummary(runtime, options.resultMode) };
     const methodByOperation: Record<AgentArrangeOperation, string> = {
         front: 'bringToFront',
         back: 'sendToBack',
@@ -539,18 +572,19 @@ export function arrangeAgentShapes(runtime: AgentManagerRuntime, options: {
     }
     method.call(editor, ids);
     runtime.triggerSave();
-    return { arrangedShapeIds: ids.map(String), summary: getAgentSummary(runtime) };
+    return { arrangedShapeIds: ids.map(String), summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export function alignAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     operation: AgentAlignOperation;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const shapes = Array.from(new Set(options.shapeIds)).slice(0, 50)
         .map((id) => editor.getShape(id as TLShapeId))
         .filter(Boolean) as TLShape[];
-    if (shapes.length < 2) return { alignedShapeIds: shapes.map((shape) => String(shape.id)), summary: getAgentSummary(runtime) };
+    if (shapes.length < 2) return { alignedShapeIds: shapes.map((shape) => String(shape.id)), summary: getAgentResultSummary(runtime, options.resultMode) };
 
     const boxes = shapes.map((shape) => {
         const bounds = editor.getShapePageBounds(shape.id);
@@ -569,18 +603,19 @@ export function alignAgentShapes(runtime: AgentManagerRuntime, options: {
         editor.updateShapes(updates as any);
         runtime.triggerSave();
     }
-    return { alignedShapeIds: shapes.map((shape) => String(shape.id)), summary: getAgentSummary(runtime) };
+    return { alignedShapeIds: shapes.map((shape) => String(shape.id)), summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export function groupAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     ungroup?: boolean;
     select?: boolean;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
         .filter((id) => editor.getShape(id as TLShapeId)) as TLShapeId[];
-    if (!ids.length) return { shapeIds: [], summary: getAgentSummary(runtime) };
+    if (!ids.length) return { shapeIds: [], summary: getAgentResultSummary(runtime, options.resultMode) };
 
     const methodName = options.ungroup ? 'ungroupShapes' : 'groupShapes';
     const method = (editor as any)[methodName];
@@ -590,17 +625,18 @@ export function groupAgentShapes(runtime: AgentManagerRuntime, options: {
     method.call(editor, ids);
     if (options.select !== false) editor.setSelectedShapes(ids);
     runtime.triggerSave();
-    return { shapeIds: ids.map(String), summary: getAgentSummary(runtime) };
+    return { shapeIds: ids.map(String), summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 export function lockAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     locked: boolean;
+    resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
     const ids = Array.from(new Set(options.shapeIds)).slice(0, 50)
         .filter((id) => editor.getShape(id as TLShapeId)) as TLShapeId[];
-    if (!ids.length) return { shapeIds: [], locked: options.locked, summary: getAgentSummary(runtime) };
+    if (!ids.length) return { shapeIds: [], locked: options.locked, summary: getAgentResultSummary(runtime, options.resultMode) };
 
     const methodName = options.locked ? 'lockShapes' : 'unlockShapes';
     const method = (editor as any)[methodName];
@@ -613,7 +649,7 @@ export function lockAgentShapes(runtime: AgentManagerRuntime, options: {
         }));
     }
     runtime.triggerSave();
-    return { shapeIds: ids.map(String), locked: options.locked, summary: getAgentSummary(runtime) };
+    return { shapeIds: ids.map(String), locked: options.locked, summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
 async function prepareAgentCreateShapeOptions(

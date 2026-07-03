@@ -1,15 +1,15 @@
-import { assertKnownArgs, booleanArgWithFallback, numberArg, shapeIdArrayArg } from '../../core/args';
+import { assertKnownArgs, booleanArgWithFallback, numberArg, resultModeArg, shapeIdArrayArg } from '../../core/args';
 import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type AgentActionDefinition } from '../shared';
 
 export function createDuplicateShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_duplicate_shapes',
-        description: 'Duplicate up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: offsetX, offsetY, select, zoom. Complex bindings may not be preserved when the editor duplicate API is unavailable.',
+        description: 'Duplicate up to 50 shapes on an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: offsetX, offsetY, select, zoom, resultMode "compact"|"full" default compact. Complex bindings may not be preserved when the editor duplicate API is unavailable.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'offsetX', 'offsetY', 'select', 'zoom'], 'tldraw_duplicate_shapes');
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'offsetX', 'offsetY', 'select', 'zoom', 'resultMode'], 'tldraw_duplicate_shapes');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -24,6 +24,7 @@ export function createDuplicateShapesAction(): AgentActionDefinition {
                     offsetY: numberArg(args.offsetY),
                     select: booleanArgWithFallback(args.select, true),
                     zoom: booleanArgWithFallback(args.zoom, false),
+                    resultMode: resultModeArg(args.resultMode),
                 });
                 return jsonResult(duplicated);
             } catch (error) {
