@@ -3,6 +3,7 @@ import {
     createDocWithMd,
     exportMdContent,
     getBlockByID,
+    getHPathByID,
     setBlockAttrs,
     sql,
 } from '@/api/api'
@@ -24,6 +25,7 @@ export type SourceDocSummaryInput = {
     title: string
     box: string
     path: string
+    hPath: string
     sourceMarkdown: string
     truncated: boolean
     instructions: string[]
@@ -31,6 +33,7 @@ export type SourceDocSummaryInput = {
 
 export async function readSourceDocForSummary(docId: string, maxChars: number): Promise<SourceDocSummaryInput> {
     const sourceDoc = await resolveDocumentBlock(docId)
+    const sourceHPath = await resolveDocumentHPath(sourceDoc)
     const exported = await exportMdContent(sourceDoc.id)
     const sourceMarkdown = String((exported as any)?.content || '')
     const truncated = sourceMarkdown.length > maxChars
@@ -40,6 +43,7 @@ export async function readSourceDocForSummary(docId: string, maxChars: number): 
         title: getDocumentTitle(sourceDoc),
         box: sourceDoc.box,
         path: sourceDoc.path,
+        hPath: sourceHPath,
         sourceMarkdown: truncated ? sourceMarkdown.slice(0, maxChars) : sourceMarkdown,
         truncated,
         instructions: [
@@ -56,15 +60,20 @@ export async function createSummaryChildDocWhiteboard(
 ) {
     const sourceDoc = await resolveDocumentBlock(options.docId)
     const sourceTitle = getDocumentTitle(sourceDoc)
+    const sourceHPath = await resolveDocumentHPath(sourceDoc)
     const childTitle = sanitizeDocTitle(options.childTitle || `${sourceTitle} Summary Mindmap`)
     const markdown = normalizeSummaryMarkdown(options.summaryMarkdown, sourceTitle)
-    const childPath = await buildUniqueChildDocPath(sourceDoc.box, sourceDoc.path, childTitle)
-    const created = await createDocWithMd(sourceDoc.box, childPath, markdown)
+    const childHPath = await buildUniqueChildDocHPath(sourceDoc.box, sourceHPath, childTitle)
+    const created = await createDocWithMd(sourceDoc.box, childHPath, markdown)
     const childDocId = normalizeCreatedDocId(created)
 
     if (!childDocId) {
         throw new Error('Failed to create summary child document.')
     }
+
+    const childDoc = await waitForDocumentBlock(childDocId)
+    const createdChildHPath = await resolveDocumentHPath(childDoc)
+    assertCreatedUnderSource(sourceDoc, sourceHPath, childDoc, createdChildHPath, childHPath)
 
     await setBlockAttrs(childDocId, {
         'custom-st-summary-source-doc': sourceDoc.id,
@@ -98,7 +107,10 @@ export async function createSummaryChildDocWhiteboard(
         sourceDocId: sourceDoc.id,
         childDocId,
         childTitle,
-        childPath,
+        childPath: childHPath,
+        childHPath: createdChildHPath,
+        requestedChildHPath: childHPath,
+        childStoragePath: childDoc.path,
         whiteboardOpened,
         mindmapInserted: Boolean(mindmap),
         pendingReason,
@@ -129,8 +141,32 @@ async function resolveDocumentBlock(id: string): Promise<Block> {
     return root
 }
 
+async function waitForDocumentBlock(docId: string, timeoutMs = 3000): Promise<Block> {
+    const started = Date.now()
+    let lastError: unknown = null
+    while (Date.now() - started <= timeoutMs) {
+        try {
+            return await resolveDocumentBlock(docId)
+        } catch (error) {
+            lastError = error
+        }
+        await sleep(150)
+    }
+    throw lastError instanceof Error ? lastError : new Error(`Document not found after creation: ${docId}`)
+}
+
+async function resolveDocumentHPath(doc: Block): Promise<string> {
+    const hPath = normalizeHPath(doc.hpath)
+    if (hPath) return hPath
+
+    const apiHPath = normalizeHPath(await getHPathByID(doc.id))
+    if (apiHPath) return apiHPath
+
+    throw new Error(`Failed to resolve document human-readable path: ${doc.id}`)
+}
+
 function getDocumentTitle(doc: Block): string {
-    return sanitizeDocTitle(doc.content || doc.name || lastPathPart(doc.path) || doc.id)
+    return sanitizeDocTitle(doc.content || doc.name || lastPathPart(doc.hpath || doc.path) || doc.id)
 }
 
 function normalizeCreatedDocId(value: unknown): string {
@@ -158,24 +194,57 @@ function normalizeSummaryMarkdown(markdown: string, sourceTitle: string): string
     return `## ${sanitizeHeadingText(sourceTitle)}\n\n${withoutH1}\n`
 }
 
-async function buildUniqueChildDocPath(box: string, sourcePath: string, title: string): Promise<string> {
-    const parentPath = sourcePath.replace(/\.sy$/i, '')
+async function buildUniqueChildDocHPath(box: string, sourceHPath: string, title: string): Promise<string> {
+    const parentPath = normalizeHPath(sourceHPath)
+    if (!parentPath) throw new Error('Source document hpath is empty.')
+
     const baseName = sanitizePathPart(title) || 'summary-mindmap'
-    const firstPath = `${parentPath}/${baseName}.sy`
-    if (!(await docPathExists(box, firstPath))) return firstPath
+    const firstPath = joinHPath(parentPath, baseName)
+    if (!(await docHPathExists(box, firstPath))) return firstPath
 
     const stamp = formatTimestamp(new Date())
-    const stampedPath = `${parentPath}/${baseName}-${stamp}.sy`
-    if (!(await docPathExists(box, stampedPath))) return stampedPath
+    const stampedPath = joinHPath(parentPath, `${baseName}-${stamp}`)
+    if (!(await docHPathExists(box, stampedPath))) return stampedPath
 
-    return `${parentPath}/${baseName}-${stamp}-${Math.random().toString(36).slice(2, 6)}.sy`
+    return joinHPath(parentPath, `${baseName}-${stamp}-${Math.random().toString(36).slice(2, 6)}`)
 }
 
-async function docPathExists(box: string, path: string): Promise<boolean> {
+async function docHPathExists(box: string, hPath: string): Promise<boolean> {
     const rows = await sql(
-        `SELECT id FROM blocks WHERE box='${escapeSql(box)}' AND path='${escapeSql(path)}' AND type='d' LIMIT 1`
+        `SELECT id FROM blocks WHERE box='${escapeSql(box)}' AND hpath='${escapeSql(hPath)}' AND type='d' LIMIT 1`
     )
     return Array.isArray(rows) && rows.length > 0
+}
+
+function assertCreatedUnderSource(
+    sourceDoc: Block,
+    sourceHPath: string,
+    childDoc: Block,
+    createdChildHPath: string,
+    expectedChildHPath: string
+) {
+    const childHPath = normalizeHPath(createdChildHPath)
+    const parentPrefix = `${normalizeHPath(sourceHPath)}/`
+    if (childDoc.box !== sourceDoc.box) {
+        throw new Error(`Created document is in another notebook: ${childDoc.box}`)
+    }
+    if (childHPath !== expectedChildHPath) {
+        throw new Error(`Created document hpath mismatch: expected ${expectedChildHPath}, got ${childHPath}`)
+    }
+    if (!childHPath.startsWith(parentPrefix)) {
+        throw new Error(`Created document is not under source document: ${childHPath}`)
+    }
+}
+
+function normalizeHPath(value: unknown): string {
+    const raw = String(value || '').replace(/\\/g, '/').replace(/\/+/g, '/').trim()
+    if (!raw) return ''
+    const withRoot = raw.startsWith('/') ? raw : `/${raw}`
+    return withRoot.length > 1 ? withRoot.replace(/\/+$/g, '') : withRoot
+}
+
+function joinHPath(parent: string, child: string): string {
+    return `${normalizeHPath(parent)}/${child}`.replace(/\/+/g, '/')
 }
 
 async function openSummaryWhiteboard(plugin: Plugin, whiteboardId: string, title: string) {
