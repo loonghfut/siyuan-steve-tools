@@ -45,7 +45,7 @@ export function getTldrawAgentCapabilities() {
             'tldraw_lock_shapes',
             'tldraw_convert_connectors',
             'tldraw_insert_doc_outline_mindmap',
-            'siyuan_create_summary_child_doc_whiteboard',
+            'siyuan_create_summary_doc_whiteboard',
         ],
         toolSelectionHints: {
             preferredPlan: {
@@ -317,7 +317,7 @@ export function getTldrawAgentCapabilities() {
             'For a document map: create a main card for the document, create single-block leaves or child cards, then create a branch with op "branch" or tldraw_insert_doc_outline_mindmap.',
             'For concept links: get shape details, then create a bezier connector with shapeIds and a short text label.',
             'For visual grouping: use frame by default. For presentation workflows only when requested: create slide frames, place content inside them, then use select/zoom or slide UI focus.',
-            'For outlines: prefer tldraw_insert_doc_outline_mindmap or siyuan_create_summary_child_doc_whiteboard over hand-placing many nodes.',
+            'For outlines: prefer tldraw_insert_doc_outline_mindmap or siyuan_create_summary_doc_whiteboard over hand-placing many nodes.',
         ],
         destructive: [
             'tldraw_delete_shapes',

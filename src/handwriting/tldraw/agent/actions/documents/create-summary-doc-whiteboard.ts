@@ -1,11 +1,11 @@
 import { booleanArgWithFallback, clampNumber, stringArg } from '../../core/args'
-import { createSummaryChildDocWhiteboard, readSourceDocForSummary } from '../../documents/summary-child-doc-board'
+import { createSummaryDocWhiteboard, readSourceDocForSummary } from '../../documents/summary-doc-board'
 import { disabledResult, jsonResult, stringifyError, type AgentActionContext, type AgentActionDefinition } from '../shared'
 
-export function createCreateSummaryChildDocWhiteboardAction(context: AgentActionContext): AgentActionDefinition {
+export function createCreateSummaryDocWhiteboardAction(context: AgentActionContext): AgentActionDefinition {
     return {
-        name: 'siyuan_create_summary_child_doc_whiteboard',
-        description: 'Create a child document for the current/source SiYuan document, fill it with a hierarchical Markdown summary, open the child document STtools tldraw whiteboard, and convert the child document headings into a branch/mindmap. Required args: docId string. Preferred args: summaryMarkdown string generated from the source document content. The summaryMarkdown must use heading blocks for hierarchy, prefer ## through ######, and avoid # headings. Optional args: childTitle string, openWhiteboard boolean default true, insertMindmap boolean default true, select boolean default true, zoom boolean default true, waitMs number default 8000. If summaryMarkdown is missing, this action returns sourceMarkdown and summarization instructions; call it again with summaryMarkdown.',
+        name: 'siyuan_create_summary_doc_whiteboard',
+        description: 'Create a summary document beside the current/source SiYuan document, fill it with a hierarchical Markdown summary, open that document STtools tldraw whiteboard, and convert the document headings into a branch/mindmap. Required args: docId string. Preferred args: summaryMarkdown string generated from the source document content. The summaryMarkdown must use heading blocks for hierarchy, prefer ## through ###### and avoid # headings. Optional args: summaryTitle string, openWhiteboard boolean default true, insertMindmap boolean default true, select boolean default true, zoom boolean default true, waitMs number default 8000. If summaryMarkdown is missing, this action returns sourceMarkdown and summarization instructions; call it again with summaryMarkdown.',
         handler: async (args) => {
             const disabled = disabledResult()
             if (disabled) return disabled
@@ -19,10 +19,10 @@ export function createCreateSummaryChildDocWhiteboardAction(context: AgentAction
                     return jsonResult(await readSourceDocForSummary(docId, maxChars))
                 }
 
-                const result = await createSummaryChildDocWhiteboard(context.plugin, {
+                const result = await createSummaryDocWhiteboard(context.plugin, {
                     docId,
                     summaryMarkdown,
-                    childTitle: stringArg(args.childTitle || args.title),
+                    summaryTitle: stringArg(args.summaryTitle || args.title),
                     openWhiteboard: booleanArgWithFallback(args.openWhiteboard, true),
                     insertMindmap: booleanArgWithFallback(args.insertMindmap, true),
                     select: booleanArgWithFallback(args.select, true),

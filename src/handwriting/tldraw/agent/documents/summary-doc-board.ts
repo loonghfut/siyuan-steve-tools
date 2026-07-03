@@ -9,10 +9,10 @@ import {
 } from '@/api/api'
 import { getInstance } from '../../tldraw-instance-manager'
 
-export type SummaryChildDocWhiteboardOptions = {
+export type SummaryDocWhiteboardOptions = {
     docId: string
     summaryMarkdown: string
-    childTitle?: string
+    summaryTitle?: string
     openWhiteboard?: boolean
     insertMindmap?: boolean
     select?: boolean
@@ -49,33 +49,33 @@ export async function readSourceDocForSummary(docId: string, maxChars: number): 
         instructions: [
             'Summarize the source document into hierarchical Markdown.',
             'Use heading blocks to represent levels; prefer ## through ###### and avoid # headings.',
-            'Call this action again with docId and summaryMarkdown to create the child document whiteboard mindmap.',
+            'Call this action again with docId and summaryMarkdown to create the summary document whiteboard mindmap.',
         ],
     }
 }
 
-export async function createSummaryChildDocWhiteboard(
+export async function createSummaryDocWhiteboard(
     plugin: Plugin,
-    options: SummaryChildDocWhiteboardOptions
+    options: SummaryDocWhiteboardOptions
 ) {
     const sourceDoc = await resolveDocumentBlock(options.docId)
     const sourceTitle = getDocumentTitle(sourceDoc)
     const sourceHPath = await resolveDocumentHPath(sourceDoc)
-    const childTitle = sanitizeDocTitle(options.childTitle || `${sourceTitle} Summary Mindmap`)
+    const summaryTitle = sanitizeDocTitle(options.summaryTitle || `${sourceTitle} Summary Mindmap`)
     const markdown = normalizeSummaryMarkdown(options.summaryMarkdown, sourceTitle)
-    const childHPath = await buildUniqueChildDocHPath(sourceDoc.box, sourceHPath, childTitle)
-    const created = await createDocWithMd(sourceDoc.box, childHPath, markdown)
-    const childDocId = normalizeCreatedDocId(created)
+    const summaryHPath = await buildUniqueSummaryDocHPath(sourceDoc.box, sourceHPath, summaryTitle)
+    const created = await createDocWithMd(sourceDoc.box, summaryHPath, markdown)
+    const summaryDocId = normalizeCreatedDocId(created)
 
-    if (!childDocId) {
-        throw new Error('Failed to create summary child document.')
+    if (!summaryDocId) {
+        throw new Error('Failed to create summary document.')
     }
 
-    const childDoc = await waitForDocumentBlock(childDocId)
-    const createdChildHPath = await resolveDocumentHPath(childDoc)
-    assertCreatedUnderSource(sourceDoc, sourceHPath, childDoc, createdChildHPath, childHPath)
+    const summaryDoc = await waitForDocumentBlock(summaryDocId)
+    const createdSummaryHPath = await resolveDocumentHPath(summaryDoc)
+    assertCreatedInSourceParent(sourceDoc, sourceHPath, summaryDoc, createdSummaryHPath, summaryHPath)
 
-    await setBlockAttrs(childDocId, {
+    await setBlockAttrs(summaryDocId, {
         'custom-st-summary-source-doc': sourceDoc.id,
         'custom-st-summary-kind': 'tldraw-mindmap',
     })
@@ -85,39 +85,39 @@ export async function createSummaryChildDocWhiteboard(
     let pendingReason: string | null = null
 
     if (options.openWhiteboard !== false) {
-        await openSummaryWhiteboard(plugin, childDocId, childTitle)
+        await openSummaryWhiteboard(plugin, summaryDocId, summaryTitle)
         whiteboardOpened = true
     }
 
     if (options.insertMindmap !== false) {
-        const instance = await waitForOpenWhiteboard(childDocId, options.waitMs ?? 8000)
+        const instance = await waitForOpenWhiteboard(summaryDocId, options.waitMs ?? 8000)
         if (instance) {
             mindmap = await (instance as any).insertDocOutlineMindmapForAgent({
-                docId: childDocId,
-                whiteboardId: childDocId,
+                docId: summaryDocId,
+                whiteboardId: summaryDocId,
                 select: options.select !== false,
                 zoom: options.zoom !== false,
             })
         } else {
-            pendingReason = `Whiteboard ${childDocId} did not finish opening before timeout.`
+            pendingReason = `Whiteboard ${summaryDocId} did not finish opening before timeout.`
         }
     }
 
     return {
         sourceDocId: sourceDoc.id,
-        childDocId,
-        childTitle,
-        childPath: childHPath,
-        childHPath: createdChildHPath,
-        requestedChildHPath: childHPath,
-        childStoragePath: childDoc.path,
+        summaryDocId,
+        summaryTitle,
+        summaryPath: summaryHPath,
+        summaryHPath: createdSummaryHPath,
+        requestedSummaryHPath: summaryHPath,
+        summaryStoragePath: summaryDoc.path,
         whiteboardOpened,
         mindmapInserted: Boolean(mindmap),
         pendingReason,
         retry: pendingReason
             ? {
                 action: 'tldraw_insert_doc_outline_mindmap',
-                args: { docId: childDocId, whiteboardId: childDocId, select: options.select !== false, zoom: options.zoom !== false },
+                args: { docId: summaryDocId, whiteboardId: summaryDocId, select: options.select !== false, zoom: options.zoom !== false },
             }
             : null,
         mindmap,
@@ -194,8 +194,8 @@ function normalizeSummaryMarkdown(markdown: string, sourceTitle: string): string
     return `## ${sanitizeHeadingText(sourceTitle)}\n\n${withoutH1}\n`
 }
 
-async function buildUniqueChildDocHPath(box: string, sourceHPath: string, title: string): Promise<string> {
-    const parentPath = normalizeHPath(sourceHPath)
+async function buildUniqueSummaryDocHPath(box: string, sourceHPath: string, title: string): Promise<string> {
+    const parentPath = getParentHPath(sourceHPath)
     if (!parentPath) throw new Error('Source document hpath is empty.')
 
     const baseName = sanitizePathPart(title) || 'summary-mindmap'
@@ -216,23 +216,23 @@ async function docHPathExists(box: string, hPath: string): Promise<boolean> {
     return Array.isArray(rows) && rows.length > 0
 }
 
-function assertCreatedUnderSource(
+function assertCreatedInSourceParent(
     sourceDoc: Block,
     sourceHPath: string,
-    childDoc: Block,
-    createdChildHPath: string,
-    expectedChildHPath: string
+    summaryDoc: Block,
+    createdSummaryHPath: string,
+    expectedSummaryHPath: string
 ) {
-    const childHPath = normalizeHPath(createdChildHPath)
-    const parentPrefix = `${normalizeHPath(sourceHPath)}/`
-    if (childDoc.box !== sourceDoc.box) {
-        throw new Error(`Created document is in another notebook: ${childDoc.box}`)
+    const summaryHPath = normalizeHPath(createdSummaryHPath)
+    const expectedParentHPath = getParentHPath(sourceHPath)
+    if (summaryDoc.box !== sourceDoc.box) {
+        throw new Error(`Created document is in another notebook: ${summaryDoc.box}`)
     }
-    if (childHPath !== expectedChildHPath) {
-        throw new Error(`Created document hpath mismatch: expected ${expectedChildHPath}, got ${childHPath}`)
+    if (summaryHPath !== expectedSummaryHPath) {
+        throw new Error(`Created document hpath mismatch: expected ${expectedSummaryHPath}, got ${summaryHPath}`)
     }
-    if (!childHPath.startsWith(parentPrefix)) {
-        throw new Error(`Created document is not under source document: ${childHPath}`)
+    if (getParentHPath(summaryHPath) !== expectedParentHPath) {
+        throw new Error(`Created document is not in source document parent: ${summaryHPath}`)
     }
 }
 
@@ -245,6 +245,13 @@ function normalizeHPath(value: unknown): string {
 
 function joinHPath(parent: string, child: string): string {
     return `${normalizeHPath(parent)}/${child}`.replace(/\/+/g, '/')
+}
+
+function getParentHPath(hPath: string): string {
+    const normalized = normalizeHPath(hPath)
+    if (!normalized || normalized === '/') return '/'
+    const index = normalized.lastIndexOf('/')
+    return index <= 0 ? '/' : normalized.slice(0, index)
 }
 
 async function openSummaryWhiteboard(plugin: Plugin, whiteboardId: string, title: string) {
