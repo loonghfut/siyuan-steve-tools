@@ -38,5 +38,5 @@ export function stringifyError(error: unknown): string {
 }
 
 export function jsonResult(value: unknown): { result: string } {
-    return { result: JSON.stringify(value, null, 2) };
+    return { result: JSON.stringify(value) };
 }

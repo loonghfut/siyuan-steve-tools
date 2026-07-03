@@ -133,7 +133,24 @@ export function getAgentSummary(runtime: AgentManagerRuntime, options: AgentSumm
 }
 
 function getAgentResultSummary(runtime: AgentManagerRuntime, resultMode?: AgentResultMode) {
+    const summary = getAgentSummary(runtime, { includeShapeSamples: resultMode === 'full' });
+    if (resultMode === 'full') return summary;
+    return compactAgentSummary(summary);
+}
+
+function getAgentInternalResultSummary(runtime: AgentManagerRuntime, resultMode?: AgentResultMode) {
     return getAgentSummary(runtime, { includeShapeSamples: resultMode === 'full' });
+}
+
+function compactAgentSummary(summary: AgentSummary) {
+    const compact = { ...summary } as Partial<AgentSummary> & { selectedShapeCount?: number };
+    const selectedShapeCount = summary.selectedShapeIds.length;
+    delete compact.selectedShapeIds;
+    delete compact.sampleShapes;
+    return {
+        ...compact,
+        selectedShapeCount,
+    };
 }
 
 export async function createAgentShape(runtime: AgentManagerRuntime, options: AgentCreateShapeArgs) {
@@ -201,13 +218,13 @@ export function zoomAgentToShapes(runtime: AgentManagerRuntime, options: { shape
 export async function saveAgentWhiteboard(runtime: AgentManagerRuntime) {
     requireEditor(runtime);
     await runtime.saveData();
-    return { success: true, summary: getAgentSummary(runtime) };
+    return { success: true, summary: getAgentResultSummary(runtime) };
 }
 
 export async function applyAgentPlan(runtime: AgentManagerRuntime, options: AgentPlanApplyOptions) {
     requireEditor(runtime);
     return executeAgentPlan(options, {
-        getSummary: () => getAgentResultSummary(runtime, options.resultMode),
+        getSummary: () => getAgentInternalResultSummary(runtime, options.resultMode),
         createShape: (shapeOptions) => createAgentShape(runtime, shapeOptions),
         createBasicShape: (shapeOptions) => createAgentBasicShape(runtime, shapeOptions),
         createConnector: (connectorOptions) => createAgentConnector(runtime, connectorOptions),

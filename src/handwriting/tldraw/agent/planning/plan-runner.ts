@@ -101,13 +101,38 @@ export async function executeAgentPlan(options: AgentPlanApplyOptions, adapter: 
         dryRun: options.dryRun === true,
         writeCount,
         saved,
-        created: state.created,
-        lastShapeIds: state.lastShapeIds,
-        summary: finalSummary,
+        summary: options.resultMode === 'full' ? finalSummary : compactPlanSummary(finalSummary),
     };
+    if (options.resultMode === 'full') {
+        output.created = state.created;
+        output.lastShapeIds = state.lastShapeIds;
+    } else {
+        output.createdAliases = summarizeCreatedRefs(state.created);
+        output.createdCount = countCreatedRefs(state.created);
+        output.lastShapeCount = state.lastShapeIds.length;
+    }
     if (options.dryRun === true || options.resultMode === 'full') output.normalizedSteps = normalizedSteps;
     if (options.resultMode === 'full') output.results = results;
     return output;
+}
+
+function compactPlanSummary(summary: { selectedShapeIds?: string[]; sampleShapes?: unknown; [key: string]: unknown }) {
+    const compact = { ...summary };
+    const selectedShapeCount = Array.isArray(summary.selectedShapeIds) ? summary.selectedShapeIds.length : 0;
+    delete compact.selectedShapeIds;
+    delete compact.sampleShapes;
+    return {
+        ...compact,
+        selectedShapeCount,
+    };
+}
+
+function summarizeCreatedRefs(created: PlanCreatedRefs): Record<string, number> {
+    return Object.fromEntries(Object.entries(created).map(([alias, shapeIds]) => [alias, shapeIds.length]));
+}
+
+function countCreatedRefs(created: PlanCreatedRefs): number {
+    return Object.values(created).reduce((sum, shapeIds) => sum + shapeIds.length, 0);
 }
 
 function normalizeSteps(value: unknown): Record<string, unknown>[] {

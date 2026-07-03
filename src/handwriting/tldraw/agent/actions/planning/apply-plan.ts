@@ -6,7 +6,7 @@ import type { AgentPlanApplyOptions } from '../../planning/plan-runner';
 export function createApplyPlanAction(): AgentActionDefinition {
     return {
         name: 'tldraw_apply_plan',
-        description: 'Preferred high-level STtools tldraw Agent entrypoint. Apply a safe JSON whiteboard plan to the focused/open whiteboard. Optional args: whiteboardId string defaults to focused whiteboard, goal string, dryRun boolean, select boolean, zoom boolean, save boolean, resultMode "compact"|"full" default compact. Required args: steps array. Supported step ops: create, connect, update, layout, focus, save. Supports references like "$selection", "$selection[0]", "$created.name", and "$last". Compact results omit per-step results and shape samples; use full only for debugging. This action does not execute JavaScript, raw store mutation, deletion, or direct SiYuan block content edits.',
+        description: 'Preferred high-level STtools tldraw Agent entrypoint. Apply a safe JSON whiteboard plan to the focused/open whiteboard. Optional args: whiteboardId string defaults to focused whiteboard, goal string, dryRun boolean, select boolean, zoom boolean, save boolean, resultMode "compact"|"full" default compact. Required args: steps array. Supported step ops: create, connect, update, layout, focus, save. Supports references like "$selection", "$selection[0]", "$created.name", and "$last". Compact results omit raw shape IDs, per-step results, and shape samples; use full only for debugging. This action does not execute JavaScript, raw store mutation, deletion, or direct SiYuan block content edits.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

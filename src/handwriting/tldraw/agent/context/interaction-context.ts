@@ -6,6 +6,7 @@ import {
 } from '../../tldraw-instance-manager'
 
 export type AgentInteractionContextOptions = {
+    includeSelectedShapeIds?: boolean
     includeSelectedShapeDetails?: boolean
     selectedShapeLimit?: number
 }
@@ -35,7 +36,7 @@ export function getAgentInteractionContext(options: AgentInteractionContextOptio
             focusedAt: getInstanceFocusedAt(id) || null,
             isOpen: Boolean(instance),
             hasSelection: selectedShapeIds.length > 0,
-            selectedShapeIds,
+            selectedShapeIds: options.includeSelectedShapeIds === true ? selectedShapeIds : undefined,
             selectedShapeCount: selectedShapeIds.length,
             selectedShapeDetails,
             shapeCount: summary?.shapeCount ?? 0,

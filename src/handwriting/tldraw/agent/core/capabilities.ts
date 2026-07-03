@@ -4,11 +4,11 @@ export function getTldrawAgentCapabilities() {
         enabled: true,
         agentPrompt: [
             'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Prefer tldraw_apply_plan for most whiteboard edits; it automatically uses the focused whiteboard when whiteboardId is omitted and supports $selection/$created/$last references.',
-            'Keep tool results compact. Use resultMode:"full", tldraw_get_summary includeShapeSamples:true, or tldraw_get_shape_details only when debugging or when exact bounds/details are necessary.',
+            'Keep tool results compact. Compact results intentionally omit raw selected shape IDs and shape samples. Use resultMode:"full", tldraw_get_interaction_context includeSelectedShapeIds:true, tldraw_get_summary includeShapeSamples:true, or tldraw_get_shape_details only when debugging or when exact IDs/bounds/details are necessary.',
             'Use low-level tldraw actions only when tldraw_apply_plan cannot express the requested edit or you need precise one-off control.',
             'Default shape preference: use card, single-block, text, bezier-connector, and frame first. Unless the user explicitly asks for another shape type or the task clearly requires it, avoid note, geo, arrow, line, draw, highlight, branch, slide, mind-map, and js-shape.',
             'Prefer semantic STtools shapes over generic drawings: card for a document/heading block or substantial content, single-block for one paragraph block or compact atomic item, text for unlinked labels/annotations, bezier-connector for labeled relationships, and frame for grouping or visual boundaries.',
-            'When creating multiple entity shapes, rely on tldraw_apply_plan aliases such as $created.name, $last, and $selection instead of repeating raw shape IDs. Use returned focused bounds or tldraw_get_shape_details bounds only when exact spatial planning is needed.',
+            'When creating multiple entity shapes, rely on tldraw_apply_plan aliases such as $created.name, $last, and $selection instead of repeating raw shape IDs. Use tldraw_get_shape_details bounds only when exact spatial planning is needed.',
             'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
         ],
         preferred: [
