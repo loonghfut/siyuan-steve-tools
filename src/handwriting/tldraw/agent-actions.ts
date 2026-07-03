@@ -4,11 +4,11 @@ import { getTldrawAgentActions } from './agent/actions';
 import type { AgentActionResult } from './agent/actions/shared';
 import { getInstance } from './tldraw-instance-manager';
 
-type AddAgentActionPositional = (
-    name: string,
-    description: string,
-    handler: (args: Record<string, unknown>, app: unknown) => AgentActionResult,
-) => string;
+type AddAgentActionObject = (options: {
+    name: string;
+    description: string;
+    handler: (args: Record<string, unknown>, app: unknown) => AgentActionResult;
+}) => string;
 
 let registered = false;
 
@@ -20,7 +20,7 @@ export function registerTldrawAgentActions(plugin: Plugin) {
         return;
     }
 
-    const addAgentAction = (plugin as any).addAgentAction as AddAgentActionPositional | undefined;
+    const addAgentAction = (plugin as any).addAgentAction as AddAgentActionObject | undefined;
     if (typeof addAgentAction !== 'function') {
         console.info('SiYuan addAgentAction API is unavailable; skip tldraw agent actions.');
         return;
@@ -36,10 +36,11 @@ export function registerTldrawAgentActions(plugin: Plugin) {
                 endAgentActivity();
             }
         };
-        // SiYuan's frontend Agent API is Plugin.addAgentAction(name, description, handler).
-        // Older experiments used an object-shaped call; positional keeps the tool metadata
-        // readable to the host Agent instead of registering a malformed action object.
-        (addAgentAction as AddAgentActionPositional).call(plugin, action.name, action.description, handler);
+        addAgentAction.call(plugin, {
+            name: action.name,
+            description: action.description,
+            handler,
+        });
     }
 
     registered = true;
