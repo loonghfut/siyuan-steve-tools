@@ -6,8 +6,8 @@ export function getTldrawAgentCapabilities() {
             'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Prefer tldraw_apply_plan for most whiteboard edits; it automatically uses the focused whiteboard when whiteboardId is omitted and supports $selection/$created/$last references.',
             'Keep tool results compact. Compact results intentionally omit raw selected shape IDs and shape samples. Use resultMode:"full", tldraw_get_interaction_context includeSelectedShapeIds:true, tldraw_get_summary includeShapeSamples:true, or tldraw_get_shape_details only when debugging or when exact IDs/bounds/details are necessary.',
             'Use low-level tldraw actions only when tldraw_apply_plan cannot express the requested edit or you need precise one-off control.',
-            'Default shape preference: use card, single-block, text, bezier-connector, frame, and branch first. Use branch for mind maps, tree/parent-child/hierarchical layouts, or explicitly branch-connected components. Unless the user explicitly asks for another shape type or the task clearly requires it, avoid note, geo, arrow, line, draw, highlight, slide, mind-map, and js-shape.',
-            'Prefer semantic STtools shapes over generic drawings: card for a document/heading block or substantial content, single-block for one paragraph block or compact atomic item, text for unlinked labels/annotations, branch for hierarchical/mind-map structures, bezier-connector for ordinary labeled relationships, and frame for grouping or visual boundaries.',
+            'Default shape preference: use card, single-block, text, bezier-connector, frame, and branch first. For hierarchy between existing shapes, use tldraw_apply_plan step {op:"connect",kind:"branch",from,to}; do not hand-place branch geometry. Unless the user explicitly asks for another shape type or the task clearly requires it, avoid note, geo, arrow, line, draw, highlight, slide, mind-map, and js-shape.',
+            'Prefer semantic STtools shapes over generic drawings: card for a document/heading block or substantial content, single-block for one paragraph block or compact atomic item, text for unlinked labels/annotations, branch connections for hierarchical/mind-map structures, bezier-connector for ordinary labeled relationships, and frame for grouping or visual boundaries.',
             'When creating multiple entity shapes, rely on tldraw_apply_plan aliases such as $created.name, $last, and $selection instead of repeating raw shape IDs. Use tldraw_get_shape_details bounds only when exact spatial planning is needed.',
             'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
         ],
@@ -56,7 +56,7 @@ export function getTldrawAgentCapabilities() {
                 exampleArgs: {
                     goal: 'Create a branch from the current selection',
                     steps: [
-                        { op: 'branch', root: '$selection[0]', child: '$selection[1]' },
+                        { op: 'connect', kind: 'branch', from: '$selection[0]', to: '$selection[1]' },
                         { op: 'focus', target: '$last' },
                     ],
                     save: true,
@@ -68,7 +68,7 @@ export function getTldrawAgentCapabilities() {
                 kinds: ['card', 'single-block', 'branch'],
                 defaultKinds: ['card', 'single-block', 'branch'],
                 nonDefaultKinds: [],
-                guidance: 'Use card and single-block for content nodes. Use branch for mind maps, tree/parent-child/hierarchical layouts, or explicitly branch-connected components; prefer tldraw_apply_plan op "branch" when possible.',
+                guidance: 'Use card and single-block for content nodes. For hierarchy between existing shapes, prefer tldraw_apply_plan op "connect" with kind:"branch"; use op "branch" only to create child nodes inline or set left/right children.',
                 exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'single-block', contentMarkdown: 'New compact note', zoom: false },
             },
             createBasicShapes: {
@@ -76,12 +76,23 @@ export function getTldrawAgentCapabilities() {
                 kinds: ['text', 'note', 'geo', 'arrow', 'line', 'draw', 'highlight', 'frame', 'bezier-connector', 'slide', 'mind-map', 'js-shape'],
                 defaultKinds: ['text', 'frame', 'bezier-connector'],
                 nonDefaultKinds: ['note', 'geo', 'arrow', 'line', 'draw', 'highlight', 'slide', 'mind-map', 'js-shape'],
-                guidance: 'Use text, frame, and bezier-connector by default for unlinked annotations, grouping, and ordinary relationships. For mind maps and hierarchical structures, prefer branch via tldraw_apply_plan. Use editable mind-map only when explicitly requested.',
+                guidance: 'Use text, frame, and bezier-connector by default for unlinked annotations, grouping, and ordinary relationships. For mind maps and hierarchical structures, prefer branch via tldraw_apply_plan connect kind:"branch". Use editable mind-map only when explicitly requested.',
                 exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'text', x: 100, y: 100, text: 'test', zoom: false },
             },
             createConnectorsBetweenShapes: {
                 action: 'tldraw_create_connector',
                 exampleArgs: { whiteboardId: '<focusedWhiteboardId>', shapeIds: ['shape:<source>', 'shape:<target>'], text: 'label', zoom: false },
+            },
+            connectBranchBetweenShapes: {
+                action: 'tldraw_apply_plan',
+                purpose: 'Simplest branch connection between existing shapes. First shape is root; all remaining shapes are children.',
+                exampleArgs: {
+                    steps: [
+                        { op: 'connect', kind: 'branch', shapeIds: ['$selection[0]', '$selection[1]'] },
+                    ],
+                    save: true,
+                    zoom: true,
+                },
             },
         },
         customShapeGuide: [
@@ -152,7 +163,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'branch',
                 purpose: 'A visual branch layout that attaches a root shape to left/right child shapes. Use it for mind maps, tree/parent-child/hierarchical layouts, and explicitly branch-connected components.',
-                createWith: 'tldraw_apply_plan op "branch" preferred; tldraw_create_shape for low-level compatibility',
+                createWith: 'tldraw_apply_plan op "connect" kind:"branch" for existing shapes; op "branch" only for inline child creation; tldraw_create_shape for low-level compatibility',
                 agentExposedArgs: {
                     kind: 'branch',
                     x: 'root point x; if rootShapeId is set and x/y omitted, root point defaults to root shape center',
@@ -180,7 +191,7 @@ export function getTldrawAgentCapabilities() {
                     'frame-floating draws a floating frame instead of per-child connector lines.',
                 ],
                 operations: [
-                    'Create a branch from existing shapes with tldraw_apply_plan: {op:"branch",root:"$selection[0]",child:"$selection[1]"}.',
+                    'Create a branch from existing shapes with tldraw_apply_plan: {op:"connect",kind:"branch",from:"$selection[0]",to:"$selection[1]"}.',
                     'Create child cards/single-blocks inside the branch in one call.',
                     'Use leftChildren/rightChildren for bilateral maps.',
                     'Use lineStyle/showBackground/color to adjust visual grouping.',
@@ -308,12 +319,12 @@ export function getTldrawAgentCapabilities() {
             'Default basic shapes are text, frame, and bezier-connector.',
             'Use text for short unlinked annotations; avoid note unless the user asks for sticky notes.',
             'Use frame for ordinary grouping and visual boundaries; avoid geo rectangles for grouping unless the user asks for geometric shapes.',
-            'Use bezier-connector through tldraw_create_connector for ordinary relationships; use branch through tldraw_apply_plan for mind maps and hierarchy; avoid arrow/line unless the user asks for arrows, straight lines, or non-binding marks.',
+            'Use bezier-connector through tldraw_create_connector for ordinary relationships; use tldraw_apply_plan connect kind:"branch" for mind maps and hierarchy; avoid arrow/line unless the user asks for arrows, straight lines, or non-binding marks.',
             'Use draw/highlight/slide/mind-map/js-shape only on explicit user request or a clearly matching workflow; editable mind-map is not the default for agent-created mind maps.',
         ],
         layoutRecipes: [
             'For most edits: use tldraw_apply_plan with steps. It can create cards using blockId or contentMarkdown/title, single-blocks, text labels, frames, branch hierarchies, connect relationship lines, update labels, layout selections, focus results, and save in one call.',
-            'For mind maps/tree/parent-child structures: use op "branch"; with two selected shapes use {op:"branch",root:"$selection[0]",child:"$selection[1]"}.',
+            'For mind maps/tree/parent-child structures between existing shapes: use {op:"connect",kind:"branch",from:"$selection[0]",to:"$selection[1]"}. Use op "branch" only when creating child nodes inline or setting leftChildren/rightChildren.',
             'For a document map: create a main card for the document, create single-block leaves or child cards, then create a branch with op "branch" or tldraw_insert_doc_outline_mindmap.',
             'For concept links: get shape details, then create a bezier connector with shapeIds and a short text label.',
             'For visual grouping: use frame by default. For presentation workflows only when requested: create slide frames, place content inside them, then use select/zoom or slide UI focus.',

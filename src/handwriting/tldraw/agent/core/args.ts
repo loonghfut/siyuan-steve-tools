@@ -321,7 +321,7 @@ function parseBasicKind(value: unknown): AgentBasicShapeCreateArgs['kind'] {
 
 function parseConnectorKind(value: unknown): AgentConnectorKind | undefined {
 	const raw = stringArg(value)
-	if (raw === 'arrow' || raw === 'bezier-connector') return raw
+	if (raw === 'arrow' || raw === 'bezier-connector' || raw === 'branch') return raw
 	return undefined
 }
 

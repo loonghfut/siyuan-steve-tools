@@ -336,6 +336,22 @@ export function createAgentBasicShape(runtime: AgentManagerRuntime, options: Age
 }
 
 export function createAgentConnector(runtime: AgentManagerRuntime, options: AgentConnectorCreateArgs) {
+    if (options.kind === 'branch') {
+        if (!options.startShapeId || !options.endShapeId) {
+            throw new Error('branch connector requires startShapeId/endShapeId or shapeIds [root, child]');
+        }
+        return createAgentShape(runtime, {
+            kind: 'branch',
+            rootShapeId: options.startShapeId,
+            children: [{ shapeId: options.endShapeId }],
+            color: options.color,
+            lineWidth: options.strokeWidth,
+            select: options.select,
+            zoom: options.zoom,
+            resultMode: options.resultMode,
+        });
+    }
+
     const editor = requireEditor(runtime);
     const connectorKind = options.kind || 'bezier-connector';
     const id = createShapeId();

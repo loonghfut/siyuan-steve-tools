@@ -1574,7 +1574,7 @@ export class TldrawManager {
         return agentOps.createAgentBasicShape(this.getAgentRuntime(), options);
     }
 
-    public createAgentConnector(options: AgentConnectorCreateArgs) {
+    public async createAgentConnector(options: AgentConnectorCreateArgs) {
         return agentOps.createAgentConnector(this.getAgentRuntime(), options);
     }
 

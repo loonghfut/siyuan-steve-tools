@@ -40,7 +40,7 @@ export type AgentPlanAdapter = {
     getSummary: () => { selectedShapeIds?: string[]; [key: string]: unknown };
     createShape: (options: AgentCreateShapeArgs) => Promise<{ createdShapeIds?: string[]; [key: string]: unknown }>;
     createBasicShape: (options: AgentBasicShapeCreateArgs) => { createdShapeIds?: string[]; [key: string]: unknown };
-    createConnector: (options: AgentConnectorCreateArgs) => { createdShapeIds?: string[]; [key: string]: unknown };
+    createConnector: (options: AgentConnectorCreateArgs) => Promise<{ createdShapeIds?: string[]; [key: string]: unknown }> | { createdShapeIds?: string[]; [key: string]: unknown };
     updateShapesBatch: (options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) => unknown;
     getShapeDetails: (options: { shapeIds?: string[]; limit?: number; includeBindings?: boolean; includeLinkedBlockContent?: boolean }) => Promise<{ shapes: AgentShapeSummary[] }> | { shapes: AgentShapeSummary[] };
     selectShape: (shapeId: string, zoom?: boolean) => unknown;
@@ -161,7 +161,10 @@ function normalizePlanStep(step: Record<string, unknown>, op: string, state: Age
         return normalizeCreateStep(step);
     }
     if (op === 'branch') return normalizeBranchStep(step, state);
-    if (op === 'connect') return normalizeConnectStep(step, state);
+    if (op === 'connect') {
+        if (stringArg(step.kind) === 'branch') return normalizeConnectBranchStep(step, state);
+        return normalizeConnectStep(step, state);
+    }
     if (op === 'update') return normalizeUpdateStep(step, state);
     if (op === 'layout') return normalizeLayoutStep(step, state);
     if (op === 'focus') return normalizeFocusStep(step, state);
@@ -379,6 +382,32 @@ function countBranchChildCreations(children: AgentBranchChildRef[]) {
     return children.filter((child) => typeof child === 'object' && child && !child.shapeId).length;
 }
 
+function normalizeConnectBranchStep(step: Record<string, unknown>, state: AgentPlanState): NormalizedPlanStep {
+    assertKnownPlanKeys(step, [
+        'op', 'as', 'from', 'to', 'startShapeId', 'endShapeId', 'shapeIds', 'kind',
+        'text', 'color', 'strokeWidth', 'lineWidth', 'select', 'zoom', 'direction',
+        'horizontalGap', 'verticalGap', 'lineStyle', 'snapDistance', 'showBackground',
+    ], 'connect branch step');
+
+    return normalizeBranchStep({
+        op: 'branch',
+        as: step.as,
+        kind: 'branch',
+        root: step.from ?? step.startShapeId ?? firstArrayItem(step.shapeIds),
+        child: step.to ?? step.endShapeId ?? arrayTail(step.shapeIds),
+        direction: step.direction,
+        horizontalGap: step.horizontalGap,
+        verticalGap: step.verticalGap,
+        lineStyle: step.lineStyle,
+        lineWidth: step.lineWidth ?? step.strokeWidth,
+        snapDistance: step.snapDistance,
+        showBackground: step.showBackground,
+        color: step.color,
+        select: step.select,
+        zoom: step.zoom,
+    }, state);
+}
+
 function normalizeConnectStep(step: Record<string, unknown>, state: AgentPlanState): NormalizedPlanStep {
     assertKnownPlanKeys(step, [
         'op', 'as', 'from', 'to', 'startShapeId', 'endShapeId', 'shapeIds', 'kind',
@@ -510,7 +539,7 @@ async function executeNormalizedStep(
         args.select = stepSelect(step, options, false);
         args.zoom = stepZoom(step, options, false);
         args.resultMode = options.resultMode;
-        const result = adapter.createConnector(args as AgentConnectorCreateArgs);
+        const result = await adapter.createConnector(args as AgentConnectorCreateArgs);
         const createdShapeIds = normalizeShapeIds(result.createdShapeIds);
         recordCreated(step.as, createdShapeIds, state);
         return result;
@@ -743,6 +772,14 @@ function firstResolvedShapeId(value: unknown, state: AgentPlanState, label: stri
 
 function secondArrayItem(value: unknown) {
     return Array.isArray(value) ? value[1] : undefined;
+}
+
+function firstArrayItem(value: unknown) {
+    return Array.isArray(value) ? value[0] : value;
+}
+
+function arrayTail(value: unknown) {
+    return Array.isArray(value) ? value.slice(1) : undefined;
 }
 
 function arrayItem(items: string[], index: number, label: string): string {

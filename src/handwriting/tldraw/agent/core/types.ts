@@ -5,7 +5,7 @@ export type AgentCreateKind = 'card' | 'single-block' | 'branch'
 export type AgentBranchSide = 'left' | 'right'
 export type AgentNodeKind = AgentCreateKind
 export type AgentBasicShapeKind = 'text' | 'note' | 'geo' | 'arrow' | 'line' | 'draw' | 'highlight' | 'frame' | 'bezier-connector' | 'slide' | 'mind-map' | 'js-shape'
-export type AgentConnectorKind = 'arrow' | 'bezier-connector'
+export type AgentConnectorKind = 'arrow' | 'bezier-connector' | 'branch'
 export type AgentResultMode = 'compact' | 'full'
 
 export type AgentSafetyOptions = {
