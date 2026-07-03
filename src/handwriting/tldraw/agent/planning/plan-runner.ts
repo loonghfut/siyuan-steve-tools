@@ -385,27 +385,32 @@ function countBranchChildCreations(children: AgentBranchChildRef[]) {
 function normalizeConnectBranchStep(step: Record<string, unknown>, state: AgentPlanState): NormalizedPlanStep {
     assertKnownPlanKeys(step, [
         'op', 'as', 'from', 'to', 'startShapeId', 'endShapeId', 'shapeIds', 'kind',
-        'text', 'color', 'strokeWidth', 'lineWidth', 'select', 'zoom', 'direction',
+        'text', 'color', 'strokeWidth', 'lineWidth', 'select', 'zoom', 'side', 'direction',
         'horizontalGap', 'verticalGap', 'lineStyle', 'snapDistance', 'showBackground',
     ], 'connect branch step');
 
-    return normalizeBranchStep({
-        op: 'branch',
-        as: step.as,
-        kind: 'branch',
-        root: step.from ?? step.startShapeId ?? firstArrayItem(step.shapeIds),
-        child: step.to ?? step.endShapeId ?? arrayTail(step.shapeIds),
-        direction: step.direction,
-        horizontalGap: step.horizontalGap,
-        verticalGap: step.verticalGap,
-        lineStyle: step.lineStyle,
-        lineWidth: step.lineWidth ?? step.strokeWidth,
-        snapDistance: step.snapDistance,
-        showBackground: step.showBackground,
-        color: step.color,
-        select: step.select,
-        zoom: step.zoom,
-    }, state);
+    const from = firstResolvedShapeId(step.from ?? step.startShapeId ?? firstArrayItem(step.shapeIds), state, 'connect branch.from');
+    const to = firstResolvedShapeId(step.to ?? step.endShapeId ?? secondArrayItem(step.shapeIds), state, 'connect branch.to');
+    return {
+        op: 'connect',
+        as: optionalAlias(step.as),
+        from,
+        to,
+        args: {
+            kind: 'branch',
+            startShapeId: from,
+            endShapeId: to,
+            text: stringArg(step.text),
+            color: colorArg(step.color),
+            strokeWidth: numberArg(step.strokeWidth ?? step.lineWidth),
+            side: branchSideArg(step.side ?? step.direction),
+            horizontalGap: numberArg(step.horizontalGap),
+            verticalGap: numberArg(step.verticalGap),
+            select: booleanArg(step.select),
+            zoom: booleanArg(step.zoom),
+        },
+        writeCount: 1,
+    };
 }
 
 function normalizeConnectStep(step: Record<string, unknown>, state: AgentPlanState): NormalizedPlanStep {
@@ -540,7 +545,7 @@ async function executeNormalizedStep(
         args.zoom = stepZoom(step, options, false);
         args.resultMode = options.resultMode;
         const result = await adapter.createConnector(args as AgentConnectorCreateArgs);
-        const createdShapeIds = normalizeShapeIds(result.createdShapeIds);
+        const createdShapeIds = normalizeConnectorResultShapeIds(result);
         recordCreated(step.as, createdShapeIds, state);
         return result;
     }
@@ -801,6 +806,14 @@ function normalizeShapeIds(value: unknown): string[] {
 function normalizeBranchCreatedShapeIds(result: { branchId?: unknown; createdShapeIds?: unknown }): string[] {
     const branchId = typeof result.branchId === 'string' && result.branchId ? result.branchId : undefined;
     return branchId ? [branchId] : normalizeShapeIds(result.createdShapeIds);
+}
+
+function normalizeConnectorResultShapeIds(result: { branchId?: unknown; updatedShapeIds?: unknown; createdShapeIds?: unknown }): string[] {
+    const branchId = typeof result.branchId === 'string' && result.branchId ? result.branchId : undefined;
+    if (branchId) return [branchId];
+    const createdShapeIds = normalizeShapeIds(result.createdShapeIds);
+    if (createdShapeIds.length) return createdShapeIds;
+    return normalizeShapeIds(result.updatedShapeIds);
 }
 
 function firstCreatedShapeId(result: { createdShapeIds?: unknown }, label: string): string {

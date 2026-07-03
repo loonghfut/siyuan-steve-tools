@@ -153,7 +153,7 @@ function ensureBranchChild(
 		if (!isBranchConnectableShape(shape)) {
 			throw new Error(`Branch child shape must be card, single-block, or branch: ${ref}`)
 		}
-		return ref
+		return resolveExistingBranchChildId(editor, shape)
 	}
 
 	if (ref.shapeId) {
@@ -164,7 +164,7 @@ function ensureBranchChild(
 		if (!isBranchConnectableShape(shape)) {
 			throw new Error(`Branch child shape must be card, single-block, or branch: ${ref.shapeId}`)
 		}
-		return ref.shapeId
+		return resolveExistingBranchChildId(editor, shape)
 	}
 
 	const kind = ref.kind || 'single-block'
@@ -200,6 +200,14 @@ function ensureBranchChild(
 	})
 	recordAgentCreatedNode(context, id, 'single-block', ref.blockId)
 	return String(id)
+}
+
+function resolveExistingBranchChildId(editor: Editor, shape: TLShape): string {
+	const rootBranch =
+		shape.type === 'card' || shape.type === 'single-block'
+			? getBranchRootParent(editor, shape.id)
+			: null
+	return String(rootBranch?.id || shape.id)
 }
 
 function getBranchRootPoint(editor: Editor, options: AgentBranchCreateArgs): { x: number; y: number } {

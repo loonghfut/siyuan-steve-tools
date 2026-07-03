@@ -2288,11 +2288,12 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
     }
 
     const childId = childShape.id as string;
+    const promotedRootChildId = childShape.id !== rawChildShape.id ? String(rawChildShape.id) : undefined;
     const side = inferAgentBranchSide(editor, existingBranch, childShape, options.side);
     const currentLeftIds = existingBranch.props.leftChildIds || [];
     const currentRightIds = existingBranch.props.rightChildIds || existingBranch.props.childIds || [];
-    const nextLeftIds = currentLeftIds.filter((id) => id !== childId);
-    const nextRightIds = currentRightIds.filter((id) => id !== childId);
+    const nextLeftIds = currentLeftIds.filter((id) => id !== childId && id !== promotedRootChildId);
+    const nextRightIds = currentRightIds.filter((id) => id !== childId && id !== promotedRootChildId);
     if (side === 'left') nextLeftIds.push(childId);
     else nextRightIds.push(childId);
 
@@ -2315,6 +2316,9 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
     }
 
     const detachedBranchIds = detachAgentBranchChildFromOtherBranches(editor, childId, existingBranch.id);
+    if (promotedRootChildId) {
+        detachedBranchIds.push(...detachAgentBranchChildFromOtherBranches(editor, promotedRootChildId, existingBranch.id));
+    }
     const latestBranch = editor.getShape<IBranchShape>(existingBranch.id);
     if (latestBranch?.type === 'branch') {
         layoutBranchChildren(editor, latestBranch);
