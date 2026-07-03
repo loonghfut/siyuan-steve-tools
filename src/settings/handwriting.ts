@@ -58,7 +58,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
         h6StyleGroup(ctx),
         {
             name: "高级设置", items: [
-                { type: "checkbox", title: "启用思源智能体操作白板", description: "启用后，思源 Agent 可以通过 frontend action 打开、读取并修改 tldraw 白板", key: "tldraw-agent-actions-enable", value: ctx.settings["tldraw-agent-actions-enable"] },
+                { type: "checkbox", title: "启用思源智能体操作白板（测试中）", description: "启用后，思源 Agent 可以通过 frontend action 打开、读取并修改 tldraw 白板", key: "tldraw-agent-actions-enable", value: ctx.settings["tldraw-agent-actions-enable"] },
                 { type: "select", title: "画板数据块备用创建位置", description: "选择日记本", key: "tl-draw-create-note-id", value: ctx.settings["tl-draw-create-note-id"], options: (() => { const nb = (window as any).siyuan?.notebooks; if (!Array.isArray(nb) || !nb.length) return { "": "无可用日记本" }; return Object.fromEntries(nb.map((n: any) => [n.id, n.name])); })() },
                 { type: "checkbox", title: "同步删除(不建议启用)", description: "删除画板块时同步删除笔记块", key: "SyncDelete", value: ctx.settings["SyncDelete"] },
                 { type: "checkbox", title: "全局禁止 JS 块执行脚本", description: "启用后所有 JS 形状将不执行脚本代码（安全模式）", key: "js-shape-disable-execution", value: ctx.settings["js-shape-disable-execution"] },
