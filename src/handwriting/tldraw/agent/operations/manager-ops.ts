@@ -2540,6 +2540,7 @@ export async function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
     shapeIds: string[];
     confirm?: boolean;
     allowLinkedBlockShapes?: boolean;
+    confirmLinkedBlockShapes?: boolean;
     resultMode?: AgentResultMode;
 }) {
     const editor = requireEditor(runtime);
@@ -2553,8 +2554,8 @@ export async function deleteAgentShapes(runtime: AgentManagerRuntime, options: {
             blocked.push({ shapeId, reason: 'shape not found' });
             continue;
         }
-        if (!options.allowLinkedBlockShapes && isLinkedBlockShape(shape)) {
-            blocked.push({ shapeId, reason: 'linked SiYuan block shape requires allowLinkedBlockShapes=true' });
+        if (isLinkedBlockShape(shape) && !(options.allowLinkedBlockShapes === true && options.confirmLinkedBlockShapes === true)) {
+            blocked.push({ shapeId, reason: 'linked SiYuan block shape requires explicit user intent: pass allowLinkedBlockShapes=true and confirmLinkedBlockShapes=true' });
             continue;
         }
         deletable.push(shape.id);

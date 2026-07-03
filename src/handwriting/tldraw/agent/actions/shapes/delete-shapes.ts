@@ -4,12 +4,12 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createDeleteShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_delete_shapes',
-        description: 'Delete up to 50 shapes from an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: confirm boolean (omit for a dry-run preview, set true to execute the deletion autonomously), allowLinkedBlockShapes boolean, resultMode "compact"|"full" default compact. A whiteboard backup is always created before confirmed deletion. Linked SiYuan block shapes are blocked unless allowLinkedBlockShapes true.',
+        description: 'Delete up to 50 shapes from an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: confirm boolean (omit for a dry-run preview, set true to execute ordinary shape deletion autonomously), allowLinkedBlockShapes boolean, confirmLinkedBlockShapes boolean, resultMode "compact"|"full" default compact. A whiteboard backup is always created before confirmed deletion. Linked SiYuan block shapes are blocked unless the user explicitly asked to delete linked block shapes and both allowLinkedBlockShapes and confirmLinkedBlockShapes are true.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'confirm', 'allowLinkedBlockShapes', 'resultMode'], 'tldraw_delete_shapes');
+                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'shapeId', 'shapeIds', 'confirm', 'allowLinkedBlockShapes', 'confirmLinkedBlockShapes', 'resultMode'], 'tldraw_delete_shapes');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -22,6 +22,7 @@ export function createDeleteShapesAction(): AgentActionDefinition {
                     shapeIds,
                     confirm: booleanArgWithFallback(args.confirm, false),
                     allowLinkedBlockShapes: booleanArgWithFallback(args.allowLinkedBlockShapes, false),
+                    confirmLinkedBlockShapes: booleanArgWithFallback(args.confirmLinkedBlockShapes, false),
                     resultMode: resultModeArg(args.resultMode),
                 });
                 return jsonResult(deleted);

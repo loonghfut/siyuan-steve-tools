@@ -19,7 +19,7 @@ export function getTldrawAgentCapabilities() {
             'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences.',
             'The old board-edit DSL tool is intentionally not registered. Do not construct operations arrays.',
             'The open whiteboard autosaves every edit, so do not pass save:true on each operation and do not call tldraw_save_whiteboard after every change. Omit save and let autosave persist the edit. Call tldraw_save_whiteboard only when the user explicitly asks to flush immediately (for example, right before closing).',
-            'You may execute shape deletion autonomously: call tldraw_delete_shapes with confirm:true and go straight to execution — no separate dry-run or user-confirmation round-trip is required. A whiteboard backup is always created before any confirmed deletion, so the backup-before-delete rule is satisfied automatically; never try to bypass it. Omit confirm only when you want a dry-run preview of what would be deleted.',
+            'You may execute ordinary shape deletion autonomously: call tldraw_delete_shapes with confirm:true and go straight to execution. A whiteboard backup is always created before any confirmed deletion, so the backup-before-delete rule is satisfied automatically; never try to bypass it. Linked SiYuan block shapes are different: do not delete them unless the user explicitly asked to delete linked block shapes; only then pass allowLinkedBlockShapes:true and confirmLinkedBlockShapes:true. Omit confirm only when you want a dry-run preview of what would be deleted.',
         ],
         preferred: [
             'tldraw_shape_command',
@@ -185,7 +185,7 @@ export function getTldrawAgentCapabilities() {
             'Most write actions require the whiteboard to be open so the user can observe changes.',
             'tldraw_shape_command only changes whitelisted semantic fields and never performs raw props mutation, JS script writes, or arbitrary data writes.',
             'Default results do not include raw snapshots, full props, or shape samples.',
-            'Shape deletion uses tldraw_delete_shapes (not tldraw_shape_command). The agent may execute it autonomously with confirm:true; a backup is always created before confirmed deletion, and linked SiYuan block shapes are blocked unless allowLinkedBlockShapes:true.',
+            'Shape deletion uses tldraw_delete_shapes (not tldraw_shape_command). The agent may execute ordinary shape deletion autonomously with confirm:true; a backup is always created before confirmed deletion. Linked SiYuan block shapes require explicit user intent and are blocked unless allowLinkedBlockShapes:true and confirmLinkedBlockShapes:true are both passed.',
             'JS shape script execution, arbitrary raw store mutation, backup restore/import, and direct SiYuan block content edits remain blocked.',
         ],
         intentionallyBlocked: [

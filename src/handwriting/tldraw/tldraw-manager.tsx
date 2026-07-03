@@ -1590,7 +1590,7 @@ export class TldrawManager {
         return agentOps.updateAgentShapesBatch(this.getAgentRuntime(), options);
     }
 
-    public async deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean; resultMode?: AgentResultMode }) {
+    public async deleteAgentShapes(options: { shapeIds: string[]; confirm?: boolean; allowLinkedBlockShapes?: boolean; confirmLinkedBlockShapes?: boolean; resultMode?: AgentResultMode }) {
         return agentOps.deleteAgentShapes(this.getAgentRuntime(), options);
     }
 
