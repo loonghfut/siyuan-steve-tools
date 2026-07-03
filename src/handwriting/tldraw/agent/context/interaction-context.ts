@@ -11,9 +11,9 @@ export type AgentInteractionContextOptions = {
     selectedShapeLimit?: number
 }
 
-export function getAgentInteractionContext(options: AgentInteractionContextOptions = {}) {
+export async function getAgentInteractionContext(options: AgentInteractionContextOptions = {}) {
     const focusedWhiteboardId = getFocusedInstanceId()
-    const openWhiteboards = getAllInstanceIds().map((id) => {
+    const openWhiteboards = await Promise.all(getAllInstanceIds().map(async (id) => {
         const instance = getInstance(id)
         const summary = instance?.getAgentSummary()
         const selectedShapeIds = (summary?.selectedShapeIds || []) as string[]
@@ -23,11 +23,11 @@ export function getAgentInteractionContext(options: AgentInteractionContextOptio
             selectedShapeLimit === 0 ||
             selectedShapeIds.length === 0
             ? undefined
-            : instance.getAgentShapeDetails({
+            : (await instance.getAgentShapeDetails({
                 shapeIds: selectedShapeIds.slice(0, selectedShapeLimit),
                 limit: selectedShapeLimit,
                 includeBindings: false,
-            }).shapes
+            })).shapes
 
         return {
             id,
@@ -42,7 +42,7 @@ export function getAgentInteractionContext(options: AgentInteractionContextOptio
             shapeCount: summary?.shapeCount ?? 0,
             shapeTypeCounts: summary?.shapeTypeCounts || {},
         }
-    })
+    }))
 
     const focusedWhiteboard = openWhiteboards.find((item) => item.id === focusedWhiteboardId) || null
 

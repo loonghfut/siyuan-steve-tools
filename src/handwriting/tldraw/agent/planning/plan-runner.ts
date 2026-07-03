@@ -42,7 +42,7 @@ export type AgentPlanAdapter = {
     createBasicShape: (options: AgentBasicShapeCreateArgs) => { createdShapeIds?: string[]; [key: string]: unknown };
     createConnector: (options: AgentConnectorCreateArgs) => { createdShapeIds?: string[]; [key: string]: unknown };
     updateShapesBatch: (options: { patches: AgentShapeUpdatePatch[]; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) => unknown;
-    getShapeDetails: (options: { shapeIds?: string[]; limit?: number; includeBindings?: boolean }) => { shapes: AgentShapeSummary[] };
+    getShapeDetails: (options: { shapeIds?: string[]; limit?: number; includeBindings?: boolean; includeLinkedBlockContent?: boolean }) => Promise<{ shapes: AgentShapeSummary[] }> | { shapes: AgentShapeSummary[] };
     selectShape: (shapeId: string, zoom?: boolean) => unknown;
     zoomToShapes: (options: { shapeIds: string[] }) => unknown;
     save: () => Promise<unknown>;
@@ -530,7 +530,12 @@ async function executeNormalizedStep(
 
     if (step.op === 'layout') {
         const shapeIds = step.target as string[];
-        const details = adapter.getShapeDetails({ shapeIds, limit: shapeIds.length, includeBindings: false });
+        const details = await adapter.getShapeDetails({
+            shapeIds,
+            limit: shapeIds.length,
+            includeBindings: false,
+            includeLinkedBlockContent: false,
+        });
         const patches = buildLayoutPatches(shapeIds, details.shapes, step);
         const result = adapter.updateShapesBatch({
             patches,

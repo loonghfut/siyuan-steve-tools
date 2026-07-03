@@ -1566,7 +1566,7 @@ export class TldrawManager {
         return agentOps.updateAgentShape(this.getAgentRuntime(), options);
     }
 
-    public getAgentShapeDetails(options: { shapeIds?: string[]; type?: string; limit?: number; includeBindings?: boolean }) {
+    public getAgentShapeDetails(options: { shapeIds?: string[]; type?: string; limit?: number; includeBindings?: boolean; includeLinkedBlockContent?: boolean }) {
         return agentOps.getAgentShapeDetails(this.getAgentRuntime(), options);
     }
 

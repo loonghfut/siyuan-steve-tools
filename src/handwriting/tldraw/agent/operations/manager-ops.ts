@@ -36,6 +36,7 @@ import type {
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
     AgentCreateShapeResult,
+    AgentLinkedBlockContent,
     AgentResultMode,
     AgentShapeSummary,
     AgentSingleBlockCreateArgs,
@@ -77,6 +78,8 @@ const AGENT_ENTITY_CREATE_SHAPES = new Set([
 ]);
 const AGENT_CREATE_GAP = 160;
 const AGENT_DEFAULT_CREATE_ORIGIN = { x: 0, y: 0 };
+const AGENT_BLOCK_CONTENT_MAX_CHARS = 4000;
+const SIYUAN_BLOCK_ID_RE = /^\d{14}-[0-9a-z]{7}$/i;
 
 export type AgentManagerRuntime = {
     id: string;
@@ -267,12 +270,13 @@ export function updateAgentShape(runtime: AgentManagerRuntime, options: {
     return { shapeId: String(shape.id), summary: getAgentResultSummary(runtime, options.resultMode) };
 }
 
-export function getAgentShapeDetails(runtime: AgentManagerRuntime, options: {
+export async function getAgentShapeDetails(runtime: AgentManagerRuntime, options: {
     shapeIds?: string[];
     type?: string;
     limit?: number;
     includeBindings?: boolean;
-}): { shapes: AgentShapeSummary[]; totalMatched: number; truncated: boolean } {
+    includeLinkedBlockContent?: boolean;
+}): Promise<{ shapes: AgentShapeSummary[]; totalMatched: number; truncated: boolean }> {
     const editor = requireEditor(runtime);
     const ids = new Set((options.shapeIds || []).filter(Boolean));
     const limit = finiteNumberInRange(options.limit, 40, 1, 200);
@@ -281,9 +285,18 @@ export function getAgentShapeDetails(runtime: AgentManagerRuntime, options: {
         if (options.type && shape.type !== options.type) return false;
         return true;
     });
+    const returnedShapes = shapes.slice(0, limit);
+    const blockContentById = options.includeLinkedBlockContent === false
+        ? new Map<string, AgentLinkedBlockContent>()
+        : await loadAgentLinkedBlockContent(returnedShapes);
 
     return {
-        shapes: shapes.slice(0, limit).map((shape) => summarizeAgentShape(editor, shape, options.includeBindings === true)),
+        shapes: returnedShapes.map((shape) => summarizeAgentShape(
+            editor,
+            shape,
+            options.includeBindings === true,
+            getShapeLinkedBlockContent(shape, blockContentById),
+        )),
         totalMatched: shapes.length,
         truncated: shapes.length > limit,
     };
@@ -1089,7 +1102,7 @@ async function validateAgentLinkedBlockId(blockId: string | undefined, kind: 'ca
     }
 }
 
-function summarizeShapeProps(props: any, editor?: Editor): Record<string, unknown> {
+function summarizeShapeProps(props: any, editor?: Editor, blockContent?: AgentLinkedBlockContent): Record<string, unknown> {
     if (!props || typeof props !== 'object') return {};
     const out: Record<string, unknown> = {};
     for (const key of ['w', 'h', 'color', 'geo', 'name', 'text', 'isMain', 'isCollapsed', 'showMask']) {
@@ -1112,6 +1125,7 @@ function summarizeShapeProps(props: any, editor?: Editor): Record<string, unknow
             out.richTextPlain = clampAgentText(fallbackPlain, 500);
         }
     }
+    if (blockContent) out.blockContent = blockContent;
     return out;
 }
 
@@ -1184,7 +1198,12 @@ function buildAgentTextPropsPatch(shape: TLShape, options: { text?: string; name
     return props;
 }
 
-function summarizeAgentShape(editor: Editor, shape: TLShape, includeBindings = false): AgentShapeSummary {
+function summarizeAgentShape(
+    editor: Editor,
+    shape: TLShape,
+    includeBindings = false,
+    blockContent?: AgentLinkedBlockContent,
+): AgentShapeSummary {
     const summary: AgentShapeSummary = {
         id: String(shape.id),
         type: String(shape.type),
@@ -1194,7 +1213,7 @@ function summarizeAgentShape(editor: Editor, shape: TLShape, includeBindings = f
         rotation: Number((shape as any).rotation || 0),
         parentId: String((shape as any).parentId || ''),
         index: String((shape as any).index || ''),
-        props: summarizeShapeProps((shape as any).props, editor),
+        props: summarizeShapeProps((shape as any).props, editor, blockContent),
     };
     if (includeBindings) {
         summary.bindings = [
@@ -1203,6 +1222,84 @@ function summarizeAgentShape(editor: Editor, shape: TLShape, includeBindings = f
         ].map(summarizeAgentBinding);
     }
     return summary;
+}
+
+async function loadAgentLinkedBlockContent(shapes: TLShape[]): Promise<Map<string, AgentLinkedBlockContent>> {
+    const blockIds = Array.from(new Set(shapes
+        .filter(shouldAttachLinkedBlockContent)
+        .map((shape) => String((shape as any).props?.blockId || '').trim())
+        .filter(Boolean)));
+    if (!blockIds.length) return new Map();
+
+    const entries = await Promise.all(blockIds.map(async (blockId) => {
+        const content = await loadAgentLinkedBlockContentById(blockId);
+        return [blockId, content] as const;
+    }));
+    return new Map(entries);
+}
+
+function shouldAttachLinkedBlockContent(shape: TLShape): boolean {
+    if (shape.type !== 'card' && shape.type !== 'single-block') return false;
+    return Boolean((shape as any).props?.blockId);
+}
+
+function getShapeLinkedBlockContent(shape: TLShape, blockContentById: Map<string, AgentLinkedBlockContent>): AgentLinkedBlockContent | undefined {
+    if (!shouldAttachLinkedBlockContent(shape)) return undefined;
+    const blockId = String((shape as any).props?.blockId || '').trim();
+    return blockContentById.get(blockId);
+}
+
+async function loadAgentLinkedBlockContentById(blockId: string): Promise<AgentLinkedBlockContent> {
+    if (!SIYUAN_BLOCK_ID_RE.test(blockId)) {
+        return { id: blockId, missing: true, error: 'invalid SiYuan block id' };
+    }
+
+    try {
+        const [block, kramdown] = await Promise.all([
+            api.getBlockByID(blockId).catch(() => null),
+            api.getBlockKramdown(blockId).catch(() => null),
+        ]);
+        if (!block && !kramdown) return { id: blockId, missing: true };
+
+        const markdownClamp = clampAgentBlockContent(
+            String((kramdown as any)?.kramdown || (block as any)?.markdown || '')
+        );
+        const contentClamp = clampAgentBlockContent(
+            String((block as any)?.fcontent || (block as any)?.content || '')
+        );
+        const title = clampAgentText(
+            String((block as any)?.fcontent || (block as any)?.content || (block as any)?.hpath || blockId).replace(/\s+/g, ' ').trim(),
+            160,
+        );
+
+        return {
+            id: blockId,
+            type: (block as any)?.type ? String((block as any).type) : undefined,
+            subType: (block as any)?.subtype ? String((block as any).subtype) : undefined,
+            title,
+            content: contentClamp.text,
+            markdown: markdownClamp.text,
+            hpath: (block as any)?.hpath ? clampAgentText(String((block as any).hpath), 240) : undefined,
+            truncated: contentClamp.truncated || markdownClamp.truncated || undefined,
+        };
+    } catch (error) {
+        return { id: blockId, missing: true, error: stringifyAgentError(error) };
+    }
+}
+
+function clampAgentBlockContent(value: string): { text: string; truncated: boolean } {
+    const normalized = String(value || '').trim();
+    if (normalized.length <= AGENT_BLOCK_CONTENT_MAX_CHARS) {
+        return { text: normalized, truncated: false };
+    }
+    return {
+        text: `${normalized.slice(0, AGENT_BLOCK_CONTENT_MAX_CHARS)}...`,
+        truncated: true,
+    };
+}
+
+function stringifyAgentError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
 }
 
 function summarizeAgentBinding(binding: any) {

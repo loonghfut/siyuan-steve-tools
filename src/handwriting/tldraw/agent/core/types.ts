@@ -124,6 +124,19 @@ export type AgentShapeSummary = {
 	bindings?: unknown[]
 }
 
+export type AgentLinkedBlockContent = {
+	id: string
+	type?: string
+	subType?: string
+	title?: string
+	content?: string
+	markdown?: string
+	hpath?: string
+	truncated?: boolean
+	missing?: boolean
+	error?: string
+}
+
 export type AgentBasicShapeCreateArgs = AgentSelectionOptions & {
 	kind: AgentBasicShapeKind
 	x?: number
