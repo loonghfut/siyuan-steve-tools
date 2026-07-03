@@ -1,7 +1,7 @@
 import type { Plugin } from 'siyuan';
 import { settingdata } from '@/index';
 import { getInstance } from '../../tldraw-instance-manager';
-import { stringArg } from '../args';
+import { stringArg } from '../core/args';
 
 export type AgentActionResult = Promise<{ result?: string; error?: string }>;
 

@@ -45,10 +45,10 @@ import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
 import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
-import * as agentOps from './agent/manager-ops';
-import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentShapeUpdatePatch } from './agent/types';
-import type { AgentDocOutlineBoardOptions } from './agent/doc-to-board';
-import type { AgentPlanApplyOptions } from './agent/plan-runner';
+import * as agentOps from './agent/operations/manager-ops';
+import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentShapeUpdatePatch } from './agent/core/types';
+import type { AgentDocOutlineBoardOptions } from './agent/documents/doc-to-board';
+import type { AgentPlanApplyOptions } from './agent/planning/plan-runner';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -1858,4 +1858,3 @@ function isDarkTheme(): boolean {
 //     }
 // }
 // window.tldraw=waytotldraw;
-
