@@ -9,7 +9,7 @@ import { normalizeAgentColor } from '../core/schema';
 
 const MAX_PLAN_WRITES = 50;
 
-const CREATE_KINDS = new Set(['card', 'single-block', 'note', 'text', 'geo', 'slide', 'mind-map']);
+const CREATE_KINDS = new Set(['card', 'single-block', 'text', 'frame', 'note', 'geo', 'slide', 'mind-map']);
 const BUSINESS_CREATE_KINDS = new Set(['card', 'single-block']);
 const PLAN_OPS = new Set(['create', 'connect', 'update', 'layout', 'focus', 'save']);
 const LAYOUT_STYLES = new Set(['row', 'column', 'grid', 'branch', 'mindmap-like']);
@@ -138,7 +138,7 @@ function normalizeCreateStep(step: Record<string, unknown>): NormalizedPlanStep 
 
     const kind = stringArg(step.kind);
     if (!kind || !CREATE_KINDS.has(kind)) {
-        throw new Error('create.kind must be card, single-block, note, text, geo, slide, or mind-map');
+        throw new Error('create.kind must be card, single-block, text, frame, note, geo, slide, or mind-map');
     }
 
     const as = optionalAlias(step.as);

@@ -5,7 +5,8 @@ export function getTldrawAgentCapabilities() {
         agentPrompt: [
             'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Prefer tldraw_apply_plan for most whiteboard edits; it automatically uses the focused whiteboard when whiteboardId is omitted and supports $selection/$created/$last references.',
             'Use low-level tldraw actions only when tldraw_apply_plan cannot express the requested edit or you need precise one-off control.',
-            'Prefer semantic STtools shapes over generic drawings: card for a document/heading block, single-block for one paragraph block, branch for mind-map-like relationships between cards/blocks, bezier-connector for labeled relationships, slide for presentation areas, mind-map for editable topic trees or markdown-derived outlines, js-shape only as a safe placeholder.',
+            'Default shape preference: use card, single-block, text, bezier-connector, and frame first. Unless the user explicitly asks for another shape type or the task clearly requires it, avoid note, geo, arrow, line, draw, highlight, branch, slide, mind-map, and js-shape.',
+            'Prefer semantic STtools shapes over generic drawings: card for a document/heading block or substantial content, single-block for one paragraph block or compact atomic item, text for unlinked labels/annotations, bezier-connector for labeled relationships, and frame for grouping or visual boundaries.',
             'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
         ],
         preferred: [
@@ -63,12 +64,18 @@ export function getTldrawAgentCapabilities() {
             createBusinessShapes: {
                 action: 'tldraw_create_shape',
                 kinds: ['card', 'single-block', 'branch'],
+                defaultKinds: ['card', 'single-block'],
+                nonDefaultKinds: ['branch'],
+                guidance: 'Use card and single-block by default; use branch only when the user asks for a branch/mind-map-like layout or the structure clearly requires a branch object.',
                 exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'card', x: 100, y: 100, zoom: false },
             },
             createBasicShapes: {
                 action: 'tldraw_create_basic_shape',
-                kinds: ['note', 'text', 'geo', 'arrow', 'line', 'draw', 'highlight', 'frame', 'bezier-connector', 'slide', 'mind-map', 'js-shape'],
-                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'note', x: 100, y: 100, text: 'test', zoom: false },
+                kinds: ['text', 'note', 'geo', 'arrow', 'line', 'draw', 'highlight', 'frame', 'bezier-connector', 'slide', 'mind-map', 'js-shape'],
+                defaultKinds: ['text', 'frame', 'bezier-connector'],
+                nonDefaultKinds: ['note', 'geo', 'arrow', 'line', 'draw', 'highlight', 'slide', 'mind-map', 'js-shape'],
+                guidance: 'Use text, frame, and bezier-connector by default for unlinked annotations, grouping, and relationships; use the other basic kinds only when the user explicitly requests them or the requested visual cannot be represented well with the defaults.',
+                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'text', x: 100, y: 100, text: 'test', zoom: false },
             },
             createConnectorsBetweenShapes: {
                 action: 'tldraw_create_connector',
@@ -136,7 +143,7 @@ export function getTldrawAgentCapabilities() {
             },
             {
                 type: 'branch',
-                purpose: 'A visual branch layout that attaches a root shape to left/right child shapes. Use it for structured decomposition, outlines, relation trees, and maps made of existing cards/single-blocks.',
+                purpose: 'A visual branch layout that attaches a root shape to left/right child shapes. This is not a default shape; use it when the user explicitly asks for a branch/mind-map-like layout or when card/single-block/text plus connectors would be inadequate.',
                 createWith: 'tldraw_create_shape',
                 agentExposedArgs: {
                     kind: 'branch',
@@ -203,7 +210,7 @@ export function getTldrawAgentCapabilities() {
             },
             {
                 type: 'mind-map',
-                purpose: 'An editable mind map shape. Use it for topic trees, outlines, or markdown-derived structure.',
+                purpose: 'An editable mind map shape. This is not a default shape; use it only when the user explicitly requests a mind map/topic tree or when importing markdown-derived outlines through the dedicated outline tools.',
                 createWith: 'tldraw_create_basic_shape',
                 agentExposedArgs: {
                     kind: 'mind-map',
@@ -234,7 +241,7 @@ export function getTldrawAgentCapabilities() {
             },
             {
                 type: 'slide',
-                purpose: 'A rectangular slide/frame area for presentation focus and screenshot export. Use it to group content spatially into pages.',
+                purpose: 'A rectangular slide/frame area for presentation focus and screenshot export. This is not a default shape; prefer frame for ordinary grouping and use slide only when the user asks for presentation pages, slide focus, or screenshot/export workflow.',
                 createWith: 'tldraw_create_basic_shape',
                 agentExposedArgs: {
                     kind: 'slide',
@@ -290,15 +297,17 @@ export function getTldrawAgentCapabilities() {
             },
         ],
         basicShapeGuide: [
-            'text/note: use for short unlinked annotations; batch_update text can edit their content.',
-            'geo: use for rectangles/ellipses/diamonds/etc; geo arg supports rectangle, ellipse, triangle, diamond, pentagon, hexagon, octagon, star, cloud, x-box, check-box, heart.',
-            'arrow/line/draw/highlight/frame: use for lightweight visual markup. Use connector tools instead when relationships should bind to shapes.',
+            'Default basic shapes are text, frame, and bezier-connector.',
+            'Use text for short unlinked annotations; avoid note unless the user asks for sticky notes.',
+            'Use frame for ordinary grouping and visual boundaries; avoid geo rectangles for grouping unless the user asks for geometric shapes.',
+            'Use bezier-connector through tldraw_create_connector for relationships; avoid arrow/line unless the user asks for arrows, straight lines, or non-binding marks.',
+            'Use draw/highlight/slide/mind-map/js-shape only on explicit user request or a clearly matching workflow.',
         ],
         layoutRecipes: [
-            'For most edits: use tldraw_apply_plan with steps. It can create notes/cards, connect shapes, update labels, layout selections, focus results, and save in one call.',
+            'For most edits: use tldraw_apply_plan with steps. It can create cards, single-blocks, text labels, frames, connect shapes, update labels, layout selections, focus results, and save in one call.',
             'For a document map: create a main card for the document, create single-block leaves or child cards, then create a branch with rootShapeId and children/leftChildren/rightChildren.',
             'For concept links: get shape details, then create a bezier connector with shapeIds and a short text label.',
-            'For presentation: create slide frames first, place content inside them, then use select/zoom or slide UI focus.',
+            'For visual grouping: use frame by default. For presentation workflows only when requested: create slide frames, place content inside them, then use select/zoom or slide UI focus.',
             'For outlines: prefer tldraw_insert_doc_outline_mindmap or siyuan_create_summary_child_doc_whiteboard over hand-placing many nodes.',
         ],
         destructive: [
@@ -310,7 +319,7 @@ export function getTldrawAgentCapabilities() {
             'Most write actions require the whiteboard to be open, so the user can observe the change.',
             'Prefer tldraw_apply_plan before low-level create/update/connect/layout actions. It has a 50-write cap, supports dryRun, and blocks script/raw mutation/delete operations.',
             'For low-level tools, call tldraw_get_interaction_context first, then prefer the focused whiteboard and current selection unless the user requested another target. tldraw_apply_plan can usually omit whiteboardId and use the focused whiteboard directly.',
-            'Use tldraw_create_shape for STtools business shapes (card, single-block, branch); use tldraw_create_basic_shape for note, text, geo, arrow, line, frame, and similar basic shapes.',
+            'Use tldraw_create_shape for STtools business shapes; default to card and single-block. Use tldraw_create_basic_shape for text and frame by default. Other shape kinds should be used only when the user explicitly asks or the task clearly requires them.',
             'Batch shape operations are capped at 50 items.',
             'Shape deletion is dry-run by default and requires confirm:true to execute.',
             'Linked SiYuan block shapes are protected from deletion unless allowLinkedBlockShapes:true is explicitly passed.',
