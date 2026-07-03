@@ -6,18 +6,12 @@ export function getTldrawAgentCapabilities() {
             'For simple custom-shape reads and edits, call tldraw_shape_command first. It can use the focused whiteboard and current selection automatically.',
             'To answer "what is the selected card content?", call tldraw_shape_command with {intent:"readSelectedContent"}; do not fetch shape ids first.',
             'To change selected custom shape properties, call tldraw_shape_command with intent "inspectEditable" if you need available fields, then intent "updateShape" with a small patch.',
-            'For batch creation, connection, layout, or complex multi-step changes, call tldraw_edit_board. Do not use legacy write tools.',
             'If the user refers to the current board or selected shapes, omit whiteboardId and use $selection / $selection[0]. The focused whiteboard is used automatically.',
-            'Always send operations as an array. Best shape creation template: {operations:[{op:"createNodes",nodes:[{as:"a",kind:"single-block",text:"..."}],layout:{style:"nearSelection"}}],save:true}.',
-            'Best branch template from the selected shape: createNodes children with aliases, then {op:"connect",kind:"branch",from:"$selection[0]",to:["$created.a","$created.b"],layout:{style:"tree",side:"right"}}, then focus "$last".',
-            'Best loose-note template: createNodes with kind:"single-block" or "text", layout {style:"grid"|"rightOf"|"below"|"nearSelection"}. Let the runtime place shapes; avoid x/y unless the user asks for exact coordinates.',
             'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences.',
-            'Use connect kind:"branch" for hierarchy; use connect kind:"relation" for ordinary relationships. References: $selection, $selection[0], $created.alias, $last, $block.<blockId>, $kind.<shapeType>.',
-            'For risky or large edits, set mode:"preview" first. For normal edits, commit once with save:true. Use result:"debug" only when troubleshooting.',
+            'The old board-edit DSL tool is intentionally not registered. Ask for a narrower semantic operation if tldraw_shape_command does not expose the needed operation yet.',
         ],
         preferred: [
             'tldraw_shape_command',
-            'tldraw_edit_board',
         ],
         read: [
             'tldraw_shape_command',
@@ -39,7 +33,6 @@ export function getTldrawAgentCapabilities() {
         ],
         createEditLayout: [
             'tldraw_shape_command',
-            'tldraw_edit_board',
         ],
         toolSelectionHints: {
             shapeCommand: {
@@ -67,68 +60,6 @@ export function getTldrawAgentCapabilities() {
                     { intent: 'updateShape', target: '$selection[0]', patch: { color: 'blue', isCollapsed: true }, save: true },
                 ],
             },
-            editBoard: {
-                action: 'tldraw_edit_board',
-                purpose: 'Primary batch/complex write tool. Send one operations array that creates, connects, lays out, focuses, and saves the board.',
-                references: ['$selection', '$selection[0]', '$created.name', '$last', '$block.<blockId>', '$kind.<shapeType>'],
-                defaults: {
-                    whiteboardId: 'omit it for the focused board',
-                    layout: 'use nearSelection/rightOf/below/grid/tree/mindmap/frameAround instead of manual coordinates',
-                    save: 'true for normal user-requested edits',
-                    result: 'minimal; use debug only after an error',
-                },
-                exampleArgs: {
-                    goal: 'Expand the selected card into a right-side branch',
-                    operations: [
-                        {
-                            op: 'createNodes',
-                            nodes: [
-                                { as: 'background', kind: 'single-block', text: 'Background' },
-                                { as: 'problem', kind: 'single-block', text: 'Problem' },
-                                { as: 'next', kind: 'single-block', text: 'Next step' },
-                            ],
-                            layout: { style: 'rightOf', anchor: '$selection[0]' },
-                        },
-                        {
-                            op: 'connect',
-                            kind: 'branch',
-                            from: '$selection[0]',
-                            to: ['$created.background', '$created.problem', '$created.next'],
-                            layout: { style: 'tree', side: 'right' },
-                        },
-                        { op: 'focus', target: '$last' },
-                    ],
-                    save: true,
-                },
-            },
-            quickCreate: {
-                action: 'tldraw_edit_board',
-                purpose: 'Create one or more new notes or custom shapes near the current view/selection.',
-                exampleArgs: {
-                    operations: [
-                        {
-                            op: 'createNodes',
-                            nodes: [
-                                { as: 'idea1', kind: 'single-block', text: 'First idea' },
-                                { as: 'idea2', kind: 'single-block', text: 'Second idea' },
-                            ],
-                            layout: { style: 'nearSelection' },
-                        },
-                        { op: 'focus', target: '$last' },
-                    ],
-                    save: true,
-                },
-            },
-            preview: {
-                action: 'tldraw_edit_board',
-                purpose: 'Validate a large or uncertain edit without changing the whiteboard or creating SiYuan blocks.',
-                exampleArgs: {
-                    mode: 'preview',
-                    operations: [
-                        { op: 'layout', target: '$selection', style: 'grid', columns: 3 },
-                    ],
-                },
-            },
             inspect: {
                 action: 'tldraw_shape_command',
                 guidance: 'Use tldraw_shape_command inspectEditable/readSelectedContent for selected custom-shape work. Use tldraw_get_shape_details only when exact bounds, bindings, or many raw shape details are needed.',
@@ -138,7 +69,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'card',
                 purpose: 'A large SiYuan document or heading card for article sections, overview documents, or rich linked content.',
-                createWith: 'tldraw_edit_board op createNodes kind:"card"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing-card reads/edits.',
                 notes: [
                     'Use blockId to reference an existing document/heading block, or contentMarkdown/title/text to create a new heading block.',
                     'Content belongs to the bound SiYuan block; use tldraw_shape_command to read content or update whiteboard card properties such as color, collapse state, mask, renderMode, and collapsed text settings.',
@@ -147,7 +78,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'single-block',
                 purpose: 'A compact SiYuan paragraph block for atomic notes, branch leaves, labels, todos, and short facts.',
-                createWith: 'tldraw_edit_board op createNodes kind:"single-block"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing single-block reads/edits.',
                 notes: [
                     'Use blockId for an existing paragraph, or text/contentMarkdown/title to create a new paragraph block.',
                     'Use this as the default branch leaf and compact content node.',
@@ -157,7 +88,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'branch',
                 purpose: 'A visual hierarchy connector from one root shape to left/right child shapes.',
-                createWith: 'tldraw_edit_board op connect kind:"branch"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing branch style edits.',
                 notes: [
                     'Do not hand-place branch geometry. Provide from/to refs and optional layout side/style.',
                     'Use layout style "tree" for one-sided hierarchies and "mindmap" for balanced left/right maps.',
@@ -167,7 +98,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'bezier-connector',
                 purpose: 'A curved, bindable relationship connector with an optional label.',
-                createWith: 'tldraw_edit_board op connect kind:"relation"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing connector edits.',
                 notes: [
                     'Use relation connections for non-hierarchical semantic links.',
                     'The runtime chooses shape ports automatically.',
@@ -177,7 +108,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'frame',
                 purpose: 'A visual boundary around related shapes.',
-                createWith: 'tldraw_edit_board op layout style:"frameAround" or createNodes kind:"frame"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL.',
                 notes: [
                     'Use frameAround when grouping existing shapes visually.',
                 ],
@@ -185,7 +116,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'mind-map',
                 purpose: 'A custom structured mind-map shape with editable root text, theme, direction, node sizing, and spacing.',
-                createWith: 'tldraw_edit_board op createNodes kind:"mind-map"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing mind-map edits.',
                 notes: [
                     'Use tldraw_shape_command for root text, theme, direction, fontSize, nodeWidth, nodeHeight, lineWidth, spacing, size, and color.',
                     'Node-level add/move/delete remains outside tldraw_shape_command in this version.',
@@ -194,7 +125,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'slide',
                 purpose: 'A custom slide frame used for focused whiteboard presentation sections.',
-                createWith: 'tldraw_edit_board op createNodes kind:"slide"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing slide edits.',
                 notes: [
                     'Use tldraw_shape_command to update slide name, borderStyle, size, position, and color.',
                     'Screenshot capture and block linking remain UI-specific actions.',
@@ -203,7 +134,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'js-shape',
                 purpose: 'A custom JavaScript-rendered shape.',
-                createWith: 'tldraw_edit_board op createNodes kind:"js-shape"',
+                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing JS shape edits.',
                 notes: [
                     'Use tldraw_shape_command to update size, position, color, interactive, and restrictDom.',
                     'Agent-supplied script and raw data writes remain blocked.',
@@ -211,15 +142,12 @@ export function getTldrawAgentCapabilities() {
             },
         ],
         layoutRecipes: [
-            'Add notes: op createNodes, nodes kind single-block/text, layout style nearSelection or grid, save true.',
-            'Expand selection into a branch: create child nodes, connect kind branch from $selection[0] to $created aliases, focus $last, save true.',
-            'Connect existing shapes: op connect, kind relation, from one ref, to one or more refs, optional text label.',
-            'Move existing shapes: op layout for automatic placement; op updateNodes only for exact x/y/w/h/text/color changes.',
-            'Frame a group: op layout, style frameAround, target $selection or explicit refs.',
-            'Document outlines may be read for planning, but whiteboard creation/editing still goes through tldraw_edit_board.',
+            'Inspect selected shapes: tldraw_shape_command intent inspectEditable.',
+            'Read selected linked content: tldraw_shape_command intent readSelectedContent.',
+            'Update selected shape fields: tldraw_shape_command intent updateShape with a small patch.',
         ],
         hiddenLegacyActions: [
-            'Legacy/basic write actions are intentionally not registered for Agent use; use tldraw_edit_board instead.',
+            'The old board-edit DSL and legacy/basic write actions are intentionally not registered for Agent use.',
         ],
         destructive: [
             'tldraw_delete_whiteboard_file',
@@ -227,12 +155,9 @@ export function getTldrawAgentCapabilities() {
         safetyRules: [
             'Agent actions must be enabled in plugin settings.',
             'Most write actions require the whiteboard to be open so the user can observe changes.',
-            'tldraw_edit_board has per-edit limits: 200 created nodes, 300 connections, and 500 updates.',
             'tldraw_shape_command only changes whitelisted semantic fields and never performs raw props mutation, JS script writes, or arbitrary data writes.',
-            'mode:"preview" validates without modifying the whiteboard or creating SiYuan blocks.',
-            'Failures return committedShapeIds and externalCreatedBlockIds when partial work happened; automatic cleanup is not performed.',
             'Default results do not include raw snapshots, full props, or shape samples.',
-            'Deletion remains outside tldraw_edit_board and keeps dry-run/confirm safeguards.',
+            'Deletion remains outside tldraw_shape_command and keeps dry-run/confirm safeguards.',
             'JS shape script execution, arbitrary raw store mutation, backup restore/import, and direct SiYuan block content edits remain blocked.',
         ],
         intentionallyBlocked: [

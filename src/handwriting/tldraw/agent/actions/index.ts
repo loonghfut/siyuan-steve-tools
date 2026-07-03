@@ -1,5 +1,4 @@
 import type { Plugin } from 'siyuan';
-import { createEditBoardAction } from './planning/edit-board';
 import { createBackupWhiteboardAction } from './whiteboards/backup-whiteboard';
 import { createDeleteWhiteboardFileAction } from './whiteboards/delete-whiteboard-file';
 import { createGetAgentCapabilitiesAction } from './system/get-agent-capabilities';
@@ -25,7 +24,6 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
         createShapeCommandAction(),
-        createEditBoardAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
         createGetSummaryAction(),
@@ -48,8 +46,7 @@ function withInteractionContextRequirement(action: AgentActionDefinition): Agent
     if (
         action.name === 'tldraw_get_interaction_context' ||
         action.name === 'tldraw_get_agent_capabilities' ||
-        action.name === 'tldraw_shape_command' ||
-        action.name === 'tldraw_edit_board'
+        action.name === 'tldraw_shape_command'
     ) {
         return action;
     }
