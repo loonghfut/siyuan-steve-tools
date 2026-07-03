@@ -1,14 +1,14 @@
 import { Plugin } from 'siyuan';
 import { settingdata } from '@/index';
 import { getTldrawAgentActions } from './agent/actions';
-import type { AgentActionDefinition, AgentActionResult } from './agent/actions/shared';
+import type { AgentActionResult } from './agent/actions/shared';
 import { getInstance } from './tldraw-instance-manager';
 
-type AddAgentAction = (options: {
-    name: string;
-    description: string;
-    handler: (args: Record<string, unknown>, app: unknown) => AgentActionResult;
-}) => string;
+type AddAgentActionPositional = (
+    name: string,
+    description: string,
+    handler: (args: Record<string, unknown>, app: unknown) => AgentActionResult,
+) => string;
 
 let registered = false;
 
@@ -20,25 +20,26 @@ export function registerTldrawAgentActions(plugin: Plugin) {
         return;
     }
 
-    const addAgentAction = (plugin as any).addAgentAction as AddAgentAction | undefined;
+    const addAgentAction = (plugin as any).addAgentAction as AddAgentActionPositional | undefined;
     if (typeof addAgentAction !== 'function') {
         console.info('SiYuan addAgentAction API is unavailable; skip tldraw agent actions.');
         return;
     }
 
     for (const action of getTldrawAgentActions(plugin)) {
-        addAgentAction.call(plugin, {
-            ...action,
-            handler: async (args, app) => {
-                const cleanedArgs = stripFrontendActionArgs(args);
-                const endAgentActivity = beginAgentActivityForArgs(cleanedArgs);
-                try {
-                    return await action.handler(cleanedArgs, app);
-                } finally {
-                    endAgentActivity();
-                }
-            },
-        } as AgentActionDefinition);
+        const handler = async (args: Record<string, unknown>, app: unknown) => {
+            const cleanedArgs = stripFrontendActionArgs(args);
+            const endAgentActivity = beginAgentActivityForArgs(cleanedArgs);
+            try {
+                return await action.handler(cleanedArgs, app);
+            } finally {
+                endAgentActivity();
+            }
+        };
+        // SiYuan's frontend Agent API is Plugin.addAgentAction(name, description, handler).
+        // Older experiments used an object-shaped call; positional keeps the tool metadata
+        // readable to the host Agent instead of registering a malformed action object.
+        (addAgentAction as AddAgentActionPositional).call(plugin, action.name, action.description, handler);
     }
 
     registered = true;
