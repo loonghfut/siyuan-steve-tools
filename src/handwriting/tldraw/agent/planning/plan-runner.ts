@@ -131,7 +131,7 @@ function normalizePlanStep(step: Record<string, unknown>, op: string, state: Age
 
 function normalizeCreateStep(step: Record<string, unknown>): NormalizedPlanStep {
     assertKnownPlanKeys(step, [
-        'op', 'as', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId', 'text', 'geo', 'name',
+        'op', 'as', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId', 'contentMarkdown', 'title', 'text', 'geo', 'name',
         'isMain', 'isCollapsed', 'showMask', 'direction', 'theme', 'select', 'zoom',
     ], 'create step');
     rejectUnsafeCreateKeys(step);
@@ -154,6 +154,8 @@ function normalizeCreateStep(step: Record<string, unknown>): NormalizedPlanStep 
             h: numberArg(step.h),
             color: colorArg(step.color),
             blockId: stringArg(step.blockId),
+            contentMarkdown: stringArg(step.contentMarkdown),
+            title: stringArg(step.title),
             text: stringArg(step.text),
             geo: stringArg(step.geo),
             name: stringArg(step.name),
@@ -392,7 +394,7 @@ function toShapeBox(shapeId: string, shape?: AgentShapeSummary): LayoutBox {
 }
 
 function layoutRow(boxes: LayoutBox[], step: NormalizedPlanStep): AgentShapeUpdatePatch[] {
-    const gap = numberValue(step.gap, 96);
+    const gap = numberValue(step.gap, 160);
     let cursor = numberValue(step.x, Math.min(...boxes.map((box) => box.x)));
     const y = numberValue(step.y, Math.min(...boxes.map((box) => box.y)));
     return boxes.map((box) => {
@@ -403,7 +405,7 @@ function layoutRow(boxes: LayoutBox[], step: NormalizedPlanStep): AgentShapeUpda
 }
 
 function layoutColumn(boxes: LayoutBox[], step: NormalizedPlanStep): AgentShapeUpdatePatch[] {
-    const gap = numberValue(step.gap, 72);
+    const gap = numberValue(step.gap, 140);
     const x = numberValue(step.x, Math.min(...boxes.map((box) => box.x)));
     let cursor = numberValue(step.y, Math.min(...boxes.map((box) => box.y)));
     return boxes.map((box) => {
@@ -414,7 +416,7 @@ function layoutColumn(boxes: LayoutBox[], step: NormalizedPlanStep): AgentShapeU
 }
 
 function layoutGrid(boxes: LayoutBox[], step: NormalizedPlanStep): AgentShapeUpdatePatch[] {
-    const gap = numberValue(step.gap, 72);
+    const gap = numberValue(step.gap, 140);
     const columns = Math.max(1, Math.min(12, Math.floor(numberValue(step.columns, Math.ceil(Math.sqrt(boxes.length))))));
     const startX = numberValue(step.x, Math.min(...boxes.map((box) => box.x)));
     const startY = numberValue(step.y, Math.min(...boxes.map((box) => box.y)));

@@ -7,7 +7,7 @@ import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition 
 export function createGetSummaryAction(): AgentActionDefinition {
     return {
         name: 'tldraw_get_summary',
-        description: 'Get a summary of an STtools tldraw whiteboard. Required args: whiteboardId string. If the whiteboard is open, returns live editor state; otherwise reads the saved snapshot file.',
+        description: 'Get a summary of an STtools tldraw whiteboard. Required args: whiteboardId string. If the whiteboard is open, returns live editor state; otherwise reads the saved snapshot file. Shape samples include bounds for layout planning.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

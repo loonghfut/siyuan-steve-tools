@@ -25,6 +25,8 @@ const CREATE_SHAPE_ARG_KEYS = [
 	'h',
 	'color',
 	'blockId',
+	'contentMarkdown',
+	'title',
 	'isMain',
 	'isCollapsed',
 	'showMask',
@@ -226,6 +228,8 @@ function parseCardCreateArgs(args: Record<string, unknown>): AgentCardCreateArgs
 		h: numberArg(args.h),
 		color: colorArg(args.color),
 		blockId: stringArg(args.blockId),
+		contentMarkdown: stringArg(args.contentMarkdown),
+		title: stringArg(args.title),
 		isMain: booleanArg(args.isMain),
 		isCollapsed: booleanArg(args.isCollapsed),
 		showMask: booleanArg(args.showMask),
@@ -327,7 +331,7 @@ function parseBranchChildRef(value: unknown): AgentBranchChildRef | undefined {
 	if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
 
 	const obj = value as Record<string, unknown>
-	const kind = parseChildKind(obj.kind)
+	const kind = parseChildKind(obj.kind) || (stringArg(obj.contentMarkdown) || stringArg(obj.title) ? 'card' : undefined)
 	return {
 		shapeId: stringArg(obj.shapeId),
 		kind,
@@ -337,6 +341,8 @@ function parseBranchChildRef(value: unknown): AgentBranchChildRef | undefined {
 		h: numberArg(obj.h),
 		color: colorArg(obj.color),
 		blockId: stringArg(obj.blockId),
+		contentMarkdown: stringArg(obj.contentMarkdown),
+		title: stringArg(obj.title),
 		isMain: kind === 'card' ? booleanArg(obj.isMain) : undefined,
 		isCollapsed: kind === 'card' ? booleanArg(obj.isCollapsed) : undefined,
 		showMask: kind === 'card' ? booleanArg(obj.showMask) : undefined,

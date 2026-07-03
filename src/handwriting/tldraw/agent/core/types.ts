@@ -25,6 +25,8 @@ export type AgentCardCreateArgs = AgentSelectionOptions & {
 	h?: number
 	color?: TLDefaultColorStyle
 	blockId?: string
+	contentMarkdown?: string
+	title?: string
 	isMain?: boolean
 	isCollapsed?: boolean
 	showMask?: boolean
@@ -51,6 +53,8 @@ export type AgentBranchChildRef =
 		h?: number
 		color?: TLDefaultColorStyle
 		blockId?: string
+		contentMarkdown?: string
+		title?: string
 		isMain?: boolean
 		isCollapsed?: boolean
 		showMask?: boolean
@@ -103,6 +107,12 @@ export type AgentShapeSummary = {
 	type: string
 	x: number
 	y: number
+	bounds?: {
+		x: number
+		y: number
+		w: number
+		h: number
+	}
 	rotation?: number
 	parentId?: string
 	index?: string

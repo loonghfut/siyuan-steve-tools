@@ -321,7 +321,19 @@ function summarizeShapeSampleForList(shape: any) {
         type: String(shape?.type || 'unknown'),
         x: Number(shape?.x || 0),
         y: Number(shape?.y || 0),
+        bounds: summarizeSingleShapeBounds(shape),
         props: summarizeListShapeProps(shape?.props),
+    };
+}
+
+function summarizeSingleShapeBounds(shape: any) {
+    const x = Number(shape?.x || 0);
+    const y = Number(shape?.y || 0);
+    return {
+        x,
+        y,
+        w: Number(shape?.props?.w ?? shape?.props?.width ?? 1) || 1,
+        h: Number(shape?.props?.h ?? shape?.props?.height ?? 1) || 1,
     };
 }
 

@@ -10,6 +10,7 @@ import {
     toRichText,
 } from '@tldraw/tldraw';
 import * as api from '@/api/api';
+import { settingdata } from '@/index';
 import { WhiteboardFileManager } from '../../whiteboard-file-manager';
 import { createOrUpdateConnectorBinding } from '../../BezierConnectorShape';
 import { getBestPortPair, getPortPagePosition } from '../../BezierConnectorShape/port-utils';
@@ -21,6 +22,7 @@ import { buildTldrawLink } from '../../utils/link-builder';
 import { convertConnectorsToArrow, convertConnectorsToBezier } from '../../utils/connector-convert';
 import { insertDocOutlineMindmapForAgent, type AgentDocOutlineBoardOptions } from '../documents/doc-to-board';
 import { finiteNumberInRange, normalizeOptionalAgentColor } from '../core/schema';
+import { getAgentCardDefaults, getAgentSingleBlockDefaults } from '../core/defaults';
 import { createAgentBusinessShape } from '../shapes/shape-ops';
 import { summarizeSnapshotObject } from '../summaries/snapshot-summary';
 import { executeAgentPlan, type AgentPlanApplyOptions } from '../planning/plan-runner';
@@ -28,12 +30,32 @@ import type {
     AgentAlignOperation,
     AgentArrangeOperation,
     AgentBasicShapeCreateArgs,
+    AgentBranchChildRef,
+    AgentBranchCreateArgs,
+    AgentCardCreateArgs,
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
     AgentCreateShapeResult,
     AgentShapeSummary,
     AgentShapeUpdatePatch,
 } from '../core/types';
+
+type AgentShapeBounds = { x: number; y: number; w: number; h: number };
+type AgentCreateLayoutKind = AgentCreateShapeArgs['kind'] | AgentBasicShapeCreateArgs['kind'];
+
+const AGENT_ENTITY_CREATE_SHAPES = new Set([
+    'card',
+    'single-block',
+    'text',
+    'frame',
+    'note',
+    'geo',
+    'slide',
+    'mind-map',
+    'js-shape',
+]);
+const AGENT_CREATE_GAP = 160;
+const AGENT_DEFAULT_CREATE_ORIGIN = { x: 0, y: 0 };
 
 export type AgentManagerRuntime = {
     id: string;
@@ -68,6 +90,7 @@ export function getAgentSummary(runtime: AgentManagerRuntime) {
         type: String(shape.type),
         x: Number(shape.x || 0),
         y: Number(shape.y || 0),
+        bounds: runtime.editor ? getAgentShapeBounds(runtime.editor, shape as TLShape) : getFallbackShapeBounds(shape as TLShape),
         props: summarizeShapeProps(shape.props, runtime.editor || undefined),
     }));
 
@@ -87,10 +110,12 @@ export function getAgentSummary(runtime: AgentManagerRuntime) {
 export async function createAgentShape(runtime: AgentManagerRuntime, options: AgentCreateShapeArgs) {
     const editor = requireEditor(runtime);
     await validateAgentCreateShapeBlockIds(options);
-    const result = createAgentBusinessShape(editor, options);
+    const preparedOptions = await prepareAgentCreateShapeOptions(runtime, options);
+    const layoutOptions = applyAgentCreateLayout(editor, preparedOptions);
+    const result = createAgentBusinessShape(editor, layoutOptions);
     syncAgentCreatedBlockAttrs(runtime, result);
     runtime.triggerSave();
-    return { ...result, summary: getAgentSummary(runtime) };
+    return { ...result, ...buildCreatedBoundsResult(editor, result.createdShapeIds), summary: getAgentSummary(runtime) };
 }
 
 export async function insertDocOutlineMindmap(runtime: AgentManagerRuntime, options: AgentDocOutlineBoardOptions) {
@@ -220,11 +245,19 @@ export function getAgentShapeDetails(runtime: AgentManagerRuntime, options: {
 export function createAgentBasicShape(runtime: AgentManagerRuntime, options: AgentBasicShapeCreateArgs) {
     const editor = requireEditor(runtime);
     const id = createShapeId();
-    const x = finiteNumberInRange(options.x, 0, -100000, 100000);
-    const y = finiteNumberInRange(options.y, 0, -100000, 100000);
+    const defaultW = defaultAgentWidth(options.kind);
+    const defaultH = defaultAgentHeight(options.kind);
+    const w = finiteNumberInRange(options.w, defaultW, 1, 4000);
+    const h = finiteNumberInRange(options.h, defaultH, 1, 4000);
+    const position = resolveAgentCreatePosition(editor, options.kind, {
+        x: options.x,
+        y: options.y,
+        w,
+        h,
+    });
     const color = options.color ?? 'black';
     const text = clampAgentText(options.text || defaultAgentText(options.kind), 2000);
-    const shape = buildAgentBasicShape(id, options, x, y, color, text);
+    const shape = buildAgentBasicShape(id, { ...options, w, h }, position.x, position.y, color, text);
 
     editor.createShape(shape as any);
     finalizeAgentSelection(editor, id, options);
@@ -233,6 +266,8 @@ export function createAgentBasicShape(runtime: AgentManagerRuntime, options: Age
     return {
         createdShapeIds: [String(id)],
         selectedShapeIds: options.select === false ? [] : [String(id)],
+        createdShapeBounds: buildCreatedShapeBoundsMap(editor, [String(id)]),
+        focusedShapeBounds: getAgentShapeBoundsById(editor, id),
         summary: getAgentSummary(runtime),
     };
 }
@@ -580,6 +615,271 @@ export function lockAgentShapes(runtime: AgentManagerRuntime, options: {
     return { shapeIds: ids.map(String), locked: options.locked, summary: getAgentSummary(runtime) };
 }
 
+async function prepareAgentCreateShapeOptions(
+    runtime: AgentManagerRuntime,
+    options: AgentCreateShapeArgs
+): Promise<AgentCreateShapeArgs> {
+    if (options.kind === 'card') return prepareAgentCardCreateArgs(runtime, options);
+    if (options.kind !== 'branch') return options;
+
+    const prepareRefs = async (refs?: AgentBranchCreateArgs['children']) => {
+        if (!Array.isArray(refs)) return refs;
+        return Promise.all(refs.map(async (ref) => {
+            if (!ref || typeof ref === 'string' || ref.shapeId) return ref;
+            const shouldCreateCardBlock = ref.kind === 'card' || ref.contentMarkdown !== undefined || ref.title !== undefined;
+            if (!shouldCreateCardBlock) return ref;
+            const cardRef = { ...ref, kind: 'card' as const };
+            return prepareAgentCardCreateArgs(runtime, cardRef);
+        }));
+    };
+
+    return {
+        ...options,
+        children: await prepareRefs(options.children),
+        leftChildren: await prepareRefs(options.leftChildren),
+        rightChildren: await prepareRefs(options.rightChildren),
+    };
+}
+
+async function prepareAgentCardCreateArgs<T extends AgentCardCreateArgs | Extract<AgentBranchChildRef, object>>(
+    runtime: AgentManagerRuntime,
+    options: T
+): Promise<T> {
+    const contentMarkdown = typeof options.contentMarkdown === 'string' ? options.contentMarkdown : undefined;
+    const blockId = typeof options.blockId === 'string' && options.blockId.trim() ? options.blockId.trim() : undefined;
+    if (blockId && contentMarkdown !== undefined) {
+        throw new Error('card cannot set both blockId and contentMarkdown');
+    }
+    if (blockId) return { ...options, blockId, contentMarkdown: undefined } as T;
+
+    const createdBlockId = await createAgentCardBlockForContent(runtime, {
+        title: options.title,
+        contentMarkdown,
+    });
+    return { ...options, blockId: createdBlockId, contentMarkdown: undefined } as T;
+}
+
+async function createAgentCardBlockForContent(runtime: AgentManagerRuntime, options: {
+    title?: string;
+    contentMarkdown?: string;
+}) {
+    const blockId = await api.generateSiyuanID() as string;
+    const title = renderAgentCardTitle(options.title);
+    const link = buildTldrawLink(runtime.id, blockId, runtime.title);
+    const headingMarkdown = [
+        `###### ${title}`,
+        `{: id="${blockId}" custom-st-tldraw="1" custom-tldraw-link="${escapeBlockAttr(link)}" }`,
+        '',
+        '{: custom-st-tldraw-none="1" }',
+        '',
+    ].join('\n');
+
+    const appendResult = await api.appendBlock('markdown', headingMarkdown, runtime.id);
+    const appendedBlockId = extractFirstOperationId(appendResult) || blockId;
+    const body = String(options.contentMarkdown || '').trim();
+    if (body) {
+        await api.insertBlock('markdown', body, undefined, appendedBlockId);
+    }
+    return appendedBlockId;
+}
+
+function renderAgentCardTitle(title?: string) {
+    const explicit = String(title || '').trim();
+    if (explicit) return explicit;
+    const customTitleTemplate = String(settingdata?.['tldraw-custom-card-title'] || '${timestamp}');
+    const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    return customTitleTemplate
+        ? customTitleTemplate.replace(/\$\{timestamp\}/g, timestamp)
+        : timestamp;
+}
+
+function escapeBlockAttr(value: string) {
+    return String(value || '').replace(/"/g, '&quot;');
+}
+
+function extractFirstOperationId(value: unknown): string | undefined {
+    const first = Array.isArray(value) ? value[0] as any : undefined;
+    const id = first?.doOperations?.[0]?.id;
+    return typeof id === 'string' && id ? id : undefined;
+}
+
+function applyAgentCreateLayout<T extends AgentCreateShapeArgs>(editor: Editor, options: T): T {
+    if (options.kind === 'branch') return options;
+    const size = getAgentCreateShapeSize(options.kind, options);
+    const position = resolveAgentCreatePosition(editor, options.kind, {
+        x: options.x,
+        y: options.y,
+        w: size.w,
+        h: size.h,
+    });
+    return { ...options, x: position.x, y: position.y } as T;
+}
+
+function getAgentCreateShapeSize(kind: AgentCreateLayoutKind, options: { w?: number; h?: number }): { w: number; h: number } {
+    if (kind === 'card') {
+        const defaults = getAgentCardDefaults();
+        return {
+            w: finiteNumberInRange(options.w, defaults.w, 1, 4000),
+            h: finiteNumberInRange(options.h, defaults.h, 1, 4000),
+        };
+    }
+    if (kind === 'single-block') {
+        const defaults = getAgentSingleBlockDefaults();
+        return {
+            w: finiteNumberInRange(options.w, defaults.w, 1, 4000),
+            h: finiteNumberInRange(options.h, defaults.h, 1, 4000),
+        };
+    }
+    return {
+        w: finiteNumberInRange(options.w, defaultAgentWidth(kind as AgentBasicShapeCreateArgs['kind']), 1, 4000),
+        h: finiteNumberInRange(options.h, defaultAgentHeight(kind as AgentBasicShapeCreateArgs['kind']), 1, 4000),
+    };
+}
+
+function resolveAgentCreatePosition(editor: Editor, kind: AgentCreateLayoutKind, draft: {
+    x?: number;
+    y?: number;
+    w: number;
+    h: number;
+}): { x: number; y: number } {
+    const fallback = getAgentDefaultCreateOrigin(editor);
+    const x = finiteNumberInRange(draft.x, fallback.x, -100000, 100000);
+    const y = finiteNumberInRange(draft.y, fallback.y, -100000, 100000);
+    if (!AGENT_ENTITY_CREATE_SHAPES.has(kind)) return { x, y };
+
+    const requested = { x, y, w: draft.w, h: draft.h };
+    const existing = getCurrentEntityShapeBounds(editor);
+    const hasExplicitPosition = draft.x !== undefined && draft.y !== undefined;
+    if (hasExplicitPosition && !boundsCollides(requested, existing, AGENT_CREATE_GAP)) {
+        return { x, y };
+    }
+
+    const found = findNearestFreeBounds(requested, existing, AGENT_CREATE_GAP);
+    return { x: found.x, y: found.y };
+}
+
+function getAgentDefaultCreateOrigin(editor: Editor): { x: number; y: number } {
+    try {
+        const viewport = (editor as any).getViewportPageBounds?.();
+        if (viewport) return { x: Number(viewport.x || 0) + 80, y: Number(viewport.y || 0) + 80 };
+    } catch {}
+    return AGENT_DEFAULT_CREATE_ORIGIN;
+}
+
+function getCurrentEntityShapeBounds(editor: Editor): AgentShapeBounds[] {
+    return editor.getCurrentPageShapes()
+        .filter((shape) => AGENT_ENTITY_CREATE_SHAPES.has(String(shape.type)))
+        .map((shape) => getAgentShapeBounds(editor, shape));
+}
+
+function findNearestFreeBounds(
+    requested: AgentShapeBounds,
+    existing: AgentShapeBounds[],
+    gap: number
+): AgentShapeBounds {
+    if (!boundsCollides(requested, existing, gap)) return requested;
+    const stepX = Math.max(requested.w + gap, gap);
+    const stepY = Math.max(requested.h + gap, gap);
+
+    for (let radius = 1; radius <= 24; radius++) {
+        let best: AgentShapeBounds | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let ix = -radius; ix <= radius; ix++) {
+            for (let iy = -radius; iy <= radius; iy++) {
+                if (Math.max(Math.abs(ix), Math.abs(iy)) !== radius) continue;
+                const candidate = {
+                    ...requested,
+                    x: requested.x + ix * stepX,
+                    y: requested.y + iy * stepY,
+                };
+                if (boundsCollides(candidate, existing, gap)) continue;
+                const distance = Math.hypot(candidate.x - requested.x, candidate.y - requested.y);
+                if (distance < bestDistance) {
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        if (best) return best;
+    }
+
+    return {
+        ...requested,
+        x: requested.x + stepX * (existing.length + 1),
+    };
+}
+
+function boundsCollides(bounds: AgentShapeBounds, existing: AgentShapeBounds[], gap: number) {
+    return existing.some((item) => boundsIntersect(bounds, item, gap));
+}
+
+function boundsIntersect(a: AgentShapeBounds, b: AgentShapeBounds, gap: number) {
+    return !(
+        a.x + a.w + gap <= b.x ||
+        b.x + b.w + gap <= a.x ||
+        a.y + a.h + gap <= b.y ||
+        b.y + b.h + gap <= a.y
+    );
+}
+
+function buildCreatedBoundsResult(editor: Editor, shapeIds: string[]) {
+    const createdShapeBounds = buildCreatedShapeBoundsMap(editor, shapeIds);
+    const focusedShapeBounds = shapeIds.length ? getAgentShapeBoundsById(editor, shapeIds[0] as TLShapeId) : undefined;
+    return { createdShapeBounds, focusedShapeBounds };
+}
+
+function buildCreatedShapeBoundsMap(editor: Editor, shapeIds: string[]) {
+    return shapeIds.reduce<Record<string, AgentShapeBounds>>((acc, shapeId) => {
+        const bounds = getAgentShapeBoundsById(editor, shapeId as TLShapeId);
+        if (bounds) acc[shapeId] = bounds;
+        return acc;
+    }, {});
+}
+
+function getAgentShapeBoundsById(editor: Editor, shapeId: TLShapeId) {
+    const shape = editor.getShape(shapeId);
+    return shape ? getAgentShapeBounds(editor, shape) : undefined;
+}
+
+function getAgentShapeBounds(editor: Editor, shape: TLShape): AgentShapeBounds {
+    const bounds = editor.getShapePageBounds(shape.id);
+    if (bounds) {
+        return {
+            x: Number(bounds.x || 0),
+            y: Number(bounds.y || 0),
+            w: Number(bounds.width || 1),
+            h: Number(bounds.height || 1),
+        };
+    }
+    return getFallbackShapeBounds(shape);
+}
+
+function getFallbackShapeBounds(shape: TLShape): AgentShapeBounds {
+    const props = (shape as any).props || {};
+    const defaults = getFallbackShapeDefaultSize(shape.type);
+    return {
+        x: Number((shape as any).x || 0),
+        y: Number((shape as any).y || 0),
+        w: Number(props.w ?? props.width ?? defaults.w) || 1,
+        h: Number(props.h ?? props.height ?? defaults.h) || 1,
+    };
+}
+
+function getFallbackShapeDefaultSize(kind: string) {
+    if (kind === 'card') {
+        const defaults = getAgentCardDefaults();
+        return { w: defaults.w, h: defaults.h };
+    }
+    if (kind === 'single-block') {
+        const defaults = getAgentSingleBlockDefaults();
+        return { w: defaults.w, h: defaults.h };
+    }
+    return {
+        w: defaultAgentWidth(kind as AgentBasicShapeCreateArgs['kind']),
+        h: defaultAgentHeight(kind as AgentBasicShapeCreateArgs['kind']),
+    };
+}
+
 function syncAgentCreatedBlockAttrs(runtime: AgentManagerRuntime, result: AgentCreateShapeResult) {
     const nodes = result.createdNodes || [];
     const linkedNodes = nodes.filter((node) =>
@@ -746,6 +1046,7 @@ function summarizeAgentShape(editor: Editor, shape: TLShape, includeBindings = f
         type: String(shape.type),
         x: Number(shape.x || 0),
         y: Number(shape.y || 0),
+        bounds: getAgentShapeBounds(editor, shape),
         rotation: Number((shape as any).rotation || 0),
         parentId: String((shape as any).parentId || ''),
         index: String((shape as any).index || ''),

@@ -7,6 +7,7 @@ export function getTldrawAgentCapabilities() {
             'Use low-level tldraw actions only when tldraw_apply_plan cannot express the requested edit or you need precise one-off control.',
             'Default shape preference: use card, single-block, text, bezier-connector, and frame first. Unless the user explicitly asks for another shape type or the task clearly requires it, avoid note, geo, arrow, line, draw, highlight, branch, slide, mind-map, and js-shape.',
             'Prefer semantic STtools shapes over generic drawings: card for a document/heading block or substantial content, single-block for one paragraph block or compact atomic item, text for unlinked labels/annotations, bezier-connector for labeled relationships, and frame for grouping or visual boundaries.',
+            'When creating multiple entity shapes, use returned bounds or tldraw_get_shape_details bounds to reason about occupied area. The create tools auto-avoid overlap for entity shapes, but explicit layout steps with generous gaps are still preferred for structured results.',
             'Use tldraw_get_shape_details with includeBindings:true before editing unfamiliar shapes. Use update_shape isCollapsed:false/true to expand/collapse card shapes. Use batch_update for moving/resizing many shapes. Use create_connector instead of a plain line when two shapes should remain connected.',
         ],
         preferred: [
@@ -67,7 +68,7 @@ export function getTldrawAgentCapabilities() {
                 defaultKinds: ['card', 'single-block'],
                 nonDefaultKinds: ['branch'],
                 guidance: 'Use card and single-block by default; use branch only when the user asks for a branch/mind-map-like layout or the structure clearly requires a branch object.',
-                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'card', x: 100, y: 100, zoom: false },
+                exampleArgs: { whiteboardId: '<focusedWhiteboardId>', kind: 'card', title: 'Topic', contentMarkdown: 'New card content', zoom: false },
             },
             createBasicShapes: {
                 action: 'tldraw_create_basic_shape',
@@ -94,7 +95,9 @@ export function getTldrawAgentCapabilities() {
                     w: 'width, default 300',
                     h: 'height, default 300',
                     color: 'tldraw color name or hex-like value normalized to nearest tldraw color',
-                    blockId: 'optional SiYuan document or heading block id; if omitted, the card starts as a new editable placeholder',
+                    blockId: 'optional SiYuan document or heading block id for referencing existing content',
+                    contentMarkdown: 'optional Markdown body for creating new card content; mutually exclusive with blockId',
+                    title: 'optional title for a newly-created card heading; if omitted, the manual card title template/timestamp is used',
                     isMain: 'true for a main document card with stronger title/header presentation',
                     isCollapsed: 'true to show a compact summary/title state instead of full content',
                     showMask: 'visual mask flag, default true',
@@ -104,11 +107,12 @@ export function getTldrawAgentCapabilities() {
                 nativePropsAndBehavior: [
                     'Native props include w,h,color,showMask,blockId,isNewlyCreated,fontSize,isMain,refreshNonce,isCollapsed,preCollapseHeight,collapsedTextSize,collapsedTextAlign,renderMode.',
                     'Can resize, rotate, edit, scroll, export to SVG, and show connector ports.',
+                    'Agent card creation is simple: use blockId to reference existing content, or contentMarkdown/title to create a new heading block and insert body content after it.',
                     'Content comes from the bound SiYuan block; do not pass text to update a card. To change content, edit the SiYuan block, not the shape props.',
                     'renderMode may be inherit/static-dom/live-protyle internally, but Agent should not raw-mutate it.',
                 ],
                 operations: [
-                    'Create standalone or linked card.',
+                    'Create a linked card from an existing blockId, or create new content with contentMarkdown/title.',
                     'Move/resize/recolor and expand/collapse with tldraw_update_shape or batch_update using isCollapsed:false/true.',
                     'Connect to other shapes with tldraw_create_connector.',
                     'Use as branch root or branch child; child objects can set card-specific isMain/isCollapsed/showMask.',
@@ -304,7 +308,7 @@ export function getTldrawAgentCapabilities() {
             'Use draw/highlight/slide/mind-map/js-shape only on explicit user request or a clearly matching workflow.',
         ],
         layoutRecipes: [
-            'For most edits: use tldraw_apply_plan with steps. It can create cards, single-blocks, text labels, frames, connect shapes, update labels, layout selections, focus results, and save in one call.',
+            'For most edits: use tldraw_apply_plan with steps. It can create cards using blockId or contentMarkdown/title, single-blocks, text labels, frames, connect shapes, update labels, layout selections, focus results, and save in one call.',
             'For a document map: create a main card for the document, create single-block leaves or child cards, then create a branch with rootShapeId and children/leftChildren/rightChildren.',
             'For concept links: get shape details, then create a bezier connector with shapeIds and a short text label.',
             'For visual grouping: use frame by default. For presentation workflows only when requested: create slide frames, place content inside them, then use select/zoom or slide UI focus.',

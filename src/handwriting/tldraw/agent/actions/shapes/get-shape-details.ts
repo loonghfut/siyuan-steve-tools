@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createGetShapeDetailsAction(): AgentActionDefinition {
     return {
         name: 'tldraw_get_shape_details',
-        description: 'Read safe details for shapes on an open STtools tldraw whiteboard. Required args: whiteboardId string. Optional args: shapeId string or shapeIds string[], type string, limit number, includeBindings boolean. Script/data/screenshot-like fields are redacted.',
+        description: 'Read safe details for shapes on an open STtools tldraw whiteboard. Required args: whiteboardId string. Optional args: shapeId string or shapeIds string[], type string, limit number, includeBindings boolean. Returns page bounds for layout planning. Script/data/screenshot-like fields are redacted.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

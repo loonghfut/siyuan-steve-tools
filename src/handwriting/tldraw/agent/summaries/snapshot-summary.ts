@@ -26,6 +26,7 @@ export function summarizeSavedSnapshot(whiteboardId: string, content: string) {
             type: String(shape.type),
             x: Number(shape.x || 0),
             y: Number(shape.y || 0),
+            bounds: summarizeShapeBounds(shape),
             props: summarizeProps(shape.props),
         })),
     };
@@ -49,6 +50,17 @@ export function summarizeSnapshotObject(whiteboardId: string, snapshot: unknown,
             name: page.name ? String(page.name) : undefined,
             index: page.index ? String(page.index) : undefined,
         })),
+    };
+}
+
+function summarizeShapeBounds(shape: any) {
+    const x = Number(shape?.x || 0);
+    const y = Number(shape?.y || 0);
+    return {
+        x,
+        y,
+        w: Number(shape?.props?.w ?? shape?.props?.width ?? 1) || 1,
+        h: Number(shape?.props?.h ?? shape?.props?.height ?? 1) || 1,
     };
 }
 
