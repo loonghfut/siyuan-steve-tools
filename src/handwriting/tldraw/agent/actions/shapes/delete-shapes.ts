@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createDeleteShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_delete_shapes',
-        description: 'Dry-run or delete up to 50 shapes from an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: resultMode "compact"|"full" default compact. By default this is a dry run; pass confirm true to execute. A whiteboard backup is created before confirmed deletion. Linked SiYuan block shapes are blocked unless allowLinkedBlockShapes true.',
+        description: 'Delete up to 50 shapes from an open whiteboard. Required args: whiteboardId string, shapeId string or shapeIds string[]. Optional args: confirm boolean (omit for a dry-run preview, set true to execute the deletion autonomously), allowLinkedBlockShapes boolean, resultMode "compact"|"full" default compact. A whiteboard backup is always created before confirmed deletion. Linked SiYuan block shapes are blocked unless allowLinkedBlockShapes true.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

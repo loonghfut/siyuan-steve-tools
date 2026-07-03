@@ -1,6 +1,7 @@
 import type { Plugin } from 'siyuan';
 import { createBackupWhiteboardAction } from './whiteboards/backup-whiteboard';
 import { createDeleteWhiteboardFileAction } from './whiteboards/delete-whiteboard-file';
+import { createDeleteShapesAction } from './shapes/delete-shapes';
 import { createGetAgentCapabilitiesAction } from './system/get-agent-capabilities';
 import { createGetInteractionContextAction } from './system/get-interaction-context';
 import { createGetShapeDetailsAction } from './shapes/get-shape-details';
@@ -24,6 +25,7 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
         createShapeCommandAction(),
+        createDeleteShapesAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
         createGetSummaryAction(),

@@ -18,6 +18,8 @@ export function getTldrawAgentCapabilities() {
             'If the user refers to the current board or selected shapes, omit whiteboardId and use $selection / $selection[0]. The focused whiteboard is used automatically.',
             'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences.',
             'The old board-edit DSL tool is intentionally not registered. Do not construct operations arrays.',
+            'The open whiteboard autosaves every edit, so do not pass save:true on each operation and do not call tldraw_save_whiteboard after every change. Omit save and let autosave persist the edit. Call tldraw_save_whiteboard only when the user explicitly asks to flush immediately (for example, right before closing).',
+            'You may execute shape deletion autonomously: call tldraw_delete_shapes with confirm:true and go straight to execution — no separate dry-run or user-confirmation round-trip is required. A whiteboard backup is always created before any confirmed deletion, so the backup-before-delete rule is satisfied automatically; never try to bypass it. Omit confirm only when you want a dry-run preview of what would be deleted.',
         ],
         preferred: [
             'tldraw_shape_command',
@@ -61,18 +63,18 @@ export function getTldrawAgentCapabilities() {
                 defaults: {
                     whiteboardId: 'omit it for the focused board',
                     target: '$selection',
-                    save: 'true when the user asked to modify the board',
+                    save: 'omit it — the open whiteboard autosaves every edit; only tldraw_save_whiteboard forces an immediate flush',
                     callShape: 'pass intent/target/patch as direct named args; do not pack them into id/query',
                 },
                 examples: [
                     { intent: 'readSelectedContent' },
                     { intent: 'inspectEditable', target: '$selection[0]' },
-                    { intent: 'updateShape', target: '$selection[0]', patch: { color: 'blue', isCollapsed: true }, save: true },
-                    { intent: 'createShapes', nodes: [{ kind: 'single-block', text: 'New note' }], layoutStyle: 'nearSelection', save: true },
-                    { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'relation', text: 'related', save: true },
-                    { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'branch', side: 'right', save: true },
-                    { intent: 'connectShapes', from: '$kind.branch', to: '$selection[0]', connectionKind: 'branch', side: 'right', save: true },
-                    { intent: 'layoutShapes', target: '$selection', layoutStyle: 'grid', columns: 3, save: true },
+                    { intent: 'updateShape', target: '$selection[0]', patch: { color: 'blue', isCollapsed: true } },
+                    { intent: 'createShapes', nodes: [{ kind: 'single-block', text: 'New note' }], layoutStyle: 'nearSelection' },
+                    { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'relation', text: 'related' },
+                    { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'branch', side: 'right' },
+                    { intent: 'connectShapes', from: '$kind.branch', to: '$selection[0]', connectionKind: 'branch', side: 'right' },
+                    { intent: 'layoutShapes', target: '$selection', layoutStyle: 'grid', columns: 3 },
                 ],
             },
             inspect: {
@@ -175,6 +177,7 @@ export function getTldrawAgentCapabilities() {
             'The old board-edit DSL and legacy/basic write actions are intentionally not registered for Agent use.',
         ],
         destructive: [
+            'tldraw_delete_shapes',
             'tldraw_delete_whiteboard_file',
         ],
         safetyRules: [
@@ -182,7 +185,7 @@ export function getTldrawAgentCapabilities() {
             'Most write actions require the whiteboard to be open so the user can observe changes.',
             'tldraw_shape_command only changes whitelisted semantic fields and never performs raw props mutation, JS script writes, or arbitrary data writes.',
             'Default results do not include raw snapshots, full props, or shape samples.',
-            'Deletion remains outside tldraw_shape_command and keeps dry-run/confirm safeguards.',
+            'Shape deletion uses tldraw_delete_shapes (not tldraw_shape_command). The agent may execute it autonomously with confirm:true; a backup is always created before confirmed deletion, and linked SiYuan block shapes are blocked unless allowLinkedBlockShapes:true.',
             'JS shape script execution, arbitrary raw store mutation, backup restore/import, and direct SiYuan block content edits remain blocked.',
         ],
         intentionallyBlocked: [
