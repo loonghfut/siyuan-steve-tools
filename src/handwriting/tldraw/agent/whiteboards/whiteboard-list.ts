@@ -111,7 +111,7 @@ export async function listWhiteboardsForAgent(args: Record<string, unknown>): Ag
                 : undefined;
             return {
                 ...item,
-                title: liveSummary?.title || item.title || item.docTitle || item.id,
+                title: liveSummary?.title || (item as any).title || (item as any).docTitle || item.id,
                 isOpen: Boolean(instance),
                 snapshot: snapshotSummary,
             };
