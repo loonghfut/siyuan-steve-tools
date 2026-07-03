@@ -12,7 +12,7 @@ export function createShapeCommandAction(): AgentActionDefinition {
             if (disabled) return disabled;
             try {
                 assertKnownArgs(args, [
-                    'whiteboardId', 'id', 'rootId', 'intent', 'target', 'shapeKind', 'patch',
+                    'whiteboardId', 'id', 'rootId', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch',
                     'node', 'nodes', 'from', 'to', 'connectionKind', 'text', 'color', 'strokeWidth', 'lineWidth',
                     'layoutStyle', 'layout', 'columns', 'gap', 'horizontalGap', 'verticalGap', 'side',
                     'x', 'y', 'w', 'h', 'name', 'save', 'select', 'zoom', 'result',
@@ -40,13 +40,13 @@ export function createShapeCommandAction(): AgentActionDefinition {
                 const request: AgentShapeCommandRequest = {
                     whiteboardId,
                     intent,
-                    target: args.target as AgentShapeCommandRequest['target'],
+                    target: shapeCommandTargetArg(args.target ?? args.shapeIds ?? args.shapeId),
                     shapeKind: stringArg(args.shapeKind),
-                    patch: shapeCommandPatchArg(args.patch),
+                    patch: shapeCommandPatchArg(args.patch) ?? shapeCommandPatchFromTopLevelArgs(args),
                     node: shapeCommandObjectArg(args.node) as AgentShapeCommandRequest['node'],
                     nodes: shapeCommandArrayArg(args.nodes) as AgentShapeCommandRequest['nodes'],
-                    from: args.from as AgentShapeCommandRequest['from'],
-                    to: args.to as AgentShapeCommandRequest['to'],
+                    from: shapeCommandTargetArg(args.from),
+                    to: shapeCommandTargetArg(args.to),
                     connectionKind: shapeCommandConnectionKindArg(args.connectionKind),
                     text: stringArg(args.text),
                     color: stringArg(args.color),
@@ -96,12 +96,51 @@ function shapeCommandPatchArg(value: unknown): Record<string, unknown> | undefin
 }
 
 function shapeCommandObjectArg(value: unknown): Record<string, unknown> | undefined {
+    value = parseJsonLikeArg(value);
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
     return value as Record<string, unknown>;
 }
 
 function shapeCommandArrayArg(value: unknown): unknown[] | undefined {
+    value = parseJsonLikeArg(value);
     return Array.isArray(value) ? value : undefined;
+}
+
+function shapeCommandTargetArg(value: unknown): AgentShapeCommandRequest['target'] {
+    const parsed = parseJsonLikeArg(value);
+    if (typeof parsed === 'string') return stringArg(parsed);
+    if (Array.isArray(parsed)) return parsed.map(stringArg).filter(Boolean) as string[];
+    if (parsed && typeof parsed === 'object') {
+        const obj = parsed as Record<string, unknown>;
+        const shapeIds = shapeCommandArrayArg(obj.shapeIds)?.map(stringArg).filter(Boolean) as string[] | undefined;
+        return {
+            shapeId: stringArg(obj.shapeId),
+            shapeIds: shapeIds?.length ? shapeIds : undefined,
+            blockId: stringArg(obj.blockId),
+            kind: stringArg(obj.kind),
+        };
+    }
+    return undefined;
+}
+
+function shapeCommandPatchFromTopLevelArgs(args: Record<string, unknown>): Record<string, unknown> | undefined {
+    const patch: Record<string, unknown> = {};
+    const keys = ['x', 'y', 'w', 'h', 'color', 'text', 'name', 'isCollapsed', 'strokeWidth', 'lineWidth'];
+    for (const key of keys) {
+        if (args[key] !== undefined) patch[key] = args[key];
+    }
+    return Object.keys(patch).length ? patch : undefined;
+}
+
+function parseJsonLikeArg(value: unknown): unknown {
+    if (typeof value !== 'string') return value;
+    const raw = value.trim();
+    if (!raw || !/^[\[{]/.test(raw)) return value;
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return value;
+    }
 }
 
 function shapeCommandConnectionKindArg(value: unknown): 'branch' | 'relation' | undefined {
