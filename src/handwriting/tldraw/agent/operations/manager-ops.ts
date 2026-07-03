@@ -389,7 +389,7 @@ async function validateBoardEditOperations(
             if (operation.layout) {
                 validateBoardLayoutIntent(operation.layout, `operations[${index}].layout`);
                 if (operation.layout.anchor !== undefined) {
-                    validateBoardEditRef(editor, operation.layout.anchor, state, plannedAliases, plannedLast, `operations[${index}].layout.anchor`);
+                    validateBoardEditOptionalLayoutAnchor(editor, operation.layout.anchor, state, plannedAliases, plannedLast, `operations[${index}].layout.anchor`);
                 }
             }
             plannedLast = true;
@@ -418,7 +418,7 @@ async function validateBoardEditOperations(
             validateBoardLayoutIntent(operation, `operations[${index}]`);
             validateBoardAlias(operation.as, `operations[${index}].as`, plannedAliases, true);
             const targetCount = validateBoardEditRef(editor, operation.target ?? '$selection', state, plannedAliases, plannedLast, `operations[${index}].target`);
-            if (operation.anchor !== undefined) validateBoardEditRef(editor, operation.anchor, state, plannedAliases, plannedLast, `operations[${index}].anchor`);
+            if (operation.anchor !== undefined) validateBoardEditOptionalLayoutAnchor(editor, operation.anchor, state, plannedAliases, plannedLast, `operations[${index}].anchor`);
             if (stringValue(operation.style) === 'frameAround') {
                 nodeWrites += 1;
                 if (nodeWrites > AGENT_BOARD_EDIT_NODE_LIMIT) {
@@ -929,7 +929,7 @@ function getBoardLayoutAnchorBounds(
     style: AgentBoardLayoutStyle
 ): AgentShapeBounds {
     const anchorIds = intent.anchor
-        ? resolveBoardEditRefs(editor, state, intent.anchor, 'layout.anchor')
+        ? resolveBoardEditRefsLenient(editor, state, intent.anchor, 'layout.anchor')
         : state.selectedShapeIds;
     const bounds = unionShapeBounds(editor, anchorIds);
     if (bounds) return bounds;
@@ -1110,6 +1110,47 @@ function validateBoardEditRef(
     const ids = resolveBoardEditRefsForValidation(editor, value, state, plannedAliases, plannedLast, label);
     if (!ids.length) throw new Error(`${label} resolved to no shapes`);
     return ids.length;
+}
+
+function validateBoardEditOptionalLayoutAnchor(
+    editor: Editor,
+    value: unknown,
+    state: AgentBoardEditState,
+    plannedAliases: Set<string>,
+    plannedLast: boolean,
+    label: string
+) {
+    const ids = resolveBoardEditRefsLenientForValidation(editor, value, state, plannedAliases, plannedLast, label);
+    return ids.length;
+}
+
+function resolveBoardEditRefsLenient(editor: Editor, state: AgentBoardEditState, value: unknown, label: string): string[] {
+    return resolveBoardEditRefsLenientForValidation(editor, value, state, new Set(Object.keys(state.created)), state.lastShapeIds.length > 0, label)
+        .filter((id) => !id.startsWith('$created.'));
+}
+
+function resolveBoardEditRefsLenientForValidation(
+    editor: Editor,
+    value: unknown,
+    state: AgentBoardEditState,
+    plannedAliases: Set<string>,
+    plannedLast: boolean,
+    label: string
+): string[] {
+    try {
+        return resolveBoardEditRefsForValidation(editor, value, state, plannedAliases, plannedLast, label);
+    } catch (error) {
+        if (isMissingSelectionReferenceError(error)) return [];
+        throw error;
+    }
+}
+
+function isMissingSelectionReferenceError(error: unknown): boolean {
+    const message = stringifyAgentError(error);
+    return message.includes('selection index is out of range') ||
+        message.includes('resolved to no shapes') ||
+        message.includes('found no shapes of kind') ||
+        message.includes('found no shape for block');
 }
 
 function findBoardShapesByBlockId(editor: Editor, blockId: string, label: string): string[] {
