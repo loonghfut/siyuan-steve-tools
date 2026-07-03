@@ -129,7 +129,7 @@ function isDescendantBranch(editor: Editor, ancestorBranchId: string, candidateI
 	return false
 }
 
-function canAttachShapeToBranch(editor: Editor, branch: IBranchShape, shape: TLShape) {
+export function canAttachShapeToBranch(editor: Editor, branch: IBranchShape, shape: TLShape) {
 	if (branch.id === shape.id) return false
 	if (shape.type !== 'branch') return true
 
@@ -416,6 +416,31 @@ export function getAllBranchChildIds(branch: IBranchShape) {
 
 export function getAllBranchAttachedShapeIds(branch: IBranchShape) {
 	return Array.from(new Set([...getAllBranchChildIds(branch), ...(branch.props.rootShapeId ? [branch.props.rootShapeId] : [])]))
+}
+
+export function isShapeInBranchTree(
+	editor: Editor,
+	branchId: TLShapeId | string,
+	targetShapeId: TLShapeId | string,
+	visited = new Set<string>()
+) {
+	const id = branchId as string
+	const targetId = targetShapeId as string
+	if (visited.has(id)) return false
+	visited.add(id)
+
+	const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
+	if (!branch || branch.type !== 'branch') return false
+
+	for (const attachedId of getAllBranchAttachedShapeIds(branch)) {
+		if (attachedId === targetId) return true
+		const attachedShape = editor.getShape(attachedId as TLShapeId)
+		if (attachedShape?.type === 'branch' && isShapeInBranchTree(editor, attachedShape.id, targetShapeId, visited)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 export function getBranchAutoFrameState(editor: Editor, branch: IBranchShape) {

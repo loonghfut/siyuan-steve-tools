@@ -1,5 +1,11 @@
 import { type Editor, type TLShapeId, createShapeId } from '@tldraw/tldraw'
-import { isBranchConnectableShape, layoutBranchChildren, relayoutBranchesContainingShapes } from '../../BranchShape/branch-layout'
+import {
+	getBranchRootParent,
+	isBranchConnectableShape,
+	isShapeInBranchTree,
+	layoutBranchChildren,
+	relayoutBranchesContainingShapes,
+} from '../../BranchShape/branch-layout'
 import type { IBranchShape } from '../../BranchShape/branch-shape-types'
 import { markExplicitCreatedBranchRelations } from '../../BranchShape/keep-branch-layouts-updated'
 import type { AgentBranchChildRef, AgentBranchCreateArgs, AgentBranchSide } from '../core/types'
@@ -39,6 +45,7 @@ export function createAgentBranchShape(
 		if (child.side === 'left') leftChildIds.push(childId)
 		else rightChildIds.push(childId)
 	}
+	validateAgentBranchCreateRelations(editor, rootShapeId, leftChildIds, rightChildIds)
 
 	markExplicitCreatedBranchRelations(editor, [branchId])
 
@@ -218,7 +225,37 @@ function getExistingRootShapeId(editor: Editor, rootShapeId?: string): string | 
 	if (shape.type !== 'card' && shape.type !== 'single-block') {
 		throw new Error(`Branch root shape must be card or single-block: ${rootShapeId}`)
 	}
+	const existingBranch = getBranchRootParent(editor, shape.id)
+	if (existingBranch) {
+		throw new Error(`Root shape already has a branch: ${rootShapeId}; use branch connect with that existing branch/root instead`)
+	}
 	return rootShapeId
+}
+
+function validateAgentBranchCreateRelations(
+	editor: Editor,
+	rootShapeId: string | undefined,
+	leftChildIds: string[],
+	rightChildIds: string[]
+) {
+	const allChildIds = [...leftChildIds, ...rightChildIds]
+	const seen = new Set<string>()
+	for (const childId of allChildIds) {
+		if (seen.has(childId)) {
+			throw new Error(`Branch child appears more than once: ${childId}`)
+		}
+		seen.add(childId)
+		if (rootShapeId && childId === rootShapeId) {
+			throw new Error('Branch root shape cannot also be a child')
+		}
+
+		const childShape = editor.getShape(childId as TLShapeId)
+		if (rootShapeId && childShape?.type === 'branch') {
+			if (isShapeInBranchTree(editor, childShape.id, rootShapeId)) {
+				throw new Error('Cannot attach a branch child that already contains the requested root shape')
+			}
+		}
+	}
 }
 
 function getShapeCenter(editor: Editor, shapeId: string): { x: number; y: number } | null {
