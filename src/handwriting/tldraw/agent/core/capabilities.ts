@@ -4,6 +4,8 @@ export function getTldrawAgentCapabilities() {
         enabled: true,
         agentPrompt: [
             'For whiteboard shape work, call tldraw_shape_command. It can use the focused whiteboard and current selection automatically.',
+            'When calling tldraw_shape_command through the frontend plugin wrapper, pass intent, target, patch, node, nodes, from, and to as direct named arguments even if the visible generic schema only lists action/id/query.',
+            'Do not encode the whole tldraw_shape_command payload into id or query. id is only a whiteboardId fallback; omit it when the focused whiteboard is already open.',
             'To answer "what is the selected card content?", call tldraw_shape_command with {intent:"readSelectedContent"}; do not fetch shape ids first.',
             'To change selected custom shape properties, call tldraw_shape_command with intent "inspectEditable" if you need available fields, then intent "updateShape" with a small patch.',
             'To create shapes, call tldraw_shape_command with intent "createShapes" and pass node or nodes. Use layoutStyle instead of manual coordinates unless exact placement is requested.',
@@ -56,6 +58,7 @@ export function getTldrawAgentCapabilities() {
                     whiteboardId: 'omit it for the focused board',
                     target: '$selection',
                     save: 'true when the user asked to modify the board',
+                    callShape: 'pass intent/target/patch as direct named args; do not pack them into id/query',
                 },
                 examples: [
                     { intent: 'readSelectedContent' },

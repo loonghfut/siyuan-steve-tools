@@ -6,13 +6,14 @@ import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition 
 export function createShapeCommandAction(): AgentActionDefinition {
     return {
         name: 'tldraw_shape_command',
-        description: 'Semantic STtools tldraw shape tool. Omit whiteboardId to use the focused whiteboard. Required intent: readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, or focusShapes. target defaults to "$selection" and supports "$selection", "$selection[0]", "$block.<blockId>", "$kind.card", shapeId string, shapeIds array, or {shapeId|shapeIds|blockId|kind}. For createShapes pass node or nodes like {kind:"single-block",text:"..."} plus optional layoutStyle "nearSelection"|"rightOf"|"below"|"grid"|"tree"|"mindmap"|"frameAround". For connectShapes pass from/to or select two shapes; connectionKind is "relation" or "branch". For layoutShapes pass target and layoutStyle. For updateShape pass patch with editable fields returned by inspectEditable.',
+        description: 'Semantic STtools tldraw shape tool. Pass intent/target/patch/etc as direct named arguments even if the frontend wrapper only displays action/id/query; do not put the whole JSON payload in id. Omit whiteboardId to use the focused whiteboard. Required intent: readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, or focusShapes. target defaults to "$selection" and supports "$selection", "$selection[0]", "$block.<blockId>", "$kind.card", shapeId string, shapeIds array, or {shapeId|shapeIds|blockId|kind}. For updateShape pass patch like {color:"orange"}; for selected shapes use {intent:"updateShape",target:"$selection",patch:{color:"orange"},save:true}. For createShapes pass node or nodes like {kind:"single-block",text:"..."} plus optional layoutStyle "nearSelection"|"rightOf"|"below"|"grid"|"tree"|"mindmap"|"frameAround". For connectShapes pass from/to or select two shapes; connectionKind is "relation" or "branch". For layoutShapes pass target and layoutStyle.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
+            const normalizedArgs = normalizeShapeCommandArgs(args);
             try {
-                assertKnownArgs(args, [
-                    'whiteboardId', 'id', 'rootId', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch',
+                assertKnownArgs(normalizedArgs, [
+                    'whiteboardId', 'id', 'rootId', 'query', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch',
                     'node', 'nodes', 'from', 'to', 'connectionKind', 'text', 'color', 'strokeWidth', 'lineWidth',
                     'layoutStyle', 'layout', 'columns', 'gap', 'horizontalGap', 'verticalGap', 'side',
                     'x', 'y', 'w', 'h', 'name', 'save', 'select', 'zoom', 'result',
@@ -21,7 +22,7 @@ export function createShapeCommandAction(): AgentActionDefinition {
                 return { error: stringifyError(error) };
             }
 
-            const whiteboardId = stringArg(args.whiteboardId || args.id || args.rootId) || getFocusedInstanceId();
+            const whiteboardId = stringArg(normalizedArgs.whiteboardId || normalizedArgs.id || normalizedArgs.rootId) || getFocusedInstanceId();
             if (!whiteboardId) {
                 return { error: 'No focused whiteboard. Focus/open a whiteboard, or pass whiteboardId.' };
             }
@@ -31,7 +32,7 @@ export function createShapeCommandAction(): AgentActionDefinition {
                 return { error: `Whiteboard ${whiteboardId} is not open. Call tldraw_open_whiteboard first.` };
             }
 
-            const intent = shapeCommandIntentArg(args.intent);
+            const intent = shapeCommandIntentArg(normalizedArgs.intent);
             if (!intent) {
                 return { error: 'intent must be one of readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, focusShapes' };
             }
@@ -40,34 +41,34 @@ export function createShapeCommandAction(): AgentActionDefinition {
                 const request: AgentShapeCommandRequest = {
                     whiteboardId,
                     intent,
-                    target: shapeCommandTargetArg(args.target ?? args.shapeIds ?? args.shapeId),
-                    shapeKind: stringArg(args.shapeKind),
-                    patch: shapeCommandPatchArg(args.patch) ?? shapeCommandPatchFromTopLevelArgs(args),
-                    node: shapeCommandObjectArg(args.node) as AgentShapeCommandRequest['node'],
-                    nodes: shapeCommandArrayArg(args.nodes) as AgentShapeCommandRequest['nodes'],
-                    from: shapeCommandTargetArg(args.from),
-                    to: shapeCommandTargetArg(args.to),
-                    connectionKind: shapeCommandConnectionKindArg(args.connectionKind),
-                    text: stringArg(args.text),
-                    color: stringArg(args.color),
-                    strokeWidth: numberArg(args.strokeWidth),
-                    lineWidth: numberArg(args.lineWidth),
-                    layoutStyle: shapeCommandLayoutStyleArg(args.layoutStyle),
-                    layout: shapeCommandObjectArg(args.layout) as AgentShapeCommandRequest['layout'],
-                    columns: numberArg(args.columns),
-                    gap: numberArg(args.gap),
-                    horizontalGap: numberArg(args.horizontalGap),
-                    verticalGap: numberArg(args.verticalGap),
-                    side: shapeCommandSideArg(args.side),
-                    x: numberArg(args.x),
-                    y: numberArg(args.y),
-                    w: numberArg(args.w),
-                    h: numberArg(args.h),
-                    name: stringArg(args.name),
-                    save: booleanArg(args.save),
-                    select: booleanArg(args.select),
-                    zoom: booleanArg(args.zoom),
-                    result: shapeCommandResultArg(args.result),
+                    target: shapeCommandTargetArg(normalizedArgs.target ?? normalizedArgs.shapeIds ?? normalizedArgs.shapeId),
+                    shapeKind: stringArg(normalizedArgs.shapeKind),
+                    patch: shapeCommandPatchArg(normalizedArgs.patch) ?? shapeCommandPatchFromTopLevelArgs(normalizedArgs),
+                    node: shapeCommandObjectArg(normalizedArgs.node) as AgentShapeCommandRequest['node'],
+                    nodes: shapeCommandArrayArg(normalizedArgs.nodes) as AgentShapeCommandRequest['nodes'],
+                    from: shapeCommandTargetArg(normalizedArgs.from),
+                    to: shapeCommandTargetArg(normalizedArgs.to),
+                    connectionKind: shapeCommandConnectionKindArg(normalizedArgs.connectionKind),
+                    text: stringArg(normalizedArgs.text),
+                    color: stringArg(normalizedArgs.color),
+                    strokeWidth: numberArg(normalizedArgs.strokeWidth),
+                    lineWidth: numberArg(normalizedArgs.lineWidth),
+                    layoutStyle: shapeCommandLayoutStyleArg(normalizedArgs.layoutStyle),
+                    layout: shapeCommandObjectArg(normalizedArgs.layout) as AgentShapeCommandRequest['layout'],
+                    columns: numberArg(normalizedArgs.columns),
+                    gap: numberArg(normalizedArgs.gap),
+                    horizontalGap: numberArg(normalizedArgs.horizontalGap),
+                    verticalGap: numberArg(normalizedArgs.verticalGap),
+                    side: shapeCommandSideArg(normalizedArgs.side),
+                    x: numberArg(normalizedArgs.x),
+                    y: numberArg(normalizedArgs.y),
+                    w: numberArg(normalizedArgs.w),
+                    h: numberArg(normalizedArgs.h),
+                    name: stringArg(normalizedArgs.name),
+                    save: booleanArg(normalizedArgs.save),
+                    select: booleanArg(normalizedArgs.select),
+                    zoom: booleanArg(normalizedArgs.zoom),
+                    result: shapeCommandResultArg(normalizedArgs.result),
                 };
                 return jsonResult(await instance.runAgentShapeCommand(request));
             } catch (error) {
@@ -89,6 +90,32 @@ function shapeCommandIntentArg(value: unknown): AgentShapeCommandIntent | undefi
         raw === 'focusShapes'
     ) return raw;
     return undefined;
+}
+
+function normalizeShapeCommandArgs(args: Record<string, unknown>): Record<string, unknown> {
+    const withoutId = { ...args };
+    delete withoutId.id;
+
+    const idPayload = shapeCommandObjectArg(args.id);
+    let normalized = idPayload && looksLikeShapeCommandPayload(idPayload)
+        ? { ...idPayload, ...withoutId }
+        : { ...args };
+
+    const queryPayload = shapeCommandObjectArg(normalized.query);
+    if (queryPayload && looksLikeShapeCommandPayload(queryPayload)) {
+        const withoutQuery = { ...normalized };
+        delete withoutQuery.query;
+        normalized = { ...queryPayload, ...withoutQuery };
+    }
+
+    return normalized;
+}
+
+function looksLikeShapeCommandPayload(value: Record<string, unknown>): boolean {
+    return [
+        'whiteboardId', 'rootId', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch',
+        'node', 'nodes', 'from', 'to', 'connectionKind', 'layoutStyle', 'layout',
+    ].some((key) => value[key] !== undefined);
 }
 
 function shapeCommandPatchArg(value: unknown): Record<string, unknown> | undefined {
