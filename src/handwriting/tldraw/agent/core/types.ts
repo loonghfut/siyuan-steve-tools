@@ -175,6 +175,9 @@ export type AgentConnectorCreateArgs = AgentSelectionOptions & {
 	color?: TLDefaultColorStyle
 	text?: string
 	strokeWidth?: number
+	side?: AgentBranchSide
+	horizontalGap?: number
+	verticalGap?: number
 }
 
 export type AgentShapeUpdatePatch = AgentSelectionOptions & {
