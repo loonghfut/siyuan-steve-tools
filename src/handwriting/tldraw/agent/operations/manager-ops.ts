@@ -79,6 +79,9 @@ const AGENT_ENTITY_CREATE_SHAPES = new Set([
 const AGENT_CREATE_GAP = 160;
 const AGENT_DEFAULT_CREATE_ORIGIN = { x: 0, y: 0 };
 const AGENT_BLOCK_CONTENT_MAX_CHARS = 4000;
+const AGENT_CARD_CHILD_MAX_COUNT = 80;
+const AGENT_CARD_CHILD_CONTENT_MAX_CHARS = 1000;
+const AGENT_CARD_CHILDREN_TEXT_MAX_CHARS = 6000;
 const SIYUAN_BLOCK_ID_RE = /^\d{14}-[0-9a-z]{7}$/i;
 
 export type AgentManagerRuntime = {
@@ -1225,14 +1228,17 @@ function summarizeAgentShape(
 }
 
 async function loadAgentLinkedBlockContent(shapes: TLShape[]): Promise<Map<string, AgentLinkedBlockContent>> {
-    const blockIds = Array.from(new Set(shapes
-        .filter(shouldAttachLinkedBlockContent)
-        .map((shape) => String((shape as any).props?.blockId || '').trim())
-        .filter(Boolean)));
-    if (!blockIds.length) return new Map();
+    const includeChildrenByBlockId = new Map<string, boolean>();
+    for (const shape of shapes) {
+        if (!shouldAttachLinkedBlockContent(shape)) continue;
+        const blockId = String((shape as any).props?.blockId || '').trim();
+        if (!blockId) continue;
+        includeChildrenByBlockId.set(blockId, includeChildrenByBlockId.get(blockId) || shape.type === 'card');
+    }
+    if (!includeChildrenByBlockId.size) return new Map();
 
-    const entries = await Promise.all(blockIds.map(async (blockId) => {
-        const content = await loadAgentLinkedBlockContentById(blockId);
+    const entries = await Promise.all(Array.from(includeChildrenByBlockId.entries()).map(async ([blockId, includeChildren]) => {
+        const content = await loadAgentLinkedBlockContentById(blockId, includeChildren);
         return [blockId, content] as const;
     }));
     return new Map(entries);
@@ -1249,15 +1255,16 @@ function getShapeLinkedBlockContent(shape: TLShape, blockContentById: Map<string
     return blockContentById.get(blockId);
 }
 
-async function loadAgentLinkedBlockContentById(blockId: string): Promise<AgentLinkedBlockContent> {
+async function loadAgentLinkedBlockContentById(blockId: string, includeChildren = false): Promise<AgentLinkedBlockContent> {
     if (!SIYUAN_BLOCK_ID_RE.test(blockId)) {
         return { id: blockId, missing: true, error: 'invalid SiYuan block id' };
     }
 
     try {
-        const [block, kramdown] = await Promise.all([
+        const [block, kramdown, childBlocks] = await Promise.all([
             api.getBlockByID(blockId).catch(() => null),
             api.getBlockKramdown(blockId).catch(() => null),
+            includeChildren ? api.getChildBlocks(blockId).catch(() => []) : Promise.resolve([]),
         ]);
         if (!block && !kramdown) return { id: blockId, missing: true };
 
@@ -1271,6 +1278,7 @@ async function loadAgentLinkedBlockContentById(blockId: string): Promise<AgentLi
             String((block as any)?.fcontent || (block as any)?.content || (block as any)?.hpath || blockId).replace(/\s+/g, ' ').trim(),
             160,
         );
+        const childSummary = includeChildren ? summarizeAgentCardChildBlocks(childBlocks) : undefined;
 
         return {
             id: blockId,
@@ -1279,21 +1287,59 @@ async function loadAgentLinkedBlockContentById(blockId: string): Promise<AgentLi
             title,
             content: contentClamp.text,
             markdown: markdownClamp.text,
+            childCount: childSummary?.childCount,
+            children: childSummary?.children,
+            childrenText: childSummary?.childrenText,
+            childrenTruncated: childSummary?.truncated || undefined,
             hpath: (block as any)?.hpath ? clampAgentText(String((block as any).hpath), 240) : undefined,
-            truncated: contentClamp.truncated || markdownClamp.truncated || undefined,
+            truncated: contentClamp.truncated || markdownClamp.truncated || childSummary?.truncated || undefined,
         };
     } catch (error) {
         return { id: blockId, missing: true, error: stringifyAgentError(error) };
     }
 }
 
-function clampAgentBlockContent(value: string): { text: string; truncated: boolean } {
+function summarizeAgentCardChildBlocks(value: unknown) {
+    const blocks = Array.isArray(value) ? value : [];
+    const children = blocks.slice(0, AGENT_CARD_CHILD_MAX_COUNT).map((block: any) => {
+        const content = clampAgentBlockContent(
+            String(block?.fcontent || block?.content || block?.markdown || ''),
+            AGENT_CARD_CHILD_CONTENT_MAX_CHARS,
+        );
+        const markdown = clampAgentBlockContent(String(block?.markdown || ''), AGENT_CARD_CHILD_CONTENT_MAX_CHARS);
+        return {
+            id: String(block?.id || ''),
+            type: block?.type ? String(block.type) : undefined,
+            subType: block?.subtype ? String(block.subtype) : undefined,
+            content: content.text,
+            markdown: markdown.text || undefined,
+            truncated: content.truncated || markdown.truncated || undefined,
+        };
+    });
+    const joined = children
+        .map((child) => child.content || child.markdown || '')
+        .filter(Boolean)
+        .join('\n');
+    const childrenText = clampAgentBlockContent(joined, AGENT_CARD_CHILDREN_TEXT_MAX_CHARS);
+    const truncated = blocks.length > AGENT_CARD_CHILD_MAX_COUNT ||
+        children.some((child) => child.truncated) ||
+        childrenText.truncated;
+
+    return {
+        childCount: blocks.length,
+        children,
+        childrenText: childrenText.text,
+        truncated,
+    };
+}
+
+function clampAgentBlockContent(value: string, maxLength = AGENT_BLOCK_CONTENT_MAX_CHARS): { text: string; truncated: boolean } {
     const normalized = String(value || '').trim();
-    if (normalized.length <= AGENT_BLOCK_CONTENT_MAX_CHARS) {
+    if (normalized.length <= maxLength) {
         return { text: normalized, truncated: false };
     }
     return {
-        text: `${normalized.slice(0, AGENT_BLOCK_CONTENT_MAX_CHARS)}...`,
+        text: `${normalized.slice(0, maxLength)}...`,
         truncated: true,
     };
 }

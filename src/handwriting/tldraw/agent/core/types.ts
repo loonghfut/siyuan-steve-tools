@@ -131,10 +131,23 @@ export type AgentLinkedBlockContent = {
 	title?: string
 	content?: string
 	markdown?: string
+	childCount?: number
+	children?: AgentLinkedBlockChildContent[]
+	childrenText?: string
+	childrenTruncated?: boolean
 	hpath?: string
 	truncated?: boolean
 	missing?: boolean
 	error?: string
+}
+
+export type AgentLinkedBlockChildContent = {
+	id: string
+	type?: string
+	subType?: string
+	content?: string
+	markdown?: string
+	truncated?: boolean
 }
 
 export type AgentBasicShapeCreateArgs = AgentSelectionOptions & {
