@@ -29,9 +29,25 @@ export function registerTldrawAgentActions(plugin: Plugin) {
     for (const action of getTldrawAgentActions(plugin)) {
         const handler = async (args: Record<string, unknown>, app: unknown) => {
             const cleanedArgs = stripFrontendActionArgs(args);
+            console.log('[tldraw agent action] call', {
+                name: action.name,
+                args: cleanedArgs,
+                rawArgs: args,
+            });
             const endAgentActivity = beginAgentActivityForArgs(cleanedArgs);
             try {
-                return await action.handler(cleanedArgs, app);
+                const result = await action.handler(cleanedArgs, app);
+                console.log('[tldraw agent action] response', {
+                    name: action.name,
+                    result,
+                });
+                return result;
+            } catch (error) {
+                console.log('[tldraw agent action] error', {
+                    name: action.name,
+                    error,
+                });
+                throw error;
             } finally {
                 endAgentActivity();
             }
