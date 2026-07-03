@@ -1,21 +1,29 @@
 import type {
     AgentBasicShapeCreateArgs,
+    AgentBranchChildRef,
+    AgentBranchCreateArgs,
+    AgentCardCreateArgs,
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
     AgentResultMode,
     AgentShapeSummary,
     AgentShapeUpdatePatch,
+    AgentSingleBlockCreateArgs,
 } from '../core/types';
-import { normalizeAgentColor } from '../core/schema';
+import { normalizeAgentColor, normalizeBranchLineStyle } from '../core/schema';
 
 const MAX_PLAN_WRITES = 50;
 
-const CREATE_KINDS = new Set(['card', 'single-block', 'text', 'frame', 'note', 'geo', 'slide', 'mind-map']);
-const BUSINESS_CREATE_KINDS = new Set(['card', 'single-block']);
-const PLAN_OPS = new Set(['create', 'connect', 'update', 'layout', 'focus', 'save']);
+const CREATE_KINDS = new Set(['card', 'single-block', 'branch', 'text', 'frame', 'note', 'geo', 'slide', 'mind-map']);
+const BUSINESS_CREATE_KINDS = new Set(['card', 'single-block', 'branch']);
+const PLAN_OPS = new Set(['create', 'branch', 'connect', 'update', 'layout', 'focus', 'save']);
 const LAYOUT_STYLES = new Set(['row', 'column', 'grid', 'branch', 'mindmap-like']);
 
 type PlanCreatedRefs = Record<string, string[]>;
+type AgentBranchNodeCreateArgs = AgentCardCreateArgs | AgentSingleBlockCreateArgs;
+type NormalizedBranchRoot =
+    | { shapeId: string; createArgs?: undefined }
+    | { shapeId?: undefined; createArgs: AgentBranchNodeCreateArgs };
 
 export type AgentPlanApplyOptions = {
     whiteboardId?: string;
@@ -69,7 +77,7 @@ export async function executeAgentPlan(options: AgentPlanApplyOptions, adapter: 
         const step = steps[index];
         const op = stringArg(step.op);
         if (!op || !PLAN_OPS.has(op)) {
-            throw new Error(`steps[${index}].op must be one of create, connect, update, layout, focus, save`);
+            throw new Error(`steps[${index}].op must be one of create, branch, connect, update, layout, focus, save`);
         }
 
         const normalized = normalizePlanStep(step, op, state);
@@ -148,7 +156,11 @@ function normalizeSteps(value: unknown): Record<string, unknown>[] {
 }
 
 function normalizePlanStep(step: Record<string, unknown>, op: string, state: AgentPlanState): NormalizedPlanStep {
-    if (op === 'create') return normalizeCreateStep(step);
+    if (op === 'create') {
+        if (stringArg(step.kind) === 'branch') return normalizeBranchStep(step, state);
+        return normalizeCreateStep(step);
+    }
+    if (op === 'branch') return normalizeBranchStep(step, state);
     if (op === 'connect') return normalizeConnectStep(step, state);
     if (op === 'update') return normalizeUpdateStep(step, state);
     if (op === 'layout') return normalizeLayoutStep(step, state);
@@ -166,7 +178,7 @@ function normalizeCreateStep(step: Record<string, unknown>): NormalizedPlanStep 
 
     const kind = stringArg(step.kind);
     if (!kind || !CREATE_KINDS.has(kind)) {
-        throw new Error('create.kind must be card, single-block, text, frame, note, geo, slide, or mind-map');
+        throw new Error('create.kind must be card, single-block, branch, text, frame, note, geo, slide, or mind-map');
     }
 
     const as = optionalAlias(step.as);
@@ -197,6 +209,174 @@ function normalizeCreateStep(step: Record<string, unknown>): NormalizedPlanStep 
         },
         writeCount: 1,
     };
+}
+
+function normalizeBranchStep(step: Record<string, unknown>, state: AgentPlanState): NormalizedPlanStep {
+    assertKnownPlanKeys(step, [
+        'op', 'as', 'kind', 'root', 'from', 'rootShapeId', 'child', 'to', 'childIds',
+        'children', 'leftChildren', 'rightChildren', 'x', 'y', 'direction', 'horizontalGap',
+        'verticalGap', 'lineStyle', 'lineWidth', 'snapDistance', 'showBackground',
+        'color', 'select', 'zoom',
+    ], 'branch step');
+    rejectUnsafeCreateKeys(step);
+    const kind = stringArg(step.kind);
+    if (kind && kind !== 'branch') throw new Error('branch.kind must be branch when provided');
+
+    const rootSource = step.root ?? step.from ?? step.rootShapeId ??
+        (state.selectedShapeIds.length >= 2 ? '$selection[0]' : undefined);
+    const root = normalizeBranchRoot(rootSource, state, 'branch.root');
+    const hasExplicitChildren =
+        step.child !== undefined ||
+        step.to !== undefined ||
+        step.childIds !== undefined ||
+        step.children !== undefined ||
+        step.leftChildren !== undefined ||
+        step.rightChildren !== undefined;
+    const defaultChild = !hasExplicitChildren && state.selectedShapeIds.length >= 2 ? '$selection[1]' : undefined;
+    const children = [
+        ...normalizeBranchChildren(step.child ?? step.to ?? defaultChild, state, 'branch.child'),
+        ...normalizeBranchChildren(step.childIds, state, 'branch.childIds'),
+        ...normalizeBranchChildren(step.children, state, 'branch.children'),
+    ];
+    const leftChildren = normalizeBranchChildren(step.leftChildren, state, 'branch.leftChildren', 'left');
+    const rightChildren = normalizeBranchChildren(step.rightChildren, state, 'branch.rightChildren', 'right');
+    const childCount = children.length + leftChildren.length + rightChildren.length;
+    if (childCount === 0) throw new Error('branch requires at least one child shape or child node');
+
+    const args: AgentBranchCreateArgs = {
+        kind: 'branch',
+        x: numberArg(step.x),
+        y: numberArg(step.y),
+        rootShapeId: root.shapeId,
+        children,
+        leftChildren,
+        rightChildren,
+        direction: branchSideArg(step.direction),
+        horizontalGap: numberArg(step.horizontalGap),
+        verticalGap: numberArg(step.verticalGap),
+        lineStyle: step.lineStyle === undefined ? undefined : normalizeBranchLineStyle(step.lineStyle),
+        lineWidth: numberArg(step.lineWidth),
+        snapDistance: numberArg(step.snapDistance),
+        showBackground: booleanArg(step.showBackground),
+        color: colorArg(step.color),
+        select: booleanArg(step.select),
+        zoom: booleanArg(step.zoom),
+    };
+
+    return {
+        op: 'branch',
+        as: optionalAlias(step.as),
+        root,
+        args,
+        select: booleanArg(step.select),
+        zoom: booleanArg(step.zoom),
+        writeCount: 1 + (root.createArgs ? 1 : 0) + countBranchChildCreations([...children, ...leftChildren, ...rightChildren]),
+    };
+}
+
+function normalizeBranchRoot(value: unknown, state: AgentPlanState, label: string): NormalizedBranchRoot {
+    if (typeof value === 'string') {
+        return { shapeId: firstResolvedShapeId(value, state, label) };
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error(`${label} is required`);
+    }
+
+    const obj = value as Record<string, unknown>;
+    assertKnownPlanKeys(obj, [
+        'shapeId', 'target', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId',
+        'contentMarkdown', 'title', 'isMain', 'isCollapsed', 'showMask',
+    ], label);
+    const shapeRef = obj.shapeId ?? obj.target;
+    if (shapeRef !== undefined) {
+        return { shapeId: firstResolvedShapeId(shapeRef, state, `${label}.shapeId`) };
+    }
+    return { createArgs: buildBranchNodeCreateArgs(obj, label, 'single-block') };
+}
+
+function normalizeBranchChildren(value: unknown, state: AgentPlanState, label: string, forcedSide?: 'left' | 'right'): AgentBranchChildRef[] {
+    if (value === undefined || value === null || value === '') return [];
+    if (Array.isArray(value)) {
+        return value.flatMap((item, index) => normalizeBranchChildren(item, state, `${label}[${index}]`, forcedSide));
+    }
+    if (typeof value === 'string') {
+        return resolveShapeRefs(value, state, label).map((shapeId) => branchExistingChild(shapeId, forcedSide));
+    }
+    if (!value || typeof value !== 'object') {
+        throw new Error(`${label} must be a shape reference or branch child object`);
+    }
+
+    const obj = value as Record<string, unknown>;
+    assertKnownPlanKeys(obj, [
+        'shapeId', 'target', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId',
+        'contentMarkdown', 'title', 'isMain', 'isCollapsed', 'showMask', 'side',
+    ], label);
+    const side = forcedSide || branchSideArg(obj.side);
+    const shapeRef = obj.shapeId ?? obj.target;
+    if (shapeRef !== undefined) {
+        return resolveShapeRefs(shapeRef, state, `${label}.shapeId`).map((shapeId) => branchExistingChild(shapeId, side));
+    }
+
+    return [{ ...buildBranchNodeCreateArgs(obj, label, 'single-block'), side }];
+}
+
+function branchExistingChild(shapeId: string, side?: 'left' | 'right'): AgentBranchChildRef {
+    return side ? { shapeId, side } : { shapeId };
+}
+
+function buildBranchNodeCreateArgs(
+    obj: Record<string, unknown>,
+    label: string,
+    fallbackKind: 'card' | 'single-block'
+): AgentBranchNodeCreateArgs {
+    const kind = branchNodeKind(obj.kind, fallbackKind, label);
+    if (kind === 'card') {
+        return {
+            kind,
+            x: numberArg(obj.x),
+            y: numberArg(obj.y),
+            w: numberArg(obj.w),
+            h: numberArg(obj.h),
+            color: colorArg(obj.color),
+            blockId: stringArg(obj.blockId),
+            contentMarkdown: stringArg(obj.contentMarkdown),
+            title: stringArg(obj.title),
+            isMain: booleanArg(obj.isMain),
+            isCollapsed: booleanArg(obj.isCollapsed),
+            showMask: booleanArg(obj.showMask),
+            select: false,
+            zoom: false,
+        };
+    }
+    return {
+        kind,
+        x: numberArg(obj.x),
+        y: numberArg(obj.y),
+        w: numberArg(obj.w),
+        h: numberArg(obj.h),
+        color: colorArg(obj.color),
+        blockId: stringArg(obj.blockId),
+        contentMarkdown: stringArg(obj.contentMarkdown),
+        title: stringArg(obj.title),
+        select: false,
+        zoom: false,
+    };
+}
+
+function branchNodeKind(value: unknown, fallback: 'card' | 'single-block', label: string): 'card' | 'single-block' {
+    const raw = stringArg(value);
+    if (!raw) return fallback;
+    if (raw === 'card' || raw === 'single-block') return raw;
+    throw new Error(`${label}.kind must be card or single-block`);
+}
+
+function branchSideArg(value: unknown): 'left' | 'right' | undefined {
+    const raw = stringArg(value);
+    return raw === 'left' || raw === 'right' ? raw : undefined;
+}
+
+function countBranchChildCreations(children: AgentBranchChildRef[]) {
+    return children.filter((child) => typeof child === 'object' && child && !child.shapeId).length;
 }
 
 function normalizeConnectStep(step: Record<string, unknown>, state: AgentPlanState): NormalizedPlanStep {
@@ -301,6 +481,30 @@ async function executeNormalizedStep(
         return result;
     }
 
+    if (step.op === 'branch') {
+        const args = { ...(step.args as AgentBranchCreateArgs) };
+        const root = step.root as NormalizedBranchRoot;
+        let rootShapeId = root.shapeId;
+        let rootResult: { createdShapeIds?: string[]; [key: string]: unknown } | undefined;
+        if (root.createArgs) {
+            rootResult = await adapter.createShape({
+                ...root.createArgs,
+                select: false,
+                zoom: false,
+                resultMode: options.resultMode,
+            });
+            rootShapeId = firstCreatedShapeId(rootResult, 'branch root');
+        }
+        args.rootShapeId = rootShapeId;
+        args.select = stepSelect(step, options, false);
+        args.zoom = stepZoom(step, options, false);
+        args.resultMode = options.resultMode;
+        const result = await adapter.createShape(args);
+        const branchShapeIds = normalizeBranchCreatedShapeIds(result);
+        recordCreated(step.as, branchShapeIds, state);
+        return rootResult ? { root: rootResult, branch: result } : result;
+    }
+
     if (step.op === 'connect') {
         const args = { ...(step.args as Record<string, unknown>) };
         args.select = stepSelect(step, options, false);
@@ -358,6 +562,12 @@ function applyDryRunState(step: NormalizedPlanStep, state: AgentPlanState) {
         return;
     }
     if (step.op === 'connect') {
+        const alias = typeof step.as === 'string' ? step.as : undefined;
+        const placeholder = alias ? `$created.${alias}` : '$last';
+        recordCreated(alias, [placeholder], state);
+        return;
+    }
+    if (step.op === 'branch') {
         const alias = typeof step.as === 'string' ? step.as : undefined;
         const placeholder = alias ? `$created.${alias}` : '$last';
         recordCreated(alias, [placeholder], state);
@@ -544,6 +754,17 @@ function recordCreated(alias: unknown, shapeIds: string[], state: AgentPlanState
 
 function normalizeShapeIds(value: unknown): string[] {
     return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function normalizeBranchCreatedShapeIds(result: { branchId?: unknown; createdShapeIds?: unknown }): string[] {
+    const branchId = typeof result.branchId === 'string' && result.branchId ? result.branchId : undefined;
+    return branchId ? [branchId] : normalizeShapeIds(result.createdShapeIds);
+}
+
+function firstCreatedShapeId(result: { createdShapeIds?: unknown }, label: string): string {
+    const ids = normalizeShapeIds(result.createdShapeIds);
+    if (!ids.length) throw new Error(`Failed to create ${label}`);
+    return ids[0];
 }
 
 function optionalAlias(value: unknown): string | undefined {
