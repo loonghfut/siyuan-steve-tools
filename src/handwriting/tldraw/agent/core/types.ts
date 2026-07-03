@@ -189,7 +189,14 @@ export type AgentShapeUpdatePatch = AgentSelectionOptions & {
 	name?: string
 }
 
-export type AgentShapeCommandIntent = 'readSelectedContent' | 'inspectEditable' | 'updateShape'
+export type AgentShapeCommandIntent =
+	| 'readSelectedContent'
+	| 'inspectEditable'
+	| 'updateShape'
+	| 'createShapes'
+	| 'connectShapes'
+	| 'layoutShapes'
+	| 'focusShapes'
 
 export type AgentEditableFieldSpec = {
 	name: string
@@ -360,6 +367,27 @@ export type AgentShapeCommandRequest = AgentSelectionOptions & {
 	target?: AgentBoardEditHandle
 	shapeKind?: string
 	patch?: Record<string, unknown>
+	node?: AgentBoardNodeCreate
+	nodes?: AgentBoardNodeCreate[]
+	from?: AgentBoardEditHandle
+	to?: AgentBoardEditHandle
+	connectionKind?: 'branch' | 'relation'
+	text?: string
+	color?: string
+	strokeWidth?: number
+	lineWidth?: number
+	layoutStyle?: AgentBoardLayoutStyle
+	layout?: AgentBoardLayoutIntent
+	columns?: number
+	gap?: number
+	horizontalGap?: number
+	verticalGap?: number
+	side?: AgentBranchSide
+	x?: number
+	y?: number
+	w?: number
+	h?: number
+	name?: string
 	save?: boolean
 	result?: AgentBoardEditResultMode
 }

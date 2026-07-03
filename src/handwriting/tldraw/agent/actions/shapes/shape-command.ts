@@ -1,17 +1,22 @@
 import { getFocusedInstanceId, getInstance } from '../../../tldraw-instance-manager';
-import { assertKnownArgs, booleanArg, stringArg } from '../../core/args';
+import { assertKnownArgs, booleanArg, numberArg, stringArg } from '../../core/args';
 import type { AgentBoardEditResultMode, AgentShapeCommandIntent, AgentShapeCommandRequest } from '../../core/types';
 import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition } from '../shared';
 
 export function createShapeCommandAction(): AgentActionDefinition {
     return {
         name: 'tldraw_shape_command',
-        description: 'Semantic STtools tldraw shape tool for simple custom-shape reads and edits. Omit whiteboardId to use the focused whiteboard. Required: intent "readSelectedContent"|"inspectEditable"|"updateShape". target defaults to "$selection" and supports "$selection", "$selection[0]", "$block.<blockId>", "$kind.card", shapeId string, shapeIds array, or {shapeId|shapeIds|blockId|kind}. Use inspectEditable to get exact fields. Common editable fields: card color/isCollapsed/showMask/isMain/renderMode/collapsedTextSize/collapsedTextAlign; single-block transparentBackground/allowBinding/connectOnEnter; branch lineStyle/lineWidth/horizontalGap/verticalGap/showBackground; bezier-connector strokeWidth/strokeStyle/labelPosition/text; mind-map theme/direction/fontSize/nodeWidth/nodeHeight/lineWidth/gaps/text; slide name/borderStyle; js-shape interactive/restrictDom. For updateShape pass patch with editable fields returned by inspectEditable. Best use: read selected content with {intent:"readSelectedContent"}; inspect with {intent:"inspectEditable",target:"$selection[0]"}; update with {intent:"updateShape",patch:{color:"blue",isCollapsed:true},save:true}.',
+        description: 'Semantic STtools tldraw shape tool. Omit whiteboardId to use the focused whiteboard. Required intent: readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, or focusShapes. target defaults to "$selection" and supports "$selection", "$selection[0]", "$block.<blockId>", "$kind.card", shapeId string, shapeIds array, or {shapeId|shapeIds|blockId|kind}. For createShapes pass node or nodes like {kind:"single-block",text:"..."} plus optional layoutStyle "nearSelection"|"rightOf"|"below"|"grid"|"tree"|"mindmap"|"frameAround". For connectShapes pass from/to or select two shapes; connectionKind is "relation" or "branch". For layoutShapes pass target and layoutStyle. For updateShape pass patch with editable fields returned by inspectEditable.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
             try {
-                assertKnownArgs(args, ['whiteboardId', 'id', 'rootId', 'intent', 'target', 'shapeKind', 'patch', 'save', 'select', 'zoom', 'result'], 'tldraw_shape_command');
+                assertKnownArgs(args, [
+                    'whiteboardId', 'id', 'rootId', 'intent', 'target', 'shapeKind', 'patch',
+                    'node', 'nodes', 'from', 'to', 'connectionKind', 'text', 'color', 'strokeWidth', 'lineWidth',
+                    'layoutStyle', 'layout', 'columns', 'gap', 'horizontalGap', 'verticalGap', 'side',
+                    'x', 'y', 'w', 'h', 'name', 'save', 'select', 'zoom', 'result',
+                ], 'tldraw_shape_command');
             } catch (error) {
                 return { error: stringifyError(error) };
             }
@@ -28,7 +33,7 @@ export function createShapeCommandAction(): AgentActionDefinition {
 
             const intent = shapeCommandIntentArg(args.intent);
             if (!intent) {
-                return { error: 'intent must be one of readSelectedContent, inspectEditable, updateShape' };
+                return { error: 'intent must be one of readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, focusShapes' };
             }
 
             try {
@@ -38,6 +43,27 @@ export function createShapeCommandAction(): AgentActionDefinition {
                     target: args.target as AgentShapeCommandRequest['target'],
                     shapeKind: stringArg(args.shapeKind),
                     patch: shapeCommandPatchArg(args.patch),
+                    node: shapeCommandObjectArg(args.node) as AgentShapeCommandRequest['node'],
+                    nodes: shapeCommandArrayArg(args.nodes) as AgentShapeCommandRequest['nodes'],
+                    from: args.from as AgentShapeCommandRequest['from'],
+                    to: args.to as AgentShapeCommandRequest['to'],
+                    connectionKind: shapeCommandConnectionKindArg(args.connectionKind),
+                    text: stringArg(args.text),
+                    color: stringArg(args.color),
+                    strokeWidth: numberArg(args.strokeWidth),
+                    lineWidth: numberArg(args.lineWidth),
+                    layoutStyle: shapeCommandLayoutStyleArg(args.layoutStyle),
+                    layout: shapeCommandObjectArg(args.layout) as AgentShapeCommandRequest['layout'],
+                    columns: numberArg(args.columns),
+                    gap: numberArg(args.gap),
+                    horizontalGap: numberArg(args.horizontalGap),
+                    verticalGap: numberArg(args.verticalGap),
+                    side: shapeCommandSideArg(args.side),
+                    x: numberArg(args.x),
+                    y: numberArg(args.y),
+                    w: numberArg(args.w),
+                    h: numberArg(args.h),
+                    name: stringArg(args.name),
                     save: booleanArg(args.save),
                     select: booleanArg(args.select),
                     zoom: booleanArg(args.zoom),
@@ -53,13 +79,47 @@ export function createShapeCommandAction(): AgentActionDefinition {
 
 function shapeCommandIntentArg(value: unknown): AgentShapeCommandIntent | undefined {
     const raw = stringArg(value);
-    if (raw === 'readSelectedContent' || raw === 'inspectEditable' || raw === 'updateShape') return raw;
+    if (
+        raw === 'readSelectedContent' ||
+        raw === 'inspectEditable' ||
+        raw === 'updateShape' ||
+        raw === 'createShapes' ||
+        raw === 'connectShapes' ||
+        raw === 'layoutShapes' ||
+        raw === 'focusShapes'
+    ) return raw;
     return undefined;
 }
 
 function shapeCommandPatchArg(value: unknown): Record<string, unknown> | undefined {
+    return shapeCommandObjectArg(value);
+}
+
+function shapeCommandObjectArg(value: unknown): Record<string, unknown> | undefined {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
     return value as Record<string, unknown>;
+}
+
+function shapeCommandArrayArg(value: unknown): unknown[] | undefined {
+    return Array.isArray(value) ? value : undefined;
+}
+
+function shapeCommandConnectionKindArg(value: unknown): 'branch' | 'relation' | undefined {
+    const raw = stringArg(value);
+    if (raw === 'branch' || raw === 'relation') return raw;
+    return undefined;
+}
+
+function shapeCommandLayoutStyleArg(value: unknown): AgentShapeCommandRequest['layoutStyle'] {
+    const raw = stringArg(value);
+    if (raw === 'nearSelection' || raw === 'rightOf' || raw === 'below' || raw === 'grid' || raw === 'tree' || raw === 'mindmap' || raw === 'frameAround') return raw;
+    return undefined;
+}
+
+function shapeCommandSideArg(value: unknown): AgentShapeCommandRequest['side'] {
+    const raw = stringArg(value);
+    if (raw === 'left' || raw === 'right') return raw;
+    return undefined;
 }
 
 function shapeCommandResultArg(value: unknown): AgentBoardEditResultMode | undefined {

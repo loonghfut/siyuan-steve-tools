@@ -352,7 +352,22 @@ export async function runAgentShapeCommand(
     let saved = false;
 
     if (intent !== 'readSelectedContent' && intent !== 'inspectEditable' && intent !== 'updateShape') {
-        return { ok: false, intent, whiteboardId: runtime.id, target, errors: [`unsupported intent: ${String(intent)}`] };
+        if (intent !== 'createShapes' && intent !== 'connectShapes' && intent !== 'layoutShapes' && intent !== 'focusShapes') {
+            return { ok: false, intent, whiteboardId: runtime.id, target, errors: [`unsupported intent: ${String(intent)}`] };
+        }
+    }
+
+    if (intent === 'createShapes') {
+        return executeAgentShapeCommandCreate(runtime, request);
+    }
+    if (intent === 'connectShapes') {
+        return executeAgentShapeCommandConnect(runtime, request);
+    }
+    if (intent === 'layoutShapes') {
+        return executeAgentShapeCommandLayout(runtime, request);
+    }
+    if (intent === 'focusShapes') {
+        return executeAgentShapeCommandFocus(runtime, request);
     }
 
     let targetShapeIds: string[];
@@ -492,6 +507,244 @@ function resolveAgentShapeCommandTarget(
         ? ids.filter((id) => editor.getShape(id as TLShapeId)?.type === kind)
         : ids;
     return filtered;
+}
+
+async function executeAgentShapeCommandCreate(
+    runtime: AgentManagerRuntime,
+    request: AgentShapeCommandRequest
+): Promise<AgentShapeCommandResult> {
+    const editor = requireEditor(runtime);
+    const state = createShapeCommandState(editor);
+    const rawNodes = Array.isArray(request.nodes)
+        ? request.nodes
+        : request.node
+            ? [request.node]
+            : [];
+    if (!rawNodes.length) {
+        return { ok: false, intent: request.intent, whiteboardId: runtime.id, target: request.target, errors: ['createShapes requires node or nodes'] };
+    }
+
+    try {
+        for (let index = 0; index < rawNodes.length; index++) {
+            await validateBoardNodeCreate(rawNodes[index], new Set(), `nodes[${index}]`);
+        }
+
+        const createdIds: string[] = [];
+        const created: Record<string, string[]> = {};
+        for (const node of rawNodes) {
+            const alias = optionalBoardAlias(node.as);
+            const originalBlockId = stringValue(node.blockId);
+            const result = await createBoardEditNode(runtime, editor, node);
+            const ids = result.createdShapeIds.map(String);
+            createdIds.push(...ids);
+            if (alias) {
+                state.created[alias] = ids;
+                created[alias] = ids;
+            }
+            trackCommittedShapes(state, ids);
+            state.counts.createdShapes += ids.length;
+            for (const createdNode of result.createdNodes || []) {
+                if (!originalBlockId && createdNode.blockId && (createdNode.kind === 'card' || createdNode.kind === 'single-block')) {
+                    state.externalCreatedBlockIds.push(createdNode.blockId);
+                }
+            }
+        }
+
+        state.lastShapeIds = createdIds;
+        const layout = buildShapeCommandLayoutIntent(request, 'nearSelection');
+        if (createdIds.length && layout) {
+            const layoutResult = applyBoardEditLayout(editor, state, createdIds, layout);
+            applyBoardLayoutResult(state, layoutResult);
+        }
+        if (request.select !== false && createdIds.length) editor.setSelectedShapes(createdIds as TLShapeId[]);
+        if (request.zoom === true && createdIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+        const saved = await persistShapeCommandIfNeeded(runtime, state, request.save);
+
+        return {
+            ok: true,
+            intent: request.intent,
+            whiteboardId: runtime.id,
+            target: request.target,
+            updatedShapeIds: uniqueStrings([...createdIds, ...state.committedShapeIds]),
+            items: [{
+                created,
+                createdShapeIds: createdIds,
+                externalCreatedBlockIds: uniqueStrings(state.externalCreatedBlockIds),
+                counts: state.counts,
+            }],
+            errors: [],
+            saved,
+        };
+    } catch (error) {
+        return { ok: false, intent: request.intent, whiteboardId: runtime.id, target: request.target, updatedShapeIds: state.committedShapeIds, errors: [stringifyAgentError(error)], saved: state.saved };
+    }
+}
+
+async function executeAgentShapeCommandConnect(
+    runtime: AgentManagerRuntime,
+    request: AgentShapeCommandRequest
+): Promise<AgentShapeCommandResult> {
+    const editor = requireEditor(runtime);
+    const state = createShapeCommandState(editor);
+    const selected = state.selectedShapeIds;
+    const from = request.from ?? selected[0];
+    const to = request.to ?? (selected.length > 2 ? selected.slice(1) : selected[1]);
+    if (!from || !to) {
+        return { ok: false, intent: request.intent, whiteboardId: runtime.id, target: request.target, errors: ['connectShapes requires from/to or at least two selected shapes'] };
+    }
+
+    try {
+        await executeBoardConnect(runtime, editor, {
+            op: 'connect',
+            kind: request.connectionKind || 'relation',
+            from,
+            to,
+            text: request.text,
+            color: boardColor(request.color),
+            strokeWidth: request.strokeWidth ?? request.lineWidth,
+            lineWidth: request.lineWidth ?? request.strokeWidth,
+            layout: buildShapeCommandLayoutIntent(request),
+        }, state);
+        if (request.select !== false && state.lastShapeIds.length) editor.setSelectedShapes(state.lastShapeIds as TLShapeId[]);
+        if (request.zoom === true && state.lastShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+        const saved = await persistShapeCommandIfNeeded(runtime, state, request.save);
+        return {
+            ok: true,
+            intent: request.intent,
+            whiteboardId: runtime.id,
+            target: request.target,
+            updatedShapeIds: state.lastShapeIds,
+            items: [{ createdShapeIds: state.lastShapeIds, counts: state.counts }],
+            errors: [],
+            saved,
+        };
+    } catch (error) {
+        return { ok: false, intent: request.intent, whiteboardId: runtime.id, target: request.target, updatedShapeIds: state.committedShapeIds, errors: [stringifyAgentError(error)], saved: state.saved };
+    }
+}
+
+async function executeAgentShapeCommandLayout(
+    runtime: AgentManagerRuntime,
+    request: AgentShapeCommandRequest
+): Promise<AgentShapeCommandResult> {
+    const editor = requireEditor(runtime);
+    const state = createShapeCommandState(editor);
+
+    try {
+        const targetIds = resolveBoardEditRefs(editor, state, request.target ?? '$selection', 'layoutShapes.target');
+        const layout = buildShapeCommandLayoutIntent(request, 'grid') || { style: 'grid' as const };
+        const result = applyBoardEditLayout(editor, state, targetIds, layout);
+        applyBoardLayoutResult(state, result);
+        const affectedIds = uniqueStrings([...result.updatedShapeIds, ...result.createdShapeIds]);
+        if (request.select !== false && affectedIds.length) editor.setSelectedShapes(affectedIds as TLShapeId[]);
+        if (request.zoom === true && affectedIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+        const saved = await persistShapeCommandIfNeeded(runtime, state, request.save);
+        return {
+            ok: true,
+            intent: request.intent,
+            whiteboardId: runtime.id,
+            target: request.target ?? '$selection',
+            updatedShapeIds: affectedIds,
+            items: [{ layout, affectedShapeIds: affectedIds, counts: state.counts }],
+            errors: [],
+            saved,
+        };
+    } catch (error) {
+        return { ok: false, intent: request.intent, whiteboardId: runtime.id, target: request.target ?? '$selection', updatedShapeIds: state.committedShapeIds, errors: [stringifyAgentError(error)], saved: state.saved };
+    }
+}
+
+function executeAgentShapeCommandFocus(
+    runtime: AgentManagerRuntime,
+    request: AgentShapeCommandRequest
+): AgentShapeCommandResult {
+    const editor = requireEditor(runtime);
+    const state = createShapeCommandState(editor);
+
+    try {
+        executeBoardFocus(editor, request.target ?? '$selection', request.zoom, state);
+        return {
+            ok: true,
+            intent: request.intent,
+            whiteboardId: runtime.id,
+            target: request.target ?? '$selection',
+            updatedShapeIds: state.focusedShapeIds,
+            items: [{ focusedShapeIds: state.focusedShapeIds, selectedShapeIds: state.selectedShapeIds }],
+            errors: [],
+            saved: false,
+        };
+    } catch (error) {
+        return { ok: false, intent: request.intent, whiteboardId: runtime.id, target: request.target ?? '$selection', errors: [stringifyAgentError(error)], saved: false };
+    }
+}
+
+function createShapeCommandState(editor: Editor): AgentBoardEditState {
+    return {
+        operationId: `shape-command-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        mode: 'commit',
+        resultMode: 'minimal',
+        selectedShapeIds: editor.getSelectedShapeIds().map(String),
+        created: {},
+        lastShapeIds: [],
+        focusedShapeIds: [],
+        committedShapeIds: [],
+        externalCreatedBlockIds: [],
+        errors: [],
+        counts: {
+            createdShapes: 0,
+            updatedShapes: 0,
+            connectors: 0,
+            branches: 0,
+        },
+        saveRequested: false,
+        saved: false,
+        anyMutation: false,
+    };
+}
+
+function buildShapeCommandLayoutIntent(
+    request: AgentShapeCommandRequest,
+    defaultStyle?: AgentBoardLayoutStyle
+): AgentBoardLayoutIntent | undefined {
+    const raw = request.layout && typeof request.layout === 'object' && !Array.isArray(request.layout)
+        ? request.layout
+        : {};
+    const style = normalizeShapeCommandLayoutStyle(request.layoutStyle ?? raw.style ?? defaultStyle);
+    if (!style && !defaultStyle && !Object.keys(raw).length) return undefined;
+    return {
+        ...raw,
+        style: style || defaultStyle,
+        target: raw.target ?? request.target,
+        anchor: raw.anchor,
+        side: request.side ?? raw.side,
+        columns: request.columns ?? raw.columns,
+        gap: request.gap ?? raw.gap,
+        horizontalGap: request.horizontalGap ?? raw.horizontalGap,
+        verticalGap: request.verticalGap ?? raw.verticalGap,
+        x: request.x ?? raw.x,
+        y: request.y ?? raw.y,
+        w: request.w ?? raw.w,
+        h: request.h ?? raw.h,
+        name: request.name ?? raw.name,
+        color: boardColor(request.color ?? raw.color),
+    };
+}
+
+function normalizeShapeCommandLayoutStyle(value: unknown): AgentBoardLayoutStyle | undefined {
+    const raw = stringValue(value);
+    if (!raw) return undefined;
+    return AGENT_BOARD_EDIT_LAYOUT_STYLES.has(raw) ? raw as AgentBoardLayoutStyle : undefined;
+}
+
+async function persistShapeCommandIfNeeded(runtime: AgentManagerRuntime, state: AgentBoardEditState, save: boolean | undefined): Promise<boolean> {
+    if (!state.anyMutation) return false;
+    if (save === true) {
+        await runtime.saveData();
+        state.saved = true;
+        return true;
+    }
+    runtime.triggerSave();
+    return false;
 }
 
 function shapeSummaryToContentItem(summary: AgentShapeSummary): Record<string, unknown> {

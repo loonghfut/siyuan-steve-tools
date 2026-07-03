@@ -3,12 +3,15 @@ export function getTldrawAgentCapabilities() {
         version: 2,
         enabled: true,
         agentPrompt: [
-            'For simple custom-shape reads and edits, call tldraw_shape_command first. It can use the focused whiteboard and current selection automatically.',
+            'For whiteboard shape work, call tldraw_shape_command. It can use the focused whiteboard and current selection automatically.',
             'To answer "what is the selected card content?", call tldraw_shape_command with {intent:"readSelectedContent"}; do not fetch shape ids first.',
             'To change selected custom shape properties, call tldraw_shape_command with intent "inspectEditable" if you need available fields, then intent "updateShape" with a small patch.',
+            'To create shapes, call tldraw_shape_command with intent "createShapes" and pass node or nodes. Use layoutStyle instead of manual coordinates unless exact placement is requested.',
+            'To connect shapes, call tldraw_shape_command with intent "connectShapes"; pass from/to or select two shapes first. Use connectionKind "branch" for hierarchy and "relation" for ordinary links.',
+            'To arrange or frame shapes, call tldraw_shape_command with intent "layoutShapes" and layoutStyle "nearSelection", "rightOf", "below", "grid", "tree", "mindmap", or "frameAround".',
             'If the user refers to the current board or selected shapes, omit whiteboardId and use $selection / $selection[0]. The focused whiteboard is used automatically.',
             'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences.',
-            'The old board-edit DSL tool is intentionally not registered. Ask for a narrower semantic operation if tldraw_shape_command does not expose the needed operation yet.',
+            'The old board-edit DSL tool is intentionally not registered. Do not construct operations arrays.',
         ],
         preferred: [
             'tldraw_shape_command',
@@ -37,9 +40,9 @@ export function getTldrawAgentCapabilities() {
         toolSelectionHints: {
             shapeCommand: {
                 action: 'tldraw_shape_command',
-                purpose: 'Primary semantic tool for simple custom-shape reads, editable-field inspection, and property updates.',
+                purpose: 'Primary semantic tool for custom-shape reads, creation, connection, layout, focusing, editable-field inspection, and property updates.',
                 references: ['$selection', '$selection[0]', '$block.<blockId>', '$kind.card', '$kind.single-block', '$kind.branch', '$kind.bezier-connector', '$kind.mind-map', '$kind.slide', '$kind.js-shape'],
-                intents: ['readSelectedContent', 'inspectEditable', 'updateShape'],
+                intents: ['readSelectedContent', 'inspectEditable', 'updateShape', 'createShapes', 'connectShapes', 'layoutShapes', 'focusShapes'],
                 editableExamples: {
                     card: ['color', 'isCollapsed', 'showMask', 'isMain', 'renderMode', 'collapsedTextSize', 'collapsedTextAlign'],
                     'single-block': ['color', 'transparentBackground', 'allowBinding', 'connectOnEnter'],
@@ -58,6 +61,9 @@ export function getTldrawAgentCapabilities() {
                     { intent: 'readSelectedContent' },
                     { intent: 'inspectEditable', target: '$selection[0]' },
                     { intent: 'updateShape', target: '$selection[0]', patch: { color: 'blue', isCollapsed: true }, save: true },
+                    { intent: 'createShapes', nodes: [{ kind: 'single-block', text: 'New note' }], layoutStyle: 'nearSelection', save: true },
+                    { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'relation', text: 'related', save: true },
+                    { intent: 'layoutShapes', target: '$selection', layoutStyle: 'grid', columns: 3, save: true },
                 ],
             },
             inspect: {
@@ -69,7 +75,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'card',
                 purpose: 'A large SiYuan document or heading card for article sections, overview documents, or rich linked content.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing-card reads/edits.',
+                createWith: 'tldraw_shape_command intent createShapes with node kind "card".',
                 notes: [
                     'Use blockId to reference an existing document/heading block, or contentMarkdown/title/text to create a new heading block.',
                     'Content belongs to the bound SiYuan block; use tldraw_shape_command to read content or update whiteboard card properties such as color, collapse state, mask, renderMode, and collapsed text settings.',
@@ -78,7 +84,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'single-block',
                 purpose: 'A compact SiYuan paragraph block for atomic notes, branch leaves, labels, todos, and short facts.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing single-block reads/edits.',
+                createWith: 'tldraw_shape_command intent createShapes with node kind "single-block".',
                 notes: [
                     'Use blockId for an existing paragraph, or text/contentMarkdown/title to create a new paragraph block.',
                     'Use this as the default branch leaf and compact content node.',
@@ -88,7 +94,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'branch',
                 purpose: 'A visual hierarchy connector from one root shape to left/right child shapes.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing branch style edits.',
+                createWith: 'tldraw_shape_command intent connectShapes with connectionKind "branch".',
                 notes: [
                     'Do not hand-place branch geometry. Provide from/to refs and optional layout side/style.',
                     'Use layout style "tree" for one-sided hierarchies and "mindmap" for balanced left/right maps.',
@@ -98,7 +104,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'bezier-connector',
                 purpose: 'A curved, bindable relationship connector with an optional label.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing connector edits.',
+                createWith: 'tldraw_shape_command intent connectShapes with connectionKind "relation".',
                 notes: [
                     'Use relation connections for non-hierarchical semantic links.',
                     'The runtime chooses shape ports automatically.',
@@ -108,7 +114,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'frame',
                 purpose: 'A visual boundary around related shapes.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL.',
+                createWith: 'tldraw_shape_command intent createShapes with node kind "frame", or layoutShapes with layoutStyle "frameAround".',
                 notes: [
                     'Use frameAround when grouping existing shapes visually.',
                 ],
@@ -116,7 +122,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'mind-map',
                 purpose: 'A custom structured mind-map shape with editable root text, theme, direction, node sizing, and spacing.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing mind-map edits.',
+                createWith: 'tldraw_shape_command intent createShapes with node kind "mind-map".',
                 notes: [
                     'Use tldraw_shape_command for root text, theme, direction, fontSize, nodeWidth, nodeHeight, lineWidth, spacing, size, and color.',
                     'Node-level add/move/delete remains outside tldraw_shape_command in this version.',
@@ -125,7 +131,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'slide',
                 purpose: 'A custom slide frame used for focused whiteboard presentation sections.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing slide edits.',
+                createWith: 'tldraw_shape_command intent createShapes with node kind "slide".',
                 notes: [
                     'Use tldraw_shape_command to update slide name, borderStyle, size, position, and color.',
                     'Screenshot capture and block linking remain UI-specific actions.',
@@ -134,7 +140,7 @@ export function getTldrawAgentCapabilities() {
             {
                 type: 'js-shape',
                 purpose: 'A custom JavaScript-rendered shape.',
-                createWith: 'Creation is intentionally not exposed through the old board-edit DSL; use tldraw_shape_command for existing JS shape edits.',
+                createWith: 'tldraw_shape_command intent createShapes with node kind "js-shape".',
                 notes: [
                     'Use tldraw_shape_command to update size, position, color, interactive, and restrictDom.',
                     'Agent-supplied script and raw data writes remain blocked.',
@@ -145,6 +151,10 @@ export function getTldrawAgentCapabilities() {
             'Inspect selected shapes: tldraw_shape_command intent inspectEditable.',
             'Read selected linked content: tldraw_shape_command intent readSelectedContent.',
             'Update selected shape fields: tldraw_shape_command intent updateShape with a small patch.',
+            'Create notes/shapes: tldraw_shape_command intent createShapes with node/nodes and layoutStyle.',
+            'Connect shapes: tldraw_shape_command intent connectShapes with from/to and connectionKind.',
+            'Arrange or frame shapes: tldraw_shape_command intent layoutShapes with target and layoutStyle.',
+            'Select and zoom: tldraw_shape_command intent focusShapes.',
         ],
         hiddenLegacyActions: [
             'The old board-edit DSL and legacy/basic write actions are intentionally not registered for Agent use.',
