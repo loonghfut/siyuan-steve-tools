@@ -189,5 +189,154 @@ export type AgentShapeUpdatePatch = AgentSelectionOptions & {
 	name?: string
 }
 
+export type AgentBoardEditMode = 'commit' | 'preview'
+export type AgentBoardEditResultMode = 'minimal' | 'debug'
+export type AgentBoardEditHandle =
+	| string
+	| string[]
+	| {
+		shapeId?: string
+		shapeIds?: string[]
+		blockId?: string
+		kind?: string
+	}
+
+export type AgentBoardLayoutStyle =
+	| 'nearSelection'
+	| 'rightOf'
+	| 'below'
+	| 'grid'
+	| 'tree'
+	| 'mindmap'
+	| 'frameAround'
+
+export type AgentBoardLayoutIntent = {
+	style?: AgentBoardLayoutStyle
+	target?: AgentBoardEditHandle
+	anchor?: AgentBoardEditHandle
+	side?: AgentBranchSide
+	columns?: number
+	gap?: number
+	horizontalGap?: number
+	verticalGap?: number
+	x?: number
+	y?: number
+	w?: number
+	h?: number
+	as?: string
+	name?: string
+	color?: TLDefaultColorStyle
+}
+
+export type AgentBoardNodeCreate = {
+	as?: string
+	kind: 'card' | 'single-block' | 'text' | 'frame'
+	x?: number
+	y?: number
+	w?: number
+	h?: number
+	color?: TLDefaultColorStyle
+	blockId?: string
+	contentMarkdown?: string
+	text?: string
+	title?: string
+	name?: string
+	isMain?: boolean
+	isCollapsed?: boolean
+	showMask?: boolean
+}
+
+export type AgentBoardNodePatch = {
+	target?: AgentBoardEditHandle
+	shapeId?: string
+	shapeIds?: string[]
+	x?: number
+	y?: number
+	w?: number
+	h?: number
+	color?: string
+	isCollapsed?: boolean
+	text?: string
+	name?: string
+}
+
+export type AgentBoardEditOperation =
+	| {
+		op: 'createNodes'
+		nodes: AgentBoardNodeCreate[]
+		layout?: AgentBoardLayoutIntent
+	}
+	| {
+		op: 'connect'
+		kind?: 'branch' | 'relation'
+		from: AgentBoardEditHandle
+		to: AgentBoardEditHandle
+		text?: string
+		color?: TLDefaultColorStyle
+		strokeWidth?: number
+		lineWidth?: number
+		layout?: AgentBoardLayoutIntent
+		as?: string
+	}
+	| ({
+		op: 'layout'
+		target?: AgentBoardEditHandle
+	} & AgentBoardLayoutIntent)
+	| {
+		op: 'updateNodes'
+		target?: AgentBoardEditHandle
+		patches?: AgentBoardNodePatch[]
+		nodes?: AgentBoardNodePatch[]
+		x?: number
+		y?: number
+		w?: number
+		h?: number
+		color?: string
+		isCollapsed?: boolean
+		text?: string
+		name?: string
+	}
+	| {
+		op: 'focus'
+		target?: AgentBoardEditHandle
+		zoom?: boolean
+	}
+	| {
+		op: 'save'
+	}
+
+export type AgentBoardEditRequest = {
+	whiteboardId?: string
+	goal?: string
+	mode?: AgentBoardEditMode
+	operations?: AgentBoardEditOperation[]
+	selection?: AgentBoardEditHandle
+	result?: AgentBoardEditResultMode
+	save?: boolean
+}
+
+export type AgentBoardEditCounts = {
+	createdShapes: number
+	updatedShapes: number
+	connectors: number
+	branches: number
+}
+
+export type AgentBoardEditResult = {
+	ok: boolean
+	operationId: string
+	mode: AgentBoardEditMode
+	committed: boolean
+	created: Record<string, string[]>
+	counts: AgentBoardEditCounts
+	focusedShapeIds: string[]
+	selectedShapeIds: string[]
+	committedShapeIds: string[]
+	externalCreatedBlockIds: string[]
+	saved: boolean
+	errors: string[]
+	summary?: unknown
+}
+
 export type AgentArrangeOperation = 'front' | 'back' | 'forward' | 'backward'
 export type AgentAlignOperation = 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom' | 'distribute-x' | 'distribute-y'

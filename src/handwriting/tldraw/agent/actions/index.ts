@@ -1,6 +1,7 @@
 import type { Plugin } from 'siyuan';
 import { createAlignShapesAction } from './shapes/align-shapes';
 import { createApplyPlanAction } from './planning/apply-plan';
+import { createEditBoardAction } from './planning/edit-board';
 import { createArrangeShapesAction } from './shapes/arrange-shapes';
 import { createBackupWhiteboardAction } from './whiteboards/backup-whiteboard';
 import { createBatchUpdateShapesAction } from './shapes/batch-update-shapes';
@@ -37,6 +38,7 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
     const actions = [
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
+        createEditBoardAction(),
         createApplyPlanAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
@@ -74,6 +76,7 @@ function withInteractionContextRequirement(action: AgentActionDefinition): Agent
     if (
         action.name === 'tldraw_get_interaction_context' ||
         action.name === 'tldraw_get_agent_capabilities' ||
+        action.name === 'tldraw_edit_board' ||
         action.name === 'tldraw_apply_plan'
     ) {
         return action;

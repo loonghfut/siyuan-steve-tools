@@ -46,7 +46,7 @@ import { setInteracting } from './utils/idle-scheduler';
 import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import * as agentOps from './agent/operations/manager-ops';
-import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeUpdatePatch } from './agent/core/types';
+import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentBoardEditRequest, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeUpdatePatch } from './agent/core/types';
 import type { AgentDocOutlineBoardOptions } from './agent/documents/doc-to-board';
 import type { AgentPlanApplyOptions } from './agent/planning/plan-runner';
 const assetUrls = createAssetUrlsWithCustomIcons();
@@ -1560,6 +1560,10 @@ export class TldrawManager {
 
     public async applyAgentPlan(options: AgentPlanApplyOptions) {
         return agentOps.applyAgentPlan(this.getAgentRuntime(), options);
+    }
+
+    public async editAgentBoard(options: AgentBoardEditRequest) {
+        return agentOps.editAgentBoard(this.getAgentRuntime(), options);
     }
 
     public updateAgentShape(options: { shapeId: string; x?: number; y?: number; w?: number; h?: number; color?: string; isCollapsed?: boolean; select?: boolean; zoom?: boolean; resultMode?: AgentResultMode }) {
