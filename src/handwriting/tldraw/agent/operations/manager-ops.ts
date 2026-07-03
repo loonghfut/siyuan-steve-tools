@@ -358,7 +358,7 @@ function normalizeBoardEditOperations(value: unknown): AgentBoardEditOperation[]
 }
 
 async function validateBoardEditOperations(
-    runtime: AgentManagerRuntime,
+    _runtime: AgentManagerRuntime,
     editor: Editor,
     operations: AgentBoardEditOperation[],
     state: AgentBoardEditState
@@ -416,8 +416,19 @@ async function validateBoardEditOperations(
             assertBoardEditKeys(operation, ['op', 'target', 'style', 'anchor', 'side', 'columns', 'gap', 'horizontalGap', 'verticalGap', 'x', 'y', 'w', 'h', 'as', 'name', 'color'], `operations[${index}]`);
             validateBoardLayoutIntent(operation, `operations[${index}]`);
             validateBoardAlias(operation.as, `operations[${index}].as`, plannedAliases, true);
-            validateBoardEditRef(editor, operation.target ?? '$selection', state, plannedAliases, plannedLast, `operations[${index}].target`);
+            const targetCount = validateBoardEditRef(editor, operation.target ?? '$selection', state, plannedAliases, plannedLast, `operations[${index}].target`);
             if (operation.anchor !== undefined) validateBoardEditRef(editor, operation.anchor, state, plannedAliases, plannedLast, `operations[${index}].anchor`);
+            if (stringValue(operation.style) === 'frameAround') {
+                nodeWrites += 1;
+                if (nodeWrites > AGENT_BOARD_EDIT_NODE_LIMIT) {
+                    throw new Error(`created nodes exceed ${AGENT_BOARD_EDIT_NODE_LIMIT}; split this edit`);
+                }
+            } else {
+                updateWrites += targetCount;
+                if (updateWrites > AGENT_BOARD_EDIT_UPDATE_LIMIT) {
+                    throw new Error(`layout/update writes exceed ${AGENT_BOARD_EDIT_UPDATE_LIMIT}; split this edit`);
+                }
+            }
             if (operation.as) plannedAliases.add(operation.as);
             plannedLast = true;
             continue;
@@ -458,8 +469,21 @@ async function validateBoardNodeCreate(
     }
     validateBoardAlias(node.as, `${label}.as`, plannedAliases, false);
     if (node.as) plannedAliases.add(node.as);
-    if (kind === 'card') await validateAgentLinkedBlockId(stringValue(node.blockId), 'card');
-    if (kind === 'single-block') await validateAgentLinkedBlockId(stringValue(node.blockId), 'single-block');
+    const blockId = stringValue(node.blockId);
+    const contentMarkdown = stringValue(node.contentMarkdown ?? node.text);
+    const title = stringValue(node.title);
+    if (kind === 'card') {
+        if (blockId && contentMarkdown !== undefined) {
+            throw new Error(`${label}: card cannot set both blockId and contentMarkdown/text`);
+        }
+        await validateAgentLinkedBlockId(blockId, 'card');
+    }
+    if (kind === 'single-block') {
+        if (blockId && (contentMarkdown !== undefined || title !== undefined)) {
+            throw new Error(`${label}: single-block cannot set blockId together with contentMarkdown/text/title`);
+        }
+        await validateAgentLinkedBlockId(blockId, 'single-block');
+    }
 }
 
 function validateBoardLayoutIntent(value: unknown, label: string) {
@@ -715,6 +739,7 @@ function executeBoardUpdateNodes(
     }
 
     if (updates.length) {
+        assertBoardEditUpdateBudget(state, updatedIds.length, 'updateNodes');
         editor.updateShapes(updates);
         state.counts.updatedShapes += updatedIds.length;
         state.lastShapeIds = updatedIds;
@@ -754,7 +779,10 @@ function applyBoardEditLayout(
     }
 
     const updates = buildBoardLayoutUpdates(editor, state, ids, intent, style);
-    if (updates.length) editor.updateShapes(updates as any);
+    if (updates.length) {
+        assertBoardEditUpdateBudget(state, updates.length, 'layout');
+        editor.updateShapes(updates as any);
+    }
     return { updatedShapeIds: updates.map((update) => String(update.id)), createdShapeIds: [] };
 }
 
@@ -955,7 +983,7 @@ function normalizeBoardUpdatePatches(
         ? operation.patches
         : Array.isArray(operation.nodes)
             ? operation.nodes
-            : [operation as AgentBoardNodePatch];
+            : [operationToBoardNodePatch(operation)];
 
     return rawPatches.flatMap((patch, index) => {
         if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error(`${label}.patches[${index}] must be an object`);
@@ -973,6 +1001,14 @@ function normalizeBoardUpdatePatches(
             name: stringValue(patch.name ?? operation.name),
         }));
     });
+}
+
+function operationToBoardNodePatch(operation: Extract<AgentBoardEditOperation, { op: 'updateNodes' }>): AgentBoardNodePatch {
+    const patch = { ...(operation as any) };
+    delete patch.op;
+    delete patch.patches;
+    delete patch.nodes;
+    return patch as AgentBoardNodePatch;
 }
 
 function resolveInitialBoardSelection(editor: Editor, value: unknown): string[] {
@@ -1103,6 +1139,13 @@ function trackCommittedShapes(state: AgentBoardEditState, ids: string[]) {
     if (!ids.length) return;
     state.anyMutation = true;
     state.committedShapeIds = uniqueStrings([...state.committedShapeIds, ...ids]);
+}
+
+function assertBoardEditUpdateBudget(state: AgentBoardEditState, count: number, label: string) {
+    if (count <= 0) return;
+    if (state.counts.updatedShapes + count > AGENT_BOARD_EDIT_UPDATE_LIMIT) {
+        throw new Error(`${label} writes exceed ${AGENT_BOARD_EDIT_UPDATE_LIMIT}; split this edit`);
+    }
 }
 
 function buildBoardEditResult(runtime: AgentManagerRuntime, state: AgentBoardEditState, ok: boolean): AgentBoardEditResult {
