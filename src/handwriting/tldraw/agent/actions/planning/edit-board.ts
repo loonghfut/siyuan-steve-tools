@@ -68,13 +68,25 @@ function normalizeEditBoardOperation(operation: unknown): unknown {
     if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return operation;
     const normalized = { ...(operation as Record<string, unknown>) };
     normalized.op = normalizeEditBoardOp(normalized.op);
+    normalizeNumericFields(normalized, ['x', 'y', 'w', 'h', 'columns', 'gap', 'horizontalGap', 'verticalGap', 'strokeWidth', 'lineWidth']);
+    normalizeTargetAliases(normalized);
+    normalizeConnectorAliases(normalized);
 
     if (normalized.op === 'createNodes' && !Array.isArray(normalized.nodes)) {
         const node = firstArray(normalized.nodes, normalized.node, normalized.items, normalized.shapes);
         if (node) normalized.nodes = node;
     }
+    if (Array.isArray(normalized.nodes)) {
+        normalized.nodes = normalized.nodes.map((node) => normalizeEditBoardNode(node));
+    }
     if (normalized.op === 'updateNodes' && !Array.isArray(normalized.patches) && Array.isArray(normalized.updates)) {
         normalized.patches = normalized.updates;
+    }
+    if (Array.isArray(normalized.patches)) {
+        normalized.patches = normalized.patches.map(normalizeEditBoardPatch);
+    }
+    if (normalized.layout) {
+        normalized.layout = normalizeEditBoardNestedObject(normalized.layout, ['x', 'y', 'w', 'h', 'columns', 'gap', 'horizontalGap', 'verticalGap']);
     }
 
     delete normalized.node;
@@ -82,6 +94,59 @@ function normalizeEditBoardOperation(operation: unknown): unknown {
     delete normalized.shapes;
     delete normalized.updates;
     return normalized;
+}
+
+function normalizeTargetAliases(operation: Record<string, unknown>) {
+    if (operation.op !== 'layout' && operation.op !== 'updateNodes' && operation.op !== 'focus') return;
+    if (operation.target === undefined) {
+        operation.target = operation.shapeIds ?? operation.shapeId;
+    }
+    delete operation.shapeId;
+    delete operation.shapeIds;
+}
+
+function normalizeConnectorAliases(operation: Record<string, unknown>) {
+    if (operation.op !== 'connect') return;
+    const shapeIds = Array.isArray(operation.shapeIds) ? operation.shapeIds : undefined;
+    if (operation.from === undefined) operation.from = operation.startShapeId ?? operation.sourceShapeId ?? shapeIds?.[0];
+    if (operation.to === undefined) operation.to = operation.endShapeId ?? operation.targetShapeId ?? shapeIds?.[1];
+    delete operation.startShapeId;
+    delete operation.endShapeId;
+    delete operation.sourceShapeId;
+    delete operation.targetShapeId;
+    delete operation.shapeIds;
+}
+
+function normalizeEditBoardNode(value: unknown): unknown {
+    const normalized = normalizeEditBoardNestedObject(value, ['x', 'y', 'w', 'h']);
+    if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) return normalized;
+    const node = normalized as Record<string, unknown>;
+    node.kind = normalizeNodeKind(node.kind);
+    return node;
+}
+
+function normalizeEditBoardPatch(value: unknown): unknown {
+    const normalized = normalizeEditBoardNestedObject(value, ['x', 'y', 'w', 'h']);
+    if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) return normalized;
+    const patch = normalized as Record<string, unknown>;
+    if (patch.shapeId === undefined && patch.id !== undefined) patch.shapeId = patch.id;
+    delete patch.id;
+    return patch;
+}
+
+function normalizeEditBoardNestedObject(value: unknown, numericKeys: string[]): unknown {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    const normalized = { ...(value as Record<string, unknown>) };
+    normalizeNumericFields(normalized, numericKeys);
+    return normalized;
+}
+
+function normalizeNumericFields(value: Record<string, unknown>, keys: string[]) {
+    for (const key of keys) {
+        if (typeof value[key] === 'string' && value[key].trim() && Number.isFinite(Number(value[key]))) {
+            value[key] = Number(value[key]);
+        }
+    }
 }
 
 function normalizeEditBoardOp(value: unknown): unknown {
@@ -92,6 +157,12 @@ function normalizeEditBoardOp(value: unknown): unknown {
     if (raw === 'layout' || raw === 'arrange') return 'layout';
     if (raw === 'focus' || raw === 'select' || raw === 'zoom') return 'focus';
     if (raw === 'save') return 'save';
+    return value;
+}
+
+function normalizeNodeKind(value: unknown): unknown {
+    const raw = stringArg(value)?.replace(/[_\s-]+/g, '').toLowerCase();
+    if (raw === 'singleblock') return 'single-block';
     return value;
 }
 

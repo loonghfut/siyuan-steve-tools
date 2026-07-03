@@ -315,9 +315,10 @@ export async function editAgentBoard(runtime: AgentManagerRuntime, request: Agen
 }
 
 function createBoardEditState(editor: Editor, request: AgentBoardEditRequest): AgentBoardEditState {
+    const currentSelectedShapeIds = editor.getSelectedShapeIds().map(String);
     const selectedShapeIds = request.selection === undefined
-        ? editor.getSelectedShapeIds().map(String)
-        : resolveInitialBoardSelection(editor, request.selection);
+        ? currentSelectedShapeIds
+        : resolveInitialBoardSelection(editor, request.selection, currentSelectedShapeIds);
     return {
         operationId: `agent-edit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         mode: request.mode === 'preview' ? 'preview' : 'commit',
@@ -1011,17 +1012,33 @@ function operationToBoardNodePatch(operation: Extract<AgentBoardEditOperation, {
     return patch as AgentBoardNodePatch;
 }
 
-function resolveInitialBoardSelection(editor: Editor, value: unknown): string[] {
-    if (Array.isArray(value)) return uniqueStrings(value.map(stringValue).filter(Boolean) as string[]);
+function resolveInitialBoardSelection(editor: Editor, value: unknown, currentSelectedShapeIds: string[]): string[] {
+    if (Array.isArray(value)) {
+        return uniqueStrings(value.flatMap((item, index) => resolveInitialBoardSelection(editor, item, currentSelectedShapeIds)));
+    }
     if (typeof value === 'string') {
         const raw = value.trim();
-        if (!raw || raw === '$selection') return editor.getSelectedShapeIds().map(String);
-        return raw.split(',').map((item) => item.trim()).filter(Boolean);
+        if (!raw || raw === '$selection') return currentSelectedShapeIds;
+        const selectionMatch = raw.match(/^\$selection\[(\d+)\]$/);
+        if (selectionMatch) {
+            const id = currentSelectedShapeIds[Number(selectionMatch[1])];
+            return id ? [id] : [];
+        }
+        const blockMatch = raw.match(/^\$block\.(.+)$/);
+        if (blockMatch) return findBoardShapesByBlockId(editor, blockMatch[1], 'selection');
+        const kindMatch = raw.match(/^\$kind\.([A-Za-z0-9_-]+)$/);
+        if (kindMatch) return findBoardShapesByKind(editor, kindMatch[1], 'selection');
+        if (raw.includes(',')) return uniqueStrings(raw.split(',').map((item) => item.trim()).filter(Boolean));
+        return editor.getShape(raw as TLShapeId) ? [raw] : [];
     }
     if (value && typeof value === 'object') {
         const obj = value as any;
-        if (Array.isArray(obj.shapeIds)) return uniqueStrings(obj.shapeIds.map(stringValue).filter(Boolean) as string[]);
-        if (obj.shapeId) return [String(obj.shapeId)];
+        if (Array.isArray(obj.shapeIds)) {
+            return uniqueStrings(obj.shapeIds.flatMap((shapeId: unknown) => resolveInitialBoardSelection(editor, shapeId, currentSelectedShapeIds)));
+        }
+        if (obj.shapeId) return resolveInitialBoardSelection(editor, obj.shapeId, currentSelectedShapeIds);
+        if (obj.blockId) return findBoardShapesByBlockId(editor, String(obj.blockId), 'selection');
+        if (obj.kind) return findBoardShapesByKind(editor, String(obj.kind), 'selection');
     }
     return [];
 }
