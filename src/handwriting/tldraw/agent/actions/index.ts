@@ -15,6 +15,7 @@ import { createPreviewBackupAction } from './whiteboards/preview-backup';
 import { createReadDocOutlineAction } from './documents/read-doc-outline';
 import { createSaveWhiteboardAction } from './whiteboards/save-whiteboard';
 import { createSelectShapeAction } from './shapes/select-shape';
+import { createShapeCommandAction } from './shapes/shape-command';
 import type { AgentActionContext, AgentActionDefinition } from './shared';
 import { createZoomToShapesAction } from './shapes/zoom-to-shapes';
 
@@ -23,6 +24,7 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
     const actions = [
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
+        createShapeCommandAction(),
         createEditBoardAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
@@ -46,6 +48,7 @@ function withInteractionContextRequirement(action: AgentActionDefinition): Agent
     if (
         action.name === 'tldraw_get_interaction_context' ||
         action.name === 'tldraw_get_agent_capabilities' ||
+        action.name === 'tldraw_shape_command' ||
         action.name === 'tldraw_edit_board'
     ) {
         return action;

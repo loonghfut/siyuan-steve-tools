@@ -2,7 +2,7 @@ import { Plugin } from 'siyuan';
 import { settingdata } from '@/index';
 import { getTldrawAgentActions } from './agent/actions';
 import type { AgentActionResult } from './agent/actions/shared';
-import { getInstance } from './tldraw-instance-manager';
+import { getFocusedInstanceId, getInstance } from './tldraw-instance-manager';
 
 type AddAgentActionObject = (options: {
     name: string;
@@ -58,7 +58,7 @@ function stripFrontendActionArgs(args: Record<string, unknown>): Record<string, 
 }
 
 function beginAgentActivityForArgs(args: Record<string, unknown>): () => void {
-    const whiteboardId = stringValue(args.whiteboardId || args.id || args.rootId);
+    const whiteboardId = stringValue(args.whiteboardId || args.id || args.rootId) || getFocusedInstanceId();
     if (!whiteboardId) return noop;
 
     const instance = getInstance(whiteboardId) as unknown as {

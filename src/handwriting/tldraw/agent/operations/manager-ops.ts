@@ -14,7 +14,9 @@ import { settingdata } from '@/index';
 import { WhiteboardFileManager } from '../../whiteboard-file-manager';
 import { createOrUpdateConnectorBinding } from '../../BezierConnectorShape';
 import { getBestPortPair, getPortPagePosition } from '../../BezierConnectorShape/port-utils';
-import { getCardCollapsedHeight } from '../../CardShape/card-collapse';
+import { alignBranchToRootContent, layoutBranchChildren, relayoutBranchesContainingShapes } from '../../BranchShape/branch-layout';
+import type { IBranchShape } from '../../BranchShape/branch-shape-types';
+import { buildCardCollapseUpdate, getCardCollapsedHeight } from '../../CardShape/card-collapse';
 import type { ICardShape } from '../../CardShape/card-shape-types';
 import { createMindMapNode } from '../../MindMapShape/mind-map-shape-types';
 import { DEFAULT_SCRIPT } from '../../JsShape/static';
@@ -43,8 +45,11 @@ import type {
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
     AgentCreateShapeResult,
+    AgentEditableFieldSpec,
     AgentLinkedBlockContent,
     AgentResultMode,
+    AgentShapeCommandRequest,
+    AgentShapeCommandResult,
     AgentShapeSummary,
     AgentSingleBlockCreateArgs,
     AgentShapeUpdatePatch,
@@ -122,8 +127,30 @@ const AGENT_BOARD_EDIT_NODE_LIMIT = 200;
 const AGENT_BOARD_EDIT_CONNECT_LIMIT = 300;
 const AGENT_BOARD_EDIT_UPDATE_LIMIT = 500;
 const AGENT_BOARD_EDIT_ALLOWED_OPS = new Set(['createNodes', 'connect', 'layout', 'updateNodes', 'focus', 'save']);
-const AGENT_BOARD_EDIT_NODE_KINDS = new Set(['card', 'single-block', 'text', 'frame']);
+const AGENT_BOARD_EDIT_NODE_KINDS = new Set(['card', 'single-block', 'text', 'frame', 'note', 'geo', 'slide', 'mind-map', 'js-shape']);
 const AGENT_BOARD_EDIT_LAYOUT_STYLES = new Set(['nearSelection', 'rightOf', 'below', 'grid', 'tree', 'mindmap', 'frameAround']);
+const AGENT_EDITABLE_COLORS = [
+    'black',
+    'grey',
+    'light-violet',
+    'violet',
+    'blue',
+    'light-blue',
+    'yellow',
+    'orange',
+    'green',
+    'light-green',
+    'light-red',
+    'red',
+    'white',
+];
+const AGENT_CARD_RENDER_MODES = ['inherit', 'static-dom', 'live-protyle'];
+const AGENT_CARD_COLLAPSED_ALIGNMENTS = ['left', 'center', 'right'];
+const AGENT_BRANCH_LINE_STYLES = ['curve-solid', 'elbow-solid', 'straight-solid', 'curve-dashed', 'frame-floating'];
+const AGENT_CONNECTOR_STROKE_STYLES = ['solid', 'dashed', 'flowing'];
+const AGENT_MIND_MAP_THEMES = ['default', 'noBorder', 'underline'];
+const AGENT_MIND_MAP_DIRECTIONS = ['right', 'left', 'up', 'down'];
+const AGENT_SLIDE_BORDER_STYLES = ['solid', 'dashed', 'wavy'];
 
 export type AgentManagerRuntime = {
     id: string;
@@ -314,6 +341,583 @@ export async function editAgentBoard(runtime: AgentManagerRuntime, request: Agen
     }
 }
 
+export async function runAgentShapeCommand(
+    runtime: AgentManagerRuntime,
+    request: AgentShapeCommandRequest
+): Promise<AgentShapeCommandResult> {
+    const editor = requireEditor(runtime);
+    const intent = request.intent;
+    const target = request.target ?? '$selection';
+    const errors: string[] = [];
+    let saved = false;
+
+    if (intent !== 'readSelectedContent' && intent !== 'inspectEditable' && intent !== 'updateShape') {
+        return { ok: false, intent, whiteboardId: runtime.id, target, errors: [`unsupported intent: ${String(intent)}`] };
+    }
+
+    let targetShapeIds: string[];
+    try {
+        targetShapeIds = resolveAgentShapeCommandTarget(editor, target, request.shapeKind, intent);
+    } catch (error) {
+        return { ok: false, intent, whiteboardId: runtime.id, target, errors: [stringifyAgentError(error)] };
+    }
+
+    if (!targetShapeIds.length) {
+        return { ok: false, intent, whiteboardId: runtime.id, target, errors: ['target resolved to no shapes'] };
+    }
+
+    if (intent === 'readSelectedContent') {
+        const details = await getAgentShapeDetails(runtime, {
+            shapeIds: targetShapeIds,
+            limit: targetShapeIds.length,
+            includeBindings: false,
+            includeLinkedBlockContent: true,
+        });
+        const items = details.shapes.map((shape) => shapeSummaryToContentItem(shape));
+        return { ok: true, intent, whiteboardId: runtime.id, target, items };
+    }
+
+    if (intent === 'inspectEditable') {
+        const items = targetShapeIds.map((shapeId) => {
+            const shape = editor.getShape(shapeId as TLShapeId) as TLShape | undefined;
+            if (!shape) return null;
+            return {
+                shape: summarizeAgentShape(editor, shape),
+                editableFields: describeEditableShape(shape),
+            };
+        }).filter(Boolean) as Array<Record<string, unknown>>;
+        return { ok: true, intent, whiteboardId: runtime.id, target, items };
+    }
+
+    const patch = request.patch && typeof request.patch === 'object' && !Array.isArray(request.patch)
+        ? request.patch
+        : null;
+    if (!patch || Object.keys(patch).length === 0) {
+        return { ok: false, intent, whiteboardId: runtime.id, target, updatedShapeIds: [], errors: ['updateShape requires a non-empty patch object'], saved };
+    }
+
+    const items: Array<Record<string, unknown>> = [];
+    const updatedShapeIds: string[] = [];
+
+    for (const shapeId of targetShapeIds) {
+        const shape = editor.getShape(shapeId as TLShapeId) as TLShape | undefined;
+        if (!shape) {
+            errors.push(`shape not found: ${shapeId}`);
+            continue;
+        }
+
+        const before = summarizeAgentShape(editor, shape);
+        const updateResult = applySemanticShapePatch(shape, patch);
+        if (updateResult.errors.length) errors.push(...updateResult.errors.map((error) => `${shapeId}: ${error}`));
+        if (!updateResult.changedFields.length || !updateResult.update) {
+            items.push({
+                shapeId,
+                before,
+                after: before,
+                changedFields: [],
+            });
+            continue;
+        }
+
+        editor.updateShape(updateResult.update as any);
+        const afterShape = editor.getShape(shape.id) as TLShape | undefined;
+        const after = afterShape ? summarizeAgentShape(editor, afterShape) : before;
+        updatedShapeIds.push(String(shape.id));
+        items.push({
+            shapeId: String(shape.id),
+            before,
+            after,
+            changedFields: updateResult.changedFields,
+        });
+    }
+
+    if (updatedShapeIds.length) {
+        if (request.select !== false) editor.setSelectedShapes(updatedShapeIds as TLShapeId[]);
+        relayoutUpdatedSemanticBranches(editor, updatedShapeIds);
+        if (request.zoom === true) editor.zoomToSelection({ animation: { duration: 300 } });
+        if (request.save === true) {
+            await runtime.saveData();
+            saved = true;
+        } else {
+            runtime.triggerSave();
+        }
+    }
+
+    const result: AgentShapeCommandResult = {
+        ok: errors.length === 0,
+        intent,
+        whiteboardId: runtime.id,
+        target,
+        updatedShapeIds,
+        items,
+        errors,
+        saved,
+    };
+    if (request.result === 'debug') {
+        (result as any).summary = getAgentResultSummary(runtime, 'full');
+    }
+    return result;
+}
+
+function resolveAgentShapeCommandTarget(
+    editor: Editor,
+    target: unknown,
+    shapeKind: string | undefined,
+    intent: AgentShapeCommandRequest['intent']
+): string[] {
+    const state: AgentBoardEditState = {
+        operationId: 'shape-command',
+        mode: 'commit',
+        resultMode: 'minimal',
+        selectedShapeIds: editor.getSelectedShapeIds().map(String),
+        created: {},
+        lastShapeIds: [],
+        focusedShapeIds: [],
+        committedShapeIds: [],
+        externalCreatedBlockIds: [],
+        errors: [],
+        counts: {
+            createdShapes: 0,
+            updatedShapes: 0,
+            connectors: 0,
+            branches: 0,
+        },
+        saveRequested: false,
+        saved: false,
+        anyMutation: false,
+    };
+    const ids = resolveBoardEditRefs(editor, state, target ?? '$selection', 'shape command target');
+    const kind = stringValue(shapeKind);
+    const filtered = kind
+        ? ids.filter((id) => editor.getShape(id as TLShapeId)?.type === kind)
+        : ids;
+    return filtered;
+}
+
+function shapeSummaryToContentItem(summary: AgentShapeSummary): Record<string, unknown> {
+    const props = { ...(summary.props || {}) };
+    const content = (props as any).blockContent || null;
+    delete (props as any).blockContent;
+    return {
+        shape: {
+            ...summary,
+            props,
+        },
+        content,
+    };
+}
+
+function describeEditableShape(shape: TLShape): AgentEditableFieldSpec[] {
+    const props = ((shape as any).props || {}) as Record<string, unknown>;
+    const commonPosition: AgentEditableFieldSpec[] = [
+        numberField('x', shape.x, -100000, 100000, 'Page x position.'),
+        numberField('y', shape.y, -100000, 100000, 'Page y position.'),
+    ];
+    const commonColor = enumField('color', props.color, AGENT_EDITABLE_COLORS, 'Nearest supported tldraw color name.');
+
+    if (shape.type === 'card') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'Card width.'),
+            numberField('h', props.h, 1, 4000, 'Card height. Collapse may override this height.'),
+            commonColor,
+            booleanField('isCollapsed', props.isCollapsed, 'Collapse or expand the card.'),
+            booleanField('showMask', props.showMask, 'Show the card mask overlay.'),
+            booleanField('isMain', props.isMain, 'Mark the card as a main card.'),
+            enumField('renderMode', props.renderMode || 'inherit', AGENT_CARD_RENDER_MODES, 'Card rendering mode.'),
+            numberField('collapsedTextSize', props.collapsedTextSize || 21, 25, 76, 'Collapsed card title text size.'),
+            enumField('collapsedTextAlign', props.collapsedTextAlign || 'center', AGENT_CARD_COLLAPSED_ALIGNMENTS, 'Collapsed card title alignment.'),
+        ];
+    }
+
+    if (shape.type === 'single-block') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'Single block width.'),
+            numberField('h', props.h, 1, 4000, 'Single block height.'),
+            commonColor,
+            booleanField('transparentBackground', props.transparentBackground, 'Use transparent background and hide border.'),
+            booleanField('allowBinding', props.allowBinding, 'Allow connectors to bind to this shape.'),
+            booleanField('connectOnEnter', props.connectOnEnter, 'Create a connection when using Enter-created follow-up blocks.'),
+        ];
+    }
+
+    if (shape.type === 'text') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'Text width.'),
+            commonColor,
+            stringField('text', getShapePlainText(shape), 'Visible text.'),
+        ];
+    }
+
+    if (shape.type === 'note') {
+        return [
+            ...commonPosition,
+            commonColor,
+            stringField('text', getShapePlainText(shape), 'Visible note text.'),
+        ];
+    }
+
+    if (shape.type === 'arrow' || shape.type === 'bezier-connector') {
+        const fields = [
+            ...commonPosition,
+            commonColor,
+            stringField('text', getShapePlainText(shape), 'Connector label text.'),
+        ];
+        if (shape.type === 'bezier-connector') {
+            fields.push(
+                numberField('strokeWidth', props.strokeWidth ?? 3, 1, 16, 'Bezier connector stroke width.'),
+                enumField('strokeStyle', props.strokeStyle || 'solid', AGENT_CONNECTOR_STROKE_STYLES, 'Bezier connector stroke style.'),
+                numberField('labelPosition', props.labelPosition ?? 0.5, 0, 1, 'Label position along the connector.'),
+            );
+        }
+        return fields;
+    }
+
+    if (shape.type === 'branch') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'Branch bounds width. Usually managed by layout.'),
+            numberField('h', props.h, 1, 4000, 'Branch bounds height. Usually managed by layout.'),
+            commonColor,
+            enumField('lineStyle', props.lineStyle || 'curve-solid', AGENT_BRANCH_LINE_STYLES, 'Branch connector visual style.'),
+            numberField('lineWidth', props.lineWidth ?? 3, 1, 24, 'Branch line width.'),
+            numberField('horizontalGap', props.horizontalGap ?? 96, 20, 2000, 'Horizontal spacing between root and children.'),
+            numberField('verticalGap', props.verticalGap ?? 28, 8, 1000, 'Vertical spacing between children.'),
+            numberField('snapDistance', props.snapDistance ?? 160, 40, 2000, 'Branch attachment snap distance.'),
+            booleanField('showBackground', props.showBackground, 'Show branch background or floating frame backdrop.'),
+        ];
+    }
+
+    if (shape.type === 'mind-map') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'Mind map width.'),
+            numberField('h', props.h, 1, 4000, 'Mind map height.'),
+            commonColor,
+            stringField('text', String((props.rootNode as any)?.text || ''), 'Root node text.'),
+            enumField('theme', props.theme || 'default', AGENT_MIND_MAP_THEMES, 'Mind map theme.'),
+            enumField('direction', props.direction || 'right', AGENT_MIND_MAP_DIRECTIONS, 'Mind map layout direction.'),
+            numberField('fontSize', props.fontSize ?? 14, 8, 96, 'Mind map font size.'),
+            numberField('nodeWidth', props.nodeWidth ?? 120, 60, 300, 'Mind map base node width.'),
+            numberField('nodeHeight', props.nodeHeight ?? 40, 20, 200, 'Mind map base node height.'),
+            numberField('lineWidth', props.lineWidth ?? 2, 1, 24, 'Mind map connector line width.'),
+            numberField('horizontalGap', props.horizontalGap ?? 100, 20, 2000, 'Horizontal spacing between mind map nodes.'),
+            numberField('verticalGap', props.verticalGap ?? 60, 8, 1000, 'Vertical spacing between mind map nodes.'),
+        ];
+    }
+
+    if (shape.type === 'slide') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'Slide width.'),
+            numberField('h', props.h, 1, 4000, 'Slide height.'),
+            commonColor,
+            stringField('name', props.name, 'Slide name.'),
+            enumField('borderStyle', props.borderStyle || 'dashed', AGENT_SLIDE_BORDER_STYLES, 'Slide border style.'),
+        ];
+    }
+
+    if (shape.type === 'js-shape') {
+        return [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, 'JS shape width.'),
+            numberField('h', props.h, 1, 4000, 'JS shape height.'),
+            commonColor,
+            booleanField('interactive', props.interactive, 'Allow rendered DOM to receive pointer events.'),
+            booleanField('restrictDom', props.restrictDom !== false, 'Restrict script DOM access to the shape container.'),
+        ];
+    }
+
+    if (shape.type === 'geo' || shape.type === 'frame') {
+        const fields = [
+            ...commonPosition,
+            numberField('w', props.w, 1, 4000, `${shape.type} width.`),
+            numberField('h', props.h, 1, 4000, `${shape.type} height.`),
+        ];
+        if (shape.type !== 'frame') fields.push(commonColor);
+        return fields;
+    }
+
+    return commonPosition;
+}
+
+function applySemanticShapePatch(
+    shape: TLShape,
+    patch: Record<string, unknown>
+): { update?: Record<string, unknown>; changedFields: string[]; errors: string[] } {
+    const editableFields = describeEditableShape(shape);
+    const editableNames = new Set(editableFields.map((field) => field.name));
+    const errors: string[] = [];
+    const changedFields: string[] = [];
+    const update: Record<string, unknown> = { id: shape.id, type: shape.type };
+    let props: Record<string, unknown> = {};
+    let hasUpdate = false;
+    let collapseRequested = false;
+
+    for (const key of Object.keys(patch)) {
+        if (!editableNames.has(key)) {
+            errors.push(`field is not editable for ${shape.type}: ${key}`);
+            continue;
+        }
+        const value = patch[key];
+        const currentProps = ((shape as any).props || {}) as Record<string, unknown>;
+
+        if (key === 'x' || key === 'y') {
+            const next = numberPatchValue(value, key, errors, -100000, 100000, key === 'x' ? shape.x : shape.y);
+            if (next === undefined) continue;
+            if (next !== (key === 'x' ? shape.x : shape.y)) {
+                update[key] = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'isCollapsed') {
+            const next = booleanPatchValue(value, key, errors);
+            if (next === undefined) continue;
+            if (shape.type !== 'card') {
+                errors.push('isCollapsed is only supported for card shapes');
+                continue;
+            }
+            props = { ...props, ...buildCardCollapseUpdate(shape as ICardShape, next).props };
+            collapseRequested = true;
+            changedFields.push(key);
+            hasUpdate = true;
+            continue;
+        }
+
+        if (
+            key === 'w' ||
+            key === 'h' ||
+            key === 'collapsedTextSize' ||
+            key === 'strokeWidth' ||
+            key === 'labelPosition' ||
+            key === 'lineWidth' ||
+            key === 'horizontalGap' ||
+            key === 'verticalGap' ||
+            key === 'snapDistance' ||
+            key === 'fontSize' ||
+            key === 'nodeWidth' ||
+            key === 'nodeHeight'
+        ) {
+            const field = editableFields.find((item) => item.name === key);
+            const next = numberPatchValue(value, key, errors, field?.min ?? 1, field?.max ?? 4000, Number(currentProps[key]) || 0);
+            if (next === undefined) continue;
+            if (currentProps[key] !== next) {
+                props[key] = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'color') {
+            const color = normalizeOptionalAgentColor(value);
+            if (!color) {
+                errors.push('color must be a supported tldraw color name or hex-like value');
+                continue;
+            }
+            if (currentProps.color !== color) {
+                props.color = color;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (
+            key === 'showMask' ||
+            key === 'isMain' ||
+            key === 'transparentBackground' ||
+            key === 'allowBinding' ||
+            key === 'connectOnEnter' ||
+            key === 'showBackground' ||
+            key === 'interactive' ||
+            key === 'restrictDom'
+        ) {
+            const next = booleanPatchValue(value, key, errors);
+            if (next === undefined) continue;
+            if (currentProps[key] !== next) {
+                props[key] = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'lineStyle') {
+            const next = enumPatchValue(value, key, AGENT_BRANCH_LINE_STYLES, errors);
+            if (!next) continue;
+            if (currentProps.lineStyle !== next) {
+                props.lineStyle = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'strokeStyle') {
+            const next = enumPatchValue(value, key, AGENT_CONNECTOR_STROKE_STYLES, errors);
+            if (!next) continue;
+            if (currentProps.strokeStyle !== next) {
+                props.strokeStyle = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'theme') {
+            const next = enumPatchValue(value, key, AGENT_MIND_MAP_THEMES, errors);
+            if (!next) continue;
+            if (currentProps.theme !== next) {
+                props.theme = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'direction') {
+            const next = enumPatchValue(value, key, AGENT_MIND_MAP_DIRECTIONS, errors);
+            if (!next) continue;
+            if (currentProps.direction !== next) {
+                props.direction = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'borderStyle') {
+            const next = enumPatchValue(value, key, AGENT_SLIDE_BORDER_STYLES, errors);
+            if (!next) continue;
+            if (currentProps.borderStyle !== next) {
+                props.borderStyle = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'renderMode') {
+            const next = enumPatchValue(value, key, AGENT_CARD_RENDER_MODES, errors);
+            if (!next) continue;
+            if (currentProps.renderMode !== next) {
+                props.renderMode = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'collapsedTextAlign') {
+            const next = enumPatchValue(value, key, AGENT_CARD_COLLAPSED_ALIGNMENTS, errors);
+            if (!next) continue;
+            if (currentProps.collapsedTextAlign !== next) {
+                props.collapsedTextAlign = next;
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+            continue;
+        }
+
+        if (key === 'text' || key === 'name') {
+            const extraProps = buildAgentTextPropsPatch(shape, {
+                text: key === 'text' ? stringPatchValue(value, key, errors) : undefined,
+                name: key === 'name' ? stringPatchValue(value, key, errors) : undefined,
+            });
+            if (Object.keys(extraProps).length) {
+                props = { ...props, ...extraProps };
+                changedFields.push(key);
+                hasUpdate = true;
+            }
+        }
+    }
+
+    if (collapseRequested && typeof patch.h === 'number' && (props as any).isCollapsed === true) {
+        props.preCollapseHeight = finiteNumberInRange(patch.h, Number(((shape as any).props || {}).h) || 300, 1, 4000);
+        props.h = getCardCollapsedHeight({ ...(shape as ICardShape), props: { ...(shape as ICardShape).props, h: props.preCollapseHeight as number } });
+    }
+
+    if (Object.keys(props).length) update.props = props;
+    return { update: hasUpdate ? update : undefined, changedFields: uniqueStrings(changedFields), errors };
+}
+
+function numberField(name: string, current: unknown, min: number, max: number, description: string): AgentEditableFieldSpec {
+    return { name, kind: 'number', current, min, max, writable: true, description };
+}
+
+function booleanField(name: string, current: unknown, description: string): AgentEditableFieldSpec {
+    return { name, kind: 'boolean', current: Boolean(current), writable: true, description };
+}
+
+function enumField(name: string, current: unknown, enumValues: string[], description: string): AgentEditableFieldSpec {
+    return { name, kind: name === 'color' ? 'color' : 'enum', current, enumValues, writable: true, description };
+}
+
+function stringField(name: string, current: unknown, description: string): AgentEditableFieldSpec {
+    return { name, kind: 'string', current: typeof current === 'string' ? current : '', writable: true, description };
+}
+
+function numberPatchValue(value: unknown, key: string, errors: string[], min: number, max: number, fallback: number): number | undefined {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        errors.push(`${key} must be a finite number`);
+        return undefined;
+    }
+    return finiteNumberInRange(value, fallback, min, max);
+}
+
+function booleanPatchValue(value: unknown, key: string, errors: string[]): boolean | undefined {
+    if (typeof value !== 'boolean') {
+        errors.push(`${key} must be boolean`);
+        return undefined;
+    }
+    return value;
+}
+
+function enumPatchValue(value: unknown, key: string, enumValues: string[], errors: string[]): string | undefined {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!enumValues.includes(raw)) {
+        errors.push(`${key} must be one of: ${enumValues.join(', ')}`);
+        return undefined;
+    }
+    return raw;
+}
+
+function stringPatchValue(value: unknown, key: string, errors: string[]): string | undefined {
+    if (typeof value !== 'string') {
+        errors.push(`${key} must be string`);
+        return undefined;
+    }
+    return value;
+}
+
+function getShapePlainText(shape: TLShape): string {
+    const richText = (shape as any).props?.richText;
+    return plainTextFromRichText(richText);
+}
+
+function relayoutUpdatedSemanticBranches(editor: Editor, updatedShapeIds: string[]) {
+    const branchIds: TLShapeId[] = [];
+    for (const shapeId of updatedShapeIds) {
+        const shape = editor.getShape(shapeId as TLShapeId) as IBranchShape | undefined;
+        if (shape?.type !== 'branch') continue;
+        layoutBranchChildren(editor, shape);
+        const latest = editor.getShape(shape.id) as IBranchShape | undefined;
+        if (latest?.type === 'branch') {
+            alignBranchToRootContent(editor, latest);
+            branchIds.push(latest.id);
+        } else {
+            branchIds.push(shape.id);
+        }
+    }
+    if (branchIds.length) relayoutBranchesContainingShapes(editor, branchIds);
+}
+
 function createBoardEditState(editor: Editor, request: AgentBoardEditRequest): AgentBoardEditState {
     const currentSelectedShapeIds = editor.getSelectedShapeIds().map(String);
     const selectedShapeIds = request.selection === undefined
@@ -463,10 +1067,10 @@ async function validateBoardNodeCreate(
 ) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
     const node = value as AgentBoardNodeCreate;
-    assertBoardEditKeys(node as any, ['as', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId', 'contentMarkdown', 'text', 'title', 'name', 'isMain', 'isCollapsed', 'showMask'], label);
+    assertBoardEditKeys(node as any, ['as', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId', 'contentMarkdown', 'text', 'title', 'name', 'geo', 'direction', 'theme', 'isMain', 'isCollapsed', 'showMask'], label);
     const kind = String(node.kind || '');
     if (!AGENT_BOARD_EDIT_NODE_KINDS.has(kind)) {
-        throw new Error(`${label}.kind must be card, single-block, text, or frame`);
+        throw new Error(`${label}.kind must be card, single-block, text, frame, note, geo, slide, mind-map, or js-shape`);
     }
     validateBoardAlias(node.as, `${label}.as`, plannedAliases, false);
     if (node.as) plannedAliases.add(node.as);
@@ -618,8 +1222,11 @@ async function createBoardEditNode(
         color: boardColor(node.color),
         text: stringValue(node.text ?? node.title ?? node.name),
         name: stringValue(node.name ?? node.title ?? node.text),
+        geo: stringValue(node.geo),
         select: false,
         zoom: false,
+        direction: normalizeAgentMindMapDirection(node.direction),
+        theme: normalizeAgentMindMapTheme(node.theme),
     };
     const size = getAgentCreateShapeSize(options.kind, options);
     const position = resolveAgentCreatePosition(editor, options.kind, {
@@ -1241,6 +1848,17 @@ function numberOrUndefined(value: unknown): number | undefined {
 
 function boardColor(value: unknown) {
     return normalizeOptionalAgentColor(value);
+}
+
+function normalizeAgentMindMapDirection(value: unknown): AgentBasicShapeCreateArgs['direction'] | undefined {
+    const raw = stringValue(value);
+    if (raw === 'left' || raw === 'right' || raw === 'up' || raw === 'down') return raw;
+    return undefined;
+}
+
+function normalizeAgentMindMapTheme(value: unknown): string | undefined {
+    const raw = stringValue(value);
+    return AGENT_MIND_MAP_THEMES.includes(raw) ? raw : undefined;
 }
 
 export function updateAgentShape(runtime: AgentManagerRuntime, options: {
@@ -2133,7 +2751,40 @@ async function validateAgentLinkedBlockId(blockId: string | undefined, kind: 'ca
 function summarizeShapeProps(props: any, editor?: Editor, blockContent?: AgentLinkedBlockContent): Record<string, unknown> {
     if (!props || typeof props !== 'object') return {};
     const out: Record<string, unknown> = {};
-    for (const key of ['w', 'h', 'color', 'geo', 'name', 'text', 'isMain', 'isCollapsed', 'showMask']) {
+    for (const key of [
+        'w',
+        'h',
+        'color',
+        'geo',
+        'name',
+        'text',
+        'isMain',
+        'isCollapsed',
+        'showMask',
+        'renderMode',
+        'collapsedTextSize',
+        'collapsedTextAlign',
+        'transparentBackground',
+        'allowBinding',
+        'connectOnEnter',
+        'lineStyle',
+        'lineWidth',
+        'horizontalGap',
+        'verticalGap',
+        'snapDistance',
+        'showBackground',
+        'strokeWidth',
+        'strokeStyle',
+        'labelPosition',
+        'theme',
+        'direction',
+        'nodeWidth',
+        'nodeHeight',
+        'fontSize',
+        'borderStyle',
+        'interactive',
+        'restrictDom',
+    ]) {
         if (props[key] !== undefined) out[key] = props[key];
     }
     if (props.blockId !== undefined) {
@@ -2271,7 +2922,7 @@ async function loadAgentLinkedBlockContent(shapes: TLShape[]): Promise<Map<strin
 }
 
 function shouldAttachLinkedBlockContent(shape: TLShape): boolean {
-    if (shape.type !== 'card' && shape.type !== 'single-block') return false;
+    if (!['card', 'single-block', 'slide', 'mind-map'].includes(shape.type)) return false;
     return Boolean((shape as any).props?.blockId);
 }
 

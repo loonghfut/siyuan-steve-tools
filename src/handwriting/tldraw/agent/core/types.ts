@@ -161,7 +161,7 @@ export type AgentBasicShapeCreateArgs = AgentSelectionOptions & {
 	geo?: string
 	name?: string
 	blockId?: string
-	direction?: 'right' | 'left' | 'both'
+	direction?: 'right' | 'left' | 'up' | 'down'
 	theme?: string
 }
 
@@ -187,6 +187,19 @@ export type AgentShapeUpdatePatch = AgentSelectionOptions & {
 	isCollapsed?: boolean
 	text?: string
 	name?: string
+}
+
+export type AgentShapeCommandIntent = 'readSelectedContent' | 'inspectEditable' | 'updateShape'
+
+export type AgentEditableFieldSpec = {
+	name: string
+	kind: 'number' | 'boolean' | 'enum' | 'string' | 'color'
+	current?: unknown
+	enumValues?: string[]
+	min?: number
+	max?: number
+	writable: boolean
+	description?: string
 }
 
 export type AgentBoardEditMode = 'commit' | 'preview'
@@ -230,7 +243,7 @@ export type AgentBoardLayoutIntent = {
 
 export type AgentBoardNodeCreate = {
 	as?: string
-	kind: 'card' | 'single-block' | 'text' | 'frame'
+	kind: 'card' | 'single-block' | 'text' | 'frame' | 'note' | 'geo' | 'slide' | 'mind-map' | 'js-shape'
 	x?: number
 	y?: number
 	w?: number
@@ -241,6 +254,9 @@ export type AgentBoardNodeCreate = {
 	text?: string
 	title?: string
 	name?: string
+	geo?: string
+	direction?: 'right' | 'left' | 'up' | 'down'
+	theme?: string
 	isMain?: boolean
 	isCollapsed?: boolean
 	showMask?: boolean
@@ -336,6 +352,27 @@ export type AgentBoardEditResult = {
 	saved: boolean
 	errors: string[]
 	summary?: unknown
+}
+
+export type AgentShapeCommandRequest = AgentSelectionOptions & {
+	whiteboardId?: string
+	intent: AgentShapeCommandIntent
+	target?: AgentBoardEditHandle
+	shapeKind?: string
+	patch?: Record<string, unknown>
+	save?: boolean
+	result?: AgentBoardEditResultMode
+}
+
+export type AgentShapeCommandResult = {
+	ok: boolean
+	intent: AgentShapeCommandIntent
+	whiteboardId: string
+	target?: unknown
+	items?: Array<Record<string, unknown>>
+	updatedShapeIds?: string[]
+	errors?: string[]
+	saved?: boolean
 }
 
 export type AgentArrangeOperation = 'front' | 'back' | 'forward' | 'backward'

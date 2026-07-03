@@ -327,7 +327,7 @@ function parseConnectorKind(value: unknown): AgentConnectorKind | undefined {
 
 function parseMindMapDirection(value: unknown): AgentBasicShapeCreateArgs['direction'] {
 	const raw = stringArg(value)
-	return raw === 'left' || raw === 'right' || raw === 'both' ? raw : undefined
+	return raw === 'left' || raw === 'right' || raw === 'up' || raw === 'down' ? raw : undefined
 }
 
 function parseSide(value: unknown): AgentBranchSide | undefined {

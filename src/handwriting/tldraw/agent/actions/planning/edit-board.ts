@@ -6,7 +6,7 @@ import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition 
 export function createEditBoardAction(): AgentActionDefinition {
     return {
         name: 'tldraw_edit_board',
-        description: 'Primary STtools tldraw write tool. Use this for every whiteboard edit. Omit whiteboardId to edit the focused whiteboard. Required: operations array. Normal call: {operations:[{op:"createNodes",nodes:[{as:"n1",kind:"single-block",text:"..."}],layout:{style:"nearSelection"}},{op:"focus",target:"$last"}],save:true}. Ops: createNodes, connect, layout, updateNodes, focus, save. Node kinds: card, single-block, text, frame. References: "$selection", "$selection[0]", "$created.alias", "$last", "$block.<blockId>", "$kind.<shapeType>". Layout styles: nearSelection, rightOf, below, grid, tree, mindmap, frameAround. Branch template: createNodes children, then connect kind:"branch" from "$selection[0]" to "$created.alias" refs. Relation template: connect kind:"relation" from one ref to one or more refs. Use mode:"preview" for large/uncertain edits; use result:"debug" only after errors.',
+        description: 'Primary STtools tldraw batch/complex write tool. Omit whiteboardId to edit the focused whiteboard. Required: operations array. Normal call: {operations:[{op:"createNodes",nodes:[{as:"n1",kind:"single-block",text:"..."}],layout:{style:"nearSelection"}},{op:"focus",target:"$last"}],save:true}. Ops: createNodes, connect, layout, updateNodes, focus, save. Node kinds: card, single-block, text, frame, note, geo, slide, mind-map, js-shape. References: "$selection", "$selection[0]", "$created.alias", "$last", "$block.<blockId>", "$kind.<shapeType>". Layout styles: nearSelection, rightOf, below, grid, tree, mindmap, frameAround. Branch template: createNodes children, then connect kind:"branch" from "$selection[0]" to "$created.alias" refs. Relation template: connect kind:"relation" from one ref to one or more refs. Use mode:"preview" for large/uncertain edits; use result:"debug" only after errors. For simple property reads/updates on existing custom shapes, prefer tldraw_shape_command.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
@@ -294,9 +294,12 @@ function normalizeEditBoardOp(value: unknown): unknown {
 function normalizeNodeKind(value: unknown): unknown {
     const raw = stringArg(value)?.replace(/[_\s-]+/g, '').toLowerCase();
     if (raw === 'singleblock') return 'single-block';
-    if (raw === 'sticky' || raw === 'stickynote' || raw === 'note' || raw === 'label') return 'text';
+    if (raw === 'sticky' || raw === 'stickynote' || raw === 'note') return 'note';
+    if (raw === 'label') return 'text';
     if (raw === 'paragraph' || raw === 'block' || raw === 'single') return 'single-block';
-    if (raw === 'card' || raw === 'text' || raw === 'frame') return raw;
+    if (raw === 'mindmap') return 'mind-map';
+    if (raw === 'js' || raw === 'jsshape' || raw === 'javascriptshape') return 'js-shape';
+    if (raw === 'card' || raw === 'text' || raw === 'frame' || raw === 'geo' || raw === 'slide' || raw === 'mind-map' || raw === 'js-shape') return raw;
     return value;
 }
 
