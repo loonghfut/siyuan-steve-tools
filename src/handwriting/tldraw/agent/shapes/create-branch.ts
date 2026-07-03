@@ -1,6 +1,7 @@
 import { type Editor, type TLShapeId, createShapeId } from '@tldraw/tldraw'
-import { layoutBranchChildren, relayoutBranchesContainingShapes } from '../../BranchShape/branch-layout'
+import { isBranchConnectableShape, layoutBranchChildren, relayoutBranchesContainingShapes } from '../../BranchShape/branch-layout'
 import type { IBranchShape } from '../../BranchShape/branch-shape-types'
+import { markExplicitCreatedBranchRelations } from '../../BranchShape/keep-branch-layouts-updated'
 import type { AgentBranchChildRef, AgentBranchCreateArgs, AgentBranchSide } from '../core/types'
 import { createAgentCardShape } from './create-card'
 import { createAgentSingleBlockShape } from './create-single-block'
@@ -38,6 +39,8 @@ export function createAgentBranchShape(
 		if (child.side === 'left') leftChildIds.push(childId)
 		else rightChildIds.push(childId)
 	}
+
+	markExplicitCreatedBranchRelations(editor, [branchId])
 
 	editor.createShape<IBranchShape>({
 		id: branchId,
@@ -138,12 +141,21 @@ function ensureBranchChild(
 	context: AgentCreateContext
 ): string | undefined {
 	if (typeof ref === 'string') {
-		return editor.getShape(ref as TLShapeId) ? ref : undefined
+		const shape = editor.getShape(ref as TLShapeId)
+		if (!shape) return undefined
+		if (!isBranchConnectableShape(shape)) {
+			throw new Error(`Branch child shape must be card, single-block, or branch: ${ref}`)
+		}
+		return ref
 	}
 
 	if (ref.shapeId) {
-		if (!editor.getShape(ref.shapeId as TLShapeId)) {
+		const shape = editor.getShape(ref.shapeId as TLShapeId)
+		if (!shape) {
 			throw new Error(`Child shape not found: ${ref.shapeId}`)
+		}
+		if (!isBranchConnectableShape(shape)) {
+			throw new Error(`Branch child shape must be card, single-block, or branch: ${ref.shapeId}`)
 		}
 		return ref.shapeId
 	}
@@ -199,8 +211,12 @@ function getBranchRootPoint(editor: Editor, options: AgentBranchCreateArgs): { x
 
 function getExistingRootShapeId(editor: Editor, rootShapeId?: string): string | undefined {
 	if (!rootShapeId) return undefined
-	if (!editor.getShape(rootShapeId as TLShapeId)) {
+	const shape = editor.getShape(rootShapeId as TLShapeId)
+	if (!shape) {
 		throw new Error(`Root shape not found: ${rootShapeId}`)
+	}
+	if (shape.type !== 'card' && shape.type !== 'single-block') {
+		throw new Error(`Branch root shape must be card or single-block: ${rootShapeId}`)
 	}
 	return rootShapeId
 }

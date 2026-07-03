@@ -14,7 +14,13 @@ import { settingdata } from '@/index';
 import { WhiteboardFileManager } from '../../whiteboard-file-manager';
 import { createOrUpdateConnectorBinding } from '../../BezierConnectorShape';
 import { getBestPortPair, getPortPagePosition } from '../../BezierConnectorShape/port-utils';
-import { alignBranchToRootContent, layoutBranchChildren, relayoutBranchesContainingShapes } from '../../BranchShape/branch-layout';
+import {
+    alignBranchToRootContent,
+    getBranchRootParent,
+    isBranchConnectableShape,
+    layoutBranchChildren,
+    relayoutBranchesContainingShapes,
+} from '../../BranchShape/branch-layout';
 import type { IBranchShape } from '../../BranchShape/branch-shape-types';
 import { buildCardCollapseUpdate, getCardCollapsedHeight } from '../../CardShape/card-collapse';
 import type { ICardShape } from '../../CardShape/card-shape-types';
@@ -41,6 +47,7 @@ import type {
     AgentBoardNodePatch,
     AgentBranchChildRef,
     AgentBranchCreateArgs,
+    AgentBranchSide,
     AgentCardCreateArgs,
     AgentConnectorCreateArgs,
     AgentCreateShapeArgs,
@@ -1518,29 +1525,31 @@ async function executeBoardConnect(
 
     const alias = optionalBoardAlias(operation.as);
     const createdIds: string[] = [];
+    const touchedIds: string[] = [];
     if ((operation.kind || 'relation') === 'branch') {
         const layout = operation.layout || {};
-        const children = targets.map((shapeId, index) => ({
-            shapeId,
-            side: layout.style === 'mindmap' && !layout.side
+        for (let index = 0; index < targets.length; index++) {
+            const target = targets[index];
+            const side = layout.style === 'mindmap' && !layout.side
                 ? (index % 2 === 0 ? 'right' as const : 'left' as const)
-                : layout.side,
-        }));
-        const result = createAgentBusinessShape(editor, {
-            kind: 'branch',
-            rootShapeId: from,
-            children,
-            direction: layout.side,
-            horizontalGap: layout.horizontalGap,
-            verticalGap: layout.verticalGap,
-            color: boardColor(operation.color),
-            lineWidth: operation.lineWidth ?? operation.strokeWidth,
-            select: false,
-            zoom: false,
-        });
-        syncAgentCreatedBlockAttrs(runtime, result);
-        createdIds.push(...result.createdShapeIds.map(String));
-        state.counts.branches += 1;
+                : layout.side;
+            const result = connectAgentBranchRelation(runtime, {
+                startShapeId: from,
+                endShapeId: target,
+                color: boardColor(operation.color),
+                strokeWidth: operation.lineWidth ?? operation.strokeWidth,
+                side,
+                horizontalGap: layout.horizontalGap,
+                verticalGap: layout.verticalGap,
+                select: false,
+                zoom: false,
+            });
+            if (Array.isArray(result.createdShapeIds)) {
+                createdIds.push(...result.createdShapeIds.map(String));
+            }
+            touchedIds.push(String(result.branchId));
+            state.counts.branches += 1;
+        }
     } else {
         for (const target of targets) {
             const result = createAgentConnectorCore(editor, {
@@ -1554,14 +1563,16 @@ async function executeBoardConnect(
                 zoom: false,
             });
             createdIds.push(...result.createdShapeIds);
+            touchedIds.push(...result.createdShapeIds);
             state.counts.connectors += 1;
         }
     }
 
-    if (alias) state.created[alias] = createdIds;
-    trackCommittedShapes(state, createdIds);
+    const resultIds = uniqueStrings([...createdIds, ...touchedIds]);
+    if (alias) state.created[alias] = resultIds;
+    trackCommittedShapes(state, resultIds);
     state.counts.createdShapes += createdIds.length;
-    state.lastShapeIds = createdIds;
+    state.lastShapeIds = resultIds;
 }
 
 function executeBoardUpdateNodes(
@@ -2207,21 +2218,138 @@ export function createAgentBasicShape(runtime: AgentManagerRuntime, options: Age
     };
 }
 
-export function createAgentConnector(runtime: AgentManagerRuntime, options: AgentConnectorCreateArgs) {
-    if (options.kind === 'branch') {
-        if (!options.startShapeId || !options.endShapeId) {
-            throw new Error('branch connector requires startShapeId/endShapeId or shapeIds [root, child]');
+type AgentBranchRelationOptions = AgentConnectorCreateArgs & {
+    side?: AgentBranchSide;
+    horizontalGap?: number;
+    verticalGap?: number;
+}
+
+function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: AgentBranchRelationOptions) {
+    const editor = requireEditor(runtime);
+    if (!options.startShapeId || !options.endShapeId) {
+        throw new Error('branch connector requires startShapeId/endShapeId or shapeIds [root, child]');
+    }
+
+    const rootShape = editor.getShape(options.startShapeId as TLShapeId) as TLShape | undefined;
+    if (!rootShape) throw new Error(`Root shape not found: ${options.startShapeId}`);
+
+    const childShape = editor.getShape(options.endShapeId as TLShapeId) as TLShape | undefined;
+    if (!childShape) throw new Error(`Child shape not found: ${options.endShapeId}`);
+    if (!isBranchConnectableShape(childShape)) {
+        throw new Error(`Branch child shape must be card, single-block, or branch: ${options.endShapeId}`);
+    }
+
+    const existingBranch = rootShape.type === 'branch'
+        ? rootShape as IBranchShape
+        : getBranchRootParent(editor, rootShape.id);
+
+    if (!existingBranch) {
+        if (rootShape.type !== 'card' && rootShape.type !== 'single-block') {
+            throw new Error(`Branch root shape must be card or single-block: ${options.startShapeId}`);
         }
-        return createAgentShape(runtime, {
+        const result = createAgentBusinessShape(editor, {
             kind: 'branch',
             rootShapeId: options.startShapeId,
-            children: [{ shapeId: options.endShapeId }],
+            children: [{ shapeId: options.endShapeId, side: options.side }],
+            direction: options.side,
+            horizontalGap: options.horizontalGap,
+            verticalGap: options.verticalGap,
             color: options.color,
             lineWidth: options.strokeWidth,
             select: options.select,
             zoom: options.zoom,
             resultMode: options.resultMode,
         });
+        syncAgentCreatedBlockAttrs(runtime, result);
+        runtime.triggerSave();
+        return {
+            ...result,
+            ...buildCreatedBoundsResult(editor, result.createdShapeIds),
+            summary: getAgentResultSummary(runtime, options.resultMode),
+        };
+    }
+
+    if (existingBranch.id === childShape.id) {
+        throw new Error('Cannot connect a branch to itself');
+    }
+    if (existingBranch.props.rootShapeId === childShape.id) {
+        throw new Error('Cannot add the branch root shape as its own child');
+    }
+
+    const childId = childShape.id as string;
+    const side = inferAgentBranchSide(editor, existingBranch, childShape, options.side);
+    const currentLeftIds = existingBranch.props.leftChildIds || [];
+    const currentRightIds = existingBranch.props.rightChildIds || existingBranch.props.childIds || [];
+    const nextLeftIds = currentLeftIds.filter((id) => id !== childId);
+    const nextRightIds = currentRightIds.filter((id) => id !== childId);
+    if (side === 'left') nextLeftIds.push(childId);
+    else nextRightIds.push(childId);
+
+    const didChange =
+        !sameStringArray(currentLeftIds, nextLeftIds) ||
+        !sameStringArray(currentRightIds, nextRightIds) ||
+        !sameStringArray(existingBranch.props.childIds || [], nextRightIds);
+
+    if (didChange) {
+        editor.updateShape<IBranchShape>({
+            id: existingBranch.id,
+            type: 'branch',
+            props: {
+                ...existingBranch.props,
+                childIds: nextRightIds,
+                leftChildIds: nextLeftIds,
+                rightChildIds: nextRightIds,
+            },
+        });
+    }
+
+    const latestBranch = editor.getShape<IBranchShape>(existingBranch.id);
+    if (latestBranch?.type === 'branch') {
+        layoutBranchChildren(editor, latestBranch);
+        relayoutBranchesContainingShapes(editor, [latestBranch.id, childShape.id]);
+    }
+
+    finalizeAgentSelection(editor, existingBranch.id, options);
+    runtime.triggerSave();
+
+    const selectedShapeIds = options.select === false ? [] : [String(existingBranch.id)];
+    const finalBranch = editor.getShape<IBranchShape>(existingBranch.id) || existingBranch;
+    return {
+        createdShapeIds: [],
+        updatedShapeIds: [String(existingBranch.id)],
+        selectedShapeIds,
+        focusedShapeId: String(existingBranch.id),
+        branchId: String(existingBranch.id),
+        rootShapeId: finalBranch.props.rootShapeId,
+        leftChildIds: finalBranch.props.leftChildIds || [],
+        rightChildIds: finalBranch.props.rightChildIds || finalBranch.props.childIds || [],
+        focusedShapeBounds: getAgentShapeBoundsById(editor, existingBranch.id),
+        summary: getAgentResultSummary(runtime, options.resultMode),
+    };
+}
+
+function inferAgentBranchSide(
+    editor: Editor,
+    branch: IBranchShape,
+    child: TLShape,
+    explicitSide?: AgentBranchSide
+): AgentBranchSide {
+    if (explicitSide) return explicitSide;
+    const branchRootX = branch.x + (branch.props.rootX ?? branch.props.w / 2);
+    const childBounds = getAgentShapeBounds(editor, child);
+    return childBounds.x + childBounds.w / 2 < branchRootX ? 'left' : 'right';
+}
+
+function sameStringArray(a: string[], b: string[]) {
+    return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
+export function createAgentConnector(runtime: AgentManagerRuntime, options: AgentConnectorCreateArgs) {
+    if (options.kind === 'branch') {
+        if (!options.startShapeId || !options.endShapeId) {
+            throw new Error('branch connector requires startShapeId/endShapeId or shapeIds [root, child]');
+        }
+        return connectAgentBranchRelation(runtime, options);
     }
 
     const editor = requireEditor(runtime);
