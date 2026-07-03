@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createUpdateShapeAction(): AgentActionDefinition {
     return {
         name: 'tldraw_update_shape',
-        description: 'Update position, size, and supported visual props of a shape on an open tldraw whiteboard. Required args: whiteboardId string, shapeId string. Optional args: x, y, w, h, color, isCollapsed for card expand/collapse, select boolean, zoom boolean default true, resultMode "compact"|"full" default compact. Color must be a tldraw color name or value normalized to one. This does not edit card/single-block/branch content; those come from bound SiYuan blocks/layout props. For text/note/connector labels, mind-map root text, or slide names, use tldraw_batch_update_shapes patches with text/name.',
+        description: 'Update position, size, and supported visual props of a shape on an open tldraw whiteboard. Required args: whiteboardId string, shapeId string. Optional args: x, y, w, h, color, isCollapsed for card expand/collapse, select boolean, zoom boolean default true, resultMode "compact"|"full" default compact. Size props only apply to shapes whose schema stores w/h; text supports w only, and note does not support w/h. Color must be a tldraw color name or value normalized to one. This does not edit card/single-block/branch content; those come from bound SiYuan blocks/layout props. For text/note/connector labels, mind-map root text, or slide names, use tldraw_batch_update_shapes patches with text/name.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

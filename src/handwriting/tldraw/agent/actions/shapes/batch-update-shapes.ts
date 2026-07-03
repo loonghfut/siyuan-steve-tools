@@ -4,7 +4,7 @@ import { disabledResult, jsonResult, requireOpenWhiteboard, stringifyError, type
 export function createBatchUpdateShapesAction(): AgentActionDefinition {
     return {
         name: 'tldraw_batch_update_shapes',
-        description: 'Safely batch update up to 50 shapes on an open whiteboard. Required args: whiteboardId string, patches array of {shapeId,x,y,w,h,color,isCollapsed,text,name}. isCollapsed only applies to card shapes. Text updates are only applied to text/note/arrow/bezier-connector/mind-map, and name only to slide. Optional args: select boolean, zoom boolean default true, resultMode "compact"|"full" default compact.',
+        description: 'Safely batch update up to 50 shapes on an open whiteboard. Required args: whiteboardId string, patches array of {shapeId,x,y,w,h,color,isCollapsed,text,name}. Size props only apply to shapes whose schema stores w/h; text supports w only, and note does not support w/h. isCollapsed only applies to card shapes. Text updates are only applied to text/note/arrow/bezier-connector/mind-map, and name only to slide. Optional args: select boolean, zoom boolean default true, resultMode "compact"|"full" default compact.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;

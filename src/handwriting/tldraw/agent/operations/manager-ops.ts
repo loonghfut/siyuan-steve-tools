@@ -1139,13 +1139,14 @@ function buildAgentShapePropsPatch(shape: TLShape, options: {
     isCollapsed?: boolean;
 }): Record<string, unknown> {
     const props: Record<string, unknown> = {};
-    const supportsSize = ['card', 'single-block', 'branch', 'geo', 'note', 'text', 'frame', 'slide', 'mind-map', 'js-shape'].includes(shape.type);
+    const supportsPropWidth = ['card', 'single-block', 'branch', 'geo', 'text', 'frame', 'slide', 'mind-map', 'js-shape'].includes(shape.type);
+    const supportsPropHeight = ['card', 'single-block', 'branch', 'geo', 'frame', 'slide', 'mind-map', 'js-shape'].includes(shape.type);
     const supportsColor = ['card', 'single-block', 'branch', 'geo', 'note', 'text', 'frame', 'draw', 'highlight', 'slide', 'mind-map', 'js-shape', 'arrow', 'line', 'bezier-connector'].includes(shape.type);
 
-    if (supportsSize && options.w !== undefined) {
+    if (supportsPropWidth && options.w !== undefined) {
         props.w = finiteNumberInRange(options.w, Number((shape as any).props?.w) || 300, 1, 4000);
     }
-    if (supportsSize && options.h !== undefined) {
+    if (supportsPropHeight && options.h !== undefined) {
         props.h = finiteNumberInRange(options.h, Number((shape as any).props?.h) || 300, 1, 4000);
     }
     if (supportsColor && options.color !== undefined) {
