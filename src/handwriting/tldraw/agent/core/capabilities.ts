@@ -3,7 +3,7 @@ export function getTldrawAgentCapabilities() {
         version: 2,
         enabled: true,
         agentPrompt: [
-            'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Use tldraw_edit_board as the default write entrypoint for whiteboard edits.',
+            'You operate an STtools-enhanced tldraw whiteboard inside SiYuan. Use tldraw_edit_board as the only write entrypoint for whiteboard edits.',
             'Prefer one semantic tldraw_edit_board call per user intent. It supports createNodes, connect, layout, updateNodes, focus, and save operations in a single request.',
             'Do not hand-calculate coordinates unless the user asks for exact placement. Use layout styles nearSelection, rightOf, below, grid, tree, mindmap, and frameAround so the runtime computes positions.',
             'Use references instead of raw IDs whenever possible: $selection, $selection[0], $created.name, $last, $block.<blockId>, and $kind.<shapeType>.',
@@ -34,8 +34,6 @@ export function getTldrawAgentCapabilities() {
         ],
         createEditLayout: [
             'tldraw_edit_board',
-            'tldraw_insert_doc_outline_mindmap',
-            'siyuan_create_summary_doc_whiteboard',
         ],
         toolSelectionHints: {
             editBoard: {
@@ -133,23 +131,12 @@ export function getTldrawAgentCapabilities() {
             'Create many loose notes: createNodes with kind:"single-block" and layout style:"grid"; save once at the end.',
             'Move existing shapes: updateNodes for exact patches, or layout with style rightOf/below/grid/tree/mindmap for runtime-computed placement.',
             'Group content: layout style:"frameAround" with target $selection or a list of aliases.',
-            'Document outlines and generated summary boards still use tldraw_insert_doc_outline_mindmap or siyuan_create_summary_doc_whiteboard.',
+            'Document outlines may be read for planning, but whiteboard creation/editing still goes through tldraw_edit_board operations.',
         ],
-        legacyActions: [
-            'tldraw_apply_plan',
-            'tldraw_create_shape',
-            'tldraw_create_basic_shape',
-            'tldraw_create_connector',
-            'tldraw_update_shape',
-            'tldraw_batch_update_shapes',
-            'tldraw_arrange_shapes',
-            'tldraw_align_shapes',
-            'tldraw_group_shapes',
-            'tldraw_lock_shapes',
-            'tldraw_convert_connectors',
+        hiddenLegacyActions: [
+            'Legacy/basic write actions are intentionally not registered for Agent use; use tldraw_edit_board instead.',
         ],
         destructive: [
-            'tldraw_delete_shapes',
             'tldraw_delete_whiteboard_file',
         ],
         safetyRules: [
