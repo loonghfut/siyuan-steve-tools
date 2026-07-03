@@ -37,6 +37,7 @@ import type {
     AgentCreateShapeArgs,
     AgentCreateShapeResult,
     AgentShapeSummary,
+    AgentSingleBlockCreateArgs,
     AgentShapeUpdatePatch,
 } from '../core/types';
 
@@ -620,16 +621,17 @@ async function prepareAgentCreateShapeOptions(
     options: AgentCreateShapeArgs
 ): Promise<AgentCreateShapeArgs> {
     if (options.kind === 'card') return prepareAgentCardCreateArgs(runtime, options);
+    if (options.kind === 'single-block') return prepareAgentSingleBlockCreateArgs(runtime, options);
     if (options.kind !== 'branch') return options;
 
     const prepareRefs = async (refs?: AgentBranchCreateArgs['children']) => {
         if (!Array.isArray(refs)) return refs;
         return Promise.all(refs.map(async (ref) => {
             if (!ref || typeof ref === 'string' || ref.shapeId) return ref;
-            const shouldCreateCardBlock = ref.kind === 'card' || ref.contentMarkdown !== undefined || ref.title !== undefined;
-            if (!shouldCreateCardBlock) return ref;
-            const cardRef = { ...ref, kind: 'card' as const };
-            return prepareAgentCardCreateArgs(runtime, cardRef);
+            const kind = ref.kind || (ref.contentMarkdown !== undefined || ref.title !== undefined ? 'card' : undefined);
+            if (kind === 'card') return prepareAgentCardCreateArgs(runtime, { ...ref, kind: 'card' as const });
+            if (kind === 'single-block') return prepareAgentSingleBlockCreateArgs(runtime, { ...ref, kind: 'single-block' as const });
+            return ref;
         }));
     };
 
@@ -639,6 +641,25 @@ async function prepareAgentCreateShapeOptions(
         leftChildren: await prepareRefs(options.leftChildren),
         rightChildren: await prepareRefs(options.rightChildren),
     };
+}
+
+async function prepareAgentSingleBlockCreateArgs<T extends AgentSingleBlockCreateArgs | Extract<AgentBranchChildRef, object>>(
+    runtime: AgentManagerRuntime,
+    options: T
+): Promise<T> {
+    const contentMarkdown = typeof options.contentMarkdown === 'string' ? options.contentMarkdown : undefined;
+    const title = typeof options.title === 'string' ? options.title : undefined;
+    const blockId = typeof options.blockId === 'string' && options.blockId.trim() ? options.blockId.trim() : undefined;
+    if (blockId && (contentMarkdown !== undefined || title !== undefined)) {
+        throw new Error('single-block cannot set blockId together with contentMarkdown/title');
+    }
+    if (blockId) return { ...options, blockId, contentMarkdown: undefined, title: undefined } as T;
+
+    const createdBlockId = await createAgentSingleBlockForContent(runtime, {
+        title,
+        contentMarkdown,
+    });
+    return { ...options, blockId: createdBlockId, contentMarkdown: undefined, title: undefined } as T;
 }
 
 async function prepareAgentCardCreateArgs<T extends AgentCardCreateArgs | Extract<AgentBranchChildRef, object>>(
@@ -657,6 +678,29 @@ async function prepareAgentCardCreateArgs<T extends AgentCardCreateArgs | Extrac
         contentMarkdown,
     });
     return { ...options, blockId: createdBlockId, contentMarkdown: undefined } as T;
+}
+
+async function createAgentSingleBlockForContent(runtime: AgentManagerRuntime, options: {
+    title?: string;
+    contentMarkdown?: string;
+}) {
+    const blockId = await api.generateSiyuanID() as string;
+    const link = buildTldrawLink(runtime.id, blockId, runtime.title);
+    const body = renderAgentSingleBlockContent(options);
+    const markdown = body
+        ? `${body}\n{: id="${blockId}" custom-st-tldraw-single="1" custom-tldraw-link="${escapeBlockAttr(link)}" }\n`
+        : `\n{: id="${blockId}" custom-st-tldraw-single="1" custom-tldraw-link="${escapeBlockAttr(link)}" }\n\n`;
+    const appendResult = await api.appendBlock('markdown', markdown, runtime.id);
+    return extractFirstOperationId(appendResult) || blockId;
+}
+
+function renderAgentSingleBlockContent(options: {
+    title?: string;
+    contentMarkdown?: string;
+}) {
+    const content = String(options.contentMarkdown || '').trim();
+    if (content) return content;
+    return String(options.title || '').trim();
 }
 
 async function createAgentCardBlockForContent(runtime: AgentManagerRuntime, options: {

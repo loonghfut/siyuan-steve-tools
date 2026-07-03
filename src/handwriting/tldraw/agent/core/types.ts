@@ -40,6 +40,8 @@ export type AgentSingleBlockCreateArgs = AgentSelectionOptions & {
 	h?: number
 	color?: TLDefaultColorStyle
 	blockId?: string
+	contentMarkdown?: string
+	title?: string
 }
 
 export type AgentBranchChildRef =

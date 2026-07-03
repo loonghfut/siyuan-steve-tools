@@ -247,6 +247,8 @@ function parseSingleBlockCreateArgs(args: Record<string, unknown>): AgentSingleB
 		h: numberArg(args.h),
 		color: colorArg(args.color),
 		blockId: stringArg(args.blockId),
+		contentMarkdown: stringArg(args.contentMarkdown),
+		title: stringArg(args.title),
 		select: booleanArg(args.select),
 		zoom: booleanArg(args.zoom),
 	}
@@ -277,6 +279,7 @@ function parseBranchCreateArgs(args: Record<string, unknown>): AgentBranchCreate
 
 function parseKind(value: unknown): AgentCreateKind {
 	const raw = stringArg(value)
+	if (normalizeKindAlias(raw) === 'single-block') return 'single-block'
 	if (raw === 'card' || raw === 'single-block' || raw === 'branch') return raw
 	throw new Error('kind must be "card", "single-block", or "branch"; use tldraw_create_basic_shape for note/text/geo/arrow/line/frame and other basic shapes')
 }
@@ -358,6 +361,13 @@ function parseBranchChildArray(value: unknown): AgentBranchChildRef[] | undefine
 
 function parseChildKind(value: unknown): 'card' | 'single-block' | undefined {
 	const raw = stringArg(value)
+	if (normalizeKindAlias(raw) === 'single-block') return 'single-block'
 	if (raw === 'card' || raw === 'single-block') return raw
 	return undefined
+}
+
+function normalizeKindAlias(value: string | undefined): string | undefined {
+	if (!value) return undefined
+	const normalized = value.replace(/[_\s]/g, '-').toLowerCase()
+	return normalized === 'singleblock' ? 'single-block' : normalized
 }
