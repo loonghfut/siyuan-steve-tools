@@ -6,7 +6,7 @@ import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition 
 export function createShapeCommandAction(): AgentActionDefinition {
     return {
         name: 'tldraw_shape_command',
-        description: 'Semantic STtools tldraw shape tool. Pass intent/target/patch/etc as direct named arguments even if the frontend wrapper only displays action/id/query; do not put the whole JSON payload in id. Omit whiteboardId to use the focused whiteboard. Required intent: readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, or focusShapes. target defaults to "$selection" and supports "$selection", "$selection[0]", "$block.<blockId>", "$kind.card", shapeId string, shapeIds array, or {shapeId|shapeIds|blockId|kind}. For updateShape pass patch like {color:"orange"}; for card content edits pass contentMarkdown or patch:{contentMarkdown:"..."}; the tool updates the linked SiYuan block, keeps generated headings below the bound heading level, and refreshes every card bound to that block. For createShapes pass node or nodes like {kind:"single-block",text:"..."} plus optional layoutStyle "nearSelection"|"rightOf"|"below"|"grid"|"tree"|"mindmap"|"frameAround"; card blockId creation infers isMain from the linked block type unless isMain is explicit. For connectShapes pass from/to or select two shapes; connectionKind is "relation" or "branch". Branch constraints: root content must be card/single-block; children must be card/single-block/branch; never branch-connect text/note/geo/frame/slide/mind-map/js-shape/arrow/connector; avoid cycles and duplicate root branches. For branch hierarchy connections and branch side changes, do not pre-move child shapes or call layout first: branch auto-arranges children from the root/branch center. To move a branch child from left to right, call connectShapes again with the same root/branch as from, that child as to, connectionKind:"branch", side:"right"; this changes branch leftChildIds/rightChildIds and relayouts. For layoutShapes pass target and layoutStyle.',
+        description: 'Semantic STtools tldraw shape tool. Pass intent/target/patch/etc as direct named arguments even if the frontend wrapper only displays action/id/query; do not put the whole JSON payload in id. Omit whiteboardId to use the focused whiteboard. Required intent: readSelectedContent, inspectEditable, updateShape, createShapes, connectShapes, layoutShapes, or focusShapes. target defaults to "$selection" and supports "$selection", "$selection[0]", "$block.<blockId>", "$kind.card", shapeId string, shapeIds array, or {shapeId|shapeIds|blockId|kind}. For updateShape pass patch like {color:"orange"}; for card content edits pass contentMarkdown or patch:{contentMarkdown:"..."} and only after explicit user confirmation pass confirmContentUpdate:true. Without confirmContentUpdate:true, linked card content writes are refused. The tool updates the linked SiYuan block, keeps generated headings below the bound heading level, and refreshes every card bound to that block. For createShapes pass node or nodes like {kind:"single-block",text:"..."} plus optional layoutStyle "nearSelection"|"rightOf"|"below"|"grid"|"tree"|"mindmap"|"frameAround"; card blockId creation infers isMain from the linked block type unless isMain is explicit. For connectShapes pass from/to or select two shapes; connectionKind is "relation" or "branch". Branch constraints: root content must be card/single-block; children must be card/single-block/branch; never branch-connect text/note/geo/frame/slide/mind-map/js-shape/arrow/connector; avoid cycles and duplicate root branches. For branch hierarchy connections and branch side changes, do not pre-move child shapes or call layout first: branch auto-arranges children from the root/branch center. To move a branch child from left to right, call connectShapes again with the same root/branch as from, that child as to, connectionKind:"branch", side:"right"; this changes branch leftChildIds/rightChildIds and relayouts. For layoutShapes pass target and layoutStyle.',
         handler: async (args) => {
             const disabled = disabledResult();
             if (disabled) return disabled;
@@ -14,7 +14,7 @@ export function createShapeCommandAction(): AgentActionDefinition {
             try {
                 assertKnownArgs(normalizedArgs, [
                     'whiteboardId', 'id', 'rootId', 'query', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch',
-                    'contentMarkdown', 'contentMode',
+                    'contentMarkdown', 'contentMode', 'confirmContentUpdate',
                     'node', 'nodes', 'from', 'to', 'connectionKind', 'text', 'color', 'strokeWidth', 'lineWidth',
                     'layoutStyle', 'layout', 'columns', 'gap', 'horizontalGap', 'verticalGap', 'side',
                     'x', 'y', 'w', 'h', 'name', 'save', 'select', 'zoom', 'result',
@@ -47,6 +47,7 @@ export function createShapeCommandAction(): AgentActionDefinition {
                     patch: shapeCommandPatchArg(normalizedArgs.patch) ?? shapeCommandPatchFromTopLevelArgs(normalizedArgs),
                     contentMarkdown: stringOrEmptyArg(normalizedArgs.contentMarkdown),
                     contentMode: shapeCommandContentModeArg(normalizedArgs.contentMode),
+                    confirmContentUpdate: booleanArg(normalizedArgs.confirmContentUpdate),
                     node: shapeCommandObjectArg(normalizedArgs.node) as AgentShapeCommandRequest['node'],
                     nodes: shapeCommandArrayArg(normalizedArgs.nodes) as AgentShapeCommandRequest['nodes'],
                     from: shapeCommandTargetArg(normalizedArgs.from),
@@ -116,7 +117,7 @@ function normalizeShapeCommandArgs(args: Record<string, unknown>): Record<string
 
 function looksLikeShapeCommandPayload(value: Record<string, unknown>): boolean {
     return [
-        'whiteboardId', 'rootId', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch', 'contentMarkdown', 'contentMode',
+        'whiteboardId', 'rootId', 'intent', 'target', 'shapeId', 'shapeIds', 'shapeKind', 'patch', 'contentMarkdown', 'contentMode', 'confirmContentUpdate',
         'node', 'nodes', 'from', 'to', 'connectionKind', 'layoutStyle', 'layout',
     ].some((key) => value[key] !== undefined);
 }

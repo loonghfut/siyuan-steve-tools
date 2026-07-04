@@ -372,6 +372,7 @@ export type AgentShapeCommandRequest = AgentSelectionOptions & {
 	patch?: Record<string, unknown>
 	contentMarkdown?: string
 	contentMode?: 'replace'
+	confirmContentUpdate?: boolean
 	node?: AgentBoardNodeCreate
 	nodes?: AgentBoardNodeCreate[]
 	from?: AgentBoardEditHandle

@@ -423,6 +423,25 @@ export async function runAgentShapeCommand(
     if (Object.keys(patch).length === 0 && !hasContentMarkdown) {
         return { ok: false, intent, whiteboardId: runtime.id, target, updatedShapeIds: [], errors: ['updateShape requires a non-empty patch object'], saved };
     }
+    if (hasContentMarkdown && request.confirmContentUpdate !== true) {
+        return {
+            ok: false,
+            intent,
+            whiteboardId: runtime.id,
+            target,
+            updatedShapeIds: [],
+            items: targetShapeIds.map((shapeId) => {
+                const shape = editor.getShape(shapeId as TLShapeId) as TLShape | undefined;
+                return {
+                    shapeId,
+                    shapeType: shape?.type,
+                    blockId: String((shape as any)?.props?.blockId || ''),
+                };
+            }),
+            errors: ['card content update requires explicit user confirmation: ask the user to confirm, then call again with confirmContentUpdate:true'],
+            saved,
+        };
+    }
 
     const items: Array<Record<string, unknown>> = [];
     const updatedShapeIds: string[] = [];
