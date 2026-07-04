@@ -1,5 +1,7 @@
 import type { Plugin } from 'siyuan';
+import { createApplyPlanAction } from './planning/apply-plan';
 import { createBackupWhiteboardAction } from './whiteboards/backup-whiteboard';
+import { createCreateSummaryDocWhiteboardAction } from './documents/create-summary-doc-whiteboard';
 import { createDeleteWhiteboardFileAction } from './whiteboards/delete-whiteboard-file';
 import { createDeleteShapesAction } from './shapes/delete-shapes';
 import { createGetAgentCapabilitiesAction } from './system/get-agent-capabilities';
@@ -9,6 +11,7 @@ import { createGetSnapshotSummaryAction } from './whiteboards/get-snapshot-summa
 import { createGetSummaryAction } from './whiteboards/get-summary';
 import { createListBackupsAction } from './whiteboards/list-backups';
 import { createListWhiteboardsAction } from './whiteboards/list-whiteboards';
+import { createInsertDocOutlineMindmapAction } from './documents/insert-doc-outline-mindmap';
 import { createNavigateToBlockAction } from './documents/navigate-to-block';
 import { createOpenWhiteboardAction } from './whiteboards/open-whiteboard';
 import { createPreviewBackupAction } from './whiteboards/preview-backup';
@@ -26,11 +29,14 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
         createShapeCommandAction(),
+        createApplyPlanAction(),
         createDeleteShapesAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
         createGetSummaryAction(),
         createReadDocOutlineAction(),
+        createInsertDocOutlineMindmapAction(),
+        createCreateSummaryDocWhiteboardAction(context),
         createGetShapeDetailsAction(),
         createGetSnapshotSummaryAction(),
         createBackupWhiteboardAction(),

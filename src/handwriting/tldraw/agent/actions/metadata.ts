@@ -6,6 +6,7 @@ export type TldrawAgentActionMeta = {
     category: TldrawAgentActionCategory;
     risk: 'read' | 'write' | 'danger';
     description: string;
+    defaultEnabled?: boolean;
 };
 
 export const TLDRAW_AGENT_ACTIONS_META: TldrawAgentActionMeta[] = [
@@ -29,6 +30,14 @@ export const TLDRAW_AGENT_ACTIONS_META: TldrawAgentActionMeta[] = [
         category: 'shape',
         risk: 'write',
         description: '用于读取、创建、更新、连接、布局和聚焦形状的高层命令。',
+    },
+    {
+        name: 'tldraw_apply_plan',
+        title: '应用白板计划',
+        category: 'shape',
+        risk: 'write',
+        description: '按 JSON steps 批量创建、连接、更新、布局和聚焦白板内容。',
+        defaultEnabled: false,
     },
     {
         name: 'tldraw_delete_shapes',
@@ -64,6 +73,22 @@ export const TLDRAW_AGENT_ACTIONS_META: TldrawAgentActionMeta[] = [
         category: 'document',
         risk: 'read',
         description: '读取思源文档大纲，供 Agent 规划白板结构。',
+    },
+    {
+        name: 'tldraw_insert_doc_outline_mindmap',
+        title: '插入文档大纲导图',
+        category: 'document',
+        risk: 'write',
+        description: '把思源文档大纲插入到打开的白板中，形成分支/导图布局。',
+        defaultEnabled: false,
+    },
+    {
+        name: 'siyuan_create_summary_doc_whiteboard',
+        title: '创建总结文档白板',
+        category: 'document',
+        risk: 'write',
+        description: '创建总结文档，打开其白板，并可把总结标题层级转成白板导图。',
+        defaultEnabled: false,
     },
     {
         name: 'tldraw_get_shape_details',
@@ -137,7 +162,9 @@ export const TLDRAW_AGENT_ACTIONS_META: TldrawAgentActionMeta[] = [
     },
 ];
 
-export const DEFAULT_TLDRAW_AGENT_ACTION_NAMES = TLDRAW_AGENT_ACTIONS_META.map((action) => action.name);
+export const DEFAULT_TLDRAW_AGENT_ACTION_NAMES = TLDRAW_AGENT_ACTIONS_META
+    .filter((action) => action.defaultEnabled !== false)
+    .map((action) => action.name);
 
 export function getTldrawAgentActionMeta(name: string): TldrawAgentActionMeta | undefined {
     return TLDRAW_AGENT_ACTIONS_META.find((action) => action.name === name);
