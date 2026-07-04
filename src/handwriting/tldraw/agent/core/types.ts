@@ -370,6 +370,8 @@ export type AgentShapeCommandRequest = AgentSelectionOptions & {
 	target?: AgentBoardEditHandle
 	shapeKind?: string
 	patch?: Record<string, unknown>
+	contentMarkdown?: string
+	contentMode?: 'replace'
 	node?: AgentBoardNodeCreate
 	nodes?: AgentBoardNodeCreate[]
 	from?: AgentBoardEditHandle

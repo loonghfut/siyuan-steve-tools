@@ -26,6 +26,7 @@ import {
 import type { IBranchShape } from '../../BranchShape/branch-shape-types';
 import { buildCardCollapseUpdate, getCardCollapsedHeight } from '../../CardShape/card-collapse';
 import type { ICardShape } from '../../CardShape/card-shape-types';
+import { invalidateCache } from '../../block-html-cache';
 import { createMindMapNode } from '../../MindMapShape/mind-map-shape-types';
 import { DEFAULT_SCRIPT } from '../../JsShape/static';
 import { buildTldrawLink } from '../../utils/link-builder';
@@ -402,21 +403,24 @@ export async function runAgentShapeCommand(
     }
 
     if (intent === 'inspectEditable') {
-        const items = targetShapeIds.map((shapeId) => {
-            const shape = editor.getShape(shapeId as TLShapeId) as TLShape | undefined;
-            if (!shape) return null;
+        const targetShapes = targetShapeIds
+            .map((shapeId) => editor.getShape(shapeId as TLShapeId) as TLShape | undefined)
+            .filter(Boolean) as TLShape[];
+        const blockContentById = await loadAgentLinkedBlockContent(targetShapes);
+        const items = targetShapes.map((shape) => {
             return {
-                shape: summarizeAgentShape(editor, shape),
+                shape: summarizeAgentShape(editor, shape, false, getShapeLinkedBlockContent(shape, blockContentById)),
                 editableFields: describeEditableShape(shape),
             };
-        }).filter(Boolean) as Array<Record<string, unknown>>;
+        }) as Array<Record<string, unknown>>;
         return { ok: true, intent, whiteboardId: runtime.id, target, items };
     }
 
-    const patch = request.patch && typeof request.patch === 'object' && !Array.isArray(request.patch)
+    const patch: Record<string, unknown> = request.patch && typeof request.patch === 'object' && !Array.isArray(request.patch)
         ? request.patch
-        : null;
-    if (!patch || Object.keys(patch).length === 0) {
+        : {};
+    const hasContentMarkdown = typeof request.contentMarkdown === 'string' || typeof patch.contentMarkdown === 'string';
+    if (Object.keys(patch).length === 0 && !hasContentMarkdown) {
         return { ok: false, intent, whiteboardId: runtime.id, target, updatedShapeIds: [], errors: ['updateShape requires a non-empty patch object'], saved };
     }
 
@@ -431,9 +435,45 @@ export async function runAgentShapeCommand(
         }
 
         const before = summarizeAgentShape(editor, shape);
-        const updateResult = applySemanticShapePatch(shape, patch);
-        if (updateResult.errors.length) errors.push(...updateResult.errors.map((error) => `${shapeId}: ${error}`));
-        if (!updateResult.changedFields.length || !updateResult.update) {
+        const contentMarkdown = getAgentShapeCommandContentMarkdown(request, patch);
+        const contentMode = getAgentShapeCommandContentMode(request, patch);
+        const semanticPatch = omitAgentContentPatchFields(patch);
+        const changedFields: string[] = [];
+        let contentWrite: Record<string, unknown> | undefined;
+
+        if (contentMarkdown !== undefined) {
+            if (contentMode !== 'replace') {
+                errors.push(`${shapeId}: contentMode must be "replace"`);
+            } else if (shape.type !== 'card') {
+                errors.push(`${shapeId}: contentMarkdown is only supported for card shapes`);
+            } else {
+                try {
+                    const contentResult = await updateAgentCardLinkedBlockContent(runtime, editor, shape as ICardShape, contentMarkdown);
+                    changedFields.push('contentMarkdown');
+                    updatedShapeIds.push(...contentResult.refreshedShapeIds);
+                    contentWrite = {
+                        blockId: contentResult.blockId,
+                        blockType: contentResult.blockType,
+                        headingLevel: contentResult.headingLevel,
+                        refreshedShapeIds: contentResult.refreshedShapeIds,
+                    };
+                } catch (error) {
+                    errors.push(`${shapeId}: ${stringifyAgentError(error)}`);
+                }
+            }
+        }
+
+        if (Object.keys(semanticPatch).length > 0) {
+            const updateResult = applySemanticShapePatch(shape, semanticPatch);
+            if (updateResult.errors.length) errors.push(...updateResult.errors.map((error) => `${shapeId}: ${error}`));
+            if (updateResult.changedFields.length && updateResult.update) {
+                editor.updateShape(updateResult.update as any);
+                updatedShapeIds.push(String(shape.id));
+                changedFields.push(...updateResult.changedFields);
+            }
+        }
+
+        if (!changedFields.length) {
             items.push({
                 shapeId,
                 before,
@@ -443,21 +483,22 @@ export async function runAgentShapeCommand(
             continue;
         }
 
-        editor.updateShape(updateResult.update as any);
         const afterShape = editor.getShape(shape.id) as TLShape | undefined;
         const after = afterShape ? summarizeAgentShape(editor, afterShape) : before;
-        updatedShapeIds.push(String(shape.id));
-        items.push({
+        const item: Record<string, unknown> = {
             shapeId: String(shape.id),
             before,
             after,
-            changedFields: updateResult.changedFields,
-        });
+            changedFields: uniqueStrings(changedFields),
+        };
+        if (contentWrite) item.contentWrite = contentWrite;
+        items.push(item);
     }
 
-    if (updatedShapeIds.length) {
-        if (request.select !== false) editor.setSelectedShapes(updatedShapeIds as TLShapeId[]);
-        relayoutUpdatedSemanticBranches(editor, updatedShapeIds);
+    const uniqueUpdatedShapeIds = uniqueStrings(updatedShapeIds);
+    if (uniqueUpdatedShapeIds.length) {
+        if (request.select !== false) editor.setSelectedShapes(uniqueUpdatedShapeIds as TLShapeId[]);
+        relayoutUpdatedSemanticBranches(editor, uniqueUpdatedShapeIds);
         if (request.zoom === true) editor.zoomToSelection({ animation: { duration: 300 } });
         if (request.save === true) {
             await runtime.saveData();
@@ -472,7 +513,7 @@ export async function runAgentShapeCommand(
         intent,
         whiteboardId: runtime.id,
         target,
-        updatedShapeIds,
+        updatedShapeIds: uniqueUpdatedShapeIds,
         items,
         errors,
         saved,
@@ -516,6 +557,33 @@ function resolveAgentShapeCommandTarget(
         ? ids.filter((id) => editor.getShape(id as TLShapeId)?.type === kind)
         : ids;
     return filtered;
+}
+
+function getAgentShapeCommandContentMarkdown(
+    request: AgentShapeCommandRequest,
+    patch: Record<string, unknown>
+): string | undefined {
+    if (typeof request.contentMarkdown === 'string') return request.contentMarkdown;
+    return typeof patch.contentMarkdown === 'string' ? patch.contentMarkdown : undefined;
+}
+
+function getAgentShapeCommandContentMode(
+    request: AgentShapeCommandRequest,
+    patch: Record<string, unknown>
+): string {
+    const raw = typeof request.contentMode === 'string'
+        ? request.contentMode
+        : typeof patch.contentMode === 'string'
+            ? patch.contentMode
+            : undefined;
+    return raw || 'replace';
+}
+
+function omitAgentContentPatchFields(patch: Record<string, unknown>): Record<string, unknown> {
+    const next = { ...patch };
+    delete next.contentMarkdown;
+    delete next.contentMode;
+    return next;
 }
 
 async function executeAgentShapeCommandCreate(
@@ -2837,13 +2905,29 @@ async function prepareAgentCardCreateArgs<T extends AgentCardCreateArgs | Extrac
     if (blockId && contentMarkdown !== undefined) {
         throw new Error('card cannot set both blockId and contentMarkdown');
     }
-    if (blockId) return { ...options, blockId, contentMarkdown: undefined } as T;
+    if (blockId) {
+        return {
+            ...options,
+            blockId,
+            contentMarkdown: undefined,
+            isMain: options.isMain ?? await inferAgentCardIsMainFromBlock(blockId),
+        } as T;
+    }
 
     const createdBlockId = await createAgentCardBlockForContent(runtime, {
         title: options.title,
         contentMarkdown,
     });
     return { ...options, blockId: createdBlockId, contentMarkdown: undefined } as T;
+}
+
+async function inferAgentCardIsMainFromBlock(blockId: string): Promise<boolean | undefined> {
+    if (!SIYUAN_BLOCK_ID_RE.test(blockId)) return undefined;
+    const block = await api.getBlockByID(blockId).catch(() => null);
+    const type = String((block as any)?.type || '');
+    if (type === 'd') return true;
+    if (type === 'h') return false;
+    return undefined;
 }
 
 async function createAgentSingleBlockForContent(runtime: AgentManagerRuntime, options: {
@@ -2924,6 +3008,160 @@ function normalizeAgentCardContent(options: {
         headingLevel: 6,
         bodyMarkdown: rawContent,
     };
+}
+
+type AgentCardLinkedContentUpdateResult = {
+    blockId: string;
+    blockType: string;
+    headingLevel?: number;
+    refreshedShapeIds: string[];
+};
+
+async function updateAgentCardLinkedBlockContent(
+    runtime: AgentManagerRuntime,
+    editor: Editor,
+    shape: ICardShape,
+    contentMarkdown: string,
+): Promise<AgentCardLinkedContentUpdateResult> {
+    const blockId = String(shape.props.blockId || '').trim();
+    if (!SIYUAN_BLOCK_ID_RE.test(blockId)) {
+        throw new Error('card content update requires a valid linked blockId');
+    }
+
+    const block = await api.getBlockByID(blockId);
+    if (!block) throw new Error(`card linked block not found: ${blockId}`);
+
+    const blockType = String((block as any).type || '');
+    if (blockType !== 'd' && blockType !== 'h') {
+        throw new Error(`card linked block must be a document or heading block; got type "${blockType || 'unknown'}"`);
+    }
+
+    if (blockType === 'h') {
+        const headingLevel = getAgentHeadingLevel(block);
+        const normalized = normalizeAgentExistingHeadingCardContent(contentMarkdown, block, headingLevel);
+        await replaceAgentLinkedBlockChildren(blockId);
+        await api.updateBlock('markdown', `${'#'.repeat(headingLevel)} ${normalized.title}`, blockId);
+        await syncAgentCardBlockAttrs(runtime, blockId, shape.id);
+        if (normalized.bodyMarkdown) {
+            await api.insertBlock('markdown', normalized.bodyMarkdown, undefined, blockId);
+        }
+        return {
+            blockId,
+            blockType,
+            headingLevel,
+            refreshedShapeIds: refreshAgentLinkedCardShapes(editor, blockId),
+        };
+    }
+
+    const bodyMarkdown = normalizeMarkdownHeadingLevelsForCardBody(String(contentMarkdown || '').trim(), 0);
+    await replaceAgentLinkedBlockChildren(blockId);
+    await syncAgentCardBlockAttrs(runtime, blockId, shape.id);
+    if (bodyMarkdown) {
+        await api.appendBlock('markdown', bodyMarkdown, blockId);
+    }
+    return {
+        blockId,
+        blockType,
+        refreshedShapeIds: refreshAgentLinkedCardShapes(editor, blockId),
+    };
+}
+
+function normalizeAgentExistingHeadingCardContent(
+    contentMarkdown: string,
+    block: unknown,
+    headingLevel: number,
+) {
+    const rawContent = String(contentMarkdown || '').trim();
+    const leadingHeading = parseLeadingMarkdownHeading(rawContent);
+    const fallbackTitle = getAgentExistingBlockTitle(block) || renderAgentCardTitle('Untitled');
+    const title = leadingHeading?.text || fallbackTitle;
+    const rawBody = leadingHeading
+        ? rawContent.slice(leadingHeading.raw.length).trimStart()
+        : rawContent;
+    return {
+        title,
+        bodyMarkdown: normalizeMarkdownHeadingLevelsForCardBody(rawBody, headingLevel),
+    };
+}
+
+function normalizeMarkdownHeadingLevelsForCardBody(markdown: string, parentHeadingLevel: number): string {
+    const raw = String(markdown || '').trim();
+    if (!raw || parentHeadingLevel <= 0) return raw;
+
+    const headingMatches = Array.from(raw.matchAll(/^(#{1,6})[ \t]+(.+?)[ \t]*(?:#+[ \t]*)?$/gm));
+    if (!headingMatches.length) return raw;
+    if (parentHeadingLevel >= 6) return convertMarkdownHeadingsToBoldParagraphs(raw);
+
+    const minHeadingLevel = Math.min(...headingMatches.map((match) => match[1].length));
+    return raw.replace(/^(#{1,6})[ \t]+(.+?)[ \t]*(?:#+[ \t]*)?$/gm, (_line, hashes: string, text: string) => {
+        const targetLevel = parentHeadingLevel + 1 + (hashes.length - minHeadingLevel);
+        const cleanText = String(text || '').trim();
+        if (targetLevel > 6) return `**${cleanText}**`;
+        return `${'#'.repeat(targetLevel)} ${cleanText}`;
+    });
+}
+
+function convertMarkdownHeadingsToBoldParagraphs(markdown: string): string {
+    return String(markdown || '').replace(/^(#{1,6})[ \t]+(.+?)[ \t]*(?:#+[ \t]*)?$/gm, (_line, _hashes: string, text: string) => {
+        return `**${String(text || '').trim()}**`;
+    }).trim();
+}
+
+function getAgentHeadingLevel(block: unknown): number {
+    const subtype = String((block as any)?.subtype || (block as any)?.subType || '').toLowerCase();
+    const subtypeMatch = subtype.match(/h([1-6])/);
+    if (subtypeMatch) return Number(subtypeMatch[1]);
+
+    const markdown = String((block as any)?.markdown || '');
+    const markdownHeading = parseLeadingMarkdownHeading(markdown);
+    if (markdownHeading) return markdownHeading.level;
+
+    return 6;
+}
+
+function getAgentExistingBlockTitle(block: unknown): string {
+    return String(
+        (block as any)?.fcontent ||
+        (block as any)?.content ||
+        (block as any)?.markdown ||
+        ''
+    ).replace(/^#{1,6}\s+/, '').trim();
+}
+
+async function replaceAgentLinkedBlockChildren(blockId: string): Promise<void> {
+    const children = await api.getChildBlocks(blockId).catch(() => []);
+    for (const child of children || []) {
+        const id = String((child as any)?.id || '').trim();
+        if (id && id !== blockId) {
+            await api.deleteBlock(id);
+        }
+    }
+}
+
+async function syncAgentCardBlockAttrs(runtime: AgentManagerRuntime, blockId: string, shapeId: TLShapeId): Promise<void> {
+    const attrs = await api.getBlockAttrs(blockId).catch(() => ({}));
+    const link = String((attrs as any)?.['custom-tldraw-link'] || '') ||
+        buildTldrawLink(runtime.id, blockId, runtime.title, shapeId);
+    await api.setBlockAttrs(blockId, {
+        'custom-st-tldraw': '1',
+        'custom-tldraw-link': link,
+    });
+}
+
+function refreshAgentLinkedCardShapes(editor: Editor, blockId: string): string[] {
+    invalidateCache(blockId);
+    const nonce = Date.now();
+    const updates = editor.getCurrentPageShapes()
+        .filter((candidate) => candidate.type === 'card' && String((candidate as ICardShape).props?.blockId || '') === blockId)
+        .map((candidate) => ({
+            id: candidate.id,
+            type: candidate.type,
+            props: {
+                refreshNonce: nonce,
+            },
+        }));
+    if (updates.length) editor.updateShapes(updates as any);
+    return updates.map((update) => String(update.id));
 }
 
 function parseLeadingMarkdownHeading(markdown: string): { raw: string; level: number; text: string } | null {

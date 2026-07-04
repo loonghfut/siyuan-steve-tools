@@ -8,6 +8,8 @@ export function getTldrawAgentCapabilities() {
             'Do not encode the whole tldraw_shape_command payload into id or query. id is only a whiteboardId fallback; omit it when the focused whiteboard is already open.',
             'To answer "what is the selected card content?", call tldraw_shape_command with {intent:"readSelectedContent"}; do not fetch shape ids first.',
             'To change selected custom shape properties, call tldraw_shape_command with intent "inspectEditable" if you need available fields, then intent "updateShape" with a small patch.',
+            'To modify linked card content, call tldraw_shape_command with intent "updateShape" and contentMarkdown or patch.contentMarkdown. The tool writes the linked SiYuan block, keeps generated headings below the bound heading level, refreshes all cards for that block, and autosaves the board.',
+            'When creating a card with blockId, omit isMain unless you need to override it. The tool treats document blocks as main cards and heading blocks as normal cards.',
             'To create shapes, call tldraw_shape_command with intent "createShapes" and pass node or nodes. Use layoutStyle instead of manual coordinates unless exact placement is requested.',
             'To connect shapes, call tldraw_shape_command with intent "connectShapes"; pass from/to or select two shapes first. Use connectionKind "branch" for hierarchy and "relation" for ordinary links.',
             'For branch hierarchy connections or side changes, do not pre-move child shapes or run a separate layout first. Branch auto-positions its children; only choose root/from, child/to, optional side, and optional spacing/style. The root shape or branch center controls the main position.',
@@ -52,7 +54,7 @@ export function getTldrawAgentCapabilities() {
                 references: ['$selection', '$selection[0]', '$block.<blockId>', '$kind.card', '$kind.single-block', '$kind.branch', '$kind.bezier-connector', '$kind.mind-map', '$kind.slide', '$kind.js-shape'],
                 intents: ['readSelectedContent', 'inspectEditable', 'updateShape', 'createShapes', 'connectShapes', 'layoutShapes', 'focusShapes'],
                 editableExamples: {
-                    card: ['color', 'isCollapsed', 'showMask', 'isMain', 'renderMode', 'collapsedTextSize', 'collapsedTextAlign'],
+                    card: ['color', 'isCollapsed', 'showMask', 'isMain', 'renderMode', 'collapsedTextSize', 'collapsedTextAlign', 'contentMarkdown'],
                     'single-block': ['color', 'transparentBackground', 'allowBinding', 'connectOnEnter'],
                     branch: ['color', 'lineStyle', 'lineWidth', 'horizontalGap', 'verticalGap', 'snapDistance', 'showBackground'],
                     'bezier-connector': ['color', 'strokeWidth', 'strokeStyle', 'labelPosition', 'text'],
@@ -70,6 +72,7 @@ export function getTldrawAgentCapabilities() {
                     { intent: 'readSelectedContent' },
                     { intent: 'inspectEditable', target: '$selection[0]' },
                     { intent: 'updateShape', target: '$selection[0]', patch: { color: 'blue', isCollapsed: true } },
+                    { intent: 'updateShape', target: '$selection[0]', contentMarkdown: '## Updated card title\n\nNew card body' },
                     { intent: 'createShapes', nodes: [{ kind: 'single-block', text: 'New note' }], layoutStyle: 'nearSelection' },
                     { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'relation', text: 'related' },
                     { intent: 'connectShapes', from: '$selection[0]', to: '$selection[1]', connectionKind: 'branch', side: 'right' },
@@ -89,7 +92,8 @@ export function getTldrawAgentCapabilities() {
                 createWith: 'tldraw_shape_command intent createShapes with node kind "card".',
                 notes: [
                     'Use blockId to reference an existing document/heading block, or contentMarkdown/title/text to create a new heading block.',
-                    'Content belongs to the bound SiYuan block; use tldraw_shape_command to read content or update whiteboard card properties such as color, collapse state, mask, renderMode, and collapsed text settings.',
+                    'Content belongs to the bound SiYuan block; use tldraw_shape_command updateShape with contentMarkdown to replace card content. The tool refreshes the card and fixes generated heading levels automatically.',
+                    'When blockId points to a document block the card defaults to isMain:true; when it points to a heading block the card defaults to isMain:false. Explicit isMain overrides this.',
                 ],
             },
             {
