@@ -1,5 +1,6 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 import { h6StyleDefaults, h6StyleGroup } from "./style-h6";
+import { DEFAULT_TLDRAW_AGENT_ACTION_NAMES } from "@/handwriting/tldraw/agent/actions/metadata";
 
 export const handwritingDefaults: Record<string, any> = {
     "handwriting-enable": false,
@@ -33,6 +34,7 @@ export const handwritingDefaults: Record<string, any> = {
     // 文档树显示白板按钮
     "tldraw-show-in-file-tree": true,
     "tldraw-agent-actions-enable": false,
+    "tldraw-agent-enabled-actions": DEFAULT_TLDRAW_AGENT_ACTION_NAMES,
     ...h6StyleDefaults,
 };
 
@@ -58,7 +60,6 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
         h6StyleGroup(ctx),
         {
             name: "高级设置", items: [
-                { type: "checkbox", title: "启用思源智能体操作白板（测试中）", description: "启用后，思源 Agent 可以通过 frontend action 打开、读取并修改 tldraw 白板", key: "tldraw-agent-actions-enable", value: ctx.settings["tldraw-agent-actions-enable"] },
                 { type: "select", title: "画板数据块备用创建位置", description: "选择日记本", key: "tl-draw-create-note-id", value: ctx.settings["tl-draw-create-note-id"], options: (() => { const nb = (window as any).siyuan?.notebooks; if (!Array.isArray(nb) || !nb.length) return { "": "无可用日记本" }; return Object.fromEntries(nb.map((n: any) => [n.id, n.name])); })() },
                 { type: "checkbox", title: "同步删除(不建议启用)", description: "删除画板块时同步删除笔记块", key: "SyncDelete", value: ctx.settings["SyncDelete"] },
                 { type: "checkbox", title: "全局禁止 JS 块执行脚本", description: "启用后所有 JS 形状将不执行脚本代码（安全模式）", key: "js-shape-disable-execution", value: ctx.settings["js-shape-disable-execution"] },
@@ -71,6 +72,12 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                     }
                 },
                 { type: "checkbox", title: "仅加载视野内形状", description: "启用后 tldraw 仅在视区内加载形状以节省资源", key: "tldraw-viewport-culling", value: ctx.settings["tldraw-viewport-culling"] },
+            ]
+        },
+        {
+            name: "Agent", items: [
+                { type: "checkbox", title: "启用思源智能体操作白板（测试中）", description: "启用后，思源 Agent 可以通过 frontend action 打开、读取并修改 tldraw 白板", key: "tldraw-agent-actions-enable", value: ctx.settings["tldraw-agent-actions-enable"] },
+                { type: "custom", title: "Agent 可用 Actions", description: "选择哪些 tldraw frontend action 暴露给思源 Agent。关闭后即使已经注册过，也会在执行时被拦截。", key: "tldraw-agent-enabled-actions", value: ctx.settings["tldraw-agent-enabled-actions"], component: "TldrawAgentActionsSettings" },
             ]
         },
         { name: "备份管理", items: [{ type: "custom", title: "画板备份管理", description: "管理画板备份", key: "tldraw-backup-manager", value: "", component: "TldrawBackupManager" }] },

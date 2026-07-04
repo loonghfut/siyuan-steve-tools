@@ -16,12 +16,13 @@ import { createReadDocOutlineAction } from './documents/read-doc-outline';
 import { createSaveWhiteboardAction } from './whiteboards/save-whiteboard';
 import { createSelectShapeAction } from './shapes/select-shape';
 import { createShapeCommandAction } from './shapes/shape-command';
+import { DEFAULT_TLDRAW_AGENT_ACTION_NAMES } from './metadata';
 import type { AgentActionContext, AgentActionDefinition } from './shared';
 import { createZoomToShapesAction } from './shapes/zoom-to-shapes';
 
 export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
     const context: AgentActionContext = { plugin };
-    const actions = [
+    const actionDefinitions = [
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
         createShapeCommandAction(),
@@ -41,7 +42,11 @@ export function getTldrawAgentActions(plugin: Plugin): AgentActionDefinition[] {
         createZoomToShapesAction(),
         createSelectShapeAction(),
     ];
-    return actions.map(withInteractionContextRequirement);
+    const actionsByName = new Map(actionDefinitions.map((action) => [action.name, action]));
+    return DEFAULT_TLDRAW_AGENT_ACTION_NAMES
+        .map((name) => actionsByName.get(name))
+        .filter((action): action is AgentActionDefinition => !!action)
+        .map(withInteractionContextRequirement);
 }
 
 function withInteractionContextRequirement(action: AgentActionDefinition): AgentActionDefinition {

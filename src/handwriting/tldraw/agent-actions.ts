@@ -1,6 +1,7 @@
 import { Plugin } from 'siyuan';
 import { settingdata } from '@/index';
 import { getTldrawAgentActions } from './agent/actions';
+import { isTldrawAgentActionEnabled } from './agent/actions/settings';
 import type { AgentActionResult } from './agent/actions/shared';
 import { getFocusedInstanceId, getInstance } from './tldraw-instance-manager';
 
@@ -10,24 +11,26 @@ type AddAgentActionObject = (options: {
     handler: (args: Record<string, unknown>, app: unknown) => AgentActionResult;
 }) => string;
 
-let registered = false;
+const registeredActionNames = new Set<string>();
 
 export function registerTldrawAgentActions(plugin: Plugin) {
     if (settingdata['tldraw-agent-actions-enable'] !== true) {
         return;
     }
-    if (registered) {
-        return;
-    }
-
     const addAgentAction = (plugin as any).addAgentAction as AddAgentActionObject | undefined;
     if (typeof addAgentAction !== 'function') {
         console.info('SiYuan addAgentAction API is unavailable; skip tldraw agent actions.');
         return;
     }
 
-    for (const action of getTldrawAgentActions(plugin)) {
+    for (const action of getTldrawAgentActions(plugin).filter((action) => isTldrawAgentActionEnabled(action.name))) {
+        if (registeredActionNames.has(action.name)) {
+            continue;
+        }
         const handler = async (args: Record<string, unknown>, app: unknown) => {
+            if (!isTldrawAgentActionEnabled(action.name)) {
+                return { error: `STtools tldraw agent action ${action.name} is disabled in plugin settings.` };
+            }
             const cleanedArgs = stripFrontendActionArgs(args);
             console.log('[tldraw agent action] call', {
                 name: action.name,
@@ -57,9 +60,8 @@ export function registerTldrawAgentActions(plugin: Plugin) {
             description: action.description,
             handler,
         });
+        registeredActionNames.add(action.name);
     }
-
-    registered = true;
 }
 
 export function syncTldrawAgentActions(plugin: Plugin) {

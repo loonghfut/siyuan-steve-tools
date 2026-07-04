@@ -1,5 +1,6 @@
 import { getTldrawAgentCapabilities } from '../../core/capabilities';
 import { disabledResult, jsonResult, type AgentActionDefinition } from '../shared';
+import { getEnabledTldrawAgentActionNames } from '../settings';
 
 export function createGetAgentCapabilitiesAction(): AgentActionDefinition {
     return {
@@ -8,7 +9,10 @@ export function createGetAgentCapabilitiesAction(): AgentActionDefinition {
         handler: async () => {
             const disabled = disabledResult();
             if (disabled) return disabled;
-            return jsonResult(getTldrawAgentCapabilities());
+            return jsonResult({
+                ...getTldrawAgentCapabilities(),
+                enabledActions: getEnabledTldrawAgentActionNames(),
+            });
         },
     };
 }
