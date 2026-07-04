@@ -1477,8 +1477,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						width: '100%',
 						height: '100%',
 						overflow: 'auto', // 内容区域可滚动
-						pointerEvents: isMainCard ? 'none' : isEditingState || isCollapsed ? 'all' : 'none',
-						touchAction: isMainCard ? 'none' : isEditingState || isCollapsed ? 'auto' : 'none',
+						pointerEvents: isEditingState || (!isMainCard && isCollapsed) ? 'all' : 'none',
+						touchAction: isEditingState || (!isMainCard && isCollapsed) ? 'auto' : 'none',
 						contain: 'strict',
 						padding: '0px',
 					}}
