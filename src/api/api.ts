@@ -3,7 +3,7 @@
  * https://github.com/frostime/sy-plugin-template-vite
  * 
  * See API Document in [API.md](https://github.com/siyuan-note/siyuan/blob/master/API.md)
- * API 文档见 [API_zh_CN.md](https://github.com/siyuan-note/siyuan/blob/master/API_zh_CN.md)
+ * API 文档见 [API.zh-CN.md](https://github.com/siyuan-note/siyuan/blob/master/API.zh-CN.md)
  */
 
 import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle } from "siyuan";

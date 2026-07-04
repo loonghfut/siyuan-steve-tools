@@ -45,12 +45,12 @@ function getCommitsSinceLastTag() {
     }
 }
 
-// Function to update README_zh_CN.md
+// Function to update README.zh-CN.md
 function updateReadmeChangelog(version, changelogContent) {
-    const readmePath = path.join(process.cwd(), 'README_zh_CN.md');
+    const readmePath = path.join(process.cwd(), 'README.zh-CN.md');
     
     if (!fs.existsSync(readmePath)) {
-        console.error('错误：README_zh_CN.md 文件不存在');
+        console.error('错误：README.zh-CN.md 文件不存在');
         return false;
     }
     
@@ -69,7 +69,7 @@ ${changelogContent}
         const markerIndex = content.indexOf(changelogMarker);
         
         if (markerIndex === -1) {
-            console.error('错误：在 README_zh_CN.md 中未找到 "#### 更新日志:" 标记');
+            console.error('错误：在 README.zh-CN.md 中未找到 "#### 更新日志:" 标记');
             return false;
         }
         
@@ -101,10 +101,10 @@ ${changelogContent}
         
         // Write the updated content back to the file
         fs.writeFileSync(readmePath, updatedContent, 'utf8');
-        console.log('✅ README_zh_CN.md 已成功更新');
+        console.log('✅ README.zh-CN.md 已成功更新');
         return true;
     } catch (error) {
-        console.error('更新 README_zh_CN.md 时出错:', error.message);
+        console.error('更新 README.zh-CN.md 时出错:', error.message);
         return false;
     }
 }
@@ -112,7 +112,7 @@ ${changelogContent}
 // Main script
 (async function () {
     try {
-        console.log('🔄 开始更新 README_zh_CN.md 中的更新日志\n');
+        console.log('🔄 开始更新 README.zh-CN.md 中的更新日志\n');
         
         // Get current version from plugin.json
         const pluginJsonPath = path.join(process.cwd(), 'plugin.json');
@@ -202,7 +202,7 @@ ${changelogContent}
             const shouldCommit = await promptUser('是否提交更改到 Git? (Y/n): ');
             if (!shouldCommit.toLowerCase().startsWith('n')) {
                 try {
-                    execSync('git add README_zh_CN.md', { stdio: 'inherit' });
+                    execSync('git add README.zh-CN.md', { stdio: 'inherit' });
                     execSync(`git commit -m "docs: 更新 ${version} 版本的更新日志"`, { stdio: 'inherit' });
                     console.log('✅ 更改已提交到 Git');
                     
