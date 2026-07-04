@@ -2,7 +2,7 @@
   "name": "siyuan-steve-tools",
   "author": "steve",
   "url": "https://github.com/loonghfut/siyuan-steve-tools",
-  "version": "0.46.1",
+  "version": "0.47.0",
   "minAppVersion": "3.7.0",
   "disabledInPublish": true,
   "backends": ["all"],
@@ -13,7 +13,7 @@
   },
   "description": {
     "default": "schedule management, docker sync awareness, ai sidebar",
-    "zh-CN": "互联日程管理（基于数据库的看板视图和日历视图）支持ics，滴答清单双向联动, docker同步感知, ai侧边栏, 资源压缩, 白板, WPS联动, （SQL，数据库）聚合可视化, 随机题头图背景图。"
+    "zh-CN": "[白板已接入思源智能体]互联日程管理（基于数据库的看板视图和日历视图）支持ics，滴答清单双向联动, docker同步感知, ai侧边栏, 资源压缩, 白板, WPS联动, （SQL，数据库）聚合可视化, 随机题头图背景图。"
   },
   "readme": {
     "default": "README.md",

@@ -5,7 +5,6 @@ STEVETOOLS
 [![GitHub issues](https://img.shields.io/github/issues/loonghfut/siyuan-steve-tools)](https://github.com/loonghfut/siyuan-steve-tools/issues)
 [![GitHub all releases](https://img.shields.io/github/downloads/loonghfut/siyuan-steve-tools/total)](https://github.com/loonghfut/siyuan-steve-tools/releases)
 
-这是一个自用工具集合？那为什么做了那么多我用不到的功能？那为什么耗费那么多夜晚来开发维护用不到的功能？（反思），~~在我自己使用的同时，分享出来也希望能够帮助到有相关需求的其他人。~~  
 `<所有功能模块开源>`  
 有个人需求：有技术，自己拉源码，自己改; 没技术，自己拉源码让ai改。
 
@@ -25,7 +24,7 @@ win端s3同步后，docker端感知s3同步。
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
 压缩媒体资源后再导入思源。  
-5. tldraw白板：  
+5. tldraw白板：【已接入思源智能体】  
 模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转  
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
