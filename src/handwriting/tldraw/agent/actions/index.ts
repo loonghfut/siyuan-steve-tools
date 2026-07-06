@@ -66,6 +66,6 @@ function withInteractionContextRequirement(action: AgentActionDefinition): Agent
 
     return {
         ...action,
-        description: `${action.description} Before calling this action, call tldraw_get_interaction_context to sense the focused whiteboard and current selection; use focusedWhiteboardId as whiteboardId unless the user explicitly requested another target.`,
+        description: `${action.description} Before calling this action, call tldraw_get_interaction_context to sense the focused whiteboard and current selection; use focusedWhiteboardId as whiteboardId unless the user explicitly requested another target or is creating a new whiteboard.`,
     };
 }
