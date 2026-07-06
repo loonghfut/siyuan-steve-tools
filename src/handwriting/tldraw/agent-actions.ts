@@ -17,7 +17,7 @@ export function registerTldrawAgentActions(plugin: Plugin) {
     if (settingdata['tldraw-agent-actions-enable'] !== true) {
         return;
     }
-    const addAgentAction = (plugin as any).addAgentAction as AddAgentActionObject | undefined;
+    const addAgentAction = plugin.addAgentAction as AddAgentActionObject | undefined;
     if (typeof addAgentAction !== 'function') {
         console.info('SiYuan addAgentAction API is unavailable; skip tldraw agent actions.');
         return;
