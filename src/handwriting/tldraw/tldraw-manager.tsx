@@ -45,10 +45,10 @@ import { buildTldrawLink } from './utils/link-builder';
 import { setInteracting } from './utils/idle-scheduler';
 import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
-import * as agentOps from './agent/operations/manager-ops';
-import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentBoardEditRequest, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeCommandRequest, AgentShapeUpdatePatch } from './agent/core/types';
-import type { AgentDocOutlineBoardOptions } from './agent/documents/doc-to-board';
-import type { AgentPlanApplyOptions } from './agent/planning/plan-runner';
+import * as agentOps from './agent/tools/internal/operations/manager-ops';
+import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentBoardEditRequest, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeCommandRequest, AgentShapeUpdatePatch } from './agent/tools/internal/core/types';
+import type { AgentDocOutlineBoardOptions } from './agent/tools/internal/documents/doc-to-board';
+import type { AgentPlanApplyOptions } from './agent/tools/internal/planning/plan-runner';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 

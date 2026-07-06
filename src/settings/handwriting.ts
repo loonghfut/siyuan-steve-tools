@@ -1,6 +1,6 @@
 import type { SettingGroupDefinition, BuildContext } from "./types";
 import { h6StyleDefaults, h6StyleGroup } from "./style-h6";
-import { DEFAULT_TLDRAW_AGENT_ACTION_NAMES } from "@/handwriting/tldraw/agent/actions/metadata";
+import { DEFAULT_TLDRAW_AGENT_ACTION_NAMES } from "@/handwriting/tldraw/agent/tools/metadata";
 
 export const handwritingDefaults: Record<string, any> = {
     "handwriting-enable": false,

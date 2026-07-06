@@ -5,8 +5,8 @@
     TLDRAW_AGENT_ACTIONS_META,
     type TldrawAgentActionCategory,
     type TldrawAgentActionMeta,
-  } from '@/handwriting/tldraw/agent/actions/metadata';
-  import { normalizeTldrawAgentActionNames } from '@/handwriting/tldraw/agent/actions/settings';
+  } from '@/handwriting/tldraw/agent/tools/metadata';
+  import { normalizeTldrawAgentActionNames } from '@/handwriting/tldraw/agent/tools/settings';
 
   export let group: string;
   export let key: string;

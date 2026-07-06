@@ -11,7 +11,7 @@ import { TLShapeId } from "@tldraw/tldraw";
 import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
 import { settingdata } from "@/index";
 import { buildH6CSS, H6_STYLE_DEFAULTS, type H6StyleConfig } from "@/settings/style-h6";
-import { registerTldrawAgentActions, syncTldrawAgentActions } from "./tldraw/agent-actions";
+import { registerTldrawAgentActions, syncTldrawAgentActions } from "./tldraw/agent/ai/siyuan-agent-adapter";
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
