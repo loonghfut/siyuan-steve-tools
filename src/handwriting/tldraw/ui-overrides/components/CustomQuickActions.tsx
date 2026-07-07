@@ -14,7 +14,7 @@ import { buildTldrawLink } from '../../utils/link-builder'
 import { resetShapeLibraryPanelPosition } from '../../shapelibrary/shape-library-manager'
 import { resetDocOutlinePanelPosition } from '../../doc-outline/doc-outline-manager'
 import { resetChildDocsPanelPosition } from '../../doc-outline/child-docs-manager'
-import { toggleShapeLibrary, toggleDocOutline, toggleChildDocs } from '../panel-state'
+import { toggleShapeLibrary, toggleDocOutline, toggleChildDocs, toggleMermaidImport } from '../panel-state'
 import { isCardLikeShape, CardLikeShape } from '../types'
 
 export const CustomQuickActions: React.FC = () => {
@@ -89,6 +89,14 @@ export const CustomQuickActions: React.FC = () => {
                         })
                         showMessage(`已刷新 ${shapes.length} 张卡片`)
                     }}
+                />
+            </div>
+            <div>
+                <TldrawUiMenuItem
+                    id="mermaid-import"
+                    icon="code"
+                    label="导入 Mermaid"
+                    onSelect={() => { toggleMermaidImport() }}
                 />
             </div>
             <div>

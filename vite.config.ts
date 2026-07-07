@@ -82,7 +82,7 @@ export default defineConfig({
 
     build: {
         outDir: outputDir,
-        emptyOutDir: false,
+        emptyOutDir: !isDev,
         minify: true,
         sourcemap: isSrcmap ? 'inline' : false,
 
@@ -134,7 +134,9 @@ export default defineConfig({
 
             output: {
                 entryFileNames: "[name].js",
+                chunkFileNames: "[name].js",
                 exports: "named",
+                inlineDynamicImports: true,
                 assetFileNames: (assetInfo) => {
                     if (assetInfo.name === "style.css") {
                         return "index.css"

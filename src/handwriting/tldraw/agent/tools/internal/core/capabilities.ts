@@ -17,6 +17,7 @@
             'Branch constraints: root content can only be card or single-block; branch children can only be card, single-block, or branch; never branch-connect text/note/geo/frame/slide/mind-map/js-shape/arrow/connector shapes. Do not create branch cycles or a second root branch for the same root card.',
             'For complex branch edits, inspect/read shape details first. Branch summaries expose rootShapeId, leftChildIds, rightChildIds, and childIds; use those ids instead of guessing from visual x/y positions.',
             'To arrange or frame shapes, call tldraw_shape_command with intent "layoutShapes" and layoutStyle "nearSelection", "rightOf", "below", "grid", "tree", "mindmap", or "frameAround".',
+            'To import Mermaid diagrams into the board, call tldraw_import_mermaid with mermaid text. Omit whiteboardId to use the focused whiteboard.',
             'If the user refers to the current board or selected shapes, omit whiteboardId and use $selection / $selection[0]. The focused whiteboard is used automatically.',
             'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences.',
             'The old board-edit DSL tool is intentionally not registered. Do not construct operations arrays.',
@@ -40,6 +41,7 @@
         ],
         openNavigateSave: [
             'tldraw_open_whiteboard',
+            'tldraw_import_mermaid',
             'tldraw_select_shape',
             'tldraw_zoom_to_shapes',
             'tldraw_navigate_to_block',
@@ -47,6 +49,7 @@
         ],
         createEditLayout: [
             'tldraw_shape_command',
+            'tldraw_import_mermaid',
         ],
         toolSelectionHints: {
             shapeCommand: {
@@ -80,6 +83,10 @@
                     { intent: 'connectShapes', from: '$kind.branch', to: '$selection[0]', connectionKind: 'branch', side: 'right' },
                     { intent: 'layoutShapes', target: '$selection', layoutStyle: 'grid', columns: 3 },
                 ],
+            },
+            mermaidImport: {
+                action: 'tldraw_import_mermaid',
+                guidance: 'Use this when the user provides Mermaid syntax and wants a diagram placed on the whiteboard as editable shapes instead of plain text.',
             },
             inspect: {
                 action: 'tldraw_shape_command',

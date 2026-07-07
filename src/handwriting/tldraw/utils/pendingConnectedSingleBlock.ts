@@ -1,6 +1,10 @@
 import { Editor, TLShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import { createConnectedSingleBlockAt } from './addConnectedSingleBlock'
+import {
+	resetPendingConnectedSingleBlockState,
+	setPendingConnectedSingleBlockState,
+} from './pendingConnectedSingleBlockState'
 
 let activeState: {
     editor: Editor
@@ -32,35 +36,7 @@ export const armAddConnectedSingleBlock = (editor: Editor, anchorId: TLShapeId) 
             // compute page position and scale to container screen position
             const pagePoint = editor.screenToPage({ x: clientX, y: clientY })
             if (!pagePoint) return
-
-            const containerRect = container.getBoundingClientRect()
-            const viewport = editor.getViewportPageBounds()
-            if (!viewport) return
-
-            const viewWidth = viewport.maxX - viewport.minX
-            const viewHeight = viewport.maxY - viewport.minY
-            const scaleX = containerRect.width / viewWidth
-            const scaleY = containerRect.height / viewHeight
-
-            const previewWPage = Math.max(editor.getShapePageBounds(editor.getShape(anchorId) as any)?.width ?? 300, 300)
-            const previewHPage = Math.max(editor.getShapePageBounds(editor.getShape(anchorId) as any)?.height ?? 50, 50)
-
-            const screenX = containerRect.left + (pagePoint.x - viewport.minX) * scaleX
-            const screenY = containerRect.top + (pagePoint.y - viewport.minY) * scaleY
-
-            const screenW = previewWPage * scaleX
-            const screenH = previewHPage * scaleY
-
-            if (activeState?.previewEl) {
-                const el = activeState.previewEl
-                el.style.display = 'block'
-                // Align preview's top-left corner with the pointer (to match actual placement behavior)
-                el.style.left = `${Math.round(screenX)}px`
-                el.style.top = `${Math.round(screenY)}px`
-                // Keep preview size representing the shape's page-size mapped to screen
-                el.style.width = `${Math.max(20, Math.round(screenW))}px`
-                el.style.height = `${Math.max(20, Math.round(screenH))}px`
-            }
+            setPendingConnectedSingleBlockState(editor, { previewPoint: pagePoint })
         } catch (err) {
             // ignore preview errors
         }
@@ -99,23 +75,13 @@ export const armAddConnectedSingleBlock = (editor: Editor, anchorId: TLShapeId) 
         }
     }
 
-    // attach listeners
-    // create visual preview element
-    const previewEl = document.createElement('div')
-    previewEl.style.position = 'absolute'
-    previewEl.style.pointerEvents = 'none'
-    previewEl.style.border = '2px dashed var(--b3-border-color)'
-    previewEl.style.background = 'rgba(0,0,0,0.06)'
-    previewEl.style.borderRadius = '6px'
-    previewEl.style.zIndex = '9999'
-    previewEl.style.display = 'none'
-    document.body.appendChild(previewEl)
-
     container.addEventListener('pointermove', onPointerMove, { capture: true })
     container.addEventListener('pointerdown', onPointerDown, { capture: true })
     window.addEventListener('keydown', onKeyDown)
 
-    activeState = { editor, anchorId, onPointerDown, onPointerMove, onKeyDown, previewEl }
+    setPendingConnectedSingleBlockState(editor, { anchorId, previewPoint: null })
+
+    activeState = { editor, anchorId, onPointerDown, onPointerMove, onKeyDown, previewEl: null }
 
     showMessage('请在画布上点击以放置关联单块（Esc 取消）', 4000, 'info')
 }
@@ -137,9 +103,7 @@ export const cleanupPending = () => {
         // ignore
     }
     try {
-        if (activeState.previewEl && activeState.previewEl.parentElement) {
-            activeState.previewEl.parentElement.removeChild(activeState.previewEl)
-        }
+        resetPendingConnectedSingleBlockState(activeState.editor)
     } catch (err) {}
     activeState = null
 }

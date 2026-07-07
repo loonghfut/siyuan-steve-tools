@@ -61,6 +61,13 @@ export const TLDRAW_AGENT_ACTIONS_META: TldrawAgentActionMeta[] = [
         description: '按文档或根块 ID 打开 STtools tldraw 白板。',
     },
     {
+        name: 'tldraw_import_mermaid',
+        title: '导入 Mermaid',
+        category: 'whiteboard',
+        risk: 'write',
+        description: '把 Mermaid 文本导入到打开的白板中，生成可编辑图形。',
+    },
+    {
         name: 'tldraw_get_summary',
         title: '读取白板摘要',
         category: 'whiteboard',

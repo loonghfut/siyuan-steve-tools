@@ -17,6 +17,7 @@ import { createOpenWhiteboardAction } from './whiteboards/open-whiteboard';
 import { createPreviewBackupAction } from './whiteboards/preview-backup';
 import { createReadDocOutlineAction } from './documents/read-doc-outline';
 import { createSaveWhiteboardAction } from './whiteboards/save-whiteboard';
+import { createImportMermaidAction } from './whiteboards/import-mermaid';
 import { createSelectShapeAction } from './shapes/select-shape';
 import { createShapeCommandAction } from './shapes/shape-command';
 import { DEFAULT_TLDRAW_AGENT_ACTION_NAMES } from './metadata';
@@ -37,6 +38,7 @@ export function getTldrawAgentTools(plugin: Plugin): AgentToolDefinition[] {
         createDeleteShapesAction(),
         createListWhiteboardsAction(),
         createOpenWhiteboardAction(context),
+        createImportMermaidAction(),
         createGetSummaryAction(),
         createReadDocOutlineAction(),
         createInsertDocOutlineMindmapAction(),

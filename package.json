@@ -70,6 +70,7 @@
     "@leafer-in/viewport": "^1.4.2",
     "@lezer/highlight": "^1.2.3",
     "@tldraw/assets": "5.2.3",
+    "@tldraw/mermaid": "5.2.3",
     "@tldraw/tldraw": "5.2.3",
     "@types/sortablejs": "^1.15.8",
     "browser-image-compression": "^2.0.2",
