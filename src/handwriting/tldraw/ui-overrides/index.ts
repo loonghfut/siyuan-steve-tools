@@ -22,7 +22,4 @@ export {
     useDocOutlineDocId,
     toggleChildDocs,
     useChildDocsOpen,
-    toggleMermaidImport,
-    setMermaidImportOpen,
-    useMermaidImportOpen,
 } from './panel-state'

@@ -89,30 +89,3 @@ export function useChildDocsOpen() {
 
     return isOpen
 }
-
-// ============ Mermaid 导入面板状态 ============
-let mermaidImportOpenState = false
-const mermaidImportListeners: Set<(isOpen: boolean) => void> = new Set()
-
-export function toggleMermaidImport() {
-    mermaidImportOpenState = !mermaidImportOpenState
-    mermaidImportListeners.forEach((listener) => listener(mermaidImportOpenState))
-}
-
-export function setMermaidImportOpen(isOpen: boolean) {
-    mermaidImportOpenState = isOpen
-    mermaidImportListeners.forEach((listener) => listener(mermaidImportOpenState))
-}
-
-export function useMermaidImportOpen() {
-    const [isOpen, setIsOpen] = React.useState(mermaidImportOpenState)
-
-    React.useEffect(() => {
-        mermaidImportListeners.add(setIsOpen)
-        return () => {
-            mermaidImportListeners.delete(setIsOpen)
-        }
-    }, [])
-
-    return isOpen
-}

@@ -16,15 +16,12 @@ import {
     setDocOutlineDocId,
     useChildDocsOpen,
     toggleChildDocs,
-    useMermaidImportOpen,
-    setMermaidImportOpen,
 } from '../panel-state'
 import { CardLikeShape, isCardLikeShape, isOverlayShape } from '../types'
 import type { ICardShape } from '../../CardShape/card-shape-types'
 import type { IJsShape } from '../../JsShape/js-shape-types'
 import { armAddConnectedSingleBlock, isArmed as isAddPending } from '../../utils/pendingConnectedSingleBlock'
 import { SlideFocusOverlay } from '../../SlideShape/SlideFocusOverlay'
-import { MermaidImportPanel } from '../../mermaid/MermaidImportPanel'
 import { MermaidPasteHandler } from '../../mermaid/MermaidPasteHandler'
 import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
 import {
@@ -41,7 +38,6 @@ export const InFrontOfCanvas: React.FC = () => {
     const isLibraryOpen = useShapeLibraryOpen()
     const isDocOutlineOpen = useDocOutlineOpen()
     const isChildDocsOpen = useChildDocsOpen()
-    const isMermaidImportOpen = useMermaidImportOpen()
 
     // 获取白板绑定的文档ID
     const container = editor.getContainer()
@@ -300,11 +296,6 @@ export const InFrontOfCanvas: React.FC = () => {
                 onClose={() => toggleChildDocs()}
                 docId={boundDocId || null}
                 selectedMainCard={selectedMainCard}
-            />
-
-            <MermaidImportPanel
-                isOpen={isMermaidImportOpen}
-                onClose={() => setMermaidImportOpen(false)}
             />
 
             {/* 选中元素的操作按钮 */}
