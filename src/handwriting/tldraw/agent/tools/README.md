@@ -21,6 +21,7 @@
 - [whiteboard 类（白板管理）](#whiteboard-类白板管理)
   - [tldraw_list_whiteboards](#tldraw_list_whiteboards)
   - [tldraw_open_whiteboard](#tldraw_open_whiteboard)
+  - [tldraw_import_mermaid](#tldraw_import_mermaid)
   - [tldraw_get_summary](#tldraw_get_summary)
   - [tldraw_get_snapshot_summary](#tldraw_get_snapshot_summary)
   - [tldraw_backup_whiteboard](#tldraw_backup_whiteboard)
@@ -206,6 +207,20 @@
   - **新建**：`{whiteboardId, docId, created: true, opened: true, title, notebook, requestedHPath, hPath, placementSource}`
     - `placementSource` ∈ `'explicit-path' | 'sibling-doc' | 'focused-whiteboard' | 'first-notebook'`
 - **错误**: `"Failed to create backing SiYuan document for the new whiteboard."` / `"Document or block not found: ..."` / `"Block ... is not a document and has no root document."` / `"Root document not found for block: ..."` / `"Failed to resolve document human-readable path: ..."` / `"No notebook is available. Pass notebook/box when creating a new whiteboard."` / `"Document not found after creation: ..."` / 全局禁用。
+
+### tldraw_import_mermaid
+
+- **文件**: [./whiteboards/import-mermaid.ts](./whiteboards/import-mermaid.ts)
+- **作用**: 把 Mermaid 文本导入到当前打开白板，生成可编辑图形。
+- **主要参数**:
+  - `whiteboardId?` / `id?` / `rootId?`: 白板 ID；省略时使用当前聚焦白板
+  - `mermaid` / `text` / `code`: Mermaid 源文本
+  - `select?`(boolean): 是否选中新导入图形，默认 `true`
+  - `zoom?`(boolean): 是否缩放到导入图形，默认 `true`
+  - `save?`(boolean): 是否立即保存，默认 `false`（仍会触发自动保存）
+- **返回**:
+  - `{ok, whiteboardId, createdShapeIds, createdShapeCount, selected, zoomed, saved}`
+- **错误**: 无聚焦白板 / 白板未打开 / 缺少 Mermaid 文本 / Mermaid 导入内部异常。
 
 ### tldraw_get_summary
 
