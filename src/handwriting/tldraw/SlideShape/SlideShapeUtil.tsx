@@ -13,12 +13,12 @@ import {
 	useValue,
 	DefaultColorStyle,
 	TLDefaultColorStyle,
-	getDefaultColorTheme,
 	HTMLContainer,
 	stopEventPropagation,
 } from '@tldraw/tldraw'
 import { moveToSlide } from './useSlides'
 import { slideShapeMigrations } from './SlideShapeMigrations'
+import { getDefaultColorTheme } from '../utils/color-theme'
 
 export type SlideShape = TLBaseShape<
 	'slide',
@@ -71,6 +71,12 @@ export class SlideShapeUtil extends ShapeUtil<SlideShape> {
 			height: shape.props.h,
 			isFilled: false,
 		})
+	}
+
+	override getIndicatorPath(shape: SlideShape) {
+		const path = new Path2D()
+		path.rect(0, 0, shape.props.w, shape.props.h)
+		return path
 	}
 
 	override onRotate(initial: SlideShape) {

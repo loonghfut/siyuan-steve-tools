@@ -298,7 +298,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             opacity: collapsedState === 'mixed' ? 0.85 : undefined,
                         }}
                     >
-                        <TldrawUiIcon icon={collapsedState === true ? 'card-expand' : 'card-collapse'} />
+                        <TldrawUiIcon label="" icon={collapsedState === true ? 'card-expand' : 'card-collapse'} />
                     </TldrawUiButton>
                 </div>
             </div>
@@ -333,7 +333,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             onClick={handleFitCollapsedTextSize}
                             title="自动调整折叠文字大小"
                         >
-                            <TldrawUiIcon icon="fit-width" />
+                            <TldrawUiIcon label="" icon="fit-width" />
                         </TldrawUiButton>
                     </div>
                 </div>
@@ -365,7 +365,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                     }}
                                     title={label}
                                 >
-                                    <TldrawUiIcon icon={icon} />
+                                    <TldrawUiIcon label="" icon={icon} />
                                 </TldrawUiButton>
                             ))}
                         </div>
@@ -418,7 +418,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                 onClick={() => { void handleInsertAllChildDocs() }}
                                 title="插入全部子文档"
                             >
-                                <TldrawUiIcon icon={insertingChildDocs ? 'loading-spinner' : 'child-docs'} />
+                                <TldrawUiIcon label="" icon={insertingChildDocs ? 'loading-spinner' : 'child-docs'} />
                             </TldrawUiButton>
                             <TldrawUiButton
                                 type="normal"
@@ -427,7 +427,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                 onClick={() => { void handleInsertAllOutline() }}
                                 title="插入全部大纲块"
                             >
-                                <TldrawUiIcon icon={insertingOutline ? 'loading-spinner' : 'outline-blocks'} />
+                                <TldrawUiIcon label="" icon={insertingOutline ? 'loading-spinner' : 'outline-blocks'} />
                             </TldrawUiButton>
                         </div>
                     </div>

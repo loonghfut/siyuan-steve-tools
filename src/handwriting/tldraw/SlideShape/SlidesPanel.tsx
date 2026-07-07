@@ -67,7 +67,7 @@ export const SlidesPanel = track(() => {
 							onClick={() => toggleGroup(groupName)}
 						>
 							<span className="slides-group-icon">
-								<TldrawUiIcon icon={isCollapsed ? 'chevron-right' : 'chevron-down'} small />
+								<TldrawUiIcon label="" icon={isCollapsed ? 'chevron-right' : 'chevron-down'} small />
 							</span>
 							<span className="slides-group-title">{groupName}</span>
 							<span className="slides-group-count">{groupSlides.length}</span>

@@ -39,7 +39,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
             {/* 字号选择 */}
             <div className="tlui-style-panel__section">
                 <TldrawUiSlider
-                    label={`字号${mindMapFontSizeValue === 'mixed' ? '' : ` — ${mindMapFontSizeValue}px`}`}
+                    label={`字号${mindMapFontSizeValue === 'mixed' ? '' : ` �?${mindMapFontSizeValue}px`}`}
                     title="思维导图字号"
                     min={20}
                     steps={48}
@@ -134,14 +134,14 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
                                 }}
                                 title={titles[dir]}
                             >
-                                <TldrawUiIcon icon={icons[dir]} />
+                                <TldrawUiIcon label="" icon={icons[dir]} />
                             </TldrawUiButton>
                         )
                     })}
                 </div>
             </div>
 
-            {/* 绑定思源块 */}
+            {/* 绑定思源�?*/}
             <div className="tlui-style-panel__section">
                 <MindMapBindingUI
                     selectedMindMapShapes={selectedMindMapShapes}
@@ -151,3 +151,4 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
         </>
     )
 }
+

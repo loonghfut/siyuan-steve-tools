@@ -547,7 +547,7 @@ function resolveAgentShapeCommandTarget(
     editor: Editor,
     target: unknown,
     shapeKind: string | undefined,
-    intent: AgentShapeCommandRequest['intent']
+    _intent: AgentShapeCommandRequest['intent']
 ): string[] {
     const state: AgentBoardEditState = {
         operationId: 'shape-command',
@@ -1974,7 +1974,7 @@ function operationToBoardNodePatch(operation: Extract<AgentBoardEditOperation, {
 
 function resolveInitialBoardSelection(editor: Editor, value: unknown, currentSelectedShapeIds: string[]): string[] {
     if (Array.isArray(value)) {
-        return uniqueStrings(value.flatMap((item, index) => resolveInitialBoardSelection(editor, item, currentSelectedShapeIds)));
+        return uniqueStrings(value.flatMap((item) => resolveInitialBoardSelection(editor, item, currentSelectedShapeIds)));
     }
     if (typeof value === 'string') {
         const raw = value.trim();

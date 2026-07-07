@@ -301,7 +301,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     title={isThisSlideFocused ? '退出聚焦（Esc）' : '聚焦此 Slide（仅显示 Slide 内内容）'}
                     aria-label={isThisSlideFocused ? '退出聚焦' : '聚焦此 Slide'}
                 >
-                    <TldrawUiIcon icon={isThisSlideFocused ? 'slide-exit-focus' : 'slide-focus'} />
+                    <TldrawUiIcon label="" icon={isThisSlideFocused ? 'slide-exit-focus' : 'slide-focus'} />
                 </TldrawUiButton>
                 <TldrawUiButton
                     type="normal"
@@ -311,7 +311,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     aria-label="复制链接"
                     disabled={rootId === ''}
                 >
-                    <TldrawUiIcon icon="copy-link-custom" />
+                    <TldrawUiIcon label="" icon="copy-link-custom" />
                 </TldrawUiButton>
                 <TldrawUiButton
                     type="normal"
@@ -321,7 +321,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     aria-label="跳转到笔记"
                     disabled={!slideShape.props.blockId}
                 >
-                    <TldrawUiIcon icon="open-block" />
+                    <TldrawUiIcon label="" icon="open-block" />
                 </TldrawUiButton>
                 <TldrawUiButton
                     type="normal"
@@ -331,7 +331,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     aria-label={isCapturingScreenshot ? '生成中…' : '更新截图'}
                     disabled={isCapturingScreenshot}
                 >
-                    <TldrawUiIcon icon={isCapturingScreenshot ? 'loading-spinner' : 'update-screenshot'} />
+                    <TldrawUiIcon label="" icon={isCapturingScreenshot ? 'loading-spinner' : 'update-screenshot'} />
                 </TldrawUiButton>
             </div>
         </div>

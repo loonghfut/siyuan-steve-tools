@@ -1,8 +1,8 @@
-import { BaseBoxShapeTool, TLCompleteEventInfo, TLPointerEventInfo } from '@tldraw/tldraw'
+import { BaseBoxShapeTool } from '@tldraw/tldraw'
 export class CardShapeTool extends BaseBoxShapeTool {
 	static override id = 'card'
 	static override initial = 'idle'
-	override shapeType = 'card'
+	override shapeType = 'card' as const
 	// override onComplete(info: TLCompleteEventInfo): void {
 	// 	// Handle double click event here
 	// 	// For example, you can open a modal or perform some action

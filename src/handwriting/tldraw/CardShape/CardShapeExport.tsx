@@ -5,10 +5,10 @@
 import React, { ReactElement } from 'react';
 import {
 	SvgExportContext,
-	getDefaultColorTheme,
 } from '@tldraw/tldraw';
 import { ICardShape } from './card-shape-types';
 import { settingdata } from '@/index';
+import { getDefaultColorTheme } from '../utils/color-theme';
 
 // 扩展的关键样式属性列表
 const EXTENDED_STYLE_PROPS = [

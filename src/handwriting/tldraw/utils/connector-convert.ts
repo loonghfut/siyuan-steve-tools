@@ -1,4 +1,4 @@
-import { Editor, TLShapeId, Vec, createShapeId, toRichText } from '@tldraw/tldraw'
+import { Editor, TLArrowShape, TLDefaultColorStyle, TLShapeId, TLShapePartial, Vec, createShapeId, toRichText } from '@tldraw/tldraw'
 import {
 	IBezierConnectorShape,
 	createOrUpdateConnectorBinding,
@@ -24,7 +24,7 @@ type ArrowShapeLike = {
 	x: number
 	y: number
 	props?: {
-		color?: string
+		color?: TLDefaultColorStyle
 		richText?: any
 		labelPosition?: number
 		start?: { x: number; y: number }
@@ -107,7 +107,7 @@ export function convertArrowToBezier(editor: Editor, arrowId: TLShapeId): TLShap
 	if (!targetPagePos) targetPagePos = fallbackEnd
 
 	const connectorId = createShapeId()
-	const color = arrow.props?.color || 'black'
+	const color: TLDefaultColorStyle = arrow.props?.color || 'black'
 	const richText = arrow.props?.richText ?? toRichText('')
 	const labelPosition = typeof arrow.props?.labelPosition === 'number' ? arrow.props.labelPosition : 0.5
 
@@ -133,7 +133,7 @@ export function convertArrowToBezier(editor: Editor, arrowId: TLShapeId): TLShap
 		endPagePos = tmp
 	}
 
-	editor.createShape({
+	const connectorShape: TLShapePartial<IBezierConnectorShape> = {
 		id: connectorId,
 		type: 'bezier-connector',
 		x: 0,
@@ -147,7 +147,8 @@ export function convertArrowToBezier(editor: Editor, arrowId: TLShapeId): TLShap
 			richText,
 			labelPosition,
 		},
-	})
+	}
+	editor.createShape(connectorShape)
 
 	// Create bindings if we know both endpoints
 	if (sourceShapeId && targetShapeId && sourcePortId && targetPortId) {
@@ -188,11 +189,11 @@ export function convertBezierToArrow(editor: Editor, connectorId: TLShapeId): TL
 
 	const arrowOrigin = Vec.Min(startPagePos, endPagePos)
 	const arrowId = createShapeId()
-	const color = (connector.props as any)?.color || 'black'
+	const color: TLDefaultColorStyle = (connector.props as any)?.color || 'black'
 	const richText = (connector.props as any)?.richText ?? toRichText('')
 	const labelPosition = typeof (connector.props as any)?.labelPosition === 'number' ? (connector.props as any).labelPosition : 0.5
 
-	editor.createShape({
+	const arrowShape: TLShapePartial<TLArrowShape> = {
 		id: arrowId,
 		type: 'arrow',
 		x: arrowOrigin.x,
@@ -206,7 +207,8 @@ export function convertBezierToArrow(editor: Editor, connectorId: TLShapeId): TL
 			arrowheadStart: 'none',
 			arrowheadEnd: 'arrow',
 		},
-	})
+	}
+	editor.createShape(arrowShape)
 
 	// Bind ends when possible
 	const bindingsToCreate: any[] = []

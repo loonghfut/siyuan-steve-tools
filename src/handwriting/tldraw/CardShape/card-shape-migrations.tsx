@@ -1,5 +1,6 @@
 import { createShapePropsMigrationIds, createShapePropsMigrationSequence } from '@tldraw/tldraw'
-import { Editor, createShapeId } from '@tldraw/tldraw'
+import { Editor, TLShapePartial, createShapeId } from '@tldraw/tldraw'
+import type { ICardShape } from './card-shape-types'
 
 const versions = createShapePropsMigrationIds(
   // this must match the shape type in the shape definition
@@ -70,7 +71,7 @@ export function initCardsWithBlockIds(
   } = options
 
   // 为每个 blockId 创建一个卡片
-  const shapes = blockIds.map((blockId) => {
+  const shapes: TLShapePartial<ICardShape>[] = blockIds.map((blockId) => {
     return {
       id: createShapeId(`card-${blockId}`),
       type: 'card',

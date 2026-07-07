@@ -198,7 +198,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 							opacity: showBackgroundState === 'mixed' ? 0.85 : undefined,
 						}}
 					>
-						<TldrawUiIcon icon="branch-background" />
+						<TldrawUiIcon label="" icon="branch-background" />
 					</TldrawUiButton>
 					<TldrawUiButton
 						type="normal"
@@ -214,7 +214,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						aria-label="Detach branch center content"
 						disabled={!selectedBranchShapes.some((shape) => !!shape.props.rootShapeId)}
 					>
-						<TldrawUiIcon icon="ungroup" />
+						<TldrawUiIcon label="" icon="ungroup" />
 					</TldrawUiButton>
 					<TldrawUiButton
 						type="normal"
@@ -229,7 +229,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						title="断开当前 Branch 的所有吸附关系"
 						aria-label="断开所有吸附"
 					>
-						<TldrawUiIcon icon="branch-detach" />
+						<TldrawUiIcon label="" icon="branch-detach" />
 					</TldrawUiButton>
 				</div>
 			</div>

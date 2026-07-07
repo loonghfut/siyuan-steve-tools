@@ -1,5 +1,6 @@
-import { Editor, TLShapeId, Vec, createShapeId } from '@tldraw/tldraw'
+import { Editor, TLArrowShape, TLDefaultColorStyle, TLShapeId, TLShapePartial, Vec, createShapeId } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
+import type { IBezierConnectorShape } from '../BezierConnectorShape/bezier-connector-types'
 import { ISingleBlockShape } from '../SingleBlockShape/single-block-shape-types'
 import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
 import { setFlashWithConnectorIfChanged } from '../BezierConnectorShape/port-state'
@@ -12,7 +13,7 @@ export const createArrowBetweenShapes = (
     editor: Editor,
     source: ISingleBlockShape,
     target: ISingleBlockShape,
-    color: string,
+    color: TLDefaultColorStyle,
 ): TLShapeId | null => {
     // Try to read page bounds first; fall back to using shape center + props if needed
     let sourceBounds = editor.getShapePageBounds(source as any)
@@ -81,7 +82,7 @@ export const createArrowBetweenShapes = (
         let sourcePagePos = getPortPagePosition(editor, source.id, sourcePortId) || startPoint
         let targetPagePos = getPortPagePosition(editor, target.id, targetPortId) || endPoint
 
-        editor.createShape({
+        const connectorShape: TLShapePartial<IBezierConnectorShape> = {
             id: connectorId,
             type: 'bezier-connector',
             x: 0,
@@ -93,7 +94,8 @@ export const createArrowBetweenShapes = (
                 strokeWidth: 3,
                 strokeStyle: 'solid',
             },
-        })
+        }
+        editor.createShape(connectorShape)
         const sourcePorts = getShapePorts(editor, source as any)
         const targetPorts = getShapePorts(editor, target as any)
         const sourceTerminal = (sourcePorts && sourcePorts[sourcePortId] && sourcePorts[sourcePortId].terminal) || 'start'
@@ -115,7 +117,7 @@ export const createArrowBetweenShapes = (
 
     const arrowId = createShapeId()
 
-    editor.createShape({
+    const arrowShape: TLShapePartial<TLArrowShape> = {
         id: arrowId,
         type: 'arrow',
         x: arrowOrigin.x,
@@ -133,7 +135,8 @@ export const createArrowBetweenShapes = (
             arrowheadStart: 'none',
             arrowheadEnd: 'arrow',
         },
-    })
+    }
+    editor.createShape(arrowShape)
 
     editor.createBindings([
         {

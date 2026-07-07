@@ -252,22 +252,22 @@ export const InFrontOfCanvas: React.FC = () => {
     }
 
     const Icons = {
-        Edit: () => <TldrawUiIcon icon="tool-pencil" small />,
-        Refresh: () => <TldrawUiIcon icon="arrow-cycle" small />,
-        ChevronRight: () => <TldrawUiIcon icon="chevron-right" small />,
-        ChevronDown: () => <TldrawUiIcon icon="chevron-down" small />,
-        FontIncrease: () => <TldrawUiIcon icon="plus" small />,
-        FontDecrease: () => <TldrawUiIcon icon="minus" small />,
-        Plus: () => <TldrawUiIcon icon="tool-text" small />,
-        Link: () => <TldrawUiIcon icon="external-link" small />,
-        Code: () => <TldrawUiIcon icon="code" small />,
-        Zap: () => <TldrawUiIcon icon="arrow-cycle" small />,
-        MousePointer: () => <TldrawUiIcon icon="tool-hand" small />,
-        SelectBranch: () => <TldrawUiIcon icon="tool-pointer" small />,
-        CenterBranch: () => <TldrawUiIcon icon="branch" />,
-        DetachCenterBranch: () => <TldrawUiIcon icon="branch-detach" />,
-        BranchAddLeft: () => <TldrawUiIcon icon="branch-add-left" />,
-        BranchAddRight: () => <TldrawUiIcon icon="branch-add-right" />,
+        Edit: () => <TldrawUiIcon label="" icon="tool-pencil" small />,
+        Refresh: () => <TldrawUiIcon label="" icon="arrow-cycle" small />,
+        ChevronRight: () => <TldrawUiIcon label="" icon="chevron-right" small />,
+        ChevronDown: () => <TldrawUiIcon label="" icon="chevron-down" small />,
+        FontIncrease: () => <TldrawUiIcon label="" icon="plus" small />,
+        FontDecrease: () => <TldrawUiIcon label="" icon="minus" small />,
+        Plus: () => <TldrawUiIcon label="" icon="tool-text" small />,
+        Link: () => <TldrawUiIcon label="" icon="external-link" small />,
+        Code: () => <TldrawUiIcon label="" icon="code" small />,
+        Zap: () => <TldrawUiIcon label="" icon="arrow-cycle" small />,
+        MousePointer: () => <TldrawUiIcon label="" icon="tool-hand" small />,
+        SelectBranch: () => <TldrawUiIcon label="" icon="tool-pointer" small />,
+        CenterBranch: () => <TldrawUiIcon label="" icon="branch" />,
+        DetachCenterBranch: () => <TldrawUiIcon label="" icon="branch-detach" />,
+        BranchAddLeft: () => <TldrawUiIcon label="" icon="branch-add-left" />,
+        BranchAddRight: () => <TldrawUiIcon label="" icon="branch-add-right" />,
     }
 
     return (

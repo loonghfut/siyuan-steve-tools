@@ -5,7 +5,6 @@ import {
 	ShapeUtil,
 	SvgExportContext,
 	TLResizeInfo,
-	getDefaultColorTheme,
 	resizeBox,
 } from '@tldraw/tldraw'
 import { cardShapeMigrations } from './card-shape-migrations'
@@ -22,6 +21,7 @@ import { renderAllContent } from '../utils/render/content-renderer'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
 import { getCardCollapsedHeight } from './card-collapse'
+import { getDefaultColorTheme } from '../utils/color-theme'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -246,6 +246,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			height: shape.props.h,
 			isFilled: true,
 		})
+	}
+
+	override getIndicatorPath(shape: ICardShape) {
+		const path = new Path2D()
+		path.rect(0, 0, shape.props.w, shape.props.h)
+		return path
 	}
 	// [6]
 	component(shape: ICardShape) {
@@ -472,7 +478,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
-		const cardRootRef = useRef<HTMLDivElement | null>(null)
 		const lastSizeRef = useRef({ h: shape.props.h })
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
 		const prevCameraRef = useRef<any | null>(null)
@@ -1409,10 +1414,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		return (
 			<HTMLContainer
-				ref={cardRootRef}
 				onMouseEnter={() => setIsHovered(true)}
 				onMouseLeave={() => setIsHovered(false)}
-				id={shape.id}
 				style={{
 					display: 'flex',
 					flexDirection: 'column',

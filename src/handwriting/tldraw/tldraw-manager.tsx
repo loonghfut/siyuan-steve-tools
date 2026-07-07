@@ -26,6 +26,7 @@ import { SlideShapeTool } from './SlideShape/SlideShapeTool';
 import { captureSlideScreenshot, CaptureSlideScreenshotOptions, CaptureSlideScreenshotResult } from './SlideShape/captureSlideScreenshot';
 import { getSlides } from './SlideShape/useSlides';
 import { ICardShape } from './CardShape/card-shape-types';
+import { ISingleBlockShape } from './SingleBlockShape/single-block-shape-types';
 import { showMessage, Dialog } from 'siyuan';
 import { WhiteboardFileManager } from './whiteboard-file-manager';
 import TldrawBackupManager from './ui/tldraw-backup-manager.svelte';
@@ -57,7 +58,7 @@ const assetUrls = createAssetUrlsWithCustomIcons();
 // [1]
 // 配置精准箭头功能
 const configuredArrowShapeUtil = ArrowShapeUtil.configure({
-    shouldBeExact: (editor, isPrecise) => settingdata['tldraw-exact-arrow-mode'] && isPrecise,
+    shouldBeExact: (_editor, isPrecise) => settingdata['tldraw-exact-arrow-mode'] && isPrecise,
 })
 // 从默认形状工具中过滤掉原始的ArrowShapeUtil，避免重复定义
 const filteredDefaultShapeUtils = defaultShapeUtils.filter(util => util.type !== 'arrow')
@@ -323,8 +324,6 @@ export class TldrawManager {
     // 性能优化：使用更激进的节流策略
     private _throttledSave: (() => void) | null = null;
     private _pendingSave = false;
-    private _saveTimer: ReturnType<typeof setTimeout> | null = null;
-
     private getThrottledSave() {
         if (!this._throttledSave) {
             // 使用更激进的节流：500ms内最多保存一次
@@ -376,7 +375,6 @@ export class TldrawManager {
                     tools={customTools}
                     overrides={uiOverrides}
                     options={this.options}
-                    inferDarkMode={isDarkTheme()}
                     components={components}
                     embeds={allEmbeds}
                     onMount={(editor) => {
@@ -746,7 +744,7 @@ export class TldrawManager {
                             if (shape.type === 'card') {
                                 await this.handleCardShapeDeletion(editor, shape as ICardShape);
                             } else if (shape.type === 'single-block') {
-                                await this.handleSingleBlockDeletion(editor, shape as ICardShape);
+                                await this.handleSingleBlockDeletion(editor, shape as ISingleBlockShape);
                             } else {
                                 // Ignore other shape types
                                 return;
@@ -1668,7 +1666,7 @@ export class TldrawManager {
      * 当 single-block 类型形状被删除后，调用该函数处理块的清理逻辑。
      * 扩展点：在这里添加任何 single-block 特有的自定义逻辑（例如不同的属性或行为）。
      */
-    private async handleSingleBlockDeletion(editor: Editor, shape: ICardShape) {
+    private async handleSingleBlockDeletion(editor: Editor, shape: ISingleBlockShape) {
         try {
             const blockId = shape.props?.blockId;
             if (!blockId) return;

@@ -5,7 +5,6 @@ import {
 	ShapeUtil,
 	SvgExportContext,
 	TLResizeInfo,
-	getDefaultColorTheme,
 	resizeBox,
 } from '@tldraw/tldraw'
 import { showMessage, Dialog } from 'siyuan'
@@ -16,6 +15,7 @@ import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
 import { CodeEditor, CodeEditorRef } from './CodeEditor'
 import { createEditorDialogContent, DEFAULT_SCRIPT, PLACEHOLDER_HTML, ScriptRunnerEnv } from './static'
+import { getDefaultColorTheme } from '../utils/color-theme'
 
 export class JsShapeUtil extends ShapeUtil<IJsShape> {
 	static override type = 'js-shape' as const
@@ -61,6 +61,12 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			height: shape.props.h,
 			isFilled: true,
 		})
+	}
+
+	override getIndicatorPath(shape: IJsShape) {
+		const path = new Path2D()
+		path.rect(0, 0, shape.props.w, shape.props.h)
+		return path
 	}
 
 	component(shape: IJsShape) {

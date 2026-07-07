@@ -783,10 +783,6 @@ function firstArrayItem(value: unknown) {
     return Array.isArray(value) ? value[0] : value;
 }
 
-function arrayTail(value: unknown) {
-    return Array.isArray(value) ? value.slice(1) : undefined;
-}
-
 function arrayItem(items: string[], index: number, label: string): string {
     const value = items[index];
     if (!value) throw new Error(`${label} is out of range`);

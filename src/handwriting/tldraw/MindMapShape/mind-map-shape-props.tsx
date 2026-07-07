@@ -1,5 +1,5 @@
 import { DefaultColorStyle, RecordProps, T } from '@tldraw/tldraw'
-import { IMindMapShape, MindMapNode } from './mind-map-shape-types'
+import { IMindMapShape } from './mind-map-shape-types'
 
 // 思维导图节点验证器
 // const mindMapNodeValidator: T.Validator<MindMapNode> = T.object({

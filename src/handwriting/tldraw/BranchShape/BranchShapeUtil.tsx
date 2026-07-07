@@ -10,7 +10,6 @@ import {
 	TLShapeId,
 	Vec,
 	VecLike,
-	getDefaultColorTheme,
 	useValue,
 } from '@tldraw/tldraw'
 import { branchShapeMigrations } from './branch-shape-migrations'
@@ -18,6 +17,7 @@ import { branchShapeProps } from './branch-shape-props'
 import { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { beginBranchAttachmentDrag, getAllBranchAttachedShapeIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, runWithSuppressedRootContentMoveIds, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHintForBranch } from './branch-interaction-state'
+import { getDefaultColorTheme } from '../utils/color-theme'
 
 const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
@@ -479,6 +479,13 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			hitTargets,
 			new Box(0, 0, Math.max(shape.props.w, 1), Math.max(shape.props.h, 1))
 		)
+	}
+
+	override getIndicatorPath(shape: IBranchShape) {
+		const bounds = this.editor.getShapeGeometry(shape).bounds
+		const path = new Path2D()
+		path.rect(bounds.x, bounds.y, bounds.w, bounds.h)
+		return path
 	}
 
 	override onBeforeUpdate(prev: IBranchShape, next: IBranchShape) {

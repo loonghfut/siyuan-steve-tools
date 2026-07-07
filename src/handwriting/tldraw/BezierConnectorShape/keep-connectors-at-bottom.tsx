@@ -1,4 +1,4 @@
-import { Editor, getIndicesBetween, IndexKey, TLParentId, TLShapeId } from '@tldraw/tldraw'
+import { Editor, TLShape, getIndicesBetween, IndexKey, TLParentId, TLShapeId, TLShapePartial } from '@tldraw/tldraw'
 
 /**
  * 保持贝塞尔连接器在其他形状的底层
@@ -28,7 +28,7 @@ export function keepConnectorsAtBottom(editor: Editor) {
 
 		const changedParentIds = pendingChangedParentIds
 		pendingChangedParentIds = new Set()
-		const updates: Array<{ id: TLShapeId; type: string; index: IndexKey }> = []
+		const updates: TLShapePartial[] = []
 
 		for (const parentId of changedParentIds) {
 			const childIds = editor.getSortedChildIdsForParent(parentId)
@@ -51,7 +51,7 @@ export function keepConnectorsAtBottom(editor: Editor) {
 			}
 
 			// 收集需要移动的非连接器形状
-			const shapesToMove: Array<{ id: TLShapeId; type: string; index: IndexKey }> = []
+			const shapesToMove: Array<{ id: TLShapeId; type: TLShape['type']; index: IndexKey }> = []
 			for (; i >= 0; i--) {
 				const child = editor.getShape(childIds[i])
 				if (!child) continue

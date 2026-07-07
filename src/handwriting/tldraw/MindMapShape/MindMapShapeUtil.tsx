@@ -113,6 +113,13 @@ export class MindMapShapeUtil extends ShapeUtil<IMindMapShape> {
         })
     }
 
+    override getIndicatorPath(shape: IMindMapShape) {
+        const bounds = this.editor.getShapeGeometry(shape).bounds
+        const path = new Path2D()
+        path.rect(bounds.x, bounds.y, bounds.w, bounds.h)
+        return path
+    }
+
     override onResize(shape: IMindMapShape, info: TLResizeInfo<IMindMapShape>) {
         return resizeBox(shape, info)
     }

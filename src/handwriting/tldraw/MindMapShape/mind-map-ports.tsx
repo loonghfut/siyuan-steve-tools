@@ -8,13 +8,13 @@ import {
     VecLike,
     useEditor,
     useValue,
-    getDefaultColorTheme,
 } from '@tldraw/tldraw'
 import { IMindMapShape } from './mind-map-shape-types'
 import { NodeLayout, calculateFullLayout, LayoutDirection } from './mind-map-layout'
 import { ShapePort } from '../BezierConnectorShape/bezier-connector-types'
 import { getPortState } from '../BezierConnectorShape/port-state'
 import { getShapeConnections } from '../BezierConnectorShape/bezier-connector-binding'
+import { getDefaultColorTheme } from '../utils/color-theme'
 
 /**
  * 思维导图节点端口信息

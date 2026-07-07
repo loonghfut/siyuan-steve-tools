@@ -71,8 +71,6 @@ export const CustomStylePanel = track(() => {
         () => selectedShapes.filter((s): s is ISingleBlockShape => s.type === 'single-block'),
         [selectedShapes]
     )
-    const hasSingleBlockSelection = selectedSingleBlockShapes.length > 0
-
     const selectedJsShapes = React.useMemo(
         () => selectedShapes.filter((shape): shape is IJsShape => shape.type === 'js-shape'),
         [selectedShapes]

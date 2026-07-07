@@ -1,4 +1,4 @@
-import { Editor, TLShapeId, getDefaultColorTheme } from '@tldraw/tldraw'
+import { Editor, TLShapeId } from '@tldraw/tldraw'
 import { SlideShape } from './SlideShapeUtil'
 
 export type SlideScreenshotFormat = 'png' | 'svg'
@@ -146,11 +146,6 @@ export async function captureSlideScreenshot(
 		height,
 		format,
 	}
-}
-
-function getDefaultBackground(editor: Editor) {
-	const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
-	return theme.background
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {

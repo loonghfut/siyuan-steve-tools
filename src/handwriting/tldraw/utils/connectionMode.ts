@@ -1,5 +1,6 @@
-import { Editor, TLShapeId, Vec, createShapeId } from '@tldraw/tldraw'
+import { Editor, TLArrowShape, TLDefaultColorStyle, TLShapeId, TLShapePartial, Vec, createShapeId } from '@tldraw/tldraw'
 import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
+import type { IBezierConnectorShape } from '../BezierConnectorShape/bezier-connector-types'
 import { setFlashWithConnectorIfChanged, setHintingPortIfChanged } from '../BezierConnectorShape/port-state'
 import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierConnectorShape/port-utils'
 import { showMessage } from 'siyuan'
@@ -207,7 +208,7 @@ export class ConnectionModeManager {
     }
 
     // 创建单个箭头绑定，返回创建的箭头ID，失败返回 null
-    private createArrowBinding(sourceShape: any, targetShape: ConnectableShape, color: string): TLShapeId | null {
+    private createArrowBinding(sourceShape: any, targetShape: ConnectableShape, color: TLDefaultColorStyle): TLShapeId | null {
         if (!this.editor) return null
 
         try {
@@ -242,7 +243,7 @@ export class ConnectionModeManager {
             const arrowPointInParentSpace = Vec.Min(startTerminalPagePosition, endTerminalPagePosition)
             const arrowId = createShapeId()
 
-            this.editor.createShape({
+            const arrowShape: TLShapePartial<TLArrowShape> = {
                 id: arrowId,
                 type: 'arrow',
                 x: arrowPointInParentSpace.x,
@@ -260,7 +261,8 @@ export class ConnectionModeManager {
                     arrowheadStart: 'none',
                     arrowheadEnd: 'arrow',
                 },
-            })
+            }
+            this.editor.createShape(arrowShape)
 
             // 尝试确定靠近的最佳端口（便于做闪烁反馈）
             const { sourcePortId: flashSourcePort, targetPortId: flashTargetPort } = getBestPortPair(this.editor, sourceShape.id as any, targetShape.id as any)
@@ -308,7 +310,7 @@ export class ConnectionModeManager {
     }
 
     // 创建贝塞尔连接器，返回 connector id
-    private createBezierBinding(sourceShape: any, targetShape: ConnectableShape, color: string): TLShapeId | null {
+    private createBezierBinding(sourceShape: any, targetShape: ConnectableShape, color: TLDefaultColorStyle): TLShapeId | null {
         if (!this.editor) return null
         try {
             const sourceBounds = this.editor.getShapePageBounds(sourceShape)
@@ -340,7 +342,7 @@ export class ConnectionModeManager {
             }
 
             // 使用 page coords 储存在 connector 的 props 中，shape origin 设为 0,0（PointingPort 也是这样）
-            this.editor.createShape({
+            const connectorShape: TLShapePartial<IBezierConnectorShape> = {
                 id: connectorId,
                 type: 'bezier-connector',
                 x: 0,
@@ -352,7 +354,8 @@ export class ConnectionModeManager {
                     strokeWidth: 3,
                     strokeStyle: 'solid',
                 },
-            })
+            }
+            this.editor.createShape(connectorShape)
 
             // 创建 binding，优先使用默认端口 id
 

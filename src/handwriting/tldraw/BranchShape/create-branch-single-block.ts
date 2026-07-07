@@ -77,7 +77,7 @@ function createBranchProps(overrides?: Partial<IBranchShape['props']>): IBranchS
 	}
 }
 
-function getSiblingInsertionPosition(editor: Editor, single: ISingleBlockShape, branch: IBranchShape, side: BranchChildSide) {
+function getSiblingInsertionPosition(_editor: Editor, single: ISingleBlockShape, branch: IBranchShape, side: BranchChildSide) {
 	const rootX = branch.x + (branch.props.rootX ?? branch.props.w / 2)
 	const horizontalGap = Math.max(branch.props.horizontalGap || DEFAULT_BRANCH_PROPS.horizontalGap, 20)
 	const width = single.props.w

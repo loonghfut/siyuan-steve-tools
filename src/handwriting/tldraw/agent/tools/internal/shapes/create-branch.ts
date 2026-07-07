@@ -1,4 +1,4 @@
-﻿import { type Editor, type TLShapeId, createShapeId } from '@tldraw/tldraw'
+import { type Editor, type TLShape, type TLShapeId, createShapeId } from '@tldraw/tldraw'
 import {
 	getBranchRootParent,
 	isBranchConnectableShape,
@@ -288,3 +288,4 @@ function getChildSide(ref: AgentBranchChildRef): AgentBranchSide | undefined {
 function toShapeId(id: string): TLShapeId {
 	return id as TLShapeId
 }
+

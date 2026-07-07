@@ -8,7 +8,6 @@ import {
 	TLResizeInfo,
 	TLShapeId,
 	createShapeId,
-	getDefaultColorTheme,
 	resizeBox,
 	AtomMap,
 	EditorAtom,
@@ -36,6 +35,7 @@ import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
+import { getDefaultColorTheme } from '../utils/color-theme'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -385,6 +385,12 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			height: size?.height ?? shape.props.h,
 			isFilled: true,
 		})
+	}
+
+	override getIndicatorPath(shape: ISingleBlockShape) {
+		const path = new Path2D()
+		path.rect(0, 0, shape.props.w, shape.props.h)
+		return path
 	}
 
 	component(shape: ISingleBlockShape) {
@@ -1651,7 +1657,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 }
 
 // ===== Single Block Binding =====
-type SingleBlockBinding = TLBaseBinding<
+export type SingleBlockBinding = TLBaseBinding<
 	'single-block',
 	{
 		anchor: VecModel

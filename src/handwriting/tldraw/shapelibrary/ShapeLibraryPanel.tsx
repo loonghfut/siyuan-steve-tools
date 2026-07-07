@@ -417,7 +417,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                                 title="清除搜索"
                                 aria-label="清除搜索"
                             >
-                                <TldrawUiIcon icon="cross-2" small />
+                                <TldrawUiIcon label="" icon="cross-2" small />
                             </button>
                         )}
                     </label>
@@ -437,7 +437,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                             setShowMore(v => !v);
                         }}
                     >
-                        <TldrawUiIcon icon="dots-horizontal" small />
+                        <TldrawUiIcon label="" icon="dots-horizontal" small />
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="icon"
@@ -445,7 +445,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                         title="关闭"
                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); onClose(); }}
                     >
-                        <TldrawUiIcon icon="cross-2" small />
+                        <TldrawUiIcon label="" icon="cross-2" small />
                     </TldrawUiButton>
                     {showMore && (
                         <div
@@ -456,21 +456,21 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
                                 className="shape-library-menu-item"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); handleImport(); }}
                             >
-                                <TldrawUiIcon icon="download" small />
+                                <TldrawUiIcon label="" icon="download" small />
                                 <span>导入</span>
                             </button>
                             <button
                                 className="shape-library-menu-item"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); handleExport(); }}
                             >
-                                <TldrawUiIcon icon="share-1" small />
+                                <TldrawUiIcon label="" icon="share-1" small />
                                 <span>导出</span>
                             </button>
                             <button
                                 className="shape-library-menu-item"
                                 onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShowMore(false); loadItems(); }}
                             >
-                                <TldrawUiIcon icon="rotate-cw" small />
+                                <TldrawUiIcon label="" icon="rotate-cw" small />
                                 <span>刷新</span>
                             </button>
                             {/* 关闭按钮已移到标题栏，保留其余菜单项 */}
@@ -503,7 +503,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
             >
                 {loading ? (
                     <div className="shape-library-empty">
-                        <TldrawUiIcon icon="rotate-cw" />
+                        <TldrawUiIcon label="" icon="rotate-cw" />
                         <span>加载中...</span>
                     </div>
                 ) : (!items || items.length === 0) ? (
@@ -554,7 +554,7 @@ export const ShapeLibraryPanel = track(({ isOpen, onClose }: ShapeLibraryPanelPr
 
             {/* 底部提示 */}
             <div className="shape-library-panel__footer">
-                <TldrawUiIcon icon="drag-handle-dots" small />
+                <TldrawUiIcon label="" icon="drag-handle-dots" small />
                 <span>拖拽到画布，或点击插入</span>
             </div>
         </div>
@@ -661,7 +661,7 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                         title="添加到画布"
                         aria-label="添加到画布"
                     >
-                        <TldrawUiIcon icon="plus" small />
+                        <TldrawUiIcon label="" icon="plus" small />
                     </button>
                     <button
                         className="shape-library-icon-button"
@@ -674,7 +674,7 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                         title="重命名"
                         aria-label="重命名"
                     >
-                        <TldrawUiIcon icon="edit" small />
+                        <TldrawUiIcon label="" icon="edit" small />
                     </button>
                     <button
                         className="shape-library-icon-button shape-library-icon-button--danger"
@@ -687,7 +687,7 @@ const ShapeLibraryItemCard: React.FC<ShapeLibraryItemCardProps> = ({
                         title="删除"
                         aria-label="删除"
                     >
-                        <TldrawUiIcon icon="trash" small />
+                        <TldrawUiIcon label="" icon="trash" small />
                     </button>
                 </div>
 

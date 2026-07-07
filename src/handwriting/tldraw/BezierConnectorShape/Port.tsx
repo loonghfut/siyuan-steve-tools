@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef, memo } from 'react'
-import { TLShapeId, useEditor, useValue, getDefaultColorTheme } from '@tldraw/tldraw'
+import { TLShapeId, useEditor, useValue } from '@tldraw/tldraw'
 import { getPortState } from './port-state'
 import { getShapePorts } from './shape-ports'
 import { getShapeConnections } from './bezier-connector-binding'
 import { settingdata } from '@/index'
+import { getDefaultColorTheme } from '../utils/color-theme'
 
 const DEFAULT_PORT_HOVER_DELAY_MS = 300
 

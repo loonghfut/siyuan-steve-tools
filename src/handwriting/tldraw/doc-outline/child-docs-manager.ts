@@ -1,13 +1,11 @@
 /**
- * 子文档面板位置管理
+ * 瀛愭枃妗ｉ潰鏉夸綅缃鐞?
  */
-import { api } from '@frostime/siyuan-plugin-kits';
 
 /**
- * 重置子文档面板位置到默认位置
+ * 閲嶇疆瀛愭枃妗ｉ潰鏉夸綅缃埌榛樿浣嶇疆
  */
 export function resetChildDocsPanelPosition() {
-    const width = 260;
     const left = Math.max(12, window.innerWidth - 900);
     const top = 60;
 

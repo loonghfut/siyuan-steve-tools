@@ -44,7 +44,7 @@ export const JsShapeStyleSection: React.FC<JsShapeStyleSectionProps> = ({
                     })
                 }}
             >
-                <TldrawUiIcon icon="js-interactive" />
+                <TldrawUiIcon label="" icon="js-interactive" />
             </TldrawUiButton>
         </div>
     )
