@@ -441,6 +441,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 			anyPt[DESTROYED_MARK] = true
 		}
+		const stopMissingStateEvent = (event: React.PointerEvent | React.MouseEvent) => {
+			event.preventDefault()
+			event.stopPropagation()
+		}
 
 
 		const destroyRuntimeResources = useCallback(() => {
@@ -463,6 +467,41 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			}
 			protyleHostRef.current = null
 		}, [])
+		const enterMissingLinkedBlockState = useCallback(() => {
+			destroyRuntimeResources()
+			setStaticHtml('')
+			setIsLoadingContent(false)
+			setHasLoadError(true)
+			try {
+				if (editor.getEditingShapeId() === shape.id) {
+					editor.setEditingShape(undefined)
+				}
+			} catch {
+				// ignore
+			}
+		}, [destroyRuntimeResources, editor, shape.id])
+		const handleRefreshMissingLinkedBlock = useCallback((event: React.PointerEvent | React.MouseEvent) => {
+			stopMissingStateEvent(event)
+			if (shape.props.blockId) {
+				invalidateCache(shape.props.blockId)
+			}
+			destroyRuntimeResources()
+			setStaticHtml('')
+			setIsLoadingContent(false)
+			setHasLoadError(false)
+			editor.updateShape({
+				id: shape.id,
+				type: shape.type,
+				props: {
+					...shape.props,
+					refreshNonce: Date.now(),
+				},
+			})
+		}, [destroyRuntimeResources, editor, shape.id, shape.props, shape.type])
+		const handleDeleteMissingLinkedBlock = useCallback((event: React.PointerEvent | React.MouseEvent) => {
+			stopMissingStateEvent(event)
+			editor.deleteShape(shape.id)
+		}, [editor, shape.id])
 
 		// 使用独立的尺寸测量 hook（自动处理尺寸更新）
 	// 如果有加载错误，跳过测量以避免异常增长
@@ -629,11 +668,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					setHasLoadError(false)
 				} else {
 					// 块不存在，设置错误状态
+					setStaticHtml('')
 					setHasLoadError(true)
 				}
 			}).catch(() => {
 				// API调用失败，设置错误状态
-				if (!cancelled) setHasLoadError(true)
+				if (!cancelled) {
+					setStaticHtml('')
+					setHasLoadError(true)
+				}
 			}).finally(() => {
 				if (!cancelled) setIsLoadingContent(false)
 			})
@@ -807,9 +850,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 								preventInsetEmptyBlock: true,
 							},
 							handleEmptyContent() {
-								showMessage('块已被删除')
 								if (!disposed && !signal.aborted) {
-									editor.deleteShape(shape.id)
+									enterMissingLinkedBlockState()
 								}
 							},
 						})
@@ -1377,24 +1419,78 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							双击编辑
 						</div>
 					)}
-					{/* 非编辑态：块不存在错误提示 */}
-					{!isEditingState && !staticHtml && !isLoadingContent && hasLoadError && (
-						<div style={{
-							width: '100%',
-							height: '100%',
+				</div>
+				{!isEditingState && hasLoadError && (
+					<div
+						onPointerDown={stopMissingStateEvent}
+						onClick={stopMissingStateEvent}
+						style={{
+							position: 'absolute',
+							inset: '0',
+							zIndex: 20,
 							display: 'flex',
 							alignItems: 'center',
 							justifyContent: 'center',
-							fontSize: `${Math.min(shape.props.fontSize, 14)}px`,
-							color: theme[shape.props.color].solid,
-							opacity: 0.6,
-							textAlign: 'center',
-							padding: '4px'
-						}}>
-							块不存在或已删除
+							padding: '12px',
+							background: shape.props.transparentBackground ? 'rgba(127, 127, 127, 0.08)' : 'rgba(127, 127, 127, 0.14)',
+							backdropFilter: 'blur(2px)',
+							pointerEvents: 'auto',
+						}}
+					>
+						<div
+							style={{
+								display: 'flex',
+								flexDirection: 'column',
+								alignItems: 'center',
+								gap: '10px',
+								maxWidth: '100%',
+								padding: '14px 16px',
+								borderRadius: '12px',
+								background: 'var(--b3-theme-background, #fff)',
+								border: '1px solid var(--b3-border-color, rgba(0, 0, 0, 0.12))',
+								boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+								color: theme[shape.props.color].solid,
+								textAlign: 'center',
+							}}
+						>
+							<div style={{ fontSize: `${Math.min(shape.props.fontSize, 14)}px`, fontWeight: 500 }}>
+								找不到绑定块
+							</div>
+							<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+								<button
+									type="button"
+									onPointerDown={stopMissingStateEvent}
+									onClick={handleRefreshMissingLinkedBlock}
+									style={{
+										padding: '6px 12px',
+										borderRadius: '8px',
+										border: '1px solid var(--b3-border-color, rgba(0, 0, 0, 0.12))',
+										background: 'transparent',
+										color: 'inherit',
+										cursor: 'pointer',
+									}}
+								>
+									刷新
+								</button>
+								<button
+									type="button"
+									onPointerDown={stopMissingStateEvent}
+									onClick={handleDeleteMissingLinkedBlock}
+									style={{
+										padding: '6px 12px',
+										borderRadius: '8px',
+										border: '1px solid var(--b3-card-error-color, #d23f31)',
+										background: 'var(--b3-card-error-background, rgba(210, 63, 49, 0.12))',
+										color: 'var(--b3-card-error-color, #d23f31)',
+										cursor: 'pointer',
+									}}
+								>
+									删除
+								</button>
+							</div>
 						</div>
-					)}
-				</div>
+					</div>
+				)}
 				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
 				{/* 在透明模式下不显示端点（PortsOverlay） */}
 				{!shape.props.transparentBackground && (

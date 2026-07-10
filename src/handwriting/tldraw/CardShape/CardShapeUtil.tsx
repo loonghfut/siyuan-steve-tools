@@ -256,6 +256,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	// [6]
 	component(shape: ICardShape) {
 		// const bounds = this.editor.getShapeGeometry(shape).bounds
+		const editor = this.editor
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 		const isEditing = this.editor.getEditingShapeId() === shape.id;
 		const branchInteractionHint = useBranchInteractionHint()
@@ -268,6 +269,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const [isInViewport, setIsInViewport] = useState(true);
 		const [canLoad, setCanLoad] = useState(true); // gating heavy render by global manager
 		const [isHovered, setIsHovered] = useState(false);
+		const [hasMissingLinkedBlock, setHasMissingLinkedBlock] = useState(false);
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
 		const tldrawHeaderImage = settingdata['tldraw-header-image'] !== false;
 		const [collapsedText, setCollapsedText] = useState<string>('加载中...');
@@ -484,6 +486,41 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const hadFocusedRef = useRef(false)
 		// 保存编辑前的形状层级索引，用于退出编辑后恢复原层次
 		const originalIndexRef = useRef<string | null>(null)
+		const stopMissingStateEvent = (event: React.PointerEvent | React.MouseEvent) => {
+			event.preventDefault()
+			event.stopPropagation()
+		}
+		const enterMissingLinkedBlockState = useCallback(() => {
+			destroyRuntimeResources()
+			setHasMissingLinkedBlock(true)
+			try {
+				if (editor.getEditingShapeId() === shape.id) {
+					editor.setEditingShape(undefined)
+				}
+			} catch {
+				// ignore
+			}
+		}, [destroyRuntimeResources, editor, shape.id])
+		const handleRefreshMissingLinkedBlock = useCallback((event: React.PointerEvent | React.MouseEvent) => {
+			stopMissingStateEvent(event)
+			if (blockId) {
+				invalidatePreviewCache(blockId)
+			}
+			destroyRuntimeResources()
+			setHasMissingLinkedBlock(false)
+			editor.updateShape({
+				id: shape.id,
+				type: shape.type,
+				props: {
+					...shape.props,
+					refreshNonce: Date.now(),
+				},
+			})
+		}, [blockId, destroyRuntimeResources, editor, shape.id, shape.props, shape.type])
+		const handleDeleteMissingLinkedBlock = useCallback((event: React.PointerEvent | React.MouseEvent) => {
+			stopMissingStateEvent(event)
+			editor.deleteShape(shape.id)
+		}, [editor, shape.id])
 
 
 		useEffect(() => {
@@ -821,15 +858,17 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					// 使用批量检查机制
 					let cancelled = false;
 					scheduleBlockCheck(currentBlockId, shape.id).then((exists) => {
-						if (!cancelled && !exists) {
-							showMessage('块不存在,已被删除');
-							this.editor.deleteShape(shape.id);
+						if (cancelled) return;
+						if (exists) {
+							setHasMissingLinkedBlock(false);
+							return;
 						}
+						enterMissingLinkedBlockState();
 					});
 					return () => { cancelled = true; };
 				}
 			}
-		}, [isEditingState, blockId]);
+		}, [blockId, editor, enterMissingLinkedBlockState, isEditingState, shape.id, shape.props, shape.type, shape.props.refreshNonce]);
 		// Protyle 生命周期管理主 Effect
 		// 注意：对于 live-protyle 模式，编辑状态切换不应触发重建
 		useEffect(() => {
@@ -1002,7 +1041,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								resolveReady && resolveReady();
 							},
 							handleEmptyContent: () => {
-								showMessage('块已被删除');
+								enterMissingLinkedBlockState();
 							},
 						});
 					} catch (err) {
@@ -1650,6 +1689,77 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						</div>
 					)}
 				</div>
+				{!isEditingState && hasMissingLinkedBlock && (
+					<div
+						onPointerDown={stopMissingStateEvent}
+						onClick={stopMissingStateEvent}
+						style={{
+							position: 'absolute',
+							inset: '0',
+							zIndex: 20,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							padding: '16px',
+							background: 'rgba(127, 127, 127, 0.14)',
+							backdropFilter: 'blur(2px)',
+							pointerEvents: 'auto',
+						}}
+					>
+						<div
+							style={{
+								display: 'flex',
+								flexDirection: 'column',
+								alignItems: 'center',
+								gap: '12px',
+								maxWidth: '100%',
+								padding: '16px 18px',
+								borderRadius: '12px',
+								background: 'var(--b3-theme-background, #fff)',
+								border: '1px solid var(--b3-border-color, rgba(0, 0, 0, 0.12))',
+								boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+								color: theme[shape.props.color].solid,
+								textAlign: 'center',
+							}}
+						>
+							<div style={{ fontSize: `${Math.min(fontSize, 16)}px`, fontWeight: 500 }}>
+								找不到绑定块
+							</div>
+							<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+								<button
+									type="button"
+									onPointerDown={stopMissingStateEvent}
+									onClick={handleRefreshMissingLinkedBlock}
+									style={{
+										padding: '6px 12px',
+										borderRadius: '8px',
+										border: '1px solid var(--b3-border-color, rgba(0, 0, 0, 0.12))',
+										background: 'transparent',
+										color: 'inherit',
+										cursor: 'pointer',
+									}}
+								>
+									刷新
+								</button>
+								<button
+									type="button"
+									onPointerDown={stopMissingStateEvent}
+									onClick={handleDeleteMissingLinkedBlock}
+									style={{
+										padding: '6px 12px',
+										borderRadius: '8px',
+										border: '1px solid var(--b3-card-error-color, #d23f31)',
+										background: 'var(--b3-card-error-background, rgba(210, 63, 49, 0.12))',
+										color: 'var(--b3-card-error-color, #d23f31)',
+										cursor: 'pointer',
+									}}
+								>
+									删除
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
 				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
 				<PortsOverlay shapeId={shape.id} parentHovered={isHovered} />
 			</HTMLContainer >
