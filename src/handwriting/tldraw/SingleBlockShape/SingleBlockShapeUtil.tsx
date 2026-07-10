@@ -7,6 +7,7 @@ import {
 	SvgExportContext,
 	TLResizeInfo,
 	TLShapeId,
+	TLShapeUtilCanBindOpts,
 	createShapeId,
 	resizeBox,
 	AtomMap,
@@ -49,6 +50,7 @@ import {
 	updateBranchAttachmentAfterDrag,
 	useBranchInteractionHint,
 } from '../BranchShape'
+import { canBindBranchToTarget } from '../BranchShape/branch-binding-policy'
 
 const draggingBranchSingleBlockIds = new Set<string>()
 const pendingCreationPromises = new Map<string, Promise<string>>()
@@ -323,8 +325,8 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		return false
 	}
 
-	override canBind() {
-		return true
+	override canBind(opts: TLShapeUtilCanBindOpts) {
+		return canBindBranchToTarget(opts)
 	}
 
 	override canCull(_shape: ISingleBlockShape): boolean {
