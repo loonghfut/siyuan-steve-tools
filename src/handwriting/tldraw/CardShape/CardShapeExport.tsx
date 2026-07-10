@@ -9,6 +9,7 @@ import {
 import { ICardShape } from './card-shape-types';
 import { settingdata } from '@/index';
 import { getDefaultColorTheme } from '../utils/color-theme';
+import { getShapeHostElement } from '../utils/getShapeHostElement';
 
 // 扩展的关键样式属性列表
 const EXTENDED_STYLE_PROPS = [
@@ -272,7 +273,7 @@ function hideScrollbars(container: Element): void {
 function copyCardContentFromDom(shape: ICardShape, isCollapsed: boolean): string {
 	if (typeof document === 'undefined') return '';
 
-	const host = document.getElementById(shape.id);
+	const host = getShapeHostElement(shape.id);
 	if (!host) return '';
 
 	const content = host.querySelector('[blockid]') as HTMLElement | null;

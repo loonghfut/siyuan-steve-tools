@@ -8,6 +8,7 @@ import type { ICardShape, CardRenderMode } from './card-shape-types'
 import { loadChildDocsForDoc, loadOutlineForDoc, outlineNodeToRelationItem } from '../doc-outline/doc-outline-data'
 import { insertDocRelations } from '../doc-outline/insert-doc-relations'
 import { buildCardCollapseUpdate } from './card-collapse'
+import { getShapeHostElement } from '../utils/getShapeHostElement'
 
 const COLLAPSED_TEXT_MIN_SIZE = 25
 const COLLAPSED_TEXT_MAX_SIZE = 76
@@ -29,7 +30,7 @@ export interface CardStyleSectionProps {
 }
 
 function getCollapsedTextElement(shape: ICardShape): HTMLElement | null {
-    const host = document.getElementById(shape.id as string)
+    const host = getShapeHostElement(shape.id as string)
     return (host?.querySelector('[data-card-collapsed-text]') as HTMLElement | null) || null
 }
 

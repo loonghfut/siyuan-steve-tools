@@ -36,6 +36,7 @@ import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, re
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import { getDefaultColorTheme } from '../utils/color-theme'
+import { getShapeHostElement } from '../utils/getShapeHostElement'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -1641,7 +1642,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		const serializeContent = () => {
 			if (typeof document === 'undefined') return ''
-			const host = document.getElementById(shape.id)
+			const host = getShapeHostElement(shape.id)
 			if (!host) return ''
 			const content = host.querySelector('[blockid]') as HTMLElement | null
 			if (!content) return ''
