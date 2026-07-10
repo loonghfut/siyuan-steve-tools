@@ -1309,6 +1309,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				</div>
 				<div
 					ref={containerRef}
+					className="st-single-block-shape__content"
 					blockid={shape.props.blockId}
 					style={{
 						width: '100%',
@@ -1327,6 +1328,17 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					{/* 非编辑态：显示静态 HTML 内容 */}
 					<style>
 						{`
+							.st-single-block-shape__content,
+							.st-single-block-shape__content * {
+								scrollbar-width: none !important;
+								-ms-overflow-style: none !important;
+							}
+							.st-single-block-shape__content::-webkit-scrollbar,
+							.st-single-block-shape__content *::-webkit-scrollbar {
+								width: 0 !important;
+								height: 0 !important;
+								display: none !important;
+							}
 							.single-block-static-content,
 							.single-block-static-content .protyle-wysiwyg {
 								pointer-events: none !important;
