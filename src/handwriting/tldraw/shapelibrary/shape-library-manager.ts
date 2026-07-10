@@ -13,6 +13,7 @@ import {
     relayoutBranchesContainingShapes,
 } from "../BranchShape";
 import { clearSvgExportSnapshotCache } from "../utils/export-dom-snapshot";
+import { getTldrawImageExportOptions } from "../utils/export-image-options";
 import { prepareSvgExportSnapshots } from "../utils/export-snapshot-preparer";
 
 /** 素材库项目接口 */
@@ -207,6 +208,7 @@ async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise
                     format: 'png',
                     background: true,
                     padding: 16,
+                    ...getTldrawImageExportOptions(),
                 });
             } finally {
                 clearSvgExportSnapshotCache();

@@ -1789,7 +1789,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	}
 
 	override toSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
-		return exportCardShapeToSvg(shape, ctx)
+		return exportCardShapeToSvg(shape, ctx, this.editor.getContainer())
 	}
 
 }

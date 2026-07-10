@@ -6,6 +6,7 @@ import { copyAs, exportAs, type TLShapeId, type TLUiOverrides } from '@tldraw/tl
 import { showMessage } from 'siyuan'
 import { selectAdjacentShape } from '../utils/selectAdjacentShape'
 import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
+import { getTldrawImageExportOptions } from '../utils/export-image-options'
 import { createExportProgressOverlay, waitForPaint } from '../utils/export-progress'
 import { prepareSvgExportSnapshots } from '../utils/export-snapshot-preparer'
 
@@ -86,11 +87,12 @@ export const uiOverrides: TLUiOverrides = {
 
                 overlay.update(mode === 'copy' ? '正在写入剪贴板' : '正在生成图片', 1, 1)
                 await waitForPaint()
+                const imageOptions = format === 'png' ? getTldrawImageExportOptions() : {}
 
                 if (mode === 'copy') {
-                    await copyAs(editor, ids, { format })
+                    await copyAs(editor, ids, { format, ...imageOptions })
                 } else {
-                    await exportAs(editor, ids, { format })
+                    await exportAs(editor, ids, { format, ...imageOptions })
                 }
             } catch (error) {
                 console.error('Image export failed', error)

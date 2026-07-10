@@ -1,6 +1,7 @@
 import { Editor, TLShapeId } from '@tldraw/tldraw'
 import { SlideShape } from './SlideShapeUtil'
 import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
+import { getTldrawImageExportOptions } from '../utils/export-image-options'
 import { prepareSvgExportSnapshots } from '../utils/export-snapshot-preparer'
 
 export type SlideScreenshotFormat = 'png' | 'svg'
@@ -42,10 +43,11 @@ export async function captureSlideScreenshot(
 		return null
 	}
 
+	const imageExportOptions = getTldrawImageExportOptions()
 	const {
 		format = 'png',
-		pixelRatio = typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 2,
-		quality = 1,
+		pixelRatio = imageExportOptions.pixelRatio ?? (typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 2),
+		quality = imageExportOptions.quality ?? 1,
 		padding = 0,
 		background = true,
 		includeSlideOutline = false,

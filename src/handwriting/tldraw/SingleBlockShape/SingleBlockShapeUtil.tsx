@@ -32,6 +32,7 @@ import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
+import { getShapeHostElement } from '../utils/getShapeHostElement'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
@@ -1586,7 +1587,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const cachedSnapshot = getCachedSvgExportSnapshot(shape.id)
 		let serialized = cachedSnapshot ?? ''
 		if (cachedSnapshot === null && typeof document !== 'undefined') {
-			const host = document.getElementById(shape.id) || document.querySelector<HTMLElement>(`[data-shape-id="${shape.id}"]`)
+			const host = getShapeHostElement(shape.id, this.editor.getContainer())
 			const content = host?.querySelector('[blockid]') as HTMLElement | null
 			if (content) {
 				serialized = serializeElementForSvgExport(content, {

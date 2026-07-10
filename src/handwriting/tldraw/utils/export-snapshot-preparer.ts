@@ -33,8 +33,8 @@ function isExportSnapshotShape(shape: TLShape | undefined): shape is TLShape {
 	return !!shape && (shape.type === 'card' || shape.type === 'single-block')
 }
 
-function getCardContentSource(shape: TLShape): HTMLElement | null {
-	const host = getShapeHostElement(shape.id)
+function getCardContentSource(shape: TLShape, root: ParentNode): HTMLElement | null {
+	const host = getShapeHostElement(shape.id, root)
 	const content = host?.querySelector('[blockid]') as HTMLElement | null
 	if (!content) return null
 
@@ -45,12 +45,12 @@ function getCardContentSource(shape: TLShape): HTMLElement | null {
 	return collapsedContent || content
 }
 
-function getSingleBlockContentSource(shape: TLShape): HTMLElement | null {
-	const host = getShapeHostElement(shape.id)
+function getSingleBlockContentSource(shape: TLShape, root: ParentNode): HTMLElement | null {
+	const host = getShapeHostElement(shape.id, root)
 	return (host?.querySelector('[blockid]') as HTMLElement | null) ?? null
 }
 
-async function serializeShapeSnapshot(editor: Editor, shape: TLShape): Promise<string> {
+async function serializeShapeSnapshot(editor: Editor, shape: TLShape, root: ParentNode): Promise<string> {
 	const props = shape.props as {
 		w?: number
 		h?: number
@@ -61,7 +61,7 @@ async function serializeShapeSnapshot(editor: Editor, shape: TLShape): Promise<s
 
 	if (shape.type === 'card') {
 		const border = settingdata["showCardBorder"] !== false ? CARD_BORDER_PX : 0
-		const source = getCardContentSource(shape)
+		const source = getCardContentSource(shape, root)
 		if (!source) return ''
 
 		return await serializeElementForSvgExportAsync(source, {
@@ -73,7 +73,7 @@ async function serializeShapeSnapshot(editor: Editor, shape: TLShape): Promise<s
 
 	const showBorder = settingdata["showCardBorder"] !== false && !props.transparentBackground
 	const border = showBorder ? SINGLE_BLOCK_BORDER_PX : 0
-	const source = getSingleBlockContentSource(shape)
+	const source = getSingleBlockContentSource(shape, root)
 	if (!source) return ''
 
 	let height = Math.max(props.h ?? SINGLE_BLOCK_MIN_HEIGHT, SINGLE_BLOCK_MIN_HEIGHT)
@@ -98,6 +98,7 @@ export async function prepareSvgExportSnapshots(
 	clearSvgExportSnapshotCache()
 
 	if (typeof document === 'undefined') return
+	const root = editor.getContainer()
 
 	const shapes = ids
 		.map((id) => editor.getShape(id))
@@ -113,7 +114,7 @@ export async function prepareSvgExportSnapshots(
 
 	for (let index = 0; index < shapes.length; index++) {
 		const shape = shapes[index]
-		const html = await serializeShapeSnapshot(editor, shape)
+		const html = await serializeShapeSnapshot(editor, shape, root)
 		setCachedSvgExportSnapshot(shape.id, html)
 
 		options.onProgress?.({

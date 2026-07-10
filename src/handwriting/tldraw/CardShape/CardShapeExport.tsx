@@ -13,10 +13,10 @@ import { getDefaultColorTheme } from '../utils/color-theme'
 import { getShapeHostElement } from '../utils/getShapeHostElement'
 import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 
-function getCardContentSource(shape: ICardShape, isCollapsed: boolean): HTMLElement | null {
+function getCardContentSource(shape: ICardShape, isCollapsed: boolean, root?: ParentNode): HTMLElement | null {
 	if (typeof document === 'undefined') return null
 
-	const host = getShapeHostElement(shape.id)
+	const host = getShapeHostElement(shape.id, root)
 	if (!host) return null
 
 	const content = host.querySelector('[blockid]') as HTMLElement | null
@@ -28,7 +28,7 @@ function getCardContentSource(shape: ICardShape, isCollapsed: boolean): HTMLElem
 	return collapsedContent || content
 }
 
-export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext): ReactElement | null {
+export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext, root?: ParentNode): ReactElement | null {
 	const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
 	const { w, h, color, fontSize = 16, blockId, isCollapsed } = shape.props
 
@@ -44,7 +44,7 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext): 
 	const scopeId = `st-card-export-${shape.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
 	const cachedSnapshot = getCachedSvgExportSnapshot(shape.id)
-	const source = cachedSnapshot === null ? getCardContentSource(shape, !!isCollapsed) : null
+	const source = cachedSnapshot === null ? getCardContentSource(shape, !!isCollapsed, root) : null
 	const serialized = cachedSnapshot ?? (source
 		? serializeElementForSvgExport(source, {
 			viewportWidth: contentWidth,

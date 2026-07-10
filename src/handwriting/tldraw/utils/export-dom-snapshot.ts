@@ -181,6 +181,12 @@ function removeRuntimeAttrs(container: Element): void {
 	}
 }
 
+function removeActiveRuntimeNodes(container: Element): void {
+	getElementsIncludingRoot<HTMLElement>(container, 'script, style, link[rel~="stylesheet"]').forEach((node) => {
+		node.remove()
+	})
+}
+
 function setResolvedSrcset(element: Element): void {
 	const srcset = element.getAttribute('srcset')
 	if (!srcset) return
@@ -341,6 +347,7 @@ export function serializeElementForSvgExport(
 
 	const clone = source.cloneNode(true) as HTMLElement
 	inlineComputedStyles(source, clone)
+	removeActiveRuntimeNodes(clone)
 	removeRuntimeAttrs(clone)
 	processImages(clone)
 	processVideos(clone)
@@ -385,6 +392,7 @@ export async function serializeElementForSvgExportAsync(
 
 	const clone = source.cloneNode(true) as HTMLElement
 	inlineComputedStyles(source, clone)
+	removeActiveRuntimeNodes(clone)
 	removeRuntimeAttrs(clone)
 	await processImagesAsync(clone)
 	await processVideosAsync(clone)
