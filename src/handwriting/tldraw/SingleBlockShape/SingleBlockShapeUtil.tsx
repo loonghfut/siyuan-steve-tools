@@ -36,7 +36,7 @@ import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, re
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import { getDefaultColorTheme } from '../utils/color-theme'
-import { getShapeHostElement } from '../utils/getShapeHostElement'
+import { getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -1576,8 +1576,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const strokeColor = showBorder ? theme[color].solid : 'none'
 		const fillColor = showBorder ? theme[color].semi : 'none'
 		const textColor = theme[color].solid
-		let serialized = ''
-
 		const size = SingleBlockSizes.get(this.editor).get(shape.id)
 		// 使用实际渲染高度，如果没有则使用属性高度，确保导出与实际一致
 		const h = size?.height ?? Math.max(hProp, MIN_HEIGHT)
@@ -1585,159 +1583,19 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// Clamp inner dimensions to avoid negative <foreignObject> size during export
 		const innerW = Math.max(w - border * 2, 1)
 		const innerH = Math.max(h - border * 2, 1)
-
-		const binaryToBase64 = (binary: string) => {
-			let base64 = ''
-			const chunkSize = 0x6000
-			for (let i = 0; i < binary.length; i += chunkSize) {
-				const slice = binary.slice(i, i + chunkSize)
-				let normalized = ''
-				for (let j = 0; j < slice.length; j++) {
-					normalized += String.fromCharCode(slice.charCodeAt(j) & 0xff)
-				}
-				base64 += btoa(normalized)
+		let serialized = ''
+		if (typeof document !== 'undefined') {
+			const host = document.getElementById(shape.id) || document.querySelector<HTMLElement>(`[data-shape-id="${shape.id}"]`)
+			const content = host?.querySelector('[blockid]') as HTMLElement | null
+			if (content) {
+				serialized = serializeElementForSvgExport(content, {
+					viewportWidth: innerW,
+					viewportHeight: innerH,
+					fontSize,
+				})
 			}
-			return base64
 		}
-
-		const assetToDataUrl = (rawSrc: string | null) => {
-			if (!rawSrc) return ''
-			const trimmed = rawSrc.trim()
-			if (!trimmed || /^data:/i.test(trimmed) || /^https?:/i.test(trimmed) || trimmed.startsWith('//')) return trimmed
-			let logicalPath = trimmed.replace(/^\.\//, '')
-			if (logicalPath.startsWith('/')) logicalPath = logicalPath.slice(1)
-			let kernelPath = ''
-			if (logicalPath.startsWith('assets/')) kernelPath = `/data/${logicalPath}`
-			else if (logicalPath.startsWith('data/')) kernelPath = `/${logicalPath}`
-			else if (logicalPath.startsWith('/data/')) kernelPath = logicalPath
-			else return trimmed
-			try {
-				const xhr = new XMLHttpRequest()
-				xhr.open('POST', '/api/file/getFile', false)
-				xhr.overrideMimeType('text/plain; charset=x-user-defined')
-				xhr.setRequestHeader('Content-Type', 'application/json')
-				xhr.send(JSON.stringify({ path: kernelPath }))
-				if (xhr.status >= 200 && xhr.status < 300 && typeof xhr.responseText === 'string') {
-					const base64 = binaryToBase64(xhr.responseText)
-					const ext = (logicalPath.split('.').pop() || 'png').toLowerCase()
-					const mimeMap: Record<string, string> = {
-						png: 'image/png',
-						jpg: 'image/jpeg',
-						jpeg: 'image/jpeg',
-						gif: 'image/gif',
-						webp: 'image/webp',
-						svg: 'image/svg+xml',
-						bmp: 'image/bmp',
-						ico: 'image/x-icon',
-						avif: 'image/avif',
-					}
-					const mime = mimeMap[ext] || 'image/png'
-					return `data:${mime};base64,${base64}`
-				}
-			} catch (err) {
-				console.warn('Embedding asset failed', err)
-			}
-			return trimmed
-		}
-
-		const serializeContent = () => {
-			if (typeof document === 'undefined') return ''
-			const host = getShapeHostElement(shape.id)
-			if (!host) return ''
-			const content = host.querySelector('[blockid]') as HTMLElement | null
-			if (!content) return ''
-			const clone = content.cloneNode(true) as HTMLElement
-
-			const inlineComputedStyles = (source: Element, target: Element) => {
-				const computed = window.getComputedStyle(source)
-				const styleText = Array.from(computed)
-					.map((prop) => `${prop}:${computed.getPropertyValue(prop)};`)
-					.join('')
-				const existing = target.getAttribute('style') || ''
-				target.setAttribute('style', `${styleText}${existing}`)
-				const sourceChildren = Array.from(source.children)
-				const targetChildren = Array.from(target.children)
-				for (let i = 0; i < sourceChildren.length; i++) {
-					const srcChild = sourceChildren[i]
-					const tgtChild = targetChildren[i]
-					if (srcChild && tgtChild) {
-						inlineComputedStyles(srcChild, tgtChild)
-					}
-				}
-			}
-
-			inlineComputedStyles(content, clone)
-			clone.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'))
-			clone.querySelectorAll('[data-node-id]').forEach((el) => el.removeAttribute('data-node-id'))
-			clone.querySelectorAll('[data-node-index]').forEach((el) => el.removeAttribute('data-node-index'))
-			clone.querySelectorAll('[updated]').forEach((el) => el.removeAttribute('updated'))
-			clone.querySelectorAll('[data-realwidth]').forEach((el) => el.removeAttribute('data-realwidth'))
-			clone.querySelectorAll('[data-readonly]').forEach((el) => el.removeAttribute('data-readonly'))
-			clone.querySelectorAll('*').forEach((node) => {
-				if (node instanceof HTMLElement) {
-					node.style.setProperty('scrollbar-width', 'none', 'important')
-					node.style.setProperty('ms-overflow-style', 'none', 'important')
-					node.style.setProperty('overscroll-behavior', 'contain')
-				}
-			})
-			clone.querySelectorAll('img').forEach((img) => {
-				const embedded = assetToDataUrl(img.getAttribute('src'))
-				if (embedded) {
-					img.setAttribute('src', embedded)
-					img.removeAttribute('crossorigin')
-				}
-				const srcset = img.getAttribute('srcset')
-				if (srcset) {
-					const resolvedSet = srcset
-						.split(',')
-						.map((entry) => {
-							const [url, descriptor] = entry.trim().split(/\s+/, 2)
-							const resolved = assetToDataUrl(url)
-							return resolved ? (descriptor ? `${resolved} ${descriptor}` : resolved) : ''
-						})
-						.filter(Boolean)
-						.join(', ')
-					if (resolvedSet) img.setAttribute('srcset', resolvedSet)
-					else img.removeAttribute('srcset')
-				}
-			})
-			clone.querySelectorAll('source').forEach((sourceEl) => {
-				const src = sourceEl.getAttribute('src')
-				const resolved = assetToDataUrl(src)
-				if (resolved) {
-					sourceEl.setAttribute('src', resolved)
-					sourceEl.removeAttribute('crossorigin')
-				}
-				const srcset = sourceEl.getAttribute('srcset')
-				if (srcset) {
-					const resolvedSet = srcset
-						.split(',')
-						.map((entry) => {
-							const [url, descriptor] = entry.trim().split(/\s+/, 2)
-							const result = assetToDataUrl(url)
-							return result ? (descriptor ? `${result} ${descriptor}` : result) : ''
-						})
-						.filter(Boolean)
-						.join(', ')
-					if (resolvedSet) sourceEl.setAttribute('srcset', resolvedSet)
-					else sourceEl.removeAttribute('srcset')
-				}
-			})
-			clone.style.width = `${Math.max(innerW, 1)}px`
-			clone.style.height = `${Math.max(innerH, 1)}px`
-			clone.style.pointerEvents = 'none'
-			clone.style.overflow = 'hidden'
-			clone.style.fontSize = `${fontSize}px`
-			clone.style.boxSizing = 'border-box'
-			return clone.outerHTML
-		}
-
-		serialized = serializeContent()
-		const containerAttrSelector = `[data-sb-id="${shape.id}"]`
-		// 使用与实际渲染一致的样式：.protyle-wysiwyg padding-left: 8px
-		const hideScrollbarStyle = serialized
-			? `<style xmlns="http://www.w3.org/1999/xhtml">${containerAttrSelector} *::-webkit-scrollbar{width:0!important;height:0!important;display:none!important;}${containerAttrSelector} *::-webkit-scrollbar-thumb{display:none!important;}${containerAttrSelector} *{scrollbar-width:none!important;}${containerAttrSelector} .protyle-wysiwyg{position:relative;padding:0 0 0 8px!important;}</style>`
-			: ''
+		const scopeId = `st-single-block-export-${shape.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
 		return (
 			<g>
@@ -1751,9 +1609,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					<foreignObject x={border} y={border} width={Math.max(innerW, 1)} height={Math.max(innerH, 1)}>
 						<div
 							xmlns="http://www.w3.org/1999/xhtml"
-							data-sb-id={shape.id}
+							id={scopeId}
 							style={{ width: '100%', height: '100%', overflow: 'hidden', fontSize: `${fontSize}px` }}
-							dangerouslySetInnerHTML={{ __html: `${hideScrollbarStyle}${serialized}` }}
+							dangerouslySetInnerHTML={{ __html: `${getSvgExportGlobalStyles(`#${scopeId}`)}${serialized}` }}
 						/>
 					</foreignObject>
 				) : (
