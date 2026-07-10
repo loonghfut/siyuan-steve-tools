@@ -818,6 +818,35 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	if (updates.length > 0) editor.updateShapes(updates)
 }
 
+/**
+ * Repairs branch props that reference a center branch's root content instead
+ * of the branch itself. This is safe to run after any programmatic branch
+ * relation update and only touches malformed relationships.
+ */
+export function repairBranchStructure(editor: Editor) {
+	const branches = getCurrentBranches(editor)
+
+	for (const branch of branches) {
+		if (!needsBranchStructureRepair(editor, branch, branches)) continue
+		const latestBranch = editor.getShape<IBranchShape>(branch.id)
+		if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
+	}
+}
+
+function needsBranchStructureRepair(editor: Editor, branch: IBranchShape, branches: IBranchShape[]) {
+	if (branch.props.rootShapeId) {
+		const rootOwner = getBranchRootParent(editor, branch.props.rootShapeId, branches)
+		if (!rootOwner || rootOwner.id !== branch.id) return true
+	}
+
+	return getAllBranchChildIds(branch).some((childId) => {
+		const child = editor.getShape(childId as TLShapeId)
+		if (child?.type !== 'card' && child?.type !== 'single-block') return false
+
+		return !!getBranchRootParent(editor, child.id, branches)
+	})
+}
+
 type BranchIdsDraft = {
 	branch: IBranchShape
 	leftChildIds: string[]

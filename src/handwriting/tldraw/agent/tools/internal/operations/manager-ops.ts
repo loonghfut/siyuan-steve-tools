@@ -21,6 +21,7 @@ import {
     isBranchConnectableShape,
     isShapeInBranchTree,
     layoutBranchChildren,
+    repairBranchStructure,
     relayoutBranchesContainingShapes,
 } from '../../../../BranchShape/branch-layout';
 import type { IBranchShape } from '../../../../BranchShape/branch-shape-types';
@@ -2698,6 +2699,7 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
             resultMode: options.resultMode,
         });
         syncAgentCreatedBlockAttrs(runtime, result);
+        repairBranchStructure(editor);
         runtime.triggerSave();
         return {
             ...result,
@@ -2758,6 +2760,7 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
         layoutBranchChildren(editor, latestBranch);
         relayoutBranchesContainingShapes(editor, [latestBranch.id, childShape.id, ...detachedBranchIds]);
     }
+    repairBranchStructure(editor);
 
     finalizeAgentSelection(editor, existingBranch.id, options);
     runtime.triggerSave();

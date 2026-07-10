@@ -1230,7 +1230,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					display: 'flex',
 					flexDirection: 'column',
 					backgroundColor: shape.props.transparentBackground ? 'transparent' : theme[shape.props.color].semi,
-					color: theme[shape.props.color].solid,
+					// color: theme[shape.props.color].solid,
 					position: 'relative',
 					isolation: 'isolate',
 					// Always allow pointer events at the container level so hover can be detected
