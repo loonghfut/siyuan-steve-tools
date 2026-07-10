@@ -388,8 +388,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 	}
 
 	override getIndicatorPath(shape: ISingleBlockShape) {
+		const { width, height } = this.editor.getShapeGeometry(shape).bounds
 		const path = new Path2D()
-		path.rect(0, 0, shape.props.w, shape.props.h)
+		path.rect(0, 0, width, height)
 		return path
 	}
 
@@ -1502,7 +1503,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 	indicator(shape: ISingleBlockShape) {
 		const { width, height } = this.editor.getShapeGeometry(shape).bounds
-		return <rect width={width} height={height} />
+		return <rect width={width} height={height} rx={10} ry={10} />
 	}
 
 	override onResize(shape: ISingleBlockShape, info: TLResizeInfo<ISingleBlockShape>) {
