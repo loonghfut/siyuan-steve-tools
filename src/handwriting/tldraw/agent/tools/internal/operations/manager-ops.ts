@@ -3310,7 +3310,9 @@ async function createAgentSingleBlockForContent(runtime: AgentManagerRuntime, op
         ? `${body}\n{: id="${blockId}" custom-st-tldraw-single="1" custom-tldraw-link="${escapeBlockAttr(link)}" }\n`
         : `\n{: id="${blockId}" custom-st-tldraw-single="1" custom-tldraw-link="${escapeBlockAttr(link)}" }\n\n`;
     const appendResult = await api.appendBlock('markdown', markdown, runtime.id);
-    return extractFirstOperationId(appendResult) || blockId;
+    const createdBlockId = extractFirstOperationId(appendResult) || blockId;
+    await waitForAgentCreatedSiyuanBlock(createdBlockId, 'p');
+    return createdBlockId;
 }
 
 function renderAgentSingleBlockContent(options: {
@@ -3339,10 +3341,55 @@ async function createAgentCardBlockForContent(runtime: AgentManagerRuntime, opti
 
     const appendResult = await api.appendBlock('markdown', headingMarkdown, runtime.id);
     const appendedBlockId = extractFirstOperationId(appendResult) || blockId;
+    // appendBlock resolves before the block SQL index is always readable. The
+    // card shape immediately queries that index during its first render, so do
+    // not create the binding until the heading can actually be retrieved.
+    await waitForAgentCreatedSiyuanBlock(appendedBlockId, 'h');
     if (content.bodyMarkdown) {
         await api.insertBlock('markdown', content.bodyMarkdown, undefined, appendedBlockId);
     }
     return appendedBlockId;
+}
+
+const AGENT_CREATED_BLOCK_READY_TIMEOUT_MS = 5_000;
+const AGENT_CREATED_BLOCK_INITIAL_RETRY_MS = 50;
+const AGENT_CREATED_BLOCK_MAX_RETRY_MS = 400;
+
+/**
+ * SiYuan's block-write endpoint can complete before its SQL index exposes the
+ * new block. Agent-created card and single-block shapes read the index as soon
+ * as they mount, so wait for that read path instead of relying on the write
+ * response alone.
+ */
+async function waitForAgentCreatedSiyuanBlock(blockId: string, expectedType: 'h' | 'p'): Promise<void> {
+    const deadline = Date.now() + AGENT_CREATED_BLOCK_READY_TIMEOUT_MS;
+    let retryDelay = AGENT_CREATED_BLOCK_INITIAL_RETRY_MS;
+    let lastObservedType = '';
+
+    while (Date.now() < deadline) {
+        try {
+            const block = await api.getBlockByID(blockId);
+            const type = String((block as any)?.type || '');
+            if (type === expectedType) return;
+            lastObservedType = type || 'not found';
+        } catch (error) {
+            console.debug('agent-created SiYuan block is not queryable yet', { blockId, error });
+        }
+
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        await delay(Math.min(retryDelay, remaining));
+        retryDelay = Math.min(retryDelay * 2, AGENT_CREATED_BLOCK_MAX_RETRY_MS);
+    }
+
+    throw new Error(
+        `New ${expectedType === 'h' ? 'card' : 'single-block'} block was not ready after ${AGENT_CREATED_BLOCK_READY_TIMEOUT_MS}ms` +
+        (lastObservedType ? ` (last observed: ${lastObservedType})` : '')
+    );
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizeAgentCardContent(options: {
