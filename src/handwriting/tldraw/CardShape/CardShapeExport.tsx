@@ -11,7 +11,7 @@ import { ICardShape } from './card-shape-types'
 import { settingdata } from '@/index'
 import { getDefaultColorTheme } from '../utils/color-theme'
 import { getShapeHostElement } from '../utils/getShapeHostElement'
-import { getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
+import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 
 function getCardContentSource(shape: ICardShape, isCollapsed: boolean): HTMLElement | null {
 	if (typeof document === 'undefined') return null
@@ -43,14 +43,15 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext): 
 	const clipId = `clip-${shape.id}`
 	const scopeId = `st-card-export-${shape.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
 
-	const source = getCardContentSource(shape, !!isCollapsed)
-	const serialized = source
+	const cachedSnapshot = getCachedSvgExportSnapshot(shape.id)
+	const source = cachedSnapshot === null ? getCardContentSource(shape, !!isCollapsed) : null
+	const serialized = cachedSnapshot ?? (source
 		? serializeElementForSvgExport(source, {
 			viewportWidth: contentWidth,
 			viewportHeight: contentHeight,
 			fontSize: isCollapsed ? undefined : fontSize,
 		})
-		: ''
+		: '')
 
 	const placeholder = (
 		<text

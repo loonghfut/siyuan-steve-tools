@@ -2,8 +2,12 @@
  * TLdraw UI Overrides
  * 工具注册和动作覆写
  */
-import type { TLUiOverrides } from '@tldraw/tldraw'
+import { copyAs, exportAs, type TLShapeId, type TLUiOverrides } from '@tldraw/tldraw'
+import { showMessage } from 'siyuan'
 import { selectAdjacentShape } from '../utils/selectAdjacentShape'
+import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
+import { createExportProgressOverlay, waitForPaint } from '../utils/export-progress'
+import { prepareSvgExportSnapshots } from '../utils/export-snapshot-preparer'
 
 export const uiOverrides: TLUiOverrides = {
     tools(editor, tools) {
@@ -59,6 +63,60 @@ export const uiOverrides: TLUiOverrides = {
     actions(editor, actions) {
         const nextActions: typeof actions = { ...actions }
         const nudgeActionIds = ['nudge-left', 'nudge-right', 'nudge-up', 'nudge-down'] as const
+        type ExportFormat = 'png' | 'svg'
+        type ExportMode = 'export' | 'copy'
+
+        const getSelectedOrCurrentPageIds = (): TLShapeId[] => {
+            const selectedIds = editor.getSelectedShapeIds()
+            return selectedIds.length > 0 ? selectedIds : Array.from(editor.getCurrentPageShapeIds())
+        }
+
+        const runPreparedImageExport = async (mode: ExportMode, format: ExportFormat, ids: TLShapeId[]) => {
+            if (ids.length === 0) return
+
+            const actionLabel = mode === 'copy' ? '复制图片' : '导出图片'
+            const overlay = createExportProgressOverlay(actionLabel)
+
+            try {
+                await prepareSvgExportSnapshots(editor, ids, {
+                    onProgress(progress) {
+                        overlay.update(progress.message, progress.current, progress.total)
+                    },
+                })
+
+                overlay.update(mode === 'copy' ? '正在写入剪贴板' : '正在生成图片', 1, 1)
+                await waitForPaint()
+
+                if (mode === 'copy') {
+                    await copyAs(editor, ids, { format })
+                } else {
+                    await exportAs(editor, ids, { format })
+                }
+            } catch (error) {
+                console.error('Image export failed', error)
+                showMessage('图片导出失败，请查看控制台日志')
+            } finally {
+                clearSvgExportSnapshotCache()
+                overlay.close()
+            }
+        }
+
+        const wrapExportAction = (
+            id: 'export-as-png' | 'export-as-svg' | 'export-all-as-png' | 'export-all-as-svg' | 'copy-as-png' | 'copy-as-svg',
+            mode: ExportMode,
+            format: ExportFormat,
+            all = false
+        ) => {
+            const action = nextActions[id]
+            if (!action) return
+            nextActions[id] = {
+                ...action,
+                async onSelect() {
+                    const ids = all ? Array.from(editor.getCurrentPageShapeIds()) : getSelectedOrCurrentPageIds()
+                    await runPreparedImageExport(mode, format, ids)
+                },
+            }
+        }
 
         nudgeActionIds.forEach((id) => {
             const action = nextActions[id]
@@ -114,6 +172,14 @@ export const uiOverrides: TLUiOverrides = {
                 editor.setEditingShape(shapes[0].id)
             },
         }
+
+        wrapExportAction('export-as-png', 'export', 'png')
+        wrapExportAction('export-as-svg', 'export', 'svg')
+        wrapExportAction('export-all-as-png', 'export', 'png', true)
+        wrapExportAction('export-all-as-svg', 'export', 'svg', true)
+        wrapExportAction('copy-as-png', 'copy', 'png')
+        wrapExportAction('copy-as-svg', 'copy', 'svg')
+
         return nextActions
     },
 }

@@ -1,5 +1,7 @@
 import { Editor, TLShapeId } from '@tldraw/tldraw'
 import { SlideShape } from './SlideShapeUtil'
+import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
+import { prepareSvgExportSnapshots } from '../utils/export-snapshot-preparer'
 
 export type SlideScreenshotFormat = 'png' | 'svg'
 
@@ -79,30 +81,35 @@ export async function captureSlideScreenshot(
 	let dataUrl = ''
 
 	if (idsToExport.length > 0) {
-		if (format === 'svg') {
-			const svgResult = await editor.getSvgString(idsToExport, {
-				bounds: exportBounds,
-				background,
-			})
-			if (!svgResult) {
-				return null
+		try {
+			await prepareSvgExportSnapshots(editor, idsToExport)
+			if (format === 'svg') {
+				const svgResult = await editor.getSvgString(idsToExport, {
+					bounds: exportBounds,
+					background,
+				})
+				if (!svgResult) {
+					return null
+				}
+				width = svgResult.width
+				height = svgResult.height
+				blob = new Blob([svgResult.svg], { type: 'image/svg+xml' })
+				dataUrl = await blobToDataUrl(blob)
+			} else {
+				const imageResult = await editor.toImage(idsToExport, {
+					format,
+					pixelRatio,
+					quality,
+					bounds: exportBounds,
+					background,
+				})
+				blob = imageResult.blob
+				width = imageResult.width
+				height = imageResult.height
+				dataUrl = await blobToDataUrl(blob)
 			}
-			width = svgResult.width
-			height = svgResult.height
-			blob = new Blob([svgResult.svg], { type: 'image/svg+xml' })
-			dataUrl = await blobToDataUrl(blob)
-		} else {
-			const imageResult = await editor.toImage(idsToExport, {
-				format,
-				pixelRatio,
-				quality,
-				bounds: exportBounds,
-				background,
-			})
-			blob = imageResult.blob
-			width = imageResult.width
-			height = imageResult.height
-			dataUrl = await blobToDataUrl(blob)
+		} finally {
+			clearSvgExportSnapshotCache()
 		}
 	} else {
 		const backgroundColor = background ? 'var(--b3-theme-background)' : 'transparent'

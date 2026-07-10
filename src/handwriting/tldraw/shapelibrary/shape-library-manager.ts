@@ -12,6 +12,8 @@ import {
     markExplicitCreatedBranchRelations,
     relayoutBranchesContainingShapes,
 } from "../BranchShape";
+import { clearSvgExportSnapshotCache } from "../utils/export-dom-snapshot";
+import { prepareSvgExportSnapshots } from "../utils/export-snapshot-preparer";
 
 /** 素材库项目接口 */
 export interface ShapeLibraryItem {
@@ -196,12 +198,20 @@ async function generateThumbnail(editor: Editor, shapeIds: TLShapeId[]): Promise
     try {
         console.debug('[素材库] 开始生成缩略图，形状数量:', shapeIds.length);
         
-        // 使用tldraw的toImage API生成图片
-        const imageResult = await editor.toImage(shapeIds, {
-            format: 'png',
-            background: true,
-            padding: 16,
-        });
+        const imageResult = await (async () => {
+            try {
+                await prepareSvgExportSnapshots(editor, shapeIds);
+
+                // 使用tldraw的toImage API生成图片
+                return await editor.toImage(shapeIds, {
+                    format: 'png',
+                    background: true,
+                    padding: 16,
+                });
+            } finally {
+                clearSvgExportSnapshotCache();
+            }
+        })();
 
         if (!imageResult || !imageResult.blob) {
             console.warn('[素材库] 生成缩略图失败：imageResult为空');

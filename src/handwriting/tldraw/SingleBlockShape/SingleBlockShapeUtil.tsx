@@ -36,7 +36,7 @@ import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, re
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import { getDefaultColorTheme } from '../utils/color-theme'
-import { getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
+import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -1583,8 +1583,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// Clamp inner dimensions to avoid negative <foreignObject> size during export
 		const innerW = Math.max(w - border * 2, 1)
 		const innerH = Math.max(h - border * 2, 1)
-		let serialized = ''
-		if (typeof document !== 'undefined') {
+		const cachedSnapshot = getCachedSvgExportSnapshot(shape.id)
+		let serialized = cachedSnapshot ?? ''
+		if (cachedSnapshot === null && typeof document !== 'undefined') {
 			const host = document.getElementById(shape.id) || document.querySelector<HTMLElement>(`[data-shape-id="${shape.id}"]`)
 			const content = host?.querySelector('[blockid]') as HTMLElement | null
 			if (content) {

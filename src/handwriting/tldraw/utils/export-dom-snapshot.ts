@@ -27,6 +27,20 @@ const MIME_MAP: Record<string, string> = {
 	ogg: 'video/ogg',
 }
 
+const svgExportSnapshotCache = new Map<string, string>()
+
+export function clearSvgExportSnapshotCache(): void {
+	svgExportSnapshotCache.clear()
+}
+
+export function setCachedSvgExportSnapshot(shapeId: string, html: string): void {
+	svgExportSnapshotCache.set(shapeId, html)
+}
+
+export function getCachedSvgExportSnapshot(shapeId: string): string | null {
+	return svgExportSnapshotCache.has(shapeId) ? svgExportSnapshotCache.get(shapeId)! : null
+}
+
 function binaryToBase64(binary: string): string {
 	let base64 = ''
 	const chunkSize = 0x6000
@@ -41,11 +55,11 @@ function binaryToBase64(binary: string): string {
 	return base64
 }
 
-export function assetToDataUrl(rawSrc: string | null): string {
-	if (!rawSrc) return ''
+function resolveLocalAsset(rawSrc: string | null): { trimmed: string; kernelPath: string; mime: string } | null {
+	if (!rawSrc) return null
 	const trimmed = rawSrc.trim()
 	if (!trimmed || /^data:/i.test(trimmed) || /^https?:/i.test(trimmed) || trimmed.startsWith('//')) {
-		return trimmed
+		return null
 	}
 
 	let logicalPath = trimmed.replace(/^\.\//, '')
@@ -55,24 +69,76 @@ export function assetToDataUrl(rawSrc: string | null): string {
 	if (logicalPath.startsWith('assets/')) kernelPath = `/data/${logicalPath}`
 	else if (logicalPath.startsWith('data/')) kernelPath = `/${logicalPath}`
 	else if (logicalPath.startsWith('/data/')) kernelPath = logicalPath
-	else return trimmed
+	else return null
+
+	const ext = (logicalPath.split('.').pop() || 'png').toLowerCase()
+	return {
+		trimmed,
+		kernelPath,
+		mime: MIME_MAP[ext] || 'application/octet-stream',
+	}
+}
+
+export function assetToDataUrl(rawSrc: string | null): string {
+	if (!rawSrc) return ''
+	const trimmed = rawSrc.trim()
+	if (!trimmed || /^data:/i.test(trimmed) || /^https?:/i.test(trimmed) || trimmed.startsWith('//')) {
+		return trimmed
+	}
+
+	const localAsset = resolveLocalAsset(trimmed)
+	if (!localAsset) return trimmed
 
 	try {
 		const xhr = new XMLHttpRequest()
 		xhr.open('POST', '/api/file/getFile', false)
 		xhr.overrideMimeType('text/plain; charset=x-user-defined')
 		xhr.setRequestHeader('Content-Type', 'application/json')
-		xhr.send(JSON.stringify({ path: kernelPath }))
+		xhr.send(JSON.stringify({ path: localAsset.kernelPath }))
 		if (xhr.status >= 200 && xhr.status < 300 && typeof xhr.responseText === 'string') {
 			const base64 = binaryToBase64(xhr.responseText)
-			const ext = (logicalPath.split('.').pop() || 'png').toLowerCase()
-			const mime = MIME_MAP[ext] || 'application/octet-stream'
-			return `data:${mime};base64,${base64}`
+			return `data:${localAsset.mime};base64,${base64}`
 		}
 	} catch (err) {
 		console.warn('Embedding asset failed', err)
 	}
 	return trimmed
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader()
+		reader.onload = () => resolve(reader.result as string)
+		reader.onerror = () => reject(reader.error ?? new Error('Failed to read asset blob'))
+		reader.readAsDataURL(blob)
+	})
+}
+
+export async function assetToDataUrlAsync(rawSrc: string | null): Promise<string> {
+	if (!rawSrc) return ''
+	const trimmed = rawSrc.trim()
+	if (!trimmed || /^data:/i.test(trimmed) || /^https?:/i.test(trimmed) || trimmed.startsWith('//')) {
+		return trimmed
+	}
+
+	const localAsset = resolveLocalAsset(trimmed)
+	if (!localAsset || typeof fetch !== 'function') return trimmed
+
+	try {
+		const response = await fetch('/api/file/getFile', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ path: localAsset.kernelPath }),
+		})
+		if (!response.ok) return trimmed
+
+		const responseBlob = await response.blob()
+		const blob = responseBlob.type ? responseBlob : responseBlob.slice(0, responseBlob.size, localAsset.mime)
+		return await blobToDataUrl(blob)
+	} catch (err) {
+		console.warn('Embedding asset failed', err)
+		return trimmed
+	}
 }
 
 function getElementsIncludingRoot<T extends Element>(root: Element, selector: string): T[] {
@@ -131,6 +197,24 @@ function setResolvedSrcset(element: Element): void {
 	else element.removeAttribute('srcset')
 }
 
+async function setResolvedSrcsetAsync(element: Element): Promise<void> {
+	const srcset = element.getAttribute('srcset')
+	if (!srcset) return
+	const resolvedSet = (
+		await Promise.all(
+			srcset.split(',').map(async (entry) => {
+				const [url, descriptor] = entry.trim().split(/\s+/, 2)
+				const resolved = await assetToDataUrlAsync(url)
+				return resolved ? (descriptor ? `${resolved} ${descriptor}` : resolved) : ''
+			})
+		)
+	)
+		.filter(Boolean)
+		.join(', ')
+	if (resolvedSet) element.setAttribute('srcset', resolvedSet)
+	else element.removeAttribute('srcset')
+}
+
 function processImages(container: Element): void {
 	getElementsIncludingRoot<HTMLImageElement>(container, 'img').forEach((img) => {
 		const embedded = assetToDataUrl(img.getAttribute('src'))
@@ -144,6 +228,23 @@ function processImages(container: Element): void {
 	})
 }
 
+async function processImagesAsync(container: Element): Promise<void> {
+	await Promise.all(
+		getElementsIncludingRoot<HTMLImageElement>(container, 'img').map(async (img) => {
+			const embedded = await assetToDataUrlAsync(img.getAttribute('src'))
+			if (embedded) img.setAttribute('src', embedded)
+			await setResolvedSrcsetAsync(img)
+		})
+	)
+	await Promise.all(
+		getElementsIncludingRoot<HTMLSourceElement>(container, 'source').map(async (source) => {
+			const embedded = await assetToDataUrlAsync(source.getAttribute('src'))
+			if (embedded) source.setAttribute('src', embedded)
+			await setResolvedSrcsetAsync(source)
+		})
+	)
+}
+
 function processVideos(container: Element): void {
 	getElementsIncludingRoot<HTMLVideoElement>(container, 'video').forEach((video) => {
 		const poster = video.getAttribute('poster')
@@ -154,6 +255,20 @@ function processVideos(container: Element): void {
 		replacement.alt = 'Video'
 		video.replaceWith(replacement)
 	})
+}
+
+async function processVideosAsync(container: Element): Promise<void> {
+	await Promise.all(
+		getElementsIncludingRoot<HTMLVideoElement>(container, 'video').map(async (video) => {
+			const poster = video.getAttribute('poster')
+			const replacement = document.createElement('img')
+			replacement.setAttribute('src', poster ? (await assetToDataUrlAsync(poster)) || poster : '')
+			replacement.style.cssText = video.getAttribute('style') || ''
+			replacement.style.objectFit = replacement.style.objectFit || 'cover'
+			replacement.alt = 'Video'
+			video.replaceWith(replacement)
+		})
+	)
 }
 
 function processCanvases(source: Element, clone: Element): void {
@@ -229,6 +344,50 @@ export function serializeElementForSvgExport(
 	removeRuntimeAttrs(clone)
 	processImages(clone)
 	processVideos(clone)
+	processCanvases(source, clone)
+	processIframes(clone)
+	processSvgUse(clone)
+	hideScrollbars(clone)
+
+	clone.style.width = `${scrollWidth}px`
+	clone.style.minWidth = `${scrollWidth}px`
+	clone.style.height = `${scrollHeight}px`
+	clone.style.minHeight = `${scrollHeight}px`
+	clone.style.overflow = 'visible'
+	clone.style.pointerEvents = 'none'
+	clone.style.boxSizing = 'border-box'
+	if (options.fontSize !== undefined) clone.style.fontSize = `${options.fontSize}px`
+
+	const transform = scrollLeft || scrollTop ? `transform:translate(${-scrollLeft}px, ${-scrollTop}px);` : ''
+	return `
+		<div style="width:${viewportWidth}px;height:${viewportHeight}px;overflow:hidden;position:relative;box-sizing:border-box;">
+			<div style="width:${scrollWidth}px;min-height:${scrollHeight}px;${transform}transform-origin:top left;position:absolute;left:0;top:0;">
+				${clone.outerHTML}
+			</div>
+		</div>
+	`
+}
+
+export async function serializeElementForSvgExportAsync(
+	source: HTMLElement,
+	options: {
+		viewportWidth: number
+		viewportHeight: number
+		fontSize?: number
+	}
+): Promise<string> {
+	const viewportWidth = Math.max(options.viewportWidth, 1)
+	const viewportHeight = Math.max(options.viewportHeight, 1)
+	const scrollLeft = source.scrollLeft || 0
+	const scrollTop = source.scrollTop || 0
+	const scrollWidth = Math.max(source.scrollWidth || 0, source.offsetWidth || 0, viewportWidth)
+	const scrollHeight = Math.max(source.scrollHeight || 0, source.offsetHeight || 0, viewportHeight)
+
+	const clone = source.cloneNode(true) as HTMLElement
+	inlineComputedStyles(source, clone)
+	removeRuntimeAttrs(clone)
+	await processImagesAsync(clone)
+	await processVideosAsync(clone)
 	processCanvases(source, clone)
 	processIframes(clone)
 	processSvgUse(clone)
