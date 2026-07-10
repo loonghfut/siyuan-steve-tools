@@ -124,6 +124,83 @@ export type AgentShapeSummary = {
 	bindings?: unknown[]
 }
 
+export type AgentVisualContextOptions = {
+	includeSelectionDetails?: boolean
+	includeVisibleShapeDetails?: boolean
+	includeOffscreenClusters?: boolean
+	includeLinkedBlockContent?: boolean
+	includeSvg?: boolean
+	shapeLimit?: number
+	clusterLimit?: number
+}
+
+export type AgentVisualClusterSummary = {
+	id: string
+	location: 'viewport' | 'offscreen'
+	direction?: string
+	shapeCount: number
+	selectedShapeCount: number
+	bounds: {
+		x: number
+		y: number
+		w: number
+		h: number
+	}
+	shapeTypeCounts: Record<string, number>
+	sampleShapeIds: string[]
+	sampleShapes?: AgentShapeSummary[]
+}
+
+export type AgentVisualContext = {
+	whiteboardId: string
+	title: string
+	generatedAt: string
+	viewport?: {
+		x: number
+		y: number
+		w: number
+		h: number
+	}
+	selection: {
+		selectedShapeIds: string[]
+		selectedShapeCount: number
+		returnedShapeCount: number
+		truncated: boolean
+		bounds?: {
+			x: number
+			y: number
+			w: number
+			h: number
+		}
+		shapes?: AgentShapeSummary[]
+	}
+	visible: {
+		shapeCount: number
+		returnedShapeCount: number
+		truncated: boolean
+		shapeIds: string[]
+		shapes?: AgentShapeSummary[]
+	}
+	offscreen: {
+		shapeCount: number
+		clusterCount: number
+		truncated: boolean
+		clusters: AgentVisualClusterSummary[]
+	}
+	scene: {
+		totalShapeCount: number
+		visibleShapeCount: number
+		offscreenShapeCount: number
+		selectedShapeCount: number
+		dominantShapeTypes: Record<string, number>
+	}
+	svg?: {
+		shapeCount: number
+		truncated: boolean
+		svg: string
+	}
+}
+
 export type AgentLinkedBlockContent = {
 	id: string
 	type?: string

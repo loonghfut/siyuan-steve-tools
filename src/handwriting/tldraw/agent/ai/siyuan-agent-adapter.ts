@@ -58,7 +58,10 @@ function createSiyuanAgentHandler(tool: AgentToolDefinition) {
             return { error: `STtools tldraw agent action ${tool.name} is disabled in plugin settings.` };
         }
         const cleanedArgs = stripFrontendActionArgs(args);
+        const callId = createAgentToolCallId(tool.name);
+        const startedAt = Date.now();
         console.log('[tldraw agent action] call', {
+            callId,
             name: tool.name,
             args: cleanedArgs,
             rawArgs: args,
@@ -67,13 +70,18 @@ function createSiyuanAgentHandler(tool: AgentToolDefinition) {
         try {
             const result = await tool.handler(cleanedArgs, app);
             console.log('[tldraw agent action] response', {
+                callId,
                 name: tool.name,
-                result,
+                durationMs: Date.now() - startedAt,
+                status: result.error ? 'error' : 'ok',
+                result: summarizeAgentToolResult(result),
             });
             return result;
         } catch (error) {
             console.log('[tldraw agent action] error', {
+                callId,
                 name: tool.name,
+                durationMs: Date.now() - startedAt,
                 error,
             });
             throw error;
@@ -92,4 +100,28 @@ function stripFrontendActionArgs(args: Record<string, unknown>): Record<string, 
     const cleaned = { ...args };
     delete cleaned.action;
     return cleaned;
+}
+
+function createAgentToolCallId(name: string): string {
+    return `${name}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function summarizeAgentToolResult(result: Awaited<AgentToolResult>) {
+    if (result.error) return { error: result.error };
+    if (!result.result) return { empty: true };
+
+    try {
+        const parsed = JSON.parse(result.result) as Record<string, unknown>;
+        const keys = Object.keys(parsed);
+        return {
+            keys,
+            ok: parsed.ok,
+            whiteboardId: parsed.whiteboardId,
+            errorCount: Array.isArray(parsed.errors) ? parsed.errors.length : 0,
+        };
+    } catch {
+        return {
+            resultLength: result.result.length,
+        };
+    }
 }

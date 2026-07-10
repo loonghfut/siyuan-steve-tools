@@ -11,6 +11,7 @@
 - [system 类（系统/上下文）](#system-类系统上下文)
   - [tldraw_get_agent_capabilities](#tldraw_get_agent_capabilities)
   - [tldraw_get_interaction_context](#tldraw_get_interaction_context)
+  - [tldraw_get_visual_context](#tldraw_get_visual_context)
 - [shape 类（形状操作）](#shape-类形状操作)
   - [tldraw_shape_command](#tldraw_shape_command)
   - [tldraw_apply_plan](#tldraw_apply_plan)
@@ -91,13 +92,36 @@
   - `focusedWhiteboardId`(string|null)、`hasFocusedWhiteboard`、`focusedWhiteboard`(对象|null)
   - `anyWhiteboardHasSelection`、`openWhiteboardCount`
   - `openWhiteboards`: 数组，每项：
-    - `id`, `title`, `isFocused`, `focusedAt`, `isOpen`, `hasSelection`
+    - `id`, `title`, `isFocused`, `focusedAt`, `isOpen`, `visualContextAvailable`, `hasSelection`
     - `selectedShapeIds`(仅 `includeSelectedShapeIds=true` 时存在)
     - `selectedShapeCount`
     - `selectedShapeDetails`(仅 `includeSelectedShapeDetails=true` 且有选中时存在，结构同 [tldraw_get_shape_details](#tldraw_get_shape_details) 的 `AgentShapeSummary`)
     - `shapeCount`, `shapeTypeCounts`
-  - `nextStepHint`(给 AI 的下一步提示)
+  - `nextStepHint`(给 AI 的下一步提示；复杂空间推理时会提示继续调用 `tldraw_get_visual_context`)
 - **错误**: 全局禁用 / 未知参数 / 内部抛错。
+
+### tldraw_get_visual_context
+
+- **文件**: [./system/get-visual-context.ts](./system/get-visual-context.ts)
+- **功能**: 读取更贴近官方 Agent starter kit 的视觉上下文，组合当前视口、结构化形状数据、离屏簇和可选 SVG 预览。
+- **成功返回**:
+  - `whiteboardId`, `title`, `generatedAt`
+  - `viewport?`: `{x,y,w,h}`
+  - `selection`: `{selectedShapeIds, selectedShapeCount, returnedShapeCount, truncated, bounds?, shapes?}`
+  - `visible`: `{shapeCount, returnedShapeCount, truncated, shapeIds, shapes?}`
+  - `offscreen`: `{shapeCount, clusterCount, truncated, clusters}`
+    - `clusters[]`: `{id, location, direction?, shapeCount, selectedShapeCount, bounds, shapeTypeCounts, sampleShapeIds, sampleShapes?}`
+  - `scene`: `{totalShapeCount, visibleShapeCount, offscreenShapeCount, selectedShapeCount, dominantShapeTypes}`
+  - `svg?`: `{shapeCount, truncated, svg}`（仅 `includeSvg=true`）
+- **默认参数**:
+  - `includeSelectionDetails=true`
+  - `includeVisibleShapeDetails=true`
+  - `includeOffscreenClusters=true`
+  - `includeLinkedBlockContent=true`
+  - `includeSvg=false`
+  - `shapeLimit=12`
+  - `clusterLimit=6`
+- **错误**: 无聚焦白板 / 白板未打开 / 未知参数 / 内部抛错。
 
 ---
 

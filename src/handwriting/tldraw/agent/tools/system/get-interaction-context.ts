@@ -5,7 +5,7 @@ import { disabledResult, jsonResult, stringifyError, type AgentActionDefinition 
 export function createGetInteractionContextAction(): AgentActionDefinition {
     return {
         name: 'tldraw_get_interaction_context',
-        description: 'Read compact current STtools tldraw context: focusedWhiteboardId, open whiteboards, selection state, and selectedShapeCount. Use this when you need to inspect which board or shapes are selected. For simple shape reads/edits, tldraw_shape_command can omit whiteboardId and use the focused whiteboard automatically. Optional args: includeSelectedShapeIds boolean default false, includeSelectedShapeDetails boolean default false, selectedShapeLimit number default 5. Selected card/single-block details include linked SiYuan block content.',
+        description: 'Read compact current STtools tldraw context: focusedWhiteboardId, open whiteboards, selection state, and selectedShapeCount. Use this to route the next action to the right whiteboard. For deeper spatial reasoning, follow with tldraw_get_visual_context. For simple shape reads/edits, tldraw_shape_command can omit whiteboardId and use the focused whiteboard automatically. Optional args: includeSelectedShapeIds boolean default false, includeSelectedShapeDetails boolean default false, selectedShapeLimit number default 5. Selected card/single-block details include linked SiYuan block content.',
         handler: async (args) => {
             const disabled = disabledResult()
             if (disabled) return disabled

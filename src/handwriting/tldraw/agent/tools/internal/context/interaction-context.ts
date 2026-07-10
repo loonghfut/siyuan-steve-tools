@@ -35,6 +35,7 @@ export async function getAgentInteractionContext(options: AgentInteractionContex
             isFocused: id === focusedWhiteboardId,
             focusedAt: getInstanceFocusedAt(id) || null,
             isOpen: Boolean(instance),
+            visualContextAvailable: Boolean(instance?.getAgentVisualContext),
             hasSelection: selectedShapeIds.length > 0,
             selectedShapeIds: options.includeSelectedShapeIds === true ? selectedShapeIds : undefined,
             selectedShapeCount: selectedShapeIds.length,
@@ -54,7 +55,7 @@ export async function getAgentInteractionContext(options: AgentInteractionContex
         openWhiteboardCount: openWhiteboards.length,
         openWhiteboards,
         nextStepHint: focusedWhiteboard
-            ? 'Use focusedWhiteboardId as whiteboardId unless the user explicitly requested another whiteboard.'
+            ? 'Use focusedWhiteboardId as whiteboardId unless the user explicitly requested another whiteboard. For complex spatial reasoning, call tldraw_get_visual_context on the focused whiteboard next.'
             : 'No focused whiteboard is known; ask the user to focus/open a whiteboard or call tldraw_open_whiteboard.',
     }
 }

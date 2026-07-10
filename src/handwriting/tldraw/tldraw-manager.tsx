@@ -49,7 +49,7 @@ import { setInteracting } from './utils/idle-scheduler';
 import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import * as agentOps from './agent/tools/internal/operations/manager-ops';
-import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentBoardEditRequest, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeCommandRequest, AgentShapeUpdatePatch } from './agent/tools/internal/core/types';
+import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentBoardEditRequest, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeCommandRequest, AgentShapeUpdatePatch, AgentVisualContextOptions } from './agent/tools/internal/core/types';
 import type { AgentDocOutlineBoardOptions } from './agent/tools/internal/documents/doc-to-board';
 import type { AgentPlanApplyOptions } from './agent/tools/internal/planning/plan-runner';
 import { InteractionHintOverlayUtil } from './ui-overrides/overlay-utils/InteractionHintOverlayUtil';
@@ -1534,6 +1534,10 @@ export class TldrawManager {
 
     public getAgentSummary(options?: { includeShapeSamples?: boolean; sampleLimit?: number }) {
         return agentOps.getAgentSummary(this.getAgentRuntime(), options);
+    }
+
+    public getAgentVisualContext(options?: AgentVisualContextOptions) {
+        return agentOps.getAgentVisualContext(this.getAgentRuntime(), options);
     }
 
     public async createAgentShape(options: AgentCreateShapeArgs) {

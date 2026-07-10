@@ -6,6 +6,7 @@ import { createDeleteWhiteboardFileAction } from './whiteboards/delete-whiteboar
 import { createDeleteShapesAction } from './shapes/delete-shapes';
 import { createGetAgentCapabilitiesAction } from './system/get-agent-capabilities';
 import { createGetInteractionContextAction } from './system/get-interaction-context';
+import { createGetVisualContextAction } from './system/get-visual-context';
 import { createGetShapeDetailsAction } from './shapes/get-shape-details';
 import { createGetSnapshotSummaryAction } from './whiteboards/get-snapshot-summary';
 import { createGetSummaryAction } from './whiteboards/get-summary';
@@ -33,6 +34,7 @@ export function getTldrawAgentTools(plugin: Plugin): AgentToolDefinition[] {
     const actionDefinitions = [
         createGetAgentCapabilitiesAction(),
         createGetInteractionContextAction(),
+        createGetVisualContextAction(),
         createShapeCommandAction(),
         createApplyPlanAction(),
         createDeleteShapesAction(),
@@ -68,6 +70,7 @@ export const getTldrawAgentActions = getTldrawAgentTools;
 function withInteractionContextRequirement(action: AgentToolDefinition): AgentToolDefinition {
     if (
         action.name === 'tldraw_get_interaction_context' ||
+        action.name === 'tldraw_get_visual_context' ||
         action.name === 'tldraw_get_agent_capabilities' ||
         action.name === 'tldraw_shape_command'
     ) {
@@ -76,6 +79,6 @@ function withInteractionContextRequirement(action: AgentToolDefinition): AgentTo
 
     return {
         ...action,
-        description: `${action.description} Before calling this action, call tldraw_get_interaction_context to sense the focused whiteboard and current selection; use focusedWhiteboardId as whiteboardId unless the user explicitly requested another target or is creating a new whiteboard.`,
+        description: `${action.description} Before calling this action, call tldraw_get_interaction_context to sense the focused whiteboard and current selection; use focusedWhiteboardId as whiteboardId unless the user explicitly requested another target or is creating a new whiteboard. When the edit depends on visual layout, also call tldraw_get_visual_context first.`,
     };
 }

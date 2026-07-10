@@ -25,6 +25,13 @@ export const TLDRAW_AGENT_ACTIONS_META: TldrawAgentActionMeta[] = [
         description: '读取当前聚焦白板、打开的白板和选择状态。',
     },
     {
+        name: 'tldraw_get_visual_context',
+        title: '读取视觉上下文',
+        category: 'system',
+        risk: 'read',
+        description: '读取当前视口、可见形状、离屏簇和可选 SVG 视觉上下文。',
+    },
+    {
         name: 'tldraw_shape_command',
         title: '语义形状命令',
         category: 'shape',

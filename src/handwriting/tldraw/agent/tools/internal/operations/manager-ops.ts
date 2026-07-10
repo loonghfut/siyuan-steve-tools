@@ -61,6 +61,9 @@ import type {
     AgentShapeCommandRequest,
     AgentShapeCommandResult,
     AgentShapeSummary,
+    AgentVisualClusterSummary,
+    AgentVisualContext,
+    AgentVisualContextOptions,
     AgentSingleBlockCreateArgs,
     AgentShapeUpdatePatch,
 } from '../core/types';
@@ -113,6 +116,10 @@ type AgentBoardEditLayoutResult = {
     updatedShapeIds: string[];
     createdShapeIds: string[];
     alias?: string;
+};
+
+type InternalAgentVisualClusterSummary = AgentVisualClusterSummary & {
+    _sampleShapes: TLShape[];
 };
 
 const AGENT_ENTITY_CREATE_SHAPES = new Set([
@@ -214,6 +221,130 @@ export function getAgentSummary(runtime: AgentManagerRuntime, options: AgentSumm
     }
 
     return summary;
+}
+
+export async function getAgentVisualContext(
+    runtime: AgentManagerRuntime,
+    options: AgentVisualContextOptions = {}
+): Promise<AgentVisualContext> {
+    const editor = requireEditor(runtime);
+    const allShapes = editor.getCurrentPageShapes();
+    const selectedShapeIds = editor.getSelectedShapeIds().map(String);
+    const selectedIdSet = new Set(selectedShapeIds);
+    const shapeLimit = finiteNumberInRange(options.shapeLimit, 12, 1, 50);
+    const clusterLimit = finiteNumberInRange(options.clusterLimit, 6, 0, 20);
+    const viewport = getAgentViewportBounds(editor);
+    const boundsById = new Map<string, AgentShapeBounds>();
+
+    for (const shape of allShapes) {
+        boundsById.set(String(shape.id), getAgentShapeBounds(editor, shape));
+    }
+
+    const selectedShapes = selectedShapeIds
+        .map((shapeId) => editor.getShape(shapeId as TLShapeId) as TLShape | undefined)
+        .filter(Boolean) as TLShape[];
+    const selectedShapesLimited = selectedShapes.slice(0, shapeLimit);
+
+    const visibleShapes = viewport
+        ? allShapes.filter((shape) => agentBoundsIntersect(boundsById.get(String(shape.id)) || getAgentShapeBounds(editor, shape), viewport))
+        : allShapes.slice();
+
+    const visibleShapesSorted = sortAgentContextShapes(visibleShapes, boundsById, selectedIdSet, viewport);
+    const visibleShapesLimited = visibleShapesSorted.slice(0, shapeLimit);
+    const visibleShapeIds = visibleShapesLimited.map((shape) => String(shape.id));
+    const offscreenShapes = viewport
+        ? allShapes.filter((shape) => !agentBoundsIntersect(boundsById.get(String(shape.id)) || getAgentShapeBounds(editor, shape), viewport))
+        : [];
+    const offscreenClusters = options.includeOffscreenClusters === false
+        ? []
+        : buildAgentSpatialClusters(editor, offscreenShapes, boundsById, selectedIdSet, viewport, clusterLimit, options.includeVisibleShapeDetails !== false);
+    const shapesForBlockContent = new Map<string, TLShape>();
+
+    if (options.includeSelectionDetails !== false) {
+        for (const shape of selectedShapesLimited) {
+            shapesForBlockContent.set(String(shape.id), shape);
+        }
+    }
+    if (options.includeVisibleShapeDetails !== false) {
+        for (const shape of visibleShapesLimited) {
+            shapesForBlockContent.set(String(shape.id), shape);
+        }
+    }
+    if (options.includeOffscreenClusters !== false) {
+        for (const cluster of offscreenClusters) {
+            for (const shape of cluster._sampleShapes) {
+                shapesForBlockContent.set(String(shape.id), shape);
+            }
+        }
+    }
+
+    const blockContentById = options.includeLinkedBlockContent === false
+        ? new Map<string, AgentLinkedBlockContent>()
+        : await loadAgentLinkedBlockContent(Array.from(shapesForBlockContent.values()));
+
+    const selectionBounds = combineAgentBounds(selectedShapes.map((shape) => boundsById.get(String(shape.id)) || getAgentShapeBounds(editor, shape)));
+    const selectionShapeSummaries = options.includeSelectionDetails === false
+        ? undefined
+        : selectedShapesLimited.map((shape) => summarizeAgentShape(
+            editor,
+            shape,
+            false,
+            getShapeLinkedBlockContent(shape, blockContentById),
+        ));
+    const visibleShapeSummaries = options.includeVisibleShapeDetails === false
+        ? undefined
+        : visibleShapesLimited.map((shape) => summarizeAgentShape(
+            editor,
+            shape,
+            false,
+            getShapeLinkedBlockContent(shape, blockContentById),
+        ));
+
+    const sceneShapeTypeCounts = allShapes.reduce<Record<string, number>>((acc, shape) => {
+        const key = String(shape.type || 'unknown');
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+
+    const svg = options.includeSvg === true
+        ? await buildAgentVisualContextSvg(editor, visibleShapesLimited.length ? visibleShapesLimited : selectedShapes.length ? selectedShapes : allShapes)
+        : undefined;
+
+    return {
+        whiteboardId: runtime.id,
+        title: runtime.title,
+        generatedAt: new Date().toISOString(),
+        viewport: viewport || undefined,
+        selection: {
+            selectedShapeIds,
+            selectedShapeCount: selectedShapeIds.length,
+            returnedShapeCount: selectedShapesLimited.length,
+            truncated: selectedShapes.length > selectedShapesLimited.length,
+            bounds: selectionBounds || undefined,
+            shapes: selectionShapeSummaries,
+        },
+        visible: {
+            shapeCount: visibleShapes.length,
+            returnedShapeCount: visibleShapesLimited.length,
+            truncated: visibleShapes.length > visibleShapesLimited.length,
+            shapeIds: visibleShapeIds,
+            shapes: visibleShapeSummaries,
+        },
+        offscreen: {
+            shapeCount: offscreenShapes.length,
+            clusterCount: offscreenClusters.length,
+            truncated: clusterLimit > 0 && offscreenShapes.length > 0 && offscreenClusters.length >= clusterLimit,
+            clusters: offscreenClusters.map(({ _sampleShapes: _ignored, ...cluster }) => cluster),
+        },
+        scene: {
+            totalShapeCount: allShapes.length,
+            visibleShapeCount: visibleShapes.length,
+            offscreenShapeCount: offscreenShapes.length,
+            selectedShapeCount: selectedShapeIds.length,
+            dominantShapeTypes: summarizeAgentTypeCounts(sceneShapeTypeCounts, 8),
+        },
+        svg,
+    };
 }
 
 function getAgentResultSummary(runtime: AgentManagerRuntime, resultMode?: AgentResultMode) {
@@ -2275,6 +2406,222 @@ export async function getAgentShapeDetails(runtime: AgentManagerRuntime, options
         totalMatched: shapes.length,
         truncated: shapes.length > limit,
     };
+}
+
+function getAgentViewportBounds(editor: Editor): AgentShapeBounds | null {
+    try {
+        const viewport = (editor as any).getViewportPageBounds?.();
+        if (!viewport) return null;
+        return {
+            x: Number(viewport.x || 0),
+            y: Number(viewport.y || 0),
+            w: Number(viewport.w || 0),
+            h: Number(viewport.h || 0),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function sortAgentContextShapes(
+    shapes: TLShape[],
+    boundsById: Map<string, AgentShapeBounds>,
+    selectedIdSet: Set<string>,
+    viewport: AgentShapeBounds | null,
+): TLShape[] {
+    const viewportCenter = viewport ? {
+        x: viewport.x + viewport.w / 2,
+        y: viewport.y + viewport.h / 2,
+    } : null;
+
+    return shapes.slice().sort((left, right) => {
+        const leftId = String(left.id);
+        const rightId = String(right.id);
+        const leftSelected = selectedIdSet.has(leftId) ? 1 : 0;
+        const rightSelected = selectedIdSet.has(rightId) ? 1 : 0;
+        if (leftSelected !== rightSelected) return rightSelected - leftSelected;
+
+        const leftBounds = boundsById.get(leftId) || getFallbackShapeBounds(left);
+        const rightBounds = boundsById.get(rightId) || getFallbackShapeBounds(right);
+        const leftArea = leftBounds.w * leftBounds.h;
+        const rightArea = rightBounds.w * rightBounds.h;
+        const leftDistance = viewportCenter ? getAgentBoundsDistanceSquared(leftBounds, viewportCenter) : 0;
+        const rightDistance = viewportCenter ? getAgentBoundsDistanceSquared(rightBounds, viewportCenter) : 0;
+        if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+        if (leftArea !== rightArea) return rightArea - leftArea;
+        return leftId.localeCompare(rightId);
+    });
+}
+
+function buildAgentSpatialClusters(
+    editor: Editor,
+    shapes: TLShape[],
+    boundsById: Map<string, AgentShapeBounds>,
+    selectedIdSet: Set<string>,
+    viewport: AgentShapeBounds | null,
+    clusterLimit: number,
+    includeSampleShapes: boolean,
+): InternalAgentVisualClusterSummary[] {
+    if (!shapes.length || clusterLimit <= 0) return [];
+
+    const clusters: Array<{ shapes: TLShape[]; bounds: AgentShapeBounds }> = [];
+    const unvisited = new Set(shapes.map((shape) => String(shape.id)));
+
+    while (unvisited.size) {
+        const firstId = Array.from(unvisited)[0];
+        const firstShape = shapes.find((shape) => String(shape.id) === firstId);
+        if (!firstShape) {
+            unvisited.delete(firstId);
+            continue;
+        }
+        unvisited.delete(firstId);
+
+        const clusterShapes: TLShape[] = [firstShape];
+        let clusterBounds = boundsById.get(firstId) || getFallbackShapeBounds(firstShape);
+        let didGrow = true;
+
+        while (didGrow) {
+            didGrow = false;
+            for (const shape of shapes) {
+                const shapeId = String(shape.id);
+                if (!unvisited.has(shapeId)) continue;
+                const candidateBounds = boundsById.get(shapeId) || getFallbackShapeBounds(shape);
+                if (!agentBoundsClose(clusterBounds, candidateBounds, 220)) continue;
+                clusterShapes.push(shape);
+                clusterBounds = combineAgentBounds([clusterBounds, candidateBounds]) || clusterBounds;
+                unvisited.delete(shapeId);
+                didGrow = true;
+            }
+        }
+
+        clusters.push({ shapes: clusterShapes, bounds: clusterBounds });
+    }
+
+    return clusters
+        .sort((left, right) => {
+            if (left.shapes.length !== right.shapes.length) return right.shapes.length - left.shapes.length;
+            return left.bounds.x - right.bounds.x;
+        })
+        .slice(0, clusterLimit)
+        .map((cluster, index) => {
+            const sampleShapes = sortAgentContextShapes(cluster.shapes, boundsById, selectedIdSet, viewport).slice(0, 3);
+            const typeCounts = cluster.shapes.reduce<Record<string, number>>((acc, shape) => {
+                const key = String(shape.type || 'unknown');
+                acc[key] = (acc[key] || 0) + 1;
+                return acc;
+            }, {});
+
+            return {
+                id: `cluster-${index + 1}`,
+                location: viewport && agentBoundsIntersect(cluster.bounds, viewport) ? 'viewport' : 'offscreen',
+                direction: viewport ? describeAgentBoundsDirection(cluster.bounds, viewport) : undefined,
+                shapeCount: cluster.shapes.length,
+                selectedShapeCount: cluster.shapes.filter((shape) => selectedIdSet.has(String(shape.id))).length,
+                bounds: cluster.bounds,
+                shapeTypeCounts: summarizeAgentTypeCounts(typeCounts, 6),
+                sampleShapeIds: sampleShapes.map((shape) => String(shape.id)),
+                sampleShapes: includeSampleShapes
+                    ? sampleShapes.map((shape) => summarizeAgentShape(editor, shape))
+                    : undefined,
+                _sampleShapes: sampleShapes,
+            };
+        });
+}
+
+function combineAgentBounds(boundsList: Array<AgentShapeBounds | null | undefined>): AgentShapeBounds | null {
+    const validBounds = boundsList.filter(Boolean) as AgentShapeBounds[];
+    if (!validBounds.length) return null;
+
+    let minX = validBounds[0].x;
+    let minY = validBounds[0].y;
+    let maxX = validBounds[0].x + validBounds[0].w;
+    let maxY = validBounds[0].y + validBounds[0].h;
+
+    for (const bounds of validBounds.slice(1)) {
+        minX = Math.min(minX, bounds.x);
+        minY = Math.min(minY, bounds.y);
+        maxX = Math.max(maxX, bounds.x + bounds.w);
+        maxY = Math.max(maxY, bounds.y + bounds.h);
+    }
+
+    return {
+        x: minX,
+        y: minY,
+        w: Math.max(0, maxX - minX),
+        h: Math.max(0, maxY - minY),
+    };
+}
+
+function agentBoundsIntersect(left: AgentShapeBounds, right: AgentShapeBounds): boolean {
+    return !(
+        left.x + left.w < right.x ||
+        right.x + right.w < left.x ||
+        left.y + left.h < right.y ||
+        right.y + right.h < left.y
+    );
+}
+
+function agentBoundsClose(left: AgentShapeBounds, right: AgentShapeBounds, padding: number): boolean {
+    const expanded = {
+        x: left.x - padding,
+        y: left.y - padding,
+        w: left.w + padding * 2,
+        h: left.h + padding * 2,
+    };
+    return agentBoundsIntersect(expanded, right);
+}
+
+function getAgentBoundsDistanceSquared(bounds: AgentShapeBounds, point: { x: number; y: number }) {
+    const centerX = bounds.x + bounds.w / 2;
+    const centerY = bounds.y + bounds.h / 2;
+    const dx = centerX - point.x;
+    const dy = centerY - point.y;
+    return dx * dx + dy * dy;
+}
+
+function describeAgentBoundsDirection(bounds: AgentShapeBounds, viewport: AgentShapeBounds): string {
+    const centerX = bounds.x + bounds.w / 2;
+    const centerY = bounds.y + bounds.h / 2;
+    const viewportCenterX = viewport.x + viewport.w / 2;
+    const viewportCenterY = viewport.y + viewport.h / 2;
+    const horizontal = centerX < viewport.x ? 'left' : centerX > viewport.x + viewport.w ? 'right' : '';
+    const vertical = centerY < viewport.y ? 'above' : centerY > viewport.y + viewport.h ? 'below' : '';
+
+    if (horizontal && vertical) return `${vertical}-${horizontal}`;
+    if (horizontal) return horizontal;
+    if (vertical) return vertical;
+
+    if (centerX < viewportCenterX) return 'left';
+    if (centerX > viewportCenterX) return 'right';
+    if (centerY < viewportCenterY) return 'above';
+    if (centerY > viewportCenterY) return 'below';
+    return 'overlapping';
+}
+
+function summarizeAgentTypeCounts(counts: Record<string, number>, limit: number): Record<string, number> {
+    return Object.fromEntries(Object.entries(counts)
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, limit));
+}
+
+async function buildAgentVisualContextSvg(editor: Editor, shapes: TLShape[]) {
+    try {
+        const svgResult = await (editor as any).getSvgString?.(shapes, { background: true });
+        if (!svgResult?.svg) return undefined;
+        const maxLength = 120000;
+        const svg = String(svgResult.svg);
+        return {
+            shapeCount: shapes.length,
+            truncated: svg.length > maxLength,
+            svg: svg.length > maxLength ? `${svg.slice(0, maxLength)}...` : svg,
+        };
+    } catch (error) {
+        return {
+            shapeCount: shapes.length,
+            truncated: true,
+            svg: `<!-- failed to export svg: ${stringifyAgentError(error)} -->`,
+        };
+    }
 }
 
 export function createAgentBasicShape(runtime: AgentManagerRuntime, options: AgentBasicShapeCreateArgs) {

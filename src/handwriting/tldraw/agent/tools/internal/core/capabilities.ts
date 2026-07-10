@@ -1,9 +1,10 @@
 ﻿export function getTldrawAgentCapabilities() {
     return {
-        version: 2,
+        version: 3,
         enabled: true,
         agentPrompt: [
             'For whiteboard shape work, call tldraw_shape_command. It can use the focused whiteboard and current selection automatically.',
+            'For complex canvas understanding, call tldraw_get_visual_context after tldraw_get_interaction_context. It provides viewport bounds, visible shapes, offscreen clusters, and optional SVG export so you can reason about spatial layout before editing.',
             'When calling tldraw_shape_command through the frontend plugin wrapper, pass intent, target, patch, node, nodes, from, and to as direct named arguments even if the visible generic schema only lists action/id/query.',
             'Do not encode the whole tldraw_shape_command payload into id or query. id is only a whiteboardId fallback; omit it when the focused whiteboard is already open.',
             'To answer "what is the selected card content?", call tldraw_shape_command with {intent:"readSelectedContent"}; do not fetch shape ids first.',
@@ -31,6 +32,7 @@
         read: [
             'tldraw_shape_command',
             'tldraw_get_interaction_context',
+            'tldraw_get_visual_context',
             'tldraw_list_whiteboards',
             'tldraw_get_summary',
             'tldraw_get_shape_details',
@@ -91,6 +93,10 @@
             inspect: {
                 action: 'tldraw_shape_command',
                 guidance: 'Use tldraw_shape_command inspectEditable/readSelectedContent for selected custom-shape work. Use tldraw_get_shape_details only when exact bounds, bindings, or many raw shape details are needed.',
+            },
+            visualContext: {
+                action: 'tldraw_get_visual_context',
+                guidance: 'Use this before non-trivial layouts or edits that depend on viewport composition. It combines structured shape summaries with viewport and offscreen cluster context, similar to the tldraw agent starter kit visual context system.',
             },
         },
         customShapeGuide: [
@@ -197,6 +203,7 @@
             'Most write actions require the whiteboard to be open so the user can observe changes.',
             'tldraw_shape_command only changes whitelisted semantic fields and never performs raw props mutation, JS script writes, or arbitrary data writes.',
             'Default results do not include raw snapshots, full props, or shape samples.',
+            'tldraw_get_visual_context returns a bounded scene summary and optional SVG preview rather than raw canvas snapshots.',
             'Shape deletion uses tldraw_delete_shapes (not tldraw_shape_command). The agent may execute ordinary shape deletion autonomously with confirm:true; a backup is always created before confirmed deletion. Linked SiYuan block shapes require explicit user intent and are blocked unless allowLinkedBlockShapes:true and confirmLinkedBlockShapes:true are both passed.',
             'JS shape script execution, arbitrary raw store mutation, backup restore/import, and direct SiYuan block content edits remain blocked.',
         ],
