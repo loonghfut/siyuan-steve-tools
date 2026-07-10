@@ -5,7 +5,6 @@ import {
 	ShapeUtil,
 	SvgExportContext,
 	TLResizeInfo,
-	TLShapeUtilCanBindOpts,
 	resizeBox,
 } from '@tldraw/tldraw'
 import { cardShapeMigrations } from './card-shape-migrations'
@@ -32,7 +31,6 @@ import {
 	updateBranchAttachmentAfterDrag,
 	useBranchInteractionHint,
 } from '../BranchShape'
-import { canBindBranchToTarget } from '../BranchShape/branch-binding-policy'
 
 let isCreatingBlock = false;
 // 仅用于并发创建控制，不再缓存最近创建的块ID
@@ -206,9 +204,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	}
 	override canScroll(_shape: ICardShape) {
 		return true
-	}
-	override canBind(opts: TLShapeUtilCanBindOpts) {
-		return canBindBranchToTarget(opts)
 	}
 	// [4]
 	override onBeforeUpdate(prev: ICardShape, next: ICardShape) {
@@ -1464,7 +1459,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					display: 'flex',
 					flexDirection: 'column',
 					backgroundColor: theme[shape.props.color].semi,
-					color: theme[shape.props.color].solid,
+					// color: theme[shape.props.color].solid,
 					// 只有在非编辑状态时才禁用指针事件
 					position: 'relative',
 					isolation: 'isolate',

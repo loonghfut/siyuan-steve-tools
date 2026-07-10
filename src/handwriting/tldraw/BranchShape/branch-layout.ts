@@ -258,6 +258,8 @@ function isBranchRootContentShape(shape: TLShape | undefined): boolean {
 function getBranchRootContent(editor: Editor, branch: IBranchShape) {
 	const rootShapeId = branch.props.rootShapeId
 	if (!rootShapeId) return null
+	const rootOwner = getBranchRootParent(editor, rootShapeId)
+	if (!rootOwner || rootOwner.id !== branch.id) return null
 
 	const shape = editor.getShape(rootShapeId as TLShapeId)
 	if (!isBranchRootContentShape(shape)) return null
@@ -278,6 +280,32 @@ function canBranchWrapRootShape(branch: IBranchShape, shape: TLShape | undefined
 export function getBranchRootParent(editor: Editor, shapeId: TLShapeId | string, branches = getCurrentBranches(editor)) {
 	const id = shapeId as string
 	return branches.find((branch) => branch.props.rootShapeId === id) || null
+}
+
+/**
+ * A branch's root content is presentation only. Once a card or single-block
+ * owns a center branch, all structural branch relationships must point to that
+ * branch, never to the root content shape itself.
+ */
+function getCanonicalBranchChildId(editor: Editor, branch: IBranchShape, childId: TLShapeId | string) {
+	const child = editor.getShape(childId as TLShapeId)
+	if (!isBranchConnectableShape(child)) return null
+
+	const rootBranch = isBranchRootContentShape(child) ? getBranchRootParent(editor, child.id) : null
+	const canonicalChild = rootBranch || child
+	if (canonicalChild.id === branch.id) return null
+	if (!canAttachShapeToBranch(editor, branch, canonicalChild)) return null
+
+	return canonicalChild.id as string
+}
+
+function normalizeBranchChildIds(editor: Editor, branch: IBranchShape, ids: Iterable<TLShapeId | string>) {
+	const normalized: string[] = []
+	for (const id of ids) {
+		const canonicalId = getCanonicalBranchChildId(editor, branch, id)
+		if (canonicalId && !normalized.includes(canonicalId)) normalized.push(canonicalId)
+	}
+	return normalized
 }
 
 function distanceBetweenPoints(a: { x: number; y: number }, b: { x: number; y: number }) {
@@ -502,24 +530,13 @@ function distanceToBranchWorkArea(editor: Editor, branch: IBranchShape, child: T
 function normalizeChildIds(editor: Editor, branch: IBranchShape, extraId?: TLShapeId | string) {
 	const ids = getAllBranchChildIds(branch)
 	if (extraId && !ids.includes(extraId)) ids.push(extraId)
-	const rootShapeId = branch.props.rootShapeId
-
-	const unique = Array.from(new Set(ids)).filter((id) => {
-		const shape = editor.getShape(id as TLShapeId)
-		return isBranchConnectableShape(shape) && shape?.id !== branch.id && id !== rootShapeId
-	})
-
-	return unique
+	return normalizeBranchChildIds(editor, branch, ids)
 }
 
 function normalizeSideChildIds(editor: Editor, branch: IBranchShape, side: BranchSide, extraId?: TLShapeId | string) {
 	const ids = [...getSideChildIds(branch, side)]
 	if (extraId && !ids.includes(extraId)) ids.push(extraId as string)
-	const rootShapeId = branch.props.rootShapeId
-	return Array.from(new Set(ids)).filter((id) => {
-		const shape = editor.getShape(id as TLShapeId)
-		return isBranchConnectableShape(shape) && shape?.id !== branch.id && id !== rootShapeId
-	})
+	return normalizeBranchChildIds(editor, branch, ids)
 }
 
 function getBranchSideChildIdsForAttachCheck(
@@ -664,7 +681,7 @@ export function beginBranchAttachmentDrag(editor: Editor, shape: TLShape) {
 }
 
 export function layoutBranchChildren(editor: Editor, branch: IBranchShape, childIds = getAllBranchChildIds(branch)) {
-	const childSet = new Set(childIds)
+	const childSet = new Set(normalizeBranchChildIds(editor, branch, childIds))
 	const leftIds = normalizeSideChildIds(editor, branch, 'left').filter((id) => childSet.has(id))
 	const rightIds = normalizeSideChildIds(editor, branch, 'right').filter((id) => childSet.has(id))
 	const leftChildren = getBranchChildren(editor, leftIds)

@@ -8,7 +8,6 @@ import {
 	ShapeUtil,
 	SVGContainer,
 	TLShapeId,
-	TLShapeUtilCanBindOpts,
 	Vec,
 	VecLike,
 	useValue,
@@ -19,7 +18,6 @@ import { BranchLineStyle, IBranchShape } from './branch-shape-types'
 import { beginBranchAttachmentDrag, getAllBranchAttachedShapeIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, runWithSuppressedRootContentMoveIds, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHintForBranch } from './branch-interaction-state'
 import { getDefaultColorTheme } from '../utils/color-theme'
-import { canBindBranchToTarget } from './branch-binding-policy'
 
 const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
@@ -353,8 +351,8 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		return { points: [] }
 	}
 
-	override canBind(opts: TLShapeUtilCanBindOpts) {
-		return canBindBranchToTarget(opts)
+	override canBind() {
+		return true
 	}
 
 	override canEdit() {

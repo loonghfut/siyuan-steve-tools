@@ -2,6 +2,7 @@ import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape } from './branch-shape-types'
 import {
 	getAllBranchChildIds,
+	getBranchRootParent,
 	isBranchConnectableShape,
 	layoutBranchChildren,
 	pruneShapesFromBranches,
@@ -325,9 +326,41 @@ function remapCreatedBranchChildren(
 	return true
 }
 
+/**
+ * Repairs imported or legacy branch props where a card/single-block root was
+ * referenced as a child instead of the branch that owns it.
+ */
+function repairBranchStructure(editor: Editor) {
+	const branches = editor
+		.getCurrentPageShapes()
+		.filter((shape): shape is IBranchShape => shape.type === 'branch')
+
+	for (const branch of branches) {
+		if (!needsBranchStructureRepair(editor, branch, branches)) continue
+		const latestBranch = editor.getShape<IBranchShape>(branch.id)
+		if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
+	}
+}
+
+function needsBranchStructureRepair(editor: Editor, branch: IBranchShape, branches: IBranchShape[]) {
+	if (branch.props.rootShapeId) {
+		const rootOwner = getBranchRootParent(editor, branch.props.rootShapeId, branches)
+		if (!rootOwner || rootOwner.id !== branch.id) return true
+	}
+
+	return getAllBranchChildIds(branch).some((childId) => {
+		const child = editor.getShape(childId as TLShapeId)
+		if (child?.type !== 'card' && child?.type !== 'single-block') return false
+
+		const rootOwner = getBranchRootParent(editor, child.id, branches)
+		return !!rootOwner
+	})
+}
+
 export function keepBranchLayoutsUpdated(editor: Editor) {
 	if (REGISTERED_EDITORS.has(editor)) return
 	REGISTERED_EDITORS.add(editor)
+	repairBranchStructure(editor)
 
 	let pendingShapeIds = new Set<string>()
 	let pendingDeletedShapes = new Map<string, TLShape>()
