@@ -13,6 +13,28 @@ import { getDefaultColorTheme } from '../utils/color-theme'
 import { getShapeHostElement } from '../utils/getShapeHostElement'
 import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 
+function resolveBodyBackgroundColor(root?: ParentNode): string {
+	if (typeof window === 'undefined') return '#fff'
+
+	const candidates: Array<Element | null | undefined> = []
+	if (root instanceof Document) {
+		candidates.push(root.documentElement, root.body)
+	} else if (root instanceof Element) {
+		candidates.push(root)
+	}
+	candidates.push(document.body, document.documentElement)
+
+	for (const candidate of candidates) {
+		if (!candidate) continue
+		const styles = window.getComputedStyle(candidate)
+		const value = styles.getPropertyValue('--b3-body-background').trim()
+			|| styles.getPropertyValue('--b3-theme-background').trim()
+		if (value) return value
+	}
+
+	return 'var(--b3-body-background, var(--b3-theme-background, #fff))'
+}
+
 function getCardContentSource(shape: ICardShape, isCollapsed: boolean, root?: ParentNode): HTMLElement | null {
 	if (typeof document === 'undefined') return null
 
@@ -31,6 +53,7 @@ function getCardContentSource(shape: ICardShape, isCollapsed: boolean, root?: Pa
 export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext, root?: ParentNode): ReactElement | null {
 	const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
 	const { w, h, color, fontSize = 16, blockId, isCollapsed } = shape.props
+	const bodyBackground = resolveBodyBackgroundColor(root)
 
 	const borderWidth = 3
 	const radius = 10
@@ -77,6 +100,19 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext, r
 				rx={radius}
 				ry={radius}
 			/>
+			{drawnBorderWidth > 0 ? (
+				<rect
+					x={drawnBorderWidth}
+					y={drawnBorderWidth}
+					width={Math.max(w - drawnBorderWidth * 2, 1)}
+					height={Math.max(h - drawnBorderWidth * 2, 1)}
+					fill="none"
+					stroke={bodyBackground}
+					strokeWidth={1}
+					rx={Math.max(radius - drawnBorderWidth, 0)}
+					ry={Math.max(radius - drawnBorderWidth, 0)}
+				/>
+			) : null}
 			<defs>
 				<clipPath id={clipId}>
 					<rect

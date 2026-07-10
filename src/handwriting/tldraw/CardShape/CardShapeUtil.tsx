@@ -295,6 +295,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			Math.floor(collapsedTextAvailableHeight / (collapsedTextSize * collapsedTextLineHeight))
 		);
 		const headerGradientFallback = `linear-gradient(135deg, ${theme[shape.props.color].solid} 0%, ${theme[shape.props.color].semi} 100%)`;
+		const cardInnerGap = 4
 
 		// 计算有效渲染模式（不使用 useMemo，确保每次渲染都读取最新的全局设置）
 		const globalRenderMode: Exclude<CardRenderMode, 'inherit'> =
@@ -303,6 +304,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			shape.props.renderMode === 'inherit' || !shape.props.renderMode
 				? globalRenderMode
 				: (shape.props.renderMode as Exclude<CardRenderMode, 'inherit'>);
+		const cardInnerEdgeShadow = 'inset 0 0 0 5px var(--b3-body-background, var(--b3-theme-background, #fff))'
+		const cardOuterShadow = isRootAttachTarget
+			? '0 0 0 4px rgba(34, 197, 94, 0.42), 0 0 20px rgba(34, 197, 94, 0.32)'
+			: isEditingState
+				? '0 0 0 2px #3d8aff'
+				: ''
 
 		// 缓存 blockId 以减少属性访问
 		const blockId = shape.props.blockId;
@@ -1470,9 +1477,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					width: '100%',
 					height: '100%',
 					overflow: 'visible', // 改为 visible 以显示端口
-					boxShadow: isRootAttachTarget
-						? '0 0 0 4px rgba(34, 197, 94, 0.42), 0 0 20px rgba(34, 197, 94, 0.32)'
-						: isEditingState ? '0 0 0 2px #3d8aff' : 'none',
+					boxShadow: cardOuterShadow
+						? `${cardOuterShadow}, ${cardInnerEdgeShadow}`
+						: cardInnerEdgeShadow,
 					cursor: isEditingState ? 'text' : 'default',
 					padding: 0,
 					border: settingdata["showCardBorder"] ? `3px solid ${theme[shape.props.color].solid}` : 'none', // 添加颜色边框
@@ -1522,7 +1529,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						pointerEvents: isEditingState || (!isMainCard && isCollapsed) ? 'all' : 'none',
 						touchAction: isEditingState || (!isMainCard && isCollapsed) ? 'auto' : 'none',
 						contain: 'strict',
-						padding: '0px',
+						padding: `${cardInnerGap}px`,
+						boxSizing: 'border-box',
 					}}
 				>
 					{/* 折叠状态 */}
