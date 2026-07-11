@@ -32,6 +32,8 @@ export const handwritingDefaults: Record<string, any> = {
     // 导出 PNG 时的图片质量与倍率
     "tldraw-export-image-quality": 100,
     "tldraw-export-pixel-ratio": 2,
+    // Card / 单块形状超过此数量时，仅导出轮廓以提升性能
+    "tldraw-export-outline-only-threshold": 90,
     // 自定义卡片标题内容
     "tldraw-custom-card-title": "",
     // 文档树显示白板按钮
@@ -58,6 +60,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "启用精确箭头模式", description: "启用后绘制箭头时将使用精确模式", key: "tldraw-exact-arrow-mode", value: ctx.settings["tldraw-exact-arrow-mode"] },
                 { type: "slider", title: "导出图片质量", description: "PNG/SVG 导出为位图时使用的质量参数，范围 10-100。对有损格式影响最明显。", key: "tldraw-export-image-quality", value: ctx.settings["tldraw-export-image-quality"], slider: { min: 10, max: 100, step: 5 } },
                 { type: "slider", title: "导出图片倍率", description: "控制导出位图的像素倍率。降低倍率可明显减小 PNG 体积。", key: "tldraw-export-pixel-ratio", value: ctx.settings["tldraw-export-pixel-ratio"], slider: { min: 0.5, max: 4, step: 0.25 } },
+                { type: "number", title: "导出轮廓模式阈值", description: "单次导出中 Card 与单块形状数量超过此值时，仅导出形状轮廓以提升性能。默认 90。", key: "tldraw-export-outline-only-threshold", value: ctx.settings["tldraw-export-outline-only-threshold"] },
                 { type: "textinput", title: "自定义卡片标题内容", description: "在此输入自定义的卡片标题内容，支持使用变量 ${timestamp}", key: "tldraw-custom-card-title", value: ctx.settings["tldraw-custom-card-title"] },
                 { type: "checkbox", title: "文档树显示白板按钮", description: "在文档树每个条目左侧显示白板图标按钮", key: "tldraw-show-in-file-tree", value: ctx.settings["tldraw-show-in-file-tree"] },
             ]

@@ -22,7 +22,7 @@ export interface PrepareSvgExportSnapshotsOptions {
 const CARD_BORDER_PX = 3
 const SINGLE_BLOCK_BORDER_PX = 3
 const SINGLE_BLOCK_MIN_HEIGHT = 30
-const OUTLINE_ONLY_SHAPE_THRESHOLD = 90
+const DEFAULT_OUTLINE_ONLY_SHAPE_THRESHOLD = 90
 
 function nextFrame(): Promise<void> {
 	if (typeof requestAnimationFrame === 'function') {
@@ -42,6 +42,13 @@ function isExportedShape(editor: Editor, shape: TLShape, exportIds: Set<TLShapeI
 		current = editor.getShape(current.parentId as TLShapeId)
 	}
 	return false
+}
+
+function getOutlineOnlyShapeThreshold(): number {
+	const configuredValue = Number(settingdata['tldraw-export-outline-only-threshold'])
+	return Number.isFinite(configuredValue) && configuredValue >= 0
+		? configuredValue
+		: DEFAULT_OUTLINE_ONLY_SHAPE_THRESHOLD
 }
 
 function getCardContentSource(shape: TLShape, root: ParentNode): HTMLElement | null {
@@ -116,7 +123,7 @@ export async function prepareSvgExportSnapshots(
 		.map((id) => editor.getShape(id))
 		.filter((shape): shape is TLShape => !!shape && isExportedShape(editor, shape, exportIds))
 		.filter(isExportSnapshotShape)
-	const outlineOnly = shapes.length > OUTLINE_ONLY_SHAPE_THRESHOLD
+	const outlineOnly = shapes.length > getOutlineOnlyShapeThreshold()
 	setSvgExportOutlineOnly(outlineOnly)
 
 	if (shapes.length === 0) {
