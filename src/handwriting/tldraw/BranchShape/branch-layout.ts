@@ -7,6 +7,8 @@ const DEFAULT_NODE_WIDTH = 300
 const DEFAULT_NODE_HEIGHT = 80
 const ROOT_RADIUS = 7
 const ROOT_DIAMETER = ROOT_RADIUS * 2
+const EMPTY_BRANCH_RADIUS = 12
+const EMPTY_BRANCH_DIAMETER = EMPTY_BRANCH_RADIUS * 2
 const DETACH_DISTANCE_MULTIPLIER = 0.01
 const ATTACH_DELAY_MS = 500
 const AUTO_FRAME_MIN_CHILDREN = 2
@@ -696,15 +698,15 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 
 	if (children.length === 0 && !rootContent) {
 		const oldRootPage = getBranchRootPagePoint(branch)
-		const nextX = oldRootPage.x - ROOT_RADIUS
-		const nextY = oldRootPage.y - ROOT_RADIUS
+		const nextX = oldRootPage.x - EMPTY_BRANCH_RADIUS
+		const nextY = oldRootPage.y - EMPTY_BRANCH_RADIUS
 		const nextChildIds: string[] = []
 		const isUnchanged =
 			sameNumber(branch.x, nextX) &&
 			sameNumber(branch.y, nextY) &&
-			sameNumber(branch.props.w, ROOT_DIAMETER) &&
-			sameNumber(branch.props.h, ROOT_DIAMETER) &&
-			sameNumber(branch.props.rootX, ROOT_RADIUS) &&
+			sameNumber(branch.props.w, EMPTY_BRANCH_DIAMETER) &&
+			sameNumber(branch.props.h, EMPTY_BRANCH_DIAMETER) &&
+			sameNumber(branch.props.rootX, EMPTY_BRANCH_RADIUS) &&
 			sameIds(branch.props.childIds || [], nextChildIds) &&
 			sameIds(branch.props.leftChildIds || [], nextChildIds) &&
 			sameIds(branch.props.rightChildIds || [], nextChildIds) &&
@@ -719,13 +721,13 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 			y: nextY,
 			props: {
 				...branch.props,
-				w: ROOT_DIAMETER,
-				h: ROOT_DIAMETER,
+				w: EMPTY_BRANCH_DIAMETER,
+				h: EMPTY_BRANCH_DIAMETER,
 				childIds: nextChildIds,
 				leftChildIds: nextChildIds,
 				rightChildIds: nextChildIds,
 				rootShapeId: undefined,
-				rootX: ROOT_RADIUS,
+				rootX: EMPTY_BRANCH_RADIUS,
 			},
 		})
 		return

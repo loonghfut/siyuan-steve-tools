@@ -326,6 +326,35 @@ function remapCreatedBranchChildren(
 	return true
 }
 
+function getBranchDepth(editor: Editor, branch: IBranchShape, visiting = new Set<string>()): number {
+	const branchId = branch.id as string
+	if (visiting.has(branchId)) return 0
+
+	visiting.add(branchId)
+	let depth = 0
+	for (const childId of getAllBranchChildIds(branch)) {
+		const child = editor.getShape<IBranchShape>(childId as TLShapeId)
+		if (child?.type === 'branch') {
+			depth = Math.max(depth, getBranchDepth(editor, child, visiting) + 1)
+		}
+	}
+	visiting.delete(branchId)
+	return depth
+}
+
+function deleteBranchesWhoseRootsWereDeleted(editor: Editor, deletedShapeIds: Set<string>) {
+	const branchIds = editor
+		.getCurrentPageShapes()
+		.filter(
+			(shape): shape is IBranchShape =>
+				shape.type === 'branch' && !!(shape as IBranchShape).props.rootShapeId && deletedShapeIds.has((shape as IBranchShape).props.rootShapeId!)
+		)
+		.map((branch) => branch.id as TLShapeId)
+
+	if (branchIds.length > 0) editor.deleteShapes(branchIds)
+	return branchIds
+}
+
 export function keepBranchLayoutsUpdated(editor: Editor) {
 	if (REGISTERED_EDITORS.has(editor)) return
 	REGISTERED_EDITORS.add(editor)
@@ -389,6 +418,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		isUpdating = true
 
 		try {
+			const remappedCreatedBranches: IBranchShape[] = []
 			for (const branchId of createdBranchIds) {
 				const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
 				if (!branch || branch.type !== 'branch') continue
@@ -396,20 +426,37 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 
 				if (remapCreatedBranchChildren(editor, branch, createdShapeIds)) {
 					const updatedBranch = editor.getShape<IBranchShape>(branch.id)
-					if (updatedBranch?.type === 'branch') {
-						layoutBranchChildren(editor, updatedBranch)
-					}
+					if (updatedBranch?.type === 'branch') remappedCreatedBranches.push(updatedBranch)
 				}
 			}
 
+			// Complete every ID remap before moving anything. A parent layout moves its whole
+			// branch subtree, so laying it out while nested branches still point at the source
+			// tree corrupts pasted multi-level branch layouts.
+			remappedCreatedBranches
+				.sort((a, b) => getBranchDepth(editor, b) - getBranchDepth(editor, a))
+				.forEach((branch) => {
+					const latestBranch = editor.getShape<IBranchShape>(branch.id)
+					if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
+				})
+
+			const rootDeletedBranchIds = deleteBranchesWhoseRootsWereDeleted(
+				editor,
+				new Set(deletedShapes.map((shape) => shape.id as string))
+			)
+			const deletedBranchIds = new Set(rootDeletedBranchIds.map((id) => id as string))
+
 			for (const shape of deletedShapes) {
-				if (shape.type === 'branch') {
+				if (shape.type === 'branch' && !deletedBranchIds.has(shape.id as string)) {
 					promoteOnlyChildOfDeletedBranch(editor, shape as IBranchShape)
 				}
 			}
 
-			if (deletedShapes.length > 0) {
-				pruneShapesFromBranches(editor, deletedShapes.map((shape) => shape.id as TLShapeId))
+			if (deletedShapes.length > 0 || rootDeletedBranchIds.length > 0) {
+				pruneShapesFromBranches(editor, [
+					...deletedShapes.map((shape) => shape.id as TLShapeId),
+					...rootDeletedBranchIds,
+				])
 			}
 
 			if (shapeIds.length > 0) {

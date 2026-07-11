@@ -29,6 +29,7 @@ const OUTER_FRAME_OPACITY = 0.96
 const OUTER_FRAME_DASHARRAY = '8 4'
 const OUTER_FRAME_RX = 12
 const BRANCH_HIT_SLOP = 4
+const EMPTY_BRANCH_RADIUS = 12
 
 type BranchChildRenderInfo = ReturnType<typeof getBranchRenderInfo>['children'][number]
 
@@ -392,6 +393,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
 		const isAutoFrameEnhanced = info.autoFrame.enabled
 		const showBackground = shape.props.showBackground === true
+		const isEmpty = !info.rootShapeId && info.children.length === 0
 
 		if (isAutoFrameEnhanced && !isFloatingStyle) {
 			hitTargets.push({
@@ -445,20 +447,21 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				hitWidth: getVisibleStrokeHitWidth(1.2),
 			})
 		} else {
+			const rootRadius = isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius
 			const root = new Rectangle2d({
-				x: info.rootX - info.rootRadius,
-				y: info.rootY - info.rootRadius,
-				width: info.rootRadius * 2,
-				height: info.rootRadius * 2,
-				isFilled: true,
+				x: info.rootX - rootRadius,
+				y: info.rootY - rootRadius,
+				width: rootRadius * 2,
+				height: rootRadius * 2,
+				isFilled: !isEmpty,
 			})
 			children.push(root)
 			hitTargets.push({
 				type: 'circle',
 				x: info.rootX,
 				y: info.rootY,
-				r: isFloatingStyle ? info.rootRadius + 5 : info.rootRadius,
-				filled: true,
+				r: isFloatingStyle ? rootRadius + 5 : rootRadius,
+				filled: !isEmpty,
 			})
 		}
 
@@ -553,6 +556,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			[editor, shape]
 		)
 		const hasChildren = info.children.length > 0
+		const isEmpty = !info.rootShapeId && !hasChildren
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
 		const lineStyle = getBranchLineStyle(shape)
 		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
@@ -727,6 +731,17 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 							pointerEvents="none"
 						/>
 					) : null
+				) : isEmpty ? (
+					<circle
+						cx={info.rootX}
+						cy={info.rootY}
+						r={EMPTY_BRANCH_RADIUS}
+						fill="none"
+						stroke={showHint ? accentColor : color}
+						strokeWidth={2}
+						opacity={0.8}
+						pointerEvents="none"
+					/>
 				) : isFloatingStyle ? (
 					<g pointerEvents="none">
 						<circle
