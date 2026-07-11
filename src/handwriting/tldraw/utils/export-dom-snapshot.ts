@@ -28,9 +28,19 @@ const MIME_MAP: Record<string, string> = {
 }
 
 const svgExportSnapshotCache = new Map<string, string>()
+let svgExportOutlineOnly = false
 
 export function clearSvgExportSnapshotCache(): void {
 	svgExportSnapshotCache.clear()
+	svgExportOutlineOnly = false
+}
+
+export function setSvgExportOutlineOnly(enabled: boolean): void {
+	svgExportOutlineOnly = enabled
+}
+
+export function isSvgExportOutlineOnly(): boolean {
+	return svgExportOutlineOnly
 }
 
 export function setCachedSvgExportSnapshot(shapeId: string, html: string): void {

@@ -4,6 +4,7 @@ import { getShapeHostElement } from './getShapeHostElement'
 import {
 	clearSvgExportSnapshotCache,
 	serializeElementForSvgExportAsync,
+	setSvgExportOutlineOnly,
 	setCachedSvgExportSnapshot,
 } from './export-dom-snapshot'
 
@@ -21,6 +22,7 @@ export interface PrepareSvgExportSnapshotsOptions {
 const CARD_BORDER_PX = 3
 const SINGLE_BLOCK_BORDER_PX = 3
 const SINGLE_BLOCK_MIN_HEIGHT = 30
+const OUTLINE_ONLY_SHAPE_THRESHOLD = 90
 
 function nextFrame(): Promise<void> {
 	if (typeof requestAnimationFrame === 'function') {
@@ -31,6 +33,15 @@ function nextFrame(): Promise<void> {
 
 function isExportSnapshotShape(shape: TLShape | undefined): shape is TLShape {
 	return !!shape && (shape.type === 'card' || shape.type === 'single-block')
+}
+
+function isExportedShape(editor: Editor, shape: TLShape, exportIds: Set<TLShapeId>): boolean {
+	let current: TLShape | undefined = shape
+	while (current) {
+		if (exportIds.has(current.id)) return true
+		current = editor.getShape(current.parentId as TLShapeId)
+	}
+	return false
 }
 
 function getCardContentSource(shape: TLShape, root: ParentNode): HTMLElement | null {
@@ -100,12 +111,21 @@ export async function prepareSvgExportSnapshots(
 	if (typeof document === 'undefined') return
 	const root = editor.getContainer()
 
-	const shapes = ids
+	const exportIds = new Set(ids)
+	const shapes = Array.from(editor.getCurrentPageShapeIds())
 		.map((id) => editor.getShape(id))
+		.filter((shape): shape is TLShape => !!shape && isExportedShape(editor, shape, exportIds))
 		.filter(isExportSnapshotShape)
+	const outlineOnly = shapes.length > OUTLINE_ONLY_SHAPE_THRESHOLD
+	setSvgExportOutlineOnly(outlineOnly)
 
 	if (shapes.length === 0) {
 		options.onProgress?.({ current: 0, total: 0, message: '准备导出内容' })
+		return
+	}
+
+	if (outlineOnly) {
+		options.onProgress?.({ current: shapes.length, total: shapes.length, message: '形状过多，导出轮廓以提升性能' })
 		return
 	}
 

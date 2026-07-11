@@ -11,7 +11,7 @@ import { ICardShape } from './card-shape-types'
 import { settingdata } from '@/index'
 import { getDefaultColorTheme } from '../utils/color-theme'
 import { getShapeHostElement } from '../utils/getShapeHostElement'
-import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
+import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, isSvgExportOutlineOnly, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 
 function resolveBodyBackgroundColor(root?: ParentNode): string {
 	if (typeof window === 'undefined') return '#fff'
@@ -60,6 +60,10 @@ export function exportCardShapeToSvg(shape: ICardShape, ctx: SvgExportContext, r
 	const strokeColor = theme[color].solid
 	const fillColor = theme[color].semi
 	const showBorder = settingdata["showCardBorder"] !== false
+	if (isSvgExportOutlineOnly()) {
+		return <rect width={w} height={h} fill="none" stroke={strokeColor} strokeWidth={showBorder ? borderWidth : 1} rx={radius} ry={radius} />
+	}
+
 	const drawnBorderWidth = showBorder ? borderWidth : 0
 	const contentWidth = Math.max(w - drawnBorderWidth * 2, 1)
 	const contentHeight = Math.max(h - drawnBorderWidth * 2, 1)

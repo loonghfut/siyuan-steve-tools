@@ -37,7 +37,7 @@ import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, re
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import { getDefaultColorTheme } from '../utils/color-theme'
-import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
+import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, isSvgExportOutlineOnly, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -1580,6 +1580,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const size = SingleBlockSizes.get(this.editor).get(shape.id)
 		// 使用实际渲染高度，如果没有则使用属性高度，确保导出与实际一致
 		const h = size?.height ?? Math.max(hProp, MIN_HEIGHT)
+		if (isSvgExportOutlineOnly()) {
+			return <rect width={w} height={h} fill="none" stroke={theme[color].solid} strokeWidth={border || 1} rx={radius} ry={radius} />
+		}
 
 		// Clamp inner dimensions to avoid negative <foreignObject> size during export
 		const innerW = Math.max(w - border * 2, 1)
