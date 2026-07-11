@@ -2,7 +2,8 @@ import { Editor } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 
 /**
- * 设置双击画布创建 single-block 的处理器
+ * 设置双击画布创建 single-block 的处理器。
+ * 文本创建使用 tldraw 原生的 createTextOnCanvasDoubleClick 选项。
  * 
  * 通过覆盖 SelectTool 的 Idle 状态的 handleDoubleClickOnCanvas 方法，
  * 实现在双击画布空白处时自动创建 single-block 形状的功能。

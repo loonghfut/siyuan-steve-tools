@@ -347,8 +347,14 @@ export class TldrawManager {
     }
 
 
+    // 兼容旧版布尔设置：true 创建单块，false 创建文本。
+    private readonly doubleClickCreationType = settingdata['enableDoubleClickCreateSingleBlock'] === 'text'
+        || settingdata['enableDoubleClickCreateSingleBlock'] === false
+        ? 'text'
+        : 'single-block'
+
     private options: Partial<TldrawOptions> = {
-        createTextOnCanvasDoubleClick: settingdata['enableDoubleClickCreateSingleBlock'] ? false : true,
+        createTextOnCanvasDoubleClick: this.doubleClickCreationType === 'text',
         maxFontsToLoadBeforeRender: 10,
         cameraSlideFriction: 1,
     }
@@ -457,8 +463,8 @@ export class TldrawManager {
                             });
                         }
 
-                        // 设置双击画布创建 single-block 的处理器
-                        if (settingdata['enableDoubleClickCreateSingleBlock'] !== false) {
+                        // 单块使用自定义处理器；文本使用 tldraw 原生双击创建行为。
+                        if (this.doubleClickCreationType === 'single-block') {
                             setupDoubleClickHandler(editor);
                         }
                         
