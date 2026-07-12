@@ -13,6 +13,13 @@ const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 const REGISTERED_EDITORS = new WeakSet<Editor>()
 const EXPLICIT_CREATED_BRANCH_RELATIONS = new WeakMap<Editor, Set<string>>()
 
+// tldraw exposes this internally on HistoryManager, but deliberately omits it
+// from its public TypeScript declaration. Keep the compatibility boundary here.
+function isReplayingHistory(editor: Editor) {
+	const history = (editor as unknown as { history?: { isReplaying?: () => boolean } }).history
+	return history?.isReplaying?.() === true
+}
+
 export function markExplicitCreatedBranchRelations(editor: Editor, branchIds: Iterable<TLShapeId | string>) {
 	let ids = EXPLICIT_CREATED_BRANCH_RELATIONS.get(editor)
 	if (!ids) {
@@ -453,7 +460,10 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 	let isUpdating = false
 
 	editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
-		if (source === 'remote' || isUpdating) return
+		// Undo/redo recreates the original records. They already contain correct
+		// IDs, so treating them as a clipboard paste would remap them to unrelated
+		// shapes that happen to share a signature and position.
+		if (source === 'remote' || isUpdating || isReplayingHistory(editor)) return
 
 		pendingCreatedShapeIds.add(shape.id as string)
 		if (shape.type !== 'branch') return
@@ -467,7 +477,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 	})
 
 	editor.sideEffects.registerAfterChangeHandler('shape', (prev, next, source) => {
-		if (source === 'remote' || isUpdating) return
+		if (source === 'remote' || isUpdating || isReplayingHistory(editor)) return
 		if (prev.parentId !== next.parentId) {
 			pendingParentChanges.set(next.id as string, {
 				previousParentId: prev.parentId as string,
@@ -480,7 +490,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 	})
 
 	editor.sideEffects.registerAfterDeleteHandler('shape', (shape, source) => {
-		if (source === 'remote' || isUpdating) return
+		if (source === 'remote' || isUpdating || isReplayingHistory(editor)) return
 		if (!BRANCH_CHILD_TYPES.has(shape.type)) return
 
 		pendingDeletedShapes.set(shape.id as string, shape)
