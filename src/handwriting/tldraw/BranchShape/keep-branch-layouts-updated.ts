@@ -203,7 +203,8 @@ function inferCreatedBranchChildrenFromLayout(
 function findCreatedShapeIdRemaps(
 	editor: Editor,
 	branch: IBranchShape,
-	createdShapeIds: Set<string>
+	createdShapeIds: Set<string>,
+	usedCreatedShapeIds: Set<string>
 ) {
 	const referencedChildIds = Array.from(
 		new Set([
@@ -214,7 +215,7 @@ function findCreatedShapeIdRemaps(
 		])
 	)
 	const createdCandidates = Array.from(createdShapeIds)
-		.filter((id) => id !== branch.id)
+		.filter((id) => id !== branch.id && !usedCreatedShapeIds.has(id))
 		.map((id) => editor.getShape(id as TLShapeId))
 		.filter((shape): shape is TLShape => !!shape && isBranchConnectableShape(shape))
 
@@ -288,9 +289,10 @@ function findCreatedShapeIdRemaps(
 function remapCreatedBranchChildren(
 	editor: Editor,
 	branch: IBranchShape,
-	createdShapeIds: Set<string>
+	createdShapeIds: Set<string>,
+	usedCreatedShapeIds: Set<string>
 ) {
-	const idRemaps = findCreatedShapeIdRemaps(editor, branch, createdShapeIds)
+	const idRemaps = findCreatedShapeIdRemaps(editor, branch, createdShapeIds, usedCreatedShapeIds)
 	const inferredChildren = idRemaps.size === 0 ? inferCreatedBranchChildrenFromLayout(editor, branch, createdShapeIds) : null
 	const remapIds = (
 		ids: string[] | undefined,
@@ -301,10 +303,19 @@ function remapCreatedBranchChildren(
 		(ids || [])
 			.map((id) => {
 				const remappedId = idRemaps.get(id)
-				if (remappedId && editor.getShape(remappedId as TLShapeId)) return remappedId
-				if (createdShapeIds.has(id) && editor.getShape(id as TLShapeId)) return id
+				if (remappedId && editor.getShape(remappedId as TLShapeId)) {
+					usedCreatedShapeIds.add(remappedId)
+					return remappedId
+				}
+				if (createdShapeIds.has(id) && editor.getShape(id as TLShapeId) && !usedCreatedShapeIds.has(id)) {
+					usedCreatedShapeIds.add(id)
+					return id
+				}
 				const fallbackId = fallbackIds[fallbackIndex++]
-				if (fallbackId && editor.getShape(fallbackId as TLShapeId)) return fallbackId
+				if (fallbackId && editor.getShape(fallbackId as TLShapeId) && !usedCreatedShapeIds.has(fallbackId)) {
+					usedCreatedShapeIds.add(fallbackId)
+					return fallbackId
+				}
 				return null
 			})
 			.filter((id): id is string => !!id)
@@ -312,9 +323,12 @@ function remapCreatedBranchChildren(
 	}
 
 	const sourceRightChildIds = branch.props.rightChildIds || branch.props.childIds
-	const nextChildIds = remapIds(branch.props.childIds, inferredChildren?.rightChildIds)
 	const nextLeftChildIds = remapIds(branch.props.leftChildIds, inferredChildren?.leftChildIds)
 	const nextRightChildIds = remapIds(sourceRightChildIds, inferredChildren?.rightChildIds)
+	// childIds is the legacy/canonical alias for rightChildIds. Reuse the same
+	// mapping instead of consuming the created IDs a second time; otherwise the
+	// fallback path would keep childIds but filter every rightChildIds entry.
+	const nextChildIds = nextRightChildIds
 	// Pasted shapes receive new IDs. Keeping an existing root ID here would make
 	// a pasted branch control the original branch's root card (often on another
 	// frame), which corrupts both layouts. If the root was not pasted, detach it.
@@ -526,12 +540,13 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 			moveConnectedBranchesToParent(editor, parentChanges)
 
 			const remappedCreatedBranches: IBranchShape[] = []
+			const usedCreatedShapeIds = new Set<string>()
 			for (const branchId of createdBranchIds) {
 				const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
 				if (!branch || branch.type !== 'branch') continue
 				if (consumeExplicitCreatedBranchRelation(editor, branchId)) continue
 
-				if (remapCreatedBranchChildren(editor, branch, createdShapeIds)) {
+				if (remapCreatedBranchChildren(editor, branch, createdShapeIds, usedCreatedShapeIds)) {
 					const updatedBranch = editor.getShape<IBranchShape>(branch.id)
 					if (updatedBranch?.type === 'branch') remappedCreatedBranches.push(updatedBranch)
 				}
