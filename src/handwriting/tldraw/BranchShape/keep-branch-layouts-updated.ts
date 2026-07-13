@@ -3,6 +3,7 @@ import { IBranchShape } from './branch-shape-types'
 import {
 	branchRelationsEqual,
 	clearBranchClipboardMarker,
+	getBranchBindings,
 	hasBranchClipboardMarker,
 	reconcileBranchRelationsFromBindings,
 	syncBranchBindingsFromLegacyProps,
@@ -224,13 +225,16 @@ function moveConnectedBranchesToParent(editor: Editor, parentChanges: Map<string
 }
 
 export function migrateBranchBindings(editor: Editor) {
-	// Existing documents only have the legacy ID arrays. Create bindings once
-	// at mount so future clipboard operations can use tldraw's native ID remap.
-	// Migrate every page, not only the page that happened to be active on mount.
+	// Bindings are authoritative for migrated documents. Only old documents that
+	// have no branch bindings at all may use their legacy ID arrays as input.
 	for (const page of editor.getPages()) {
 		for (const shapeId of editor.getPageShapeIds(page.id)) {
 			const shape = editor.getShape(shapeId)
-			if (shape?.type === 'branch') syncBranchBindingsFromLegacyProps(editor, shape as IBranchShape)
+			if (shape?.type !== 'branch') continue
+
+			const branch = shape as IBranchShape
+			if (getBranchBindings(editor, branch).length > 0) reconcileBranchRelationsFromBindings(editor, branch)
+			else syncBranchBindingsFromLegacyProps(editor, branch)
 		}
 	}
 }
@@ -253,8 +257,13 @@ function layoutBranches(editor: Editor, branchIds: Iterable<TLShapeId | string>)
 export function keepBranchLayoutsUpdated(editor: Editor) {
 	if (REGISTERED_EDITORS.has(editor)) return
 	REGISTERED_EDITORS.add(editor)
-	repairBranchStructure(editor)
 	migrateBranchBindings(editor)
+	repairBranchStructure(editor)
+	// The repair step intentionally normalizes legacy cache fields. Persist that
+	// normalized structure back into bindings once, after bindings were hydrated.
+	for (const shape of editor.getCurrentPageShapes()) {
+		if (shape.type === 'branch') syncBranchBindingsFromLegacyProps(editor, shape as IBranchShape)
+	}
 
 	let pendingShapeIds = new Set<string>()
 	let pendingDeletedShapes = new Map<string, TLShape>()
@@ -265,7 +274,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 	let pendingParentChanges = new Map<string, BranchParentChange>()
 	let isUpdating = false
 
-	const shouldIgnore = (source: string) => source === 'remote' || isUpdating || isReplayingHistory(editor)
+	const shouldIgnore = (_source: string) => isUpdating || isReplayingHistory(editor)
 
 	editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
 		if (shouldIgnore(source)) return

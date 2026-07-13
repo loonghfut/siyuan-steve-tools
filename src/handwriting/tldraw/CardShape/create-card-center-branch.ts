@@ -48,17 +48,25 @@ function getShapeCenter(editor: Editor, shape: CenterBranchRootShape) {
 	}
 }
 
-function createBranchShapeForRootShape(id: TLShapeId, shape: CenterBranchRootShape, center: { x: number; y: number }) {
+function createBranchShapeForRootShape(
+	editor: Editor,
+	id: TLShapeId,
+	shape: CenterBranchRootShape,
+	center: { x: number; y: number }
+) {
 	const props: IBranchShape['props'] = {
 		...DEFAULT_BRANCH_PROPS,
 		rootShapeId: shape.id as string,
 	}
+	const parent = editor.getShapeParent(shape)
+	const localCenter = parent ? editor.getPointInShapeSpace(parent, center) : center
 
 	return {
 		id,
 		type: 'branch' as const,
-		x: center.x - (props.rootX ?? props.w / 2),
-		y: center.y - props.h / 2,
+		parentId: shape.parentId,
+		x: localCenter.x - (props.rootX ?? props.w / 2),
+		y: localCenter.y - props.h / 2,
 		props,
 	}
 }
@@ -122,7 +130,7 @@ export function createCenterBranchForShape(editor: Editor, shape: CenterBranchRo
 	const branchId = createShapeId()
 	const sideParentBranches = getSideParentBranches(editor, latestShape.id as string)
 	const center = getShapeCenter(editor, latestShape)
-	const branchShape = createBranchShapeForRootShape(branchId, latestShape, center)
+	const branchShape = createBranchShapeForRootShape(editor, branchId, latestShape, center)
 
 	editor.run(() => {
 		editor.createShape(branchShape)

@@ -112,6 +112,7 @@ export function createSingleBlockForBranch(
 		editor.createShape({
 			id: newShapeId,
 			type: 'single-block',
+			parentId: branch.parentId,
 			x: rootX + horizontalOffset,
 			y: initialY,
 			props: {
@@ -160,6 +161,7 @@ export function createSiblingSingleInBranch(editor: Editor, singleId: TLShapeId)
 		editor.createShape({
 			id: newSingleId,
 			type: 'single-block',
+			parentId: single.parentId,
 			x: position.x,
 			y: position.y,
 			props: cloneSingleProps(single),
@@ -207,6 +209,7 @@ export function createChildBranchFromSingle(editor: Editor, singleId: TLShapeId)
 			{
 				id: newSingleId,
 				type: 'single-block',
+				parentId: single.parentId,
 				x: childSingleX,
 				y: childSingleY,
 				props: cloneSingleProps(single),
@@ -214,6 +217,7 @@ export function createChildBranchFromSingle(editor: Editor, singleId: TLShapeId)
 			{
 				id: newBranchId,
 				type: 'branch',
+				parentId: single.parentId,
 				x: branchCenterX - DEFAULT_BRANCH_PROPS.w / 2,
 				y: branchCenterY - DEFAULT_BRANCH_PROPS.h / 2,
 				props: createBranchProps({

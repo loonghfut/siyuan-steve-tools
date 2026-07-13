@@ -1,5 +1,6 @@
 import {
 	BindingUtil,
+	createBindingId,
 	Editor,
 	T,
 	TLBaseBinding,
@@ -61,19 +62,59 @@ export function getBranchBindings(editor: Editor, branch: IBranchShape): BranchB
 }
 
 export function getBranchRelationsFromBindings(editor: Editor, branch: IBranchShape): BranchRelation[] {
-	return getBranchBindings(editor, branch)
-		.map((binding): BranchRelation | null => {
-			const target = editor.getShape(binding.toId)
-			if (!target || !CONNECTABLE_BRANCH_TYPES.has(target.type)) return null
+	const relations: BranchRelation[] = []
+	const seen = new Set<string>()
+	let hasRoot = false
 
-			return {
-				toId: binding.toId as string,
-				role: binding.props.role,
-				side: binding.props.role === 'child' ? (binding.props.side || 'right') : undefined,
-				index: binding.props.index ?? 0,
-			}
+	for (const binding of getBranchBindings(editor, branch).sort((a, b) => String(a.id).localeCompare(String(b.id)))) {
+		const relation = getValidBranchRelation(editor, branch, binding)
+		if (!relation || (relation.role === 'root' && hasRoot)) continue
+
+		const key = relationKey(relation)
+		if (seen.has(key)) continue
+		seen.add(key)
+		if (relation.role === 'root') hasRoot = true
+		relations.push(relation)
+	}
+
+	return relations
+}
+
+function getValidBranchRelation(editor: Editor, branch: IBranchShape, binding: BranchBinding): BranchRelation | null {
+	const target = editor.getShape(binding.toId)
+	if (!target || binding.toId === branch.id) return null
+
+	if (binding.props.role === 'root') {
+		if (target.type !== 'card' && target.type !== 'single-block') return null
+		return { toId: binding.toId as string, role: 'root', index: 0 }
+	}
+
+	if (!CONNECTABLE_BRANCH_TYPES.has(target.type)) return null
+	if (target.type === 'branch' && hasBranchChildPath(editor, target.id as string, branch.id as string)) return null
+	return {
+		toId: binding.toId as string,
+		role: 'child',
+		side: binding.props.side || 'right',
+		index: binding.props.index ?? 0,
+	}
+}
+
+function hasBranchChildPath(editor: Editor, fromId: string, targetId: string, visited = new Set<string>()): boolean {
+	if (fromId === targetId) return true
+	if (visited.has(fromId)) return false
+	visited.add(fromId)
+
+	const from = editor.getShape(fromId as TLShapeId)
+	if (from?.type !== 'branch') return false
+	return editor
+		.getBindingsFromShape<BranchBinding>(from.id, BRANCH_BINDING_TYPE)
+		.filter(isBranchBinding)
+		.some((binding) => {
+			if (binding.props.role !== 'child') return false
+			const child = editor.getShape(binding.toId)
+			if (!child || child.type !== 'branch') return false
+			return hasBranchChildPath(editor, child.id as string, targetId, visited)
 		})
-		.filter((relation): relation is BranchRelation => relation !== null)
 }
 
 export function getLegacyRelations(branch: IBranchShape): BranchRelation[] {
@@ -161,9 +202,14 @@ function sameRelationProps(a: BranchBindingProps, b: BranchBindingProps) {
 	return a.role === b.role && (a.side || undefined) === (b.side || undefined) && (a.index ?? 0) === (b.index ?? 0)
 }
 
-function canCreateBranchBinding(editor: Editor, branch: IBranchShape, targetId: string) {
-	const target = editor.getShape(targetId as TLShapeId)
-	if (!target || !CONNECTABLE_BRANCH_TYPES.has(target.type)) return false
+function canCreateBranchBinding(editor: Editor, branch: IBranchShape, relation: BranchRelation) {
+	const target = editor.getShape(relation.toId as TLShapeId)
+	if (!target || target.id === branch.id) return false
+	if (relation.role === 'root' && target.type !== 'card' && target.type !== 'single-block') return false
+	if (relation.role === 'child' && !CONNECTABLE_BRANCH_TYPES.has(target.type)) return false
+	if (relation.role === 'child' && target.type === 'branch' && hasBranchChildPath(editor, target.id as string, branch.id as string)) {
+		return false
+	}
 
 	return editor.canBindShapes({
 		fromShape: branch,
@@ -179,7 +225,7 @@ function canCreateBranchBinding(editor: Editor, branch: IBranchShape, targetId: 
  */
 export function syncBranchBindingsFromLegacyProps(editor: Editor, branch: IBranchShape) {
 	const desired = getLegacyRelations(branch)
-		.filter((relation) => canCreateBranchBinding(editor, branch, relation.toId))
+		.filter((relation) => canCreateBranchBinding(editor, branch, relation))
 	const desiredByKey = new Map(desired.map((relation) => [relationKey(relation), relation]))
 	const existing = getBranchBindings(editor, branch)
 	const existingByKey = new Map<string, BranchBinding[]>()
@@ -263,9 +309,72 @@ export function branchRelationsEqual(a: IBranchShape, b: IBranchShape) {
 }
 
 function getBranchAttachmentIdsForClipboard(editor: Editor, branch: IBranchShape) {
-	const bindingRelations = getBranchRelationsFromBindings(editor, branch)
-	const relations = bindingRelations.length > 0 ? bindingRelations : getLegacyRelations(branch)
-	return relations.map((relation) => relation.toId)
+	return Array.from(
+		new Set([
+			...getBranchRelationsFromBindings(editor, branch),
+			...getLegacyRelations(branch),
+		].map((relation) => relation.toId))
+	)
+}
+
+function getClipboardRelationKey(fromId: string, relation: BranchRelation) {
+	return `${fromId}:${relationKey(relation)}`
+}
+
+function getClipboardRelationEndpointKey(fromId: string, relation: BranchRelation) {
+	return `${fromId}:${relation.role}:${relation.toId}`
+}
+
+/**
+ * A document may be opened from a pre-binding version or contain only a
+ * partially migrated branch. Preserve existing bindings and synthesize only
+ * the missing legacy relations in clipboard content, where tldraw can remap
+ * every endpoint ID atomically during paste.
+ */
+function addMissingLegacyBranchBindings(content: TLContent): TLContent {
+	const shapesById = new Map(content.shapes.map((shape) => [shape.id as string, shape]))
+	const relationKeys = new Set<string>()
+	const relationEndpointKeys = new Set<string>()
+	for (const binding of content.bindings) {
+		if (binding.type !== BRANCH_BINDING_TYPE) continue
+		const relation = {
+				toId: binding.toId as string,
+				role: binding.props.role,
+				side: binding.props.role === 'child' ? (binding.props.side || 'right') : undefined,
+				index: binding.props.index ?? 0,
+			} satisfies BranchRelation
+		relationKeys.add(getClipboardRelationKey(binding.fromId as string, relation))
+		relationEndpointKeys.add(getClipboardRelationEndpointKey(binding.fromId as string, relation))
+	}
+
+	const bindingsToAdd: TLBinding[] = []
+	for (const shape of content.shapes) {
+		if (shape.type !== 'branch') continue
+		const branch = shape as IBranchShape
+		for (const relation of getLegacyRelations(branch)) {
+			const target = shapesById.get(relation.toId)
+			if (!target || target.id === branch.id) continue
+			if (relation.role === 'root' && target.type !== 'card' && target.type !== 'single-block') continue
+			if (relation.role === 'child' && !CONNECTABLE_BRANCH_TYPES.has(target.type)) continue
+
+			const key = getClipboardRelationKey(branch.id as string, relation)
+			const endpointKey = getClipboardRelationEndpointKey(branch.id as string, relation)
+			if (relationKeys.has(key) || relationEndpointKeys.has(endpointKey)) continue
+			relationKeys.add(key)
+			relationEndpointKeys.add(endpointKey)
+			bindingsToAdd.push({
+				id: createBindingId(),
+				typeName: 'binding',
+				type: BRANCH_BINDING_TYPE,
+				fromId: branch.id,
+				toId: relation.toId as TLShapeId,
+				props: { role: relation.role, side: relation.side, index: relation.index },
+				meta: {},
+			})
+		}
+	}
+
+	return bindingsToAdd.length === 0 ? content : { ...content, bindings: [...content.bindings, ...bindingsToAdd] }
 }
 
 /**
@@ -293,7 +402,7 @@ export function getBranchClipboardContent(editor: Editor, content: TLContent) {
 	const expanded = editor.getContentFromCurrentPage(Array.from(shapeIds) as TLShapeId[])
 	if (!expanded) return content
 
-	return {
+	return addMissingLegacyBranchBindings({
 		...expanded,
 		shapes: expanded.shapes.map((shape) => {
 			if (shape.type !== 'branch') return shape
@@ -305,7 +414,7 @@ export function getBranchClipboardContent(editor: Editor, content: TLContent) {
 				},
 			}
 		}),
-	}
+	})
 }
 
 /**
@@ -315,12 +424,13 @@ export function getBranchClipboardContent(editor: Editor, content: TLContent) {
  */
 export function prepareBranchClipboardContentForPaste(content: TLExternalContent<unknown>): TLExternalContent<unknown> {
 	if (content.type !== 'tldraw' || !content.content.shapes.some((shape) => shape.type === 'branch')) return content
+	const branchContent = addMissingLegacyBranchBindings(content.content)
 
 	return {
 		...content,
 		content: {
-			...content.content,
-			shapes: content.content.shapes.map((shape) => {
+			...branchContent,
+			shapes: branchContent.shapes.map((shape) => {
 				if (shape.type !== 'branch') return shape
 				const branch = shape as IBranchShape
 				const { rootShapeId: _rootShapeId, ...propsWithoutRoot } = branch.props

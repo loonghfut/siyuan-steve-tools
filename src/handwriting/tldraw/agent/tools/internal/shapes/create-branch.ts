@@ -37,6 +37,9 @@ export function createAgentBranchShape(
 	const rightChildIds: string[] = []
 	const rootShapeId = getExistingRootShapeId(editor, options.rootShapeId)
 	const branchDefaults = getAgentBranchDefaults()
+	const rootShape = rootShapeId ? editor.getShape(rootShapeId as TLShapeId) : undefined
+	const rootParent = rootShape ? editor.getShapeParent(rootShape) : undefined
+	const localRootPoint = rootParent ? editor.getPointInShapeSpace(rootParent, rootPoint) : rootPoint
 
 	for (const child of normalizeBranchChildren(options, rootPoint)) {
 		const childId = ensureBranchChild(editor, child.ref, child.defaults, context)
@@ -50,8 +53,9 @@ export function createAgentBranchShape(
 	editor.createShape<IBranchShape>({
 		id: branchId,
 		type: 'branch',
-		x: rootPoint.x - (branchDefaults.rootX ?? branchDefaults.w / 2),
-		y: rootPoint.y - branchDefaults.h / 2,
+		parentId: rootShape?.parentId,
+		x: localRootPoint.x - (branchDefaults.rootX ?? branchDefaults.w / 2),
+		y: localRootPoint.y - branchDefaults.h / 2,
 		props: {
 			...branchDefaults,
 			color: options.color ?? branchDefaults.color,

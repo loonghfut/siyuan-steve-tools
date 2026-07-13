@@ -565,13 +565,12 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const hasRootContent = !!info.rootShapeId && !!info.rootBounds
 		const interactionHint = useBranchInteractionHintForBranch(shape.id as string)
 		const isAttachTarget = interactionHint?.mode === 'attach' && interactionHint.branchId === shape.id
-		const isAbsorbingShape = isAttachTarget && !!interactionHint?.targetShapeId
 		const isRootAttachTarget = isAttachTarget && interactionHint.slot === 'root'
 		const isDetachTarget = interactionHint?.mode === 'detach' && interactionHint.branchId === shape.id
 		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
 		const activeSide = isAttachTarget ? interactionHint.side : null
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
-		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
+		const rootHaloRadius = info.rootRadius + (isAttachTarget ? 10 : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
 		const isAutoFrameEnhanced = info.autoFrame.enabled
 		const showBackground = shape.props.showBackground === true

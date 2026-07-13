@@ -268,8 +268,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isRootAttachTarget =
 			branchInteractionHint?.mode === 'attach' &&
 			branchInteractionHint.slot === 'root' &&
-			(branchInteractionHint.targetShapeId === shape.id ||
-				(!branchInteractionHint.targetShapeId && branchInteractionHint.draggingShapeId === shape.id))
+			branchInteractionHint.draggingShapeId === shape.id
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		const [isInViewport, setIsInViewport] = useState(true);
 		const [canLoad, setCanLoad] = useState(true); // gating heavy render by global manager

@@ -7,7 +7,6 @@ export type BranchInteractionHint =
 			branchId: string
 			side?: 'left' | 'right'
 			slot?: 'root' | 'side'
-			targetShapeId?: string
 	  }
 	| {
 			mode: 'detach'
@@ -55,8 +54,7 @@ export function setBranchInteractionHint(nextHint: BranchInteractionHint | null)
 		prev?.branchId === nextHint?.branchId &&
 		(prev as any)?.draggingShapeId === (nextHint as any)?.draggingShapeId &&
 		(prev as any)?.side === (nextHint as any)?.side &&
-		(prev as any)?.slot === (nextHint as any)?.slot &&
-		(prev as any)?.targetShapeId === (nextHint as any)?.targetShapeId
+		(prev as any)?.slot === (nextHint as any)?.slot
 
 	if (isSame) return
 	currentHint = nextHint

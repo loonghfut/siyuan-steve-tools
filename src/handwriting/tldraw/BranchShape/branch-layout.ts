@@ -25,7 +25,6 @@ const delayedAttachCandidates = new Map<
 		branchId: string
 		side?: BranchSide
 		slot?: BranchAttachmentSlot
-		targetShapeId?: string
 		timeoutId: ReturnType<typeof setTimeout> | null
 	}
 >()
@@ -74,7 +73,6 @@ type BranchDragPreview =
 			branch: IBranchShape
 			side?: BranchSide
 			slot?: BranchAttachmentSlot
-			targetShapeId?: string
 	  }
 	| {
 			mode: 'detach'
@@ -85,7 +83,6 @@ type BranchDragPreviewOptions = {
 	scheduleAttachHint?: boolean
 	draggingShapeId?: string
 	branches?: IBranchShape[]
-	pageShapes?: TLShape[]
 	parentsByChildId?: Map<string, IBranchShape[]>
 }
 
@@ -107,7 +104,6 @@ function getActiveBranchDragPreviewOptions(editor: Editor): BranchDragPreviewOpt
 	const branches = getCurrentBranches(editor)
 	return {
 		branches,
-		pageShapes: editor.getCurrentPageShapes(),
 		parentsByChildId: buildBranchParentIndex(branches),
 	}
 }
@@ -163,16 +159,12 @@ function getAttachCandidateKey(
 	attach:
 		| BranchAttachToBranchCandidate
 		| BranchRootAttachCandidate
-		| { branch: IBranchShape; side?: BranchSide; slot?: BranchAttachmentSlot; mode?: 'attach-to-branch'; targetShapeId?: string }
+		| { branch: IBranchShape; side?: BranchSide; slot?: BranchAttachmentSlot; mode?: 'attach-to-branch' }
 ) {
 	const mode = attach.mode ?? 'attach-to-branch'
-	const targetShapeId =
-		'targetShapeId' in attach ? attach.targetShapeId : undefined
 	const side = 'side' in attach ? attach.side : undefined
 	const slot = 'slot' in attach ? attach.slot : undefined
-	return targetShapeId
-		? `${mode}:${attach.branch.id}:${side ?? slot ?? 'root'}:${targetShapeId}`
-		: `${mode}:${attach.branch.id}:${side ?? slot ?? 'root'}`
+	return `${mode}:${attach.branch.id}:${side ?? slot ?? 'root'}`
 }
 
 function isDelayedAttachReady(
@@ -195,7 +187,6 @@ function isDelayedAttachReady(
 			branchId: attach.branch.id as string,
 			side: 'side' in attach ? attach.side : undefined,
 			slot,
-			targetShapeId: undefined,
 			timeoutId: null as ReturnType<typeof setTimeout> | null,
 		}
 
@@ -211,7 +202,6 @@ function isDelayedAttachReady(
 					branchId: latest.branchId,
 					side: latest.side,
 					slot: latest.slot,
-					targetShapeId: latest.targetShapeId,
 				})
 			}, ATTACH_DELAY_MS)
 		}
@@ -563,29 +553,6 @@ function normalizeSideChildIds(editor: Editor, branch: IBranchShape, side: Branc
 	return normalizeBranchChildIds(editor, branch, ids)
 }
 
-function getBranchSideChildIdsForAttachCheck(
-	editor: Editor,
-	branch: IBranchShape,
-	side: BranchSide,
-	draft?: BranchIdsDraft
-) {
-	if (draft) return side === 'left' ? draft.leftChildIds : draft.rightChildIds
-	return normalizeSideChildIds(editor, branch, side)
-}
-
-function canBranchAbsorbShapeOnSide(
-	editor: Editor,
-	branch: IBranchShape,
-	side: BranchSide,
-	options?: {
-		draft?: BranchIdsDraft
-		allowedExistingChildId?: string
-	}
-) {
-	const sideChildIds = getBranchSideChildIdsForAttachCheck(editor, branch, side, options?.draft)
-	return sideChildIds.every((id) => id === options?.allowedExistingChildId)
-}
-
 function getBranchChildren(editor: Editor, ids: string[]) {
 	return ids
 		.map((id) => {
@@ -595,8 +562,7 @@ function getBranchChildren(editor: Editor, ids: string[]) {
 			if (!bounds) return null
 			return { shape: shape as BranchChildShape, bounds }
 		})
-		.filter(Boolean)
-		.sort((a, b) => a!.bounds.centerY - b!.bounds.centerY) as BranchChildEntry[]
+		.filter(Boolean) as BranchChildEntry[]
 }
 
 export function addBranchDescendantMoveUpdates(
@@ -953,7 +919,6 @@ export function attachShapeToNearestBranch(editor: Editor, shape: TLShape) {
 	const preview = getBranchDragPreview(editor, shape, {
 		scheduleAttachHint: false,
 		branches,
-		pageShapes: editor.getCurrentPageShapes(),
 		parentsByChildId: buildBranchParentIndex(branches),
 	})
 	if (preview?.mode !== 'attach') return false
@@ -965,7 +930,6 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 	const currentBranches = getCurrentBranches(editor)
 	if (currentBranches.length === 0) return false
 
-	const pageShapes = editor.getCurrentPageShapes()
 	const parentsByChildId = buildBranchParentIndex(currentBranches)
 	const drafts = new Map<TLShapeId, BranchIdsDraft>()
 	const affectedBranchIds = new Set<TLShapeId>()
@@ -981,18 +945,14 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			scheduleAttachHint: false,
 			draggingShapeId: shape.id as string,
 			branches: currentBranches,
-			pageShapes,
 			parentsByChildId,
 		})
 
 		if (preview?.mode === 'attach') {
 			if (previewShape.type === 'branch') affectedBranchIds.add(previewShape.id)
 			const nearest = preview.branch
-			const attachTargetShapeId = preview.targetShapeId
-			const attachTargetShape = attachTargetShapeId ? editor.getShape(attachTargetShapeId as TLShapeId) : null
-			if (attachTargetShapeId && !attachTargetShape) continue
-			const childShape = attachTargetShape ?? previewShape
-			const attachChildId = (attachTargetShape?.id as string) || childId
+			const childShape = previewShape
+			const attachChildId = childId
 
 			if (preview.slot === 'root') {
 				if (!canBranchWrapRootShape(nearest, childShape)) continue
@@ -1021,27 +981,14 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 			if (!preview.side) continue
 			if (!canAttachShapeToBranch(editor, nearest, childShape)) continue
 			const nearestDraft = getBranchDraft(editor, drafts, nearest)
-			if (attachTargetShape) {
-				if (
-					!canBranchAbsorbShapeOnSide(editor, nearest, preview.side, {
-						draft: nearestDraft,
-						allowedExistingChildId: attachChildId,
-					})
-				) {
-					continue
-				}
-			}
 			const containingBranches = parentsByChildId.get(attachChildId) || []
-			const sourceBranch = attachTargetShape
-				? containingBranches.find((branch) => branch.id !== nearest.id) || null
-				: null
 			const isOnlyInNearest = containingBranches.length === 1 && containingBranches[0].id === nearest.id
 			const isAlreadyOnSameSide =
 				preview.side === 'left'
 					? nearestDraft.leftChildIds.includes(attachChildId)
 					: nearestDraft.rightChildIds.includes(attachChildId)
 
-			if (attachTargetShape && isOnlyInNearest && isAlreadyOnSameSide) {
+			if (isOnlyInNearest && isAlreadyOnSameSide) {
 				continue
 			}
 
@@ -1058,34 +1005,6 @@ function updateBranchAttachmentsAfterDrag(editor: Editor, shapes: TLShape[]) {
 				else nearestDraft.rightChildIds.push(attachChildId)
 			}
 			affectedBranchIds.add(nearest.id)
-
-			if (attachTargetShape && sourceBranch && canAttachShapeToBranch(editor, sourceBranch, nearest)) {
-				const sourceDraft = getBranchDraft(editor, drafts, sourceBranch)
-				const sourceSide = getChildSideInBranch(sourceBranch, attachChildId) || getBranchSideForShape(editor, sourceBranch, nearest)
-				const nearestBranchId = nearest.id as string
-				const nearestAlreadyOnSourceSide =
-					sourceSide === 'left'
-						? sourceDraft.leftChildIds.includes(nearestBranchId)
-						: sourceDraft.rightChildIds.includes(nearestBranchId)
-				const nearestContainingBranches = parentsByChildId.get(nearestBranchId) || []
-				const nearestOnlyInSource =
-					nearestContainingBranches.length === 1 && nearestContainingBranches[0].id === sourceBranch.id
-
-				if (!(nearestOnlyInSource && nearestAlreadyOnSourceSide)) {
-					for (const branch of currentBranches) {
-						const draft = getBranchDraft(editor, drafts, branch)
-						if (!draftContainsChild(draft, nearestBranchId)) continue
-						if (removeChildFromDraft(draft, nearestBranchId)) affectedBranchIds.add(branch.id)
-					}
-
-					if (sourceSide === 'left') {
-						if (!sourceDraft.leftChildIds.includes(nearestBranchId)) sourceDraft.leftChildIds.push(nearestBranchId)
-					} else {
-						if (!sourceDraft.rightChildIds.includes(nearestBranchId)) sourceDraft.rightChildIds.push(nearestBranchId)
-					}
-					affectedBranchIds.add(sourceBranch.id)
-				}
-			}
 
 			didHandle = true
 			continue
@@ -1209,7 +1128,6 @@ export function getBranchInteractionHintForShape(editor: Editor, shape: TLShape)
 			branchId: preview.branch.id,
 			side: preview.side,
 			slot: preview.slot,
-			targetShapeId: preview.targetShapeId,
 		}
 	}
 
