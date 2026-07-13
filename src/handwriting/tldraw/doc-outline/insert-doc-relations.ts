@@ -3,7 +3,7 @@ import { api } from '@frostime/siyuan-plugin-kits'
 import { showMessage } from 'siyuan'
 import type { ICardShape } from '../CardShape/card-shape-types'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
-import { getAllBranchAttachedShapeIds, layoutBranchChildren, markExplicitCreatedBranchRelations, relayoutBranchesContainingShapes } from '../BranchShape'
+import { getAllBranchAttachedShapeIds, layoutBranchChildren, relayoutBranchesContainingShapes } from '../BranchShape'
 import type { BranchLineStyle } from '../BranchShape/branch-shape-types'
 import { buildTldrawLink } from '../utils/link-builder'
 
@@ -269,8 +269,6 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 		branchShape.props.childIds = [...rightChildIds]
 		branchShape.props.rightChildIds = [...rightChildIds]
 	}
-
-	markExplicitCreatedBranchRelations(editor, [branchId, ...branchLayoutIds])
 
 	editor.run(() => {
 		editor.createShapes(createdShapes)

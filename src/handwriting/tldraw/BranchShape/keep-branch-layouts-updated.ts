@@ -1,8 +1,14 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { IBranchShape } from './branch-shape-types'
 import {
+	branchRelationsEqual,
+	clearBranchClipboardMarker,
+	hasBranchClipboardMarker,
+	reconcileBranchRelationsFromBindings,
+	syncBranchBindingsFromLegacyProps,
+} from './branch-binding'
+import {
 	getAllBranchChildIds,
-	isBranchConnectableShape,
 	layoutBranchChildren,
 	pruneShapesFromBranches,
 	repairBranchStructure,
@@ -11,31 +17,12 @@ import {
 
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 const REGISTERED_EDITORS = new WeakSet<Editor>()
-const EXPLICIT_CREATED_BRANCH_RELATIONS = new WeakMap<Editor, Set<string>>()
 
 // tldraw exposes this internally on HistoryManager, but deliberately omits it
 // from its public TypeScript declaration. Keep the compatibility boundary here.
 function isReplayingHistory(editor: Editor) {
 	const history = (editor as unknown as { history?: { isReplaying?: () => boolean } }).history
 	return history?.isReplaying?.() === true
-}
-
-export function markExplicitCreatedBranchRelations(editor: Editor, branchIds: Iterable<TLShapeId | string>) {
-	let ids = EXPLICIT_CREATED_BRANCH_RELATIONS.get(editor)
-	if (!ids) {
-		ids = new Set<string>()
-		EXPLICIT_CREATED_BRANCH_RELATIONS.set(editor, ids)
-	}
-	for (const branchId of branchIds) ids.add(branchId as string)
-}
-
-function consumeExplicitCreatedBranchRelation(editor: Editor, branchId: TLShapeId | string) {
-	const ids = EXPLICIT_CREATED_BRANCH_RELATIONS.get(editor)
-	if (!ids?.has(branchId as string)) return false
-
-	ids.delete(branchId as string)
-	if (ids.size === 0) EXPLICIT_CREATED_BRANCH_RELATIONS.delete(editor)
-	return true
 }
 
 function getShapeWidth(shape: TLShape) {
@@ -60,27 +47,6 @@ function didRelevantBoundsChange(prev: TLShape, next: TLShape) {
 	if (getBranchRootX(prev) !== getBranchRootX(next)) return true
 
 	return false
-}
-
-function getShapeSignature(shape: TLShape) {
-	return `${shape.type}:${getShapeWidth(shape) ?? ''}:${getShapeHeight(shape) ?? ''}:${getBranchRootX(shape) ?? ''}`
-}
-
-function getRoundedDeltaKey(dx: number, dy: number) {
-	return `${Math.round(dx * 1000) / 1000}:${Math.round(dy * 1000) / 1000}`
-}
-
-function getShapeBounds(shape: TLShape) {
-	const w = getShapeWidth(shape)
-	const h = getShapeHeight(shape)
-	if (w == null || h == null) return null
-	return {
-		x: shape.x,
-		y: shape.y,
-		w,
-		h,
-		centerY: shape.y + h / 2,
-	}
 }
 
 function isPromotableBranchChild(shape: TLShape | undefined) {
@@ -147,218 +113,14 @@ function promoteOnlyChildOfDeletedBranch(editor: Editor, deletedBranch: IBranchS
 		const updatedParent = editor.getShape<IBranchShape>(parentId)
 		if (updatedParent?.type === 'branch') {
 			layoutBranchChildren(editor, updatedParent)
+			const laidOutParent = editor.getShape<IBranchShape>(updatedParent.id)
+			if (laidOutParent?.type === 'branch') syncBranchBindingsFromLegacyProps(editor, laidOutParent)
 		}
 	}
 
 	if (affectedParentIds.size > 0) {
 		relayoutBranchesContainingShapes(editor, [promotedChildId as TLShapeId, ...Array.from(affectedParentIds)])
 	}
-}
-
-function inferCreatedBranchChildrenFromLayout(
-	editor: Editor,
-	branch: IBranchShape,
-	createdShapeIds: Set<string>
-) {
-	const branchPageBounds = editor.getShapePageBounds(branch.id)
-	const branchRootX = (branchPageBounds?.x ?? branch.x) + getBranchRootX(branch)!
-	const horizontalGap = Math.max(branch.props.horizontalGap || 80, 20)
-	const expectedLeftEdgeX = branchRootX - horizontalGap
-	const expectedRightEdgeX = branchRootX + horizontalGap
-	const tolerance = Math.max(2, horizontalGap * 0.05)
-	const leftCandidates: Array<{ id: string; centerY: number }> = []
-	const rightCandidates: Array<{ id: string; centerY: number }> = []
-
-	for (const id of createdShapeIds) {
-		if (id === branch.id) continue
-		const shape = editor.getShape(id as TLShapeId)
-		if (!shape || !isBranchConnectableShape(shape)) continue
-
-		const pageBounds = editor.getShapePageBounds(shape.id)
-		const bounds = pageBounds
-			? { x: pageBounds.x, y: pageBounds.y, w: pageBounds.width, h: pageBounds.height, centerY: pageBounds.y + pageBounds.height / 2 }
-			: getShapeBounds(shape)
-		if (!bounds) continue
-		const branchY = branchPageBounds?.y ?? branch.y
-		const isInBranchYRange = bounds.centerY >= branchY - tolerance && bounds.centerY <= branchY + branch.props.h + tolerance
-		if (!isInBranchYRange) continue
-
-		if (Math.abs(bounds.x + bounds.w - expectedLeftEdgeX) <= tolerance) {
-			leftCandidates.push({ id, centerY: bounds.centerY })
-		} else if (Math.abs(bounds.x - expectedRightEdgeX) <= tolerance) {
-			rightCandidates.push({ id, centerY: bounds.centerY })
-		}
-	}
-
-	const byCenterY = (a: { centerY: number }, b: { centerY: number }) => a.centerY - b.centerY
-	leftCandidates.sort(byCenterY)
-	rightCandidates.sort(byCenterY)
-
-	return {
-		leftChildIds: leftCandidates.map(({ id }) => id),
-		rightChildIds: rightCandidates.map(({ id }) => id),
-	}
-}
-
-function findCreatedShapeIdRemaps(
-	editor: Editor,
-	branch: IBranchShape,
-	createdShapeIds: Set<string>,
-	usedCreatedShapeIds: Set<string>
-) {
-	const referencedChildIds = Array.from(
-		new Set([
-			...(branch.props.childIds || []),
-			...(branch.props.leftChildIds || []),
-			...(branch.props.rightChildIds || []),
-			...(branch.props.rootShapeId ? [branch.props.rootShapeId] : []),
-		])
-	)
-	const createdCandidates = Array.from(createdShapeIds)
-		.filter((id) => id !== branch.id && !usedCreatedShapeIds.has(id))
-		.map((id) => editor.getShape(id as TLShapeId))
-		.filter((shape): shape is TLShape => !!shape && isBranchConnectableShape(shape))
-
-	const deltaCounts = new Map<string, number>()
-	for (const childId of referencedChildIds) {
-		const sourceShape = editor.getShape(childId as TLShapeId)
-		if (!sourceShape || !isBranchConnectableShape(sourceShape)) continue
-
-		const sourceSignature = getShapeSignature(sourceShape)
-		for (const candidate of createdCandidates) {
-			if (getShapeSignature(candidate) !== sourceSignature) continue
-			const sourceBounds = editor.getShapePageBounds(sourceShape.id)
-			const candidateBounds = editor.getShapePageBounds(candidate.id)
-			if (!sourceBounds || !candidateBounds) continue
-			const deltaKey = getRoundedDeltaKey(candidateBounds.x - sourceBounds.x, candidateBounds.y - sourceBounds.y)
-			deltaCounts.set(deltaKey, (deltaCounts.get(deltaKey) || 0) + 1)
-		}
-	}
-
-	let bestDeltaKey: string | null = null
-	let bestDeltaCount = 0
-	for (const [deltaKey, count] of deltaCounts) {
-		if (count > bestDeltaCount) {
-			bestDeltaKey = deltaKey
-			bestDeltaCount = count
-		}
-	}
-
-	if (!bestDeltaKey) return new Map<string, string>()
-
-	const [dxText, dyText] = bestDeltaKey.split(':')
-	const dx = Number(dxText)
-	const dy = Number(dyText)
-	const remainingCandidates = new Map<string, TLShape[]>()
-
-	for (const candidate of createdCandidates) {
-		const signature = getShapeSignature(candidate)
-		const existing = remainingCandidates.get(signature)
-		if (existing) existing.push(candidate)
-		else remainingCandidates.set(signature, [candidate])
-	}
-
-	const remaps = new Map<string, string>()
-	for (const childId of referencedChildIds) {
-		const sourceShape = editor.getShape(childId as TLShapeId)
-		if (!sourceShape || !isBranchConnectableShape(sourceShape)) continue
-
-		const signature = getShapeSignature(sourceShape)
-		const candidates = remainingCandidates.get(signature)
-		if (!candidates || candidates.length === 0) continue
-
-		const sourceBounds = editor.getShapePageBounds(sourceShape.id)
-		if (!sourceBounds) continue
-		const expectedX = sourceBounds.x + dx
-		const expectedY = sourceBounds.y + dy
-		const matchedIndex = candidates.findIndex(
-			(candidate) => {
-				const candidateBounds = editor.getShapePageBounds(candidate.id)
-				return !!candidateBounds && Math.abs(candidateBounds.x - expectedX) <= 0.001 && Math.abs(candidateBounds.y - expectedY) <= 0.001
-			}
-		)
-		if (matchedIndex === -1) continue
-
-		const [matchedShape] = candidates.splice(matchedIndex, 1)
-		remaps.set(childId, matchedShape.id as string)
-	}
-
-	return remaps
-}
-
-function remapCreatedBranchChildren(
-	editor: Editor,
-	branch: IBranchShape,
-	createdShapeIds: Set<string>,
-	usedCreatedShapeIds: Set<string>
-) {
-	const idRemaps = findCreatedShapeIdRemaps(editor, branch, createdShapeIds, usedCreatedShapeIds)
-	const inferredChildren = idRemaps.size === 0 ? inferCreatedBranchChildrenFromLayout(editor, branch, createdShapeIds) : null
-	const remapIds = (
-		ids: string[] | undefined,
-		fallbackIds: string[] = []
-	) => {
-		let fallbackIndex = 0
-		return (
-		(ids || [])
-			.map((id) => {
-				const remappedId = idRemaps.get(id)
-				if (remappedId && editor.getShape(remappedId as TLShapeId)) {
-					usedCreatedShapeIds.add(remappedId)
-					return remappedId
-				}
-				if (createdShapeIds.has(id) && editor.getShape(id as TLShapeId) && !usedCreatedShapeIds.has(id)) {
-					usedCreatedShapeIds.add(id)
-					return id
-				}
-				const fallbackId = fallbackIds[fallbackIndex++]
-				if (fallbackId && editor.getShape(fallbackId as TLShapeId) && !usedCreatedShapeIds.has(fallbackId)) {
-					usedCreatedShapeIds.add(fallbackId)
-					return fallbackId
-				}
-				return null
-			})
-			.filter((id): id is string => !!id)
-		)
-	}
-
-	const sourceRightChildIds = branch.props.rightChildIds || branch.props.childIds
-	const nextLeftChildIds = remapIds(branch.props.leftChildIds, inferredChildren?.leftChildIds)
-	const nextRightChildIds = remapIds(sourceRightChildIds, inferredChildren?.rightChildIds)
-	// childIds is the legacy/canonical alias for rightChildIds. Reuse the same
-	// mapping instead of consuming the created IDs a second time; otherwise the
-	// fallback path would keep childIds but filter every rightChildIds entry.
-	const nextChildIds = nextRightChildIds
-	// Pasted shapes receive new IDs. Keeping an existing root ID here would make
-	// a pasted branch control the original branch's root card (often on another
-	// frame), which corrupts both layouts. If the root was not pasted, detach it.
-	const nextRootShapeIds = remapIds(branch.props.rootShapeId ? [branch.props.rootShapeId] : [])
-	const nextRootShapeId = nextRootShapeIds[0]
-
-	const didChange =
-		nextChildIds.length !== (branch.props.childIds || []).length ||
-		nextLeftChildIds.length !== (branch.props.leftChildIds || []).length ||
-		nextRightChildIds.length !== (sourceRightChildIds || []).length ||
-		nextChildIds.some((id, index) => id !== (branch.props.childIds || [])[index]) ||
-		nextLeftChildIds.some((id, index) => id !== (branch.props.leftChildIds || [])[index]) ||
-		nextRightChildIds.some((id, index) => id !== (sourceRightChildIds || [])[index]) ||
-		nextRootShapeId !== branch.props.rootShapeId
-
-	if (!didChange) return false
-
-	editor.updateShape<IBranchShape>({
-		id: branch.id,
-		type: 'branch',
-		props: {
-			...branch.props,
-			childIds: nextChildIds,
-			leftChildIds: nextLeftChildIds,
-			rightChildIds: nextRightChildIds,
-			rootShapeId: nextRootShapeId,
-		},
-	})
-
-	return true
 }
 
 function getBranchDepth(editor: Editor, branch: IBranchShape, visiting = new Set<string>()): number {
@@ -461,119 +223,144 @@ function moveConnectedBranchesToParent(editor: Editor, parentChanges: Map<string
 	}
 }
 
+export function migrateBranchBindings(editor: Editor) {
+	// Existing documents only have the legacy ID arrays. Create bindings once
+	// at mount so future clipboard operations can use tldraw's native ID remap.
+	// Migrate every page, not only the page that happened to be active on mount.
+	for (const page of editor.getPages()) {
+		for (const shapeId of editor.getPageShapeIds(page.id)) {
+			const shape = editor.getShape(shapeId)
+			if (shape?.type === 'branch') syncBranchBindingsFromLegacyProps(editor, shape as IBranchShape)
+		}
+	}
+}
+
+function layoutBranches(editor: Editor, branchIds: Iterable<TLShapeId | string>) {
+	const branches = Array.from(new Set(Array.from(branchIds).map(String)))
+		.map((id) => editor.getShape<IBranchShape>(id as TLShapeId))
+		.filter((branch): branch is IBranchShape => branch?.type === 'branch')
+		.sort((a, b) => getBranchDepth(editor, b) - getBranchDepth(editor, a))
+
+	for (const branch of branches) {
+		const latest = editor.getShape<IBranchShape>(branch.id)
+		if (!latest?.type || latest.type !== 'branch') continue
+		layoutBranchChildren(editor, latest)
+		const laidOut = editor.getShape<IBranchShape>(latest.id)
+		if (laidOut?.type === 'branch') syncBranchBindingsFromLegacyProps(editor, laidOut)
+	}
+}
+
 export function keepBranchLayoutsUpdated(editor: Editor) {
 	if (REGISTERED_EDITORS.has(editor)) return
 	REGISTERED_EDITORS.add(editor)
 	repairBranchStructure(editor)
+	migrateBranchBindings(editor)
 
 	let pendingShapeIds = new Set<string>()
 	let pendingDeletedShapes = new Map<string, TLShape>()
-	let pendingCreatedShapeIds = new Set<string>()
 	let pendingCreatedBranchIds = new Set<string>()
+	let pendingPastedBranchIds = new Set<string>()
+	let pendingRelationBranchIds = new Set<string>()
+	let pendingBindingBranchIds = new Set<string>()
 	let pendingParentChanges = new Map<string, BranchParentChange>()
 	let isUpdating = false
 
-	editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
-		// Undo/redo recreates the original records. They already contain correct
-		// IDs, so treating them as a clipboard paste would remap them to unrelated
-		// shapes that happen to share a signature and position.
-		if (source === 'remote' || isUpdating || isReplayingHistory(editor)) return
+	const shouldIgnore = (source: string) => source === 'remote' || isUpdating || isReplayingHistory(editor)
 
-		pendingCreatedShapeIds.add(shape.id as string)
+	editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
+		if (shouldIgnore(source)) return
 		if (shape.type !== 'branch') return
 
-		const branch = shape as IBranchShape
-		if ((branch.props.childIds || []).length === 0 && (branch.props.leftChildIds || []).length === 0 && (branch.props.rightChildIds || []).length === 0 && !branch.props.rootShapeId) {
-			return
-		}
-
 		pendingCreatedBranchIds.add(shape.id as string)
+		if (hasBranchClipboardMarker(shape as IBranchShape)) pendingPastedBranchIds.add(shape.id as string)
 	})
 
 	editor.sideEffects.registerAfterChangeHandler('shape', (prev, next, source) => {
-		if (source === 'remote' || isUpdating || isReplayingHistory(editor)) return
+		if (shouldIgnore(source)) return
 		if (prev.parentId !== next.parentId) {
 			pendingParentChanges.set(next.id as string, {
 				previousParentId: prev.parentId as string,
 				nextParentId: next.parentId as string,
 			})
 		}
-		if (!didRelevantBoundsChange(prev, next)) return
-
-		pendingShapeIds.add(next.id as string)
+		if (prev.type === 'branch' && next.type === 'branch' && !branchRelationsEqual(prev as IBranchShape, next as IBranchShape)) {
+			pendingRelationBranchIds.add(next.id as string)
+		}
+		if (didRelevantBoundsChange(prev, next)) pendingShapeIds.add(next.id as string)
 	})
 
 	editor.sideEffects.registerAfterDeleteHandler('shape', (shape, source) => {
-		if (source === 'remote' || isUpdating || isReplayingHistory(editor)) return
-		if (!BRANCH_CHILD_TYPES.has(shape.type)) return
-
+		if (shouldIgnore(source) || !BRANCH_CHILD_TYPES.has(shape.type)) return
 		pendingDeletedShapes.set(shape.id as string, shape)
 	})
 
+	const markBindingChange = (binding: { type: string; fromId: TLShapeId | string }, source: string) => {
+		if (shouldIgnore(source) || binding.type !== 'branch-child') return
+		pendingBindingBranchIds.add(binding.fromId as string)
+	}
+	editor.sideEffects.registerAfterCreateHandler('binding', markBindingChange)
+	editor.sideEffects.registerAfterChangeHandler('binding', (_prev, next, source) => markBindingChange(next, source))
+	editor.sideEffects.registerAfterDeleteHandler('binding', markBindingChange)
+
 	editor.sideEffects.registerOperationCompleteHandler(() => {
 		if (
+			isUpdating ||
 			(
 				pendingShapeIds.size === 0 &&
 				pendingDeletedShapes.size === 0 &&
-				pendingCreatedShapeIds.size === 0 &&
 				pendingCreatedBranchIds.size === 0 &&
+				pendingPastedBranchIds.size === 0 &&
+				pendingRelationBranchIds.size === 0 &&
+				pendingBindingBranchIds.size === 0 &&
 				pendingParentChanges.size === 0
-			) ||
-			isUpdating
+			)
 		) {
 			return
 		}
 
 		const shapeIds = Array.from(pendingShapeIds)
 		const deletedShapes = Array.from(pendingDeletedShapes.values())
-		const createdShapeIds = new Set(pendingCreatedShapeIds)
-		const createdBranchIds = Array.from(pendingCreatedBranchIds)
+		const createdBranchIds = new Set(pendingCreatedBranchIds)
+		const pastedBranchIds = new Set(pendingPastedBranchIds)
+		const relationBranchIds = new Set(pendingRelationBranchIds)
+		const bindingBranchIds = new Set(pendingBindingBranchIds)
 		const parentChanges = new Map(pendingParentChanges)
 		pendingShapeIds = new Set()
 		pendingDeletedShapes = new Map()
-		pendingCreatedShapeIds = new Set()
 		pendingCreatedBranchIds = new Set()
+		pendingPastedBranchIds = new Set()
+		pendingRelationBranchIds = new Set()
+		pendingBindingBranchIds = new Set()
 		pendingParentChanges = new Map()
 		isUpdating = true
 
 		try {
 			moveConnectedBranchesToParent(editor, parentChanges)
+			const branchesToLayout = new Set<TLShapeId | string>()
 
-			const remappedCreatedBranches: IBranchShape[] = []
-			const usedCreatedShapeIds = new Set<string>()
 			for (const branchId of createdBranchIds) {
 				const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
-				if (!branch || branch.type !== 'branch') continue
-				if (consumeExplicitCreatedBranchRelation(editor, branchId)) continue
+				if (!branch?.type || branch.type !== 'branch') continue
 
-				if (remapCreatedBranchChildren(editor, branch, createdShapeIds, usedCreatedShapeIds)) {
-					const updatedBranch = editor.getShape<IBranchShape>(branch.id)
-					if (updatedBranch?.type === 'branch') remappedCreatedBranches.push(updatedBranch)
+				if (pastedBranchIds.has(branchId) || bindingBranchIds.has(branchId)) {
+					const hydrated = reconcileBranchRelationsFromBindings(editor, branch)
+					clearBranchClipboardMarker(editor, hydrated)
+					branchesToLayout.add(branchId)
+				} else {
+					syncBranchBindingsFromLegacyProps(editor, branch)
 				}
 			}
-
-			// Complete every ID remap before moving anything. A parent layout moves its whole
-			// branch subtree, so laying it out while nested branches still point at the source
-			// tree corrupts pasted multi-level branch layouts.
-			remappedCreatedBranches
-				.sort((a, b) => getBranchDepth(editor, b) - getBranchDepth(editor, a))
-				.forEach((branch) => {
-					const latestBranch = editor.getShape<IBranchShape>(branch.id)
-					if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
-				})
 
 			const rootDeletedBranchIds = deleteBranchesWhoseRootsWereDeleted(
 				editor,
 				new Set(deletedShapes.map((shape) => shape.id as string))
 			)
 			const deletedBranchIds = new Set(rootDeletedBranchIds.map((id) => id as string))
-
 			for (const shape of deletedShapes) {
 				if (shape.type === 'branch' && !deletedBranchIds.has(shape.id as string)) {
 					promoteOnlyChildOfDeletedBranch(editor, shape as IBranchShape)
 				}
 			}
-
 			if (deletedShapes.length > 0 || rootDeletedBranchIds.length > 0) {
 				pruneShapesFromBranches(editor, [
 					...deletedShapes.map((shape) => shape.id as TLShapeId),
@@ -581,9 +368,17 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 				])
 			}
 
-			if (shapeIds.length > 0) {
-				relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
+			for (const branchId of new Set([...relationBranchIds, ...bindingBranchIds])) {
+				const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
+				if (!branch?.type || branch.type !== 'branch') continue
+
+				if (bindingBranchIds.has(branchId)) reconcileBranchRelationsFromBindings(editor, branch)
+				else syncBranchBindingsFromLegacyProps(editor, branch)
+				branchesToLayout.add(branchId)
 			}
+
+			if (shapeIds.length > 0) relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
+			layoutBranches(editor, branchesToLayout)
 		} finally {
 			isUpdating = false
 		}

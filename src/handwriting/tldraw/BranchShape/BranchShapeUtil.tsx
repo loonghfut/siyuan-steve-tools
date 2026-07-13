@@ -8,6 +8,7 @@ import {
 	ShapeUtil,
 	SVGContainer,
 	TLShapeId,
+	TLShapeUtilCanBindOpts,
 	Vec,
 	VecLike,
 	useValue,
@@ -352,8 +353,9 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		return { points: [] }
 	}
 
-	override canBind() {
-		return true
+	override canBind({ bindingType, fromShape, toShape }: TLShapeUtilCanBindOpts<IBranchShape>) {
+		if (bindingType !== 'branch-child') return true
+		return fromShape.type === 'branch' && ['card', 'single-block', 'branch'].includes(toShape.type)
 	}
 
 	override canEdit() {

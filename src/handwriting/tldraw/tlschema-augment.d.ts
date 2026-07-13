@@ -1,6 +1,7 @@
 import type { ConnectorBinding } from './BezierConnectorShape'
 import type { IBezierConnectorShape } from './BezierConnectorShape/bezier-connector-types'
 import type { IBranchShape } from './BranchShape/branch-shape-types'
+import type { BranchBinding } from './BranchShape/branch-binding'
 import type { ICardShape } from './CardShape/card-shape-types'
 import type { IJsShape } from './JsShape/js-shape-types'
 import type { IMindMapShape } from './MindMapShape/mind-map-shape-types'
@@ -22,5 +23,6 @@ declare module '@tldraw/tldraw' {
 	interface TLGlobalBindingPropsMap {
 		'single-block': SingleBlockBinding['props']
 		'bezier-connector': ConnectorBinding['props']
+		'branch-child': BranchBinding['props']
 	}
 }

@@ -9,7 +9,6 @@ import type { IBranchShape } from "../BranchShape";
 import {
     getAllBranchAttachedShapeIds,
     layoutBranchChildren,
-    markExplicitCreatedBranchRelations,
     relayoutBranchesContainingShapes,
 } from "../BranchShape";
 import { clearSvgExportSnapshotCache } from "../utils/export-dom-snapshot";
@@ -28,7 +27,7 @@ export interface ShapeLibraryItem {
     shapes: TLShape[];
     /** 相关的资源数据（如图片等） */
     assets: TLAsset[];
-    /** 绑定关系数据（连接器与形状的绑定） */
+    /** 绑定关系数据（连接器、箭头与 branch 关系的绑定） */
     bindings?: TLBinding[];
     /** 缩略图（可选，base64） */
     thumbnail?: string;
@@ -141,22 +140,14 @@ function collectBindingsForShapes(editor: Editor, shapes: TLShape[]): TLBinding[
     const addedBindingIds = new Set<string>();
 
     for (const shape of shapes) {
-        // 获取从该形状发出的绑定（如连接器的绑定）
-        const outBindings = editor.getBindingsFromShape(shape.id, 'bezier-connector');
-        for (const binding of outBindings) {
-            // 只收集两端都在素材中的绑定
-            if (shapeIds.has(binding.toId) && !addedBindingIds.has(binding.id)) {
-                bindings.push(binding);
-                addedBindingIds.add(binding.id);
-            }
-        }
-        
-        // 同时处理 arrow 类型的绑定
-        const arrowBindings = editor.getBindingsFromShape(shape.id, 'arrow');
-        for (const binding of arrowBindings) {
-            if (shapeIds.has(binding.toId) && !addedBindingIds.has(binding.id)) {
-                bindings.push(binding);
-                addedBindingIds.add(binding.id);
+        // 收集所有两端都在素材中的绑定，包括 branch 的结构关系。
+        for (const bindingType of ['bezier-connector', 'arrow', 'branch-child'] as const) {
+            const outBindings = editor.getBindingsFromShape(shape.id, bindingType);
+            for (const binding of outBindings) {
+                if (shapeIds.has(binding.toId) && !addedBindingIds.has(binding.id)) {
+                    bindings.push(binding);
+                    addedBindingIds.add(binding.id);
+                }
             }
         }
     }
@@ -580,10 +571,6 @@ export function addLibraryItemToCanvas(
             .filter((shape): shape is IBranchShape => shape.type === 'branch')
             .map(shape => shape.id);
 
-        if (createdBranchIds.length > 0) {
-            markExplicitCreatedBranchRelations(editor, createdBranchIds);
-        }
-        
         editor.createShapes(sortedShapes);
 
         // 恢复绑定关系（连接器与形状的绑定）

@@ -39,7 +39,12 @@ import { MindMapShapeUtil } from './MindMapShape/MindMapShapeUtil';
 import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { BranchShapeUtil } from './BranchShape/BranchShapeUtil';
 import { BranchShapeTool } from './BranchShape/BranchShapeTool';
-import { keepBranchLayoutsUpdated } from './BranchShape/keep-branch-layouts-updated';
+import {
+    BranchBindingUtil,
+    getBranchClipboardContent,
+    prepareBranchClipboardContentForPaste,
+} from './BranchShape/branch-binding';
+import { keepBranchLayoutsUpdated, migrateBranchBindings } from './BranchShape/keep-branch-layouts-updated';
 import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
 import { ConfiguredEmbedShapeUtil } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
@@ -66,7 +71,7 @@ const configuredArrowShapeUtil = ArrowShapeUtil.configure({
 // 从默认形状工具中过滤掉原始的ArrowShapeUtil，避免重复定义
 const filteredDefaultShapeUtils = defaultShapeUtils.filter(util => util.type !== 'arrow' && util.type !== 'embed')
 const customShapeUtils = [...filteredDefaultShapeUtils, configuredArrowShapeUtil, ConfiguredEmbedShapeUtil, CardShapeUtil, SingleBlockShapeUtil, SlideShapeUtil, JsShapeUtil, MindMapShapeUtil, BranchShapeUtil, BezierConnectorShapeUtil]
-const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil, BezierConnectorBindingUtil]
+const customBindingUtils = [...defaultBindingUtils, SingleBlockBindingUtil, BezierConnectorBindingUtil, BranchBindingUtil]
 const customTools = [CardShapeTool, SingleBlockShapeTool, SlideShapeTool, JsShapeTool, MindMapShapeTool, BranchShapeTool]
 const customOverlayUtils: readonly TLOverlayUtilConstructor[] = [InteractionHintOverlayUtil]
 
@@ -357,6 +362,8 @@ export class TldrawManager {
         createTextOnCanvasDoubleClick: this.doubleClickCreationType === 'text',
         maxFontsToLoadBeforeRender: 10,
         cameraSlideFriction: 1,
+        onBeforeCopyToClipboard: ({ content, editor }) => getBranchClipboardContent(editor, content),
+        onBeforePasteFromClipboard: ({ content }) => prepareBranchClipboardContentForPaste(content),
     }
     /**
      * 渲染tldraw组件
@@ -1170,6 +1177,7 @@ export class TldrawManager {
                                     // 加载导入的数据快照
                                     try {
                                         loadSnapshot(this.store, data);
+                                        migrateBranchBindings(this.editor);
 
                                         // 保存导入的数据
                                         await this.saveData();

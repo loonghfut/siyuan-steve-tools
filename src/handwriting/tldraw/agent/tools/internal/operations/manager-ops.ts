@@ -4011,6 +4011,7 @@ function summarizeAgentShape(
         summary.bindings = [
             ...((editor as any).getBindingsFromShape?.(shape.id, 'arrow') || []),
             ...((editor as any).getBindingsFromShape?.(shape.id, 'bezier-connector') || []),
+            ...((editor as any).getBindingsFromShape?.(shape.id, 'branch-child') || []),
         ].map(summarizeAgentBinding);
     }
     return summary;

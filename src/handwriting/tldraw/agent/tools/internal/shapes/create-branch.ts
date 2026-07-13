@@ -7,7 +7,6 @@ import {
 	relayoutBranchesContainingShapes,
 } from '../../../../BranchShape/branch-layout'
 import type { IBranchShape } from '../../../../BranchShape/branch-shape-types'
-import { markExplicitCreatedBranchRelations } from '../../../../BranchShape/keep-branch-layouts-updated'
 import type { AgentBranchChildRef, AgentBranchCreateArgs, AgentBranchSide } from '../core/types'
 import { createAgentCardShape } from './create-card'
 import { createAgentSingleBlockShape } from './create-single-block'
@@ -47,7 +46,6 @@ export function createAgentBranchShape(
 	}
 	validateAgentBranchCreateRelations(editor, rootShapeId, leftChildIds, rightChildIds)
 
-	markExplicitCreatedBranchRelations(editor, [branchId])
 
 	editor.createShape<IBranchShape>({
 		id: branchId,

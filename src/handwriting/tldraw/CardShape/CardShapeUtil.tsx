@@ -4,6 +4,7 @@ import {
 	Rectangle2d,
 	ShapeUtil,
 	SvgExportContext,
+	TLShapeUtilCanBindOpts,
 	TLResizeInfo,
 	resizeBox,
 } from '@tldraw/tldraw'
@@ -189,6 +190,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	// [3]
 	override canCull(_shape: ICardShape) {
 		return false
+	}
+	override canBind({ bindingType, fromShape }: TLShapeUtilCanBindOpts<ICardShape>) {
+		if (bindingType === 'branch-child') return fromShape.type === 'branch'
+		return true
 	}
 	override isAspectRatioLocked(_shape: ICardShape) {
 		return false

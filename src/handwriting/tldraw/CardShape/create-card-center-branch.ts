@@ -3,7 +3,6 @@ import {
 	getAllBranchChildIds,
 	getBranchRootParent,
 	layoutBranchChildren,
-	markExplicitCreatedBranchRelations,
 	relayoutBranchesContainingShapes,
 } from '../BranchShape'
 import type { IBranchShape } from '../BranchShape/branch-shape-types'
@@ -124,8 +123,6 @@ export function createCenterBranchForShape(editor: Editor, shape: CenterBranchRo
 	const sideParentBranches = getSideParentBranches(editor, latestShape.id as string)
 	const center = getShapeCenter(editor, latestShape)
 	const branchShape = createBranchShapeForRootShape(branchId, latestShape, center)
-
-	markExplicitCreatedBranchRelations(editor, [branchId])
 
 	editor.run(() => {
 		editor.createShape(branchShape)
