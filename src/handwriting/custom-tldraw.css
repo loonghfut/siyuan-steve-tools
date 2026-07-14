@@ -177,6 +177,10 @@
   z-index: 1 !important;
 }
 
+.tl-canvas__in-front  {
+  z-index: 1 !important;
+}
+
 /* 美化单块 (single-block) 的复选框行 */
 .tlui-style-panel__section .single-block-toggle {
   display: flex;
