@@ -410,12 +410,12 @@ function getBranchSideForShape(editor: Editor, branch: IBranchShape, child: TLSh
 
 function getSideChildIds(branch: IBranchShape, side: BranchSide) {
 	if (side === 'left') return branch.props.leftChildIds || []
-	return branch.props.rightChildIds || branch.props.childIds || []
+	return branch.props.rightChildIds
 }
 
 function getChildSideInBranch(branch: IBranchShape, childId: string): BranchSide | null {
 	if ((branch.props.leftChildIds || []).includes(childId)) return 'left'
-	if ((branch.props.rightChildIds || branch.props.childIds || []).includes(childId)) return 'right'
+	if (branch.props.rightChildIds.includes(childId)) return 'right'
 	return null
 }
 
@@ -462,7 +462,7 @@ function getParentBranchAttachment(editor: Editor, branch: IBranchShape): Branch
 }
 
 export function getAllBranchChildIds(branch: IBranchShape) {
-	return Array.from(new Set([...(branch.props.leftChildIds || []), ...(branch.props.rightChildIds || branch.props.childIds || [])]))
+	return Array.from(new Set([...(branch.props.leftChildIds || []), ...branch.props.rightChildIds]))
 }
 
 export function getAllBranchAttachedShapeIds(branch: IBranchShape) {
@@ -666,11 +666,10 @@ export function runWithSuppressedRootContentMoveIds<T>(shapeIds: Iterable<string
 
 function removeChildIdsFromBranch(branch: IBranchShape, childIds: Set<string>) {
 	const leftChildIds = (branch.props.leftChildIds || []).filter((id) => !childIds.has(id))
-	const rightChildIds = (branch.props.rightChildIds || branch.props.childIds || []).filter((id) => !childIds.has(id))
+	const rightChildIds = branch.props.rightChildIds.filter((id) => !childIds.has(id))
 	return {
 		leftChildIds,
 		rightChildIds,
-		childIds: rightChildIds,
 	}
 }
 
@@ -726,7 +725,6 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 			sameNumber(branch.props.w, EMPTY_BRANCH_DIAMETER) &&
 			sameNumber(branch.props.h, EMPTY_BRANCH_DIAMETER) &&
 			sameNumber(branch.props.rootX, EMPTY_BRANCH_RADIUS) &&
-			sameIds(branch.props.childIds || [], nextChildIds) &&
 			sameIds(branch.props.leftChildIds || [], nextChildIds) &&
 			sameIds(branch.props.rightChildIds || [], nextChildIds) &&
 			!branch.props.rootShapeId
@@ -742,7 +740,6 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 				...branch.props,
 				w: EMPTY_BRANCH_DIAMETER,
 				h: EMPTY_BRANCH_DIAMETER,
-				childIds: nextChildIds,
 				leftChildIds: nextChildIds,
 				rightChildIds: nextChildIds,
 				rootShapeId: undefined,
@@ -809,9 +806,8 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 		!sameNumber(branch.props.w, branchWidth) ||
 		!sameNumber(branch.props.h, branchHeight) ||
 		!sameNumber(branch.props.rootX, rootLocalX) ||
-		!sameIds(branch.props.childIds || [], nextRightChildIds) ||
 		!sameIds(branch.props.leftChildIds || [], nextLeftChildIds) ||
-		!sameIds(branch.props.rightChildIds || branch.props.childIds || [], nextRightChildIds) ||
+		!sameIds(branch.props.rightChildIds, nextRightChildIds) ||
 		branch.props.rootShapeId !== nextRootShapeId
 
 	if (branchChanged) {
@@ -824,7 +820,6 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 				...branch.props,
 				w: branchWidth,
 				h: branchHeight,
-				childIds: nextRightChildIds,
 				leftChildIds: nextLeftChildIds,
 				rightChildIds: nextRightChildIds,
 				rootShapeId: nextRootShapeId,
@@ -910,8 +905,7 @@ function applyDraftToBranch(editor: Editor, draft: BranchIdsDraft) {
 	const { branch, leftChildIds, rightChildIds, rootShapeId } = draft
 	if (
 		sameIds(leftChildIds, branch.props.leftChildIds || []) &&
-		sameIds(rightChildIds, branch.props.rightChildIds || branch.props.childIds || []) &&
-		sameIds(rightChildIds, branch.props.childIds || []) &&
+		sameIds(rightChildIds, branch.props.rightChildIds) &&
 		rootShapeId === branch.props.rootShapeId
 	) {
 		return false
@@ -922,7 +916,6 @@ function applyDraftToBranch(editor: Editor, draft: BranchIdsDraft) {
 		type: 'branch',
 		props: {
 			...branch.props,
-			childIds: rightChildIds,
 			leftChildIds,
 			rightChildIds,
 			rootShapeId,
@@ -1375,7 +1368,6 @@ export function detachBranchCompletely(editor: Editor, branchId: TLShapeId) {
 		type: 'branch',
 		props: {
 			...latestBranch.props,
-			childIds: [],
 			leftChildIds: [],
 			rightChildIds: [],
 			rootShapeId: undefined,

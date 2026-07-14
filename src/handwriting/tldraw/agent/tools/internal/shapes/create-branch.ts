@@ -57,7 +57,6 @@ export function createAgentBranchShape(
 		props: {
 			...branchDefaults,
 			color: options.color ?? branchDefaults.color,
-			childIds: [...rightChildIds],
 			leftChildIds,
 			rightChildIds,
 			rootShapeId,

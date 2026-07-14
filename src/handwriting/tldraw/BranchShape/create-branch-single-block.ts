@@ -9,7 +9,6 @@ const DEFAULT_BRANCH_PROPS: IBranchShape['props'] = {
 	w: 80,
 	h: 40,
 	color: 'black',
-	childIds: [],
 	leftChildIds: [],
 	rightChildIds: [],
 	rootX: 40,
@@ -20,11 +19,11 @@ const DEFAULT_BRANCH_PROPS: IBranchShape['props'] = {
 	lineStyle: 'curve-solid',
 	snapDistance: 160,
 	showBackground: false,
-	version: 5,
+	version: 6,
 }
 
 function getSideChildIds(branch: IBranchShape, side: BranchChildSide) {
-	return side === 'left' ? branch.props.leftChildIds || [] : branch.props.rightChildIds || branch.props.childIds || []
+	return side === 'left' ? branch.props.leftChildIds || [] : branch.props.rightChildIds
 }
 
 function getInitialSingleBlockY(
@@ -103,7 +102,7 @@ export function createSingleBlockForBranch(
 	const initialY = getInitialSingleBlockY(editor, branch, side, rootY, initialHeight)
 	const newShapeId = createShapeId()
 	const leftChildIds = [...(branch.props.leftChildIds || [])]
-	const rightChildIds = [...(branch.props.rightChildIds || branch.props.childIds || [])]
+	const rightChildIds = [...branch.props.rightChildIds]
 
 	if (side === 'left') leftChildIds.push(newShapeId)
 	else rightChildIds.push(newShapeId)
@@ -128,7 +127,6 @@ export function createSingleBlockForBranch(
 			type: 'branch',
 			props: {
 				...branch.props,
-				childIds: rightChildIds,
 				leftChildIds,
 				rightChildIds,
 			},
@@ -152,7 +150,7 @@ export function createSiblingSingleInBranch(editor: Editor, singleId: TLShapeId)
 	const newSingleId = createShapeId()
 	const position = getSiblingInsertionPosition(editor, single, branch, side)
 	const leftChildIds = [...(branch.props.leftChildIds || [])]
-	const rightChildIds = [...(branch.props.rightChildIds || branch.props.childIds || [])]
+	const rightChildIds = [...branch.props.rightChildIds]
 	const sideChildIds = side === 'left' ? leftChildIds : rightChildIds
 	sideChildIds.splice(index + 1, 0, newSingleId as string)
 
@@ -170,7 +168,6 @@ export function createSiblingSingleInBranch(editor: Editor, singleId: TLShapeId)
 			type: 'branch',
 			props: {
 				...branch.props,
-				childIds: rightChildIds,
 				leftChildIds,
 				rightChildIds,
 			},
@@ -198,7 +195,7 @@ export function createChildBranchFromSingle(editor: Editor, singleId: TLShapeId)
 	const branchCenterX = single.x + single.props.w / 2
 	const branchCenterY = single.y + single.props.h / 2
 	const leftChildIds = [...(parentBranch.props.leftChildIds || [])]
-	const rightChildIds = [...(parentBranch.props.rightChildIds || parentBranch.props.childIds || [])]
+	const rightChildIds = [...parentBranch.props.rightChildIds]
 	const parentSideIds = side === 'left' ? leftChildIds : rightChildIds
 	parentSideIds.splice(index, 1, newBranchId as string)
 
@@ -218,7 +215,6 @@ export function createChildBranchFromSingle(editor: Editor, singleId: TLShapeId)
 				y: branchCenterY - DEFAULT_BRANCH_PROPS.h / 2,
 				props: createBranchProps({
 					color: parentBranch.props.color,
-					childIds: [newSingleId as string],
 					leftChildIds: [singleId as string],
 					rightChildIds: [newSingleId as string],
 				}),
@@ -230,7 +226,6 @@ export function createChildBranchFromSingle(editor: Editor, singleId: TLShapeId)
 			type: 'branch',
 			props: {
 				...parentBranch.props,
-				childIds: rightChildIds,
 				leftChildIds,
 				rightChildIds,
 			},

@@ -6,6 +6,7 @@ const versions = createShapePropsMigrationIds('branch', {
 	RenameShowOuterFrameToShowBackground: 3,
 	AddLineStyle: 4,
 	AddRootShapeId: 5,
+	MigrateChildIdsToRightChildIds: 6,
 })
 
 export const branchShapeMigrations = createShapePropsMigrationSequence({
@@ -62,6 +63,19 @@ export const branchShapeMigrations = createShapePropsMigrationSequence({
 			down(props) {
 				delete props.rootShapeId
 				props.version = 4
+			},
+		},
+		{
+			id: versions.MigrateChildIdsToRightChildIds,
+			up(props) {
+				props.rightChildIds = props.rightChildIds ?? props.childIds ?? []
+				delete props.childIds
+				props.version = 6
+			},
+			down(props) {
+				props.childIds = props.rightChildIds ?? []
+				delete props.rightChildIds
+				props.version = 5
 			},
 		},
 	],

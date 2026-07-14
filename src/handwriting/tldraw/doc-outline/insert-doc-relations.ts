@@ -49,7 +49,6 @@ const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
 	w: 80,
 	h: 40,
 	color: 'black',
-	childIds: [],
 	leftChildIds: [],
 	rightChildIds: [],
 	rootX: 40,
@@ -60,7 +59,7 @@ const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
 	lineStyle: 'curve-solid' as BranchLineStyle,
 	snapDistance: 160,
 	showBackground: false,
-	version: 5,
+	version: 6,
 }
 
 function getExistingBlockIds(editor: Editor) {
@@ -110,12 +109,11 @@ function uniqueIds(ids: string[]) {
 }
 
 function createBranchShape(id: TLShapeId, rootX: number, rootY: number, props: Partial<IBranchShape['props']> = {}) {
-	const rightChildIds = uniqueIds([...(props.rightChildIds || props.childIds || [])])
+	const rightChildIds = uniqueIds([...(props.rightChildIds || [])])
 	const leftChildIds = uniqueIds([...(props.leftChildIds || [])])
 	const nextProps: IBranchShape['props'] = {
 		...BRANCH_DEFAULT_PROPS,
 		...props,
-		childIds: rightChildIds,
 		leftChildIds,
 		rightChildIds,
 	}
@@ -146,15 +144,14 @@ function replaceChildInBranch(editor: Editor, branch: IBranchShape, oldChildId: 
 		? (branch.props.leftChildIds || []).filter((id) => id !== oldChildId && id !== newChildId)
 		: replaceChildId(branch.props.leftChildIds, oldChildId, newChildId)
 	const rightChildIds = wasRootChild
-		? uniqueIds([...(branch.props.rightChildIds || branch.props.childIds || []).filter((id) => id !== oldChildId && id !== newChildId), newChildId])
-		: replaceChildId(branch.props.rightChildIds || branch.props.childIds, oldChildId, newChildId)
+		? uniqueIds([...branch.props.rightChildIds.filter((id) => id !== oldChildId && id !== newChildId), newChildId])
+		: replaceChildId(branch.props.rightChildIds, oldChildId, newChildId)
 
 	editor.updateShape<IBranchShape>({
 		id: branch.id,
 		type: 'branch',
 		props: {
 			...branch.props,
-			childIds: rightChildIds,
 			leftChildIds,
 			rightChildIds,
 			rootShapeId: wasRootChild ? undefined : branch.props.rootShapeId,
@@ -261,12 +258,10 @@ export async function insertDocRelations(options: InsertDocRelationsOptions): Pr
 		}
 
 		const rootChildren = creatableTree.map(buildOutlineNode)
-		branchShape.props.childIds = [...rootChildren]
 		branchShape.props.rightChildIds = [...rootChildren]
 	} else {
 		const cardShapes = creatableTree.map((item, index) => createCardShape(item, index))
 		const rightChildIds = cardShapes.map((shape) => shape.id as string)
-		branchShape.props.childIds = [...rightChildIds]
 		branchShape.props.rightChildIds = [...rightChildIds]
 	}
 

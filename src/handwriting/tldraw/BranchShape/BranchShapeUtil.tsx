@@ -369,7 +369,6 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			w: 80,
 			h: 40,
 			color: 'black',
-			childIds: [],
 			leftChildIds: [],
 			rightChildIds: [],
 			rootX: 40,
@@ -380,7 +379,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			lineStyle: 'curve-solid',
 			snapDistance: 160,
 			showBackground: false,
-			version: 5,
+			version: 6,
 		}
 	}
 

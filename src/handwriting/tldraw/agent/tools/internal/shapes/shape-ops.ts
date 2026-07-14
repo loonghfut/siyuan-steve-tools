@@ -37,7 +37,7 @@ export function createAgentBusinessShape(editor: Editor, options: AgentCreateSha
 		branchId: String(branchId),
 		rootShapeId: branch?.props.rootShapeId,
 		leftChildIds: branch?.props.leftChildIds || [],
-		rightChildIds: branch?.props.rightChildIds || branch?.props.childIds || [],
+		rightChildIds: branch?.props.rightChildIds || [],
 	}
 }
 

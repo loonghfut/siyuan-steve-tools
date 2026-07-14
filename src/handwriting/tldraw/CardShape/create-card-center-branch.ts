@@ -16,7 +16,6 @@ const DEFAULT_BRANCH_PROPS: IBranchShape['props'] = {
 	w: 80,
 	h: 40,
 	color: 'black',
-	childIds: [],
 	leftChildIds: [],
 	rightChildIds: [],
 	rootX: 40,
@@ -27,7 +26,7 @@ const DEFAULT_BRANCH_PROPS: IBranchShape['props'] = {
 	lineStyle: 'curve-solid',
 	snapDistance: 160,
 	showBackground: false,
-	version: 5,
+	version: 6,
 }
 
 function uniqueIds(ids: string[]) {
@@ -65,7 +64,7 @@ function createBranchShapeForRootShape(id: TLShapeId, shape: CenterBranchRootSha
 }
 
 function getRightChildIds(branch: IBranchShape) {
-	return branch.props.rightChildIds || branch.props.childIds || []
+	return branch.props.rightChildIds
 }
 
 function getSideParentBranches(editor: Editor, childId: string) {
@@ -94,7 +93,6 @@ function replaceSideChildInBranch(editor: Editor, branch: IBranchShape, oldChild
 		type: 'branch',
 		props: {
 			...branch.props,
-			childIds: rightChildIds,
 			leftChildIds,
 			rightChildIds,
 		},

@@ -524,9 +524,8 @@ function replaceIdsInShape(
 
         newShape.props = {
             ...props,
-            childIds: replaceBranchChildIds(props.childIds),
             leftChildIds: replaceBranchChildIds(props.leftChildIds),
-            rightChildIds: replaceBranchChildIds(props.rightChildIds || props.childIds),
+            rightChildIds: replaceBranchChildIds(props.rightChildIds),
             rootShapeId,
         };
     }

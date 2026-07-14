@@ -2727,7 +2727,7 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
     const promotedRootChildId = childShape.id !== rawChildShape.id ? String(rawChildShape.id) : undefined;
     const side = inferAgentBranchSide(editor, existingBranch, childShape, options.side);
     const currentLeftIds = existingBranch.props.leftChildIds || [];
-    const currentRightIds = existingBranch.props.rightChildIds || existingBranch.props.childIds || [];
+    const currentRightIds = existingBranch.props.rightChildIds;
     const nextLeftIds = currentLeftIds.filter((id) => id !== childId && id !== promotedRootChildId);
     const nextRightIds = currentRightIds.filter((id) => id !== childId && id !== promotedRootChildId);
     if (side === 'left') nextLeftIds.push(childId);
@@ -2735,8 +2735,7 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
 
     const didChange =
         !sameStringArray(currentLeftIds, nextLeftIds) ||
-        !sameStringArray(currentRightIds, nextRightIds) ||
-        !sameStringArray(existingBranch.props.childIds || [], nextRightIds);
+        !sameStringArray(currentRightIds, nextRightIds);
 
     if (didChange) {
         editor.updateShape<IBranchShape>({
@@ -2744,7 +2743,6 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
             type: 'branch',
             props: {
                 ...existingBranch.props,
-                childIds: nextRightIds,
                 leftChildIds: nextLeftIds,
                 rightChildIds: nextRightIds,
             },
@@ -2775,7 +2773,7 @@ function connectAgentBranchRelation(runtime: AgentManagerRuntime, options: Agent
         branchId: String(existingBranch.id),
         rootShapeId: finalBranch.props.rootShapeId,
         leftChildIds: finalBranch.props.leftChildIds || [],
-        rightChildIds: finalBranch.props.rightChildIds || finalBranch.props.childIds || [],
+        rightChildIds: finalBranch.props.rightChildIds,
         focusedShapeBounds: getAgentShapeBoundsById(editor, existingBranch.id),
         summary: getAgentResultSummary(runtime, options.resultMode),
     };
@@ -2813,11 +2811,10 @@ function detachAgentBranchChildFromOtherBranches(editor: Editor, childId: string
         if (candidate.type !== 'branch' || candidate.id === targetBranchId) continue;
         const branch = candidate as IBranchShape;
         const nextLeftIds = (branch.props.leftChildIds || []).filter((id) => id !== childId);
-        const nextRightIds = (branch.props.rightChildIds || branch.props.childIds || []).filter((id) => id !== childId);
+        const nextRightIds = branch.props.rightChildIds.filter((id) => id !== childId);
         const changed =
             !sameStringArray(nextLeftIds, branch.props.leftChildIds || []) ||
-            !sameStringArray(nextRightIds, branch.props.rightChildIds || branch.props.childIds || []) ||
-            !sameStringArray(nextRightIds, branch.props.childIds || []);
+            !sameStringArray(nextRightIds, branch.props.rightChildIds);
         if (!changed) continue;
 
         editor.updateShape<IBranchShape>({
@@ -2825,7 +2822,6 @@ function detachAgentBranchChildFromOtherBranches(editor: Editor, childId: string
             type: 'branch',
             props: {
                 ...branch.props,
-                childIds: nextRightIds,
                 leftChildIds: nextLeftIds,
                 rightChildIds: nextRightIds,
             },
@@ -3873,7 +3869,6 @@ function summarizeShapeProps(props: any, editor?: Editor, blockContent?: AgentLi
         'collapsedTextSize',
         'collapsedTextAlign',
         'rootShapeId',
-        'childIds',
         'leftChildIds',
         'rightChildIds',
         'transparentBackground',

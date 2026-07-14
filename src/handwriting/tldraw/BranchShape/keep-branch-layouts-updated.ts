@@ -123,7 +123,7 @@ function promoteOnlyChildOfDeletedBranch(editor: Editor, deletedBranch: IBranchS
 		const parentBranch = candidate as IBranchShape
 		const leftResult = replaceChildId(parentBranch.props.leftChildIds, deletedBranchId, promotedChildId)
 		const rightResult = replaceChildId(
-			parentBranch.props.rightChildIds || parentBranch.props.childIds || [],
+			parentBranch.props.rightChildIds,
 			deletedBranchId,
 			promotedChildId
 		)
@@ -135,7 +135,6 @@ function promoteOnlyChildOfDeletedBranch(editor: Editor, deletedBranch: IBranchS
 			type: 'branch',
 			props: {
 				...parentBranch.props,
-				childIds: rightResult.nextIds,
 				leftChildIds: leftResult.nextIds,
 				rightChildIds: rightResult.nextIds,
 			},
@@ -207,9 +206,8 @@ function findCreatedShapeIdRemaps(
 ) {
 	const referencedChildIds = Array.from(
 		new Set([
-			...(branch.props.childIds || []),
 			...(branch.props.leftChildIds || []),
-			...(branch.props.rightChildIds || []),
+			...branch.props.rightChildIds,
 			...(branch.props.rootShapeId ? [branch.props.rootShapeId] : []),
 		])
 	)
@@ -311,8 +309,7 @@ function remapCreatedBranchChildren(
 		)
 	}
 
-	const sourceRightChildIds = branch.props.rightChildIds || branch.props.childIds
-	const nextChildIds = remapIds(branch.props.childIds, inferredChildren?.rightChildIds)
+	const sourceRightChildIds = branch.props.rightChildIds
 	const nextLeftChildIds = remapIds(branch.props.leftChildIds, inferredChildren?.leftChildIds)
 	const nextRightChildIds = remapIds(sourceRightChildIds, inferredChildren?.rightChildIds)
 	// Pasted shapes receive new IDs. Keeping an existing root ID here would make
@@ -322,10 +319,8 @@ function remapCreatedBranchChildren(
 	const nextRootShapeId = nextRootShapeIds[0]
 
 	const didChange =
-		nextChildIds.length !== (branch.props.childIds || []).length ||
 		nextLeftChildIds.length !== (branch.props.leftChildIds || []).length ||
 		nextRightChildIds.length !== (sourceRightChildIds || []).length ||
-		nextChildIds.some((id, index) => id !== (branch.props.childIds || [])[index]) ||
 		nextLeftChildIds.some((id, index) => id !== (branch.props.leftChildIds || [])[index]) ||
 		nextRightChildIds.some((id, index) => id !== (sourceRightChildIds || [])[index]) ||
 		nextRootShapeId !== branch.props.rootShapeId
@@ -337,7 +332,6 @@ function remapCreatedBranchChildren(
 		type: 'branch',
 		props: {
 			...branch.props,
-			childIds: nextChildIds,
 			leftChildIds: nextLeftChildIds,
 			rightChildIds: nextRightChildIds,
 			rootShapeId: nextRootShapeId,
@@ -469,7 +463,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		if (shape.type !== 'branch') return
 
 		const branch = shape as IBranchShape
-		if ((branch.props.childIds || []).length === 0 && (branch.props.leftChildIds || []).length === 0 && (branch.props.rightChildIds || []).length === 0 && !branch.props.rootShapeId) {
+		if ((branch.props.leftChildIds || []).length === 0 && branch.props.rightChildIds.length === 0 && !branch.props.rootShapeId) {
 			return
 		}
 
