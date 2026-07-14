@@ -12,7 +12,7 @@ export function getSiyuanThemeBackgroundColor(): string {
 	)
 }
 
-/** Export transparent tldraw content, then composite it over SiYuan's theme background. */
+/** Export transparent tldraw content, then composite it over SiYuan's theme background when enabled. */
 export async function toPngWithSiyuanThemeBackground(
 	editor: Editor,
 	shapeIds: TLShapeId[],
@@ -23,6 +23,9 @@ export async function toPngWithSiyuanThemeBackground(
 		format: 'png',
 		background: false,
 	})
+	if (!editor.getInstanceState().exportBackground) {
+		return image.blob
+	}
 	const bitmap = await createImageBitmap(image.blob)
 	const canvas = document.createElement('canvas')
 	canvas.width = bitmap.width
