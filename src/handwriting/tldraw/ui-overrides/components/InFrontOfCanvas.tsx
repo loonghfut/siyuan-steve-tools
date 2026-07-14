@@ -27,8 +27,8 @@ import { buildCardCollapseUpdate } from '../../CardShape/card-collapse'
 import {
     createCenterBranchForShape,
     createCenterBranchForCard,
-    deleteEmptyCenterBranchForCard,
-    getEmptyCenterBranchForCard,
+    deleteEmptyCenterBranchForShape,
+    getEmptyCenterBranchForShape,
 } from '../../CardShape/create-card-center-branch'
 import { createSingleBlockForBranch, getBranchRootParent } from '../../BranchShape'
 import type { ISingleBlockShape } from '../../SingleBlockShape/single-block-shape-types'
@@ -115,7 +115,9 @@ export const InFrontOfCanvas: React.FC = () => {
         () => {
             if (!selectionInfo) return null
             const shape = editor.getShape(selectionInfo.id)
-            return shape?.type === 'card' ? getEmptyCenterBranchForCard(editor, shape as ICardShape) : null
+            return shape && (shape.type === 'card' || shape.type === 'single-block')
+                ? getEmptyCenterBranchForShape(editor, shape as ICardShape | ISingleBlockShape)
+                : null
         },
         [editor, selectionInfo?.id]
     )
@@ -373,9 +375,9 @@ export const InFrontOfCanvas: React.FC = () => {
                                     style={buttonStyle}
                                     onClick={() => {
                                         const shape = editor.getShape(selectionInfo.id)
-                                        if (!shape || shape.type !== 'card') return
+                                        if (!shape || (shape.type !== 'card' && shape.type !== 'single-block')) return
 
-                                        const removedBranchId = deleteEmptyCenterBranchForCard(editor, shape as ICardShape)
+                                        const removedBranchId = deleteEmptyCenterBranchForShape(editor, shape as ICardShape | ISingleBlockShape)
                                         if (!removedBranchId) {
                                             showMessage('取消中心吸附失败：Branch 已吸附其他组件', 3000, 'error')
                                         }
