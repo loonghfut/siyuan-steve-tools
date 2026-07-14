@@ -651,6 +651,11 @@ export function syncBranchMoveForRootContent(editor: Editor, prev: TLShape, next
 
 	const branch = getBranchRootParent(editor, next.id)
 	if (!branch) return false
+	// When the root and its branch are selected together, tldraw translates
+	// both records in the same drag. The branch's onBeforeUpdate handler also
+	// translates its unselected descendants, so syncing the branch here would
+	// apply the same drag delta a second time.
+	if (editor.getSelectedShapeIds().some((shapeId) => shapeId === branch.id)) return false
 
 	const dx = next.x - prev.x
 	const dy = next.y - prev.y
