@@ -9,6 +9,7 @@ import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
 import { getTldrawImageExportOptions } from '../utils/export-image-options'
 import { createExportProgressOverlay, waitForPaint } from '../utils/export-progress'
 import { prepareSvgExportSnapshots } from '../utils/export-snapshot-preparer'
+import { copyPng, downloadPng, toPngWithSiyuanThemeBackground } from '../utils/export-image-with-theme-background'
 
 export const uiOverrides: TLUiOverrides = {
     tools(editor, tools) {
@@ -89,7 +90,14 @@ export const uiOverrides: TLUiOverrides = {
                 await waitForPaint()
                 const imageOptions = format === 'png' ? getTldrawImageExportOptions() : {}
 
-                if (mode === 'copy') {
+                if (format === 'png') {
+                    const blob = await toPngWithSiyuanThemeBackground(editor, ids, imageOptions)
+                    if (mode === 'copy') {
+                        await copyPng(blob)
+                    } else {
+                        await downloadPng(blob)
+                    }
+                } else if (mode === 'copy') {
                     await copyAs(editor, ids, { format, ...imageOptions })
                 } else {
                     await exportAs(editor, ids, { format, ...imageOptions })
