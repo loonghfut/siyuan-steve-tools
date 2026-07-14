@@ -22,6 +22,7 @@ import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
 import { getCardCollapsedHeight } from './card-collapse'
 import { getDefaultColorTheme } from '../utils/color-theme'
+import { inputDialogSync } from '@/libs/dialog'
 import {
 	beginBranchAttachmentDrag,
 	clearBranchInteractionHint,
@@ -32,9 +33,8 @@ import {
 	useBranchInteractionHint,
 } from '../BranchShape'
 
-let isCreatingBlock = false;
-// 仅用于并发创建控制，不再缓存最近创建的块ID
-let pendingCreationPromise: Promise<string> | null = null;
+// 按卡片隔离创建流程，避免多个新卡片互相复用创建结果
+const pendingCreationPromises = new Map<string, Promise<string>>();
 const draggingBranchCardIds = new Set<string>()
 
 // 静态预览 DOM 缓存：避免重复请求
@@ -318,6 +318,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 追踪上一次的编辑状态，用于检测编辑->非编辑的切换
 		const prevIsEditingRef = useRef(isEditingState);
 		const refreshNonceRef = useRef(shape.props.refreshNonce);
+		// 每个新卡片只询问一次用户标题，避免编辑态重渲染时重复弹窗
+		const userTitlePromptedRef = useRef(false)
 		const prevCollapsedRef = useRef(isCollapsed);
 
 		// 稳定引用当前 shape props，供折叠图标点击回调使用，避免 useCallback 依赖 shape.props 导致频繁重建
@@ -940,7 +942,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						showMessage('配置不完整,请检查设置');
 						return null;
 					}
-					if (isCreatingBlock && pendingCreationPromise) {
+					const pendingCreationPromise = pendingCreationPromises.get(shape.id as string);
+					if (pendingCreationPromise) {
 						try {
 							currentBlockId = await pendingCreationPromise;
 						} catch (e) {
@@ -948,35 +951,64 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						if (cancelled) return null;
 					} else if (!currentBlockId) {
-						isCreatingBlock = true;
+						const creationPromise = (async () => {
+							const customTitleTemplate = String(settingdata["tldraw-custom-card-title"] || "${timestamp}");
+							const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+							const initialTitle = customTitleTemplate
+								? customTitleTemplate.replace(/\$\{timestamp\}/g, () => timestamp)
+								: timestamp;
+							const idid = await api.generateSiyuanID() as string;
+							const link = buildTldrawLink(tldrawId, idid, title);
+							// 先创建一个可用的默认标题块，用户输入在创建完成后再更新标题。
+							const content =
+								'###### ' + initialTitle +
+								'\n' +
+								'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
+								'\n\n' +
+								'{: custom-st-tldraw-none="1" }' +
+								'\n';
+							const redata = await api.appendBlock("markdown", content, tldrawId!);
+							const newBlockId = redata[0].doOperations[0].id as string;
+
+							if (isEditingState && !shape.props.blockId && !containerRef.current?.getAttribute('blockid') && settingdata["tldraw-prompt-card-title"] && !userTitlePromptedRef.current) {
+								userTitlePromptedRef.current = true;
+								try {
+									const input = await inputDialogSync({
+										title: '输入卡片标题',
+										placeholder: '请输入标题',
+										width: '520px',
+									});
+									const userTitle = input?.replace(/[\r\n]+/g, ' ').trim() || '';
+									if (userTitle) {
+										// updateBlock 会整体替换块内容，因此必须重新附带 Card 的 IAL。
+										await api.updateBlock(
+											'markdown',
+											'###### ' + userTitle +
+											'\n' +
+											'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
+											'\n\n' +
+											'{: custom-st-tldraw-none="1" }' +
+											'\n',
+											newBlockId,
+										);
+									}
+								} catch (err) {
+									// 标题更新失败不应影响已创建块与 Card 的绑定。
+									console.log('更新卡片标题失败，继续使用默认标题', err);
+								}
+							}
+							return newBlockId;
+						})();
+						pendingCreationPromises.set(shape.id as string, creationPromise);
 						try {
-							pendingCreationPromise = (async () => {
-								const idid = await api.generateSiyuanID() as string;
-								const customTitleTemplate = settingdata["tldraw-custom-card-title"] || "${timestamp}";
-								const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-								const renderedTitle = customTitleTemplate
-									? customTitleTemplate.replace(/\$\{timestamp\}/g, timestamp)
-									: timestamp;
-								const link = buildTldrawLink(tldrawId, idid, title);
-								// 将链接保存到自定义属性中
-								const content =
-									'###### ' + renderedTitle +
-									'\n' +
-									'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
-									'\n\n' +
-									'{: custom-st-tldraw-none="1" }' +
-									'\n';
-								const redata = await api.appendBlock("markdown", content, tldrawId!);
-								const newBlockId = redata[0].doOperations[0].id;
-								return newBlockId;
-							})();
-							currentBlockId = await pendingCreationPromise;
+							currentBlockId = await creationPromise;
 							if (cancelled) return null;
 						} catch (err) {
 							console.error('创建块失败', err);
 						} finally {
-							isCreatingBlock = false;
-							setTimeout(() => (pendingCreationPromise = null), 5000);
+							if (pendingCreationPromises.get(shape.id as string) === creationPromise) {
+								pendingCreationPromises.delete(shape.id as string);
+							}
 						}
 					}
 				}
