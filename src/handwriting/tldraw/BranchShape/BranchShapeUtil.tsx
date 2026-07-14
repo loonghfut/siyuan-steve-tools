@@ -345,11 +345,14 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override canSnap() {
-		return false
+		return true
 	}
 
-	override getBoundsSnapGeometry() {
-		return { points: [] }
+	override getBoundsSnapGeometry(shape: IBranchShape) {
+		const info = getBranchRenderInfo(this.editor, shape)
+		// The semantic center of a branch is its root node. Snapping to the
+		// whole branch frame is misleading when children exist only on one side.
+		return { points: [{ x: info.rootX, y: info.rootY }] }
 	}
 
 	override canBind() {

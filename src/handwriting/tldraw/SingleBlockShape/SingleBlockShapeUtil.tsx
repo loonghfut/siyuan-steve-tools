@@ -46,6 +46,7 @@ import {
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
 	syncBranchMoveForRootContent,
+	relayoutBranchesContainingShape,
 	updateBranchAttachmentAfterDrag,
 	useBranchInteractionHint,
 } from '../BranchShape'
@@ -64,6 +65,17 @@ const SingleBlockSizes = new EditorAtom('single-block sizes', (editor) => {
 })
 const BORDER_PX = 3 // 与样式、SVG 导出保持一致
 const MIN_HEIGHT = 30
+
+function setMeasuredSingleBlockSize(editor: Editor, shapeId: TLShapeId, size: { width: number; height: number }) {
+	let changed = false
+	SingleBlockSizes.update(editor, (map) => {
+		const existing = map.get(shapeId)
+		if (existing && existing.width === size.width && existing.height === size.height) return map
+		changed = true
+		return map.set(shapeId, size)
+	})
+	if (changed) relayoutBranchesContainingShape(editor, shapeId)
+}
 const SIYUAN_BLOCK_ID_RE = /\b\d{14}-[0-9a-z]{7}\b/i
 const STEVE_TOOLS_PLUGIN_URL_RE = /^(?:https:\/\/|siyuan:\/\/)plugins\/siyuan-steve-tools\//i
 
@@ -174,11 +186,7 @@ function useSingleBlockSize(
 		if (heightLockRef.current && lastHeightRef.current !== null) {
 			const lockedHeight = lastHeightRef.current
 			const lockedWidth = Math.max(shape.props.w, 1)
-			SingleBlockSizes.update(editor, (map) => {
-				const existing = map.get(shape.id)
-				if (existing && existing.height === lockedHeight && existing.width === lockedWidth) return map
-				return map.set(shape.id, { width: lockedWidth, height: lockedHeight })
-			})
+			setMeasuredSingleBlockSize(editor, shape.id, { width: lockedWidth, height: lockedHeight })
 			return
 		}
 
@@ -187,11 +195,7 @@ function useSingleBlockSize(
 			const fallbackHeight = Math.max(shape.props.h, MIN_HEIGHT)
 			const fallbackWidth = Math.max(shape.props.w, 1)
 			lastHeightRef.current = fallbackHeight
-			SingleBlockSizes.update(editor, (map) => {
-				const existing = map.get(shape.id)
-				if (existing && existing.height === fallbackHeight && existing.width === fallbackWidth) return map
-				return map.set(shape.id, { width: fallbackWidth, height: fallbackHeight })
-			})
+			setMeasuredSingleBlockSize(editor, shape.id, { width: fallbackWidth, height: fallbackHeight })
 			return
 		}
 
@@ -217,11 +221,7 @@ function useSingleBlockSize(
 		lastHeightRef.current = nextHeight
 
 		// 更新全局 atom 中的尺寸
-		SingleBlockSizes.update(editor, (map) => {
-			const existing = map.get(shape.id)
-			if (existing && existing.height === nextHeight && existing.width === nextWidth) return map
-			return map.set(shape.id, { width: nextWidth, height: nextHeight })
-		})
+		setMeasuredSingleBlockSize(editor, shape.id, { width: nextWidth, height: nextHeight })
 	}, [
 		editor,
 		shape.id,
@@ -387,6 +387,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			height: size?.height ?? shape.props.h,
 			isFilled: true,
 		})
+	}
+
+	override getBoundsSnapGeometry(shape: ISingleBlockShape) {
+		return { points: this.editor.getShapeGeometry(shape).bounds.cornersAndCenter }
 	}
 
 	override getIndicatorPath(shape: ISingleBlockShape) {
@@ -1540,7 +1544,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
         // 如果当前 shape 标记为不允许绑定，则跳过创建绑定
         if (currentShape.props.allowBinding === false) return
-		const pageAnchor = this.editor.getShapePageTransform(currentShape).applyToPoint({ x: 0, y: 0 })
+		const pageAnchor = this.editor
+			.getShapePageTransform(currentShape)
+			.applyToPoint(this.editor.getShapeGeometry(currentShape).bounds.center)
 		const target = this.editor.getShapeAtPoint(pageAnchor, {
 			hitInside: true,
 			filter: (shape) =>

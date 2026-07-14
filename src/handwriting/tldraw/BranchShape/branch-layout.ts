@@ -324,7 +324,7 @@ function getBranchRootShapeCandidate(
 	if (getBranchRootParent(editor, shape.id, branches)) return null
 
 	let nearestAttach: BranchRootAttachCandidate | null = null
-	const shapeCenter = { x: shapeBounds.centerX, y: shapeBounds.centerY }
+	const shapeCenter = getPageShapeCenter(editor, shape)
 
 	for (const branch of branches) {
 		if (!canBranchWrapRootShape(branch, shape)) continue
@@ -360,13 +360,14 @@ function getPageBounds(editor: Editor, shape: TLShape): Bounds | null {
 	const props = (shape as any).props || {}
 	const w = Math.max(Number(props.w) || DEFAULT_NODE_WIDTH, 1)
 	const h = Math.max(Number(props.h) || DEFAULT_NODE_HEIGHT, 1)
+	const pagePoint = getShapePagePoint(editor, shape)
 	return {
-		x: shape.x,
-		y: shape.y,
+		x: pagePoint.x,
+		y: pagePoint.y,
 		w,
 		h,
-		centerX: shape.x + w / 2,
-		centerY: shape.y + h / 2,
+		centerX: pagePoint.x + w / 2,
+		centerY: pagePoint.y + h / 2,
 	}
 }
 
@@ -390,12 +391,29 @@ function getPagePositionUpdate(editor: Editor, shape: TLShape, pageX: number, pa
 	return { id: shape.id, type: shape.type, x: local.x, y: local.y }
 }
 
+function getPageShapeCenter(editor: Editor, shape: TLShape) {
+	const geometry = editor.getShapeGeometry(shape)
+	return editor.getShapePageTransform(shape).applyToPoint(geometry.bounds.center)
+}
+
+function getPagePositionUpdateForBounds(editor: Editor, shape: TLShape, nextX: number, nextY: number, currentBounds: Bounds) {
+	// A rotated shape's page bounds are axis-aligned. Translate its page origin
+	// by the bounds delta so the resulting bounds, rather than the origin, lands
+	// at the layout position.
+	const currentPagePoint = getShapePagePoint(editor, shape)
+	return getPagePositionUpdate(
+		editor,
+		shape,
+		currentPagePoint.x + nextX - currentBounds.x,
+		currentPagePoint.y + nextY - currentBounds.y
+	)
+}
+
 function getBranchRootPagePoint(editor: Editor, branch: IBranchShape) {
-	const pagePoint = getShapePagePoint(editor, branch)
-	return {
-		x: pagePoint.x + getBranchRootLocalX(branch),
-		y: pagePoint.y + branch.props.h / 2,
-	}
+	return editor.getShapePageTransform(branch).applyToPoint({
+		x: getBranchRootLocalX(branch),
+		y: branch.props.h / 2,
+	})
 }
 
 function getBranchRootLocalX(branch: IBranchShape) {
@@ -405,7 +423,8 @@ function getBranchRootLocalX(branch: IBranchShape) {
 function getBranchSideForShape(editor: Editor, branch: IBranchShape, child: TLShape, childBounds = getPageBounds(editor, child)): BranchSide {
 	const root = getBranchRootPagePoint(editor, branch)
 	if (!childBounds) return 'right'
-	return childBounds.centerX < root.x ? 'left' : 'right'
+	const childCenter = child.type === 'branch' ? getBranchRootPagePoint(editor, child as IBranchShape) : getPageShapeCenter(editor, child)
+	return childCenter.x < root.x ? 'left' : 'right'
 }
 
 function getSideChildIds(branch: IBranchShape, side: BranchSide) {
@@ -541,11 +560,14 @@ function distanceToBranchWorkArea(editor: Editor, branch: IBranchShape, child: T
 	if (!childBounds) return Number.POSITIVE_INFINITY
 
 	const padding = Math.max(branch.props.snapDistance || 160, 80)
-	const branchPagePoint = getShapePagePoint(editor, branch)
-	const minX = branchPagePoint.x - padding
-	const minY = branchPagePoint.y - padding
-	const maxX = branchPagePoint.x + branch.props.w + padding
-	const maxY = branchPagePoint.y + branch.props.h + padding
+	const branchPageBounds = editor.getShapePageBounds(branch.id)
+	const branchBounds = branchPageBounds
+		? { x: branchPageBounds.x, y: branchPageBounds.y, w: branchPageBounds.width, h: branchPageBounds.height }
+		: { x: getShapePagePoint(editor, branch).x, y: getShapePagePoint(editor, branch).y, w: branch.props.w, h: branch.props.h }
+	const minX = branchBounds.x - padding
+	const minY = branchBounds.y - padding
+	const maxX = branchBounds.x + branchBounds.w + padding
+	const maxY = branchBounds.y + branchBounds.h + padding
 	const clampedX = Math.max(minX, Math.min(childBounds.centerX, maxX))
 	const clampedY = Math.max(minY, Math.min(childBounds.centerY, maxY))
 	return Math.hypot(childBounds.centerX - clampedX, childBounds.centerY - clampedY)
@@ -760,7 +782,7 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const contentHeight = Math.max(leftHeight, rightHeight, rootHeight)
 	const branchHeight = contentHeight + framePadding * 2
 	const oldRootPage = rootContent
-		? { x: rootContent.bounds.centerX, y: rootContent.bounds.centerY }
+		? getPageShapeCenter(editor, rootContent.shape)
 		: getBranchRootPagePoint(editor, branch)
 	const rootLocalX = Math.max(leftWidth, ROOT_RADIUS) + framePadding + rootWidth / 2
 	const branchWidth = rootLocalX + rootWidth / 2 + Math.max(rightWidth, ROOT_RADIUS) + framePadding
@@ -782,12 +804,11 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 			const nextX = side === 'left' ? nodeEdgeX - bounds.w : nodeEdgeX
 			cursorY += bounds.h + verticalGap
 
-			const currentPosition = getShapePagePoint(editor, shape as TLShape)
-			if (Math.abs(currentPosition.x - nextX) > 0.5 || Math.abs(currentPosition.y - nextY) > 0.5) {
-				const dx = nextX - currentPosition.x
-				const dy = nextY - currentPosition.y
+			if (Math.abs(bounds.x - nextX) > 0.5 || Math.abs(bounds.y - nextY) > 0.5) {
+				const dx = nextX - bounds.x
+				const dy = nextY - bounds.y
 				movedIds.add(shape.id as string)
-				updates.push(getPagePositionUpdate(editor, shape as TLShape, nextX, nextY))
+				updates.push(getPagePositionUpdateForBounds(editor, shape as TLShape, nextX, nextY, bounds))
 
 				if (shape.type === 'branch') {
 					addBranchDescendantMoveUpdates(editor, shape as IBranchShape, dx, dy, updates, movedIds)
@@ -1287,10 +1308,13 @@ export function alignBranchToRootContent(editor: Editor, branch: IBranchShape) {
 	const rootContent = getBranchRootContent(editor, branch)
 	if (!rootContent) return false
 
-	const rootLocalX = getBranchRootLocalX(branch)
-	const expectedX = rootContent.bounds.centerX - rootLocalX
-	const expectedY = rootContent.bounds.centerY - branch.props.h / 2
-	const expectedPosition = getPointInShapeParentSpace(editor, branch, { x: expectedX, y: expectedY })
+	const rootCenter = getPageShapeCenter(editor, rootContent.shape)
+	const currentRoot = getBranchRootPagePoint(editor, branch)
+	const currentBranchOrigin = getShapePagePoint(editor, branch)
+	const expectedPosition = getPointInShapeParentSpace(editor, branch, {
+		x: currentBranchOrigin.x + rootCenter.x - currentRoot.x,
+		y: currentBranchOrigin.y + rootCenter.y - currentRoot.y,
+	})
 	if (Math.abs(branch.x - expectedPosition.x) <= 0.5 && Math.abs(branch.y - expectedPosition.y) <= 0.5) return false
 
 	editor.updateShape<IBranchShape>({
@@ -1422,8 +1446,9 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 				}
 			})()
 		: null
-	const rootX = rootBounds ? rootBounds.x + rootBounds.w / 2 : getBranchRootLocalX(branch)
-	const rootY = rootBounds ? rootBounds.y + rootBounds.h / 2 : branch.props.h / 2
+	const rootCenter = rootContent ? toBranchLocal(getPageShapeCenter(editor, rootContent.shape)) : null
+	const rootX = rootCenter ? rootCenter.x : getBranchRootLocalX(branch)
+	const rootY = rootCenter ? rootCenter.y : branch.props.h / 2
 	const children = normalizeChildIds(editor, branch)
 		.map((id) => {
 			const child = editor.getShape(id as TLShapeId)
@@ -1431,12 +1456,15 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 			const childPageBounds = getPageBounds(editor, child)
 			if (!childPageBounds) return null
 			const local = toBranchLocal(childPageBounds)
+			const childCenter = toBranchLocal(
+				child.type === 'branch' ? getBranchRootPagePoint(editor, child as IBranchShape) : getPageShapeCenter(editor, child)
+			)
 			const childLocal = {
 				x: local.x,
 				y: local.y,
 				w: childPageBounds.w,
 				h: childPageBounds.h,
-				centerY: toBranchLocal({ x: childPageBounds.centerX, y: childPageBounds.centerY }).y,
+				centerY: childCenter.y,
 			}
 			const side: BranchSide = (branch.props.leftChildIds || []).includes(id) ? 'left' : 'right'
 			const targetX = side === 'left' ? childLocal.x + childLocal.w : childLocal.x
