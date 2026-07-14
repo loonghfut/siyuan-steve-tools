@@ -1578,10 +1578,13 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
 		const { w, h: hProp, color, fontSize = 16, blockId, transparentBackground } = shape.props
 		const showBorder = settingdata["showCardBorder"] !== false && !transparentBackground
+		// 背景是否透明与是否显示边框是两个独立的选项。画布上的
+		// singleblock 在关闭边框时仍然保留颜色背景，导出也应保持一致。
+		const hasBackground = !transparentBackground
 		const border = showBorder ? BORDER_PX : 0
 		const radius = 10
 		const strokeColor = showBorder ? theme[color].solid : 'none'
-		const fillColor = showBorder ? theme[color].semi : 'none'
+		const fillColor = hasBackground ? theme[color].semi : 'none'
 		const textColor = theme[color].solid
 		const size = SingleBlockSizes.get(this.editor).get(shape.id)
 		// 使用实际渲染高度，如果没有则使用属性高度，确保导出与实际一致
@@ -1610,7 +1613,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		return (
 			<g>
-				{border > 0 ? (
+				{hasBackground || border > 0 ? (
 					<rect width={w} height={h} fill={fillColor} stroke={strokeColor} strokeWidth={border} rx={radius} ry={radius} />
 				) : (
 					// 保持形状几何但不绘制填充与边框
