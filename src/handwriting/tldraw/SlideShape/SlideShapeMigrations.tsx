@@ -9,6 +9,7 @@ const versions = createShapePropsMigrationIds(
     Addcolor: 2,
     Addscreenshot: 3,
     AddborderStyle: 4,
+    RemoveBlockIdBinding: 5,
   }
 )
 
@@ -56,6 +57,15 @@ export const slideShapeMigrations = createShapePropsMigrationSequence({
       },
       down(props) {
         delete props.borderStyle
+      },
+    },
+    {
+      id: versions.RemoveBlockIdBinding,
+      up(props) {
+        delete (props as any).blockId
+      },
+      down() {
+        // blockId was only a cache of the linked SiYuan block and is intentionally not restored.
       },
     },
   ],

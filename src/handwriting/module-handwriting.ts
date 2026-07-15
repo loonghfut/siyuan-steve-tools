@@ -5,13 +5,25 @@ import { TldrawManager } from './tldraw/tldraw-manager';
 // 替换为新的卡片视图组件
 import TldrawWhiteboardCards from './tldraw/ui/tldraw-whiteboard-cards.svelte';
 import TldrawWhiteboardManager from './tldraw/ui/tldraw-whiteboard-manager.svelte';
+import SlideScreenshotDock from './tldraw/ui/slide-screenshot-dock.svelte';
 import { addWhiteboardButton, setupFileTreeObserver } from "./function/assist";
 import * as api from "@/api/api";
+import { getCursorBlockId } from "@/api/api2";
 import { TLShapeId } from "@tldraw/tldraw";
 import { registerTab, unregisterTab } from './tldraw/tldraw-instance-manager';
 import { settingdata } from "@/index";
 import { buildH6CSS, H6_STYLE_DEFAULTS, type H6StyleConfig } from "@/settings/style-h6";
 import { registerTldrawAgentActions, syncTldrawAgentActions } from "./tldraw/agent/ai/siyuan-agent-adapter";
+import { buildTldrawLink } from './tldraw/utils/link-builder';
+import { buildSlideScreenshotMarkdown } from './tldraw/SlideShape/slide-block-binding';
+import {
+    clearActiveSlideScreenshotStore,
+    getActiveSlideScreenshotStore,
+    setActiveSlideScreenshotStore,
+    SlideScreenshotStore,
+    SLIDE_SCREENSHOT_DRAG_TYPE,
+    type SlideScreenshotRecord,
+} from './tldraw/SlideShape/slide-screenshot-store';
 export class M_handwriting {
     private plugin: Plugin;
     // 存储画布实例的映射表
@@ -19,6 +31,10 @@ export class M_handwriting {
     private currentid: string = "";
     // svelte dock component instance
     private dockComponent: any | null = null;
+    private slideScreenshotDockComponent: any | null = null;
+    private slideScreenshotStore: SlideScreenshotStore;
+    private slideScreenshotDragOverHandler?: (event: DragEvent) => void;
+    private slideScreenshotDropHandler?: (event: DragEvent) => void;
     // 记录点击拦截器以便卸载时移除
     private clickHandler?: (e: MouseEvent) => void;
     // 委托的 icon 点击处理，用于单点管理所有注入的 icon
@@ -35,6 +51,7 @@ export class M_handwriting {
 
     constructor(plugin: Plugin) {
         this.plugin = plugin;
+        this.slideScreenshotStore = new SlideScreenshotStore(plugin);
     }
 
     // 公开访问 plugin 的 getter
@@ -55,6 +72,9 @@ export class M_handwriting {
 
     async init(settingdata) {
         registerTldrawAgentActions(this.plugin);
+        await this.slideScreenshotStore.load();
+        setActiveSlideScreenshotStore(this.slideScreenshotStore);
+        this.bindSlideScreenshotDropHandlers();
 
         const h6cfg = settingdata['style-h6-config'];
         if (h6cfg && typeof h6cfg === 'object') {
@@ -390,6 +410,77 @@ export class M_handwriting {
             },
         });
 
+        this.plugin.addDock({
+            config: {
+                position: "RightTop",
+                size: { width: 300, height: 0 },
+                icon: "iconSTWhiteboard",
+                title: "Slide截图",
+            },
+            data: null,
+            type: "steveTool-slide-screenshots",
+            resize: async () => {
+
+            },
+            update() {
+                try {
+                    const existing = (this as any).__svelteComponent;
+                    if (!existing) {
+                        this.element.innerHTML = '';
+                        const root = document.createElement('div');
+                        root.className = 'steve-slide-screenshot-dock-root';
+                        root.style.width = '100%';
+                        root.style.height = '100%';
+                        this.element.appendChild(root);
+                        // @ts-ignore
+                        self.slideScreenshotDockComponent = new SlideScreenshotDock({
+                            target: root,
+                            props: {
+                                store: self.slideScreenshotStore,
+                                onOpen: (item: SlideScreenshotRecord) => self.openSlideScreenshotTarget(item),
+                            },
+                        });
+                        (this as any).__svelteComponent = self.slideScreenshotDockComponent;
+                    }
+                } catch (err) {
+                    console.error('更新 Slide 截图 dock 时出错:', err);
+                }
+            },
+            init: async (dock) => {
+                try {
+                    dock.element.innerHTML = '';
+                    const root = document.createElement('div');
+                    root.className = 'steve-slide-screenshot-dock-root';
+                    root.style.width = '100%';
+                    root.style.height = '100%';
+                    dock.element.appendChild(root);
+                    // @ts-ignore
+                    self.slideScreenshotDockComponent = new SlideScreenshotDock({
+                        target: root,
+                        props: {
+                            store: self.slideScreenshotStore,
+                            onOpen: (item: SlideScreenshotRecord) => self.openSlideScreenshotTarget(item),
+                        },
+                    });
+                    (dock as any).__svelteComponent = self.slideScreenshotDockComponent;
+                } catch (err) {
+                    console.error('挂载 Slide 截图 dock 出错:', err);
+                }
+            },
+            destroy() {
+                try {
+                    const component = self.slideScreenshotDockComponent || (this as any).__svelteComponent;
+                    if (component && typeof component.$destroy === 'function') {
+                        component.$destroy();
+                    }
+                    self.slideScreenshotDockComponent = null;
+                } catch (e) { /* ignore */ }
+                try {
+                    if (this.element) this.element.innerHTML = '';
+                } catch (e) { /* ignore */ }
+            },
+        });
+
     }
 
     async onLayoutReady(_settingdata) {
@@ -439,6 +530,104 @@ export class M_handwriting {
                 },
             },
         });
+    }
+
+    private bindSlideScreenshotDropHandlers() {
+        this.slideScreenshotDragOverHandler = (event: DragEvent) => {
+            if (!this.isSlideScreenshotDrop(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+        };
+        this.slideScreenshotDropHandler = (event: DragEvent) => {
+            if (!this.isSlideScreenshotDrop(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            void this.insertDraggedSlideScreenshot(event);
+        };
+        document.addEventListener('dragover', this.slideScreenshotDragOverHandler, true);
+        document.addEventListener('drop', this.slideScreenshotDropHandler, true);
+    }
+
+    private unbindSlideScreenshotDropHandlers() {
+        if (this.slideScreenshotDragOverHandler) {
+            document.removeEventListener('dragover', this.slideScreenshotDragOverHandler, true);
+            this.slideScreenshotDragOverHandler = undefined;
+        }
+        if (this.slideScreenshotDropHandler) {
+            document.removeEventListener('drop', this.slideScreenshotDropHandler, true);
+            this.slideScreenshotDropHandler = undefined;
+        }
+    }
+
+    private isSlideScreenshotDrop(event: DragEvent): boolean {
+        const target = event.target instanceof Element ? event.target : null;
+        const types = Array.from(event.dataTransfer?.types || []);
+        return types.includes(SLIDE_SCREENSHOT_DRAG_TYPE) && !!target?.closest('.protyle-wysiwyg');
+    }
+
+    private async insertDraggedSlideScreenshot(event: DragEvent) {
+        const id = event.dataTransfer?.getData(SLIDE_SCREENSHOT_DRAG_TYPE) || '';
+        const store = getActiveSlideScreenshotStore() || this.slideScreenshotStore;
+        const item = store.get(id);
+        if (!item) {
+            showMessage('未找到待插入的 Slide 截图', 3000, 'error');
+            return;
+        }
+
+        const target = event.target instanceof Element ? event.target : null;
+        const targetBlockId = target?.closest('[data-node-id]')?.getAttribute('data-node-id') || getCursorBlockId();
+        if (!targetBlockId) {
+            showMessage('未找到图片插入位置，截图暂存项已保留', 3000, 'error');
+            return;
+        }
+
+        try {
+            const fileName = `slide_${this.safeSlideFileName(item.name)}_${Date.now()}.png`;
+            const file = this.dataUrlToFile(item.dataUrl, fileName);
+            const uploadResult = await api.upload('assets/st_slides', [file]);
+            const kernelPath = (uploadResult as any)?.succMap?.[fileName] as string | undefined;
+            if (!kernelPath) throw new Error('upload screenshot failed: no succMap path');
+
+            const assetPath = kernelPath.replace(/^data\//, '');
+            const markdown = buildSlideScreenshotMarkdown({
+                assetPath,
+                name: item.name,
+                shapeId: item.shapeId,
+                rootId: item.rootId,
+                title: item.title,
+            });
+            await api.smartInsertBlock('markdown', markdown, targetBlockId);
+            await store.remove(item.id);
+            showMessage('Slide 截图已插入文档，暂存项已删除');
+        } catch (error) {
+            console.error('拖入 Slide 截图失败', error);
+            showMessage('插入 Slide 截图失败，暂存项已保留', 4000, 'error');
+        }
+    }
+
+    private async openSlideScreenshotTarget(item: SlideScreenshotRecord) {
+        const link = buildTldrawLink(item.rootId, item.rootId, item.title, item.shapeId);
+        if (!this.handlePluginUrl) {
+            showMessage('白板导航尚未初始化', 3000, 'error');
+            return;
+        }
+        await this.handlePluginUrl(link);
+    }
+
+    private safeSlideFileName(value: string): string {
+        return value.replace(/[^\w\u4e00-\u9fa5-]+/g, '_').slice(0, 80) || 'slide';
+    }
+
+    private dataUrlToFile(dataUrl: string, name: string): File {
+        const [header, encoded] = dataUrl.split(',', 2);
+        if (!header || !encoded) throw new Error('invalid image data URL');
+        const mime = header.match(/^data:([^;]+)/)?.[1] || 'image/png';
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+        return new File([bytes], name, { type: mime });
     }
 
     private injectTldrawLinkIcons(container: HTMLElement) {
@@ -524,6 +713,8 @@ export class M_handwriting {
      * 插件卸载时的清理工作
      */
     async onunload() {
+        this.unbindSlideScreenshotDropHandlers();
+        clearActiveSlideScreenshotStore(this.slideScreenshotStore);
         // 移除链接点击拦截器
         if (this.clickHandler) {
             document.removeEventListener('click', this.clickHandler, true);
@@ -545,6 +736,10 @@ export class M_handwriting {
             if (this.dockComponent && typeof this.dockComponent.$destroy === 'function') {
                 this.dockComponent.$destroy();
                 this.dockComponent = null;
+            }
+            if (this.slideScreenshotDockComponent && typeof this.slideScreenshotDockComponent.$destroy === 'function') {
+                this.slideScreenshotDockComponent.$destroy();
+                this.slideScreenshotDockComponent = null;
             }
         } catch (e) { /* ignore */ }
         // 移除自定义 h6 样式

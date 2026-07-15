@@ -17,19 +17,10 @@ export function buildTldrawLink(
     const scheme = (settingdata['tldraw-link-scheme'] as 'https' | 'siyuan') || 'https';
     const protocol = scheme === 'siyuan' ? 'siyuan://' : 'https://';
     
-    let url = `${protocol}plugins/siyuan-steve-tools/?rootid=${rootId}`;
-    
-    if (blockId) {
-        url += `&blockid=${blockId}`;
-    }
-    
-    if (title) {
-        url += `&title=${title}`;
-    }
-    
-    if (shapeId) {
-        url += `&shapeid=${shapeId}`;
-    }
-    
-    return url;
+    const params = new URLSearchParams();
+    params.set('rootid', rootId);
+    if (blockId) params.set('blockid', blockId);
+    if (title) params.set('title', title);
+    if (shapeId) params.set('shapeid', shapeId);
+    return `${protocol}plugins/siyuan-steve-tools/?${params.toString()}`;
 }

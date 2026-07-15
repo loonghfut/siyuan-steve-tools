@@ -4029,7 +4029,7 @@ async function loadAgentLinkedBlockContent(shapes: TLShape[]): Promise<Map<strin
 }
 
 function shouldAttachLinkedBlockContent(shape: TLShape): boolean {
-    if (!['card', 'single-block', 'slide', 'mind-map'].includes(shape.type)) return false;
+    if (!['card', 'single-block', 'mind-map'].includes(shape.type)) return false;
     return Boolean((shape as any).props?.blockId);
 }
 
@@ -4234,7 +4234,7 @@ function buildAgentBasicShape(id: TLShapeId, options: AgentBasicShapeCreateArgs,
         return { id, type: 'bezier-connector', x: 0, y: 0, props: { start: { x, y }, end: { x: x + w, y: y + h }, color, strokeWidth: 3, strokeStyle: 'solid', richText: toRichText(text), labelPosition: 0.5, font: 'draw', size: 'm', scale: 1 } };
     }
     if (options.kind === 'slide') {
-        return { id, type: 'slide', x, y, props: { w, h, color, name: clampAgentText(options.name || text || 'New Slide', 120), blockId: options.blockId, borderStyle: 'dashed' } };
+        return { id, type: 'slide', x, y, props: { w, h, color, name: clampAgentText(options.name || text || 'New Slide', 120), borderStyle: 'dashed' } };
     }
     if (options.kind === 'mind-map') {
         return { id, type: 'mind-map', x, y, props: { w, h, color, rootNode: createMindMapNode(text || '涓績涓婚'), horizontalGap: 50, verticalGap: 20, nodeWidth: 120, nodeHeight: 36, fontSize: 14, lineWidth: 2, direction: options.direction || 'right', theme: options.theme || 'default', blockId: options.blockId, version: 1, refreshNonce: Date.now() } };
@@ -4326,7 +4326,7 @@ function finalizeAgentSelection(editor: Editor, focusedId: TLShapeId, options: {
 }
 
 function isLinkedBlockShape(shape: TLShape) {
-    return Boolean((shape as any).props?.blockId && ['card', 'single-block', 'slide', 'mind-map'].includes(shape.type));
+    return Boolean((shape as any).props?.blockId && ['card', 'single-block', 'mind-map'].includes(shape.type));
 }
 
 function clampAgentText(value: string, maxLength: number) {

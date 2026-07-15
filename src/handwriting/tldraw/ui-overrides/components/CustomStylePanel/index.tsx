@@ -97,7 +97,6 @@ export const CustomStylePanel = track(() => {
     const editorElement = container?.closest('.tldraw__editor')
     const rootId = editorElement?.getAttribute('data-tldraw-id')
     const title = editorElement?.getAttribute('data-tldraw-title')
-    const blockId = rootId
 
     return (
         <DefaultStylePanel>
@@ -119,7 +118,6 @@ export const CustomStylePanel = track(() => {
                 slideShape={slideShape}
                 isSingleSlideSelected={isSingleSlideSelected}
                 rootId={rootId}
-                blockId={blockId}
                 title={title}
             />
 

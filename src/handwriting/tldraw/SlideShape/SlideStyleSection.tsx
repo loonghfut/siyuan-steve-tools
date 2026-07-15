@@ -4,10 +4,12 @@
 import React from 'react'
 import { TldrawUiButton, TldrawUiIcon, TldrawUiInput, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
-import { upload, appendBlock, updateBlock, getBlockByID } from '@/api/api'
+import { upload, appendBlock, updateBlock } from '@/api/api'
 import { getCursorBlockId } from '@/api/api2'
 import { buildTldrawLink } from '../utils/link-builder'
 import { captureSlideScreenshot } from './captureSlideScreenshot'
+import { getActiveSlideScreenshotStore } from './slide-screenshot-store'
+import { buildSlideScreenshotMarkdown, findSlideScreenshotBlockId } from './slide-block-binding'
 import { settingdata } from '@/index'
 import { $currentSlide, setSlideFocusMode, useCurrentSlide, useSlideFocusMode } from './useSlides'
 import type { SlideShape } from './SlideShapeUtil'
@@ -17,7 +19,6 @@ export interface SlideStyleSectionProps {
     slideShape: SlideShape | null
     isSingleSlideSelected: boolean
     rootId: string | null | undefined
-    blockId: string | null | undefined
     title: string | null | undefined
 }
 
@@ -26,7 +27,6 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
     slideShape,
     isSingleSlideSelected,
     rootId,
-    blockId,
     title,
 }) => {
     const [isCapturingScreenshot, setIsCapturingScreenshot] = React.useState(false)
@@ -93,31 +93,8 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
 
         setIsCapturingScreenshot(true)
         try {
-            let targetBlockId: string | null = (slideShape.props.blockId ?? '').trim()
-            if (!targetBlockId) {
-                targetBlockId = null
-            }
-
             const cursorId = getCursorBlockId()
-
-            if (targetBlockId) {
-                try {
-                    const blk = await getBlockByID(targetBlockId)
-                    if (!blk || !blk.id) {
-                        console.warn('保存的 blockId 在思源中未找到: ', targetBlockId)
-                        showMessage('幻灯片保存的块在思源中未找到，后续将作为新块插入', 3000, 'info')
-                        targetBlockId = null
-                    }
-                } catch (err) {
-                    console.warn('检查保存的 blockId 时出错', err)
-                    targetBlockId = null
-                }
-            }
-
-            if (!targetBlockId && !cursorId) {
-                showMessage('未检测到已有截图块且未获取到光标位置，已取消操作', 3000, 'error')
-                return
-            }
+            let targetBlockId = await findSlideScreenshotBlockId(slideShape.id)
 
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
@@ -126,6 +103,26 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
             })
             if (result) {
                 try {
+                    const saveToDock = async () => {
+                        const store = getActiveSlideScreenshotStore()
+                        if (!store) throw new Error('slide screenshot store is not initialized')
+                        await store.add({
+                            dataUrl: result.dataUrl,
+                            width: result.width,
+                            height: result.height,
+                            name: slideShape.props.name || 'Slide',
+                            rootId: rootId || '',
+                            shapeId: slideShape.id,
+                            title: title || '',
+                        })
+                    }
+
+                    if (!targetBlockId && !cursorId) {
+                        await saveToDock()
+                        showMessage('未检测到光标块，截图已保存到 Slide 截图侧边栏')
+                        return
+                    }
+
                     const now = new Date()
                     const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
                     const rawName = slideShape?.props?.name || 'slide'
@@ -144,25 +141,26 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     }
                     const assetPath = kernelPath.replace(/^data\//, '')
 
-                    const alt = rawName || 'slide'
-                    const md = `![${alt}](${assetPath})\n{: custom-st-slide-id="${slideShape.id}" custom-tldraw-link="${buildTldrawLink(rootId || '', blockId || '', title || '', slideShape.id)}" }`
+                    const md = buildSlideScreenshotMarkdown({
+                        assetPath,
+                        name: rawName || 'slide',
+                        shapeId: slideShape.id,
+                        rootId: rootId || '',
+                        title: title || '',
+                    })
 
                     let fallbackFromUpdateFailure = false
 
                     if (targetBlockId) {
                         try {
                             await updateBlock('markdown', md, targetBlockId)
-                            editor.updateShape({
-                                id: slideShape.id,
-                                type: 'slide',
-                                props: { blockId: targetBlockId },
-                            })
                             showMessage('已更新之前插入的幻灯片截图')
                             return
                         } catch (updateErr) {
                             console.error('更新现有幻灯片截图块失败', updateErr)
                             if (!cursorId) {
-                                showMessage('更新截图块失败，且未检测到光标位置可新建截图', 4000, 'error')
+                                await saveToDock()
+                                showMessage('原截图块更新失败，截图已保存到 Slide 截图侧边栏', 4000, 'info')
                                 return
                             }
                             fallbackFromUpdateFailure = true
@@ -177,16 +175,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                         }
 
                         const appendRes = await appendBlock('markdown', md, cursorId)
-                        const newBlockId = appendRes?.[0]?.doOperations?.[0]?.id as string | undefined
-                        if (typeof newBlockId === 'string' && newBlockId) {
-                            editor.updateShape({
-                                id: slideShape.id,
-                                type: 'slide',
-                                props: { blockId: newBlockId },
-                            })
-                        } else {
-                            console.warn('无法获取新建幻灯片截图块的 ID', appendRes)
-                        }
+                        if (!appendRes?.[0]?.doOperations?.[0]?.id) console.warn('无法获取新建幻灯片截图块的 ID', appendRes)
                         showMessage(
                             fallbackFromUpdateFailure
                                 ? '原块更新失败，已在光标位置插入新的幻灯片截图'
@@ -206,14 +195,14 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
         } finally {
             setIsCapturingScreenshot(false)
         }
-    }, [editor, slideShape, isCapturingScreenshot, rootId, blockId, title])
+    }, [editor, slideShape, isCapturingScreenshot, rootId, title])
 
     const handleOpenSlideBlock = React.useCallback(async () => {
         if (!slideShape) return
 
-        const blockId = slideShape.props.blockId
+        const blockId = await findSlideScreenshotBlockId(slideShape.id)
         if (!blockId) {
-            showMessage('幻灯片暂未绑定思源块', 3000, 'error')
+            showMessage('幻灯片暂未绑定思源截图块', 3000, 'error')
             return
         }
 
@@ -238,9 +227,9 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
             const shapeId = slideShape.id
             let url: string
             if (settingdata['copyLinkTitle']) {
-                url = `[slide:${slideShape.props.name}](${buildTldrawLink(rootId, blockId, title, shapeId)})`
+                url = `[slide:${slideShape.props.name}](${buildTldrawLink(rootId, rootId, title, shapeId)})`
             } else {
-                url = buildTldrawLink(rootId, blockId, title, shapeId)
+                url = buildTldrawLink(rootId, rootId, title, shapeId)
             }
             try {
                 await navigator.clipboard.writeText(url)
@@ -254,7 +243,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
             showMessage('无法生成链接：缺少 rootId。', -1, 'error')
             console.error('Cannot copy link: rootId is not set.')
         }
-    }, [slideShape, rootId, blockId, title])
+    }, [slideShape, rootId, title])
 
     if (!isSingleSlideSelected || !slideShape) return null
 
@@ -319,7 +308,6 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     style={{ flex: '1 1 0', minWidth: 0 }}
                     title="跳转到笔记"
                     aria-label="跳转到笔记"
-                    disabled={!slideShape.props.blockId}
                 >
                     <TldrawUiIcon label="" icon="open-block" />
                 </TldrawUiButton>
