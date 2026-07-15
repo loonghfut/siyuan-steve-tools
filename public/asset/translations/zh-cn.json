@@ -488,5 +488,17 @@
 	"style-panel.card-render-mode": "渲染方式",
 	"card-render-mode-style.inherit": "继承",
 	"card-render-mode-style.static-dom": "静态 DOM",
-	"card-render-mode-style.live-protyle": "实时 Protyle"
+	"card-render-mode-style.live-protyle": "实时 Protyle",
+	"action.copy-as-json.short": "复制 JSON",
+	"action.copy-as-json": "复制为 JSON",
+	"action.copy-hovered-styles": "复制悬停样式",
+	"action.frame-selection": "框选内容",
+	"action.toggle-invert-zoom.menu": "反转缩放方向",
+	"action.toggle-invert-zoom": "反转缩放方向",
+	"action.zoom-quick": "快速缩放",
+	"action.select-zoom-tool": "选择缩放工具",
+	"fill-style.lined-fill": "线条填充",
+	"menu.color-theme": "颜色主题",
+	"menu.input-device": "输入设备",
+	"page-menu.max-pages-reached": "已达到最大页面数"
 }

@@ -66,6 +66,13 @@ export function createAssetUrlsWithCustomIcons() {
         for (const [name, filename] of Object.entries(CUSTOM_ICONS)) {
             assetUrls.icons[name] = `${BASE_URL}/${filename}`;
         }
+
+        // tldraw 5.2.3 includes Canva in its embed definition list, but the
+        // published self-hosted assets do not contain canva.png. Reuse the
+        // bundled tldraw icon so opening a whiteboard does not issue a 404.
+        if (assetUrls.embedIcons?.tldraw) {
+            assetUrls.embedIcons.canva = assetUrls.embedIcons.tldraw;
+        }
     } catch (err) {
         console.warn('无法在 assetUrls 上添加 custom-icon 映射', err);
     }
