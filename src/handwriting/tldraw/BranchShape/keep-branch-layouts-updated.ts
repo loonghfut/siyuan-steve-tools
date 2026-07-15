@@ -377,27 +377,47 @@ function deleteBranchesWhoseRootsWereDeleted(editor: Editor, deletedShapeIds: Se
  * behind in the old frame.
  */
 function getConnectedBranchShapeIds(editor: Editor, initialShapeIds: Iterable<string>) {
-	const branches = editor.getCurrentPageShapes().filter((shape): shape is IBranchShape => shape.type === 'branch')
-	const ids = new Set(initialShapeIds)
-	let didAdd = true
+	const adjacentIds = new Map<string, Set<string>>()
+	const connect = (from: string, to: string) => {
+		let neighbors = adjacentIds.get(from)
+		if (!neighbors) {
+			neighbors = new Set<string>()
+			adjacentIds.set(from, neighbors)
+		}
+		neighbors.add(to)
+	}
 
-	while (didAdd) {
-		didAdd = false
-		for (const branch of branches) {
-			const attachedIds = getAllBranchChildIds(branch)
-			if (branch.props.rootShapeId) attachedIds.push(branch.props.rootShapeId)
-			if (!ids.has(branch.id as string) && !attachedIds.some((id) => ids.has(id))) continue
+	for (const branch of editor.getCurrentPageShapes()) {
+		if (branch.type !== 'branch') continue
 
-			for (const id of [branch.id as string, ...attachedIds]) {
-				if (!ids.has(id)) {
-					ids.add(id)
-					didAdd = true
-				}
-			}
+		const branchId = branch.id as string
+		const attachedIds = getAllBranchChildIds(branch as IBranchShape)
+		if ((branch as IBranchShape).props.rootShapeId) {
+			attachedIds.push((branch as IBranchShape).props.rootShapeId!)
+		}
+
+		for (const attachedId of attachedIds) {
+			connect(branchId, attachedId)
+			connect(attachedId, branchId)
 		}
 	}
 
-	return ids
+	// Branch attachments form an undirected visual group. Traversing the
+	// adjacency map preserves the former transitive closure behavior without
+	// repeatedly scanning every branch for each newly discovered shape.
+	const connectedIds = new Set<string>()
+	const queue = Array.from(initialShapeIds)
+	for (let index = 0; index < queue.length; index++) {
+		const id = queue[index]
+		if (connectedIds.has(id)) continue
+		connectedIds.add(id)
+
+		for (const neighborId of adjacentIds.get(id) || []) {
+			if (!connectedIds.has(neighborId)) queue.push(neighborId)
+		}
+	}
+
+	return connectedIds
 }
 
 type BranchParentChange = {
@@ -517,52 +537,54 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 		isUpdating = true
 
 		try {
-			moveConnectedBranchesToParent(editor, parentChanges)
+			editor.run(() => {
+				moveConnectedBranchesToParent(editor, parentChanges)
 
-			const remappedCreatedBranches: IBranchShape[] = []
-			for (const branchId of createdBranchIds) {
-				const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
-				if (!branch || branch.type !== 'branch') continue
-				if (consumeExplicitCreatedBranchRelation(editor, branchId)) continue
+				const remappedCreatedBranches: IBranchShape[] = []
+				for (const branchId of createdBranchIds) {
+					const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
+					if (!branch || branch.type !== 'branch') continue
+					if (consumeExplicitCreatedBranchRelation(editor, branchId)) continue
 
-				if (remapCreatedBranchChildren(editor, branch, createdShapeIds)) {
-					const updatedBranch = editor.getShape<IBranchShape>(branch.id)
-					if (updatedBranch?.type === 'branch') remappedCreatedBranches.push(updatedBranch)
+					if (remapCreatedBranchChildren(editor, branch, createdShapeIds)) {
+						const updatedBranch = editor.getShape<IBranchShape>(branch.id)
+						if (updatedBranch?.type === 'branch') remappedCreatedBranches.push(updatedBranch)
+					}
 				}
-			}
 
-			// Complete every ID remap before moving anything. A parent layout moves its whole
-			// branch subtree, so laying it out while nested branches still point at the source
-			// tree corrupts pasted multi-level branch layouts.
-			remappedCreatedBranches
-				.sort((a, b) => getBranchDepth(editor, b) - getBranchDepth(editor, a))
-				.forEach((branch) => {
-					const latestBranch = editor.getShape<IBranchShape>(branch.id)
-					if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
-				})
+				// Complete every ID remap before moving anything. A parent layout moves its whole
+				// branch subtree, so laying it out while nested branches still point at the source
+				// tree corrupts pasted multi-level branch layouts.
+				remappedCreatedBranches
+					.sort((a, b) => getBranchDepth(editor, b) - getBranchDepth(editor, a))
+					.forEach((branch) => {
+						const latestBranch = editor.getShape<IBranchShape>(branch.id)
+						if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
+					})
 
-			const rootDeletedBranchIds = deleteBranchesWhoseRootsWereDeleted(
-				editor,
-				new Set(deletedShapes.map((shape) => shape.id as string))
-			)
-			const deletedBranchIds = new Set(rootDeletedBranchIds.map((id) => id as string))
+				const rootDeletedBranchIds = deleteBranchesWhoseRootsWereDeleted(
+					editor,
+					new Set(deletedShapes.map((shape) => shape.id as string))
+				)
+				const deletedBranchIds = new Set(rootDeletedBranchIds.map((id) => id as string))
 
-			for (const shape of deletedShapes) {
-				if (shape.type === 'branch' && !deletedBranchIds.has(shape.id as string)) {
-					promoteOnlyChildOfDeletedBranch(editor, shape as IBranchShape)
+				for (const shape of deletedShapes) {
+					if (shape.type === 'branch' && !deletedBranchIds.has(shape.id as string)) {
+						promoteOnlyChildOfDeletedBranch(editor, shape as IBranchShape)
+					}
 				}
-			}
 
-			if (deletedShapes.length > 0 || rootDeletedBranchIds.length > 0) {
-				pruneShapesFromBranches(editor, [
-					...deletedShapes.map((shape) => shape.id as TLShapeId),
-					...rootDeletedBranchIds,
-				])
-			}
+				if (deletedShapes.length > 0 || rootDeletedBranchIds.length > 0) {
+					pruneShapesFromBranches(editor, [
+						...deletedShapes.map((shape) => shape.id as TLShapeId),
+						...rootDeletedBranchIds,
+					])
+				}
 
-			if (shapeIds.length > 0) {
-				relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
-			}
+				if (shapeIds.length > 0) {
+					relayoutBranchesContainingShapes(editor, shapeIds as TLShapeId[])
+				}
+			})
 		} finally {
 			isUpdating = false
 		}
