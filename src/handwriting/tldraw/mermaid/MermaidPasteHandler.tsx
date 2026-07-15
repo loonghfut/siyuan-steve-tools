@@ -6,9 +6,13 @@ export function MermaidPasteHandler() {
 	const editor = useEditor()
 
 	React.useEffect(() => {
-		return editor.registerExternalContentHandler('text', async (content) => {
+		editor.registerExternalContentHandler('text', async (content) => {
 			await handleExternalMermaidText(editor, content)
 		})
+
+		return () => {
+			editor.registerExternalContentHandler('text', null)
+		}
 	}, [editor])
 
 	return null
