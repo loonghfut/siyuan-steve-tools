@@ -53,6 +53,7 @@ import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateA
 import type { AgentDocOutlineBoardOptions } from './agent/tools/internal/documents/doc-to-board';
 import type { AgentPlanApplyOptions } from './agent/tools/internal/planning/plan-runner';
 import { InteractionHintOverlayUtil } from './ui-overrides/overlay-utils/InteractionHintOverlayUtil';
+import { syncTldrawThemeFromSiyuan } from './utils/siyuan-theme';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -90,6 +91,7 @@ export class TldrawManager {
     private applyingRemoteChanges = false;
     private title: string;
     private themeObserver: MutationObserver | null = null;
+    private themeSyncFrame: number | null = null;
     private _autosaveUnsub: (() => void) | null = null;
     private _realtimeUnsub: (() => void) | null = null;
     private _broadcastChannel: BroadcastChannel | null = null;
@@ -1059,27 +1061,36 @@ export class TldrawManager {
 
     private applyThemeToEditor() {
         if (!this.editor) return;
-        const isDark = isDarkTheme();
         try {
-            this.editor.user.updateUserPreferences({ colorScheme: isDark ? 'dark' : 'light' });
+            syncTldrawThemeFromSiyuan(this.editor);
         } catch (err) {
-            console.warn('更新 tldraw 主题偏好失败', err);
+            console.warn('同步思源主题到 tldraw 失败', err);
         }
     }
 
     private setupThemeObserver() {
         if (this.themeObserver) return;
-        const target = document.documentElement;
-        if (!target) return;
+        const root = document.documentElement;
+        if (!root) return;
+
+        const scheduleThemeSync = () => {
+            if (this.themeSyncFrame !== null) return;
+
+            this.themeSyncFrame = requestAnimationFrame(() => {
+                this.themeSyncFrame = null;
+                if (!this._destroyed) this.applyThemeToEditor();
+            });
+        };
+
         this.themeObserver = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme-mode') {
-                    this.applyThemeToEditor();
-                    break;
-                }
+            if (mutations.some((mutation) => mutation.attributeName === 'data-theme-mode')) {
+                scheduleThemeSync();
             }
         });
-        this.themeObserver.observe(target, { attributes: true, attributeFilter: ['data-theme-mode'] });
+        this.themeObserver.observe(root, {
+            attributes: true,
+            attributeFilter: ['data-theme-mode'],
+        });
     }
 
     /**
@@ -1394,6 +1405,10 @@ export class TldrawManager {
         if (this.themeObserver) {
             this.themeObserver.disconnect();
             this.themeObserver = null;
+        }
+        if (this.themeSyncFrame !== null) {
+            cancelAnimationFrame(this.themeSyncFrame);
+            this.themeSyncFrame = null;
         }
 
         // 销毁React根节点
@@ -1895,12 +1910,6 @@ export class TldrawManager {
     }
 
 
-}
-
-function isDarkTheme(): boolean {
-    // 思源笔记暗色主题通常通过 data-theme 属性判断
-    // console.debug("判断思源主题", document.documentElement.getAttribute('data-theme-mode'));
-    return document.documentElement.getAttribute('data-theme-mode') === 'dark';
 }
 
 //暴露给全局

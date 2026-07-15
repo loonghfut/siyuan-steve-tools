@@ -19,7 +19,20 @@
   --layer-header-footer: 999;
   --layer-following-indicator: 1000;
 }
-
+.tlui-button__tool[aria-pressed=true]:not(:disabled,[data-disabled]):after {
+    background: var(--b3-theme-primary) !important;
+    opacity: 1;
+}
+.tlui-slider__track:after {
+    display: block;
+    position: absolute;
+    top: calc(50% - 2px);
+    content: "";
+    height: 3px;
+    width: 100%;
+    background-color:  var(--b3-theme-primary) !important;
+    border-radius: 14px;
+}
 
 /* 添加以下样式 */
 .tldraw__editor {
