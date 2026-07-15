@@ -4,54 +4,8 @@
  */
 import {
 	CustomEmbedDefinition,
-	DEFAULT_EMBED_DEFINITIONS,
 	EmbedShapeUtil,
 } from '@tldraw/tldraw'
-
-function normalizeSiyuanPluginUrl(url: string) {
-	if (url.startsWith('siyuan://plugins/siyuan-steve-tools/')) {
-		return `https://plugins/siyuan-steve-tools/${url.slice('siyuan://plugins/siyuan-steve-tools/'.length)}`
-	}
-	return url
-}
-
-function createPassthroughEmbedDefinition(
-	type: string,
-	title: string,
-	hostnames: string[],
-	icon: string,
-	options?: Partial<CustomEmbedDefinition>
-): CustomEmbedDefinition {
-	return {
-		type,
-		title,
-		hostnames,
-		minWidth: 320,
-		minHeight: 220,
-		width: 960,
-		height: 640,
-		doesResize: true,
-		toEmbedUrl: (url: string) => {
-			try {
-				const normalized = normalizeSiyuanPluginUrl(url)
-				const parsed = new URL(normalized)
-				if (!hostnames.includes(parsed.hostname)) return undefined
-				return parsed.toString()
-			} catch {
-				return undefined
-			}
-		},
-		fromEmbedUrl: (url: string) => {
-			try {
-				return new URL(url).toString()
-			} catch {
-				return undefined
-			}
-		},
-		icon,
-		...options,
-	}
-}
 
 export const bilibiliEmbed: CustomEmbedDefinition = {
 	type: 'bilibili',
@@ -115,64 +69,12 @@ export const bilibiliEmbed: CustomEmbedDefinition = {
 	icon: 'https://www.bilibili.com/favicon.ico',
 }
 
-export const siyuanWhiteboardEmbed = createPassthroughEmbedDefinition(
-	'siyuan-whiteboard',
-	'思源白板',
-	['plugins'],
-	'https://assets.b3logfile.com/siyuan/favicon.png',
-	{
-		width: 1100,
-		height: 720,
-		toEmbedUrl: (url: string) => {
-			try {
-				const normalized = normalizeSiyuanPluginUrl(url)
-				const parsed = new URL(normalized)
-				if (parsed.hostname !== 'plugins') return undefined
-				if (!parsed.pathname.startsWith('/siyuan-steve-tools/')) return undefined
-				return parsed.toString()
-			} catch {
-				return undefined
-			}
-		},
-	}
-)
-
-export const wpsEmbed = createPassthroughEmbedDefinition(
-	'wps-document',
-	'WPS',
-	['kdocs.cn', 'www.kdocs.cn'],
-	'https://www.kdocs.cn/favicon.ico',
-	{
-		width: 1080,
-		height: 720,
-	}
-)
-
-export const webPageEmbed = createPassthroughEmbedDefinition(
-	'web-page',
-	'网页',
-	[
-		'docs.qq.com',
-		'doc.weixin.qq.com',
-		'mp.weixin.qq.com',
-		'yuque.com',
-		'www.yuque.com',
-		'notion.so',
-		'www.notion.so',
-		'notion.site',
-		'www.notion.site',
-	],
-	'https://www.google.com/s2/favicons?domain=www.example.com&sz=64'
-)
-
 export const customEmbedDefinitions: CustomEmbedDefinition[] = [
-	siyuanWhiteboardEmbed,
-	wpsEmbed,
-	webPageEmbed,
 	bilibiliEmbed,
 ]
 
-export const allEmbeds = [...DEFAULT_EMBED_DEFINITIONS, ...customEmbedDefinitions]
+// 仅向创建嵌入菜单注册哔哩哔哩，避免显示其他内置或自定义嵌入类型。
+export const allEmbeds = customEmbedDefinitions
 
 export const ConfiguredEmbedShapeUtil = EmbedShapeUtil.configure({
 	embedDefinitions: allEmbeds,
