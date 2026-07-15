@@ -4,6 +4,7 @@
  */
 import {
 	CustomEmbedDefinition,
+	DEFAULT_EMBED_DEFINITIONS,
 	EmbedShapeUtil,
 } from '@tldraw/tldraw'
 
@@ -69,12 +70,39 @@ export const bilibiliEmbed: CustomEmbedDefinition = {
 	icon: 'https://www.bilibili.com/favicon.ico',
 }
 
+/**
+ * 普通网页也允许作为 iframe 嵌入。
+ *
+ * 站点是否允许被 iframe 加载仍由目标站点的 CSP/X-Frame-Options 决定；
+ * 对不允许嵌入的站点，用户仍可通过右键菜单切回书签。
+ */
+export const webpageEmbed: CustomEmbedDefinition = {
+	type: 'webpage',
+	title: '网页',
+	hostnames: ['*'],
+	minWidth: 300,
+	minHeight: 200,
+	width: 720,
+	height: 500,
+	doesResize: true,
+	embedOnPaste: true,
+	icon: '',
+	toEmbedUrl: (url: string) => url,
+	fromEmbedUrl: (url: string) => url,
+}
+
 export const customEmbedDefinitions: CustomEmbedDefinition[] = [
 	bilibiliEmbed,
+	webpageEmbed,
 ]
 
-// 仅向创建嵌入菜单注册哔哩哔哩，避免显示其他内置或自定义嵌入类型。
-export const allEmbeds = customEmbedDefinitions
+// 保留 tldraw 内置嵌入，同时支持哔哩哔哩和普通网页。
+// DEFAULT_EMBED_DEFINITIONS 的内置定义不要求 icon，而 CustomEmbedDefinition 要求
+// icon，因此在合并时使用 tldraw 的嵌入定义联合类型。
+export const allEmbeds = [
+	...DEFAULT_EMBED_DEFINITIONS,
+	...customEmbedDefinitions,
+]
 
 export const ConfiguredEmbedShapeUtil = EmbedShapeUtil.configure({
 	embedDefinitions: allEmbeds,

@@ -5,6 +5,8 @@ import React from 'react'
 import {
     DefaultContextMenu,
     DefaultContextMenuContent,
+    ConvertToBookmarkMenuItem,
+    ConvertToEmbedMenuItem,
     TldrawUiMenuGroup,
     TldrawUiMenuItem,
     TLUiContextMenuProps,
@@ -70,6 +72,10 @@ export const CustomContextMenu: React.FC<TLUiContextMenuProps> = (props) => {
 
     return (
         <DefaultContextMenu {...props}>
+            <TldrawUiMenuGroup id="link-display-mode">
+                <ConvertToEmbedMenuItem />
+                <ConvertToBookmarkMenuItem />
+            </TldrawUiMenuGroup>
             <TldrawUiMenuGroup id="shape-library">
                 <TldrawUiMenuItem
                     id="add-to-library"
