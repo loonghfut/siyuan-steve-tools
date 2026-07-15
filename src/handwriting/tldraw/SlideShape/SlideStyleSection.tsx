@@ -4,12 +4,10 @@
 import React from 'react'
 import { TldrawUiButton, TldrawUiIcon, TldrawUiInput, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
-import { upload, appendBlock, updateBlock } from '@/api/api'
-import { getCursorBlockId } from '@/api/api2'
 import { buildTldrawLink } from '../utils/link-builder'
 import { captureSlideScreenshot } from './captureSlideScreenshot'
 import { getActiveSlideScreenshotStore } from './slide-screenshot-store'
-import { buildSlideScreenshotMarkdown, findSlideScreenshotBlockId, findSlideScreenshotBlockIds } from './slide-block-binding'
+import { findSlideScreenshotBlockId } from './slide-block-binding'
 import { settingdata } from '@/index'
 import { $currentSlide, setSlideFocusMode, useCurrentSlide, useSlideFocusMode } from './useSlides'
 import type { SlideShape } from './SlideShapeUtil'
@@ -93,9 +91,6 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
 
         setIsCapturingScreenshot(true)
         try {
-            const cursorId = getCursorBlockId()
-            let targetBlockIds = await findSlideScreenshotBlockIds(slideShape.id)
-
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
                 updateShape: true,
@@ -117,86 +112,11 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                         })
                     }
 
-                    if (targetBlockIds.length === 0 && !cursorId) {
-                        await saveToDock()
-                        showMessage('未检测到光标块，截图已保存到 Slide 截图侧边栏')
-                        return
-                    }
-
-                    const now = new Date()
-                    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
-                    const rawName = slideShape?.props?.name || 'slide'
-                    const safeName = String(rawName).replace(/[^\w\u4e00-\u9fa5-]+/g, '_')
-                    const ext = result.format === 'svg' ? 'svg' : 'png'
-                    const fileName = `slide_${safeName}_${ts}.${ext}`
-                    const blobType = result.blob.type || 'image/png'
-                    const file = new File([result.blob], fileName, { type: blobType })
-                    const uploadDir = 'assets/st_slides'
-
-                    const upRes = await upload(uploadDir, [file])
-                    const succMap = (upRes as any)?.succMap || {}
-                    const kernelPath: string | undefined = succMap[fileName]
-                    if (!kernelPath) {
-                        throw new Error('upload screenshot failed: no succMap path')
-                    }
-                    const assetPath = kernelPath.replace(/^data\//, '')
-
-                    const md = buildSlideScreenshotMarkdown({
-                        assetPath,
-                        name: rawName || 'slide',
-                        shapeId: slideShape.id,
-                        rootId: rootId || '',
-                        title: title || '',
-                    })
-
-                    let fallbackFromUpdateFailure = false
-
-                    if (targetBlockIds.length > 0) {
-                        const updateResults = await Promise.allSettled(
-                            targetBlockIds.map((targetBlockId) => updateBlock('markdown', md, targetBlockId))
-                        )
-                        const failedCount = updateResults.filter((result) => result.status === 'rejected').length
-                        const updatedCount = targetBlockIds.length - failedCount
-                        if (failedCount === 0) {
-                            showMessage(`已更新 ${updatedCount} 个关联的幻灯片截图`)
-                            return
-                        }
-                        updateResults.forEach((result, index) => {
-                            if (result.status === 'rejected') {
-                                console.error('更新关联的幻灯片截图块失败', targetBlockIds[index], result.reason)
-                            }
-                        })
-                        if (updatedCount > 0) {
-                            showMessage(`已更新 ${updatedCount} 个截图，${failedCount} 个更新失败`, 4000, 'error')
-                            return
-                        }
-                        fallbackFromUpdateFailure = true
-                        targetBlockIds = []
-                    }
-
-                    if (targetBlockIds.length === 0) {
-                        if (!cursorId) {
-                            if (fallbackFromUpdateFailure) {
-                                await saveToDock()
-                                showMessage('关联截图更新失败，截图已保存到 Slide 截图侧边栏', 4000, 'info')
-                            } else {
-                                await saveToDock()
-                                showMessage('未检测到光标块，截图已保存到 Slide 截图侧边栏')
-                            }
-                            return
-                        }
-
-                        const appendRes = await appendBlock('markdown', md, cursorId)
-                        if (!appendRes?.[0]?.doOperations?.[0]?.id) console.warn('无法获取新建幻灯片截图块的 ID', appendRes)
-                        showMessage(
-                            fallbackFromUpdateFailure
-                                ? '原块更新失败，已在光标位置插入新的幻灯片截图'
-                                : '已将幻灯片截图插入到当前光标位置'
-                        )
-                    }
+                    await saveToDock()
+                    showMessage('Slide 截图已保存到侧边栏')
                 } catch (insErr) {
-                    console.error('insert slide screenshot to Siyuan failed', insErr)
-                    showMessage('已更新截图，但插入到思源失败', 4000, 'error')
+                    console.error('save slide screenshot to dock failed', insErr)
+                    showMessage('已生成截图，但保存到侧边栏失败', 4000, 'error')
                 }
             } else {
                 showMessage('生成幻灯片截图失败', -1, 'error')
