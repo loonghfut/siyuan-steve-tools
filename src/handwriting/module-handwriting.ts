@@ -414,7 +414,7 @@ export class M_handwriting {
             config: {
                 position: "RightTop",
                 size: { width: 300, height: 0 },
-                icon: "iconSTWhiteboard",
+                icon: "iconImage",
                 title: "Slide截图",
             },
             data: null,
