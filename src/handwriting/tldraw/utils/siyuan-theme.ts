@@ -71,7 +71,7 @@ export function syncTldrawThemeFromSiyuan(editor: Editor): void {
 		text: textColor,
 		background: backgroundColor,
 		negativeSpace: backgroundColor,
-		cursor: textColor,
+		// cursor: textColor,
 		noteBorder: borderColor,
 		selectionStroke: primaryColor,
 		// selectionFill: withAlpha(primaryColor, 0.005),
