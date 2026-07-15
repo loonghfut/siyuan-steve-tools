@@ -11,8 +11,24 @@ import { Dialog } from "siyuan";
 export const inputDialog = (args: {
     title: string, placeholder?: string, defaultText?: string,
     confirm?: (text: string) => void, cancel?: () => void,
-    width?: string, height?: string
+    width?: string, height?: string, confirmOnEnter?: boolean
 }) => {
+    let settled = false;
+    const finishCancel = () => {
+        if (settled) return;
+        settled = true;
+        args?.cancel?.();
+        dialog.destroy();
+    };
+    const finishConfirm = () => {
+        if (settled) return;
+        settled = true;
+        try {
+            args?.confirm?.(target.value);
+        } finally {
+            dialog.destroy();
+        }
+    };
     const dialog = new Dialog({
         title: args.title,
         content: `<div class="b3-dialog__content">
@@ -23,27 +39,38 @@ export const inputDialog = (args: {
     <button class="b3-button b3-button--text" id="confirmDialogConfirmBtn">${window.siyuan.languages.confirm}</button>
 </div>`,
         width: args.width ?? "520px",
-        height: args.height
+        height: args.height,
+        // 点击遮罩或其它外部行为销毁 Dialog 时，也要结束 inputDialogSync。
+        destroyCallback: () => {
+            if (!settled) {
+                settled = true;
+                args?.cancel?.();
+            }
+        }
     });
     const target: HTMLTextAreaElement = dialog.element.querySelector(".b3-dialog__content>div.ft__breakword>textarea");
     const btnsElement = dialog.element.querySelectorAll(".b3-button");
-    btnsElement[0].addEventListener("click", () => {
-        if (args?.cancel) {
-            args.cancel();
+    btnsElement[0].addEventListener("click", finishCancel);
+    btnsElement[1].addEventListener("click", finishConfirm);
+    const handleKeydown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            finishCancel();
+        } else if (event.key === "Enter" && args?.confirmOnEnter) {
+            event.preventDefault();
+            finishConfirm();
         }
-        dialog.destroy();
-    });
-    btnsElement[1].addEventListener("click", () => {
-        if (args?.confirm) {
-            args.confirm(target.value);
-        }
-        dialog.destroy();
-    });
+    };
+    // 监听 Dialog 容器而不只监听 textarea，避免焦点落在其它控件时 Esc 失效。
+    dialog.element.addEventListener("keydown", handleKeydown, true);
+    // Dialog 创建后主动聚焦，并在下一帧再次聚焦以覆盖其内部初始化带来的焦点变化。
+    target.focus();
+    requestAnimationFrame(() => target.focus());
 };
 
 export const inputDialogSync = async (args: {
     title: string, placeholder?: string, defaultText?: string,
-    width?: string, height?: string
+    width?: string, height?: string, confirmOnEnter?: boolean
 }) => {
     return new Promise<string>((resolve) => {
         let newargs = {

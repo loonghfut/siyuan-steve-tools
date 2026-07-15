@@ -977,6 +977,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 										title: '输入卡片标题',
 										placeholder: '请输入标题',
 										width: '520px',
+										confirmOnEnter: true,
 									});
 									const userTitle = input?.replace(/[\r\n]+/g, ' ').trim() || '';
 									if (userTitle) {
