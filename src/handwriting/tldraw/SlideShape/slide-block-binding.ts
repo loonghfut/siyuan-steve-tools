@@ -14,16 +14,21 @@ export interface SlideScreenshotMarkdownOptions {
 /**
  * Slide 与思源图片块之间只通过 shapeId 属性关联，块 ID 永不写入白板快照。
  */
-export async function findSlideScreenshotBlockId(shapeId: string): Promise<string | null> {
+export async function findSlideScreenshotBlockIds(shapeId: string): Promise<string[]> {
 	const normalizedShapeId = String(shapeId || '').trim()
-	if (!normalizedShapeId) return null
+	if (!normalizedShapeId) return []
 
 	const escapedShapeId = normalizedShapeId.replace(/'/g, "''")
 	const rows = await sql(
-		`SELECT block_id FROM attributes WHERE name = '${SLIDE_SHAPE_ID_ATTR}' AND value = '${escapedShapeId}' AND type = 'b' ORDER BY rowid DESC LIMIT 1`
+		`SELECT block_id, MAX(rowid) AS newest FROM attributes WHERE name = '${SLIDE_SHAPE_ID_ATTR}' AND value = '${escapedShapeId}' AND type = 'b' GROUP BY block_id ORDER BY newest DESC`
 	)
-	const blockId = String(rows?.[0]?.block_id || '').trim()
-	return blockId || null
+	return (rows || [])
+		.map((row) => String(row?.block_id || '').trim())
+		.filter((blockId) => !!blockId)
+}
+
+export async function findSlideScreenshotBlockId(shapeId: string): Promise<string | null> {
+	return (await findSlideScreenshotBlockIds(shapeId))[0] || null
 }
 
 export function buildSlideScreenshotMarkdown(options: SlideScreenshotMarkdownOptions): string {
