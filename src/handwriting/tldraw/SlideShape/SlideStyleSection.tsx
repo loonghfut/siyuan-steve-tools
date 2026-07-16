@@ -227,6 +227,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
     return (
         <div className="tlui-style-panel__section">
             <TldrawUiInput
+                className="slide-name-input"
                 value={slideShape.props.name}
                 onValueChange={handleNameChange}
                 onBlur={handleNameTrim}

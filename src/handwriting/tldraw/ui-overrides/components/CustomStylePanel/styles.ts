@@ -51,4 +51,27 @@ export const stylePanelStyles = `
         display: inline-block;
         transform: translateY(-1px);
     }
+    /* Style panel text input: align with native tlui-button metrics (40px row, 12px inset) */
+    .tlui-style-panel__section > .tlui-input__wrapper {
+        position: relative;
+        height: 40px;
+        padding: 0 var(--tl-space-4);
+    }
+    /* Hover/focus feedback mirrors .tlui-button::after (inset 4px, radius-2, muted bg) */
+    .tlui-style-panel__section > .tlui-input__wrapper::after {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: var(--tl-radius-2);
+        background: var(--tl-color-muted-2);
+        opacity: 0;
+        pointer-events: none;
+    }
+    .tlui-style-panel__section > .tlui-input__wrapper:hover::after,
+    .tlui-style-panel__section > .tlui-input__wrapper:focus-within::after {
+        opacity: 1;
+    }
+    .tlui-style-panel__section .slide-name-input {
+        padding: 0;
+    }
 `
