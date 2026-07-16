@@ -141,21 +141,7 @@
 
 
 
-.slides-panel {
-  /* ... 其他现有样式 ... */
-  max-height: 400px;
-  /* 设置一个最大高度，例如 400px */
-  overflow-y: auto;
-  /* 当内容超出最大高度时显示垂直滚动条 */
-  max-width: 120px;
-  /* 设置最大宽度，例如 320px */
-  word-break: break-all;
-  /* 长单词或URL换行 */
-  white-space: normal;
-  /* 允许文本换行 */
-  /* 根据主题设置背景色 */
-  background-color: var(--color-low);
-}
+/* .slides-panel 主体样式见下方 "Slides Panel Styling" 区块 */
 
 /* Slide 聚焦遮罩：只显示 slide 区域，其它区域盖住 */
 .slide-focus-mask {
@@ -175,7 +161,7 @@
 }
 
 .slides-panel::-webkit-scrollbar-thumb {
-  background-color: var(--color-muted-1);
+  background-color: var(--tl-color-muted-1);
   /* 滚动条滑块颜色 */
   border-radius: 3px;
   /* 滚动条滑块圆角 */
@@ -871,19 +857,72 @@
   height: calc(var(--port-hit-size, 28px) * 1.7);
 }
 /* Slides Panel Styling */
+/* 包裹层：半透明面板背景，配色跟随 tldraw 主题（深浅色自动切换） */
+.slides-panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  pointer-events: all;
+  /* HelperButtons 槽位默认 pointer-events: none */
+  max-width: 160px;
+  min-width: 120px;
+  background-color: color-mix(in srgb, var(--b3-theme-surface, var(--tl-color-panel)) 78%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--tl-color-low-border) 60%, transparent);
+  border-radius: var(--tl-radius-3);
+  box-shadow: var(--tl-shadow-1);
+  overflow: hidden;
+}
+
+/* 面板折叠/展开按钮 */
+.slides-panel-toggle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100%;
+  padding: 6px 8px !important;
+  height: auto !important;
+  min-height: 0;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tl-color-text-1);
+  text-align: left;
+  user-select: none;
+}
+
+.slides-panel-toggle:hover {
+  background-color: var(--tl-color-muted-2);
+}
+
+.slides-panel-toggle-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .slides-panel {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+  word-break: break-all;
+  white-space: normal;
+  border-top: 1px solid color-mix(in srgb, var(--tl-color-divider) 70%, transparent);
 }
 
 .slides-panel--empty {
     align-items: center;
     justify-content: center;
-    min-height: 100px;
-    color: var(--color-text-3);
+    min-height: 0;
+    color: var(--tl-color-text-3);
     font-size: 12px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
 
 .slides-group {
@@ -899,7 +938,7 @@
     user-select: none;
     font-size: 12px;
     font-weight: 600;
-    color: var(--color-text-1);
+    color: var(--tl-color-text-1);
     width: 100%;
     justify-content: flex-start !important;
     text-align: left;
@@ -908,7 +947,7 @@
 }
 
 .slides-group-header:hover {
-    background-color: var(--color-muted-2);
+    background-color: var(--tl-color-muted-2);
 }
 
 .slides-group-icon {
@@ -926,8 +965,8 @@
 
 .slides-group-count {
     font-size: 10px;
-    color: var(--color-text-3);
-    background-color: var(--color-muted-2);
+    color: var(--tl-color-text-3);
+    background-color: var(--tl-color-muted-2);
     padding: 1px 5px;
     border-radius: 10px;
 }
@@ -937,7 +976,7 @@
     flex-direction: column;
     padding-left: 10px;
     margin-top: 2px;
-    border-left: 1px solid var(--color-divider);
+    border-left: 1px solid var(--tl-color-divider);
     margin-left: 12px;
 }
 
@@ -951,22 +990,22 @@
     border-radius: 4px;
     gap: 8px;
     font-size: 12px;
-    color: var(--color-text-1);
+    color: var(--tl-color-text-1);
     transition: background-color 0.1s ease;
 }
 
 .slides-panel-button:hover {
-    background-color: var(--color-muted-2);
+    background-color: var(--tl-color-muted-2);
 }
 
 .slides-panel-button.current {
-    background-color: var(--color-muted-1);
+    background-color: var(--tl-color-muted-1);
     font-weight: 500;
 }
 
 .slides-panel-button.selected {
-    background-color: var(--color-selected-muted, rgba(61, 138, 255, 0.1));
-    color: var(--color-selected);
+    background-color: color-mix(in srgb, var(--tl-color-selected) 12%, transparent);
+    color: var(--tl-color-selected);
 }
 
 .slides-item-icon {
@@ -977,7 +1016,7 @@
 
 .slides-panel-button.selected .slides-item-icon {
     opacity: 1;
-    color: var(--color-selected);
+    color: var(--tl-color-selected);
 }
 
 .slides-item-text {
@@ -985,6 +1024,56 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* 拖拽排序：被拖拽项淡出 */
+.slides-panel-button.dragging {
+    opacity: 0.4;
+}
+
+/* 拖拽排序：插入位置指示线（伪元素避免布局抖动） */
+.slides-panel-button.drop-before::before,
+.slides-panel-button.drop-after::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--tl-color-selected, var(--color-selected));
+    pointer-events: none;
+    z-index: 1;
+}
+
+.slides-panel-button.drop-before::before {
+    top: -2px;
+}
+
+.slides-panel-button.drop-after::after {
+    bottom: -2px;
+}
+
+/* 拖入分组标题：高亮整个标题行 */
+.slides-group-header.drop-into {
+    outline: 1.5px solid var(--tl-color-selected, var(--color-selected));
+    outline-offset: -1.5px;
+    background-color: var(--tl-color-muted-2, var(--color-muted-2));
+}
+
+/* 双击重命名输入框 */
+.slides-item-rename-input {
+    flex: 1;
+    min-width: 0;
+    height: 20px;
+    box-sizing: border-box;
+    padding: 0 4px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--tl-color-text-1);
+    background: var(--tl-color-panel);
+    border: 1px solid var(--tl-color-selected);
+    border-radius: 4px;
+    outline: none;
 }
 
 .card-shape-collapsed-toggle-icon {
