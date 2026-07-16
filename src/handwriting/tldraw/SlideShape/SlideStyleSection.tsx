@@ -93,7 +93,8 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
         try {
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
-                updateShape: true,
+                includeDataUrl: false,
+                updateShape: false,
                 background: true,
             })
             if (result) {
@@ -101,14 +102,19 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     const saveToDock = async () => {
                         const store = getActiveSlideScreenshotStore()
                         if (!store) throw new Error('slide screenshot store is not initialized')
-                        await store.add({
-                            dataUrl: result.dataUrl,
+                        const item = await store.add({
+                            image: result.blob,
                             width: result.width,
                             height: result.height,
                             name: slideShape.props.name || 'Slide',
                             rootId: rootId || '',
                             shapeId: slideShape.id,
                             title: title || '',
+                        })
+                        editor.updateShape({
+                            id: slideShape.id,
+                            type: 'slide',
+                            props: { screenshot: item.imageUrl },
                         })
                     }
 

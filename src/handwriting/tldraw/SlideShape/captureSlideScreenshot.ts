@@ -13,6 +13,7 @@ export interface CaptureSlideScreenshotOptions {
 	padding?: number
 	background?: boolean
 	includeSlideOutline?: boolean
+	includeDataUrl?: boolean
 	updateShape?: boolean
 }
 
@@ -51,6 +52,7 @@ export async function captureSlideScreenshot(
 		padding = 0,
 		background = true,
 		includeSlideOutline = false,
+		includeDataUrl = true,
 		updateShape = false,
 	} = opts
 
@@ -96,7 +98,7 @@ export async function captureSlideScreenshot(
 				width = svgResult.width
 				height = svgResult.height
 				blob = new Blob([svgResult.svg], { type: 'image/svg+xml' })
-				dataUrl = await blobToDataUrl(blob)
+				if (includeDataUrl || updateShape) dataUrl = await blobToDataUrl(blob)
 			} else {
 				const imageResult = await editor.toImage(idsToExport, {
 					format,
@@ -108,7 +110,7 @@ export async function captureSlideScreenshot(
 				blob = imageResult.blob
 				width = imageResult.width
 				height = imageResult.height
-				dataUrl = await blobToDataUrl(blob)
+				if (includeDataUrl || updateShape) dataUrl = await blobToDataUrl(blob)
 			}
 		} finally {
 			clearSvgExportSnapshotCache()
@@ -118,7 +120,7 @@ export async function captureSlideScreenshot(
 		if (format === 'svg') {
 			const svg = `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" style="background:${backgroundColor}"/>`
 			blob = new Blob([svg], { type: 'image/svg+xml' })
-			dataUrl = await blobToDataUrl(blob)
+			if (includeDataUrl || updateShape) dataUrl = await blobToDataUrl(blob)
 		} else {
 			const canvas = document.createElement('canvas')
 			const scaledWidth = Math.max(1, Math.round(width * pixelRatio))
@@ -136,7 +138,7 @@ export async function captureSlideScreenshot(
 			if (!blob) {
 				return null
 			}
-			dataUrl = await blobToDataUrl(blob)
+			if (includeDataUrl || updateShape) dataUrl = await blobToDataUrl(blob)
 		}
 	}
 

@@ -37,15 +37,7 @@
         dataTransfer.effectAllowed = 'copy';
         dataTransfer.setData(SLIDE_SCREENSHOT_DRAG_TYPE, item.id);
         dataTransfer.setData('text/plain', item.name);
-        dataTransfer.setData('text/html', `<img src="${item.dataUrl}" alt="${escapeHtml(item.name)}">`);
-
-        try {
-            const file = dataUrlToFile(item.dataUrl, `${safeFileName(item.name)}.png`);
-            dataTransfer.items.add(file);
-        } catch (error) {
-            // 插件自己的 drop handler 仍可通过条目 ID读取 Data URL。
-            console.debug('无法将 slide 截图加入原生拖拽文件列表', error);
-        }
+        dataTransfer.setData('text/html', `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}">`);
 
         const image = event.currentTarget instanceof HTMLElement
             ? event.currentTarget.querySelector('img')
@@ -57,23 +49,10 @@
         return new Date(timestamp).toLocaleString();
     }
 
-    function safeFileName(value: string): string {
-        return value.replace(/[^\w\u4e00-\u9fa5-]+/g, '_').slice(0, 80) || 'slide';
-    }
-
     function escapeHtml(value: string): string {
         return value.replace(/[&<>\"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char] || char));
     }
 
-    function dataUrlToFile(dataUrl: string, name: string): File {
-        const [header, encoded] = dataUrl.split(',', 2);
-        if (!header || !encoded) throw new Error('invalid image data URL');
-        const mime = header.match(/^data:([^;]+)/)?.[1] || 'image/png';
-        const binary = atob(encoded);
-        const bytes = new Uint8Array(binary.length);
-        for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
-        return new File([bytes], name, { type: mime });
-    }
 </script>
 
 <div class="st-slide-screenshot-dock">
@@ -89,7 +68,7 @@
                     on:dragstart={(event) => handleDragStart(event, item)}
                     on:click={() => onOpen(item)}
                 >
-                    <img class="st-slide-screenshot-image" src={item.dataUrl} alt={item.name} draggable="false" />
+                    <img class="st-slide-screenshot-image" src={item.imageUrl} alt={item.name} draggable="false" />
                     <div class="st-slide-screenshot-info">
                         <button class="st-slide-screenshot-name" type="button" on:click|stopPropagation={() => onOpen(item)}>
                             {item.name}

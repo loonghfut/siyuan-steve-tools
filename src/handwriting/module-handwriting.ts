@@ -22,6 +22,7 @@ import {
     setActiveSlideScreenshotStore,
     SlideScreenshotStore,
     SLIDE_SCREENSHOT_DRAG_TYPE,
+    slideScreenshotUrlToAssetPath,
     type SlideScreenshotRecord,
 } from './tldraw/SlideShape/slide-screenshot-store';
 export class M_handwriting {
@@ -584,13 +585,8 @@ export class M_handwriting {
         }
 
         try {
-            const fileName = `slide_${this.safeSlideFileName(item.name)}_${Date.now()}.png`;
-            const file = this.dataUrlToFile(item.dataUrl, fileName);
-            const uploadResult = await api.upload('assets/st_slides', [file]);
-            const kernelPath = (uploadResult as any)?.succMap?.[fileName] as string | undefined;
-            if (!kernelPath) throw new Error('upload screenshot failed: no succMap path');
-
-            const assetPath = kernelPath.replace(/^data\//, '');
+            const assetPath = slideScreenshotUrlToAssetPath(item.imageUrl);
+            if (!assetPath) throw new Error('invalid stored slide screenshot asset URL');
             const markdown = buildSlideScreenshotMarkdown({
                 assetPath,
                 name: item.name,
@@ -614,20 +610,6 @@ export class M_handwriting {
             return;
         }
         await this.handlePluginUrl(link);
-    }
-
-    private safeSlideFileName(value: string): string {
-        return value.replace(/[^\w\u4e00-\u9fa5-]+/g, '_').slice(0, 80) || 'slide';
-    }
-
-    private dataUrlToFile(dataUrl: string, name: string): File {
-        const [header, encoded] = dataUrl.split(',', 2);
-        if (!header || !encoded) throw new Error('invalid image data URL');
-        const mime = header.match(/^data:([^;]+)/)?.[1] || 'image/png';
-        const binary = atob(encoded);
-        const bytes = new Uint8Array(binary.length);
-        for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
-        return new File([bytes], name, { type: mime });
     }
 
     private injectTldrawLinkIcons(container: HTMLElement) {

@@ -1,11 +1,13 @@
 import type { Plugin } from 'siyuan'
+import { upload } from '@/api/api'
 
 export const SLIDE_SCREENSHOT_DATA_FILE = 'slide-screenshots.json'
 export const SLIDE_SCREENSHOT_DRAG_TYPE = 'application/st-slide-screenshot'
+const SLIDE_SCREENSHOT_ASSET_DIR = '/assets/st_slide_screenshots'
 
 export interface SlideScreenshotRecord {
 	id: string
-	dataUrl: string
+	imageUrl: string
 	width: number
 	height: number
 	name: string
@@ -15,7 +17,8 @@ export interface SlideScreenshotRecord {
 	title: string
 }
 
-export type NewSlideScreenshotRecord = Omit<SlideScreenshotRecord, 'id' | 'createdAt'> & {
+export type NewSlideScreenshotRecord = Omit<SlideScreenshotRecord, 'id' | 'createdAt' | 'imageUrl'> & {
+	image: Blob
 	id?: string
 	createdAt?: number
 }
@@ -59,8 +62,15 @@ export class SlideScreenshotStore {
 	}
 
 	async add(input: NewSlideScreenshotRecord): Promise<SlideScreenshotRecord> {
+		const imageUrl = await this.uploadImage(input.image, input.name)
 		const item: SlideScreenshotRecord = {
-			...input,
+			width: input.width,
+			height: input.height,
+			name: input.name,
+			rootId: input.rootId,
+			shapeId: input.shapeId,
+			title: input.title,
+			imageUrl,
 			id: input.id || createId(),
 			createdAt: input.createdAt || Date.now(),
 		}
@@ -83,7 +93,7 @@ export class SlideScreenshotStore {
 		const snapshot = this.getAll()
 		this.writeQueue = this.writeQueue.catch(() => undefined).then(async () => {
 			await this.plugin.saveData(SLIDE_SCREENSHOT_DATA_FILE, {
-				version: 1,
+				version: 2,
 				items: snapshot,
 			})
 		})
@@ -91,11 +101,11 @@ export class SlideScreenshotStore {
 	}
 
 	private normalize(value: any): SlideScreenshotRecord | null {
-		if (!value || typeof value !== 'object' || typeof value.dataUrl !== 'string' || !value.dataUrl) return null
+		if (!value || typeof value !== 'object' || typeof value.imageUrl !== 'string' || !value.imageUrl) return null
 		if (typeof value.rootId !== 'string' || typeof value.shapeId !== 'string') return null
 		return {
 			id: typeof value.id === 'string' && value.id ? value.id : createId(),
-			dataUrl: value.dataUrl,
+			imageUrl: value.imageUrl,
 			width: Number(value.width) || 0,
 			height: Number(value.height) || 0,
 			name: typeof value.name === 'string' && value.name ? value.name : 'Slide',
@@ -104,6 +114,16 @@ export class SlideScreenshotStore {
 			shapeId: value.shapeId,
 			title: typeof value.title === 'string' ? value.title : '',
 		}
+	}
+
+	private async uploadImage(blob: Blob, name: string): Promise<string> {
+		const extension = extensionForMime(blob.type)
+		const fileName = `slide_${safeFileName(name)}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`
+		const file = new File([blob], fileName, { type: blob.type || 'image/png' })
+		const result = await upload(SLIDE_SCREENSHOT_ASSET_DIR, [file])
+		const kernelPath = result?.succMap?.[fileName]
+		if (!kernelPath) throw new Error('upload slide screenshot failed: no asset path returned')
+		return toImageUrl(kernelPath)
 	}
 
 	private notify(): void {
@@ -128,4 +148,26 @@ export function clearActiveSlideScreenshotStore(store: SlideScreenshotStore): vo
 
 function createId(): string {
 	return `slide-screenshot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function toImageUrl(path: string): string {
+	const normalized = path.replace(/^\/+/, '').replace(/^data\//, '')
+	return `/${normalized}`
+}
+
+function safeFileName(value: string): string {
+	return value.replace(/[^\w\u4e00-\u9fa5-]+/g, '_').slice(0, 60) || 'slide'
+}
+
+function extensionForMime(mime: string): string {
+	if (mime === 'image/jpeg') return 'jpg'
+	if (mime === 'image/webp') return 'webp'
+	if (mime === 'image/svg+xml') return 'svg'
+	return 'png'
+}
+
+export function slideScreenshotUrlToAssetPath(imageUrl: string): string | null {
+	if (!imageUrl) return null
+	const assetPath = imageUrl.replace(/^\/+/, '').replace(/^data\//, '')
+	return assetPath.startsWith('assets/') ? assetPath : null
 }
