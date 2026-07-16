@@ -45,6 +45,7 @@ export type AgentPlanAdapter = {
     getShapeDetails: (options: { shapeIds?: string[]; limit?: number; includeBindings?: boolean; includeLinkedBlockContent?: boolean }) => Promise<{ shapes: AgentShapeSummary[] }> | { shapes: AgentShapeSummary[] };
     selectShape: (shapeId: string, zoom?: boolean) => unknown;
     zoomToShapes: (options: { shapeIds: string[] }) => unknown;
+    focusShapes?: (shapeIds: string[]) => unknown;
     save: () => Promise<unknown>;
 };
 
@@ -72,6 +73,7 @@ export async function executeAgentPlan(options: AgentPlanApplyOptions, adapter: 
     const results: unknown[] = [];
     let writeCount = 0;
     let saved = false;
+    let hasExplicitFocus = false;
 
     for (let index = 0; index < steps.length; index++) {
         const step = steps[index];
@@ -79,6 +81,7 @@ export async function executeAgentPlan(options: AgentPlanApplyOptions, adapter: 
         if (!op || !PLAN_OPS.has(op)) {
             throw new Error(`steps[${index}].op must be one of create, branch, connect, update, layout, focus, save`);
         }
+        if (op === 'focus') hasExplicitFocus = true;
 
         const normalized = normalizePlanStep(step, op, state);
         writeCount += normalized.writeCount;
@@ -101,6 +104,15 @@ export async function executeAgentPlan(options: AgentPlanApplyOptions, adapter: 
     if (options.dryRun !== true && options.save === true && !saved) {
         results.push(await adapter.save());
         saved = true;
+    }
+
+    // One camera move at plan end instead of per-step animations; explicit focus steps win.
+    if (options.dryRun !== true && options.zoom !== false && !hasExplicitFocus && adapter.focusShapes) {
+        const focusIds = uniqueShapeIds([
+            ...Object.values(state.created).flat(),
+            ...state.lastShapeIds,
+        ]);
+        if (focusIds.length) adapter.focusShapes(focusIds);
     }
 
     const finalSummary = adapter.getSummary();
@@ -802,6 +814,10 @@ function normalizeShapeIds(value: unknown): string[] {
 function normalizeBranchCreatedShapeIds(result: { branchId?: unknown; createdShapeIds?: unknown }): string[] {
     const branchId = typeof result.branchId === 'string' && result.branchId ? result.branchId : undefined;
     return branchId ? [branchId] : normalizeShapeIds(result.createdShapeIds);
+}
+
+function uniqueShapeIds(shapeIds: string[]): string[] {
+    return Array.from(new Set(shapeIds.filter((id) => id && !id.startsWith('$'))));
 }
 
 function normalizeConnectorResultShapeIds(result: { branchId?: unknown; updatedShapeIds?: unknown; createdShapeIds?: unknown }): string[] {

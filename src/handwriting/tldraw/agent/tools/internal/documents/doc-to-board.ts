@@ -3,6 +3,7 @@ import { generateSiyuanID, getBlockByID, insertBlock, prependBlock, sql } from '
 import type { ICardShape } from '../../../../CardShape/card-shape-types'
 import { insertDocRelations } from '../../../../doc-outline/insert-doc-relations'
 import { loadOutlineForDoc, outlineNodeToRelationItem, type OutlineNode } from '../../../../doc-outline/doc-outline-data'
+import { focusAgentShapesById, getAgentViewportCenterOrigin } from '../core/camera'
 
 export type AgentDocOutlineBoardOptions = {
     docId: string
@@ -56,7 +57,7 @@ export async function insertDocOutlineMindmapForAgent(
         editor.select(selectedId as TLShapeId)
     }
     if (options.zoom !== false && selectedId) {
-        editor.zoomToSelection({ animation: { duration: 300 } })
+        focusAgentShapesById(editor, [String(selectedId)], { force: true })
     }
 
     return {
@@ -242,10 +243,8 @@ function findMainCardByBlockId(editor: Editor, docId: string): ICardShape | null
 }
 
 function getNewMainCardPosition(editor: Editor): { x: number; y: number } {
-    const viewport = (editor as any).getViewportPageBounds?.()
-    if (viewport && Number.isFinite(viewport.x) && Number.isFinite(viewport.y)) {
-        return { x: viewport.x + 64, y: viewport.y + 64 }
-    }
+    const origin = getAgentViewportCenterOrigin(editor, { w: 800, h: 1200 })
+    if (origin.x || origin.y) return origin
     return { x: 50, y: 50 }
 }
 

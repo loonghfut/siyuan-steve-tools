@@ -4,6 +4,7 @@ import { createAgentCardShape } from './create-card'
 import { createAgentSingleBlockShape } from './create-single-block'
 import { createAgentBranchShape } from './create-branch'
 import { buildBaseCreateResult, createAgentCreateContext, recordAgentCreatedNode } from '../core/context'
+import { focusAgentShapesById } from '../core/camera'
 import type { AgentCreateShapeArgs, AgentCreateShapeResult } from '../core/types'
 
 export function createAgentBusinessShape(editor: Editor, options: AgentCreateShapeArgs): AgentCreateShapeResult {
@@ -46,10 +47,6 @@ function finalizeSelection(editor: Editor, focusedId: TLShapeId, options: { sele
 		editor.setSelectedShapes([focusedId])
 	}
 	if (options.zoom !== false) {
-		try {
-			editor.zoomToSelection({ animation: { duration: 300 } })
-		} catch (error) {
-			console.warn('agent zoomToSelection failed after create shape', error)
-		}
+		focusAgentShapesById(editor, [focusedId])
 	}
 }

@@ -49,6 +49,7 @@ import { setInteracting } from './utils/idle-scheduler';
 import { markFocusedInstance, registerInstance, unregisterInstance } from './tldraw-instance-manager';
 import { createAssetUrlsWithCustomIcons } from './utils/custom-icons';
 import * as agentOps from './agent/tools/internal/operations/manager-ops';
+import { focusAgentShapesById } from './agent/tools/internal/core/camera';
 import type { AgentAlignOperation, AgentArrangeOperation, AgentBasicShapeCreateArgs, AgentBoardEditRequest, AgentConnectorCreateArgs, AgentCreateShapeArgs, AgentResultMode, AgentShapeCommandRequest, AgentShapeUpdatePatch, AgentVisualContextOptions } from './agent/tools/internal/core/types';
 import type { AgentDocOutlineBoardOptions } from './agent/tools/internal/documents/doc-to-board';
 import type { AgentPlanApplyOptions } from './agent/tools/internal/planning/plan-runner';
@@ -1649,7 +1650,7 @@ export class TldrawManager {
             this.editor.setSelectedShapes(createdShapeIds as TLShapeId[]);
         }
         if (options.zoom !== false && createdShapeIds.length) {
-            this.editor.zoomToSelection({ animation: { duration: 300 } });
+            focusAgentShapesById(this.editor, createdShapeIds, { force: true });
         }
         if (options.save === true) {
             await this.saveData();

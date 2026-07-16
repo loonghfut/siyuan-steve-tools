@@ -34,6 +34,7 @@ import { buildTldrawLink } from '../../../../utils/link-builder';
 import { convertConnectorsToArrow, convertConnectorsToBezier } from '../../../../utils/connector-convert';
 import { insertDocOutlineMindmapForAgent, type AgentDocOutlineBoardOptions } from '../documents/doc-to-board';
 import { finiteNumberInRange, normalizeOptionalAgentColor } from '../core/schema';
+import { focusAgentShapesById, getAgentViewportCenterOrigin } from '../core/camera';
 import { getAgentCardDefaults, getAgentSingleBlockDefaults } from '../core/defaults';
 import { createAgentBusinessShape } from '../shapes/shape-ops';
 import { summarizeSnapshotObject } from '../summaries/snapshot-summary';
@@ -134,7 +135,9 @@ const AGENT_ENTITY_CREATE_SHAPES = new Set([
     'mind-map',
     'js-shape',
 ]);
-const AGENT_CREATE_GAP = 160;
+const AGENT_CREATE_MAX_GAP = 160;
+const AGENT_CREATE_MIN_GAP = 24;
+const AGENT_EXPLICIT_OVERLAP_TOLERANCE = 8;
 const AGENT_DEFAULT_CREATE_ORIGIN = { x: 0, y: 0 };
 const AGENT_BLOCK_CONTENT_MAX_CHARS = 4000;
 const AGENT_CARD_CHILD_MAX_COUNT = 80;
@@ -393,7 +396,7 @@ export function selectAgentShape(runtime: AgentManagerRuntime, shapeId: string, 
     const shape = editor.getShape(id);
     if (!shape) throw new Error(`Shape not found: ${shapeId}`);
     editor.select(id);
-    if (zoom) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (zoom) focusAgentShapesById(editor, [id], { force: true });
     return { selectedShapeIds: editor.getSelectedShapeIds().map(String) };
 }
 
@@ -412,7 +415,7 @@ export function navigateAgentToBlock(runtime: AgentManagerRuntime, options: {
         return { found: false, shapeId: String(shapeId), selectedShapeIds: editor.getSelectedShapeIds().map(String) };
     }
     editor.select(shapeId);
-    if (options.zoom !== false) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false) focusAgentShapesById(editor, [shapeId], { force: true });
     return {
         found: true,
         shapeId: String(shapeId),
@@ -426,7 +429,7 @@ export function zoomAgentToShapes(runtime: AgentManagerRuntime, options: { shape
         .filter((id) => editor.getShape(id as TLShapeId)) as TLShapeId[];
     if (ids.length) {
         editor.setSelectedShapes(ids);
-        editor.zoomToSelection({ animation: { duration: 300 } });
+        focusAgentShapesById(editor, ids, { force: true });
     }
     return { zoomedShapeIds: ids.map(String) };
 }
@@ -448,6 +451,7 @@ export async function applyAgentPlan(runtime: AgentManagerRuntime, options: Agen
         getShapeDetails: (detailOptions) => getAgentShapeDetails(runtime, detailOptions),
         selectShape: (shapeId, zoom) => selectAgentShape(runtime, shapeId, zoom),
         zoomToShapes: (zoomOptions) => zoomAgentToShapes(runtime, zoomOptions),
+        focusShapes: (shapeIds) => focusAgentShapesById(requireEditor(runtime), shapeIds, { force: true }),
         save: () => saveAgentWhiteboard(runtime),
     });
 }
@@ -466,6 +470,11 @@ export async function editAgentBoard(runtime: AgentManagerRuntime, request: Agen
 
         for (const operation of operations) {
             await executeBoardEditOperation(runtime, editor, operation, state);
+        }
+
+        // Focus once on everything the edit touched; an explicit focus op wins.
+        if (state.anyMutation && !state.focusedShapeIds.length && state.committedShapeIds.length) {
+            focusAgentShapesById(editor, state.committedShapeIds.slice(-50));
         }
 
         if (state.saveRequested) {
@@ -650,7 +659,7 @@ export async function runAgentShapeCommand(
     if (uniqueUpdatedShapeIds.length) {
         if (request.select !== false) editor.setSelectedShapes(uniqueUpdatedShapeIds as TLShapeId[]);
         relayoutUpdatedSemanticBranches(editor, uniqueUpdatedShapeIds);
-        if (request.zoom === true) editor.zoomToSelection({ animation: { duration: 300 } });
+        if (request.zoom !== false) focusAgentShapesById(editor, uniqueUpdatedShapeIds);
         if (request.save === true) {
             await runtime.saveData();
             saved = true;
@@ -759,10 +768,11 @@ async function executeAgentShapeCommandCreate(
 
         const createdIds: string[] = [];
         const created: Record<string, string[]> = {};
+        const layout = buildShapeCommandLayoutIntent(request, 'nearSelection');
         for (const node of rawNodes) {
             const alias = optionalBoardAlias(node.as);
             const originalBlockId = stringValue(node.blockId);
-            const result = await createBoardEditNode(runtime, editor, node);
+            const result = await createBoardEditNode(runtime, editor, node, Boolean(layout));
             const ids = result.createdShapeIds.map(String);
             createdIds.push(...ids);
             if (alias) {
@@ -779,13 +789,12 @@ async function executeAgentShapeCommandCreate(
         }
 
         state.lastShapeIds = createdIds;
-        const layout = buildShapeCommandLayoutIntent(request, 'nearSelection');
         if (createdIds.length && layout) {
             const layoutResult = applyBoardEditLayout(editor, state, createdIds, layout);
             applyBoardLayoutResult(state, layoutResult);
         }
         if (request.select !== false && createdIds.length) editor.setSelectedShapes(createdIds as TLShapeId[]);
-        if (request.zoom === true && createdIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+        if (request.zoom !== false && createdIds.length) focusAgentShapesById(editor, createdIds);
         const saved = await persistShapeCommandIfNeeded(runtime, state, request.save);
 
         return {
@@ -834,7 +843,7 @@ async function executeAgentShapeCommandConnect(
             layout: buildShapeCommandLayoutIntent(request),
         }, state);
         if (request.select !== false && state.lastShapeIds.length) editor.setSelectedShapes(state.lastShapeIds as TLShapeId[]);
-        if (request.zoom === true && state.lastShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+        if (request.zoom !== false && state.lastShapeIds.length) focusAgentShapesById(editor, state.lastShapeIds);
         const saved = await persistShapeCommandIfNeeded(runtime, state, request.save);
         return {
             ok: true,
@@ -865,7 +874,7 @@ async function executeAgentShapeCommandLayout(
         applyBoardLayoutResult(state, result);
         const affectedIds = uniqueStrings([...result.updatedShapeIds, ...result.createdShapeIds]);
         if (request.select !== false && affectedIds.length) editor.setSelectedShapes(affectedIds as TLShapeId[]);
-        if (request.zoom === true && affectedIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+        if (request.zoom !== false && affectedIds.length) focusAgentShapesById(editor, affectedIds);
         const saved = await persistShapeCommandIfNeeded(runtime, state, request.save);
         return {
             ok: true,
@@ -1623,11 +1632,12 @@ async function executeBoardCreateNodes(
     state: AgentBoardEditState
 ) {
     const createdIds: string[] = [];
+    const skipAutoPlace = Boolean(layout);
 
     for (const node of nodes) {
         const originalBlockId = stringValue(node.blockId);
         const alias = optionalBoardAlias(node.as);
-        const result = await createBoardEditNode(runtime, editor, node);
+        const result = await createBoardEditNode(runtime, editor, node, skipAutoPlace);
         const ids = result.createdShapeIds.map(String);
         createdIds.push(...ids);
         if (alias) state.created[alias] = ids;
@@ -1650,7 +1660,8 @@ async function executeBoardCreateNodes(
 async function createBoardEditNode(
     runtime: AgentManagerRuntime,
     editor: Editor,
-    node: AgentBoardNodeCreate
+    node: AgentBoardNodeCreate,
+    skipAutoPlace = false
 ): Promise<AgentCreateShapeResult> {
     if (node.kind === 'card') {
         const prepared = await prepareAgentCardCreateArgs(runtime, {
@@ -1669,7 +1680,7 @@ async function createBoardEditNode(
             select: false,
             zoom: false,
         });
-        const result = createAgentBusinessShape(editor, applyAgentCreateLayout(editor, prepared));
+        const result = createAgentBusinessShape(editor, applyAgentCreateLayout(editor, prepared, skipAutoPlace));
         syncAgentCreatedBlockAttrs(runtime, result);
         return result;
     }
@@ -1688,7 +1699,7 @@ async function createBoardEditNode(
             select: false,
             zoom: false,
         });
-        const result = createAgentBusinessShape(editor, applyAgentCreateLayout(editor, prepared));
+        const result = createAgentBusinessShape(editor, applyAgentCreateLayout(editor, prepared, skipAutoPlace));
         syncAgentCreatedBlockAttrs(runtime, result);
         return result;
     }
@@ -1715,7 +1726,7 @@ async function createBoardEditNode(
         y: options.y,
         w: size.w,
         h: size.h,
-    });
+    }, skipAutoPlace);
     const shape = buildAgentBasicShape(
         id,
         { ...options, w: size.w, h: size.h },
@@ -1850,7 +1861,7 @@ function executeBoardFocus(editor: Editor, target: unknown, zoom: boolean | unde
     }
     editor.setSelectedShapes(existing as TLShapeId[]);
     if (zoom !== false) {
-        try { editor.zoomToSelection({ animation: { duration: 300 } }); } catch {}
+        focusAgentShapesById(editor, existing, { force: true });
     }
     state.focusedShapeIds = existing;
     state.selectedShapeIds = existing;
@@ -2026,8 +2037,8 @@ function getBoardLayoutAnchorBounds(
     const bounds = unionShapeBounds(editor, anchorIds);
     if (bounds) return bounds;
     if (style === 'nearSelection') {
-        const viewport = (editor as any).getViewportPageBounds?.();
-        if (viewport) return { x: Number(viewport.x || 0) + 80, y: Number(viewport.y || 0) + 80, w: 1, h: 1 };
+        const centered = getAgentViewportCenterOrigin(editor, { w: 1, h: 1 });
+        if (centered.x || centered.y) return { x: centered.x, y: centered.y, w: 1, h: 1 };
     }
     return { x: intent.x ?? 0, y: intent.y ?? 0, w: 1, h: 1 };
 }
@@ -2371,7 +2382,7 @@ export function updateAgentShape(runtime: AgentManagerRuntime, options: {
 
     editor.updateShape(patch);
     if (options.select !== false) editor.select(shape.id);
-    if (options.zoom !== false) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false) focusAgentShapesById(editor, [String(shape.id)]);
     runtime.triggerSave();
 
     return { shapeId: String(shape.id), summary: getAgentResultSummary(runtime, options.resultMode) };
@@ -2968,7 +2979,7 @@ export function updateAgentShapesBatch(runtime: AgentManagerRuntime, options: {
 
     if (updates.length) editor.updateShapes(updates);
     if (options.select !== false && updatedShapeIds.length) editor.setSelectedShapes(updatedShapeIds as TLShapeId[]);
-    if (options.zoom !== false && updatedShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false && updatedShapeIds.length) focusAgentShapesById(editor, updatedShapeIds);
     runtime.triggerSave();
     return { updatedShapeIds, skipped, summary: getAgentResultSummary(runtime, options.resultMode) };
 }
@@ -3108,7 +3119,7 @@ export function duplicateAgentShapes(runtime: AgentManagerRuntime, options: {
     }
     const duplicatedShapeIds = duplicated.map((shape) => String(shape.id));
     if (options.select !== false && duplicatedShapeIds.length) editor.setSelectedShapes(duplicatedShapeIds as TLShapeId[]);
-    if (options.zoom && duplicatedShapeIds.length) editor.zoomToSelection({ animation: { duration: 300 } });
+    if (options.zoom !== false && duplicatedShapeIds.length) focusAgentShapesById(editor, duplicatedShapeIds);
     runtime.triggerSave();
     return { duplicatedShapeIds, blocked, summary: getAgentResultSummary(runtime, options.resultMode) };
 }
@@ -3610,7 +3621,7 @@ function extractFirstOperationId(value: unknown): string | undefined {
     return typeof id === 'string' && id ? id : undefined;
 }
 
-function applyAgentCreateLayout<T extends AgentCreateShapeArgs>(editor: Editor, options: T): T {
+function applyAgentCreateLayout<T extends AgentCreateShapeArgs>(editor: Editor, options: T, skipAutoPlace = false): T {
     if (options.kind === 'branch') return options;
     const size = getAgentCreateShapeSize(options.kind, options);
     const position = resolveAgentCreatePosition(editor, options.kind, {
@@ -3618,7 +3629,7 @@ function applyAgentCreateLayout<T extends AgentCreateShapeArgs>(editor: Editor, 
         y: options.y,
         w: size.w,
         h: size.h,
-    });
+    }, skipAutoPlace);
     return { ...options, x: position.x, y: position.y } as T;
 }
 
@@ -3648,8 +3659,9 @@ function resolveAgentCreatePosition(editor: Editor, kind: AgentCreateLayoutKind,
     y?: number;
     w: number;
     h: number;
-}): { x: number; y: number } {
-    const fallback = getAgentDefaultCreateOrigin(editor);
+}, skipAutoPlace = false): { x: number; y: number } {
+    const gap = computeAgentCreateGap(draft);
+    const fallback = getAgentCreateAnchor(editor, draft, gap);
     const x = finiteNumberInRange(draft.x, fallback.x, -100000, 100000);
     const y = finiteNumberInRange(draft.y, fallback.y, -100000, 100000);
     if (!AGENT_ENTITY_CREATE_SHAPES.has(kind)) return { x, y };
@@ -3657,19 +3669,38 @@ function resolveAgentCreatePosition(editor: Editor, kind: AgentCreateLayoutKind,
     const requested = { x, y, w: draft.w, h: draft.h };
     const existing = getCurrentEntityShapeBounds(editor);
     const hasExplicitPosition = draft.x !== undefined && draft.y !== undefined;
-    if (hasExplicitPosition && !boundsCollides(requested, existing, AGENT_CREATE_GAP)) {
+    // Honor explicit agent coordinates unless they truly overlap existing shapes.
+    if (hasExplicitPosition && !boundsCollides(requested, existing, AGENT_EXPLICIT_OVERLAP_TOLERANCE)) {
+        return { x, y };
+    }
+    // A follow-up layout pass will reposition the shape; skip the collision search.
+    if (skipAutoPlace && !hasExplicitPosition) {
         return { x, y };
     }
 
-    const found = findNearestFreeBounds(requested, existing, AGENT_CREATE_GAP);
+    const found = findNearestFreeBounds(requested, existing, gap);
     return { x: found.x, y: found.y };
 }
 
-function getAgentDefaultCreateOrigin(editor: Editor): { x: number; y: number } {
+function computeAgentCreateGap(size: { w: number; h: number }): number {
+    const gap = Math.round(Math.max(size.w, size.h) * 0.15);
+    return Math.max(AGENT_CREATE_MIN_GAP, Math.min(AGENT_CREATE_MAX_GAP, gap));
+}
+
+/**
+ * Anchor priority for auto-placement: right of the current selection (what the
+ * agent last touched), then viewport center, then origin.
+ */
+function getAgentCreateAnchor(editor: Editor, size: { w: number; h: number }, gap: number): { x: number; y: number } {
     try {
-        const viewport = (editor as any).getViewportPageBounds?.();
-        if (viewport) return { x: Number(viewport.x || 0) + 80, y: Number(viewport.y || 0) + 80 };
-    } catch {}
+        const selectionIds = editor.getSelectedShapeIds().map(String);
+        if (selectionIds.length) {
+            const selection = unionShapeBounds(editor, selectionIds);
+            if (selection) return { x: selection.x + selection.w + gap, y: selection.y };
+        }
+    } catch { }
+    const centered = getAgentViewportCenterOrigin(editor, size);
+    if (centered.x || centered.y) return centered;
     return AGENT_DEFAULT_CREATE_ORIGIN;
 }
 
@@ -3690,7 +3721,7 @@ function findNearestFreeBounds(
 
     for (let radius = 1; radius <= 24; radius++) {
         let best: AgentShapeBounds | null = null;
-        let bestDistance = Number.POSITIVE_INFINITY;
+        let bestScore = Number.POSITIVE_INFINITY;
         for (let ix = -radius; ix <= radius; ix++) {
             for (let iy = -radius; iy <= radius; iy++) {
                 if (Math.max(Math.abs(ix), Math.abs(iy)) !== radius) continue;
@@ -3700,10 +3731,13 @@ function findNearestFreeBounds(
                     y: requested.y + iy * stepY,
                 };
                 if (boundsCollides(candidate, existing, gap)) continue;
-                const distance = Math.hypot(candidate.x - requested.x, candidate.y - requested.y);
-                if (distance < bestDistance) {
+                const dx = candidate.x - requested.x;
+                const dy = candidate.y - requested.y;
+                // Reading-order preference: right first, then below; left/above only when packed.
+                const score = Math.hypot(dx * (dx < 0 ? 3 : 1), dy * (dy < 0 ? 2.5 : 1));
+                if (score < bestScore) {
                     best = candidate;
-                    bestDistance = distance;
+                    bestScore = score;
                 }
             }
         }
@@ -4316,13 +4350,7 @@ function getAgentShapeCenter(editor: Editor, shapeId: TLShapeId) {
 
 function finalizeAgentSelection(editor: Editor, focusedId: TLShapeId, options: { select?: boolean; zoom?: boolean }) {
     if (options.select !== false) editor.setSelectedShapes([focusedId]);
-    if (options.zoom !== false) {
-        try {
-            editor.zoomToSelection({ animation: { duration: 300 } });
-        } catch (error) {
-            console.warn('agent zoomToSelection failed after create/update', error);
-        }
-    }
+    if (options.zoom !== false) focusAgentShapesById(editor, [focusedId]);
 }
 
 function isLinkedBlockShape(shape: TLShape) {
