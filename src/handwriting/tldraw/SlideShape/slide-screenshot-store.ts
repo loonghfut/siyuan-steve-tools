@@ -117,19 +117,27 @@ export class SlideScreenshotStore {
 	}
 
 	private async uploadImage(blob: Blob, name: string): Promise<string> {
-		const extension = extensionForMime(blob.type)
-		const fileName = `slide_${safeFileName(name)}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`
-		const file = new File([blob], fileName, { type: blob.type || 'image/png' })
-		const result = await upload(SLIDE_SCREENSHOT_ASSET_DIR, [file])
-		const kernelPath = result?.succMap?.[fileName]
-		if (!kernelPath) throw new Error('upload slide screenshot failed: no asset path returned')
-		return toImageUrl(kernelPath)
+		return uploadSlideScreenshotImage(blob, name)
 	}
 
 	private notify(): void {
 		const items = this.getAll()
 		this.listeners.forEach((listener) => listener(items))
 	}
+}
+
+/**
+ * 将截图上传为思源资源，并返回可用于图片标签和白板形状的 URL。
+ * 关联块更新和侧边栏暂存共用这条上传路径，但只有后者会写入暂存数据。
+ */
+export async function uploadSlideScreenshotImage(blob: Blob, name: string): Promise<string> {
+	const extension = extensionForMime(blob.type)
+	const fileName = `slide_${safeFileName(name)}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`
+	const file = new File([blob], fileName, { type: blob.type || 'image/png' })
+	const result = await upload(SLIDE_SCREENSHOT_ASSET_DIR, [file])
+	const kernelPath = result?.succMap?.[fileName]
+	if (!kernelPath) throw new Error('upload slide screenshot failed: no asset path returned')
+	return toImageUrl(kernelPath)
 }
 
 let activeStore: SlideScreenshotStore | null = null

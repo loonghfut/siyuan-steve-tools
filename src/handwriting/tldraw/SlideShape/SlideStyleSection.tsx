@@ -4,10 +4,11 @@
 import React from 'react'
 import { TldrawUiButton, TldrawUiIcon, TldrawUiInput, StylePanelDropdownPicker, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
+import { updateBlock } from '@/api/api'
 import { buildTldrawLink } from '../utils/link-builder'
 import { captureSlideScreenshot } from './captureSlideScreenshot'
-import { getActiveSlideScreenshotStore } from './slide-screenshot-store'
-import { findSlideScreenshotBlockId } from './slide-block-binding'
+import { getActiveSlideScreenshotStore, slideScreenshotUrlToAssetPath, uploadSlideScreenshotImage } from './slide-screenshot-store'
+import { buildSlideScreenshotMarkdown, findSlideScreenshotBlockId, findSlideScreenshotBlockIds } from './slide-block-binding'
 import { settingdata } from '@/index'
 import { $currentSlide, setSlideFocusMode, useCurrentSlide, useSlideFocusMode } from './useSlides'
 import type { SlideShape } from './SlideShapeUtil'
@@ -91,6 +92,8 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
 
         setIsCapturingScreenshot(true)
         try {
+            // 先查找所有已关联的截图块；有绑定时更新原块，不再创建侧边栏暂存项。
+            const targetBlockIds = await findSlideScreenshotBlockIds(slideShape.id)
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
                 includeDataUrl: false,
@@ -99,6 +102,42 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
             })
             if (result) {
                 try {
+                    if (targetBlockIds.length > 0) {
+                        const imageUrl = await uploadSlideScreenshotImage(result.blob, slideShape.props.name || 'Slide')
+                        const assetPath = slideScreenshotUrlToAssetPath(imageUrl)
+                        if (!assetPath) throw new Error('invalid uploaded slide screenshot asset URL')
+
+                        const markdown = buildSlideScreenshotMarkdown({
+                            assetPath,
+                            name: slideShape.props.name || 'slide',
+                            shapeId: slideShape.id,
+                            rootId: rootId || '',
+                            title: title || '',
+                        })
+                        const updateResults = await Promise.allSettled(
+                            targetBlockIds.map((blockId) => updateBlock('markdown', markdown, blockId))
+                        )
+                        updateResults.forEach((updateResult, index) => {
+                            if (updateResult.status === 'rejected') {
+                                console.error('更新关联的幻灯片截图块失败', targetBlockIds[index], updateResult.reason)
+                            }
+                        })
+                        const failedCount = updateResults.filter((updateResult) => updateResult.status === 'rejected').length
+
+                        editor.updateShape({
+                            id: slideShape.id,
+                            type: 'slide',
+                            props: { screenshot: imageUrl },
+                        })
+
+                        if (failedCount === 0) {
+                            showMessage(`已更新 ${targetBlockIds.length} 个关联的幻灯片截图`)
+                        } else {
+                            showMessage(`已更新 ${targetBlockIds.length - failedCount} 个截图，${failedCount} 个更新失败`, 4000, 'error')
+                        }
+                        return
+                    }
+
                     const saveToDock = async () => {
                         const store = getActiveSlideScreenshotStore()
                         if (!store) throw new Error('slide screenshot store is not initialized')
