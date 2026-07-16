@@ -11,6 +11,7 @@ import type { TLShapePartial } from '@tldraw/tldraw'
 import { moveToSlide, useCurrentSlide, useSlides } from './useSlides'
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { SlideShape } from './SlideShapeUtil'
+import { settingdata } from '@/index'
 
 /** 拖拽放置目标：条目前后 / 分组标题（追加到组尾） */
 type DropTarget =
@@ -42,6 +43,15 @@ export const SlidesPanel = track(() => {
 	const [renamingId, setRenamingId] = useState<string | null>(null)
 	const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
 	const panelRef = useRef<HTMLDivElement>(null)
+	// 工具栏为垂直时占据左侧，slide 面板改放底部并横向排列，避免重叠
+	const toolbarOrientation = (settingdata?.['tldraw-toolbar-orientation'] as 'vertical' | 'horizontal') || 'vertical'
+	const isHorizontalPanel = toolbarOrientation === 'vertical'
+	const wrapperClassNames = [
+		'slides-panel-wrapper',
+		isHorizontalPanel ? 'slides-panel-wrapper--bottom' : '',
+	]
+		.filter(Boolean)
+		.join(' ')
 
 	const groupedSlides = useMemo(() => {
 		const groups: Record<string, SlideShape[]> = {}
@@ -156,7 +166,10 @@ export const SlidesPanel = track(() => {
 				const id = itemEl.dataset.slideId!
 				if (id === draggingId) return null
 				const rect = itemEl.getBoundingClientRect()
-				const position = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+				// 横向排列时以水平中线判断插入位置
+				const position = isHorizontalPanel
+					? e.clientX < rect.left + rect.width / 2 ? 'before' : 'after'
+					: e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
 				return { kind: 'item', id, position }
 			}
 			const groupEl = el?.closest?.('[data-group-name]') as HTMLElement | null
@@ -203,7 +216,7 @@ export const SlidesPanel = track(() => {
 			panel.removeEventListener('dragleave', onDragLeave)
 		}
 		// isPanelCollapsed：面板重新展开时 ref 指向新元素，需要重新绑定监听
-	}, [draggingId, handleDrop, clearDragState, isPanelCollapsed])
+	}, [draggingId, handleDrop, clearDragState, isPanelCollapsed, isHorizontalPanel])
 
 	/** 提交重命名（空值或未变化时不更新） */
 	const commitRename = useCallback(
@@ -284,13 +297,13 @@ export const SlidesPanel = track(() => {
 
 	if (slides.length === 0) {
 		return (
-			<div className="slides-panel-wrapper slides-panel--empty" onPointerDown={(e) => stopEventPropagation(e)}>
+			<div className={`${wrapperClassNames} slides-panel--empty`} onPointerDown={(e) => stopEventPropagation(e)}>
 			</div>
 		)
 	}
 
 	return (
-		<div className="slides-panel-wrapper" onPointerDown={(e) => stopEventPropagation(e)}>
+		<div className={wrapperClassNames} onPointerDown={(e) => stopEventPropagation(e)}>
 			{/* 面板折叠/展开按钮 */}
 			<TldrawUiButton
 				type="normal"

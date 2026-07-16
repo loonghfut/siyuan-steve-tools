@@ -874,6 +874,97 @@
   overflow: hidden;
 }
 
+/* ---------- 底部横向模式（工具栏垂直时） ---------- */
+/* 工具栏垂直时占据左侧，slide 面板改为吸附底部居中、横向排列。
+   .tlui-layout 有 contain: strict，fixed 定位以 layout 为包含块，可脱离左上角 HelperButtons 槽位 */
+.slides-panel-wrapper--bottom {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tl-space-3, 8px) + var(--tl-sab, 0px));
+  transform: translateX(-50%);
+  z-index: var(--tl-layer-panels, 300);
+  flex-direction: row;
+  align-items: stretch;
+  max-width: min(70vw, 720px);
+  min-width: 0;
+  width: max-content;
+}
+
+/* 折叠按钮变为左侧竖条，宽度收紧 */
+.slides-panel-wrapper--bottom .slides-panel-toggle {
+  width: auto;
+  flex: none;
+}
+
+.slides-panel-wrapper--bottom .slides-panel-toggle-title {
+  flex: none;
+}
+
+/* 列表横向滚动，条目单行排开 */
+.slides-panel-wrapper--bottom .slides-panel {
+  flex-direction: row;
+  align-items: stretch;
+  max-height: none;
+  overflow-y: hidden;
+  overflow-x: auto;
+  white-space: nowrap;
+  word-break: normal;
+  border-top: none;
+  border-left: 1px solid color-mix(in srgb, var(--tl-color-divider) 70%, transparent);
+}
+
+/* 分组也横向：标题在左，条目在右侧一行排开 */
+.slides-panel-wrapper--bottom .slides-group {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.slides-panel-wrapper--bottom .slides-group-header {
+  width: auto;
+  flex: none;
+}
+
+.slides-panel-wrapper--bottom .slides-group-content {
+  flex-direction: row;
+  margin-top: 0;
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid var(--tl-color-divider);
+}
+
+/* 条目定宽，名称超长省略 */
+.slides-panel-wrapper--bottom .slides-panel-button {
+  width: auto;
+  flex: none;
+  max-width: 140px;
+}
+
+.slides-panel-wrapper--bottom .slides-item-text {
+  flex: none;
+  max-width: 120px;
+}
+
+/* 横向排列时插入指示线改为竖线（左右侧） */
+.slides-panel-wrapper--bottom .slides-panel-button.drop-before::before,
+.slides-panel-wrapper--bottom .slides-panel-button.drop-after::after {
+  left: auto;
+  right: auto;
+  top: 4px;
+  bottom: 4px;
+  height: auto;
+  width: 2px;
+}
+
+.slides-panel-wrapper--bottom .slides-panel-button.drop-before::before {
+  left: -2px;
+  top: 4px;
+}
+
+.slides-panel-wrapper--bottom .slides-panel-button.drop-after::after {
+  right: -2px;
+  bottom: 4px;
+}
+
 /* 面板折叠/展开按钮 */
 .slides-panel-toggle {
   display: flex !important;
