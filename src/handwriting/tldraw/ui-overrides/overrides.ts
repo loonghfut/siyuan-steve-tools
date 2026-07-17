@@ -2,7 +2,7 @@
  * TLdraw UI Overrides
  * 工具注册和动作覆写
  */
-import { copyAs, exportAs, type TLShapeId, type TLUiOverrides } from '@tldraw/tldraw'
+import { copyAs, exportAs, onDragFromToolbarToCreateShape, type TLShapeId, type TLUiOverrides } from '@tldraw/tldraw'
 import { showMessage } from 'siyuan'
 import { selectAdjacentShape } from '../utils/selectAdjacentShape'
 import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
@@ -22,6 +22,11 @@ export const uiOverrides: TLUiOverrides = {
             onSelect: () => {
                 editor.setCurrentTool('card')
             },
+            onDragStart: (_source, info) => {
+                onDragFromToolbarToCreateShape(editor, info, {
+                    createShape: (id) => editor.createShape({ id, type: 'card' }),
+                })
+            },
         }
         tools['single-block'] = {
             id: 'single-block',
@@ -31,6 +36,11 @@ export const uiOverrides: TLUiOverrides = {
             onSelect: () => {
                 editor.setCurrentTool('single-block')
             },
+            onDragStart: (_source, info) => {
+                onDragFromToolbarToCreateShape(editor, info, {
+                    createShape: (id) => editor.createShape({ id, type: 'single-block' }),
+                })
+            },
         }
         tools.slide = {
             id: 'slide',
@@ -38,6 +48,11 @@ export const uiOverrides: TLUiOverrides = {
             label: 'Slide',
             kbd: 's',
             onSelect: () => editor.setCurrentTool('slide'),
+            onDragStart: (_source, info) => {
+                onDragFromToolbarToCreateShape(editor, info, {
+                    createShape: (id) => editor.createShape({ id, type: 'slide' }),
+                })
+            },
         }
         tools['js-shape'] = {
             id: 'js-shape',
@@ -45,6 +60,11 @@ export const uiOverrides: TLUiOverrides = {
             label: 'JS Shape',
             kbd: 'j',
             onSelect: () => editor.setCurrentTool('js-shape'),
+            onDragStart: (_source, info) => {
+                onDragFromToolbarToCreateShape(editor, info, {
+                    createShape: (id) => editor.createShape({ id, type: 'js-shape' }),
+                })
+            },
         }
         tools['mind-map'] = {
             id: 'mind-map',
@@ -52,6 +72,11 @@ export const uiOverrides: TLUiOverrides = {
             label: 'Mind Map',
             kbd: 'm',
             onSelect: () => editor.setCurrentTool('mind-map'),
+            onDragStart: (_source, info) => {
+                onDragFromToolbarToCreateShape(editor, info, {
+                    createShape: (id) => editor.createShape({ id, type: 'mind-map' }),
+                })
+            },
         }
         tools.branch = {
             id: 'branch',
@@ -59,6 +84,11 @@ export const uiOverrides: TLUiOverrides = {
             label: 'Branch',
             kbd: 't',
             onSelect: () => editor.setCurrentTool('branch'),
+            onDragStart: (_source, info) => {
+                onDragFromToolbarToCreateShape(editor, info, {
+                    createShape: (id) => editor.createShape({ id, type: 'branch' }),
+                })
+            }
         }
         return tools
     },
