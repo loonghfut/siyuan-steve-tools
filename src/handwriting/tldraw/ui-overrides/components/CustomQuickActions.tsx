@@ -55,9 +55,9 @@ export const CustomQuickActions: React.FC = () => {
                 <TldrawUiMenuItem id="external-link" icon="heading" label="复制白板链接" onSelect={() => {
                     let url: string
                     if (settingdata['copyLinkTitle']) {
-                        url = `[画板:${title}](${buildTldrawLink(rootId, undefined, title)})`
+                        url = `[画板:${title}](${buildTldrawLink(rootId)})`
                     } else {
-                        url = buildTldrawLink(rootId, undefined, title)
+                        url = buildTldrawLink(rootId)
                     }
                     navigator.clipboard.writeText(url).then(() => {
                         showMessage('链接已复制到剪贴板!')

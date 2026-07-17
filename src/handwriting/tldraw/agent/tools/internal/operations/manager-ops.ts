@@ -3311,7 +3311,7 @@ async function createAgentSingleBlockForContent(runtime: AgentManagerRuntime, op
     contentMarkdown?: string;
 }) {
     const blockId = await api.generateSiyuanID() as string;
-    const link = buildTldrawLink(runtime.id, blockId, runtime.title);
+    const link = buildTldrawLink(runtime.id, blockId);
     const body = renderAgentSingleBlockContent(options);
     const markdown = body
         ? `${body}\n{: id="${blockId}" custom-st-tldraw-single="1" custom-tldraw-link="${escapeBlockAttr(link)}" }\n`
@@ -3337,7 +3337,7 @@ async function createAgentCardBlockForContent(runtime: AgentManagerRuntime, opti
 }) {
     const blockId = await api.generateSiyuanID() as string;
     const content = normalizeAgentCardContent(options);
-    const link = buildTldrawLink(runtime.id, blockId, runtime.title);
+    const link = buildTldrawLink(runtime.id, blockId);
     const headingMarkdown = [
         `${'#'.repeat(content.headingLevel)} ${content.title}`,
         `{: id="${blockId}" custom-st-tldraw="1" custom-tldraw-link="${escapeBlockAttr(link)}" }`,
@@ -3564,7 +3564,7 @@ async function replaceAgentLinkedBlockChildren(blockId: string): Promise<void> {
 async function syncAgentCardBlockAttrs(runtime: AgentManagerRuntime, blockId: string, shapeId: TLShapeId): Promise<void> {
     const attrs = await api.getBlockAttrs(blockId).catch(() => ({}));
     const link = String((attrs as any)?.['custom-tldraw-link'] || '') ||
-        buildTldrawLink(runtime.id, blockId, runtime.title, shapeId);
+        buildTldrawLink(runtime.id, blockId, shapeId);
     await api.setBlockAttrs(blockId, {
         'custom-st-tldraw': '1',
         'custom-tldraw-link': link,
@@ -3830,7 +3830,7 @@ function syncAgentCreatedBlockAttrs(runtime: AgentManagerRuntime, result: AgentC
 
     void Promise.all(linkedNodes.map(async (node) => {
         const blockId = node.blockId as string;
-        const link = buildTldrawLink(runtime.id, blockId, runtime.title, node.id);
+        const link = buildTldrawLink(runtime.id, blockId, node.id);
         const attrs = node.kind === 'single-block'
             ? { 'custom-tldraw-link': link, 'custom-st-tldraw-single': '1' }
             : { 'custom-tldraw-link': link, 'custom-st-tldraw': '1' };

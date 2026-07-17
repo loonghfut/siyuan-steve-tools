@@ -79,7 +79,7 @@ export async function listWhiteboardsForAgent(args: Record<string, unknown>): Ag
                     fileSize: typeof file.size === 'number' ? file.size : undefined,
                     fileSizeText: file.hSize ? String(file.hSize) : undefined,
                     isOpen: openIds.has(id),
-                    link: buildTldrawLink(id, undefined, id),
+                    link: buildTldrawLink(id),
                 };
             });
 

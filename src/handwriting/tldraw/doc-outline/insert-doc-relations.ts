@@ -178,7 +178,7 @@ async function syncOutlineBlockAttrs(editor: Editor, blockIds: string[]) {
 
 	await Promise.all(
 		blockIds.map(async (blockId) => {
-			const link = buildTldrawLink(rootId, blockId, title)
+			const link = buildTldrawLink(rootId, blockId)
 			await api.setBlockAttrs(blockId, {
 				'custom-tldraw-link': link,
 				'custom-st-tldraw': '1',

@@ -958,7 +958,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								? customTitleTemplate.replace(/\$\{timestamp\}/g, () => timestamp)
 								: timestamp;
 							const idid = await api.generateSiyuanID() as string;
-							const link = buildTldrawLink(tldrawId, idid, title);
+							const link = buildTldrawLink(tldrawId, idid);
 							// 先创建一个可用的默认标题块，用户输入在创建完成后再更新标题。
 							const content =
 								'###### ' + initialTitle +

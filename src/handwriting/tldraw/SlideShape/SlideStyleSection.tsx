@@ -204,9 +204,9 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
             const shapeId = slideShape.id
             let url: string
             if (settingdata['copyLinkTitle']) {
-                url = `[slide:${slideShape.props.name}](${buildTldrawLink(rootId, rootId, title, shapeId)})`
+                url = `[slide:${slideShape.props.name}](${buildTldrawLink(rootId, rootId, shapeId)})`
             } else {
-                url = buildTldrawLink(rootId, rootId, title, shapeId)
+                url = buildTldrawLink(rootId, rootId, shapeId)
             }
             try {
                 await navigator.clipboard.writeText(url)

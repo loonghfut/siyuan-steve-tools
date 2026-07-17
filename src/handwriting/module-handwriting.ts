@@ -71,6 +71,21 @@ export class M_handwriting {
         this.h6StyleEl.textContent = css || '';
     }
 
+    private async getWhiteboardTitle(docId: string): Promise<string> {
+        const fallbackTitle = `画板${docId}`;
+        const escapedDocId = String(docId).replace(/'/g, "''");
+        try {
+            const rows = await api.sql(
+                `SELECT content FROM blocks WHERE id='${escapedDocId}' AND type='d' LIMIT 1`
+            );
+            const title = String(rows[0]?.content || '').trim();
+            return title || fallbackTitle;
+        } catch (error) {
+            console.warn('通过 SQL 查询白板文档标题失败:', docId, error);
+            return fallbackTitle;
+        }
+    }
+
     async init(settingdata) {
         registerTldrawAgentActions(this.plugin);
         await this.slideScreenshotStore.load();
@@ -110,10 +125,10 @@ export class M_handwriting {
                 let rootid = params.get('rootid');
                 const blockid = params.get('blockid');
                 const shapeid = params.get('shapeid');
-                const title = params.get('title') || "画板" + rootid;
 
                 // 如果只有 rootid（且 blockid 显式为 null），直接打开空白画板
                 if (rootid && blockid === null) {
+                    const title = await this.getWhiteboardTitle(rootid);
                     await openTab({
                         app: this.plugin.app,
                         custom: {
@@ -150,6 +165,7 @@ export class M_handwriting {
                         showMessage('未找到此blockid对应的块');
                         return;
                     }
+                    const title = await this.getWhiteboardTitle(rootid);
 
                     const tab = await openTab({
                         app: this.plugin.app,
@@ -604,7 +620,7 @@ export class M_handwriting {
     }
 
     private async openSlideScreenshotTarget(item: SlideScreenshotRecord) {
-        const link = buildTldrawLink(item.rootId, item.rootId, item.title, item.shapeId);
+        const link = buildTldrawLink(item.rootId, item.rootId, item.shapeId);
         if (!this.handlePluginUrl) {
             showMessage('白板导航尚未初始化', 3000, 'error');
             return;

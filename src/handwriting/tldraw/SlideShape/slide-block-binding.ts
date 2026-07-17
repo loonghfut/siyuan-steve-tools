@@ -33,6 +33,6 @@ export async function findSlideScreenshotBlockId(shapeId: string): Promise<strin
 
 export function buildSlideScreenshotMarkdown(options: SlideScreenshotMarkdownOptions): string {
 	const alt = options.name || 'slide'
-	const link = buildTldrawLink(options.rootId, options.rootId, options.title || '', options.shapeId)
+	const link = buildTldrawLink(options.rootId, options.rootId, options.shapeId)
 	return `![${alt}](${options.assetPath})\n{: ${SLIDE_SHAPE_ID_ATTR}="${options.shapeId}" custom-tldraw-link="${link}" }`
 }

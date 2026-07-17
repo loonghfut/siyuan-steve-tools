@@ -769,7 +769,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					try {
 						const creationPromise = (async () => {
 							const idid = (await api.generateSiyuanID()) as string
-							const link = buildTldrawLink(tldrawId, idid, title)
+							const link = buildTldrawLink(tldrawId, idid)
 							// 将链接保存到自定义属性中
 							const redata = await api.appendBlock(
 								'markdown',

@@ -654,13 +654,13 @@ export class TldrawManager {
                             // console.debug("拖拽块的内容", content);
                             if (blockIdo_rigin.includes('nodeheading')) {
                                 aproblock = blockId;
-                                const link = buildTldrawLink(this.id, aproblock, this.title);
+                                const link = buildTldrawLink(this.id, aproblock);
                                 // 将链接保存到块的自定义属性中
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
                             } else if (blockIdo_rigin.includes('paragraph')) {
                                 aproblock = blockId;
                                 // 将链接保存到块的自定义属性中
-                                const link = buildTldrawLink(this.id, aproblock, this.title);
+                                const link = buildTldrawLink(this.id, aproblock);
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw-single':"1"})
                             } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
@@ -668,7 +668,7 @@ export class TldrawManager {
                             } else if (blockIdo_rigin.startsWith('application/doc-outline-block')) {
                                 aproblock = blockId;
                                 console.debug("拖拽的是文档大纲块");
-                                const link = buildTldrawLink(this.id, aproblock, this.title);
+                                const link = buildTldrawLink(this.id, aproblock);
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
                             } else if(blockIdo_rigin.startsWith('application/child-doc')) {
                                 aproblock = blockId;
@@ -676,7 +676,7 @@ export class TldrawManager {
                                 await api.prependBlock("markdown", `((${blockId} '${docname}'))`, this.id)
                             } else {
                                 aproblock = idid as string;
-                                const link = buildTldrawLink(this.id, aproblock, this.title);
+                                const link = buildTldrawLink(this.id, aproblock);
                                 await api.insertBlock("markdown", `###### ${timestamp}
 {: id="${idid}" custom-st-tldraw="1" custom-tldraw-link="${link}"}`, blockId)
                             }
