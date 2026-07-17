@@ -7,6 +7,7 @@ import TldrawWhiteboardCards from './tldraw/ui/tldraw-whiteboard-cards.svelte';
 import TldrawWhiteboardManager from './tldraw/ui/tldraw-whiteboard-manager.svelte';
 import SlideScreenshotDock from './tldraw/ui/slide-screenshot-dock.svelte';
 import { addWhiteboardButton, setupFileTreeObserver } from "./function/assist";
+import { TldrawLinkIconController } from './function/tldraw-link-icon-controller';
 import * as api from "@/api/api";
 import { getCursorBlockId } from "@/api/api2";
 import { TLShapeId } from "@tldraw/tldraw";
@@ -42,11 +43,7 @@ export class M_handwriting {
     private delegatedIconClickHandler?: (e: MouseEvent) => void;
     // 复用的插件 URL 处理函数
     private handlePluginUrl?: (url: string) => Promise<void>;
-    // 监听带 custom-tldraw-link 元素的观察器
-    private tldrawLinkObserver?: MutationObserver;
-    private pendingTldrawNodes?: Set<HTMLElement>;
-    private mutationFlushHandle?: number;
-    private mutationFlushHandleIsTimeout?: boolean;
+    private tldrawLinkIconController?: TldrawLinkIconController;
     // 文档树观察器实例
     private fileTreeObserver?: MutationObserver;
 
@@ -510,9 +507,13 @@ export class M_handwriting {
             addWhiteboardButton(e);
             const protyleEl = e.detail?.protyle?.element as HTMLElement | undefined;
             if (protyleEl) {
-                this.startTldrawLinkWatcher(protyleEl);
+                this.tldrawLinkIconController?.watchProtyle(protyleEl);
             }
         });
+
+        // 搜索预览创建的 Protyle 不会触发 switch-protyle 事件。
+        this.tldrawLinkIconController = new TldrawLinkIconController();
+        this.tldrawLinkIconController.watchSearchPreviews();
 
         // 设置文档树白板按钮观察器（根据设置决定是否启用）
         if (settingdata['tldraw-show-in-file-tree'] !== false) {
@@ -628,85 +629,6 @@ export class M_handwriting {
         await this.handlePluginUrl(link);
     }
 
-    private injectTldrawLinkIcons(container: HTMLElement) {
-        if (!container || !this.handlePluginUrl) return;
-        const nodes = container.querySelectorAll<HTMLElement>('[custom-tldraw-link]');
-        nodes.forEach((node) => {
-            this.injectTldrawIconForNode(node);
-        });
-    }
-
-    private injectTldrawIconForNode(node: HTMLElement) {
-        if (!node || !this.handlePluginUrl) return;
-        const linkAttr = node.getAttribute('custom-tldraw-link');
-        if (!linkAttr) return;
-
-        const attrEl = Array.from(node.children).find((child) => (child as HTMLElement).classList?.contains('protyle-attr')) as HTMLElement | undefined;
-        if (!attrEl) return;
-
-        if (attrEl.querySelector('.st-tldraw-link-icon')) return;
-
-        const icon = document.createElement('span');
-        icon.className = 'st-tldraw-link-icon block__icon fn__flex-center';
-        icon.setAttribute('aria-label', '打开白板');
-        icon.title = '打开白板';
-        //加opacity: 1
-        icon.style.opacity = '1';
-        icon.innerHTML = '<svg class="item__graphic"><use xlink:href="#iconSTWhiteboard">🔗</use></svg>';
-        // 把链接存到 icon 的属性上，供委托处理器使用
-        icon.setAttribute('data-tldraw-link', linkAttr);
-
-        attrEl.appendChild(icon);
-    }
-
-    private startTldrawLinkWatcher(protyleEl: HTMLElement) {
-        if (!protyleEl) return;
-        // 先停止上一个观察器
-        this.stopTldrawLinkWatcher();
-
-        // 先对现有内容做一次注入
-        this.injectTldrawLinkIcons(protyleEl);
-
-        // 监听新增节点或属性变化
-        this.tldrawLinkObserver = new MutationObserver((mutations) => {
-            for (const m of mutations) {
-                if (m.type === 'childList') {
-                    m.addedNodes.forEach((n) => {
-                        if (n instanceof HTMLElement) {
-                            if (n.hasAttribute('custom-tldraw-link')) {
-                                this.scheduleTldrawNodeInjection(n);
-                            }
-                            n.querySelectorAll<HTMLElement>('[custom-tldraw-link]').forEach((child) => {
-                                this.scheduleTldrawNodeInjection(child);
-                            });
-                        }
-                    });
-                } else if (m.type === 'attributes') {
-                    const target = m.target as HTMLElement;
-                    if (m.attributeName === 'custom-tldraw-link') {
-                        this.scheduleTldrawNodeInjection(target);
-                    }
-                }
-            }
-        });
-
-        this.tldrawLinkObserver.observe(protyleEl, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['custom-tldraw-link'],
-        });
-    }
-
-    private stopTldrawLinkWatcher() {
-        if (this.tldrawLinkObserver) {
-            this.tldrawLinkObserver.disconnect();
-            this.tldrawLinkObserver = undefined;
-        }
-        this.clearScheduledTldrawNodes();
-        // 注意：不要在这里移除 `delegatedIconClickHandler`，它应当在插件卸载时统一清理。
-    }
-
     /**
      * 插件卸载时的清理工作
      */
@@ -722,8 +644,8 @@ export class M_handwriting {
             document.removeEventListener('click', this.delegatedIconClickHandler, true);
             this.delegatedIconClickHandler = undefined;
         }
-        // 停止观察器
-        this.stopTldrawLinkWatcher();
+        this.tldrawLinkIconController?.destroy();
+        this.tldrawLinkIconController = undefined;
         // 停止文档树观察器
         if (this.fileTreeObserver) {
             this.fileTreeObserver.disconnect();
@@ -762,52 +684,4 @@ export class M_handwriting {
         return result;
     }
 
-    private scheduleTldrawNodeInjection(node: HTMLElement) {
-        if (!node) return;
-        if (!this.pendingTldrawNodes) {
-            this.pendingTldrawNodes = new Set();
-        }
-        this.pendingTldrawNodes.add(node);
-        if (this.mutationFlushHandle !== undefined) {
-            return;
-        }
-
-        const flush = () => {
-            if (this.pendingTldrawNodes) {
-                this.pendingTldrawNodes.forEach((pendingNode) => {
-                    if (pendingNode.isConnected) {
-                        this.injectTldrawIconForNode(pendingNode);
-                    }
-                });
-                this.pendingTldrawNodes.clear();
-                this.pendingTldrawNodes = undefined;
-            }
-            this.mutationFlushHandle = undefined;
-            this.mutationFlushHandleIsTimeout = undefined;
-        };
-
-        if (typeof requestAnimationFrame === 'function') {
-            this.mutationFlushHandle = requestAnimationFrame(flush);
-            this.mutationFlushHandleIsTimeout = false;
-        } else {
-            this.mutationFlushHandle = window.setTimeout(flush, 16);
-            this.mutationFlushHandleIsTimeout = true;
-        }
-    }
-
-    private clearScheduledTldrawNodes() {
-        if (this.mutationFlushHandle !== undefined) {
-            if (this.mutationFlushHandleIsTimeout) {
-                clearTimeout(this.mutationFlushHandle);
-            } else {
-                cancelAnimationFrame(this.mutationFlushHandle);
-            }
-        }
-        if (this.pendingTldrawNodes) {
-            this.pendingTldrawNodes.clear();
-            this.pendingTldrawNodes = undefined;
-        }
-        this.mutationFlushHandle = undefined;
-        this.mutationFlushHandleIsTimeout = undefined;
-    }
 }
