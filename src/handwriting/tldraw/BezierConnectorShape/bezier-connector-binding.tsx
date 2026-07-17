@@ -168,6 +168,10 @@ export function getConnectorBindingPositionInPageSpace(
 
 /**
  * 创建或更新绑定
+ *
+ * 统一策略：除 mind-map（端口按节点定位，auto 无法解析到具体节点）外，
+ * 所有绑定的 portId 一律归一化为 AUTO_PORT_ID——连线根据两形状相对位置
+ * 自动选择进出方向并随移动换边，所有调用点行为一致。
  */
 export function createOrUpdateConnectorBinding(
 	editor: Editor,
@@ -177,9 +181,16 @@ export function createOrUpdateConnectorBinding(
 ) {
 	const connectorId = typeof connector === 'string' ? connector : connector.id
 
+	// 归一化 portId：非 mind-map 目标一律使用 auto
+	const targetShape = editor.getShape(targetId)
+	const normalizedProps: ConnectorBinding['props'] =
+		targetShape && targetShape.type !== 'mind-map'
+			? { ...props, portId: AUTO_PORT_ID }
+			: props
+
 	const existing = editor
 		.getBindingsFromShape<ConnectorBinding>(connectorId, 'bezier-connector')
-		.filter((b) => b.props.terminal === props.terminal)
+		.filter((b) => b.props.terminal === normalizedProps.terminal)
 
 	if (existing.length > 1) {
 		editor.deleteBindings(existing.slice(1))
@@ -188,17 +199,17 @@ export function createOrUpdateConnectorBinding(
 	const current = existing[0]
 	if (current) {
 		// 如果没有变化则跳过，避免重复写 store
-		if (current.toId === targetId && current.props.portId === props.portId) {
+		if (current.toId === targetId && current.props.portId === normalizedProps.portId) {
 			return
 		}
 		editor.updateBinding({
 			...current,
 			toId: targetId,
-			props,
+			props: normalizedProps,
 		})
 		// 显示短暂的连接高亮反馈（端口和整个 connector）
 		try {
-			const flashPortId = resolveConnectorBindingPortId(editor, { ...current, toId: targetId, props })
+			const flashPortId = resolveConnectorBindingPortId(editor, { ...current, toId: targetId, props: normalizedProps })
 			setFlashWithConnectorIfChanged(editor, { shapeId: targetId, portId: flashPortId }, connectorId, 350)
 		} catch (e) {
 			// ignore
@@ -208,14 +219,14 @@ export function createOrUpdateConnectorBinding(
 			type: 'bezier-connector',
 			fromId: connectorId,
 			toId: targetId,
-			props,
+			props: normalizedProps,
 		})
 		// 显示短暂的连接高亮反馈（端口和整个 connector）
 		try {
 			const created = editor
 				.getBindingsFromShape<ConnectorBinding>(connectorId, 'bezier-connector')
-				.find((b) => b.props.terminal === props.terminal)
-			const flashPortId = created ? resolveConnectorBindingPortId(editor, created) : props.portId
+				.find((b) => b.props.terminal === normalizedProps.terminal)
+			const flashPortId = created ? resolveConnectorBindingPortId(editor, created) : normalizedProps.portId
 			setFlashWithConnectorIfChanged(editor, { shapeId: targetId, portId: flashPortId }, connectorId, 350)
 		} catch (e) {
 			// ignore

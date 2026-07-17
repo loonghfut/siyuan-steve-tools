@@ -22,14 +22,15 @@ const CONNECTOR_SHAPE_TYPES = new Set(['bezier-connector', 'arrow'])
  * 端口"远距吸附"白名单：只有这些形状会在拖拽时以端口半径参与命中测试。
  * 与实际渲染端口 overlay 的形状保持一致，避免吸附到不可见端口。
  * 其他形状仍可通过"指针落在形状内部"的方式连接（见 getConnectionTargetAtPoint）。
+ * 注意：branch 不参与连接吸附（它是布局容器，不应被连线）。
  */
-const PORT_SNAP_SHAPE_TYPES = new Set(['card', 'single-block', 'branch', 'mind-map'])
+const PORT_SNAP_SHAPE_TYPES = new Set(['card', 'single-block', 'mind-map'])
 
 /**
- * 形状级命中测试排除类型：连接线自身，以及 frame/slide 这类大容器
+ * 形状级命中测试排除类型：连接线自身、frame/slide 这类大容器、branch 布局容器
  * （容器内部点击命中会把整个画框当成磁铁，体验极差）
  */
-const SHAPE_HIT_EXCLUDED_TYPES = new Set(['bezier-connector', 'arrow', 'frame', 'slide'])
+const SHAPE_HIT_EXCLUDED_TYPES = new Set(['bezier-connector', 'arrow', 'frame', 'slide', 'branch'])
 
 /**
  * 该形状是否以端口半径参与远距吸附

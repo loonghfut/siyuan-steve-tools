@@ -300,14 +300,20 @@ export function getConnectorTerminals(
 	const bindings = getConnectorBindings(editor, connector)
 	const shapeTransform = Mat.Inverse(editor.getShapePageTransform(connector))
 
-	// 从绑定获取位置
-	if (bindings.start) {
+	// 拖拽中的临时目标：拖拽端的位置以 props 为准（onHandleDrag 每帧更新），
+	// 必须忽略旧 binding 的位置，否则曲线端点会被旧绑定"钉"在端口上不跟手，
+	// 直到松手 onHandleDragEnd 提交 binding 变更后才跳到新位置
+	const pending = pendingBindingTargets.get(connector.id)
+	const pendingTerminal = pending?.terminal
+
+	// 从绑定获取位置（拖拽中的一端跳过，走 props 回退）
+	if (bindings.start && pendingTerminal !== 'start') {
 		const inPageSpace = getConnectorBindingPositionInPageSpace(editor, bindings.start)
 		if (inPageSpace) {
 			start = Mat.applyToPoint(shapeTransform, inPageSpace)
 		}
 	}
-	if (bindings.end) {
+	if (bindings.end && pendingTerminal !== 'end') {
 		const inPageSpace = getConnectorBindingPositionInPageSpace(editor, bindings.end)
 		if (inPageSpace) {
 			end = Mat.applyToPoint(shapeTransform, inPageSpace)
@@ -333,8 +339,7 @@ export function getConnectorTerminals(
 		endPortId = resolveConnectorBindingPortId(editor, bindings.end)
 	}
 
-	// 在拖拽过程中，优先使用未提交的 pendingBindingTargets 提供的端口信息以便实时显示
-	const pending = pendingBindingTargets.get(connector.id)
+	// 拖拽过程中，优先使用未提交的 pendingBindingTargets 提供的端口信息以便实时显示
 	if (pending) {
 		if (pending.kind === 'set') {
 			// auto 端口在拖拽预览时不指定方向，让控制点走主轴回退逻辑
