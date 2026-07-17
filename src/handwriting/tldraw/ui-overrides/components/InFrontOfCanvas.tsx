@@ -8,6 +8,7 @@ import { showMessage, openTab } from 'siyuan'
 import { ShapeLibraryPanel } from '../../shapelibrary/ShapeLibraryPanel'
 import { DocOutlinePanel } from '../../doc-outline/DocOutlinePanel'
 import { ChildDocsPanel } from '../../doc-outline/ChildDocsPanel'
+import { SearchPanel } from '../../search/SearchPanel'
 import {
     useShapeLibraryOpen,
     toggleShapeLibrary,
@@ -16,6 +17,8 @@ import {
     setDocOutlineDocId,
     useChildDocsOpen,
     toggleChildDocs,
+    useSearchPanelOpen,
+    toggleSearchPanel,
 } from '../panel-state'
 import { CardLikeShape, isCardLikeShape, isOverlayShape } from '../types'
 import type { ICardShape } from '../../CardShape/card-shape-types'
@@ -38,6 +41,7 @@ export const InFrontOfCanvas: React.FC = () => {
     const isLibraryOpen = useShapeLibraryOpen()
     const isDocOutlineOpen = useDocOutlineOpen()
     const isChildDocsOpen = useChildDocsOpen()
+    const isSearchOpen = useSearchPanelOpen()
 
     // 获取白板绑定的文档ID
     const container = editor.getContainer()
@@ -298,6 +302,12 @@ export const InFrontOfCanvas: React.FC = () => {
                 onClose={() => toggleChildDocs()}
                 docId={boundDocId || null}
                 selectedMainCard={selectedMainCard}
+            />
+
+            {/* 搜索面板 */}
+            <SearchPanel
+                isOpen={isSearchOpen}
+                onClose={() => toggleSearchPanel()}
             />
 
             {/* 选中元素的操作按钮 */}

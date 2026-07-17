@@ -551,6 +551,14 @@ export class TldrawManager {
                                         return;
                                     }
 
+                                    // 排除自定义浮动面板（素材库/文档大纲/子文档/搜索），避免面板内输入框被立刻失焦
+                                    if (target.closest('.shape-library-panel') ||
+                                        target.closest('.doc-outline-panel') ||
+                                        target.closest('.child-docs-panel') ||
+                                        target.closest('.search-panel')) {
+                                        return;
+                                    }
+
                                     // 只有点击画布背景时才清除选区
                                     if (window.getSelection) {
                                         const sel = window.getSelection();

@@ -1,6 +1,6 @@
 /**
  * 全局面板状态管理
- * 管理素材库、文档大纲、子文档面板的开关状态
+ * 管理素材库、文档大纲、子文档、搜索面板的开关状态
  */
 import React from 'react'
 
@@ -84,6 +84,28 @@ export function useChildDocsOpen() {
         childDocsListeners.add(setIsOpen)
         return () => {
             childDocsListeners.delete(setIsOpen)
+        }
+    }, [])
+
+    return isOpen
+}
+
+// ============ 搜索面板状态 ============
+let searchPanelOpenState = false
+const searchPanelListeners: Set<(isOpen: boolean) => void> = new Set()
+
+export function toggleSearchPanel() {
+    searchPanelOpenState = !searchPanelOpenState
+    searchPanelListeners.forEach(listener => listener(searchPanelOpenState))
+}
+
+export function useSearchPanelOpen() {
+    const [isOpen, setIsOpen] = React.useState(searchPanelOpenState)
+
+    React.useEffect(() => {
+        searchPanelListeners.add(setIsOpen)
+        return () => {
+            searchPanelListeners.delete(setIsOpen)
         }
     }, [])
 
