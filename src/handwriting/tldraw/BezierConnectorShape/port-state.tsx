@@ -120,6 +120,10 @@ export function setHighlightConnectorIfChanged(editor: Editor, connectorId: TLSh
 /**
  * 设置 flashPort 与 flashConnectorId（仅在变化时），并可指定自动清除时间
  */
+// 每个 editor 的 flash 版本号：定时器只清除"仍是自己那一次"的 flash，
+// 避免连续两次连接时第一条的定时器提前掐灭第二条的 flash
+const flashTokens = new WeakMap<Editor, number>()
+
 export function setFlashWithConnectorIfChanged(
 	editor: Editor,
 	flashPort: PortState['flashPort'],
@@ -136,8 +140,12 @@ export function setFlashWithConnectorIfChanged(
 		flashPort,
 		flashConnectorId,
 	})
+	const token = (flashTokens.get(editor) ?? 0) + 1
+	flashTokens.set(editor, token)
 	if (durationMs && (flashPort || flashConnectorId)) {
 		setTimeout(() => {
+			// 有更新的 flash 覆盖了本次，则不清除
+			if (flashTokens.get(editor) !== token) return
 			const s = getPortStateAtom(editor)
 			s.set({
 				...s.get(),

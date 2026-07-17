@@ -1,5 +1,5 @@
 import { Editor, TLArrowShape, TLDefaultColorStyle, TLShapeId, TLShapePartial, Vec, createShapeId } from '@tldraw/tldraw'
-import { createOrUpdateConnectorBinding } from '../BezierConnectorShape'
+import { createOrUpdateConnectorBinding, AUTO_PORT_ID } from '../BezierConnectorShape'
 import type { IBezierConnectorShape } from '../BezierConnectorShape/bezier-connector-types'
 import { setFlashWithConnectorIfChanged, setHintingPortIfChanged } from '../BezierConnectorShape/port-state'
 import { getPortPagePosition, getBestPortPair, getShapePorts } from '../BezierConnectorShape/port-utils'
@@ -357,14 +357,14 @@ export class ConnectionModeManager {
             }
             this.editor.createShape(connectorShape)
 
-            // 创建 binding，优先使用默认端口 id
-
+            // 创建 binding
+            // 使用 auto 端口：连线随两个形状的相对位置自动换边
             createOrUpdateConnectorBinding(this.editor, connectorId, sourceShape.id, {
-                portId: sourcePort,
+                portId: AUTO_PORT_ID,
                 terminal: sourceTerminal as any,
             })
             createOrUpdateConnectorBinding(this.editor, connectorId, targetShape.id, {
-                portId: targetPort,
+                portId: AUTO_PORT_ID,
                 terminal: targetTerminal as any,
             })
 

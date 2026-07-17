@@ -75,23 +75,9 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 		[editor, shapeId, portId, portData?.port]
 	)
 
-	if (!portData) return null
-
-	const { port, hitSize, dotSize, defaultDotColor } = portData
+	// 注意：所有 hooks 必须在任何提前 return 之前调用（React Hooks 规则），
+	// 否则形状被删除导致 portData 变 null 的那一帧会因 hooks 数量变化而崩溃
 	const { isHinting, isEligible, isFlashing, isConnected } = portState
-	const isInput = port.terminal === 'end'
-
-	const left = typeof port.x === 'number' ? `${port.x}px` : undefined
-	const top = typeof port.y === 'number' ? `${port.y}px` : undefined
-
-	const scale = isHinting ? 1.4 : 1
-	let extraOffsetX = 0
-	let extraOffsetY = 0
-	if (settingdata["showCardBorder"]) {
-		extraOffsetX = -3
-		extraOffsetY = -3
-	}
-
 	const isInteractive = isConnected || parentHovered || isEligible || isHinting || isFlashing
 
 	// 入场动画：parentHovered 触发端口首次可见时短暂缩放，配合 CSS transition 实现弹性入场
@@ -110,6 +96,22 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 			setEntering(false)
 		}
 	}, [isInteractive, isConnected, isHinting, isEligible, isFlashing])
+
+	if (!portData) return null
+
+	const { port, hitSize, dotSize, defaultDotColor } = portData
+	const isInput = port.terminal === 'end'
+
+	const left = typeof port.x === 'number' ? `${port.x}px` : undefined
+	const top = typeof port.y === 'number' ? `${port.y}px` : undefined
+
+	const scale = isHinting ? 1.4 : 1
+	let extraOffsetX = 0
+	let extraOffsetY = 0
+	if (settingdata["showCardBorder"]) {
+		extraOffsetX = -3
+		extraOffsetY = -3
+	}
 
 	const displayScale = entering ? 0.3 : scale
 
@@ -130,6 +132,9 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 				'--port-dot-size': `${dotSize}px`,
 			} as React.CSSProperties}
 			onPointerDown={() => {
+				// 注意：不要 stopPropagation / markEventAsHandled——
+				// tldraw 需要收到这次 pointerdown 才会更新 inputs.isDragging，
+				// 否则 PointingPort.onPointerMove 永远不会进入拖拽创建连接的分支
 				editor.setCurrentTool('select.pointing_port', {
 					shapeId,
 					portId,

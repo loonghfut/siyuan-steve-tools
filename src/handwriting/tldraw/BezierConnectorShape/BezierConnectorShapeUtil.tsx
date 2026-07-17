@@ -25,6 +25,7 @@ import {
 	TLRichText,
 } from '@tldraw/tldraw'
 import { RichTextLabel, RichTextSVG } from '@tldraw/tldraw'
+import { showMessage } from 'siyuan'
 import { bezierConnectorShapeProps } from './bezier-connector-props'
 import { bezierConnectorShapeMigrations } from './bezier-connector-migrations'
 import { IBezierConnectorShape, PortTerminal } from './bezier-connector-types'
@@ -33,8 +34,10 @@ import {
 	getConnectorBindingPositionInPageSpace,
 	createOrUpdateConnectorBinding,
 	removeConnectorBinding,
+	resolveConnectorBindingPortId,
+	AUTO_PORT_ID,
 } from './bezier-connector-binding'
-import { getPortAtPoint } from './port-utils'
+import { getConnectionTargetAtPoint } from './port-utils'
 import { getPortState, setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
 import { getDefaultColorTheme } from '../utils/color-theme'
 
@@ -165,7 +168,29 @@ const pendingBindingTargets = new Map<TLShapeId, PendingBindingTarget>()
 const handleLastDragKey = new Map<TLShapeId, string>()
 
 /**
+ * 检查除 selfConnectorId 之外，shapeA 与 shapeB 之间是否已存在其他 bezier 连接
+ * （用于拖拽落点时防止重复连线）
+ */
+function hasOtherConnectionBetween(
+	editor: Editor,
+	selfConnectorId: TLShapeId,
+	shapeA: TLShapeId,
+	shapeB: TLShapeId
+): boolean {
+	const bindingsToA = editor.getBindingsToShape(shapeA, 'bezier-connector')
+	for (const binding of bindingsToA) {
+		if (binding.fromId === selfConnectorId) continue
+		const siblings = editor.getBindingsFromShape(binding.fromId, 'bezier-connector')
+		if (siblings.some((b) => b.toId === shapeB)) return true
+	}
+	return false
+}
+
+/**
  * 计算贝塞尔曲线的控制点
+ * 每个端点按自身端口朝向独立计算偏移量：
+ * - 偏移大小主要取决于该端出线轴上的距离，clamp 到 [40, 250]
+ * - 反向连接（目标在出线方向的背面）时用固定的较大偏移，让曲线自然绕出
  */
 function getConnectionControlPoints(
 	start: VecLike,
@@ -189,55 +214,52 @@ function getConnectionControlPoints(
 	const startDir = extractPortDirection(startPortId)
 	const endDir = extractPortDirection(endPortId)
 
-	// 先识别端口方向（若已绑定端口，则优先使用端口方向）
 	const startIsVertical = startDir === 'top' || startDir === 'bottom'
 	const startIsHorizontal = startDir === 'input' || startDir === 'output' || startDir === 'left' || startDir === 'right'
 	const endIsVertical = endDir === 'top' || endDir === 'bottom'
 	const endIsHorizontal = endDir === 'input' || endDir === 'output' || endDir === 'left' || endDir === 'right'
 
-	// 计算水平/垂直偏移大小
-	const distanceX = dx
-	const absX = Math.abs(distanceX)
-	const adjustedDistanceX = Math.max(30, distanceX > 0 ? distanceX / 3 : clamp(absX + 30, 0, 100))
-
-	const distanceY = dy
-	const absY = Math.abs(distanceY)
-	const adjustedDistanceY = Math.max(30, Math.min(absY / 3, 100))
-	const signY = distanceY >= 0 ? 1 : -1
-
-	// 计算控制点：分别独立处理每个端点，优先使用端口方向
-	let cp1: Vec
-	let cp2: Vec
-
-	// 起点控制点
-	if (startIsHorizontal) {
-		const isLeftOrInput = startDir === 'input' || startDir === 'left'
-		cp1 = new Vec(start.x + (isLeftOrInput ? -adjustedDistanceX : adjustedDistanceX), start.y)
-	} else if (startIsVertical) {
-		cp1 = new Vec(start.x, start.y + (startDir === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
-	} else {
-		// 根据主轴选择偏移方向
-		if (Math.abs(dx) >= Math.abs(dy)) {
-			cp1 = new Vec(start.x + (distanceX > 0 ? adjustedDistanceX : -adjustedDistanceX), start.y)
-		} else {
-			cp1 = new Vec(start.x, start.y + signY * adjustedDistanceY)
+	// 某端沿指定单位方向 (ux, uy) 出线时的控制点偏移量
+	// forwardDist: 目标相对该端点在出线方向上的投影距离（正=前方，负=背面）
+	const offsetAlong = (forwardDist: number, crossDist: number) => {
+		if (forwardDist >= 0) {
+			// 正向：距离越远曲线越舒展；横向偏移较大时加一点余量避免过平
+			return clamp(forwardDist * 0.5 + Math.abs(crossDist) * 0.1, 40, 250)
 		}
+		// 反向：需要绕出，固定较大偏移（随背离程度略增）
+		return clamp(Math.abs(forwardDist) * 0.25 + 60, 60, 180)
 	}
 
-	// 终点控制点
-	if (endIsHorizontal) {
-		// 默认让控制点在端口外侧。
-		const isLeftOrInput = endDir === 'input' || endDir === 'left'
-		cp2 = new Vec(end.x + (isLeftOrInput ? -adjustedDistanceX : adjustedDistanceX), end.y)
-	} else if (endIsVertical) {
-		cp2 = new Vec(end.x, end.y + (endDir === 'bottom' ? adjustedDistanceY : -adjustedDistanceY))
-	} else {
-		if (Math.abs(dx) >= Math.abs(dy)) {
-			cp2 = new Vec(end.x + (distanceX > 0 ? -adjustedDistanceX : adjustedDistanceX), end.y)
-		} else {
-			cp2 = new Vec(end.x, end.y + (signY < 0 ? adjustedDistanceY : -adjustedDistanceY))
+	const computeCp = (
+		point: VecLike,
+		isHorizontal: boolean,
+		isVertical: boolean,
+		dir: string | null,
+		/** 该端指向对端的向量 */
+		towardX: number,
+		towardY: number
+	): Vec => {
+		if (isHorizontal) {
+			const sign = dir === 'input' || dir === 'left' ? -1 : 1
+			const dist = offsetAlong(towardX * sign, towardY)
+			return new Vec(point.x + sign * dist, point.y)
 		}
+		if (isVertical) {
+			const sign = dir === 'top' ? -1 : 1
+			const dist = offsetAlong(towardY * sign, towardX)
+			return new Vec(point.x, point.y + sign * dist)
+		}
+		// 未绑定端口：沿主轴指向对端
+		if (Math.abs(towardX) >= Math.abs(towardY)) {
+			const sign = towardX >= 0 ? 1 : -1
+			return new Vec(point.x + sign * clamp(Math.abs(towardX) * 0.5, 40, 250), point.y)
+		}
+		const sign = towardY >= 0 ? 1 : -1
+		return new Vec(point.x, point.y + sign * clamp(Math.abs(towardY) * 0.5, 40, 250))
 	}
+
+	const cp1 = computeCp(start, startIsHorizontal, startIsVertical, startDir, dx, dy)
+	const cp2 = computeCp(end, endIsHorizontal, endIsVertical, endDir, -dx, -dy)
 
 	return [cp1, cp2]
 }
@@ -297,29 +319,32 @@ export function getConnectorTerminals(
 	if (!end) end = connector.props.end
 
 	// 从绑定中提取形状/端口信息（可用于决定控制点方向）
+	// auto 端口解析为当前相对位置下的实际端口，保证控制点方向与实际出线边一致
 	let startShapeId: TLShapeId | undefined
 	let endShapeId: TLShapeId | undefined
 	let startPortId: string | undefined
 	let endPortId: string | undefined
 	if (bindings.start) {
 		startShapeId = bindings.start.toId
-		startPortId = bindings.start.props.portId
+		startPortId = resolveConnectorBindingPortId(editor, bindings.start)
 	}
 	if (bindings.end) {
 		endShapeId = bindings.end.toId
-		endPortId = bindings.end.props.portId
+		endPortId = resolveConnectorBindingPortId(editor, bindings.end)
 	}
 
 	// 在拖拽过程中，优先使用未提交的 pendingBindingTargets 提供的端口信息以便实时显示
 	const pending = pendingBindingTargets.get(connector.id)
 	if (pending) {
 		if (pending.kind === 'set') {
+			// auto 端口在拖拽预览时不指定方向，让控制点走主轴回退逻辑
+			const pendingPortId = pending.portId === AUTO_PORT_ID ? undefined : pending.portId
 			if (pending.terminal === 'start') {
 				startShapeId = pending.targetId
-				startPortId = pending.portId
+				startPortId = pendingPortId
 			} else {
 				endShapeId = pending.targetId
-				endPortId = pending.portId
+				endPortId = pendingPortId
 			}
 		} else if (pending.kind === 'remove') {
 			if (pending.terminal === 'start') {
@@ -770,19 +795,22 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 			}
 			handleLastDragKey.set(connectorId, key)
 
-		// 查找该位置的端口
-		// 不再按 terminal (start/end) 过滤目标端口，允许任意端口互连
-		// 将 handle 拖动视为连接模式的一部分：显示 eligible ports
-		setEligiblePortsIfChanged(this.editor, {
-			terminal: undefined,
-			excludeShapeIds: new Set([connector.id]),
-		})
+		// 排除连接器自身；同时排除对侧已绑定的形状，防止拖回同一形状产生自环
+		const excludeShapeIds = new Set<TLShapeId>([connectorId])
+		const bindings = getConnectorBindings(this.editor, connector)
+		const oppositeBinding = draggingTerminal === 'start' ? bindings.end : bindings.start
+		if (oppositeBinding) excludeShapeIds.add(oppositeBinding.toId)
 
-		const target = getPortAtPoint(this.editor, handlePagePosition, {
+		// 注意：拖拽中不设置 eligiblePorts（不在其他形状四周显示端口特效），
+		// 仅在命中目标时通过 hintingPort 高亮目标端口
+
+		// 查找该位置的连接目标：优先精确端口，其次形状本体（自动选边）
+		const target = getConnectionTargetAtPoint(this.editor, handlePagePosition, {
 			margin: 28,
+			excludeShapeIds,
 		})
 
-		// 如果找到可用端口，记录待绑定目标，并设置高亮当前 connector
+		// 如果找到可用目标，记录待绑定目标，并设置高亮当前 connector
 		if (target) {
 			const targetShape = this.editor.getShape(target.shapeId)
 			if (targetShape) {
@@ -796,10 +824,13 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 				// 高亮当前连接器用于视觉引导
 				setHighlightConnectorIfChanged(this.editor, connectorId)
 				// 只存储目标信息，不写 store
+				// 非精确命中（落在形状本体上）时记录 auto 端口，之后随相对位置自动换边
+				// mind-map 端口按节点定位（nodeId:direction），auto 无法解析到具体节点，始终锁定实际端口
+				const useAutoPort = !target.precise && targetShape.type !== 'mind-map'
 				pendingBindingTargets.set(connectorId, {
 					kind: 'set',
 					targetId: target.shapeId,
-					portId: target.port.id,
+					portId: useAutoPort ? AUTO_PORT_ID : target.port.id,
 					terminal: draggingTerminal,
 				})
 
@@ -840,26 +871,55 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		_info: TLHandleDragInfo<IBezierConnectorShape>
 	): void {
 		const pending = pendingBindingTargets.get(connector.id)
-		pendingBindingTargets.delete(connector.id)
+		this.cleanupHandleDragState(connector.id)
 		if (!pending) return
 
 		if (pending.kind === 'remove') {
 			removeConnectorBinding(this.editor, connector.id, pending.terminal)
 		} else {
+			// 查重：同一对形状之间若已有其他连接线，则不重复创建绑定
+			const oppositeTerminal: PortTerminal = pending.terminal === 'start' ? 'end' : 'start'
+			const bindings = getConnectorBindings(this.editor, connector)
+			const opposite = bindings[oppositeTerminal]
+			if (opposite && hasOtherConnectionBetween(this.editor, connector.id, opposite.toId, pending.targetId)) {
+				// 已存在等价连接：放弃这一端的绑定（保持自由端点），并给出提示反馈
+				removeConnectorBinding(this.editor, connector.id, pending.terminal)
+				try {
+					showMessage('两个形状之间已存在连接', 2000, 'info')
+				} catch {
+					// ignore（非思源环境下静默）
+				}
+				return
+			}
 			createOrUpdateConnectorBinding(this.editor, connector.id, pending.targetId, {
 				portId: pending.portId,
 				terminal: pending.terminal,
 			})
 		}
+	}
 
+	/**
+	 * 拖拽被取消（Escape / 中断）时清理临时状态
+	 * 不做任何 binding 提交——tldraw 会通过 bailToMark 回滚形状变更
+	 */
+	override onHandleDragCancel(
+		connector: IBezierConnectorShape,
+		_info: TLHandleDragInfo<IBezierConnectorShape>
+	): void {
+		this.cleanupHandleDragState(connector.id)
+	}
+
+	/**
+	 * 统一清理拖拽过程中的临时状态（pending 目标、端口高亮、节流缓存）
+	 */
+	private cleanupHandleDragState(connectorId: TLShapeId): void {
+		pendingBindingTargets.delete(connectorId)
+		handleLastDragKey.delete(connectorId)
 		// 清理 hinting，并清除 connector highlight
 		setHintingPortIfChanged(this.editor, null)
 		setHighlightConnectorIfChanged(this.editor, null)
 		// 清理 eligiblePorts 以隐藏端口 overlay
 		setEligiblePortsIfChanged(this.editor, null)
-
-	// 清理位置节流缓存
-	handleLastDragKey.delete(connector.id)
 	}
 
 	// 渲染连接组件

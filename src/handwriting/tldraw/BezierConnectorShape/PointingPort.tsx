@@ -9,9 +9,9 @@ import {
 	createOrUpdateConnectorBinding,
 	getShapeConnections,
 } from './bezier-connector-binding'
-import { getPortAtPoint } from './port-utils'
+import { getConnectionTargetAtPoint } from './port-utils'
 import { getShapePorts } from './shape-ports'
-import { setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
+import { setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
 
 /**
  * 端口拖拽信息
@@ -38,17 +38,12 @@ export class PointingPort extends StateNode {
 		// 设置光标
 		this.editor.setCursor({ type: 'cross', rotation: 0 })
 
-		// 设置可连接的端口状态：将 terminal 设为 undefined，表示任何端口均可连接
-		// 标记 eligiblePorts，使得目标形状上的端口可视化（即使没有 hover）
-		setEligiblePortsIfChanged(this.editor, {
-			terminal: undefined,
-			excludeShapeIds: new Set([info.shapeId]),
-		})
+		// 不再设置 eligiblePorts：拖拽时不在其他形状四周显示端口特效，
+		// 仅在命中目标时通过 hintingPort 高亮目标端口
 	}
 
 	override onExit() {
-		// 不清除 eligiblePorts：过渡到 dragging_handle 时端口光环应保持可见
-		// eligiblePorts 会在 onHandleDragEnd 或 onPointerUp/onCancel 中清除
+		// eligiblePorts 已不再使用；清理 hinting / highlight 状态
 		setHintingPortIfChanged(this.editor, null)
 		setHighlightConnectorIfChanged(this.editor, null)
 		this.info = undefined
@@ -56,23 +51,15 @@ export class PointingPort extends StateNode {
 	}
 
 	override onPointerMove(info: TLPointerEventInfo): void {
-		if (!this.info) {
-			console.debug('[PointingPort] onPointerMove: no info')
-			return
-		}
-		if (!this.editor.inputs.isDragging) {
-			console.debug('[PointingPort] onPointerMove: not dragging yet')
-			return
-		}
+		if (!this.info) return
+		if (!this.editor.inputs.isDragging) return
 
-		console.debug('[PointingPort] onPointerMove: isDragging=true, creating connection')
 		const currentPoint = this.editor.inputs.currentPagePoint
 
-		// 查找当前位置的端口
-		// 现在允许连接到任何端口类型（不再限制 start/end），因此不传 terminal
-		const target = getPortAtPoint(this.editor, currentPoint, {
+		// 查找当前位置的连接目标（精确端口优先，其次形状本体）
+		const target = getConnectionTargetAtPoint(this.editor, currentPoint, {
 			margin: 28,
-			excludeShapeId: this.info.shapeId,
+			excludeShapeIds: new Set([this.info.shapeId]),
 		})
 
 		// 更新 hinting 状态
@@ -109,23 +96,15 @@ export class PointingPort extends StateNode {
 		const connectingTerminal = this.info.terminal
 		const draggingTerminal = connectingTerminal === 'start' ? 'end' : 'start'
 
-		console.debug('[PointingPort] Creating bezier-connector shape:', connectionShapeId)
-
 		// 获取源端口的页面位置作为连接起点
 		const sourceShape = this.editor.getShape(this.info.shapeId)
-		if (!sourceShape) {
-			console.debug('[PointingPort] Source shape not found!')
-			return
-		}
+		if (!sourceShape) return
 
 		// 获取端口在页面坐标中的位置
 		const sourceShapeTransform = this.editor.getShapePageTransform(sourceShape)
 		const ports = getShapePorts(this.editor, sourceShape)
 		const sourcePort = ports?.[this.info.portId]
-		if (!sourcePort) {
-			console.debug('[PointingPort] Source port not found!')
-			return
-		}
+		if (!sourcePort) return
 		const sourcePortPagePos = sourceShapeTransform.applyToPoint(sourcePort)
 
 		// 连接器形状的原点在 (0,0)，start/end 使用页面坐标
@@ -149,27 +128,19 @@ export class PointingPort extends StateNode {
 			},
 		})
 
-		console.debug('[PointingPort] Shape created, getting handles')
-
 		// 绑定一端到起始端口
 		createOrUpdateConnectorBinding(this.editor, connectionShapeId, this.info.shapeId, {
 			portId: this.info.portId,
 			terminal: connectingTerminal,
 		})
 
-		console.debug('[PointingPort] Binding created')
-
 		// 切换到拖动另一端
 		const handles = this.editor.getShapeHandles(connectionShapeId)
-		console.debug('[PointingPort] Handles:', handles)
 		const handle = handles?.find((h) => h.id === draggingTerminal)
-		console.debug('[PointingPort] Target handle:', handle)
 
 		if (handle) {
 			const connectionShape = this.editor.getShape(connectionShapeId)
-			console.debug('[PointingPort] Connection shape:', connectionShape)
 			if (connectionShape) {
-				console.debug('[PointingPort] Transitioning to dragging_handle')
 				this.parent.transition('dragging_handle', {
 					...info,
 					target: 'handle',
@@ -178,20 +149,22 @@ export class PointingPort extends StateNode {
 					creatingMarkId,
 					isCreating: true,
 				})
+				return
 			}
-		} else {
-			console.debug('[PointingPort] No handle found!')
 		}
+
+		// 找不到手柄：回滚已创建的孤儿连接，避免留下一条死线
+		console.warn('[PointingPort] handle not found, bailing out of connection creation')
+		this.editor.bailToMark(creatingMarkId)
+		this.parent.transition('idle')
 	}
 
 	override onPointerUp(): void {
-		// 点击（非拖拽）处理：清除端口状态后返回 idle
-		setEligiblePortsIfChanged(this.editor, null)
+		// 点击（非拖拽）处理：返回 idle
 		this.parent.transition('idle')
 	}
 
 	override onCancel(): void {
-		setEligiblePortsIfChanged(this.editor, null)
 		this.parent.transition('idle')
 	}
 }

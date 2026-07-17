@@ -1,7 +1,7 @@
 import { Editor, TLShapeId, VecLike, createComputedCache } from '@tldraw/tldraw'
 import { ShapePort, PortTerminal } from './bezier-connector-types'
 import { getShapeConnections } from './bezier-connector-binding'
-import { getShapePorts } from './shape-ports'
+import { getShapePorts, isPortSnappableShape, isShapeHitTargetable } from './shape-ports'
 
 // 重新导出便于其他模块使用
 export { getShapePorts, getPortPagePosition, isConnectableShape } from './shape-ports'
@@ -54,6 +54,7 @@ export function getPortAtPoint(
 		terminal?: PortTerminal
 		margin?: number
 		excludeShapeId?: TLShapeId
+		excludeShapeIds?: Set<TLShapeId>
 	}
 ): {
 	shapeId: TLShapeId
@@ -79,6 +80,10 @@ export function getPortAtPoint(
 	for (const shape of shapes) {
 		// 跳过排除的形状
 		if (opts?.excludeShapeId && shape.id === opts.excludeShapeId) continue
+		if (opts?.excludeShapeIds?.has(shape.id)) continue
+
+		// 只吸附"会渲染端口 overlay"的形状，避免吸附到不可见端口
+		if (!isPortSnappableShape(shape)) continue
 
 		// 通过缓存获取该 shape 的 page-space 端口位置与 bbox
 		const cache = shapePagePortsCache.get(editor, shape.id)
@@ -90,7 +95,7 @@ export function getPortAtPoint(
 		// 然后按 zoom 缩放：缩小画布时放大 page-space margin，放大画布时缩小
 		// clamp 8~200 避免极端缩放时 hit area 过大或过小
 		const rawMargin = bbox
-			? Math.max(16, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.13, 38))
+			? Math.max(baseMargin, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.13, 38))
 			: baseMargin
 		const shapeMargin = Math.max(8, Math.min(rawMargin / zoom, 200))
 
@@ -140,6 +145,86 @@ export function getPortAtPoint(
 		port: bestResult.port,
 		existingConnections,
 	}
+}
+
+/**
+ * 连接目标查找结果
+ * precise=true 表示鼠标精确命中了某个端口；false 表示只是落在形状内部/边缘，
+ * 端口由相对位置自动推断（后续形状移动时也应保持自动换边）。
+ */
+export interface ConnectionTarget {
+	shapeId: TLShapeId
+	port: ShapePort
+	/** 是否精确命中端口 */
+	precise: boolean
+	existingConnections: ReturnType<typeof getShapeConnections>
+}
+
+/**
+ * 查找某个页面坐标处的连接目标：
+ * 1. 优先精确匹配端口（getPortAtPoint）
+ * 2. 否则命中形状本体（含少量外扩 margin），自动选择离指针最近的端口
+ *
+ * 这让用户把线拖到目标形状"任意位置"即可连接，无需精确对准端口小圆点。
+ */
+export function getConnectionTargetAtPoint(
+	editor: Editor,
+	point: VecLike,
+	opts?: {
+		margin?: number
+		excludeShapeIds?: Set<TLShapeId>
+	}
+): ConnectionTarget | null {
+	const excludeShapeIds = opts?.excludeShapeIds
+
+	// 1. 精确端口命中
+	const portHit = getPortAtPoint(editor, point, {
+		margin: opts?.margin ?? 28,
+		excludeShapeIds,
+	})
+	if (portHit) {
+		return { ...portHit, precise: true }
+	}
+
+	// 2. 形状本体命中（含外扩 margin，随缩放调整）
+	const zoom = editor.getZoomLevel()
+	const hitShape = editor.getShapeAtPoint(point, {
+		hitInside: true,
+		margin: 8 / zoom,
+		filter: (shape) => {
+			if (excludeShapeIds?.has(shape.id)) return false
+			if (!isShapeHitTargetable(shape)) return false
+			// 必须有端口才能作为连接目标
+			const ports = getShapePorts(editor, shape)
+			return !!ports && Object.keys(ports).length > 0
+		},
+	})
+	if (!hitShape) return null
+
+	// 在命中的形状上选择离指针最近的端口
+	const cache = shapePagePortsCache.get(editor, hitShape.id) as
+		| { pagePorts: Record<string, VecLike>; portDefs: Record<string, ShapePort> }
+		| undefined
+	if (!cache || !cache.pagePorts) return null
+
+	let bestPortId: string | null = null
+	let bestDistSq = Infinity
+	for (const [portId, pagePos] of Object.entries(cache.pagePorts)) {
+		const dx = point.x - pagePos.x
+		const dy = point.y - pagePos.y
+		const distSq = dx * dx + dy * dy
+		if (distSq < bestDistSq) {
+			bestDistSq = distSq
+			bestPortId = portId
+		}
+	}
+	if (!bestPortId) return null
+
+	const port = cache.portDefs?.[bestPortId]
+	if (!port) return null
+
+	const existingConnections = getShapeConnections(editor, hitShape.id).filter((c) => c.ownPortId === port.id)
+	return { shapeId: hitShape.id, port, precise: false, existingConnections }
 }
 
 /**

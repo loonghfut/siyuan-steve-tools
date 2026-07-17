@@ -13,10 +13,46 @@ import { getMindMapShapePorts } from '../MindMapShape/mind-map-ports'
 export const CONNECTABLE_SHAPE_TYPES: string[] = []
 
 /**
+ * 连接线类形状：自身不能作为连接目标
+ * （否则拖拽端点经过曲线自身时会绑定到自己，几何计算陷入无限递归）
+ */
+const CONNECTOR_SHAPE_TYPES = new Set(['bezier-connector', 'arrow'])
+
+/**
+ * 端口"远距吸附"白名单：只有这些形状会在拖拽时以端口半径参与命中测试。
+ * 与实际渲染端口 overlay 的形状保持一致，避免吸附到不可见端口。
+ * 其他形状仍可通过"指针落在形状内部"的方式连接（见 getConnectionTargetAtPoint）。
+ */
+const PORT_SNAP_SHAPE_TYPES = new Set(['card', 'single-block', 'branch', 'mind-map'])
+
+/**
+ * 形状级命中测试排除类型：连接线自身，以及 frame/slide 这类大容器
+ * （容器内部点击命中会把整个画框当成磁铁，体验极差）
+ */
+const SHAPE_HIT_EXCLUDED_TYPES = new Set(['bezier-connector', 'arrow', 'frame', 'slide'])
+
+/**
+ * 该形状是否以端口半径参与远距吸附
+ */
+export function isPortSnappableShape(shape: TLShape): boolean {
+	return PORT_SNAP_SHAPE_TYPES.has(shape.type)
+}
+
+/**
+ * 该形状是否可作为形状级命中测试目标（指针在形状内部时）
+ */
+export function isShapeHitTargetable(shape: TLShape): boolean {
+	return !SHAPE_HIT_EXCLUDED_TYPES.has(shape.type)
+}
+
+/**
  * 获取形状的端口定义
  * 端口位于形状的左侧（输入）和右侧（输出）
  */
 export function getShapePorts(editor: Editor, shape: TLShape): Record<string, ShapePort> | null {
+	// 连接线类形状不提供端口（防止连接器互连/自连导致的递归）
+	if (CONNECTOR_SHAPE_TYPES.has(shape.type)) return null
+
 	// 思维导图形状：返回每个节点的端口
 	if (shape.type === 'mind-map') {
 		return getMindMapShapePorts(editor, shape as IMindMapShape)
@@ -79,7 +115,7 @@ export function getPortPagePosition(
 /**
  * 检查形状是否支持端口连接
  */
-export function isConnectableShape(_shape: TLShape): boolean {
-	// 所有形状均可被视作支持端口，移除原有基于 shape.type 的限制
-	return true
+export function isConnectableShape(shape: TLShape): boolean {
+	// 除连接线类形状外，所有形状均可被视作支持端口
+	return !CONNECTOR_SHAPE_TYPES.has(shape.type)
 }

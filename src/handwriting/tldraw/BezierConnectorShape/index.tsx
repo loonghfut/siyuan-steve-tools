@@ -12,6 +12,8 @@ export {
 	createOrUpdateConnectorBinding,
 	removeConnectorBinding,
 	getShapeConnections,
+	resolveConnectorBindingPortId,
+	AUTO_PORT_ID,
 } from './bezier-connector-binding'
 export type { ConnectorBinding, ConnectorBindings } from './bezier-connector-binding'
 
@@ -20,13 +22,17 @@ export {
 	getShapePorts,
 	getPortPagePosition,
 	isConnectableShape,
+	isPortSnappableShape,
+	isShapeHitTargetable,
 	CONNECTABLE_SHAPE_TYPES,
 } from './shape-ports'
 
 // 端口工具 - 位置查找
 export {
 	getPortAtPoint,
+	getConnectionTargetAtPoint,
 } from './port-utils'
+export type { ConnectionTarget } from './port-utils'
 
 // 端口状态
 export {

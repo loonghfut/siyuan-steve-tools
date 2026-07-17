@@ -154,12 +154,14 @@ interface MindMapPortProps {
     portId: string
     port: MindMapNodePort
     key?: string
+    /** 光标正悬停在该端口所属节点附近（用于主动发起连接时显示端口） */
+    nodeHovered?: boolean
 }
 
 /**
  * 单个端口组件
  */
-export function MindMapPort({ shapeId, portId, port }: MindMapPortProps) {
+export function MindMapPort({ shapeId, portId, port, nodeHovered = false }: MindMapPortProps) {
     const editor = useEditor()
     
     // 判断是否正在被拖拽连接指向
@@ -214,12 +216,13 @@ export function MindMapPort({ shapeId, portId, port }: MindMapPortProps) {
     const defaultDotColor = theme.black.solid
 
     // zoom-aware：端口圆点大小和触发区域跟随画布缩放动态变化
-    const zoom = editor.getZoomLevel()
+    // 通过 useValue 订阅 zoom，缩放画布时端口尺寸能实时更新
+    const zoom = useValue('zoom', () => editor.getZoomLevel(), [editor])
     const hitSize = Math.max(8, Math.min(28 / zoom, 200))
     const dotSize = Math.max(3, Math.min(8 / zoom, 48))
 
-    // 只在需要时显示端口（不包括父悬浮状态）
-    const shouldShow = isConnected || isEligible || isHinting || isFlashing
+    // 只在需要时显示端口（nodeHovered 让新节点也能主动发起连接）
+    const shouldShow = isConnected || isEligible || isHinting || isFlashing || nodeHovered
 
     return (
         <div
@@ -261,10 +264,57 @@ interface MindMapPortsOverlayProps {
  */
 export function MindMapPortsOverlay({ shapeId, ports }: MindMapPortsOverlayProps) {
     const editor = useEditor()
-    
+
+    // 追踪指针悬停的节点：让该节点的端口显示出来，从而可以主动发起连接
+    const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null)
+    React.useEffect(() => {
+        const container = editor.getContainer()
+        if (!container) return
+        let raf = 0
+        const handlePointerMove = (event: PointerEvent) => {
+            if (raf) return
+            raf = requestAnimationFrame(() => {
+                raf = 0
+                // 仅在 select 工具空闲/悬停时响应，避免拖拽中闪烁
+                const path = editor.getPath()
+                if (path !== 'select.idle' && path !== 'select.hovering' && path !== 'select.pointing_shape') {
+                    setHoveredNodeId(null)
+                    return
+                }
+                const shape = editor.getShape(shapeId)
+                if (!shape) {
+                    setHoveredNodeId(null)
+                    return
+                }
+                const pagePoint = editor.screenToPage({ x: event.clientX, y: event.clientY })
+                const localPoint = editor.getPointInShapeSpace(shape, pagePoint)
+                // 找出距指针最近的节点端口；在阈值内则认为悬停该节点
+                const zoom = editor.getZoomLevel()
+                const threshold = 48 / zoom
+                let best: { nodeId: string; distSq: number } | null = null
+                for (const port of Object.values(ports)) {
+                    const dx = localPoint.x - port.x
+                    const dy = localPoint.y - port.y
+                    const distSq = dx * dx + dy * dy
+                    if (!best || distSq < best.distSq) {
+                        best = { nodeId: port.nodeId, distSq }
+                    }
+                }
+                setHoveredNodeId(best && best.distSq < threshold * threshold ? best.nodeId : null)
+            })
+        }
+        container.addEventListener('pointermove', handlePointerMove, { passive: true })
+        return () => {
+            container.removeEventListener('pointermove', handlePointerMove)
+            if (raf) cancelAnimationFrame(raf)
+        }
+    }, [editor, shapeId, ports])
+
     const visible = useValue('overlay-visible', () => {
         const state = getPortState(editor)
         if (!ports || Object.keys(ports).length === 0) return false
+        // 悬停某个节点附近时显示（发起连接入口）
+        if (hoveredNodeId) return true
         // 如果形状已有连接也显示
         const conns = getShapeConnections(editor, shapeId)
         if (conns.length > 0) return true
@@ -276,12 +326,12 @@ export function MindMapPortsOverlay({ shapeId, ports }: MindMapPortsOverlayProps
             if (!eligible.excludeShapeIds?.has(shapeId)) return true
         }
         return false
-    }, [editor, shapeId, ports])
-    
+    }, [editor, shapeId, ports, hoveredNodeId])
+
     if (!visible) return null
-    
+
     return (
-        <div 
+        <div
             className="mind-map-ports-overlay"
             style={{
                 position: 'absolute',
@@ -298,6 +348,7 @@ export function MindMapPortsOverlay({ shapeId, ports }: MindMapPortsOverlayProps
                     shapeId={shapeId}
                     portId={portId}
                     port={port}
+                    nodeHovered={hoveredNodeId === port.nodeId}
                 />
             ))}
         </div>

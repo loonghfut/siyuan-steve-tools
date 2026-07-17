@@ -19,10 +19,19 @@
    - 左侧端口：输入端口（用作连接的终点）
    - 右侧端口：输出端口（用作连接的起点）
 3. 点击并拖拽一个端口
-4. 将线拖拽到另一个形状的端口上
+4. 将线拖到目标形状上：
+   - **拖到形状任意位置**即可连接（自动选择最合适的一侧，之后随形状相对位置自动换边）
+   - **精确拖到某个端口**则锁定该端口
 5. 松开鼠标完成连接
 
 > 端口在形状上出现前的悬停延时可在画板设置中调整，默认值为 300ms。
+> 同一对形状之间已有连接时，再次拖拽连接会被跳过并提示。
+
+### 自动端口（auto）
+
+绑定的 `portId` 可以为 `'auto'`：渲染时按两个形状的相对位置动态解析为
+`input / output / top / bottom`，移动形状时连线自动从合理的一侧进出。
+拖到形状本体（非精确端口）产生的绑定、以及"连接模式"批量连线默认使用 auto。
 
 ### 编辑连接
 
@@ -101,10 +110,11 @@ getShapeConnections(editor, shapeId) => Array<{connectionId, ownPortId, terminal
 
 ## 扩展支持
 
-如需为其他形状添加端口支持，修改 `port-utils.tsx` 中的 `CONNECTABLE_SHAPE_TYPES` 数组：
+端口相关的形状类型控制集中在 `shape-ports.tsx`：
 
-```typescript
-const CONNECTABLE_SHAPE_TYPES = ['card', 'single-block', 'your-shape-type']
-```
+- `PORT_SNAP_SHAPE_TYPES`：会渲染端口 overlay、参与"远距端口吸附"的形状
+- `SHAPE_HIT_EXCLUDED_TYPES`：不作为形状级命中目标的类型（连接线、frame 等）
+- `CONNECTOR_SHAPE_TYPES`：连接线类形状，自身不提供端口（防递归）
 
+如需为其他形状添加端口支持，将其加入 `PORT_SNAP_SHAPE_TYPES`，
 并确保该形状的 `ShapeUtil` 返回包含 `bounds` 的几何形状。
