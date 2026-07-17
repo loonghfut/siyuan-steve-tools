@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.49.0 (2026年07月17日)
+### v0.49.1 (2026年07月17日)
 - fix(tldraw-agent): 移除不必要的类型断言，直接访问 plugin.addAgentAction (loonghfut)
 - feat(tldraw-agent): tldraw_open_whiteboard 支持创建新白板，自动生成关联 SiYuan 文档 (loonghfut)
 - feat(agent): 建立 tools 架构替代原有 actions，引入 SiYuan 适配器层与集中式元数据管理 (loonghfut)
@@ -107,6 +107,10 @@ win端s3同步后，docker端感知s3同步。
 - feat(search): 新增搜索面板，支持文本搜索与快速操作集成 (loonghfut)
 - feat(sync-tldraw): 新增同步到 tldraw 的脚本及 npm 命令 (loonghfut)
 - chore(plugin): 升级插件版本号至 0.49.0 (loonghfut)
+- docs: 更新 v0.49.0 版本的更新日志 (loonghfut)
+- feat(BezierConnectorShape): 支持自动端口与形状级连接吸附 (loonghfut)
+- fix(BezierConnectorShape): 修复拖拽端点不跟手与 branch 误吸附问题 (loonghfut)
+- chore(plugin): 升级插件版本号至 0.49.1 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
