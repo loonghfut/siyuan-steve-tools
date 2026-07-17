@@ -17,3 +17,4 @@ tldraw-main
 ui-ux-pro-max
 .codex
 AGENTS.md
+scripts/sync-to-tldraw.mjs

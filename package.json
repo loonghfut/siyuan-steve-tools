@@ -21,7 +21,9 @@
     "update-changelog": "node --no-warnings ./scripts/update_changelog.js",
     "r": "bash ./my/release.sh",
     "clean-stats": "node --no-warnings ./scripts/handle_private_stats.js --cleanup",
-    "create-module": "node --no-warnings ./scripts/create_module.js"
+    "create-module": "node --no-warnings ./scripts/create_module.js",
+    "sync-tldraw": "node --no-warnings ./scripts/sync-to-tldraw.mjs",
+    "sync-tldraw:dry": "node --no-warnings ./scripts/sync-to-tldraw.mjs --dry-run"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.0",
