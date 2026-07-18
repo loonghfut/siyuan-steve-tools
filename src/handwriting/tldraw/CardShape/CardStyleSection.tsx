@@ -17,6 +17,7 @@ const COLLAPSED_TEXT_HORIZONTAL_PADDING = 28
 const COLLAPSED_TEXT_VERTICAL_PADDING = 20
 const COLLAPSED_ICON_SIZE_RATIO = 0.85
 const COLLAPSED_TEXT_GAP = 10
+const CARD_AUTO_SHRINK_MIN_HEIGHT = 25
 
 type CardCollapsedTextSizeUpdate = {
     id: ICardShape['id']
@@ -111,6 +112,35 @@ function getBestCollapsedTextSize(shape: ICardShape, measureRoot: HTMLElement): 
     return best
 }
 
+function getShrunkCardHeight(shape: ICardShape): number | null {
+    const host = getShapeHostElement(shape.id as string)
+    const container = host?.querySelector<HTMLElement>('[blockid]') || null
+    const source = container?.querySelector<HTMLElement>('.protyle-wysiwyg') || null
+    if (!container || !source || source.childElementCount === 0 || container.clientWidth <= 0) return null
+
+    const clone = source.cloneNode(true) as HTMLElement
+    clone.style.position = 'fixed'
+    clone.style.left = '-10000px'
+    clone.style.top = '0'
+    clone.style.visibility = 'hidden'
+    clone.style.pointerEvents = 'none'
+    clone.style.width = `${container.clientWidth}px`
+    clone.style.height = 'auto'
+    clone.style.minHeight = '0'
+    clone.style.maxHeight = 'none'
+    clone.style.overflow = 'visible'
+    clone.style.boxSizing = 'border-box'
+    document.body.appendChild(clone)
+
+    try {
+        const contentHeight = Math.ceil(clone.getBoundingClientRect().height)
+        const cardChromeHeight = Math.max(0, shape.props.h - container.clientHeight)
+        return Math.max(CARD_AUTO_SHRINK_MIN_HEIGHT, contentHeight + cardChromeHeight)
+    } finally {
+        clone.remove()
+    }
+}
+
 export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
     editor,
     selectedCardShapes,
@@ -163,6 +193,9 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
 
     const collapsedNormalCardShapes = React.useMemo(() => {
         return selectedCardShapes.filter((shape) => !shape.props.isMain && shape.props.isCollapsed)
+    }, [selectedCardShapes])
+    const expandedCardShapes = React.useMemo(() => {
+        return selectedCardShapes.filter((shape) => !shape.props.isCollapsed)
     }, [selectedCardShapes])
 
     React.useEffect(() => {
@@ -273,6 +306,25 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
         })
     }, [collapsedNormalCardShapes, editor])
 
+    const handleShrinkToContentHeight = React.useCallback(() => {
+        const updates: CardCollapsedTextSizeUpdate[] = []
+
+        for (const shape of expandedCardShapes) {
+            const nextHeight = getShrunkCardHeight(shape)
+            if (nextHeight === null || nextHeight >= shape.props.h - 1) continue
+            updates.push({
+                id: shape.id,
+                type: 'card',
+                props: { ...shape.props, h: nextHeight },
+            })
+        }
+
+        if (!updates.length) return
+        editor.run(() => {
+            editor.updateShapes(updates)
+        })
+    }, [editor, expandedCardShapes])
+
     if (!hasCardSelection) return null
 
     return (
@@ -300,6 +352,15 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                         }}
                     >
                         <TldrawUiIcon label="" icon={collapsedState === true ? 'card-expand' : 'card-collapse'} />
+                    </TldrawUiButton>
+                    <TldrawUiButton
+                        type="normal"
+                        className="tlui-toggle-button"
+                        disabled={!expandedCardShapes.length}
+                        onClick={handleShrinkToContentHeight}
+                        title="收缩至内容高度"
+                    >
+                        <TldrawUiIcon label="" icon="fit-width" />
                     </TldrawUiButton>
                 </div>
             </div>
