@@ -35,6 +35,7 @@ import {
 } from '../../CardShape/create-card-center-branch'
 import { createSingleBlockForBranch, getBranchRootParent } from '../../BranchShape'
 import type { ISingleBlockShape } from '../../SingleBlockShape/single-block-shape-types'
+import { ConnectorExtensionMenu } from '../../BezierConnectorShape/ConnectorExtensionMenu'
 
 export const InFrontOfCanvas: React.FC = () => {
     const editor = useEditor()
@@ -281,6 +282,7 @@ export const InFrontOfCanvas: React.FC = () => {
         <>
             <MermaidPasteHandler />
             <SlideFocusOverlay />
+            <ConnectorExtensionMenu />
 
             {/* 素材库面板 */}
             <ShapeLibraryPanel

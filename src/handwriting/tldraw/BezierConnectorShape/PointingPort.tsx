@@ -12,6 +12,7 @@ import {
 import { getConnectionTargetAtPoint } from './port-utils'
 import { getShapePorts } from './shape-ports'
 import { setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
+import { clearConnectorCreationMark, setConnectorCreationMark } from './connector-creation-state'
 
 /**
  * 端口拖拽信息
@@ -127,6 +128,7 @@ export class PointingPort extends StateNode {
 				strokeStyle: 'solid',
 			},
 		})
+		setConnectorCreationMark(this.editor, connectionShapeId, creatingMarkId)
 
 		// 绑定一端到起始端口
 		createOrUpdateConnectorBinding(this.editor, connectionShapeId, this.info.shapeId, {
@@ -146,8 +148,6 @@ export class PointingPort extends StateNode {
 					target: 'handle',
 					shape: connectionShape,
 					handle: handle!,
-					creatingMarkId,
-					isCreating: true,
 				})
 				return
 			}
@@ -155,6 +155,7 @@ export class PointingPort extends StateNode {
 
 		// 找不到手柄：回滚已创建的孤儿连接，避免留下一条死线
 		console.warn('[PointingPort] handle not found, bailing out of connection creation')
+		clearConnectorCreationMark(this.editor, connectionShapeId)
 		this.editor.bailToMark(creatingMarkId)
 		this.parent.transition('idle')
 	}

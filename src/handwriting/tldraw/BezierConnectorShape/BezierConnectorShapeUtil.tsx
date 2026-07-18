@@ -40,6 +40,8 @@ import {
 import { getConnectionTargetAtPoint } from './port-utils'
 import { getPortState, setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
 import { getDefaultColorTheme } from '../utils/color-theme'
+import { openConnectorExtensionMenu } from './connector-extension-menu-state'
+import { clearConnectorCreationMark, takeConnectorCreationMark } from './connector-creation-state'
 
 // 常量定义（参考 tldraw 的 default-shape-constants）
 const ARROW_LABEL_FONT_SIZES: Record<string, number> = {
@@ -876,11 +878,23 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		_info: TLHandleDragInfo<IBezierConnectorShape>
 	): void {
 		const pending = pendingBindingTargets.get(connector.id)
+		const creatingMarkId = takeConnectorCreationMark(this.editor, connector.id)
+		const releasedPoint = pending?.kind === 'remove'
+			? this.editor.getShapePageTransform(connector).applyToPoint(connector.props[pending.terminal])
+			: null
 		this.cleanupHandleDragState(connector.id)
 		if (!pending) return
 
 		if (pending.kind === 'remove') {
 			removeConnectorBinding(this.editor, connector.id, pending.terminal)
+			if (creatingMarkId && releasedPoint) {
+				openConnectorExtensionMenu(this.editor, {
+					connectorId: connector.id,
+					terminal: pending.terminal,
+					pagePoint: releasedPoint,
+					creatingMarkId,
+				})
+			}
 		} else {
 			// 查重：同一对形状之间若已有其他连接线，则不重复创建绑定
 			const oppositeTerminal: PortTerminal = pending.terminal === 'start' ? 'end' : 'start'
@@ -920,6 +934,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	private cleanupHandleDragState(connectorId: TLShapeId): void {
 		pendingBindingTargets.delete(connectorId)
 		handleLastDragKey.delete(connectorId)
+		clearConnectorCreationMark(this.editor, connectorId)
 		// 清理 hinting，并清除 connector highlight
 		setHintingPortIfChanged(this.editor, null)
 		setHighlightConnectorIfChanged(this.editor, null)
