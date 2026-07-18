@@ -27,6 +27,8 @@ const CUSTOM_ICONS: Record<string, string> = {
     'connector-flow': 'connector-flow.svg',
     'quick-card': 'quick-card.svg',
     'quick-single-block': 'quick-single-block.svg',
+    'tool-card': 'tool-card.svg',
+    'tool-single-block': 'tool-single-block.svg',
     'jump-start': 'jump-start.svg',
     'jump-end': 'jump-end.svg',
     'card-collapse': 'card-collapse.svg',

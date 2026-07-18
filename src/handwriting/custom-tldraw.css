@@ -981,17 +981,18 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--tl-color-low-border, var(--b3-border-color));
+  border: 1px solid var(--b3-border-color);
   border-radius: 6px;
-  background: var(--tl-color-panel, var(--b3-theme-surface));
+  background: var(--b3-theme-surface);
   box-shadow: var(--tl-shadow-2, 0 4px 12px rgba(0, 0, 0, 0.16));
   pointer-events: all;
   z-index: 1001;
 }
 
 .bezier-connector-extension-menu button {
-  height: 28px;
-  padding: 0 9px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -999,15 +1000,20 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bezier-connector-extension-menu button .tlui-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .bezier-connector-extension-menu button:hover {
   background: var(--tl-color-muted-2, var(--b3-list-hover));
 }
 
-.bezier-connector-extension-menu .bezier-connector-extension-menu__cancel {
-  color: var(--tl-color-text-3, var(--b3-theme-on-surface-light));
-}
 
 /* 输入端口（左侧）：居中于形状左边缘 */
 .bezier-connector-port--input {

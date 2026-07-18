@@ -16,7 +16,7 @@ export const uiOverrides: TLUiOverrides = {
         // Create a tool item in the ui's context.
         tools.card = {
             id: 'card',
-            icon: 'color',
+            icon: 'tool-card',
             label: 'Card',
             kbd: 'c',
             onSelect: () => {
@@ -30,7 +30,7 @@ export const uiOverrides: TLUiOverrides = {
         }
         tools['single-block'] = {
             id: 'single-block',
-            icon: 'iconParagraph',
+            icon: 'tool-single-block',
             label: 'Single Block',
             kbd: 'b',
             onSelect: () => {

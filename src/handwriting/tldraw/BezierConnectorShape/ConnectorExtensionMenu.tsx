@@ -1,5 +1,5 @@
 import React from 'react'
-import { Editor, useEditor, useValue } from '@tldraw/tldraw'
+import { Editor, TldrawUiIcon, useEditor, useValue } from '@tldraw/tldraw'
 import { createAndBindShape } from './createAndBindShape'
 import type { NewShapeType } from './createAndBindShape'
 import {
@@ -84,20 +84,17 @@ export function ConnectorExtensionMenu() {
 		<div
 			ref={menuRef}
 			className="bezier-connector-extension-menu"
-			style={{ transform: `translate(${position.x}px, ${position.y + 12}px)` }}
+			style={{ transform: `translate(${position.x}px, ${position.y + 12}px) translate(-50%, -50%)` }}
 			onPointerDown={(event) => {
 				event.preventDefault()
 				event.stopPropagation()
 			}}
 		>
-			<button type="button" onPointerDown={handlePointerDown} onClick={() => create('card')}>
-				卡片
+			<button type="button" onPointerDown={handlePointerDown} onClick={() => create('card')} title="创建并连接卡片" aria-label="创建并连接卡片">
+				<TldrawUiIcon label="" icon="quick-card" />
 			</button>
-			<button type="button" onPointerDown={handlePointerDown} onClick={() => create('single-block')}>
-				块
-			</button>
-			<button type="button" className="bezier-connector-extension-menu__cancel" onPointerDown={handlePointerDown} onClick={cancel}>
-				取消
+			<button type="button" onPointerDown={handlePointerDown} onClick={() => create('single-block')} title="创建并连接块" aria-label="创建并连接块">
+				<TldrawUiIcon label="" icon="quick-single-block" />
 			</button>
 		</div>
 	)
