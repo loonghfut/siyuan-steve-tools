@@ -49,12 +49,13 @@
   } */
 
   .protyle-toolbar {
-    top: auto !important;
+    /* top: auto !important;
     bottom: 0 !important;
     left: 0 !important;
     max-width: 100% !important;
     overflow-x: auto !important;
-    white-space: nowrap !important;
+    white-space: nowrap !important; */
+    display: none;
   }
 
   .protyle-title {
