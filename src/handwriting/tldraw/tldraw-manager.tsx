@@ -598,7 +598,16 @@ export class TldrawManager {
                             this.dropHandled = now;
 
                             // 解析拖拽数据
-                            const blockIdo_rigin = e.dataTransfer!.types[0];
+                            const dragTypes = Array.from(e.dataTransfer?.types || []);
+                            const blockIdo_rigin = dragTypes[0] || '';
+                            const siyuanDragTypes = dragTypes.filter((type) =>
+                                type.toLowerCase().startsWith('application/siyuan')
+                            );
+                            const siyuanDragType = siyuanDragTypes.find((type) =>
+                                /nodeheading|nodeblockquote|paragraph|siyuan-file/i.test(type)
+                            ) || siyuanDragTypes[0] || blockIdo_rigin;
+                            const dragTypeLower = siyuanDragType.toLowerCase();
+                            const isBlockquote = dragTypeLower.includes('nodeblockquote');
                             console.debug('拖拽的数据类型', e);
                             console.debug('拖拽的数据类型', blockIdo_rigin);
                             // 使用正则表达式提取块ID
@@ -628,14 +637,16 @@ export class TldrawManager {
                                     console.error('解析子文档拖放数据失败:', err);
                                     return;
                                 }
-                            } else if (blockIdo_rigin.startsWith('application/siyuan')) {
-                                const matches = blockIdo_rigin.match(/(\d{14}-\w{7})/g);
+                            } else if (siyuanDragType.toLowerCase().startsWith('application/siyuan')) {
+                                const matches = dragTypes
+                                    .filter((type) => type.toLowerCase().startsWith('application/siyuan'))
+                                    .flatMap((type) => type.match(/(\d{14}-\w{7})/g) || []);
                                 if (matches && matches.length > 0) {
                                     blockId = matches[0]; // 获取第一个匹配的块ID
                                     console.debug('从数据类型中提取的块ID', blockId);
                                 }
                             }
-                            if (blockIdo_rigin.startsWith('application/siyuan-file') && (window as any).__st_dragNodeId) {
+                            if (dragTypeLower.startsWith('application/siyuan-file') && (window as any).__st_dragNodeId) {
                                 blockId = (window as any).__st_dragNodeId;
                             }
                             if (!blockId) {
@@ -660,25 +671,25 @@ export class TldrawManager {
                             // Use class-level helper to create updated content with link to avoid adding link inside IAL/attribute block
                             // const appendLinkToKramdown = this.appendLinkToKramdown.bind(this);
                             // console.debug("拖拽块的内容", content);
-                            if (blockIdo_rigin.includes('nodeheading')) {
+                            if (dragTypeLower.includes('nodeheading') || isBlockquote) {
                                 aproblock = blockId;
                                 const link = buildTldrawLink(this.id, aproblock);
                                 // 将链接保存到块的自定义属性中
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
-                            } else if (blockIdo_rigin.includes('paragraph')) {
+                            } else if (dragTypeLower.includes('paragraph')) {
                                 aproblock = blockId;
                                 // 将链接保存到块的自定义属性中
                                 const link = buildTldrawLink(this.id, aproblock);
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw-single':"1"})
-                            } else if (blockIdo_rigin.startsWith('application/siyuan-file')) {
+                            } else if (dragTypeLower.startsWith('application/siyuan-file')) {
                                 aproblock = blockId;
                                 await api.prependBlock("markdown", `((${blockId} '${(window as any).__st_dragName || ''}'))`, this.id)
-                            } else if (blockIdo_rigin.startsWith('application/doc-outline-block')) {
+                            } else if (blockIdo_rigin.toLowerCase().startsWith('application/doc-outline-block')) {
                                 aproblock = blockId;
                                 console.debug("拖拽的是文档大纲块");
                                 const link = buildTldrawLink(this.id, aproblock);
                                 await api.setBlockAttrs(aproblock, { 'custom-tldraw-link': link ,'custom-st-tldraw':"1"})
-                            } else if(blockIdo_rigin.startsWith('application/child-doc')) {
+                            } else if (blockIdo_rigin.toLowerCase().startsWith('application/child-doc')) {
                                 aproblock = blockId;
                                 console.debug("拖拽的是子文档块");
                                 await api.prependBlock("markdown", `((${blockId} '${docname}'))`, this.id)
@@ -690,7 +701,7 @@ export class TldrawManager {
                             }
                             // 创建新的Card形状
                             // console.debug("创建新的卡片形状",  aproblock[0].doOperations[0].id);
-                            if (blockIdo_rigin.startsWith('application/siyuan-file')||blockIdo_rigin.includes('application/child-doc')) {
+                            if (dragTypeLower.startsWith('application/siyuan-file') || dragTypeLower.includes('application/child-doc')) {
                                 editor.createShape({
                                     type: 'card',
                                     x: x, // 默认宽度的一半，使形状中心在鼠标位置
@@ -705,7 +716,7 @@ export class TldrawManager {
                                         isCollapsed: true, // 拖拽进来默认为折叠状态
                                     },
                                 });
-                            } else if (blockIdo_rigin.includes('paragraph')) {
+                            } else if (dragTypeLower.includes('paragraph')) {
                                 editor.createShape({
                                     type: 'single-block',
                                     x: x, // 默认宽度的一半，使形状中心在鼠标位置

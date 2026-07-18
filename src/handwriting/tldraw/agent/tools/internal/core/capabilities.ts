@@ -102,12 +102,12 @@
         customShapeGuide: [
             {
                 type: 'card',
-                purpose: 'A large SiYuan document or heading card for article sections, overview documents, or rich linked content.',
+                purpose: 'A large SiYuan document, heading, or blockquote card for article sections, overview documents, or rich linked content.',
                 createWith: 'tldraw_shape_command intent createShapes with node kind "card".',
                 notes: [
-                    'Use blockId to reference an existing document/heading block, or contentMarkdown/title/text to create a new heading block.',
+                    'Use blockId to reference an existing document, heading, or blockquote block, or contentMarkdown/title/text to create a new heading block.',
                     'Content belongs to the bound SiYuan block; after explicit user confirmation, use tldraw_shape_command updateShape with contentMarkdown and confirmContentUpdate:true to replace card content. The tool refreshes the card and fixes generated heading levels automatically.',
-                    'When blockId points to a document block the card defaults to isMain:true; when it points to a heading block the card defaults to isMain:false. Explicit isMain overrides this.',
+                    'When blockId points to a document block the card defaults to isMain:true; heading and blockquote blocks default to isMain:false. Explicit isMain overrides this.',
                 ],
             },
             {

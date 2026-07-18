@@ -3302,7 +3302,7 @@ async function inferAgentCardIsMainFromBlock(blockId: string): Promise<boolean |
     const block = await api.getBlockByID(blockId).catch(() => null);
     const type = String((block as any)?.type || '');
     if (type === 'd') return true;
-    if (type === 'h') return false;
+    if (type === 'h' || type === 'b') return false;
     return undefined;
 }
 
@@ -3455,8 +3455,8 @@ async function updateAgentCardLinkedBlockContent(
     if (!block) throw new Error(`card linked block not found: ${blockId}`);
 
     const blockType = String((block as any).type || '');
-    if (blockType !== 'd' && blockType !== 'h') {
-        throw new Error(`card linked block must be a document or heading block; got type "${blockType || 'unknown'}"`);
+    if (blockType !== 'd' && blockType !== 'h' && blockType !== 'b') {
+        throw new Error(`card linked block must be a document, heading, or blockquote block; got type "${blockType || 'unknown'}"`);
     }
 
     if (blockType === 'h') {
@@ -3878,8 +3878,8 @@ async function validateAgentLinkedBlockId(blockId: string | undefined, kind: 'ca
 
     const type = String((block as any).type || '');
     if (kind === 'card') {
-        if (type === 'd' || type === 'h') return;
-        throw new Error(`card blockId must point to a document or heading block; got type "${type || 'unknown'}"`);
+        if (type === 'd' || type === 'h' || type === 'b') return;
+        throw new Error(`card blockId must point to a document, heading, or blockquote block; got type "${type || 'unknown'}"`);
     }
     if (type !== 'p') {
         throw new Error(`single-block blockId must point to a paragraph block; got type "${type || 'unknown'}"`);
