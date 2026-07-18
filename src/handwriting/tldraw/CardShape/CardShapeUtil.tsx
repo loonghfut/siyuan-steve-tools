@@ -46,6 +46,28 @@ const INITIAL_NODE_LIMIT = 80;
 const INITIAL_TEXT_LIMIT = 8000;
 const SIYUAN_BLOCK_ID_RE = /\b\d{14}-[0-9a-z]{7}\b/i
 const STEVE_TOOLS_PLUGIN_URL_RE = /^(?:https:\/\/|siyuan:\/\/)plugins\/siyuan-steve-tools\//i
+type DefaultCardBlockType = 'heading' | 'blockquote'
+
+function getDefaultCardBlockType(): DefaultCardBlockType {
+	return settingdata['tldraw-card-default-block-type'] === 'blockquote' ? 'blockquote' : 'heading'
+}
+
+function buildDefaultCardBlockMarkdown(
+	blockType: DefaultCardBlockType,
+	title: string,
+	blockId: string,
+	link: string,
+) {
+	const firstLine = blockType === 'blockquote' ? `> ` : `###### ${title}`
+	return (
+		firstLine +
+		'\n' +
+		'{: id="' + blockId + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
+		'\n\n' +
+		'{: custom-st-tldraw-none="1" }' +
+		'\n'
+	)
+}
 
 function decodeLinkTarget(value: string) {
 	return value
@@ -951,25 +973,18 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (cancelled) return null;
 					} else if (!currentBlockId) {
 						const creationPromise = (async () => {
-							const customTitleTemplate = String(settingdata["tldraw-custom-card-title"] || "${timestamp}");
-							const timestamp = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-							const initialTitle = customTitleTemplate
-								? customTitleTemplate.replace(/\$\{timestamp\}/g, () => timestamp)
-								: timestamp;
 							const idid = await api.generateSiyuanID() as string;
 							const link = buildTldrawLink(tldrawId, idid);
-							// 先创建一个可用的默认标题块，用户输入在创建完成后再更新标题。
-							const content =
-								'###### ' + initialTitle +
-								'\n' +
-								'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
-								'\n\n' +
-								'{: custom-st-tldraw-none="1" }' +
-								'\n';
+							const defaultBlockType = getDefaultCardBlockType();
+							const initialTitle = defaultBlockType === 'heading'
+								? String(settingdata["tldraw-custom-card-title"] || "${timestamp}")
+									.replace(/\$\{timestamp\}/g, () => new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }))
+								: '';
+							const content = buildDefaultCardBlockMarkdown(defaultBlockType, initialTitle, idid, link)
 							const redata = await api.appendBlock("markdown", content, tldrawId!);
 							const newBlockId = redata[0].doOperations[0].id as string;
 
-							if (isEditingState && !shape.props.blockId && !containerRef.current?.getAttribute('blockid') && settingdata["tldraw-prompt-card-title"] && !userTitlePromptedRef.current) {
+							if (defaultBlockType === 'heading' && isEditingState && !shape.props.blockId && !containerRef.current?.getAttribute('blockid') && settingdata["tldraw-prompt-card-title"] && !userTitlePromptedRef.current) {
 								userTitlePromptedRef.current = true;
 								try {
 									const input = await inputDialogSync({
@@ -981,16 +996,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									const userTitle = input?.replace(/[\r\n]+/g, ' ').trim() || '';
 									if (userTitle) {
 										// updateBlock 会整体替换块内容，因此必须重新附带 Card 的 IAL。
-										await api.updateBlock(
-											'markdown',
-											'###### ' + userTitle +
-											'\n' +
-											'{: id="' + idid + '" custom-st-tldraw="1" custom-tldraw-link="' + link + '" }' +
-											'\n\n' +
-											'{: custom-st-tldraw-none="1" }' +
-											'\n',
-											newBlockId,
-										);
+										await api.updateBlock('markdown', buildDefaultCardBlockMarkdown(defaultBlockType, userTitle, idid, link), newBlockId);
 									}
 								} catch (err) {
 									// 标题更新失败不应影响已创建块与 Card 的绑定。
