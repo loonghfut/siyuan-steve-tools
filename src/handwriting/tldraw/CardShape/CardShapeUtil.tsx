@@ -268,7 +268,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const [isEditingState, setIsEditingState] = useState(isEditing);
 		const [isInViewport, setIsInViewport] = useState(true);
 		const [canLoad, setCanLoad] = useState(true); // gating heavy render by global manager
-		const [isHovered, setIsHovered] = useState(false);
 		const [hasMissingLinkedBlock, setHasMissingLinkedBlock] = useState(false);
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false;
 		const tldrawHeaderImage = settingdata['tldraw-header-image'] !== false;
@@ -1493,8 +1492,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		return (
 			<HTMLContainer
-				onMouseEnter={() => setIsHovered(true)}
-				onMouseLeave={() => setIsHovered(false)}
 				style={{
 					display: 'flex',
 					flexDirection: 'column',
@@ -1802,7 +1799,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					</div>
 				)}
 				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
-				<PortsOverlay shapeId={shape.id} parentHovered={isHovered} />
+				<PortsOverlay shapeId={shape.id} />
 			</HTMLContainer >
 		)
 	}

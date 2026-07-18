@@ -2,30 +2,21 @@ import React, { useEffect, useState, useRef, memo } from 'react'
 import { TLShapeId, useEditor, useValue } from '@tldraw/tldraw'
 import { getPortState } from './port-state'
 import { getShapePorts } from './shape-ports'
-import { getShapeConnections } from './bezier-connector-binding'
 import { settingdata } from '@/index'
 import { getDefaultColorTheme } from '../utils/color-theme'
-
-const DEFAULT_PORT_HOVER_DELAY_MS = 300
-
-function getPortHoverDelayMs(): number {
-	const raw = Number(settingdata['tldraw-port-hover-delay'])
-	if (!Number.isFinite(raw)) return DEFAULT_PORT_HOVER_DELAY_MS
-	return Math.max(0, raw)
-}
 
 interface PortProps {
 	shapeId: TLShapeId
 	portId: string
 	key?: string
-	parentHovered?: boolean
+	isSelected?: boolean
 }
 
 /**
  * 端口组件 - 用于在形状上显示可连接的端口
  * React.memo 避免父组件重渲染时不必要的子组件更新（内部通过 useValue 自行订阅状态）
  */
-export const Port = memo(function Port({ shapeId, portId, parentHovered = false }: PortProps) {
+export const Port = memo(function Port({ shapeId, portId, isSelected = false }: PortProps) {
 	const editor = useEditor()
 
 	// 一次性读取端口定义与形状几何信息，减少 useValue 订阅数量
@@ -53,12 +44,11 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 		[editor, shapeId, portId]
 	)
 
-	// 合并端口状态查询：一次 useValue 读取 hinting/eligible/flash/isConnected
+	// 合并端口状态查询，连接命中与反馈状态始终优先于选中态样式
 	const portState = useValue(
 		'portState',
 		() => {
 			const state = getPortState(editor)
-			const conns = getShapeConnections(editor, shapeId)
 			return {
 				isHinting: state.hintingPort?.portId === portId && state.hintingPort?.shapeId === shapeId,
 				isEligible: (() => {
@@ -69,7 +59,6 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 					return true
 				})(),
 				isFlashing: state.flashPort?.shapeId === shapeId && state.flashPort?.portId === portId,
-				isConnected: conns.some((c) => c.ownPortId === portId),
 			}
 		},
 		[editor, shapeId, portId, portData?.port]
@@ -77,14 +66,14 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 
 	// 注意：所有 hooks 必须在任何提前 return 之前调用（React Hooks 规则），
 	// 否则形状被删除导致 portData 变 null 的那一帧会因 hooks 数量变化而崩溃
-	const { isHinting, isEligible, isFlashing, isConnected } = portState
-	const isInteractive = isConnected || parentHovered || isEligible || isHinting || isFlashing
+	const { isHinting, isEligible, isFlashing } = portState
+	const isInteractive = isSelected || isEligible || isHinting || isFlashing
 
-	// 入场动画：parentHovered 触发端口首次可见时短暂缩放，配合 CSS transition 实现弹性入场
+	// 入场动画：选中形状后端口短暂缩放，配合 CSS transition 实现轻量反馈
 	const isFirstInteractive = useRef(false)
 	const [entering, setEntering] = useState(false)
 	useEffect(() => {
-		if (isInteractive && !isConnected && !isHinting && !isEligible && !isFlashing) {
+		if (isInteractive && !isHinting && !isEligible && !isFlashing) {
 			if (!isFirstInteractive.current) {
 				isFirstInteractive.current = true
 				setEntering(true)
@@ -95,7 +84,7 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 			isFirstInteractive.current = false
 			setEntering(false)
 		}
-	}, [isInteractive, isConnected, isHinting, isEligible, isFlashing])
+	}, [isInteractive, isHinting, isEligible, isFlashing])
 
 	if (!portData) return null
 
@@ -117,7 +106,7 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 
 	return (
 		<div
-			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${isHinting ? ' bezier-connector-port--hinting' : ''
+			className={`bezier-connector-port bezier-connector-port--${isInput ? 'input' : 'output'}${isSelected ? ' bezier-connector-port--selected' : ''}${isHinting ? ' bezier-connector-port--hinting' : ''
 				}${isEligible ? ' bezier-connector-port--eligible' : ''}${isFlashing ? ' bezier-connector-port--flash' : ''}`}
 			style={{
 				position: 'absolute',
@@ -125,8 +114,6 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 				top,
 				transform: `translate(-50%, -50%) translateX(${extraOffsetX}px) translateY(${extraOffsetY}px) scale(${displayScale})`,
 				pointerEvents: isInteractive ? 'all' : 'none',
-				opacity: isInteractive ? 1 : 0,
-				transition: 'opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
 				backgroundColor: isHinting || isEligible ? undefined : defaultDotColor,
 				'--port-hit-size': `${hitSize}px`,
 				'--port-dot-size': `${dotSize}px`,
@@ -148,16 +135,14 @@ export const Port = memo(function Port({ shapeId, portId, parentHovered = false 
 /**
  * 端口容器组件 - 在形状上显示输入和输出端口
  */
-export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLShapeId; parentHovered?: boolean }) {
+export function PortsOverlay({ shapeId }: { shapeId: TLShapeId }) {
 	const editor = useEditor()
 
-	// 当形状已被选中时，不再因悬停触发端口显示（此时浮动操作按钮栏已展示）
 	const isSelected = useValue(
 		'is-shape-selected',
 		() => editor.getSelectedShapeIds().includes(shapeId),
 		[editor, shapeId]
 	)
-	const effectiveParentHovered = parentHovered && !isSelected
 
 	const ports = useValue(
 		'ports',
@@ -169,46 +154,6 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 		[editor, shapeId]
 	)
 
-	// 延时显示：当 parentHovered 为 true 时，短暂延迟后显示端口（防止快速划过时闪烁）
-	const [hoveredVisible, setHoveredVisible] = useState(false)
-	const hoverTimerRef = useRef<number | null>(null)
-
-	useEffect(() => {
-		return () => {
-			if (hoverTimerRef.current) {
-				clearTimeout(hoverTimerRef.current)
-				hoverTimerRef.current = null
-			}
-		}
-	}, [])
-
-	useEffect(() => {
-		// 如果工具为 hand，确保不显示
-		if (editor.getCurrentToolId() === 'hand') {
-			setHoveredVisible(false)
-			if (hoverTimerRef.current) {
-				clearTimeout(hoverTimerRef.current)
-				hoverTimerRef.current = null
-			}
-			return
-		}
-
-		if (effectiveParentHovered) {
-			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
-			const hoverDelayMs = getPortHoverDelayMs()
-			hoverTimerRef.current = window.setTimeout(() => {
-				hoverTimerRef.current = null
-				setHoveredVisible(true)
-			}, hoverDelayMs)
-		} else {
-			if (hoverTimerRef.current) {
-				clearTimeout(hoverTimerRef.current)
-				hoverTimerRef.current = null
-			}
-			setHoveredVisible(false)
-		}
-	}, [effectiveParentHovered, editor])
-
 	const visible = useValue('overlay-visible', () => {
 		// 当工具为 hand 时，隐藏端口
 		const currentToolId = editor.getCurrentToolId()
@@ -216,8 +161,7 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 
 		const state = getPortState(editor)
 		if (!ports) return false
-		// 只有在 hoveredVisible 为 true 或满足其他即时条件时才显示
-		if (hoveredVisible) return true
+		if (isSelected) return true
 		if (state.hintingPort?.shapeId === shapeId) return true
 		if (state.flashPort?.shapeId === shapeId) return true
 		const eligible = state.eligiblePorts
@@ -226,14 +170,14 @@ export function PortsOverlay({ shapeId, parentHovered = false }: { shapeId: TLSh
 			if (!eligible.excludeShapeIds?.has(shapeId)) return true
 		}
 		return false
-	}, [editor, shapeId, effectiveParentHovered, ports, hoveredVisible])
+	}, [editor, shapeId, isSelected, ports])
 
 	if (!ports || !visible) return null
 
 	return (
 		<div className="bezier-connector-ports-overlay">
 			{Object.keys(ports).map((portId) => (
-				<Port key={portId} shapeId={shapeId} portId={portId} parentHovered={effectiveParentHovered} />
+				<Port key={portId} shapeId={shapeId} portId={portId} isSelected={isSelected} />
 			))}
 		</div>
 	)

@@ -414,7 +414,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const [isEditingState, setIsEditingState] = useState(isEditing)
 		const [isInViewport, setIsInViewport] = useState(true)
 		const [canLoad, setCanLoad] = useState(true)
- 		const [isHovered, setIsHovered] = useState(false)
 		const [hasAttrIcon, setHasAttrIcon] = useState(false)
 		const [hasLoadError, setHasLoadError] = useState(false)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
@@ -1227,8 +1226,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		return (
 			<HTMLContainer
-				onMouseEnter={() => setIsHovered(true)}
-				onMouseLeave={() => setIsHovered(false)}
 				id={shape.id}
 				style={{
 					display: 'flex',
@@ -1513,7 +1510,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				{/* 端口覆盖层 - 用于贝塞尔连接器 */}
 				{/* 在透明模式下不显示端点（PortsOverlay） */}
 				{!shape.props.transparentBackground && (
-					<PortsOverlay shapeId={shape.id} parentHovered={isHovered} />
+					<PortsOverlay shapeId={shape.id} />
 				)}
 			</HTMLContainer>
 		)

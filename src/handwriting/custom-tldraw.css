@@ -958,8 +958,21 @@
   z-index: 999;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   flex: 0 0 auto;
-  transition: transform 0.12s ease-in-out, background-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, opacity 0.16s ease, box-shadow 0.15s ease;
   cursor: crosshair;
+}
+
+/* 选中形状时端口低调常驻；进入扩大的命中区域后再完整显现。 */
+.bezier-connector-port--selected {
+  opacity: 0.42;
+}
+
+.bezier-connector-port--selected:hover,
+.bezier-connector-port--hinting,
+.bezier-connector-port--eligible,
+.bezier-connector-port--flash {
+  opacity: 1;
 }
 
 /* 输入端口（左侧）：居中于形状左边缘 */
