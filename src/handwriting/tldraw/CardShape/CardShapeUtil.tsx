@@ -1082,6 +1082,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							handleEmptyContent: () => {
 								enterMissingLinkedBlockState();
 							},
+							click: {
+								/** 点击末尾是否阻止插入新块 */
+								preventInsetEmptyBlock: true,
+							}
 						});
 					} catch (err) {
 						console.error('Protyle 构造失败', err);
@@ -1569,77 +1573,77 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							<div
 								className="card-shape-collapsed-content"
 								style={{
-								width: '100%',
-								height: '100%',
-								display: 'flex',
-								flexDirection: 'column',
-								alignItems: 'flex-start',
-								justifyContent: 'flex-start',
-								gap: '12px',
-								padding: '12px',
-								boxSizing: 'border-box',
-								color: theme[shape.props.color].solid,
-								overflow: 'hidden',
-								opacity: 1,
-								transform: 'translateY(0)'
-							}}
-						>
-							{tldrawHeaderImage && (
-								<div
-									style={{
-										width: '100%',
-										height: '80%',
-										minHeight: '120px',
-										borderRadius: '12px',
-										overflow: 'hidden',
-										background: collapsedDocInfo?.titleImgBackground || collapsedDocInfo?.titleImgColor || headerGradientFallback,
-										display: 'flex',
-										alignItems: 'center',
-										justifyContent: 'center',
-									}}
-								>
-									{collapsedDocInfo?.titleImgHasUrl ? (
-										<img
-											src={collapsedDocInfo.titleImgSrc}
-											style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-											alt={collapsedDocInfo.title || '文档'}
-										/>
-									) : null}
+									width: '100%',
+									height: '100%',
+									display: 'flex',
+									flexDirection: 'column',
+									alignItems: 'flex-start',
+									justifyContent: 'flex-start',
+									gap: '12px',
+									padding: '12px',
+									boxSizing: 'border-box',
+									color: theme[shape.props.color].solid,
+									overflow: 'hidden',
+									opacity: 1,
+									transform: 'translateY(0)'
+								}}
+							>
+								{tldrawHeaderImage && (
+									<div
+										style={{
+											width: '100%',
+											height: '80%',
+											minHeight: '120px',
+											borderRadius: '12px',
+											overflow: 'hidden',
+											background: collapsedDocInfo?.titleImgBackground || collapsedDocInfo?.titleImgColor || headerGradientFallback,
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+										}}
+									>
+										{collapsedDocInfo?.titleImgHasUrl ? (
+											<img
+												src={collapsedDocInfo.titleImgSrc}
+												style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+												alt={collapsedDocInfo.title || '文档'}
+											/>
+										) : null}
+									</div>
+								)}
+								<div style={{
+									width: '100%',
+									display: 'flex',
+									alignItems: 'center',
+									gap: '8px',
+									fontSize: `${Math.min(shape.props.w / 8, 28)}px`,
+									fontWeight: 600,
+									wordBreak: 'break-all',
+								}}>
+									<span style={{ display: 'flex', alignItems: 'center' }}>
+										<svg width="20" height="20" style={{ marginRight: '6px' }}>
+											<use xlinkHref="#iconFile"></use>
+										</svg>
+										{collapsedDocInfo?.title || '加载中...'}
+									</span>
 								</div>
-							)}
-							<div style={{
-								width: '100%',
-								display: 'flex',
-								alignItems: 'center',
-								gap: '8px',
-								fontSize: `${Math.min(shape.props.w / 8, 28)}px`,
-								fontWeight: 600,
-								wordBreak: 'break-all',
-							}}>
-								<span style={{ display: 'flex', alignItems: 'center' }}>
-									<svg width="20" height="20" style={{ marginRight: '6px' }}>
-										<use xlinkHref="#iconFile"></use>
-									</svg>
-									{collapsedDocInfo?.title || '加载中...'}
-								</span>
 							</div>
-						</div>
 						) : (
 							<div
 								className="card-shape-collapsed-content"
 								style={{
-								width: '100%',
-								height: '100%',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: collapsedTextAlign === 'right' ? 'flex-end' : collapsedTextAlign === 'center' ? 'center' : 'flex-start',
-								padding: '10px 14px',
-								boxSizing: 'border-box',
-								gap: collapsedTextAlign === 'center' ? '0px' : '10px',
-								position: 'relative',
-								opacity: 1,
-								transform: 'translateY(0)'
-							}}>
+									width: '100%',
+									height: '100%',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: collapsedTextAlign === 'right' ? 'flex-end' : collapsedTextAlign === 'center' ? 'center' : 'flex-start',
+									padding: '10px 14px',
+									boxSizing: 'border-box',
+									gap: collapsedTextAlign === 'center' ? '0px' : '10px',
+									position: 'relative',
+									opacity: 1,
+									transform: 'translateY(0)'
+								}}>
 								{/* 折叠图标 — 点击展开 */}
 								<svg
 									className="card-shape-collapsed-toggle-icon"
@@ -1652,12 +1656,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 									strokeLinecap="round"
 									strokeLinejoin="round"
 									style={{
-									flexShrink: 0,
-									cursor: 'pointer',
-									...(collapsedTextAlign === 'center'
-										? { position: 'absolute', left: '14px', zIndex: 1 }
-										: {}),
-								}}
+										flexShrink: 0,
+										cursor: 'pointer',
+										...(collapsedTextAlign === 'center'
+											? { position: 'absolute', left: '14px', zIndex: 1 }
+											: {}),
+									}}
 									onClick={handleUncollapse}
 									onPointerDown={(e) => e.stopPropagation()}
 								>
