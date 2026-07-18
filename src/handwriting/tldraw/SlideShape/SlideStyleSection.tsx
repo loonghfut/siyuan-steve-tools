@@ -12,6 +12,7 @@ import { buildSlideScreenshotMarkdown, findSlideScreenshotBlockId, findSlideScre
 import { settingdata } from '@/index'
 import { $currentSlide, setSlideFocusMode, useCurrentSlide, useSlideFocusMode } from './useSlides'
 import type { SlideShape } from './SlideShapeUtil'
+import { createExportProgressOverlay, waitForPaint } from '../utils/export-progress'
 
 export interface SlideStyleSectionProps {
     editor: Editor
@@ -91,18 +92,25 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
         if (!slideShape || isCapturingScreenshot) return
 
         setIsCapturingScreenshot(true)
+        const overlay = createExportProgressOverlay('正在生成 Slide 截图')
         try {
             // 先查找所有已关联的截图块；有绑定时更新原块，不再创建侧边栏暂存项。
+            overlay.update('正在准备截图')
+            await waitForPaint()
             const targetBlockIds = await findSlideScreenshotBlockIds(slideShape.id)
             const result = await captureSlideScreenshot(editor, slideShape.id, {
                 format: 'png',
                 includeDataUrl: false,
                 updateShape: false,
                 background: true,
+                onProgress(progress) {
+                    overlay.update(progress.message, progress.current, progress.total)
+                },
             })
             if (result) {
                 try {
                     if (targetBlockIds.length > 0) {
+                        overlay.update('正在上传截图')
                         const imageUrl = await uploadSlideScreenshotImage(result.blob, slideShape.props.name || 'Slide')
                         const assetPath = slideScreenshotUrlToAssetPath(imageUrl)
                         if (!assetPath) throw new Error('invalid uploaded slide screenshot asset URL')
@@ -114,8 +122,17 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                             rootId: rootId || '',
                             title: title || '',
                         })
+                        overlay.update('正在更新关联截图', 0, targetBlockIds.length)
+                        let updatedCount = 0
                         const updateResults = await Promise.allSettled(
-                            targetBlockIds.map((blockId) => updateBlock('markdown', markdown, blockId))
+                            targetBlockIds.map(async (blockId) => {
+                                try {
+                                    return await updateBlock('markdown', markdown, blockId)
+                                } finally {
+                                    updatedCount += 1
+                                    overlay.update('正在更新关联截图', updatedCount, targetBlockIds.length)
+                                }
+                            })
                         )
                         updateResults.forEach((updateResult, index) => {
                             if (updateResult.status === 'rejected') {
@@ -139,6 +156,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     }
 
                     const saveToDock = async () => {
+                        overlay.update('正在保存截图')
                         const store = getActiveSlideScreenshotStore()
                         if (!store) throw new Error('slide screenshot store is not initialized')
                         const item = await store.add({
@@ -170,6 +188,7 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
             console.error('capture slide screenshot failed', error)
             showMessage('生成幻灯片截图失败', -1, 'error')
         } finally {
+            overlay.close()
             setIsCapturingScreenshot(false)
         }
     }, [editor, slideShape, isCapturingScreenshot, rootId, title])

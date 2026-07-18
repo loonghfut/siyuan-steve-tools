@@ -2,7 +2,10 @@ import { Editor, TLShapeId } from '@tldraw/tldraw'
 import { SlideShape } from './SlideShapeUtil'
 import { clearSvgExportSnapshotCache } from '../utils/export-dom-snapshot'
 import { getTldrawImageExportOptions } from '../utils/export-image-options'
-import { prepareSvgExportSnapshots } from '../utils/export-snapshot-preparer'
+import {
+	prepareSvgExportSnapshots,
+	type SvgExportPreparationProgress,
+} from '../utils/export-snapshot-preparer'
 
 export type SlideScreenshotFormat = 'png' | 'svg'
 
@@ -15,6 +18,7 @@ export interface CaptureSlideScreenshotOptions {
 	includeSlideOutline?: boolean
 	includeDataUrl?: boolean
 	updateShape?: boolean
+	onProgress?: (progress: SvgExportPreparationProgress) => void
 }
 
 export interface CaptureSlideScreenshotResult {
@@ -54,6 +58,7 @@ export async function captureSlideScreenshot(
 		includeSlideOutline = false,
 		includeDataUrl = true,
 		updateShape = false,
+		onProgress,
 	} = opts
 
 	const pageId = slide.parentId
@@ -86,7 +91,8 @@ export async function captureSlideScreenshot(
 
 	if (idsToExport.length > 0) {
 		try {
-			await prepareSvgExportSnapshots(editor, idsToExport)
+			await prepareSvgExportSnapshots(editor, idsToExport, { onProgress })
+			onProgress?.({ current: 1, total: 1, message: '正在生成图片' })
 			if (format === 'svg') {
 				const svgResult = await editor.getSvgString(idsToExport, {
 					bounds: exportBounds,
