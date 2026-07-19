@@ -139,8 +139,8 @@ export function PortsOverlay({ shapeId }: { shapeId: TLShapeId }) {
 	const editor = useEditor()
 
 	const isSelected = useValue(
-		'is-shape-selected',
-		() => editor.getSelectedShapeIds().includes(shapeId),
+		'is-only-selected-shape',
+		() => editor.getOnlySelectedShapeId() === shapeId,
 		[editor, shapeId]
 	)
 
