@@ -115,7 +115,10 @@
   }
 }
 
-
+/* 让 blockquote 的文字颜色更接近正文 */
+div.bq[data-type="NodeBlockquote"][custom-st-tldraw="1"] {
+    color: var(--b3-theme-on-background) !important;
+}
 
 
 /* 变扁一点：减少高度与字体 */
