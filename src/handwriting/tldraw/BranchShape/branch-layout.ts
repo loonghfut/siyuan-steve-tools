@@ -1503,10 +1503,9 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 				sourceY: rootY,
 				targetX,
 				targetY: childLocal.centerY,
-				midX: sourceX + (targetX - sourceX) * 0.42,
 			}
 		})
-		.filter(Boolean) as Array<{ id: string; side: BranchSide; sourceX: number; sourceY: number; targetX: number; targetY: number; midX: number }>
+		.filter(Boolean) as Array<{ id: string; side: BranchSide; sourceX: number; sourceY: number; targetX: number; targetY: number }>
 
 	return {
 		rootX,

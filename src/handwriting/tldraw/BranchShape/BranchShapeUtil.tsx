@@ -21,7 +21,7 @@ import { getDefaultColorTheme } from '../utils/color-theme'
 
 const translatingBranchIds = new Set<string>()
 const syncingBranchMoveIds = new Set<string>()
-const CURVE_DASHARRAY = '6 5'
+const CURVE_DASHARRAY = '8 6'
 const DETACH_DASHARRAY = '6 5'
 const OUTER_FRAME_INSET = 2
 const OUTER_FRAME_STROKE_WIDTH = 2.2
@@ -61,6 +61,61 @@ function createLinearBezier(start: VecLike, end: VecLike) {
 	})
 }
 
+function createQuadraticBezier(start: VecLike, control: VecLike, end: VecLike) {
+	return new CubicBezier2d({
+		start: new Vec(start.x, start.y),
+		cp1: new Vec(
+			start.x + (control.x - start.x) * (2 / 3),
+			start.y + (control.y - start.y) * (2 / 3)
+		),
+		cp2: new Vec(
+			end.x + (control.x - end.x) * (2 / 3),
+			end.y + (control.y - end.y) * (2 / 3)
+		),
+		end: new Vec(end.x, end.y),
+	})
+}
+
+function getRoundedElbowPathInfo(sourceX: number, sourceY: number, targetX: number, targetY: number): BranchPathInfo {
+	const horizontalDistance = targetX - sourceX
+	const verticalDistance = targetY - sourceY
+
+	if (Math.abs(horizontalDistance) < 0.5 || Math.abs(verticalDistance) < 0.5) {
+		return {
+			path: `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`,
+			geometry: [createLinearBezier({ x: sourceX, y: sourceY }, { x: targetX, y: targetY })],
+		}
+	}
+
+	const horizontalDirection = Math.sign(horizontalDistance)
+	const verticalDirection = Math.sign(verticalDistance)
+	const elbowX = sourceX + horizontalDistance / 2
+	const radius = Math.min(12, Math.abs(horizontalDistance) / 2, Math.abs(verticalDistance) / 2)
+	const firstSegmentEnd = { x: elbowX - horizontalDirection * radius, y: sourceY }
+	const firstCornerEnd = { x: elbowX, y: sourceY + verticalDirection * radius }
+	const verticalSegmentEnd = { x: elbowX, y: targetY - verticalDirection * radius }
+	const secondCornerEnd = { x: elbowX + horizontalDirection * radius, y: targetY }
+	const target = { x: targetX, y: targetY }
+
+	return {
+		path: [
+			`M ${sourceX} ${sourceY}`,
+			`L ${firstSegmentEnd.x} ${firstSegmentEnd.y}`,
+			`Q ${elbowX} ${sourceY} ${firstCornerEnd.x} ${firstCornerEnd.y}`,
+			`L ${verticalSegmentEnd.x} ${verticalSegmentEnd.y}`,
+			`Q ${elbowX} ${targetY} ${secondCornerEnd.x} ${secondCornerEnd.y}`,
+			`L ${target.x} ${target.y}`,
+		].join(' '),
+		geometry: [
+			createLinearBezier({ x: sourceX, y: sourceY }, firstSegmentEnd),
+			createQuadraticBezier(firstSegmentEnd, { x: elbowX, y: sourceY }, firstCornerEnd),
+			createLinearBezier(firstCornerEnd, verticalSegmentEnd),
+			createQuadraticBezier(verticalSegmentEnd, { x: elbowX, y: targetY }, secondCornerEnd),
+			createLinearBezier(secondCornerEnd, target),
+		],
+	}
+}
+
 function getBranchPathInfo(
 	rootX: number,
 	rootY: number,
@@ -69,7 +124,9 @@ function getBranchPathInfo(
 ): BranchPathInfo {
 	const sourceX = child.sourceX ?? rootX
 	const sourceY = child.sourceY ?? rootY
-	const elbowX = sourceX + (child.side === 'left' ? -24 : 24)
+	const horizontalDistance = child.targetX - sourceX
+	const horizontalDirection = Math.sign(horizontalDistance) || (child.side === 'left' ? -1 : 1)
+	const curveControlDistance = Math.min(72, Math.abs(horizontalDistance) * 0.38)
 
 	switch (lineStyle) {
 		case 'frame-floating':
@@ -85,25 +142,19 @@ function getBranchPathInfo(
 				],
 			}
 		case 'elbow-solid':
-			return {
-				path: `M ${sourceX} ${sourceY} L ${elbowX} ${sourceY} L ${elbowX} ${child.targetY} L ${child.targetX} ${child.targetY}`,
-				geometry: [
-					createLinearBezier({ x: sourceX, y: sourceY }, { x: elbowX, y: sourceY }),
-					createLinearBezier({ x: elbowX, y: sourceY }, { x: elbowX, y: child.targetY }),
-					createLinearBezier({ x: elbowX, y: child.targetY }, { x: child.targetX, y: child.targetY }),
-				],
-			}
+			return getRoundedElbowPathInfo(sourceX, sourceY, child.targetX, child.targetY)
 		case 'curve-dashed':
 		case 'curve-solid': {
-			const stemX = sourceX + (child.side === 'left' ? -24 : 24)
+			const stemX = sourceX + horizontalDirection * curveControlDistance
+			const targetControlX = child.targetX - horizontalDirection * curveControlDistance
 			return {
-				path: `M ${sourceX} ${sourceY} C ${stemX} ${sourceY}, ${child.midX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
+				path: `M ${sourceX} ${sourceY} C ${stemX} ${sourceY}, ${targetControlX} ${child.targetY}, ${child.targetX} ${child.targetY}`,
 				strokeDasharray: lineStyle === 'curve-dashed' ? CURVE_DASHARRAY : undefined,
 				geometry: [
 					new CubicBezier2d({
 						start: new Vec(sourceX, sourceY),
 						cp1: new Vec(stemX, sourceY),
-						cp2: new Vec(child.midX, child.targetY),
+						cp2: new Vec(targetControlX, child.targetY),
 						end: new Vec(child.targetX, child.targetY),
 					}),
 				],
