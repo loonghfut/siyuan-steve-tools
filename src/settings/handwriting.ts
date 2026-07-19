@@ -24,7 +24,7 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-max-active-shapes": 40,
     // 全局禁止 JS 块执行脚本
     "js-shape-disable-execution": false,
-    // 双击画板空白处创建的形状：text | single-block
+    // 双击画板空白处创建的形状：text | single-block | card
     "enableDoubleClickCreateSingleBlock": "single-block",
     // 精确箭头模式
     "tldraw-exact-arrow-mode": true,
@@ -55,14 +55,14 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 {
                     type: "select",
                     title: "双击画板空白处创建",
-                    description: "选择双击画板空白处时创建文本或单块。旧版开关设置会自动兼容：开启为单块，关闭为文本。",
+                    description: "选择双击画板空白处时创建文本、单块或卡片。旧版开关设置会自动兼容：开启为单块，关闭为文本。",
                     key: "enableDoubleClickCreateSingleBlock",
                     value: ctx.settings["enableDoubleClickCreateSingleBlock"] === false
                         ? "text"
                         : ctx.settings["enableDoubleClickCreateSingleBlock"] === true
                             ? "single-block"
                             : ctx.settings["enableDoubleClickCreateSingleBlock"],
-                    options: { "text": "文本", "single-block": "单块" },
+                    options: { "text": "文本", "single-block": "单块", "card": "Card" },
                 },
                 { type: "checkbox", title: "显示 Card 形状边框", description: "启用后 Card 形状将显示边框", key: "showCardBorder", value: ctx.settings["showCardBorder"] },
                 { type: "checkbox", title: "启用画板网格背景", description: "默认开启网格", key: "isGridMode", value: ctx.settings["isGridMode"] },

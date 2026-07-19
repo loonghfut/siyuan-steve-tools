@@ -40,7 +40,7 @@ import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { BranchShapeUtil } from './BranchShape/BranchShapeUtil';
 import { BranchShapeTool } from './BranchShape/BranchShapeTool';
 import { keepBranchLayoutsUpdated } from './BranchShape/keep-branch-layouts-updated';
-import { setupDoubleClickHandler } from './utils/setupDoubleClickHandler';
+import { setupDoubleClickHandler, type DoubleClickCreationType } from './utils/setupDoubleClickHandler';
 import { ConfiguredEmbedShapeUtil } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
 import { setupShapeLibraryDropHandler } from './shapelibrary/ShapeLibraryPanel';
@@ -351,10 +351,12 @@ export class TldrawManager {
 
 
     // 兼容旧版布尔设置：true 创建单块，false 创建文本。
-    private readonly doubleClickCreationType = settingdata['enableDoubleClickCreateSingleBlock'] === 'text'
+    private readonly doubleClickCreationType: DoubleClickCreationType = settingdata['enableDoubleClickCreateSingleBlock'] === 'text'
         || settingdata['enableDoubleClickCreateSingleBlock'] === false
         ? 'text'
-        : 'single-block'
+        : settingdata['enableDoubleClickCreateSingleBlock'] === 'card'
+            ? 'card'
+            : 'single-block'
 
     private options: Partial<TldrawOptions> = {
         createTextOnCanvasDoubleClick: this.doubleClickCreationType === 'text',
@@ -466,9 +468,9 @@ export class TldrawManager {
                             });
                         }
 
-                        // 单块使用自定义处理器；文本使用 tldraw 原生双击创建行为。
-                        if (this.doubleClickCreationType === 'single-block') {
-                            setupDoubleClickHandler(editor);
+                        // 单块 / Card 使用自定义处理器；文本使用 tldraw 原生双击创建行为。
+                        if (this.doubleClickCreationType !== 'text') {
+                            setupDoubleClickHandler(editor, this.doubleClickCreationType);
                         }
                         
                         // 设置贝塞尔连接器的交互状态机
