@@ -15,6 +15,7 @@ const CUSTOM_ICONS: Record<string, string> = {
     'branch-elbow-solid': 'branch-elbow-solid.svg',
     'branch-straight-solid': 'branch-straight-solid.svg',
     'branch-curve-dashed': 'branch-curve-dashed.svg',
+	'branch-tree-table': 'branch-tree-table.svg',
     'branch-frame-floating': 'branch-frame-floating.svg',
     'branch-background': 'branch-background.svg',
     'branch-detach': 'branch-detach.svg',

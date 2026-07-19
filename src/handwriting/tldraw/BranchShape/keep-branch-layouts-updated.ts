@@ -12,6 +12,44 @@ import {
 const BRANCH_CHILD_TYPES = new Set(['card', 'single-block', 'branch'])
 const REGISTERED_EDITORS = new WeakSet<Editor>()
 const EXPLICIT_CREATED_BRANCH_RELATIONS = new WeakMap<Editor, Set<string>>()
+const ACTIVE_BRANCH_RESIZES = new WeakMap<Editor, { activeShapeIds: Set<string>; completedShapeIds: Set<TLShapeId> }>()
+
+function getBranchResizeState(editor: Editor) {
+	let state = ACTIVE_BRANCH_RESIZES.get(editor)
+	if (!state) {
+		state = { activeShapeIds: new Set(), completedShapeIds: new Set() }
+		ACTIVE_BRANCH_RESIZES.set(editor, state)
+	}
+	return state
+}
+
+function isBranchResizeInProgress(editor: Editor) {
+	return (ACTIVE_BRANCH_RESIZES.get(editor)?.activeShapeIds.size || 0) > 0
+}
+
+export function beginBranchResize(editor: Editor, shapeId: TLShapeId | string) {
+	getBranchResizeState(editor).activeShapeIds.add(shapeId as string)
+}
+
+export function endBranchResize(editor: Editor, shapeId: TLShapeId | string) {
+	const state = getBranchResizeState(editor)
+	state.activeShapeIds.delete(shapeId as string)
+	state.completedShapeIds.add(shapeId as TLShapeId)
+	if (state.activeShapeIds.size > 0) return
+
+	const completedShapeIds = Array.from(state.completedShapeIds)
+	ACTIVE_BRANCH_RESIZES.delete(editor)
+	if (completedShapeIds.length > 0) relayoutBranchesContainingShapes(editor, completedShapeIds)
+}
+
+export function requestBranchRelayout(editor: Editor, shapeId: TLShapeId | string) {
+	if (isBranchResizeInProgress(editor)) {
+		getBranchResizeState(editor).completedShapeIds.add(shapeId as TLShapeId)
+		return
+	}
+
+	relayoutBranchesContainingShapes(editor, [shapeId as TLShapeId])
+}
 
 // tldraw exposes this internally on HistoryManager, but deliberately omits it
 // from its public TypeScript declaration. Keep the compatibility boundary here.
@@ -498,7 +536,7 @@ export function keepBranchLayoutsUpdated(editor: Editor) {
 				nextParentId: next.parentId as string,
 			})
 		}
-		if (!didRelevantBoundsChange(prev, next)) return
+		if (!didRelevantBoundsChange(prev, next) || isBranchResizeInProgress(editor)) return
 
 		pendingShapeIds.add(next.id as string)
 	})

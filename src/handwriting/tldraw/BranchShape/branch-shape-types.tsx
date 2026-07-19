@@ -1,7 +1,15 @@
 import { TLBaseShape, TLDefaultColorStyle } from '@tldraw/tldraw'
 
 export type BranchDirection = 'right' | 'left'
-export type BranchLineStyle = 'curve-solid' | 'elbow-solid' | 'straight-solid' | 'curve-dashed' | 'frame-floating'
+export type BranchLineStyle =
+	| 'curve-solid'
+	| 'elbow-solid'
+	| 'straight-solid'
+	| 'curve-dashed'
+	| 'frame-floating'
+	| 'tree-table'
+
+export const TREE_TABLE_CELL_PADDING = 10
 
 export type IBranchShape = TLBaseShape<
 	'branch',

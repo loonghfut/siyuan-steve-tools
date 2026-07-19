@@ -167,7 +167,7 @@ const AGENT_EDITABLE_COLORS = [
 ];
 const AGENT_CARD_RENDER_MODES = ['inherit', 'static-dom', 'live-protyle'];
 const AGENT_CARD_COLLAPSED_ALIGNMENTS = ['left', 'center', 'right'];
-const AGENT_BRANCH_LINE_STYLES = ['curve-solid', 'elbow-solid', 'straight-solid', 'curve-dashed', 'frame-floating'];
+const AGENT_BRANCH_LINE_STYLES = ['curve-solid', 'elbow-solid', 'straight-solid', 'curve-dashed', 'frame-floating', 'tree-table'];
 const AGENT_CONNECTOR_STROKE_STYLES = ['solid', 'dashed', 'flowing'];
 const AGENT_MIND_MAP_THEMES = ['default', 'noBorder', 'underline'];
 const AGENT_MIND_MAP_DIRECTIONS = ['right', 'left', 'up', 'down'];

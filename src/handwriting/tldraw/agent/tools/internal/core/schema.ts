@@ -54,6 +54,7 @@ const BRANCH_LINE_STYLES = new Set<string>([
     'straight-solid',
     'curve-dashed',
     'frame-floating',
+	'tree-table',
 ])
 
 export function normalizeAgentColor(value: unknown): TLDefaultColorStyle {

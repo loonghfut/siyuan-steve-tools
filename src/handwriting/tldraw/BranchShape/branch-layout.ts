@@ -1,5 +1,5 @@
 import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
-import { IBranchShape, BranchChildShape } from './branch-shape-types'
+import { IBranchShape, BranchChildShape, TREE_TABLE_CELL_PADDING } from './branch-shape-types'
 import { BranchInteractionHint, setBranchInteractionHint } from './branch-interaction-state'
 
 const CONNECTABLE_TYPES = new Set(['card', 'single-block', 'branch'])
@@ -756,22 +756,26 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 	const rootContent = getBranchRootContent(editor, branch, branches)
 	const nextRootShapeId = rootContent ? (rootContent.shape.id as string) : undefined
 	const autoFrame = getBranchAutoFrameState(editor, branch, branches)
-	const shouldShowBackground = branch.props.showBackground === true
-	const shouldPadForFrame = (children.length > 0 || !!rootContent) && (autoFrame.enabled || shouldShowBackground || usesManualFrameStyle(branch))
-	const framePadding = shouldPadForFrame ? ENHANCED_FRAME_PADDING : 0
+	const isTreeTable = branch.props.lineStyle === 'tree-table'
+	const shouldShowBackground = branch.props.showBackground === true && !isTreeTable
+	const shouldPadForFrame = !isTreeTable && (children.length > 0 || !!rootContent) && (autoFrame.enabled || shouldShowBackground || usesManualFrameStyle(branch))
+	const framePadding = isTreeTable ? TREE_TABLE_CELL_PADDING : shouldPadForFrame ? ENHANCED_FRAME_PADDING : 0
 
 	if (children.length === 0 && !rootContent) {
 		const oldRootPage = getBranchRootPagePoint(editor, branch)
-		const nextX = oldRootPage.x - EMPTY_BRANCH_RADIUS
-		const nextY = oldRootPage.y - EMPTY_BRANCH_RADIUS
+		const emptyBranchPadding = isTreeTable ? TREE_TABLE_CELL_PADDING : 0
+		const nextRootX = EMPTY_BRANCH_RADIUS + emptyBranchPadding
+		const nextDiameter = EMPTY_BRANCH_DIAMETER + emptyBranchPadding * 2
+		const nextX = oldRootPage.x - nextRootX
+		const nextY = oldRootPage.y - nextRootX
 		const nextPosition = getPointInShapeParentSpace(editor, branch, { x: nextX, y: nextY })
 		const nextChildIds: string[] = []
 		const isUnchanged =
 			sameNumber(branch.x, nextPosition.x) &&
 			sameNumber(branch.y, nextPosition.y) &&
-			sameNumber(branch.props.w, EMPTY_BRANCH_DIAMETER) &&
-			sameNumber(branch.props.h, EMPTY_BRANCH_DIAMETER) &&
-			sameNumber(branch.props.rootX, EMPTY_BRANCH_RADIUS) &&
+			sameNumber(branch.props.w, nextDiameter) &&
+			sameNumber(branch.props.h, nextDiameter) &&
+			sameNumber(branch.props.rootX, nextRootX) &&
 			sameIds(branch.props.leftChildIds || [], nextChildIds) &&
 			sameIds(branch.props.rightChildIds || [], nextChildIds) &&
 			!branch.props.rootShapeId
@@ -785,12 +789,12 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 			y: nextPosition.y,
 			props: {
 				...branch.props,
-				w: EMPTY_BRANCH_DIAMETER,
-				h: EMPTY_BRANCH_DIAMETER,
+				w: nextDiameter,
+				h: nextDiameter,
 				leftChildIds: nextChildIds,
 				rightChildIds: nextChildIds,
 				rootShapeId: undefined,
-				rootX: EMPTY_BRANCH_RADIUS,
+				rootX: nextRootX,
 			},
 		})
 		return
@@ -1296,7 +1300,7 @@ export function relayoutBranchesContainingShapes(editor: Editor, shapeIds: TLSha
 
 	const parentsByChildId = buildBranchParentIndex(branches)
 	const queue = Array.from(new Set(shapeIds.map((id) => id as string)))
-	const laidOutBranchIds = new Set<string>()
+	const affectedBranchIds = new Set<TLShapeId>()
 
 	for (let index = 0; index < queue.length; index++) {
 		const shapeId = queue[index]
@@ -1307,16 +1311,38 @@ export function relayoutBranchesContainingShapes(editor: Editor, shapeIds: TLSha
 		if (!parentBranches) continue
 
 		for (const parentBranch of parentBranches) {
-			const branchId = parentBranch.id as string
-			if (laidOutBranchIds.has(branchId)) continue
+			if (affectedBranchIds.has(parentBranch.id)) continue
 
-			const latestBranch = editor.getShape<IBranchShape>(parentBranch.id)
-			if (!latestBranch || latestBranch.type !== 'branch') continue
-
-			laidOutBranchIds.add(branchId)
-			layoutBranchChildren(editor, latestBranch)
-			if (!visited.has(branchId)) queue.push(branchId)
+			affectedBranchIds.add(parentBranch.id)
+			if (!visited.has(parentBranch.id as string)) queue.push(parentBranch.id as string)
 		}
+	}
+
+	// A parent layout measures branch children by their current bounds. When a
+	// node resize affects a table containing nested branches, refresh each
+	// descendant first so the parent never calculates with stale child bounds.
+	const addDescendantBranches = (branchId: TLShapeId, seen = new Set<string>()) => {
+		if (seen.has(branchId as string)) return
+		seen.add(branchId as string)
+
+		const branch = editor.getShape<IBranchShape>(branchId)
+		if (!branch || branch.type !== 'branch') return
+
+		for (const childId of getAllBranchChildIds(branch)) {
+			const child = editor.getShape<IBranchShape>(childId as TLShapeId)
+			if (child?.type !== 'branch' || affectedBranchIds.has(child.id)) continue
+			affectedBranchIds.add(child.id)
+			addDescendantBranches(child.id, seen)
+		}
+	}
+
+	for (const branchId of Array.from(affectedBranchIds)) {
+		addDescendantBranches(branchId)
+	}
+
+	for (const branch of sortBranchesForLayout(editor, affectedBranchIds)) {
+		const latestBranch = editor.getShape<IBranchShape>(branch.id)
+		if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
 	}
 }
 
@@ -1455,6 +1481,12 @@ export function detachBranchRootShape(editor: Editor, branchId: TLShapeId) {
 
 export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 	const branches = getCurrentBranches(editor)
+	const isNestedInTreeTable = branches.some(
+		(candidate) =>
+			candidate.id !== branch.id &&
+			candidate.props.lineStyle === 'tree-table' &&
+			[...(candidate.props.leftChildIds || []), ...candidate.props.rightChildIds].includes(branch.id as string)
+	)
 	const autoFrame = getBranchAutoFrameState(editor, branch, branches)
 	const rootContent = getBranchRootContent(editor, branch, branches)
 	const toBranchLocal = (pagePoint: { x: number; y: number }) => editor.getPointInShapeSpace(branch, pagePoint)
@@ -1499,13 +1531,28 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 			return {
 				id,
 				side,
+				x: childLocal.x,
+				y: childLocal.y,
+				w: childLocal.w,
+				h: childLocal.h,
 				sourceX,
 				sourceY: rootY,
 				targetX,
 				targetY: childLocal.centerY,
 			}
 		})
-		.filter(Boolean) as Array<{ id: string; side: BranchSide; sourceX: number; sourceY: number; targetX: number; targetY: number }>
+		.filter(Boolean) as Array<{
+			id: string
+			side: BranchSide
+			x: number
+			y: number
+			w: number
+			h: number
+			sourceX: number
+			sourceY: number
+			targetX: number
+			targetY: number
+		}>
 
 	return {
 		rootX,
@@ -1514,6 +1561,7 @@ export function getBranchRenderInfo(editor: Editor, branch: IBranchShape) {
 		rootShapeId: rootContent?.shape.id as string | undefined,
 		rootBounds,
 		autoFrame,
+		isNestedInTreeTable,
 		children,
 	}
 }

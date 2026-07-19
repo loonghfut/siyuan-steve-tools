@@ -25,7 +25,9 @@ import { getDefaultColorTheme } from '../utils/color-theme'
 import { inputDialogSync } from '@/libs/dialog'
 import {
 	beginBranchAttachmentDrag,
+	beginBranchResize,
 	clearBranchInteractionHint,
+	endBranchResize,
 	getBranchInteractionHintForShape,
 	setBranchInteractionHint,
 	syncBranchMoveForRootContent,
@@ -1822,6 +1824,18 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	// [8]
 	override onResize(shape: ICardShape, info: TLResizeInfo<ICardShape>) {
 		return resizeBox(shape, info)
+	}
+
+	override onResizeStart(shape: ICardShape) {
+		beginBranchResize(this.editor, shape.id)
+	}
+
+	override onResizeEnd(_initialShape: ICardShape, currentShape: ICardShape) {
+		endBranchResize(this.editor, currentShape.id)
+	}
+
+	override onResizeCancel(_initialShape: ICardShape, currentShape: ICardShape) {
+		endBranchResize(this.editor, currentShape.id)
 	}
 
 	override onTranslateStart(shape: ICardShape) {

@@ -16,7 +16,7 @@ export function getBranchShapeDefaultProps(): IBranchShape['props'] {
 		lineStyle: 'curve-solid',
 		snapDistance: 160,
 		showBackground: false,
-		version: 6,
+		version: 7,
 	}
 }
 
@@ -32,7 +32,7 @@ export const branchShapeProps: RecordProps<IBranchShape> = {
 	horizontalGap: T.number,
 	verticalGap: T.number,
 	lineWidth: T.number,
-	lineStyle: T.optional(T.literalEnum('curve-solid', 'elbow-solid', 'straight-solid', 'curve-dashed', 'frame-floating')),
+	lineStyle: T.optional(T.literalEnum('curve-solid', 'elbow-solid', 'straight-solid', 'curve-dashed', 'frame-floating', 'tree-table')),
 	snapDistance: T.number,
 	showBackground: T.optional(T.boolean),
 	version: T.optional(T.number),

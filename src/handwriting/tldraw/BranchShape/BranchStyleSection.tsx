@@ -128,6 +128,7 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 						{ value: 'elbow-solid', icon: 'branch-elbow-solid' },
 						{ value: 'straight-solid', icon: 'branch-straight-solid' },
 						{ value: 'curve-dashed', icon: 'branch-curve-dashed' },
+						{ value: 'tree-table', icon: 'branch-tree-table' },
 						{ value: 'frame-floating', icon: 'branch-frame-floating' },
 					]}
 					value={

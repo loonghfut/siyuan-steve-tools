@@ -59,7 +59,7 @@ const BRANCH_DEFAULT_PROPS: IBranchShape['props'] = {
 	lineStyle: 'curve-solid' as BranchLineStyle,
 	snapDistance: 160,
 	showBackground: false,
-	version: 6,
+	version: 7,
 }
 
 function getExistingBlockIds(editor: Editor) {

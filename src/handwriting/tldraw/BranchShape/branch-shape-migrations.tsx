@@ -7,6 +7,7 @@ const versions = createShapePropsMigrationIds('branch', {
 	AddLineStyle: 4,
 	AddRootShapeId: 5,
 	MigrateChildIdsToRightChildIds: 6,
+	AddTreeTableStyle: 7,
 })
 
 export const branchShapeMigrations = createShapePropsMigrationSequence({
@@ -76,6 +77,16 @@ export const branchShapeMigrations = createShapePropsMigrationSequence({
 				props.childIds = props.rightChildIds ?? []
 				delete props.rightChildIds
 				props.version = 5
+			},
+		},
+		{
+			id: versions.AddTreeTableStyle,
+			up(props) {
+				props.version = 7
+			},
+			down(props) {
+				if (props.lineStyle === 'tree-table') props.lineStyle = 'curve-solid'
+				props.version = 6
 			},
 		},
 	],
