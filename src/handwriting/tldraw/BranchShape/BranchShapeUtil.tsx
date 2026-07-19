@@ -130,6 +130,23 @@ function getTreeTableLayout(
 	}
 }
 
+function getTreeTableOutline(table: TreeTableLayout, lineWidth: number): TreeTableBox {
+	const inset = Math.min(lineWidth / 2, table.outer.w / 2, table.outer.h / 2)
+	return {
+		x: table.outer.x + inset,
+		y: table.outer.y + inset,
+		w: Math.max(table.outer.w - inset * 2, 0),
+		h: Math.max(table.outer.h - inset * 2, 0),
+	}
+}
+
+function getTreeTableRowDividerBounds(column: TreeTableColumn, outline: TreeTableBox) {
+	return {
+		x1: column.side === 'left' ? outline.x : column.x,
+		x2: column.side === 'left' ? column.x + column.w : outline.x + outline.w,
+	}
+}
+
 function createLinearBezier(start: VecLike, end: VecLike) {
 	return new CubicBezier2d({
 		start: new Vec(start.x, start.y),
@@ -582,38 +599,40 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		if (isTreeTable) {
 			const tableRootRadius = isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius
 			const table = getTreeTableLayout(info.rootBounds, info.rootX, info.rootY, tableRootRadius, info.children)
+			const tableOutline = getTreeTableOutline(table, lineWidth)
 			children.push(
 				new Rectangle2d({
-					x: table.outer.x,
-					y: table.outer.y,
-					width: table.outer.w,
-					height: table.outer.h,
+					x: tableOutline.x,
+					y: tableOutline.y,
+					width: tableOutline.w,
+					height: tableOutline.h,
 					isFilled: false,
 				})
 			)
 			hitTargets.push({
 				type: 'rect',
-				x: table.outer.x,
-				y: table.outer.y,
-				w: table.outer.w,
-				h: table.outer.h,
+				x: tableOutline.x,
+				y: tableOutline.y,
+				w: tableOutline.w,
+				h: tableOutline.h,
 				hitWidth: getVisibleStrokeHitWidth(lineWidth),
 			})
 			for (const column of table.columns) {
 				hitTargets.push({
 					type: 'line',
 					x1: column.dividerX,
-					y1: table.outer.y,
+					y1: tableOutline.y,
 					x2: column.dividerX,
-					y2: table.outer.y + table.outer.h,
+					y2: tableOutline.y + tableOutline.h,
 					hitWidth: getVisibleStrokeHitWidth(lineWidth),
 				})
+				const rowDividerBounds = getTreeTableRowDividerBounds(column, tableOutline)
 				for (const y of column.rowDividers) {
 					hitTargets.push({
 						type: 'line',
-						x1: column.x,
+						x1: rowDividerBounds.x1,
 						y1: y,
-						x2: column.x + column.w,
+						x2: rowDividerBounds.x2,
 						y2: y,
 						hitWidth: getVisibleStrokeHitWidth(lineWidth),
 					})
@@ -757,8 +776,10 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const isMovingBranch = interactionHint?.mode === 'move-branch' && interactionHint.branchId === shape.id
 		const activeSide = isAttachTarget ? interactionHint.side : null
 		const accentColor = isDetachTarget ? '#ef4444' : isAttachTarget ? '#22c55e' : '#3b82f6'
-		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const showHint = isAttachTarget || isDetachTarget || isMovingBranch
+		const treeTableOutline = treeTable ? getTreeTableOutline(treeTable, lineWidth) : null
+		const treeTableStroke = showHint ? accentColor : color
+		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const isAutoFrameEnhanced = info.autoFrame.enabled
 		const showBackground = shape.props.showBackground === true && !isTreeTable
 		const backgroundInset = isAutoFrameEnhanced ? 2 : 1
@@ -812,19 +833,20 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						pointerEvents="none"
 					/>
 				)}
-				{treeTable && !isMovingBranch && (
+				{treeTable && treeTableOutline && (
 					<g pointerEvents="none">
 						{!isNestedTreeTable && (
 							<rect
-								x={treeTable.outer.x}
-								y={treeTable.outer.y}
-								width={treeTable.outer.w}
-								height={treeTable.outer.h}
+								x={treeTableOutline.x}
+								y={treeTableOutline.y}
+								width={treeTableOutline.w}
+								height={treeTableOutline.h}
 								rx={4}
 								ry={4}
 								fill="none"
-								stroke={color}
-								strokeWidth={lineWidth}
+								stroke={treeTableStroke}
+								strokeWidth={showHint ? lineWidth + 1.5 : lineWidth}
+								strokeDasharray={isDetachTarget ? DETACH_DASHARRAY : undefined}
 								opacity={0.86}
 							/>
 						)}
@@ -832,25 +854,30 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 							<g key={column.side}>
 								<line
 									x1={column.dividerX}
-									y1={treeTable.outer.y}
+									y1={treeTableOutline.y}
 									x2={column.dividerX}
-									y2={treeTable.outer.y + treeTable.outer.h}
-									stroke={color}
-									strokeWidth={lineWidth}
+									y2={treeTableOutline.y + treeTableOutline.h}
+									stroke={treeTableStroke}
+									strokeWidth={showHint ? lineWidth + 1.5 : lineWidth}
+									strokeDasharray={isDetachTarget ? DETACH_DASHARRAY : undefined}
 									opacity={0.82}
 								/>
-								{column.rowDividers.map((y, index) => (
-									<line
-										key={index}
-										x1={column.x}
-										y1={y}
-										x2={column.x + column.w}
-										y2={y}
-										stroke={color}
-										strokeWidth={lineWidth}
-										opacity={0.9}
-									/>
-								))}
+								{(() => {
+									const rowDividerBounds = getTreeTableRowDividerBounds(column, treeTableOutline)
+									return column.rowDividers.map((y, index) => (
+										<line
+											key={index}
+											x1={rowDividerBounds.x1}
+											y1={y}
+											x2={rowDividerBounds.x2}
+											y2={y}
+											stroke={treeTableStroke}
+											strokeWidth={showHint ? lineWidth + 1.5 : lineWidth}
+											strokeDasharray={isDetachTarget ? DETACH_DASHARRAY : undefined}
+											opacity={0.9}
+										/>
+									))
+								})()}
 							</g>
 						))}
 					</g>
