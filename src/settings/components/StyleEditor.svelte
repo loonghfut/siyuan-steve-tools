@@ -1,6 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { H6_STYLE_DEFAULTS, type H6StyleConfig } from '@/settings/style-h6';
+  import {
+    H6_STYLE_CENTERED_DEFAULTS,
+    H6_STYLE_DEFAULTS,
+    type H6StyleConfig,
+  } from '@/settings/style-h6';
 
   export let group: string;
   export let value: any;
@@ -9,7 +13,8 @@
 
   function parseValue(val: any): H6StyleConfig {
     if (!val || typeof val !== 'object') return { ...H6_STYLE_DEFAULTS };
-    return { ...H6_STYLE_DEFAULTS, ...val };
+    const { minHeight: _minHeight, maxHeight: _maxHeight, ...supportedConfig } = val;
+    return { ...H6_STYLE_DEFAULTS, ...supportedConfig };
   }
 
   let cfg: H6StyleConfig = parseValue(value);
@@ -24,20 +29,28 @@
     emitChange();
   }
 
+  function applyCenteredDefaults() {
+    cfg = { ...H6_STYLE_CENTERED_DEFAULTS };
+    emitChange();
+  }
+
   $: previewStyle = `
     background-color: ${cfg.backgroundColor};
     color: ${cfg.color};
     font-size: ${cfg.fontSize}px;
     line-height: ${cfg.lineHeight}px;
     padding: ${cfg.paddingV}px ${cfg.paddingH}px;
-    min-height: ${cfg.minHeight}px;
-    max-height: ${cfg.maxHeight}px;
     border-radius: ${cfg.borderRadius}px;
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: ${cfg.textAlign === 'center' ? 'center' : 'flex-start'};
+    text-align: ${cfg.textAlign};
+    height: auto;
+    min-height: auto;
+    max-height: none;
     box-sizing: border-box;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
   `.trim();
 </script>
 
@@ -87,14 +100,23 @@
       </div>
 
       <div class="style-section">
-        <div class="style-section-title">尺寸</div>
+        <div class="style-section-title">外观</div>
         <div class="style-row">
-           <span class="style-label">最小高度 <span class="style-value">{cfg.minHeight}px</span></span>
-          <input class="b3-slider style-slider" type="range" min="10" max="60" step="1" bind:value={cfg.minHeight} on:input={emitChange} />
-        </div>
-        <div class="style-row">
-           <span class="style-label">最大高度 <span class="style-value">{cfg.maxHeight}px</span></span>
-          <input class="b3-slider style-slider" type="range" min="10" max="80" step="1" bind:value={cfg.maxHeight} on:input={emitChange} />
+          <span class="style-label">对齐</span>
+          <div class="style-align-options" role="group" aria-label="标题对齐">
+            <button
+              class:style-align-option--active={cfg.textAlign === 'left'}
+              class="b3-button b3-button--outline style-align-option"
+              type="button"
+              on:click={() => { cfg.textAlign = 'left'; emitChange(); }}
+            >靠左</button>
+            <button
+              class:style-align-option--active={cfg.textAlign === 'center'}
+              class="b3-button b3-button--outline style-align-option"
+              type="button"
+              on:click={() => { cfg.textAlign = 'center'; emitChange(); }}
+            >居中</button>
+          </div>
         </div>
         <div class="style-row">
            <span class="style-label">圆角 <span class="style-value">{cfg.borderRadius}px</span></span>
@@ -104,6 +126,7 @@
 
       <div class="style-actions">
         <button class="b3-button b3-button--outline" on:click={resetDefaults}>恢复默认</button>
+        <button class="b3-button b3-button--outline" on:click={applyCenteredDefaults}>默认居中</button>
       </div>
     </div>
 
@@ -230,8 +253,24 @@
 
   .style-actions {
     display: flex;
+    gap: 8px;
     justify-content: flex-end;
     margin-top: 4px;
+  }
+
+  .style-align-options {
+    display: flex;
+    gap: 4px;
+  }
+
+  .style-align-option {
+    min-width: 54px;
+  }
+
+  .style-align-option--active {
+    background: var(--b3-theme-primary) !important;
+    border-color: var(--b3-theme-primary) !important;
+    color: var(--b3-theme-on-primary) !important;
   }
 
   .style-preview-canvas {

@@ -7,9 +7,8 @@ export interface H6StyleConfig {
     lineHeight: number;
     paddingV: number;
     paddingH: number;
-    minHeight: number;
-    maxHeight: number;
     borderRadius: number;
+    textAlign: "left" | "center";
 }
 
 export const H6_STYLE_DEFAULTS: H6StyleConfig = {
@@ -19,9 +18,13 @@ export const H6_STYLE_DEFAULTS: H6StyleConfig = {
     lineHeight: 16,
     paddingV: 2,
     paddingH: 6,
-    minHeight: 20,
-    maxHeight: 20,
     borderRadius: 4,
+    textAlign: "left",
+};
+
+export const H6_STYLE_CENTERED_DEFAULTS: H6StyleConfig = {
+    ...H6_STYLE_DEFAULTS,
+    textAlign: "center",
 };
 
 export const h6StyleDefaults: Record<string, any> = {
@@ -34,16 +37,20 @@ export function buildH6CSS(cfg: Partial<H6StyleConfig> | null | undefined): stri
     return `[custom-st-tldraw="1"][data-subtype="h6"] {
   background-color: ${c.backgroundColor};
   color: ${c.color} !important;
-  display: inline-flex;
+  display: flex;
+  align-items: center;
+  justify-content: ${c.textAlign === "center" ? "center" : "flex-start"};
   padding: ${c.paddingV}px ${c.paddingH}px;
-  min-height: ${c.minHeight}px;
-  max-height: ${c.maxHeight}px;
+  height: auto;
+  min-height: auto;
+  max-height: none;
   line-height: ${c.lineHeight}px;
   font-size: ${c.fontSize}px !important;
   border-radius: ${c.borderRadius}px;
   box-sizing: border-box;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  text-align: ${c.textAlign};
+  white-space: normal;
+  overflow-wrap: anywhere;
 }`;
 }
 
