@@ -41,7 +41,7 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.50.0 (2026年07月20日)
+### v0.50.1 (2026年07月20日)
 - refactor(handwriting): 重构工具栏隐藏样式实现，移除冗余定位规则 (loonghfut)
 - feat(handwriting): 重构贝塞尔连接器端口显示逻辑，由悬停触发改为选中触发 (loonghfut)
 - feat(BezierConnectorShape): 新增连接线扩展菜单，拖拽释放至空白处可创建关联节点 (loonghfut)
@@ -60,6 +60,8 @@ win端s3同步后，docker端感知s3同步。
 - feat(style-h6): 新增文本对齐配置，移除高度限制并支持多行文本显示 (loonghfut)
 - refactor(deps): 移除 leafer-ui 及 @leafer-in/viewport 依赖声明 (loonghfut)
 - feat(plugin): 升级版本号至 0.50.0 (loonghfut)
+- docs: 更新 v0.50.0 版本的更新日志 (loonghfut)
+- chore(preview): 更新图标及预览图，移除旧版预览文件 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
