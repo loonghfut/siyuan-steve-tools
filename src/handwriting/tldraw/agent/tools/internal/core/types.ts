@@ -240,6 +240,14 @@ export type AgentBasicShapeCreateArgs = AgentSelectionOptions & {
 	blockId?: string
 	direction?: 'right' | 'left' | 'up' | 'down'
 	theme?: string
+	/** Complete JavaScript source for an agent-created js-shape. */
+	script?: string
+	/** JSON string used as the initial persistent state for a js-shape. */
+	data?: string
+	/** Whether the generated JS UI can receive pointer events. */
+	interactive?: boolean
+	/** Keep generated code scoped to the JS shape's DOM container. Defaults to true. */
+	restrictDom?: boolean
 }
 
 export type AgentConnectorCreateArgs = AgentSelectionOptions & {
@@ -347,6 +355,12 @@ export type AgentBoardNodeCreate = {
 	isMain?: boolean
 	isCollapsed?: boolean
 	showMask?: boolean
+	/** Complete JavaScript source. Required when kind is js-shape. */
+	script?: string
+	/** Initial JSON state for a js-shape, stored in props.data. */
+	data?: string
+	interactive?: boolean
+	restrictDom?: boolean
 }
 
 export type AgentBoardNodePatch = {

@@ -1557,7 +1557,7 @@ async function validateBoardNodeCreate(
 ) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
     const node = value as AgentBoardNodeCreate;
-    assertBoardEditKeys(node as any, ['as', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId', 'contentMarkdown', 'text', 'title', 'name', 'geo', 'direction', 'theme', 'isMain', 'isCollapsed', 'showMask'], label);
+    assertBoardEditKeys(node as any, ['as', 'kind', 'x', 'y', 'w', 'h', 'color', 'blockId', 'contentMarkdown', 'text', 'title', 'name', 'geo', 'direction', 'theme', 'isMain', 'isCollapsed', 'showMask', 'script', 'data', 'interactive', 'restrictDom'], label);
     const kind = String(node.kind || '');
     if (!AGENT_BOARD_EDIT_NODE_KINDS.has(kind)) {
         throw new Error(`${label}.kind must be card, single-block, text, frame, note, geo, slide, mind-map, or js-shape`);
@@ -1579,6 +1579,28 @@ async function validateBoardNodeCreate(
         }
         await validateAgentLinkedBlockId(blockId, 'single-block');
     }
+	if (kind === 'js-shape') {
+		const script = stringValue(node.script);
+		if (!script) throw new Error(`${label}.script is required for js-shape`);
+		if (script.length > 50000) throw new Error(`${label}.script exceeds the 50000 character limit`);
+		if (/^```/.test(script)) throw new Error(`${label}.script must be JavaScript only; omit Markdown code fences`);
+		if (node.interactive !== undefined && typeof node.interactive !== 'boolean') {
+			throw new Error(`${label}.interactive must be boolean`);
+		}
+		if (node.restrictDom !== undefined && typeof node.restrictDom !== 'boolean') {
+			throw new Error(`${label}.restrictDom must be boolean`);
+		}
+		if (node.data !== undefined) {
+			if (typeof node.data !== 'string') throw new Error(`${label}.data must be a JSON string`);
+			try {
+				JSON.parse(node.data);
+			} catch {
+				throw new Error(`${label}.data must contain valid JSON`);
+			}
+		}
+	} else if (node.script !== undefined || node.data !== undefined || node.interactive !== undefined || node.restrictDom !== undefined) {
+		throw new Error(`${label}.script, data, interactive, and restrictDom are only supported for js-shape`);
+	}
 }
 
 function validateBoardLayoutIntent(value: unknown, label: string) {
@@ -1719,6 +1741,10 @@ async function createBoardEditNode(
         zoom: false,
         direction: normalizeAgentMindMapDirection(node.direction),
         theme: normalizeAgentMindMapTheme(node.theme),
+        script: stringValue(node.script),
+        data: stringValue(node.data),
+        interactive: node.interactive,
+        restrictDom: node.restrictDom,
     };
     const size = getAgentCreateShapeSize(options.kind, options);
     const position = resolveAgentCreatePosition(editor, options.kind, {
@@ -4273,7 +4299,22 @@ function buildAgentBasicShape(id: TLShapeId, options: AgentBasicShapeCreateArgs,
     if (options.kind === 'mind-map') {
         return { id, type: 'mind-map', x, y, props: { w, h, color, rootNode: createMindMapNode(text || '涓績涓婚'), horizontalGap: 50, verticalGap: 20, nodeWidth: 120, nodeHeight: 36, fontSize: 14, lineWidth: 2, direction: options.direction || 'right', theme: options.theme || 'default', blockId: options.blockId, version: 1, refreshNonce: Date.now() } };
     }
-    return { id, type: 'js-shape', x, y, props: { w, h, color, script: DEFAULT_SCRIPT, autoRun: false, interactive: false, restrictDom: true, data: JSON.stringify({ createdBy: 'siyuan-agent', note: clampAgentText(text, 500) }) } };
+    return {
+        id,
+        type: 'js-shape',
+        x,
+        y,
+        props: {
+            w,
+            h,
+            color,
+            script: options.script || DEFAULT_SCRIPT,
+            autoRun: false,
+            interactive: options.interactive === true,
+            restrictDom: options.restrictDom !== false,
+            data: options.data || JSON.stringify({ createdBy: 'siyuan-agent', note: clampAgentText(text, 500) }),
+        },
+    };
 }
 
 function resolveAgentConnectorEndpoints(editor: Editor, options: AgentConnectorCreateArgs) {
