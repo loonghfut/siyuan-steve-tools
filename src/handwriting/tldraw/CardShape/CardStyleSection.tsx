@@ -112,32 +112,76 @@ function getBestCollapsedTextSize(shape: ICardShape, measureRoot: HTMLElement): 
     return best
 }
 
+function getVisibleContentHeight(element: HTMLElement) {
+    const top = element.getBoundingClientRect().top
+    let bottom = top
+    const textWalker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    let textNode: Text | null
+
+    while ((textNode = textWalker.nextNode() as Text | null)) {
+        if (!textNode.data.trim()) continue
+
+        const range = document.createRange()
+        range.selectNodeContents(textNode)
+        for (const rect of Array.from(range.getClientRects())) {
+            if (rect.height > 0) bottom = Math.max(bottom, rect.bottom)
+        }
+    }
+
+    // Text ranges do not cover non-text content such as images and embeds.
+    for (const child of Array.from(element.querySelectorAll<HTMLElement>(
+        'img, video, audio, iframe, canvas, svg, [data-type="NodeBlockQueryEmbed"]'
+    ))) {
+        if (getComputedStyle(child).display === 'none') continue
+        const rect = child.getBoundingClientRect()
+        if (rect.height > 0) bottom = Math.max(bottom, rect.bottom)
+    }
+
+    // Keep the regular box measurement as a fallback for content which has no
+    // text range or supported media element (for example, a custom widget).
+    if (bottom === top) return Math.ceil(element.scrollHeight)
+
+    const paddingBottom = Number.parseFloat(getComputedStyle(element).paddingBottom) || 0
+    return Math.ceil(bottom - top + paddingBottom)
+}
+
 function getShrunkCardHeight(shape: ICardShape): number | null {
     const host = getShapeHostElement(shape.id as string)
     const container = host?.querySelector<HTMLElement>('[blockid]') || null
     const source = container?.querySelector<HTMLElement>('.protyle-wysiwyg') || null
-    if (!container || !source || source.childElementCount === 0 || container.clientWidth <= 0) return null
+    if (!container || !source || source.childElementCount === 0 || source.offsetWidth <= 0) return null
+
+    // Preserve the source's tldraw parent selector while measuring. In particular,
+    // it resets Siyuan's `.render-node` min-height; measuring the clone directly
+    // under `body` otherwise adds a blank line to short cards.
+    const measureRoot = document.createElement('div')
+    measureRoot.className = 'tl-html-container'
+    measureRoot.style.position = 'fixed'
+    measureRoot.style.left = '-10000px'
+    measureRoot.style.top = '0'
+    measureRoot.style.visibility = 'hidden'
+    measureRoot.style.pointerEvents = 'none'
+    measureRoot.style.width = `${source.offsetWidth}px`
+    measureRoot.style.contain = 'layout style'
 
     const clone = source.cloneNode(true) as HTMLElement
-    clone.style.position = 'fixed'
-    clone.style.left = '-10000px'
-    clone.style.top = '0'
-    clone.style.visibility = 'hidden'
-    clone.style.pointerEvents = 'none'
-    clone.style.width = `${container.clientWidth}px`
+    clone.style.width = '100%'
     clone.style.height = 'auto'
     clone.style.minHeight = '0'
     clone.style.maxHeight = 'none'
     clone.style.overflow = 'visible'
     clone.style.boxSizing = 'border-box'
-    document.body.appendChild(clone)
+    measureRoot.appendChild(clone)
+    document.body.appendChild(measureRoot)
 
     try {
-        const contentHeight = Math.ceil(clone.getBoundingClientRect().height)
-        const cardChromeHeight = Math.max(0, shape.props.h - container.clientHeight)
+        const contentHeight = getVisibleContentHeight(clone)
+        // Account for the card border and the content container's padding using
+        // the actual source element, rather than assuming the container fills h.
+        const cardChromeHeight = Math.max(0, shape.props.h - source.offsetHeight)
         return Math.max(CARD_AUTO_SHRINK_MIN_HEIGHT, contentHeight + cardChromeHeight)
     } finally {
-        clone.remove()
+        measureRoot.remove()
     }
 }
 
