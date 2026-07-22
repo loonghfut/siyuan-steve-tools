@@ -34,6 +34,10 @@
     border-radius: 14px;
 }
 
+.tlui-main-toolbar__extras__controls {
+    background-color: var(--b3-theme-surface) !important;
+}
+
 /* 添加以下样式 */
 .tldraw__editor {
   .protyle-gutters {
