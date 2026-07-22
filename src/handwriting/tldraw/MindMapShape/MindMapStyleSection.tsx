@@ -39,7 +39,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
             {/* 字号选择 */}
             <div className="tlui-style-panel__section">
                 <TldrawUiSlider
-                    label={`字号${mindMapFontSizeValue === 'mixed' ? '' : ` �?${mindMapFontSizeValue}px`}`}
+                    label={`字号${mindMapFontSizeValue === 'mixed' ? '' : ` — ${mindMapFontSizeValue}px`}`}
                     title="思维导图字号"
                     min={20}
                     steps={48}
@@ -110,7 +110,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
 
             {/* 方向选择 */}
             <div className="tlui-style-panel__section">
-                <div style={{ display: 'flex', gap: '0px' }}>
+                <div className="tlui-custom-button-row">
                     {(['up', 'down', 'left', 'right'] as const).map(dir => {
                         const v = selectedMindMapShapes.length ? selectedMindMapShapes[0].props.direction : 'right'
                         const icons = { up: 'arrange-up', down: 'arrange-down', left: 'arrange-left', right: 'arrange-right' }
@@ -118,8 +118,9 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
                         return (
                             <TldrawUiButton
                                 key={dir}
-                                type={v === dir ? 'primary' : 'normal'}
-                                style={{ flex: '1 1 0', minWidth: '0' }}
+                                type="normal"
+                                className={v === dir ? 'tlui-toggle-button--active' : undefined}
+                                aria-pressed={v === dir}
                                 onClick={() => {
                                     if (!selectedMindMapShapes.length) return
                                     editor.run(() => {
@@ -141,7 +142,7 @@ export const MindMapStyleSection: React.FC<MindMapStyleSectionProps> = ({
                 </div>
             </div>
 
-            {/* 绑定思源�?*/}
+            {/* 绑定思源�?*/}
             <div className="tlui-style-panel__section">
                 <MindMapBindingUI
                     selectedMindMapShapes={selectedMindMapShapes}

@@ -334,6 +334,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                     <TldrawUiButton
                         type="normal"
                         className={`tlui-toggle-button ${collapsedState === true ? 'tlui-toggle-button--active' : collapsedState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
+                        aria-pressed={collapsedState === true}
                         onClick={() => {
                             const nextCollapsed = collapsedState === 'mixed' ? true : !collapsedState
                             editor.run(() => {
@@ -344,12 +345,6 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                         }}
                         title={collapsedState === true ? '展开选中的卡片' : '折叠选中的卡片'}
                         aria-label="切换卡片折叠状态"
-                        style={{
-                            fontWeight: collapsedState === true ? 700 : undefined,
-                            background: collapsedState === true ? 'var(--tl-color-muted-2)' : undefined,
-                            color: collapsedState === true ? 'var(--b3-theme-on-surface, var(--color-text))' : undefined,
-                            opacity: collapsedState === 'mixed' ? 0.85 : undefined,
-                        }}
                     >
                         <TldrawUiIcon label="" icon={collapsedState === true ? 'card-expand' : 'card-collapse'} />
                     </TldrawUiButton>
@@ -387,7 +382,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             })
                         }}
                     />
-                    <div className="tlui-toggle-button-row" style={{ marginTop: '4px' }}>
+                    <div className="tlui-toggle-button-row">
                         <TldrawUiButton
                             type="normal"
                             className="tlui-toggle-button"
@@ -402,8 +397,7 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
 
                 <div className="tlui-style-panel__section">
                     {/* 折叠后文字对齐方式 */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', gap: '0px' }}>
+                    <div className="tlui-custom-button-row">
                             {([
                                 { value: 'left', label: '靠左', icon: 'text-align-left-custom' },
                                 { value: 'center', label: '居中', icon: 'text-align-center-custom' },
@@ -411,8 +405,9 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             ] as const).map(({ value, label, icon }) => (
                                 <TldrawUiButton
                                     key={value}
-                                    type={collapsedTextAlignValue === value ? 'primary' : 'normal'}
-                                    style={{ flex: '1 1 0', minWidth: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    type="normal"
+                                    className={collapsedTextAlignValue === value ? 'tlui-toggle-button--active' : collapsedTextAlignValue === 'mixed' ? 'tlui-toggle-button--mixed' : undefined}
+                                    aria-pressed={collapsedTextAlignValue === value}
                                     onClick={() => {
                                         if (!selectedCardShapes.length) return
                                         editor.run(() => {
@@ -430,7 +425,6 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                                     <TldrawUiIcon label="" icon={icon} />
                                 </TldrawUiButton>
                             ))}
-                        </div>
                     </div>
                 </div>
             </>}
@@ -471,11 +465,9 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
 
             {selectedMainCard && (
                 <div className="tlui-style-panel__section">
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ display: 'flex', gap: '0px' }}>
+                    <div className="tlui-custom-button-row">
                             <TldrawUiButton
                                 type="normal"
-                                style={{ flex: '1 1 0', minWidth: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 disabled={insertingChildDocs}
                                 onClick={() => { void handleInsertAllChildDocs() }}
                                 title="插入全部子文档"
@@ -484,14 +476,12 @@ export const CardStyleSection: React.FC<CardStyleSectionProps> = ({
                             </TldrawUiButton>
                             <TldrawUiButton
                                 type="normal"
-                                style={{ flex: '1 1 0', minWidth: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 disabled={insertingOutline}
                                 onClick={() => { void handleInsertAllOutline() }}
                                 title="插入全部大纲块"
                             >
                                 <TldrawUiIcon label="" icon={insertingOutline ? 'loading-spinner' : 'outline-blocks'} />
                             </TldrawUiButton>
-                        </div>
                     </div>
                 </div>
             )}

@@ -2,7 +2,7 @@
  * 思维导图绑定思源块 UI 组件
  */
 import React from 'react'
-import { TldrawUiButton, Editor } from '@tldraw/tldraw'
+import { TldrawUiButton, TldrawUiButtonLabel, Editor } from '@tldraw/tldraw'
 import { showMessage, openTab } from 'siyuan'
 import { getBlockKramdown } from '@/api/api'
 import { parseMarkdownToMindMap } from './mind-map-markdown'
@@ -109,54 +109,56 @@ export const MindMapBindingUI: React.FC<MindMapBindingUIProps> = ({ selectedMind
 
     if (!singleSelected) {
         return (
-            <div style={{ fontSize: 12, color: 'var(--b3-theme-on-surface-light)', padding: '4px 0' }}>
+            <div className="tlui-custom-panel-note">
                 选中单个思维导图以绑定思源块
             </div>
         )
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="tlui-custom-panel-group">
             {isLinked ? (
                 <>
-                    <div style={{ fontSize: 11, color: 'var(--b3-theme-on-surface-light)', wordBreak: 'break-all' }}>
+                    <div className="tlui-custom-panel-note">
                         已绑定: {linkedBlockId.slice(0, 8)}...
                     </div>
-                    <div style={{ display: 'flex', gap: '4px' }}>
+                    <div className="tlui-custom-button-row">
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: 1 }}
                             onClick={handleRefresh}
                             title="从思源块重新获取内容"
                         >
-                            刷新
+                            <TldrawUiButtonLabel>刷新</TldrawUiButtonLabel>
                         </TldrawUiButton>
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: 1 }}
                             onClick={handleJumpToBlock}
                             title="跳转到绑定的思源块"
                         >
-                            跳转
+                            <TldrawUiButtonLabel>跳转</TldrawUiButtonLabel>
                         </TldrawUiButton>
                     </div>
-                    <TldrawUiButton
-                        type="normal"
-                        onClick={handleUnbindBlock}
-                        title="解除绑定后可手动编辑思维导图"
-                    >
-                        解除绑定
-                    </TldrawUiButton>
+                    <div className="tlui-custom-button-row">
+                        <TldrawUiButton
+                            type="normal"
+                            onClick={handleUnbindBlock}
+                            title="解除绑定后可手动编辑思维导图"
+                        >
+                            <TldrawUiButtonLabel>解除绑定</TldrawUiButtonLabel>
+                        </TldrawUiButton>
+                    </div>
                 </>
             ) : (
-                <TldrawUiButton
-                    type="normal"
-                    onClick={handleOpenBindDialog}
-                    disabled={isBinding}
-                    title="输入思源块ID后点击绑定，将从该块获取 Markdown 内容渲染思维导图"
-                >
-                    {isBinding ? '绑定中...' : '绑定思源块'}
-                </TldrawUiButton>
+                <div className="tlui-custom-button-row">
+                    <TldrawUiButton
+                        type="normal"
+                        onClick={handleOpenBindDialog}
+                        disabled={isBinding}
+                        title="输入思源块ID后点击绑定，将从该块获取 Markdown 内容渲染思维导图"
+                    >
+                        <TldrawUiButtonLabel>{isBinding ? '绑定中...' : '绑定思源块'}</TldrawUiButtonLabel>
+                    </TldrawUiButton>
+                </div>
             )}
         </div>
     )

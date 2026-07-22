@@ -279,11 +279,10 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                     })
                 }}
             />
-            <div style={{ display: 'flex', gap: 0, marginTop: '-8px' }}>
+            <div className="tlui-custom-button-row">
                 <TldrawUiButton
                     type="normal"
                     onClick={handleToggleFocus}
-                    style={{ flex: '1 1 0', minWidth: 0 }}
                     title={isThisSlideFocused ? '退出聚焦（Esc）' : '聚焦此 Slide（仅显示 Slide 内内容）'}
                     aria-label={isThisSlideFocused ? '退出聚焦' : '聚焦此 Slide'}
                 >
@@ -292,7 +291,6 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                 <TldrawUiButton
                     type="normal"
                     onClick={handleCopyLink}
-                    style={{ flex: '1 1 0', minWidth: 0 }}
                     title="复制链接"
                     aria-label="复制链接"
                     disabled={rootId === ''}
@@ -302,7 +300,6 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                 <TldrawUiButton
                     type="normal"
                     onClick={handleOpenSlideBlock}
-                    style={{ flex: '1 1 0', minWidth: 0 }}
                     title="跳转到笔记"
                     aria-label="跳转到笔记"
                 >
@@ -311,7 +308,6 @@ export const SlideStyleSection: React.FC<SlideStyleSectionProps> = ({
                 <TldrawUiButton
                     type="normal"
                     onClick={handleCaptureScreenshot}
-                    style={{ flex: '1 1 0', minWidth: 0 }}
                     title={isCapturingScreenshot ? '生成中…' : '更新截图'}
                     aria-label={isCapturingScreenshot ? '生成中…' : '更新截图'}
                     disabled={isCapturingScreenshot}

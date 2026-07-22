@@ -113,11 +113,10 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
 
         return (
             <div className="tlui-style-panel__section">
-                <div style={{ display: 'flex', gap: 0 }}>
+                <div className="tlui-custom-button-row">
                     {hasAnyArrow && (
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                             title="将选中箭头批量转换为曲线连接器（保留文字，尽量保留绑定）"
                             onClick={handleToBezier}
                         >
@@ -127,7 +126,6 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                     {hasAnyBezier && (
                         <TldrawUiButton
                             type="normal"
-                            style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                             title="将选中曲线连接器批量转换为箭头（保留文字，尽量保留绑定）"
                             onClick={handleToArrow}
                         >
@@ -165,10 +163,9 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
 
         return (
             <div className="tlui-style-panel__section">
-                <div style={{ display: 'flex' }}>
+                <div className="tlui-custom-button-row">
                     <TldrawUiButton
                         type="normal"
-                        style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                         title="创建并绑定卡片"
                         onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'card')}
                     >
@@ -176,7 +173,6 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="normal"
-                        style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                         title="创建并绑定单块"
                         onClick={() => createAndBindShapeLocal(unconnectedTerminal, 'single-block')}
                     >
@@ -208,10 +204,9 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
 
         return (
             <div className="tlui-style-panel__section">
-                <div style={{ display: 'flex' }}>
+                <div className="tlui-custom-button-row">
                     <TldrawUiButton
                         type="normal"
-                        style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                         title="跳转到起点"
                         onClick={() => jumpToShape(terminals.startShapeId)}
                     >
@@ -219,7 +214,6 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                     </TldrawUiButton>
                     <TldrawUiButton
                         type="normal"
-                        style={{ flex: 1, color: 'var(--color-text)', fontWeight: 400 }}
                         title="跳转到终点"
                         onClick={() => jumpToShape(terminals.endShapeId)}
                     >
@@ -244,8 +238,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                         value={connectorStrokeState === 'mixed' ? null : connectorStrokeState * 2}
                         onValueChange={(value) => handleConnectorWidthChange(value / 2)}
                     />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginTop: 8 }}>
-                        <div className="tlui-toggle-button-row" style={{ marginLeft: 8 }}>
+                    <div className="tlui-toggle-button-row">
                             {(['solid', 'dashed', 'flowing'] as const).map((style) => {
                                 const isMixed = connectorStrokeStyleState === 'mixed'
                                 const isActive = connectorStrokeStyleState === style
@@ -254,6 +247,7 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                                         key={style}
                                         type="normal"
                                         className={`tlui-toggle-button ${isActive ? 'tlui-toggle-button--active' : isMixed ? 'tlui-toggle-button--mixed' : ''}`}
+                                        aria-pressed={isActive}
                                         onClick={() => handleConnectorStyleChange(style)}
                                     >
                                         <TldrawUiIcon label=""
@@ -262,7 +256,6 @@ export const BezierConnectorStyleSection: React.FC<BezierConnectorStyleSectionPr
                                     </TldrawUiButton>
                                 )
                             })}
-                        </div>
                     </div>
                 </div>
             )}

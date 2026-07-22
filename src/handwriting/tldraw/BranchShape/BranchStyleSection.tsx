@@ -186,18 +186,13 @@ export const BranchStyleSection: React.FC<BranchStyleSectionProps> = ({
 					<TldrawUiButton
 						type="normal"
 						className={`tlui-toggle-button ${showBackgroundState === true ? 'tlui-toggle-button--active' : showBackgroundState === 'mixed' ? 'tlui-toggle-button--mixed' : ''}`}
+						aria-pressed={showBackgroundState === true}
 						onClick={() => {
 							const next = showBackgroundState === 'mixed' ? true : !showBackgroundState
 							updateBranchProps(() => ({ showBackground: next }), { relayout: true })
 						}}
 						title="显示或隐藏 Branch 背景"
 						aria-label="Branch 背景"
-						style={{
-							fontWeight: showBackgroundState === true ? 700 : undefined,
-							background: showBackgroundState === true ? 'var(--tl-color-muted-2)' : undefined,
-							color: showBackgroundState === true ? 'var(--b3-theme-on-surface, var(--color-text))' : undefined,
-							opacity: showBackgroundState === 'mixed' ? 0.85 : undefined,
-						}}
 					>
 						<TldrawUiIcon label="" icon="branch-background" />
 					</TldrawUiButton>
