@@ -1,6 +1,6 @@
 ﻿export function getTldrawAgentCapabilities() {
     return {
-        version: 3,
+        version: 4,
         enabled: true,
         agentPrompt: [
             'For whiteboard shape work, call tldraw_shape_command. It can use the focused whiteboard and current selection automatically.',
@@ -20,7 +20,7 @@
             'To arrange or frame shapes, call tldraw_shape_command with intent "layoutShapes" and layoutStyle "nearSelection", "rightOf", "below", "grid", "tree", "mindmap", or "frameAround".',
             'To import Mermaid diagrams into the board, call tldraw_import_mermaid with mermaid text. Omit whiteboardId to use the focused whiteboard.',
             'If the user refers to the current board or selected shapes, omit whiteboardId and use $selection / $selection[0]. The focused whiteboard is used automatically.',
-            'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences. A js-shape must be created with a complete plain-JavaScript node.script: render into api.dom, persist state with api.getData()/api.saveData(), use api.shape for its dimensions, and return optional cleanup. Do not use Markdown fences, imports, or direct document access. Keep restrictDom true unless the user explicitly requires otherwise; use interactive:true only for controls.',
+            'Use card for existing document/heading blocks or substantial content, single-block for compact notes, text/note for unlinked labels, frame for visual grouping, slide/mind-map/js-shape for their custom experiences. A js-shape must be created with a complete plain-JavaScript node.script: render into api.dom, persist state with api.getData()/api.saveData(), use api.shape for its dimensions, and return optional cleanup. Do not use Markdown fences, imports, or direct document access. Keep restrictDom true unless the user explicitly requires otherwise; use interactive:true only for controls. After every JS shape create or script update, read the returned runtimeDiagnostics/runtime result. If it reports error or disabled, correct the complete patch.script and call updateShape again; get shape details also exposes safe runtime state without exposing source code.',
             'The old board-edit DSL tool is intentionally not registered. Do not construct operations arrays.',
             'To create a new whiteboard, call tldraw_open_whiteboard with createNew:true or omit whiteboardId and pass a title. The tool creates the backing SiYuan document and opens its whiteboard; do not invent a whiteboardId.',
             'The open whiteboard autosaves every edit, so do not pass save:true on each operation and do not call tldraw_save_whiteboard after every change. Omit save and let autosave persist the edit. Call tldraw_save_whiteboard only when the user explicitly asks to flush immediately (for example, right before closing).',
@@ -66,7 +66,7 @@
                     'bezier-connector': ['color', 'strokeWidth', 'strokeStyle', 'labelPosition', 'text'],
                     'mind-map': ['color', 'theme', 'direction', 'fontSize', 'nodeWidth', 'nodeHeight', 'lineWidth', 'horizontalGap', 'verticalGap', 'text'],
                     slide: ['color', 'name', 'borderStyle'],
-                    'js-shape': ['color', 'interactive', 'restrictDom'],
+                    'js-shape': ['color', 'interactive', 'restrictDom', 'script (write-only replacement)'],
                 },
                 defaults: {
                     whiteboardId: 'omit it for the focused board',
@@ -179,7 +179,7 @@
                 notes: [
                     'Create it with tldraw_shape_command intent createShapes and a node containing kind:"js-shape" plus complete plain-JavaScript script source.',
                     'The script receives api.dom, api.getData(), api.saveData(data), api.clearData(), and api.shape. Render only into api.dom; use api.shape.width/height for responsive UI and return a cleanup function for timers/listeners.',
-                    'Agent-supplied scripts are accepted only during creation. Existing scripts and raw data remain protected from updateShape.',
+                    'Syntax errors are returned before creation. Runtime errors are returned in create/update results and included as safe runtime diagnostics in shape details; use updateShape with a complete patch.script to correct them. Current source remains write-only and raw data stays protected.',
                     'restrictDom defaults to true. Set interactive:true only when the generated UI has controls; handlers should stop event propagation so canvas selection and dragging continue to work.',
                 ],
             },

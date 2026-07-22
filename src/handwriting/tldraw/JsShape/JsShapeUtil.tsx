@@ -15,6 +15,7 @@ import { jsShapeProps } from './js-shape-props'
 import { jsShapeMigrations } from './js-shape-migrations'
 import { CodeEditor, CodeEditorRef } from './CodeEditor'
 import { createEditorDialogContent, DEFAULT_SCRIPT, PLACEHOLDER_HTML, ScriptRunnerEnv } from './static'
+import { reportJsShapeRuntimeStatus } from './runtime-status'
 import { getDefaultColorTheme } from '../utils/color-theme'
 
 export class JsShapeUtil extends ShapeUtil<IJsShape> {
@@ -282,7 +283,9 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			// 检查全局禁用开关
 			if (settingdata?.['js-shape-disable-execution'] === true) {
 				host.innerHTML = '<div style="padding:16px;color:#ef4444;text-align:center;">脚本执行已全局禁用，请在插件设置中开启。</div>'
-				setRuntimeError('全局禁用：管理员已关闭 JS 形状脚本执行功能')
+				const message = '全局禁用：管理员已关闭 JS 形状脚本执行功能'
+				setRuntimeError(message)
+				reportJsShapeRuntimeStatus(currentShape.id, { state: 'disabled', message })
 				return
 			}
 
@@ -292,8 +295,10 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 			if (!trimmed) {
 				host.innerHTML = PLACEHOLDER_HTML
 				setRuntimeError(null)
+				reportJsShapeRuntimeStatus(currentShape.id, { state: 'empty' })
 				return
 			}
+			reportJsShapeRuntimeStatus(currentShape.id, { state: 'running' })
 
 			const saveData = (data: any) => {
 				const latestShape = (this.editor.getShape(currentShape.id) as IJsShape | undefined) ?? currentShape
@@ -379,6 +384,7 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 					}
 				}
 				setRuntimeError(null)
+				reportJsShapeRuntimeStatus(currentShape.id, { state: 'success' })
 				// clear editor diagnostics
 				try { codeEditorRef.current?.setDiagnostics?.([]) } catch (e) {}
 			} catch (err: any) {
@@ -392,7 +398,9 @@ export class JsShapeUtil extends ShapeUtil<IJsShape> {
 						isSandboxBlock = true
 					}
 				}
-				setRuntimeError((isSandboxBlock ? '安全限制阻止访问 document（请使用 api.dom）：' : '脚本错误：') + msg)
+				const message = (isSandboxBlock ? '安全限制阻止访问 document（请使用 api.dom）：' : '脚本错误：') + msg
+				setRuntimeError(message)
+				reportJsShapeRuntimeStatus(currentShape.id, { state: 'error', message })
 				// try to parse line/col from stack or message to annotate editor
 				try {
 					const stack = err?.stack || msg || ''
