@@ -777,6 +777,26 @@ async function executeAgentShapeCommandCreate(
         for (let index = 0; index < rawNodes.length; index++) {
             await validateBoardNodeCreate(rawNodes[index], new Set(), `nodes[${index}]`);
         }
+		const requestedJsShape = rawNodes.some((node) => node.kind === 'js-shape');
+		const failedSelectedJsShapeIds = requestedJsShape ? getSelectedFailedJsShapeIds(editor) : [];
+		if (failedSelectedJsShapeIds.length) {
+			return {
+				ok: false,
+				intent: request.intent,
+				whiteboardId: runtime.id,
+				target: request.target,
+				items: [{
+					correction: {
+						action: 'tldraw_shape_command',
+						intent: 'updateShape',
+						target: failedSelectedJsShapeIds[0],
+						shapeIds: failedSelectedJsShapeIds,
+						instruction: 'A selected JS shape has a runtime error. Do not create a duplicate. Correct the complete script and call updateShape on this original shape ID with patch:{script:"..."}.',
+					},
+				}],
+				errors: [`Selected JS shape ${failedSelectedJsShapeIds[0]} has an unresolved runtime error; update that original shape instead of creating another JS shape.`],
+			};
+		}
 
         const createdIds: string[] = [];
         const created: Record<string, string[]> = {};
@@ -841,6 +861,14 @@ async function collectJsShapeRuntimeDiagnostics(editor: Editor, shapeIds: string
         shapeId,
         runtime: await waitForJsShapeRuntimeStatus(shapeId, 500),
     })));
+}
+
+/** Prevents Agent retry loops from turning a broken selected JS shape into duplicate shapes. */
+function getSelectedFailedJsShapeIds(editor: Editor): string[] {
+	return editor.getSelectedShapeIds()
+		.filter((shapeId) => editor.getShape(shapeId)?.type === 'js-shape')
+		.filter((shapeId) => getJsShapeRuntimeStatus(String(shapeId))?.state === 'error')
+		.map(String);
 }
 
 async function executeAgentShapeCommandConnect(
