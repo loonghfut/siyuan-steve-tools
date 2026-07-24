@@ -40,51 +40,24 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     background-color: $background-color !important;
     padding: 6px 8px;
     border-radius: $calendar-radius-lg;
-}
 
-//时间条
-.fc-timegrid-event-harness {
-    max-width: none;
-
-    * {
-        border: none;
+    ::-webkit-scrollbar {
+        width: 0px !important;
+        height: 10px;
     }
 
-    .fc-timegrid-event {
-        opacity: 0.94 !important;
-        border-radius: $calendar-radius-md;
-        box-shadow: none;
-        transition: filter 0.15s ease, box-shadow 0.15s ease;
-
-        &:hover {
-            filter: brightness(1.03);
-            box-shadow: $calendar-shadow-sm;
-        }
-
-        .fc-event-main {
-            .fc-event-main-frame {
-                min-height: 18px;
-
-                .fc-event-time {
-                    display: none;
-                }
-
-                .fc-event-title-container {
-                    .fc-event-title {
-                        font-size: 12px;
-                        line-height: 1.25;
-                        word-break: break-word;
-                    }
-                }
-            }
-        }
-    }
 }
 
+.fc-v-event {
+    background-color: var(--fc-event-bg-color);
+    border: none !important;
+    display: block;
+}
 
-
-
-
+.fc-theme-standard td,
+.fc-theme-standard th {
+    border: none !important;
+}
 
 //边框问题
 .fc-scrollgrid-section-header,
@@ -226,11 +199,7 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     color: $text-color;
 }
 
-.fc-theme-standard td,
-.fc-theme-standard th,
-.fc-theme-standard {
-    border: 1px solid $border-color !important;
-}
+
 
 .fc-toolbar {
     background-color: $background-color;
@@ -264,13 +233,13 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     background-color: $hover-background-color;
 }
 
-.fc-event {
-    background-color: $background-color;
-    color: $text-color;
-    border-radius: $calendar-radius-md !important;
-    border: 1px solid rgba(0, 0, 0, 0.03);
-    overflow: hidden;
-}
+// .fc-event {
+//     background-color: $background-color;
+//     color: $text-color;
+//     border-radius: $calendar-radius-md !important;
+//     border: 1px solid rgba(0, 0, 0, 0.03);
+//     overflow: hidden;
+// }
 
 .fc-event:hover {
     filter: brightness(1.03);
@@ -373,60 +342,9 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     /* 设置边框颜色 */
 }
 
-.fc .fc-timegrid-slot {
-    border-bottom: 0px;
-    height: calc((100vh - 255px) / 24); // 减去顶部工具栏、标题等空间，平均分配给24个时间槽
-}
-
-.fc-multimonth-singlecol .fc-day {
-    background-color: $background-color;
-    /* 设置单个日期单元格的背景颜色 */
-    color: $text-color;
-    /* 设置单个日期单元格的文字颜色 */
-}
-
-.fc-multimonth-singlecol .fc-day:hover {
-    background-color: $hover-background-color;
-    /* 设置单个日期单元格在鼠标悬停时的背景颜色 */
-    color: $text-color;
-    /* 设置单个日期单元格在鼠标悬停时的文字颜色 */
-}
-
-.fc-multimonth-title {
-    background-color: $background-color;
-    /* 设置背景颜色 */
-    color: $text-color;
-    /* 设置文字颜色 */
-    border-color: $border-color;
-    /* 设置边框颜色 */
-}
-
-.fc .fc-cell-shaded,
-.fc .fc-day-disabled {
-    background: $background-color;
-}
-
-// .fc .fc-daygrid-day.fc-day-today {
-//     background-color: $background-color-today;
-// }
 
 
 
-//日程字体
-.fc-v-event {
-    .fc-event-title-container {
-        flex-grow: 1;
-        flex-shrink: 1;
-        min-height: 0;
-        padding: 2px 6px;
-        border-radius: $calendar-radius-sm;
-        transition: background-color 0.15s ease;
-
-        &:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-    }
-}
 
 
 //悬浮
@@ -676,6 +594,7 @@ body.st-invert-mode .emoji {
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }

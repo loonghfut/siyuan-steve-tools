@@ -982,10 +982,7 @@ export async function run(
             if (settingdata["cal-event-tooltip"]) tippy(info.el, {
                 content: `
                     <div class="event-tooltip">
-                        <span class="event-tooltip__title"
-                            data-type="block-ref"
-                            data-id="${info.event.extendedProps.blockId || ''}"
-                        >
+                        <span class="event-tooltip__title">
                             ${info.event.title}
                         </span>
                         <div class="event-tooltip__content">
