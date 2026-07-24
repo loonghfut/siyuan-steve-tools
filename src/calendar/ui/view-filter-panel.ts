@@ -1,5 +1,5 @@
-import { moduleInstances } from '..';
-import { av_ids } from './calendar';
+import { moduleInstances } from '@/index';
+import { av_ids } from './calendar-view';
 import {
     ViewGroup,
     userGroups,
@@ -17,7 +17,7 @@ import {
     getUngroupedViews,
     getAllViewIds,
     getViewLabel,
-} from './initializeGroups';
+} from './view-groups';
 
 // ============== 小工具 ==============
 const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';

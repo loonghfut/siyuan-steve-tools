@@ -1,6 +1,6 @@
 import { EventInput } from '@fullcalendar/core';
-import { getBlockAttrs, sql } from '../api/api';
-import { ATTRS } from '../lifelog/module-lifelog';
+import { getBlockAttrs, sql } from '@/api/api';
+import { ATTRS } from '@/lifelog/module-lifelog';
 import { settingdata } from '@/index';
 
 // 把 "HH:mm" 或 "HH:mm:ss" 拆为 [h, m, s?]；非法值兜底为 0

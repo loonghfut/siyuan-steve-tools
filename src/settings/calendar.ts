@@ -1,4 +1,4 @@
-import { convertProjectsToRecord } from "@/calendar/dida/dida_interface";
+import { convertProjectsToRecord } from "@/calendar/integrations/dida/dida_interface";
 import { DidaService } from "@/calendar/module-calendar";
 import type { SettingGroupDefinition, BuildContext } from "./types";
 
@@ -154,7 +154,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
         {
             name: "ics分享",
             items: [
-                { type: "select", title: "ics分享平台", description: "可能存在隐私风险，请谨慎", key: "cal-share", value: ctx.settings["ai-url-type"], options: { "": "无", alist: "alist", s3: "s3", "s3-diy": "s3-diy", webdav: "WebDAV" } },
+                { type: "select", title: "ics分享平台", description: "可能存在隐私风险，请谨慎", key: "cal-share", value: ctx.settings["ai-url-type"], options: { "": "无", s3: "s3", "s3-diy": "s3-diy", webdav: "WebDAV" } },
                 { type: "textinput", title: "触发平台", description: `当前平台：${ctx.frontEnd} （空=全部）`, key: "SelectTOPics", value: ctx.settings["SelectTOPics"] },
                 { type: "textinput", title: "S3_Bucket", description: "s3-diy 填写", key: "cal-s3-bucket", value: ctx.settings["cal-s3-bucket"] },
                 { type: "textinput", title: "S3_AccessKeyId", description: "s3-diy 填写", key: "cal-s3-accessKeyId", value: ctx.settings["cal-s3-accessKeyId"] },

@@ -2,7 +2,7 @@ import * as api from "@/api/api";
 import { fetchSyncPost, showMessage } from "siyuan";
 import steveTools, { settingdata, moduleInstances } from "@/index";
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
-import { getViewId, getViewValue } from "../myF";
+import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
 
 interface ICSEvent {
     uid: string;

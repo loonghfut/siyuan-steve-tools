@@ -1,28 +1,28 @@
 import { showMessage } from "siyuan";
-import { Dida365ApiClient } from "@/calendar/dida/api/dida-api-client";
-import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "@/calendar/dida/dida_interface";
+import { Dida365ApiClient } from "@/calendar/integrations/dida/api/dida-api-client";
+import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "@/calendar/integrations/dida/dida_interface";
 import steveTools, { settingdata } from "@/index";
-import { getViewId, getViewValue } from "@/calendar/myF";
+import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
-import { formatDateForDida, formatDateToISO, formatLocalDate } from "@/calendar/dida/siyuan_api";
+import { formatDateForDida, formatDateToISO, formatLocalDate } from "@/calendar/integrations/dida/siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
 import { beginTaggedRequests, endTaggedRequests } from "@/api/network-interceptor";
-import type { DidaSyncFeature } from "@/calendar/dida/sync/sync-feature";
-import { TaskSyncStore } from "@/calendar/dida/storage/task-sync-store";
+import type { DidaSyncFeature } from "@/calendar/integrations/dida/sync/sync-feature";
+import { TaskSyncStore } from "@/calendar/integrations/dida/storage/task-sync-store";
 import {
     getDidaStatusAttr,
     hasSiyuanTaskChanged,
     mapDidaTaskToSiyuan,
     parseDidaReminders,
     removeDidaLinks,
-} from "@/calendar/dida/mappers/task-mapper";
+} from "@/calendar/integrations/dida/mappers/task-mapper";
 import {
     buildDidaImportTemplateData,
     getDefaultDidaImportTemplate,
     renderDidaTemplate,
-} from "@/calendar/dida/mappers/task-template-mapper";
-import { SiyuanTaskChangeSource } from "@/calendar/dida/sync/siyuan-task-change-source";
+} from "@/calendar/integrations/dida/mappers/task-template-mapper";
+import { SiyuanTaskChangeSource } from "@/calendar/integrations/dida/sync/siyuan-task-change-source";
 export class DidaTaskSyncFeature implements DidaSyncFeature {
     readonly id = "tasks";
     private apiClient: Dida365ApiClient;

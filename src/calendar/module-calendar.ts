@@ -3,31 +3,26 @@ import { EventAttributes } from 'ics';
 import * as api from "@/api/api"
 import { showMessage, openTab, Dialog, getFrontend, Menu } from "siyuan";
 import * as ic from "@/icon"
-import "./event_style.scss";
+import "./ui/styles/calendar-events.scss";
 declare const siyuan: any;
-import { init_viewValue, run, update_av_ids } from "./calendar";
-export let calendarpath = 'data/public/stevetools/calendar.ics';
-let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
-export const eventsPath = 'data/public/stevetools/events.json';
-export let linkToCalendar = '';
-import * as myF from "./myF";
-import { activeCalendars, scheduleCalendarRefresh, unregisterCalendarInstance } from './calendar-runtime';
+import { init_viewValue, run, update_av_ids } from "./ui/calendar-view";
+import * as myF from "./data/calendar-data";
+import { CALENDAR_EVENTS_JSON_PATH, calendarPaths, configureCalendarPaths } from './config/calendar-paths';
+import { activeCalendars, scheduleCalendarRefresh, unregisterCalendarInstance } from './core/calendar-runtime';
 import { registerTransactionListener } from './listeners/transactionListener';
 import { LIFELOG_CHANGED_EVENT } from '../lifelog/module-lifelog';
-import { LifelogView } from './lifelog-view';
-import { icsFileManager, transformEvents } from './ics/IcsFileManager';
-import { createScheduleInConfiguredDatabase } from './event-creation';
-import { openScheduleEditor } from './schedule-editor';
-import { addQuickAddButton, getCursorContainer } from './quickadd';
-import { M_caldata } from "./M_caldata";
-import { ics_alist } from "./share/alist";
-import { ics_s3 } from "./share/s3";
-import { WebDAVSync } from "./share/webdav";
-import { ICSSubscription } from "./share/ics_discribe";
+import { LifelogView } from './integrations/lifelog-event-source';
+import { icsFileManager, transformEvents } from './integrations/ics/IcsFileManager';
+import { createScheduleInConfiguredDatabase } from './features/schedule-creation';
+import { openScheduleEditor } from './features/schedule-editor';
+import { addQuickAddButton, getCursorContainer } from './features/quick-add';
+import { M_caldata } from "./config/calendar-view-config";
+import { ics_s3 } from "./integrations/share/s3";
+import { WebDAVSync } from "./integrations/share/webdav";
+import { ICSSubscription } from "./integrations/share/ics_discribe";
 import { Calendar } from "@fullcalendar/core";
-// import { insertHtml, THIS } from "./insertHtml"; // 未使用，保留注释以供未来参考
-import { ICSImporter } from "./ics/ics_siyuan";
-import { Dida365Service } from "./dida/features/dida-service";
+import { ICSImporter } from "./integrations/ics/ics_siyuan";
+import { Dida365Service } from "./integrations/dida/features/dida-service";
 // import { AVManager } from "@/api/db_pro"; // 未使用
 import { IAVOperator } from "@/api/db_interface";
 import { extractDataAvId } from "@/api/api3";
@@ -88,7 +83,6 @@ export class M_calendar {
     // private isSettingAttrs: boolean = false;  // 暂未使用，后续如需并发控制可启用
     public av_ids: any = [];
     public calConfig: M_caldata;
-    public alistPlugin: ics_alist;
     public s3Client: ics_s3;
     public webdavClient: WebDAVSync;
     public icsSubscription: ICSSubscription;
@@ -129,15 +123,13 @@ export class M_calendar {
         await this.calConfig.load();
         // console.debug(this.calConfig.getAll());
         this_settingdata = settingdata;
-        calendarpath = `data/public/stevetools/${settingdata["cal-url"]}`;
-        calendarpath2 = `public/stevetools/${settingdata["cal-url"]}`;
+        configureCalendarPaths(settingdata["cal-url"]);
         this.plugin.addIcons(`
     <symbol id="iconSTcal" viewBox="0 0 500 500">
        ${ic.steveTools_cal}
     </symbol>
         `);
-        this.checkAndCreateEventsFile(eventsPath);
-        linkToCalendar = calendarpath2;
+        this.checkAndCreateEventsFile(CALENDAR_EVENTS_JSON_PATH);
         this.loadedProtyleHandler = this.avButton.bind(this);
         this.switchProtyleInitHandler = this.avButton.bind(this);
         this.plugin.eventBus.on("loaded-protyle-dynamic", this.loadedProtyleHandler);
@@ -153,8 +145,6 @@ export class M_calendar {
                 callback: async () => {
                     await this.getEventsFromSiYuanDatabase()
                     showMessage("日历文件生成结束", 3000, "info");
-                    // await this.addEvent(Mevents, eventsPath);
-                    // await this.generateICSFromEventsFile(eventsPath, calendarpath);
                 }
             });
         }
@@ -445,10 +435,6 @@ export class M_calendar {
             await this.icsSubscription.init();
             console.debug("ST_ics状态:", this.icsSubscription.getEvents());
         }
-        if (settingdata["cal-share"] === "alist") {
-            this.alistPlugin = new ics_alist();
-            this.alistPlugin.init();
-        }
         if (this_settingdata["cal-share"] === "s3") {
             this.s3Client = new ics_s3({});
             this.s3Client.load_date_from_siyuan();
@@ -636,8 +622,7 @@ export class M_calendar {
         // // steveTools.outlog(this_settingdata["cal-enable"]);
         if (this_settingdata["cal-enable"] == true) {
             const currentHost = "（思源伺服地址）";
-            // linkToCalendar = currentHost + "/" + calendarpath2;
-            showMessage("日历订阅链接：" + currentHost + "/" + calendarpath2 + "", 0, "info");
+            showMessage("日历订阅链接：" + currentHost + "/" + calendarPaths.icsPublicPath, 0, "info");
             return
         }
         showMessage("请先启用日历订阅模块", 6000, "info");
@@ -747,27 +732,23 @@ export class M_calendar {
                 //TODO:周期事件的周期处理改为数据库单选
                 await this.addEventToGlobal(result_zq);
             }
-            await this.uploadAllEventsToFile(eventsPath);
-            await icsFileManager.generateFromEventsJson(eventsPath, calendarpath);
+            await this.uploadAllEventsToFile(CALENDAR_EVENTS_JSON_PATH);
+            await icsFileManager.generateFromEventsJson(CALENDAR_EVENTS_JSON_PATH, calendarPaths.icsDataPath);
 
             const selectToPics = this_settingdata["SelectTOPics"];
             if (!selectToPics || selectToPics === frontEnd) {
-                if (settingdata["cal-share"] === "alist") {
-                    await this.alistPlugin.upload_ics();
-                    console.debug("alist_ics");
-                }
                 if (settingdata["cal-share"] === "s3") {
-                    const ics = await api.getFileBlob(calendarpath)
+                    const ics = await api.getFileBlob(calendarPaths.icsDataPath)
                     const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                    await this.s3Client.uploadFile(calendarpath2, file);
+                    await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
                 }
                 if (settingdata["cal-share"] === "s3-diy") {
-                    const ics = await api.getFileBlob(calendarpath)
+                    const ics = await api.getFileBlob(calendarPaths.icsDataPath)
                     const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                    await this.s3Client.uploadFile(calendarpath2, file);
+                    await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
                 }
                 if (settingdata["cal-share"] === "webdav") {
-                    const ics = await api.getFileBlob(calendarpath)
+                    const ics = await api.getFileBlob(calendarPaths.icsDataPath)
                     const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                     await this.webdavClient.uploadFile(settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
                 }

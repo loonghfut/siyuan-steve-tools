@@ -7,13 +7,13 @@
  */
 
 import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle } from "siyuan";
-import { ISelectOption } from "@/calendar/interface";
+import { ISelectOption } from "@/calendar/core/types";
 import { settingdata } from "..";
 import { AVManager } from "./db_pro";
 import {
     markCalendarCellWrite,
     type CalendarWriteReason,
-} from "@/calendar/calendar-self-write";
+} from "@/calendar/core/calendar-self-write";
 // 创建 AVManager 实例 - 可以根据需要进行配置
 const avManager = new AVManager();
 
@@ -1411,7 +1411,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
     }
 }
 
-import { scheduleCalendarRefresh } from "@/calendar/calendar-runtime";
+import { scheduleCalendarRefresh } from "@/calendar/core/calendar-runtime";
 
 
 

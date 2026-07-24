@@ -7,7 +7,7 @@ import { showMessage } from 'siyuan';
 import {
     SPECIAL_CALENDAR_SOURCES,
     SPECIAL_CALENDAR_SOURCE_LABELS,
-} from '../calendar-sources';
+} from '@/calendar/core/calendar-sources';
 
 export interface CalendarStatsData {
     // 事件统计

@@ -1,6 +1,6 @@
 import { Calendar } from '@fullcalendar/core';
 import interactionPlugin from '@fullcalendar/interaction';
-import { createUnscheduledPanelController } from './function/unscheduled';
+import { createUnscheduledPanelController } from '@/calendar/features/unscheduled-panel';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
@@ -12,24 +12,24 @@ import {
     refetchPeerCalendars,
     registerCalendarInstance,
     scheduleCalendarRefresh,
-} from './calendar-runtime';
+} from '@/calendar/core/calendar-runtime';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
 import solarLunar from 'solarlunar';
-import * as myF from './myF';
+import * as myF from '@/calendar/data/calendar-data';
 import { showMessage } from 'siyuan';
-import { createFloatingCalendar } from './function/createFloatingCalendar';
+import { createFloatingCalendar } from './floating-calendar';
 import { updateAttrViewCell_pro, setBlockAttrs } from '@/api/api';
-import { markCalendarBlockWrite } from './calendar-self-write';
+import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
 
 //审查ok
-import { getCategoryColor, getLifelogColor } from '../lifelog/styles/colors';
-import { LifelogView } from './lifelog-view';
-import { createViewFilterMenu, initializeGroups } from './initializeGroups';
-import { calendarStatsManager } from './stats';
-import { isSpecialCalendarSource } from './calendar-sources';
+import { getCategoryColor, getLifelogColor } from '@/lifelog/styles/colors';
+import { LifelogView } from '@/calendar/integrations/lifelog-event-source';
+import { createViewFilterMenu, initializeGroups } from './view-groups';
+import { calendarStatsManager } from '@/calendar/features/stats';
+import { isSpecialCalendarSource } from '@/calendar/core/calendar-sources';
 //审查ok
 
 

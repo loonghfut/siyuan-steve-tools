@@ -113,12 +113,10 @@ export class WebDAVSync {
 
         try {
             let body: Buffer | string | Blob | ArrayBuffer;
-            let contentType = 'text/plain';
 
             if (content instanceof Blob) {
                 // 将 Blob 转换为 ArrayBuffer
                 body = await content.arrayBuffer();
-                contentType = content.type || 'application/octet-stream';
             } else if (typeof content === 'string') {
                 body = content;
             } else {

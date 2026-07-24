@@ -1,9 +1,9 @@
-import { moduleInstances } from '..';
+import { moduleInstances } from '@/index';
 import {
     SPECIAL_CALENDAR_SOURCES,
     SPECIAL_CALENDAR_SOURCE_LABELS,
     isSpecialCalendarSource,
-} from './calendar-sources';
+} from '@/calendar/core/calendar-sources';
 
 // 分组配置接口
 export interface ViewGroup {

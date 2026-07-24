@@ -1,26 +1,25 @@
 import * as api from '@/api/api';
-import { ViewItem } from '@/calendar/interface';
+import { ViewItem } from '@/calendar/core/types';
 import * as sy from 'siyuan'
 import { settingdata } from '@/index';
 import { Calendar, DurationInput } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
-import { ISelectOption } from "@/calendar/interface";
-import { refetchPeerCalendars } from './calendar-runtime';
+import { ISelectOption } from "@/calendar/core/types";
+import { refetchPeerCalendars } from '@/calendar/core/calendar-runtime';
 import {
     parseCategory,
     parseDescription,
-    parseScheduleTime,
     parseTags,
     parseTaskList,
     parseTitle,
-} from './quickadd';
-// import { isEventCompleted } from './calendar';
+} from '@/calendar/features/quick-add/content-metadata';
+import { parseScheduleTime } from '@/calendar/features/quick-add/time-parser';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
-import { getRequiredFields } from './fieldConfig';
-import type { CalendarWriteReason } from './calendar-self-write';
-import { markCalendarBlockWrite } from './calendar-self-write';
-import { isSpecialCalendarSource } from './calendar-sources';
+import { getRequiredFields } from '@/calendar/config/field-config';
+import type { CalendarWriteReason } from '@/calendar/core/calendar-self-write';
+import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
+import { isSpecialCalendarSource } from '@/calendar/core/calendar-sources';
 
 // ================== 自定义类型补充（轻量，不破坏现有引用） ==================
 // 事件字段解析结果（行中的“事件”列）

@@ -1,17 +1,24 @@
 import steveTools, { settingdata } from '@/index';
-import { M_calendar } from '@/calendar/module-calendar';
 import * as api from '@/api/api';
-import { scheduleCalendarRefresh } from '@/calendar/calendar-runtime';
-import { statusMap } from '@/calendar/myF';
+import { scheduleCalendarRefresh } from '@/calendar/core/calendar-runtime';
+import { statusMap } from '@/calendar/data/calendar-data';
 import { interceptFetch } from '@/api/network-interceptor';
 import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
 import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
-} from '@/calendar/calendar-self-write';
+} from '@/calendar/core/calendar-self-write';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
+
+interface CalendarListenerHost {
+  av_ids: Array<{ id: string }>;
+  avButton(): void;
+  isAutoSyncingUpdateEnabled(): boolean;
+  isListening(): boolean;
+  scheduleCalendarUpdate(delay?: number): void;
+}
 
 /**
  * 判断一个 updateAttrs 操作是不是 lifelog 模块自己刚写入的（自反射）。
@@ -38,14 +45,14 @@ function isLifelogSelfUpdateAttrs(op: WsOp): boolean {
     return false;
 }
 
-export function registerTransactionListener(plugin: steveTools, M_calendar: M_calendar) {
+export function registerTransactionListener(plugin: steveTools, calendarHost: CalendarListenerHost) {
   const wsMainHandler = async (e) => {
     const msg: WsMsg = e.detail;
     // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
     if (settingdata["cal-auto-syncing-update"] == true) {
       if (msg.cmd === 'syncing') {
-        if (M_calendar.isAutoSyncingUpdateEnabled() && M_calendar.isListening()) {
-          M_calendar.scheduleCalendarUpdate(2000);
+        if (calendarHost.isAutoSyncingUpdateEnabled() && calendarHost.isListening()) {
+          calendarHost.scheduleCalendarUpdate(2000);
         }
       }
     }
@@ -70,10 +77,10 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
         console.debug('[CalendarSelfWrite] skip ws-main updateAttrs', op.id);
         return;
       }
-      M_calendar.avButton();
+      calendarHost.avButton();
       scheduleCalendarRefresh();
       if (op.avID && op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID) {
-        if (M_calendar.av_ids && M_calendar.av_ids.map(i => i.id).includes(op.avID)) {
+        if (calendarHost.av_ids?.some(item => item.id === op.avID)) {
           try {
             const blockId = await api.getAttributeViewBoundBlockIDsByItemIDs(op.avID, [op.rowID]).then(data => data[op.rowID]);
             const avDetails = await api.getAttributeViewKeys(blockId);
@@ -114,7 +121,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
 
         // 只对我们关心的数据库进行处理
         const avID: string | undefined = body?.avID;
-        if (!avID || !M_calendar.av_ids || !M_calendar.av_ids.map(i => i.id).includes(avID)) return;
+        if (!avID || !calendarHost.av_ids?.some(item => item.id === avID)) return;
 
         // 抽取选择值（兼容 select/mSelect）
         const getSelectValue = (v: any): string | undefined => {
@@ -153,7 +160,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
             console.debug('[CalendarSelfWrite] skip network setAttributeViewBlockAttr', avID, itemID);
             return;
           }
-          try { M_calendar.avButton(); } catch { }
+          try { calendarHost.avButton(); } catch { }
           try { scheduleCalendarRefresh(); } catch { }
           return;
         }
@@ -202,7 +209,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
             refreshNeeded = true;
           }
           if (refreshNeeded) {
-            try { M_calendar.avButton(); } catch { }
+            try { calendarHost.avButton(); } catch { }
             try { scheduleCalendarRefresh(); } catch { }
           }
           return;

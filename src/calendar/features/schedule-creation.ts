@@ -1,6 +1,6 @@
 import { settingdata } from '@/index';
-import { av_ids, filterViewId, OUTcalendar } from './calendar';
-import { createEventInDatabase, getViewId, getViewValue } from './myF';
+import { av_ids, filterViewId, OUTcalendar } from '@/calendar/ui/calendar-view';
+import { createEventInDatabase, getViewId, getViewValue } from '@/calendar/data/calendar-data';
 
 export interface ScheduleTarget {
     isdirect: boolean;
