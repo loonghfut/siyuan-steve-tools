@@ -21,7 +21,7 @@ Free users: if you encounter problems, don't report them unless they affect my p
 To facilitate communication with donors, I created a temporary feedback QQ group (may be dissolved anytime). Please fill in the application form before joining: https://www.kdocs.cn/wo/sl/v1lC0R0
 
 Available features (see plugin demos and tutorials at https://ld246.com/search?q=sttools):
-1. Interconnected schedule management: deeply integrates with SiYuan to provide calendar and kanban views, generate .ics calendar files for syncing with calendar apps via URL subscription (Thunderbird, Xiaomi Calendar, Apple Calendar, etc.), and basic integration with TickTick. (Demo and tutorials linked in the original README.)
+1. Interconnected schedule management: deeply integrates with SiYuan to provide calendar views, generate .ics calendar files for syncing with calendar apps via URL subscription (Thunderbird, Xiaomi Calendar, Apple Calendar, etc.), and basic integration with TickTick. (Demo and tutorials linked in the original README.)
 2. Docker sync awareness: Windows S3 synchronization is detected by the Docker side.
 3. AI web sidebar: embeds several AI web pages for convenient use.
 4. Media compression: compress media before importing into SiYuan.

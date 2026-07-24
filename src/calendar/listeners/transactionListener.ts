@@ -1,7 +1,7 @@
 import steveTools, { settingdata } from '@/index';
 import { M_calendar } from '@/calendar/module-calendar';
 import * as api from '@/api/api';
-import { refreshKanban } from '@/calendar/kanban';
+import { scheduleCalendarRefresh } from '@/calendar/calendar-runtime';
 import { statusMap } from '@/calendar/myF';
 import { interceptFetch } from '@/api/network-interceptor';
 import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
@@ -15,7 +15,7 @@ interface WsMsg { cmd: string; data?: any[] }
 
 /**
  * 判断一个 updateAttrs 操作是不是 lifelog 模块自己刚写入的（自反射）。
- * 命中则跳过全量 refreshKanban —— 因为 lifelog 写完属性后会自己发
+ * 命中则跳过全量日历刷新——因为 lifelog 写完属性后会自己发
  * LIFELOG_CHANGED_EVENT 通知日历做局部增量更新，再走全量 refresh 是重复劳动。
  *
  * 判定条件（任一命中即视为自写）：
@@ -54,13 +54,13 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
     if (!op) return;
     const action = op.action;
     if (action === 'updateAttrs' || action === 'updateAttrViewCell') {
-      // lifelog 自写入引起的 updateAttrs：跳过全量 refreshKanban，
+      // lifelog 自写入引起的 updateAttrs：跳过全量日历刷新，
       // 由 LIFELOG_CHANGED_EVENT 走局部增量更新路径。
       if (action === 'updateAttrs' && isLifelogSelfUpdateAttrs(op)) {
         return;
       }
       // 日历自写：拖拽/调整大小/状态/归档/周期 等本地已经更新好 UI 的 AV 单元格写入，
-      // 不需要再走全量 refreshKanban。匹配 (avID, rowID, keyID) 三元组或 blockId。
+      // 不需要再走全量日历刷新。匹配 (avID, rowID, keyID) 三元组或 blockId。
       if (action === 'updateAttrViewCell'
           && isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID)) {
         console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell', op.avID, op.rowID);
@@ -71,7 +71,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
         return;
       }
       M_calendar.avButton();
-      refreshKanban();
+      scheduleCalendarRefresh();
       if (op.avID && op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID) {
         if (M_calendar.av_ids && M_calendar.av_ids.map(i => i.id).includes(op.avID)) {
           try {
@@ -95,7 +95,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
     if (action === 'update') {
       const data = op.data;
       if (typeof data === 'string' && data.startsWith('<div data-marker')) {
-        refreshKanban();
+        scheduleCalendarRefresh();
       }
     }
   };
@@ -138,12 +138,9 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
 
           const avDetails = await api.getAttributeViewKeys(blockId);
           let statusKeyDefinition: any;
-          let priorityKeyDefinition: any;
           if (avDetails && avDetails[0]?.keyValues) {
             const statusKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '状态');
             if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
-            const priorityKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '优先级');
-            if (priorityKeyValue) priorityKeyDefinition = priorityKeyValue.key;
           }
           const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === keyID);
           if (isStatus && selectValue) {
@@ -157,7 +154,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
             return;
           }
           try { M_calendar.avButton(); } catch { }
-          try { refreshKanban(); } catch { }
+          try { scheduleCalendarRefresh(); } catch { }
           return;
         }
 
@@ -206,7 +203,7 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
           }
           if (refreshNeeded) {
             try { M_calendar.avButton(); } catch { }
-            try { refreshKanban(); } catch { }
+            try { scheduleCalendarRefresh(); } catch { }
           }
           return;
         }

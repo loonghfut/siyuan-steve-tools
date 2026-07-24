@@ -41,7 +41,7 @@ export async function createViewFilterMenu(
     calendar: any,
     filterViewId: string[],
     setFilterViewId: (ids: string[]) => void,
-    refreshKanban: () => void,
+    refreshCalendar: () => void,
     lastSavedLifelogSlotDuration: string
 ) {
     const button = calendarEl.querySelector('.fc-viewFilter-button') as HTMLElement | null;
@@ -302,7 +302,7 @@ export async function createViewFilterMenu(
         });
     };
     confirmBtn.onclick = () => {
-        refreshKanban();
+        refreshCalendar();
         closeMenu();
     };
 

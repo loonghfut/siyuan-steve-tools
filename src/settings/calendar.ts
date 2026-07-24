@@ -15,7 +15,6 @@ export const calendarDefaults: Record<string, any> = {
     "cal-db-id": null,
     "cal-create-way": "0",
     "cal-seemore": false,
-    "cal-show-ref-event": true,
     "cal-show-float-view": false,
     "cal-auto-update-status": false,
     "cal-auto-create-fields": true,
@@ -72,7 +71,6 @@ export const calendarDefaults: Record<string, any> = {
     "cal-webdav-password": "",
     "cal-webdav-path": "",
     // 其它
-    "cal-show-zq-done": false,
     "cal-ics-filter-old": 1,
     "cal-ics-filter-new": 1,
     // 视图
@@ -89,13 +87,9 @@ export const calendarDefaults: Record<string, any> = {
     "cal-color-by-tag": false,
     // 以每行一条的形式定义：标签=颜色，例如： 工作=#5B8FF9\n学习=rgb(64, 192, 87)
     "cal-tag-color-map": "",
-    "kanban-default-view": "kanban",
     "cal-default-view": "dayGridMonth",
-    "quadrant-default-view": "priorityQuadrant",
     // 工具栏
-    "cal-toolbar-right": "multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,weekkanban,kanban,yearkanban,priorityQuadrant",
-    // 四象限
-    "cal-quadrant-urgent-days": 2,
+    "cal-toolbar-right": "multiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,planButton",
     // 触发平台
     "SelectTOPics": "",
 };
@@ -139,8 +133,6 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "select", title: "基本交互方式", description: "在日历视图中的基本交互方式", key: "cal-create-way", value: ctx.settings["cal-create-way"], options: { "0": "双击交互", "1": "单击交互" } },
                 { type: "checkbox", title: "事件交互方式", description: "启用后和事件交互会自动跳转到块属性页面，启用前则跳转到目标块", key: "cal-seemore", value: ctx.settings["cal-seemore"] },
                 { type: "checkbox", title: "启用右键事件交互方式", description: "启用后会互补左键交互方式", key: "cal-show-right-click", value: ctx.settings["cal-show-right-click"] },
-                { type: "checkbox", title: "是否展示被关联子的事件", description: "启用后看板会展示被关联子的事件（建议开启）", key: "cal-show-ref-event", value: ctx.settings["cal-show-ref-event"] },
-                { type: "checkbox", title: "完成项是否显示周期事件", description: "启用后看板完成项会展示周期事件", key: "cal-show-zq-done", value: ctx.settings["cal-show-zq-done"] },
                 { type: "checkbox", title: "是否悬浮显示视图", description: "启用后会在页面上方显示悬浮视图", key: "cal-show-float-view", value: ctx.settings["cal-show-float-view"] },
                 { type: "checkbox", title: "是否自动更新状态(打开视图时生效）", description: "根据块内子事件完成情况自动更新事件状态", key: "cal-auto-update-status", value: ctx.settings["cal-auto-update-status"] },
                 { type: "checkbox", title: "自动创建缺失的数据库字段", description: "自动创建日程管理所需的数据库字段", key: "cal-auto-create-fields", value: ctx.settings["cal-auto-create-fields"] },
@@ -200,10 +192,7 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "checkbox", title: "按标签为事件上色", description: "优先使用事件的第一个标签决定颜色（优先级颜色将被覆盖）", key: "cal-color-by-tag", value: ctx.settings["cal-color-by-tag"] },
                 { type: "custom", component: "TagColorMapEditor", title: "标签-颜色映射", description: "为每个标签配置颜色，支持可视化选择", key: "cal-tag-color-map", value: ctx.settings["cal-tag-color-map"], direction: "column" },
                 { type: "select", title: "默认日历视图模式", description: "首次打开默认模式", key: "cal-default-view", value: ctx.settings["cal-default-view"], options: { multiMonthYear: "MultiMonthYear", dayGridMonth: "DayGridMonth", timeGridWeek: "TimeGridWeek", timeGridThreeDays: "TimeGridThreeDays", timeGridDay: "TimeGridDay" } },
-                { type: "select", title: "默认看板视图模式", description: "看板默认模式", key: "kanban-default-view", value: ctx.settings["kanban-default-view"], options: { weekkanban: "WeekKanban", kanban: "Kanban", yearkanban: "YearKanban" } },
-                { type: "select", title: "默认四象限视图模式", description: "四象限默认模式", key: "quadrant-default-view", value: ctx.settings["quadrant-default-view"], options: { weekpriorityQuadrant: "WeekQuadrant", priorityQuadrant: "Quadrant", yearpriorityQuadrant: "YearQuadrant" } },
-                { type: "textarea", title: "视图右侧按钮", description: "逗号分隔的视图按钮列表：\n\nmultiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,\n\nweekkanban,kanban,yearkanban,\n\npriorityQuadrant,yearpriorityQuadrant,weekpriorityQuadrant,planButton", key: "cal-toolbar-right", value: ctx.settings["cal-toolbar-right"], direction: "row" },
-                { type: "number", title: "四象限紧急阈值（天）", description: "<=阈值视为紧急", key: "cal-quadrant-urgent-days", value: ctx.settings["cal-quadrant-urgent-days"] },
+                { type: "textarea", title: "视图右侧按钮", description: "逗号分隔的视图按钮列表：\n\nmultiMonthYear,dayGridMonth,timeGridWeek,timeGridThreeDays,timeGridDay,planButton", key: "cal-toolbar-right", value: ctx.settings["cal-toolbar-right"], direction: "row" },
             ]
         },
         {

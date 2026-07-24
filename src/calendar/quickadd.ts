@@ -1,87 +1,9 @@
 import dayjs from 'dayjs';
-import { IProtyle, showMessage, subMenu } from 'siyuan';
-import { allKBEvents, handleAddButtonClick } from './kanban';
-import { updateAttrViewCell_pro } from '@/api/api';
-import { findEventByPublicId, run_getsubevents } from './myK';
+import { showMessage } from 'siyuan';
+import { createSchedule } from './event-creation';
 import { api } from '@frostime/siyuan-plugin-kits';
 
-interface BlockNode {
-    id: string;
-    type: string;
-    children: BlockNode[];
-}
-
-interface BlockTreeResult {
-    tree: BlockNode;
-    paragraphs: Array<{
-        id: string,
-        type: string,
-        BlockNodeChildren: string[]
-    }>;
-    listItems: Array<{
-        id: string,
-        type: string,
-        BlockNodeChildren: string[]
-    }>;
-}
-
-function extractBlockTree(element: HTMLElement): BlockTreeResult {
-    const paragraphs: Array<{ id: string, type: string, BlockNodeChildren: string[] }> = [];
-    const listItems: Array<{ id: string, type: string, BlockNodeChildren: string[] }> = [];
-
-    function buildTree(element: HTMLElement): BlockNode {
-        const result: BlockNode = {
-            id: element.dataset.nodeId || '',
-            type: element.dataset.type || '',
-            children: []
-        };
-
-        // 收集指定类型的子节点ID
-        const collectTypeChildIds = (node: HTMLElement, nodeType: string): string[] => {
-            const ids: string[] = [];
-            Array.from(node.children).forEach(child => {
-                const childElement = child as HTMLElement;
-                if (childElement.dataset.nodeId && childElement.dataset.type === nodeType) {
-                    ids.push(childElement.dataset.nodeId);
-                }
-                ids.push(...collectTypeChildIds(childElement, nodeType));
-            });
-            return ids;
-        };
-
-        if (result.type === 'NodeParagraph') {
-            paragraphs.push({
-                id: result.id,
-                type: result.type,
-                BlockNodeChildren: collectTypeChildIds(element, 'NodeParagraph')
-            });
-        } else if (result.type === 'NodeListItem') {
-            listItems.push({
-                id: result.id,
-                type: result.type,
-                BlockNodeChildren: collectTypeChildIds(element, 'NodeListItem')
-            });
-        }
-
-        const children = element.children;
-        for (let i = 0; i < children.length; i++) {
-            const child = children[i] as HTMLElement;
-            if (child.dataset.nodeId) {
-                result.children.push(buildTree(child));
-            }
-        }
-
-        return result;
-    }
-
-    return {
-        tree: buildTree(element),
-        paragraphs,
-        listItems
-    };
-}
-
-export function getCursorElement() {
+export function getCursorContainer() {
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
@@ -103,7 +25,7 @@ function getCursorElementRecursive(node) {
 
 
 
-export function runblockdata_for_sub(content: string): { subevent: string, completed: boolean }[] {
+export function parseTaskList(content: string): { subevent: string, completed: boolean }[] {
     // 使用正则表达式全局匹配所有 [X] 或 [ ] 及后面的事件内容，考虑markdown列表格式
     const taskRegex = /^\s*\-\s*\{:[^}]*\}\s*\[(X| )\]\s*(.+?)(?=\s*\{:|$)/gm;
     const results: { subevent: string, completed: boolean }[] = [];
@@ -123,7 +45,7 @@ export function runblockdata_for_sub(content: string): { subevent: string, compl
  * 从内容中提取标签信息，支持 #标签名#
  * 返回所有匹配的标签名字符串数组，未匹配返回空数组
  */
-export function runblockdata_for_tags(content: string): string[] {
+export function parseTags(content: string): string[] {
     // 匹配 #标签名#
     const tagPattern = /#([\u4e00-\u9fa5\w\-]+)#/g;
     const matches = [];
@@ -138,7 +60,7 @@ export function runblockdata_for_tags(content: string): string[] {
  * 从内容中提取分类信息，支持 #@分类名#
  * 返回第一个匹配的分类名字符串，未匹配返回空字符串
  */
-export function runblockdata_for_category(content: string): string {
+export function parseCategory(content: string): string {
     // 匹配 #@分类名#
     const hashPattern = /#@([\u4e00-\u9fa5\w\-]+)#/;
     const hashMatch = content.match(hashPattern);
@@ -154,7 +76,7 @@ export function runblockdata_for_category(content: string): string {
     return '';
 }
 
-export function runblockdata_for_note(content: string): string {
+export function parseDescription(content: string): string {
     // 匹配包含"@描述"的文本行
     const notePattern = /([^\n]+)@描述/;
     const noteMatch = content.match(notePattern);
@@ -167,7 +89,7 @@ export function runblockdata_for_note(content: string): string {
     return '';
 }
 
-export function runblockdata_for_title(content: string): string {
+export function parseTitle(content: string): string {
     // 匹配包含"@描述"的文本行
     const notePattern = /([^\n]+)@日程/;
     const noteMatch = content.match(notePattern);
@@ -188,120 +110,7 @@ export function runblockdata_for_title(content: string): string {
 
 
 
-////////////////////////////////////////目前无法实现（短时间内多次添加事件，会导致事件数据丢失）////////////////////////////////////////
-export function quickadd_event_more(event: CustomEvent<{//无法实现（短时间内多次添加事件，会导致事件数据丢失）
-    menu: subMenu;
-    protyle: IProtyle;
-    blockElements: HTMLElement[];
-}>) {
-    const menu = event.detail.menu;
-    // console.debug('quickadd_event_more', menu);
-    menu.addItem({
-        icon: 'iconCalendar',
-        label: '添加日程pro',
-        type: "submenu",
-        click: async () => {
-            const blockElement = event.detail.blockElements[0];
-            const result = extractBlockTree(blockElement);
-            // console.debug('完整树结构:', result.tree);
-            // console.debug('段落列表:', result.paragraphs);
-            console.debug('列表项列表:', result.listItems);
-            const listItemsdata = result.listItems;
-            await quickadd_event_more_main(listItemsdata);
-            await quickadd_event_more_sub(listItemsdata);
-        },
-    })
-}
-
-async function quickadd_event_more_main(listItemsdata: BlockTreeResult['listItems']) {
-    // 检查输入参数是否有效
-    if (!listItemsdata || listItemsdata.length === 0) {
-        showMessage("此功能只支持列表类块")
-        return;
-    }
-    let isok = false;
-    // 遍历所有列表项
-    for (const item of listItemsdata) {
-        if (item.id) {
-            try {
-                isok = await handleAddButtonClick("", {
-                    directid: item.id,
-                    isdirect: true
-                });
-                //延时处理
-                await new Promise<void>((resolve) => {
-                    setTimeout(() => {
-                        resolve(void 0);
-                    }, 1000);
-                });
-                if (isok) {
-                    isok = false;
-                    showMessage(`成功处理列表项 ${item.id}`);
-                    continue;
-                }
-                if (!isok) {
-                    console.warn(`Failed to process item ${item.id}`);
-                    continue;
-                }
-            } catch (error) {
-                console.error(`Error processing item ${item.id}:`, error);
-                continue;
-            }
-        }
-    }
-}
-
-export async function quickadd_event_more_sub(listItemsdata: BlockTreeResult['listItems']) {
-    // 检查输入是否有效
-    if (!listItemsdata || listItemsdata.length === 0) {
-        showMessage("没有找到列表项");
-        return;
-    }
-
-    // 遍历列表项，处理每个项的子项关联
-    for (const item of listItemsdata) {
-        // 获取当前项的子项 IDs
-        const childIds = item.BlockNodeChildren || [];
-
-        if (childIds.length > 0) {
-            // 查找父事件
-            const parentEvent = await findEventByPublicId(allKBEvents, item.id);
-            if (!parentEvent) {
-                console.warn(`未找到父事件: ${item.id}`);
-                continue;
-            }
-
-            // 对每个子项进行处理
-            for (const childId of childIds) {
-                // 查找子事件
-                const childEvent = await findEventByPublicId(allKBEvents, childId);
-                if (!childEvent) {
-                    console.warn(`未找到子事件: ${childId}`);
-                    continue;
-                }
-
-                // 建立关联关系
-                try {
-                    const result = await run_getsubevents(childEvent, parentEvent);
-                    //延时处理
-                    await new Promise<void>((resolve) => {
-                        setTimeout(() => {
-                            resolve(void 0);
-                        }, 1000);
-                    });
-                    if (!result) {
-                        console.warn(`关联失败: ${childId} -> ${item.id}`);
-                    }
-                } catch (error) {
-                    console.error(`建立关联时出错: ${error}`);
-                }
-            }
-        }
-    }
-}
-
-
-export async function addquikaddButton(e) {
+export async function addQuickAddButton(e: any) {
     const breadcrumb = e.detail.protyle.element.querySelector('.protyle-breadcrumb');
     if (breadcrumb) {
         // Check if the button already exists
@@ -332,7 +141,7 @@ export async function addquikaddButton(e) {
                 for (const blockId of idsWithSchedule) {
                     try {
                         showMessage(`正在处理块 ${blockId}`, -1, 'info', '@日程');
-                        const success = await handleAddButtonClick('', { isdirect: true, directid: blockId });
+                        const success = await createSchedule('', { isdirect: true, directid: blockId });
                         if (success) {
                             showMessage(`成功处理块 ${blockId}`, -1, 'info', '@日程');
                         } else {
@@ -634,7 +443,7 @@ function parseTimeFromString(timeMatch: RegExpMatchArray | null, initialDate: da
     return targetDate;
 }
 
-export function runblockdata_for_time(content: string): string | null {
+export function parseScheduleTime(content: string): string | null {
     if (content === '') {
         return null;
     }
@@ -699,7 +508,7 @@ export function runblockdata_for_time(content: string): string | null {
 
 
 
-export async function runblockdata_for_time_ai(content: string): Promise<string | null> {
+export async function parseScheduleTimeWithAi(content: string): Promise<string | null> {
     if (content === '') {
         return null;
     }
@@ -710,7 +519,7 @@ export async function runblockdata_for_time_ai(content: string): Promise<string 
         console.error("DeepSeek API key is not set. Please set the DEEPSEEK_API_KEY environment variable.");
         // 回退到原始解析器
         console.warn("Falling back to original parser due to missing DeepSeek API key.");
-        return runblockdata_for_time(content);
+        return parseScheduleTime(content);
     }
 
     const today = dayjs().format('YYYY-MM-DD');
@@ -755,7 +564,7 @@ Your response:
             const errorBody = await response.text();
             console.error(`DeepSeek API error: ${response.status} ${response.statusText}`, errorBody);
             console.warn(`DeepSeek API error. Falling back to original parser for content: "${content}".`);
-            return runblockdata_for_time(content);
+            return parseScheduleTime(content);
         }
 
         const completion = await response.json();
@@ -767,17 +576,17 @@ Your response:
                 return aiResponse;
             } else {
                 console.warn(`DeepSeek AI returned a malformed date-time: "${aiResponse}" for content: "${content}". Falling back to original parser.`);
-                return runblockdata_for_time(content);
+                return parseScheduleTime(content);
             }
         } else {
             console.debug(`DeepSeek AI could not parse date/time from content: "${content}". Falling back to original parser.`);
-            return runblockdata_for_time(content);
+            return parseScheduleTime(content);
         }
 
     } catch (error) {
         console.error("Error calling DeepSeek API:", error);
         console.warn(`DeepSeek API call failed. Falling back to original parser for content: "${content}".`);
-        return runblockdata_for_time(content);
+        return parseScheduleTime(content);
     }
 }
 

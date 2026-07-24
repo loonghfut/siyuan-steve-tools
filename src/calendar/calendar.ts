@@ -8,7 +8,11 @@ import multiMonthPlugin from '@fullcalendar/multimonth'
 import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
-import { refreshKanban, refetchOtherVisibleCalendars, thisCalendars, update_thisCalendars } from './kanban';
+import {
+    refetchPeerCalendars,
+    registerCalendarInstance,
+    scheduleCalendarRefresh,
+} from './calendar-runtime';
 import { settingdata } from '@/index';
 // import 'tippy.js/dist/tippy.css';
 import { moduleInstances } from '@/index';
@@ -52,6 +56,14 @@ const textColorCache = new Map<string, string>();
 const VIEW_FILTER_ICON = 'iconFilter';
 const STATS_ICON = 'iconList';
 const REFRESH_ICON = 'iconRefresh';
+const REMOVED_VIEW_IDS = new Set([
+    'kanban',
+    'weekkanban',
+    'yearkanban',
+    'priorityQuadrant',
+    'weekpriorityQuadrant',
+    'yearpriorityQuadrant',
+]);
 // 农历结果缓存：同一公历日期的农历结果恒定不变，永久缓存（无 TTL）。
 // key 为 'YYYY-MM-DD'，避免每个日历单元格、每次重渲染都重复调用 solarLunar.solar2lunar。
 const lunarCache = new Map<string, any>();
@@ -152,6 +164,9 @@ export async function run(
     ccenter = 'title',
     elementca?: any,
 ) {
+    if (REMOVED_VIEW_IDS.has(initialView)) {
+        initialView = 'dayGridMonth';
+    }
     // 允许用户通过设置覆盖 initialView 与 cright（当使用的是内置默认或未传入时）
     try {
         const DEFAULT_INITIAL = 'dayGridMonth';
@@ -170,7 +185,10 @@ export async function run(
     } catch (e) {
         console.warn('读取日历视图设置失败，使用默认值', e);
     }
-    const rightSegments = cright.split(',').map(segment => segment.trim()).filter(Boolean);
+    const rightSegments = cright
+        .split(',')
+        .map(segment => segment.trim())
+        .filter(segment => segment && !REMOVED_VIEW_IDS.has(segment));
     // if (!rightSegments.includes('planButton')) {
     //     rightSegments.push('planButton');
     // }
@@ -250,7 +268,6 @@ export async function run(
             listPlugin,
             multiMonthPlugin,
             rrule,
-            // kanban and priority/quadrant views removed
         ],
         initialView: initialView,
         navLinks: true,
@@ -295,7 +312,7 @@ export async function run(
                     draggedEl.remove();
                 }
                 updatePlanButtonLabel();
-                refreshKanban();
+                scheduleCalendarRefresh();
                 setTimeout(() => calendar.refetchEvents(), 200);
                 moduleInstances['M_calendar']?.scheduleCalendarUpdate?.(1500);
             } catch (error) {
@@ -462,7 +479,7 @@ export async function run(
                     reason: 'drag',
                 });
                 // 同步其他可见日历实例：myF 已 patch 了 viewValueCache，refetch 命中缓存几乎零开销。
-                refetchOtherVisibleCalendars(calendar);
+                refetchPeerCalendars(calendar);
             } catch (error) {
                 console.error('拖拽更新事件失败:', error);
                 forgetPendingCalendarEventPatch(info.event);
@@ -516,7 +533,7 @@ export async function run(
                 await myF.updateEventInDatabase(info, calendar, viewValue, true, {
                     reason: 'resize',
                 });
-                refetchOtherVisibleCalendars(calendar);
+                refetchPeerCalendars(calendar);
             } catch (error) {
                 console.error('调整事件时长失败:', error);
                 forgetPendingCalendarEventPatch(info.event);
@@ -531,7 +548,6 @@ export async function run(
                 duration: { weeks: 2 },
                 buttonText: '两周'
             },
-            // Removed kanban and quadrant custom views to simplify UI
         },
         customButtons: {
             viewFilter: {
@@ -548,7 +564,7 @@ export async function run(
                         calendar,
                         filterViewId,
                         (ids: string[]) => { filterViewId = ids; },
-                        refreshKanban,
+                        scheduleCalendarRefresh,
                         lastSavedLifelogSlotDuration
                     );
                 },
@@ -571,7 +587,7 @@ export async function run(
                 hint: '刷新',
                 click: function () {
                     showMessage('正在刷新视图...', 3000);
-                    refreshKanban();
+                    scheduleCalendarRefresh();
                 }
             },
             // 统计功能按钮
@@ -996,9 +1012,7 @@ export async function run(
             });
         },
     });
-    update_thisCalendars();
-    thisCalendars.push(calendar);
-    console.debug("thisCalendars", thisCalendars);
+    registerCalendarInstance(calendar);
     OUTcalendar = calendar;
     calendar.render();
     applyCalendarToolbarIcons(calendarEl);
@@ -1420,7 +1434,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                         ).then(() => {
                             showMessage('已将事件标记为归档', 3000);
                             // 本地更新事件状态：FullCalendar 重渲染时 eventDidMount 的归档样式
-                            // 会基于 status 重新应用，无需走 refreshKanban 全量刷新。
+                            // 会基于 status 重新应用，无需全量刷新当前日历。
                             try {
                                 info.event.setExtendedProp('status', '归档');
                             } catch (e) { /* ignore */ }
@@ -1438,7 +1452,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                                 setBlockAttrs(blockId, { 'custom-st-event': archivedAttr });
                             } catch (e) { /* ignore */ }
                             // 同步其他可见日历
-                            refetchOtherVisibleCalendars(null);
+                            refetchPeerCalendars(null);
                         }).catch(error => {
                             console.error('更新事件状态失败:', error);
                             showMessage('更新事件状态失败', 3000, 'error');

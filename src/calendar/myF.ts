@@ -6,8 +6,15 @@ import { Calendar, DurationInput } from '@fullcalendar/core';
 import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/interface";
-import { refetchOtherVisibleCalendars } from './kanban';
-import { runblockdata_for_category, runblockdata_for_note, runblockdata_for_sub, runblockdata_for_tags, runblockdata_for_time, runblockdata_for_title } from './quickadd';
+import { refetchPeerCalendars } from './calendar-runtime';
+import {
+    parseCategory,
+    parseDescription,
+    parseScheduleTime,
+    parseTags,
+    parseTaskList,
+    parseTitle,
+} from './quickadd';
 // import { isEventCompleted } from './calendar';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
 import { getRequiredFields } from './fieldConfig';
@@ -177,7 +184,7 @@ export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr:
         removeUnscheduledEvent(event);
         api.handleDidaListEvent(event.rootid, event.blockId, event.itemID);
         // 同步其他可见日历（drop 回调里已对发起 calendar 自身做了 refetch）
-        refetchOtherVisibleCalendars(null);
+        refetchPeerCalendars(null);
         return true;
     } catch (error) {
         console.error('安排事件时出错:', error);
@@ -1018,7 +1025,6 @@ export async function showEvent(blockID, _rootId?, isSeeMore = false, forceSeeMo
         //         // console.debug("ishandle",option?.ishandle)
         //         if (option?.ishandle) {
         //         } else {
-        //             await refreshKanban();
         //         }
         //     },
         //     hideCloseIcon: true,
@@ -1113,12 +1119,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         //块时间处理
         const blockdata = await api.getBlockKramdown(direct.directid);
         // console.debug("blockdata:::", blockdata.kramdown);
-        const ce = runblockdata_for_time(blockdata?.kramdown);
-        const minsub = runblockdata_for_sub(blockdata?.kramdown);
-        const categorie = runblockdata_for_category(blockdata?.kramdown);
-        const tags = runblockdata_for_tags(blockdata?.kramdown);
-        const note = runblockdata_for_note(blockdata?.kramdown);
-        const title = runblockdata_for_title(blockdata?.kramdown);
+        const ce = parseScheduleTime(blockdata?.kramdown);
+        const minsub = parseTaskList(blockdata?.kramdown);
+        const categorie = parseCategory(blockdata?.kramdown);
+        const tags = parseTags(blockdata?.kramdown);
+        const note = parseDescription(blockdata?.kramdown);
+        const title = parseTitle(blockdata?.kramdown);
         console.debug("title:::", title);
         let ismain = false;
         if (minsub.length > 0) {
@@ -1337,11 +1343,11 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
             ////块时间处理
             const blockdata = await api.getBlockKramdown(id);
-            const ce = runblockdata_for_time(blockdata?.kramdown);
-            const minsub = runblockdata_for_sub(blockdata?.kramdown);
-            const category1 = runblockdata_for_category(blockdata?.kramdown);
-            const tags = runblockdata_for_tags(blockdata?.kramdown);
-            const note = runblockdata_for_note(blockdata?.kramdown);
+            const ce = parseScheduleTime(blockdata?.kramdown);
+            const minsub = parseTaskList(blockdata?.kramdown);
+            const category1 = parseCategory(blockdata?.kramdown);
+            const tags = parseTags(blockdata?.kramdown);
+            const note = parseDescription(blockdata?.kramdown);
             // 手动输入分类优先
             const category = category1 || category2;
             let ismain = false;
@@ -1717,7 +1723,7 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
     } catch (e) { /* ignore */ }
     // 同步可见日历实例。如果调用方提供了 originator，把它从刷新集合排除（它将在
     // FullCalendar 下个微任务里自然重渲染 isEventCompleted 状态）
-    refetchOtherVisibleCalendars(originator ?? null);
+    refetchPeerCalendars(originator ?? null);
 }
 
 

@@ -20,7 +20,7 @@ const avManager = new AVManager();
 /**
  * AV 单元格写入选项。仅在调用方主动声明 source==='calendar' 时影响行为：
  * - markSelfWrite (默认 true): 入队即把 (avID, itemID, keyID) 标记为日历自写，
- *   transactionListener 看到 ws/fetch 回声会跳过 refreshKanban。
+ *   transactionListener 看到 ws/fetch 回声会跳过日历刷新。
  * - suppressPostRefresh (默认 true): 本批结尾的 refreshAttributeView 跳过——
  *   若一批里全部为自写，省掉一次全量 refetch；只要混入一条非自写仍会刷新。
  * 不传 options 时与历史行为完全一致。
@@ -1143,7 +1143,7 @@ async function processQueue() {
 
                 // console.debug(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
                 // 批量更新完成后的后续处理
-                // 仅当本批"全部"为日历自写且未禁用 suppressPostRefresh 时，跳过 refreshKanban。
+                // 仅当本批"全部"为日历自写且未禁用 suppressPostRefresh 时，跳过日历刷新。
                 // 混入任何非自写更新仍触发刷新，保证外部调用方行为不变。
                 const allCalendarSelf = updates.every(u =>
                     u.options?.source === 'calendar' && u.options.suppressPostRefresh !== false
@@ -1195,7 +1195,7 @@ async function handlePostBatchUpdateActions(avID: string, opts?: { skipRefresh?:
 // 刷新属性视图
 async function refreshAttributeView(avID: string) {
     try {
-        refreshKanban();
+        scheduleCalendarRefresh();
         // console.debug(`🔄 [视图刷新] 成功刷新视图，avID: ${avID}`);
     } catch (error) {
         console.warn(`⚠️ [视图刷新] 刷新视图失败，avID: ${avID}`, error);
@@ -1411,7 +1411,7 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
     }
 }
 
-import { refreshKanban } from "@/calendar/kanban";
+import { scheduleCalendarRefresh } from "@/calendar/calendar-runtime";
 
 
 

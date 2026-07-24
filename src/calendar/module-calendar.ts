@@ -11,13 +11,14 @@ let calendarpath2 = 'public/stevetools/calendar.ics';//订阅地址
 export const eventsPath = 'data/public/stevetools/events.json';
 export let linkToCalendar = '';
 import * as myF from "./myF";
-import { handleAddButtonClick_Independent, refreshKanban, thisCalendars } from "./kanban";
+import { activeCalendars, scheduleCalendarRefresh, unregisterCalendarInstance } from './calendar-runtime';
 import { registerTransactionListener } from './listeners/transactionListener';
 import { LIFELOG_CHANGED_EVENT } from '../lifelog/module-lifelog';
 import { LifelogView } from './lifelog-view';
 import { icsFileManager, transformEvents } from './ics/IcsFileManager';
-import { globalOpen2 } from "./myK";
-import { addquikaddButton, getCursorElement } from "./quickadd";
+import { createScheduleInConfiguredDatabase } from './event-creation';
+import { openScheduleEditor } from './schedule-editor';
+import { addQuickAddButton, getCursorContainer } from './quickadd';
 import { M_caldata } from "./M_caldata";
 import { ics_alist } from "./share/alist";
 import { ics_s3 } from "./share/s3";
@@ -33,7 +34,6 @@ import { extractDataAvId } from "@/api/api3";
 
 
 
-// import { openNewWindowById } from "./myK";
 let allEvents: EventAttributes[] = [];
 export let DidaService: Dida365Service | null = null;
 let this_settingdata: any = {};
@@ -110,6 +110,7 @@ export class M_calendar {
                 console.debug("销毁日历选项卡", this.data.id);
                 const calendar = calendarinstance.get(this.data.id);
                 if (calendar) {
+                    unregisterCalendarInstance(calendar);
                     calendar.destroy();
                     calendarinstance.delete(this.data.id);
                     console.debug("销毁日历实例", this.data.id);
@@ -123,7 +124,6 @@ export class M_calendar {
                 }
             },
         })
-        // Quadrants and Kanban tabs removed — these views are deprecated/disabled.
         front = getFrontend();
         this.calConfig = new M_caldata(this.plugin.name);
         await this.calConfig.load();
@@ -134,9 +134,6 @@ export class M_calendar {
         this.plugin.addIcons(`
     <symbol id="iconSTcal" viewBox="0 0 500 500">
        ${ic.steveTools_cal}
-    </symbol>
-    <symbol id="iconSTcalKanban" viewBox="0 0 802 802">
-        ${ic.steveTools_cal_kanban}
     </symbol>
         `);
         this.checkAndCreateEventsFile(eventsPath);
@@ -175,9 +172,6 @@ export class M_calendar {
                 }
             });
         }
-        let D_calendar: any;
-        // Kanban dock removed
-
         let D_calendar_day: any;
         this.plugin.addDock({
             config: {
@@ -191,7 +185,8 @@ export class M_calendar {
             resize: async () => {
                 D_calendar_day.updateSize();
             },
-            init: async (dock) => {
+            init: async function () {
+                const dock = this;
                 const id = new Date().getTime().toString();
                 dock.element.innerHTML = `
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
@@ -265,7 +260,7 @@ export class M_calendar {
         // lifelog 增量更新接入：lifelog 模块写完属性后会广播此事件，detail.ids 为变更 blockId 列表。
         // 此处只需：1) invalidate 缓存（让下次 getLifelogEvents 重取这些 block）；
         //          2) debounced refetch 当前可见的日历实例（仅显示 lifelog 的）。
-        // 不走 transactionListener 的 refreshKanban 全量链路 —— 那个已被
+        // 不走 transactionListener 的全量刷新链路——那个已被
         // isLifelogSelfUpdateAttrs 过滤掉。
         this.lifelogChangedHandler = (e) => {
             const ids: string[] | undefined = e?.detail?.ids;
@@ -284,7 +279,7 @@ export class M_calendar {
                 try {
                     // 直接 refetch 当前日历实例：getLifelogEvents 内部会因缓存命中跳过
                     // 未变更的 block，只重取受影响的少数几条，避免全月 N 次 getBlockAttrs。
-                    for (const cal of thisCalendars) {
+                    for (const cal of activeCalendars) {
                         if (cal && cal.el && document.body.contains(cal.el)) {
                             cal.refetchEvents();
                         }
@@ -301,7 +296,7 @@ export class M_calendar {
 
     async onLayoutReady() {
         this.switchProtyleLayoutHandler = (e) => {
-            addquikaddButton(e);
+            addQuickAddButton(e);
         };
         this.plugin.eventBus.on('switch-protyle', this.switchProtyleLayoutHandler);
 
@@ -343,7 +338,7 @@ export class M_calendar {
                 // console.debug("添加日程waiwai");
                 try {
                     // await globalOpen();//失败
-                    globalOpen2();
+                    openScheduleEditor();
                 } finally {
                     setTimeout(() => {
                         isCommandExecuting = false;
@@ -353,11 +348,11 @@ export class M_calendar {
         })
         this.plugin.addCommand({
             langKey: "ST_calendar_reload",
-            langText: "刷新日历看板",
+            langText: "刷新日历",
             hotkey: "",
             callback: async () => {
                 // 刷新日历的逻辑
-                refreshKanban();
+                scheduleCalendarRefresh();
             }
         })
         this.plugin.addCommand({
@@ -365,7 +360,7 @@ export class M_calendar {
             langText: "创建日程（应用内弹窗）",
             hotkey: "",
             callback: async () => {
-                handleAddButtonClick_Independent();
+                createScheduleInConfiguredDatabase();
             },
         })
         this.plugin.addCommand({
@@ -373,7 +368,7 @@ export class M_calendar {
             langText: "创建日程（光标所在块）",
             hotkey: "",
             editorCallback: async () => {
-                const cursorElement = getCursorElement();
+                const cursorElement = getCursorContainer();
                 console.debug("🚧🚧🚧elemet:", cursorElement);
 
                 // 1) 优先在常规块元素上查找（含 data-type 的块容器）
@@ -413,7 +408,7 @@ export class M_calendar {
                 
                 // console.debug("pro", blockId);
                 // console.debug("创建日程（光标所在块）", blockId);
-                handleAddButtonClick_Independent('', { isdirect: true, directid: blockId });
+                createScheduleInConfiguredDatabase('', { isdirect: true, directid: blockId });
             },
         })
     }
@@ -433,7 +428,6 @@ export class M_calendar {
                 }
             }
         });
-        // Kanban and Quadrant menu items removed
         if (front == "browser-mobile" || front == "mobile") {
             menu.fullscreen();
         } else {
@@ -563,43 +557,7 @@ export class M_calendar {
         }, 100);
     }
 
-    async openRiChengView(initialView = "dayGridMonth") {
-        // 统一根据 initialView 决定打开哪个选项卡（calendar / quadrants / kanban）
-        const view = initialView || settingdata["cal-default-view"] || "dayGridMonth";
-
-    // 日历视图无需专门判断，落入默认分支即可
-        const kanbanViews: string[] = []; // Kanban views disabled
-        const quadrantViews: string[] = []; // Quadrant views disabled
-
-        if (quadrantViews.includes(view)) {
-            await openTab({
-                app: window.siyuan.ws.app,
-                custom: {
-                    icon: "iconSTcal",
-                    title: `四象限`,
-                    id: this.plugin.name + 'quadrants',
-                    data: { id: null },
-                },
-                keepCursor: false
-            });
-            return;
-        }
-
-        if (kanbanViews.includes(view)) {
-            await openTab({
-                app: window.siyuan.ws.app,
-                custom: {
-                    icon: "iconSTcalKanban",
-                    title: `看板视图`,
-                    id: this.plugin.name + 'kanban',
-                    data: { id: null },
-                },
-                keepCursor: false
-            });
-            return;
-        }
-
-        // 其余一律视为日历视图
+    async openRiChengView() {
         await openTab({
             app: window.siyuan.ws.app,
             custom: {

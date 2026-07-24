@@ -11,7 +11,7 @@ const DAILY_NOTE_ATTR_PREFIX = 'custom-dailynote-';  // 思源 daily note 文档
  * detail 为变更的 blockId 列表。
  *
  * 为什么不用 ws-main：我们自己的 setBlockAttrs 会触发思源再广播一次 transactions
- * （action=updateAttrs），日历侧 transactionListener 会据此全量 refreshKanban。
+ * （action=updateAttrs），日历侧 transactionListener 会据此全量刷新。
  * 用独立事件名绕开这条全量链路，让日历侧只针对 lifelog block 做增量更新。
  */
 export const LIFELOG_CHANGED_EVENT = 'steve-tools:lifelog-changed';
@@ -376,7 +376,7 @@ export class M_lifelog {
         // 并行 setBlockAttrs，单条失败不影响其他
         const writtenIds: string[] = [];
         // 提前登记到 pendingWrittenIds，避免下面 setBlockAttrs 广播的 updateAttrs
-        // 被 transactionListener 当成"用户编辑"再次触发全量 refreshKanban。
+        // 被 transactionListener 当成"用户编辑"再次触发全量日历刷新。
         for (const u of updates) {
             if (u?.id) {
                 pendingWrittenIds.add(u.id);
@@ -416,7 +416,7 @@ export class M_lifelog {
 
 /**
  * 判断某个 blockId 是否是 lifelog 模块自己刚写入的（用于 transactionListener
- * 过滤掉自反射的 updateAttrs，避免触发全量 refreshKanban）。
+ * 过滤掉自反射的 updateAttrs，避免触发全量日历刷新）。
  */
 export function isLifelogSelfWrite(blockId: string): boolean {
     return pendingWrittenIds.has(blockId);

@@ -17,7 +17,7 @@ STEVETOOLS
 
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
-和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。     
+和思源深度融合的日历视图，同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。
 2. docker同步感知：    
 win端s3同步后，docker端感知s3同步。  
 3. ai网页侧边栏：    

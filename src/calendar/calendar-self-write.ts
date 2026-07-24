@@ -4,7 +4,7 @@
  * 当日历模块自身写入 SiYuan AV 单元格 / 块属性时，把 (avID, itemID, keyID) /
  * blockId 登记进短期标记表。下游的 transactionListener (ws-main + fetch 拦截器)
  * 与 api 层的 handlePostBatchUpdateActions 在收到回声时识别为"自写"，跳过
- * refreshKanban 全量刷新链路 —— 因为 FullCalendar 已在本地把事件状态更新好了。
+ * 全量日历刷新链路——因为 FullCalendar 已在本地把事件状态更新好了。
  *
  * 设计参考：lifelog 模块同名机制 module-lifelog.ts 的 pendingWrittenIds /
  * isLifelogSelfWrite —— 这里把模式从单一 blockId 推广到 cell/row/block 三层。
