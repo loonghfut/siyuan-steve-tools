@@ -79,8 +79,6 @@ export const calendarDefaults: Record<string, any> = {
     "cal-slot-max-time": "24:00:00",
     "cal-snap-duration": "00:30:00",
     "cal-event-color": true,
-    // 事件DOM写入块引用属性
-    "cal-event-dom-blockref": true,
     // 事件提示气泡（tippy）
     "cal-event-tooltip": true,
     // 标签上色
@@ -187,7 +185,6 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "拖拽时间间隔", description: "拖拽调整最小单位", key: "cal-snap-duration", value: ctx.settings["cal-snap-duration"] },
                 { type: "select", title: "日历周起始日", description: "周首日", key: "cal-week-start", value: ctx.settings["cal-week-start"], options: { monday: "周一", sunday: "周日" } },
                 { type: "checkbox", title: "事件颜色样式切换", description: "启用后使用另一套事件颜色", key: "cal-event-color", value: ctx.settings["cal-event-color"] },
-                { type: "checkbox", title: "事件元素写入块引用属性", description: "为事件DOM添加 data-type=\"block-ref\" 与 data-id 属性", key: "cal-event-dom-blockref", value: ctx.settings["cal-event-dom-blockref"] },
                 { type: "checkbox", title: "启用事件悬浮提示", description: "显示事件详情的悬浮提示气泡（tippy）", key: "cal-event-tooltip", value: ctx.settings["cal-event-tooltip"] },
                 { type: "checkbox", title: "按标签为事件上色", description: "优先使用事件的第一个标签决定颜色（优先级颜色将被覆盖）", key: "cal-color-by-tag", value: ctx.settings["cal-color-by-tag"] },
                 { type: "custom", component: "TagColorMapEditor", title: "标签-颜色映射", description: "为每个标签配置颜色，支持可视化选择", key: "cal-tag-color-map", value: ctx.settings["cal-tag-color-map"], direction: "column" },

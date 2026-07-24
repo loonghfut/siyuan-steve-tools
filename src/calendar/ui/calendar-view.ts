@@ -812,26 +812,11 @@ export async function run(
             if (!info || !info.event) return;
             // 给每个事件元素打上一个内部用的 blockId 标记,供 setupWeekHorizontalSwipe
             // 在拖动过程中 datesSet 重渲染时识别"同一事件在新视图里被重新挂载的副本",
-            // 避免拖动镜像和重渲染源同时显示。与上面的 data-id 互不影响 ——
-            // data-id 是面向外部块引用的可配置行为,这个是组件内部用的。
+            // 避免拖动镜像和重渲染源同时显示。
             try {
                 const blockRefId = info.event?.extendedProps?.blockId;
                 if (blockRefId) info.el.setAttribute('data-st-block-id', String(blockRefId));
             } catch (e) { /* ignore */ }
-            // 为事件元素本身添加块引用属性，便于外部识别/交互（可配置）
-            // 周期事件不添加该属性
-            if (settingdata["cal-event-dom-blockref"]) {
-                try {
-                    const isRecurring = !!info.event?.extendedProps?.isRecurring;
-                    if (!isRecurring) {
-                        const blockRefId = info.event?.extendedProps?.blockId;
-                        if (blockRefId) {
-                            info.el.setAttribute('data-type', 'block-ref');
-                            info.el.setAttribute('data-id', blockRefId);
-                        }
-                    }
-                } catch (e) { console.warn('设置事件元素块引用属性失败:', e); }
-            }
             // 添加右键菜单事件监听
             if (settingdata["cal-show-right-click"]) {
                 info.el.addEventListener('contextmenu', async (e: MouseEvent) => {
