@@ -1,7 +1,11 @@
 import steveTools, { settingdata } from '@/index';
 import * as api from '@/api/api';
 import { scheduleCalendarRefresh } from '@/calendar/core/calendar-runtime';
-import { statusMap } from '@/calendar/data/calendar-data';
+import {
+    invalidateKramdownCache,
+    invalidateViewValueCache,
+    statusMap,
+} from '@/calendar/data/calendar-data';
 import { interceptFetch } from '@/api/network-interceptor';
 import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
 import {
@@ -18,6 +22,7 @@ interface CalendarListenerHost {
   isAutoSyncingUpdateEnabled(): boolean;
   isListening(): boolean;
   scheduleCalendarUpdate(delay?: number): void;
+  getManagedCalendarAvIds(): Promise<string[]>;
 }
 
 /**
@@ -57,34 +62,39 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
       }
     }
     if (msg.cmd !== 'transactions') return;
-    const op: WsOp | undefined = msg?.data?.[0]?.doOperations?.[0];
-    if (!op) return;
-    const action = op.action;
-    if (action === 'updateAttrs' || action === 'updateAttrViewCell') {
-      // lifelog 自写入引起的 updateAttrs：跳过全量日历刷新，
-      // 由 LIFELOG_CHANGED_EVENT 走局部增量更新路径。
-      if (action === 'updateAttrs' && isLifelogSelfUpdateAttrs(op)) {
-        return;
-      }
-      // 日历自写：拖拽/调整大小/状态/归档/周期 等本地已经更新好 UI 的 AV 单元格写入，
-      // 不需要再走全量日历刷新。匹配 (avID, rowID, keyID) 三元组或 blockId。
-      if (action === 'updateAttrViewCell'
-          && isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID)) {
-        console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell', op.avID, op.rowID);
-        return;
-      }
-      if (action === 'updateAttrs' && isCalendarSelfBlockWrite(op.id)) {
-        console.debug('[CalendarSelfWrite] skip ws-main updateAttrs', op.id);
-        return;
-      }
-      calendarHost.avButton();
-      scheduleCalendarRefresh();
-      if (op.avID && op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID) {
-        if (calendarHost.av_ids?.some(item => item.id === op.avID)) {
+    // 一次事务可带多条 doOperation。只读取第一条会漏掉批量编辑，既无法失效
+    // 对应 AV 缓存，也可能让日历一直显示旧数据。
+    const operations = (msg.data || []).flatMap(transaction => transaction?.doOperations || []);
+    if (operations.length === 0) return;
+
+    // 只有 AV 单元格写入才需要查询受管理 AV 集合；普通块属性变更不应因此
+    // 额外执行两次 blocks SQL。
+    const hasAttributeViewCellWrite = operations.some(op =>
+      op.action === 'updateAttrViewCell' && !!op.avID
+    );
+    const managedAvIds = hasAttributeViewCellWrite
+      ? new Set(await calendarHost.getManagedCalendarAvIds())
+      : new Set<string>();
+    let refreshNeeded = false;
+
+    for (const op of operations) {
+      const action = op.action;
+      if (action === 'updateAttrViewCell') {
+        // 与日程无关的 AV 编辑不再触发所有已打开日历重新加载。
+        if (!op.avID || !managedAvIds.has(op.avID)) continue;
+        if (isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID)) {
+          console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell', op.avID, op.rowID);
+          continue;
+        }
+
+        invalidateViewValueCache(op.avID);
+        refreshNeeded = true;
+
+        if (op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID
+            && calendarHost.av_ids?.some(item => item.id === op.avID)) {
           try {
             const blockId = await api.getAttributeViewBoundBlockIDsByItemIDs(op.avID, [op.rowID]).then(data => data[op.rowID]);
             const avDetails = await api.getAttributeViewKeys(blockId);
-            // console.debug("获取到的属性视图信息🚧🚧:", avDetails);
             let statusKeyDefinition: any;
             if (avDetails && avDetails[0]?.keyValues) {
               const statusKeyValue = avDetails[0].keyValues.find(kv => kv.key && kv.key.name === '状态');
@@ -97,13 +107,34 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
             console.error('状态列变化处理失败', err);
           }
         }
+        continue;
+      }
+
+      if (action === 'updateAttrs') {
+        // 块属性变更无法直接得知它是否绑定到日程 AV，保留原有刷新语义；
+        // 同时仅失效相应块的文本缓存，避免下一次转换使用旧 kramdown。
+        if (isLifelogSelfUpdateAttrs(op)) continue;
+        if (isCalendarSelfBlockWrite(op.id)) {
+          console.debug('[CalendarSelfWrite] skip ws-main updateAttrs', op.id);
+          continue;
+        }
+        invalidateKramdownCache(op.id);
+        refreshNeeded = true;
+        continue;
+      }
+
+      if (action === 'update') {
+        invalidateKramdownCache(op.id);
+        const data = op.data;
+        if (typeof data === 'string' && data.startsWith('<div data-marker')) {
+          refreshNeeded = true;
+        }
       }
     }
-    if (action === 'update') {
-      const data = op.data;
-      if (typeof data === 'string' && data.startsWith('<div data-marker')) {
-        scheduleCalendarRefresh();
-      }
+
+    if (refreshNeeded) {
+      calendarHost.avButton();
+      scheduleCalendarRefresh();
     }
   };
 

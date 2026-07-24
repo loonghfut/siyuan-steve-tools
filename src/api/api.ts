@@ -485,23 +485,35 @@ export async function getAttributeViewItemIDsByBoundIDs(avID: string, blockIDs: 
     return request(url, data);
 }
 
-export async function renderAttributeView(avid: BlockId, viewID?: string) {
-    let data: any;
-    if (viewID === undefined) {
-        data = {
-            id: avid, // avID,
-            // viewID: '20241003141312-30yk3cr',//测试可以不用这个参数 //TODO：多视图的情况下需要
-            pageSize: 99999,
-            page: 1
-        }
-    } else {
-        data = {
-            id: avid, // avID,
-            viewID: viewID,
-            pageSize: 99999,
-            page: 1
-        }
-    }
+export interface RenderAttributeViewOptions {
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    groupPaging?: Record<string, unknown>;
+    ignoreRows?: boolean;
+}
+
+/**
+ * Render an Attribute View.
+ *
+ * `ignoreRows` is useful for metadata-only reads (for example, enumerating
+ * view IDs). SiYuan then skips row filter/sort/calculation work instead of
+ * building a full view only for callers to discard its rows.
+ */
+export async function renderAttributeView(
+    avid: BlockId,
+    viewID?: string,
+    options: RenderAttributeViewOptions = {},
+) {
+    const data: Record<string, unknown> = {
+        id: avid,
+        pageSize: options.pageSize ?? 99999,
+        page: options.page ?? 1,
+    };
+    if (viewID !== undefined) data.viewID = viewID;
+    if (options.query !== undefined) data.query = options.query;
+    if (options.groupPaging !== undefined) data.groupPaging = options.groupPaging;
+    if (options.ignoreRows !== undefined) data.ignoreRows = options.ignoreRows;
 
     const url = '/api/av/renderAttributeView';
     return request(url, data);

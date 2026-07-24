@@ -54,7 +54,9 @@ export class M_calendar {
     }
     private isUpdating: boolean = false;
     private avIdCache: Map<string, { ts: number; value: string[] }> = new Map();
-    private avIdCacheTTL = 5000;
+    // 日程 AV 的发现结果只会在用户新建、删除或重命名对应块时变化，
+    // 不应跟随每次日历 refetch 重新执行 blocks SQL。
+    private avIdCacheTTL = 10 * 1000;
     /**
      * 对外提供的安全调度更新方法，带去抖。\n
      * 如果当前已有更新计时器在等待，则忽略新的调度请求。\n
@@ -80,6 +82,15 @@ export class M_calendar {
 
     /** 是否仍在监听（给监听器访问） */
     public isListening(): boolean { return islisten; }
+
+    /** All AV IDs that feed calendar data, including recurring-event databases. */
+    public async getManagedCalendarAvIds(): Promise<string[]> {
+        const [normal, recurring] = await Promise.all([
+            this.getAVreferenceid(),
+            this.getAVreferenceid('周期'),
+        ]);
+        return Array.from(new Set([...(normal || []), ...(recurring || [])]));
+    }
     // private isSettingAttrs: boolean = false;  // 暂未使用，后续如需并发控制可启用
     public av_ids: any = [];
     public calConfig: M_caldata;
@@ -198,39 +209,25 @@ export class M_calendar {
                 // if (1) { return; }
                 const msg = JSON.parse(e.data);
                 if (msg.cmd === "transactions") {
-                    // steveTools.outlog(msg);
-                    if (msg.data[0].doOperations[0].action === "updateAttrViewCell") {//BUG:同时添加会崩溃，无法稳定复现
-                        // // steveTools.outlog("更新了一个属性视图");
-                        const avids = await this.getAVreferenceid();
-                        //加上周期
-                        const avids_zq = await this.getAVreferenceid('周期');
-                        // steveTools.outlog(avids);
-                        if (avids.includes(msg.data[0].doOperations[0].avID) || avids_zq.includes(msg.data[0].doOperations[0].avID)) {
-                            // steveTools.outlog("更新了日程信息");
-                            //延时执行
-                            if (!this.isUpdating) {
-                                this.isUpdating = true;
-                                setTimeout(async () => {
-                                    await this.getEventsFromSiYuanDatabase();
-                                    console.debug("更新日历文件<2>");
-                                    this.isUpdating = false;
-                                }, 10000);
-                            }
-                        } else {
-                            // // steveTools.outlog("avID 不在 avids 数组中");
-                        }
-                        // steveTools.outlog("更新了日程信息");
-                        //延时执行
-                        if (!this.isUpdating) {
+                    const operations = (msg.data || []).flatMap((transaction: any) => transaction?.doOperations || []);
+                    const cellWrites = operations.filter((op: any) =>
+                        op?.action === 'updateAttrViewCell' && op?.avID
+                    );
+                    if (cellWrites.length > 0) {
+                        const managedAvIds = new Set(await this.getManagedCalendarAvIds());
+                        const hasCalendarWrite = cellWrites.some((op: any) => managedAvIds.has(op.avID));
+                        if (hasCalendarWrite && !this.isUpdating) {
                             this.isUpdating = true;
                             setTimeout(async () => {
-                                await this.getEventsFromSiYuanDatabase();
-                                console.debug("更新日历文件<2>");
-                                this.isUpdating = false;
+                                try {
+                                    await this.getEventsFromSiYuanDatabase();
+                                    console.debug("更新日历文件<2>");
+                                } finally {
+                                    this.isUpdating = false;
+                                }
                             }, 10000);
                         }
                     }
-                    // // steveTools.outlog(msg);
                 }
             };
             siyuan.ws.ws.addEventListener('message', this.wsMessageHandler);

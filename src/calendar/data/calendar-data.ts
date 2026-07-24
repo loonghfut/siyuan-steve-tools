@@ -235,8 +235,9 @@ type ViewData = Promise<ViewItem[]>;
 // viewIdCache 缓存的是「AV 的视图清单（viewId/rootid/name）」——这本质是配置数据，
 // 只有用户新建/删除/重命名视图时才变，变化频率极低。5 秒 TTL 会让每次 refetch（切月、
 // 滚动、拖拽）都对所有 av_id 重新枚举一遍 renderAttributeView，是"只选 1 个视图也触发
-// 多次 renderAttributeView"的主因。延长到 30 秒，视为准静态；需要刷新时走 invalidateViewIdCache。
-const VIEW_ID_CACHE_TTL = 30 * 1000;
+// 多次 renderAttributeView"的主因。10 秒足够避免连续刷新重复查询，
+// 同时让新建/重命名视图能更快出现在日历中；需要立即刷新时走 invalidateViewIdCache。
+const VIEW_ID_CACHE_TTL = 10 * 1000;
 // viewValueCache 缓存的是行数据（事件/时间/状态），变化频繁，保持短 TTL；
 // 自写已通过 patchViewValueRow 行级 patch 维持一致性，外部编辑走 invalidateViewValueCache。
 const VIEW_VALUE_CACHE_TTL = 5000;
@@ -247,6 +248,21 @@ const viewValueCache = new Map<string, { ts: number; data: any[] }>();
 // 经典 single-flight / request coalescing 模式。
 const viewIdInFlight = new Map<string, Promise<ViewItem[]>>();
 const viewValueInFlight = new Map<string, Promise<any[]>>();
+
+// 主事件的 kramdown 不属于 AV 渲染响应，但日历刷新会频繁重复转换相同的行。
+// 用短缓存和 single-flight 避免每个日历实例在每次 refetch 时再次产生 N 个请求。
+const KRAMDOWN_CACHE_TTL = 10 * 1000;
+const kramdownCache = new Map<string, { ts: number; value: string }>();
+const kramdownInFlight = new Map<string, Promise<string>>();
+
+/** Invalidate cached block text after an external block edit. */
+export function invalidateKramdownCache(blockId?: string): void {
+    if (blockId) {
+        kramdownCache.delete(blockId);
+        return;
+    }
+    kramdownCache.clear();
+}
 
 /**
  * 行级 patch：自写 AV 单元格成功后，把同一 row 在 viewValueCache 里的对应字段
@@ -342,7 +358,11 @@ export async function getViewId(va_ids: string[]): ViewData {
 
         const promise = (async () => {
             try {
-                const view = await api.renderAttributeView(va_id);
+                // 此处只需要 AV 元数据中的 views；不要为此构建并传回整张表。
+                const view = await api.renderAttributeView(va_id, undefined, {
+                    ignoreRows: true,
+                    pageSize: 1,
+                });
                 // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
                 const rootname = view.name ? `${view.name}-` : "";
                 const rootid = view.id;
@@ -712,43 +732,62 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
 
 //OK解决事件重复问题
 //转换数据格式
-// 预取所有“主事件”块的 kramdown 文本。
-// 原实现会在循环内逐个 await api.getBlockKramdown（串行 N+1，事件多时显著拖慢）。
-// 这里收集所有需要获取的 blockId，一次性 Promise.all 并行拉取，按 blockId 缓存结果。
-// 对空/未传入的 viewData 直接返回空 Map，行为与原循环内跳过逻辑一致。
+async function getCachedKramdown(blockId: string): Promise<string> {
+    const now = Date.now();
+    const cached = kramdownCache.get(blockId);
+    if (cached && now - cached.ts < KRAMDOWN_CACHE_TTL) {
+        return cached.value;
+    }
+
+    const inFlight = kramdownInFlight.get(blockId);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+        try {
+            const res = await api.getBlockKramdown(blockId);
+            const value = res?.kramdown || '';
+            kramdownCache.set(blockId, { ts: Date.now(), value });
+            return value;
+        } catch (error) {
+            console.warn('预取 kramdown 失败:', blockId, error);
+            return '';
+        } finally {
+            kramdownInFlight.delete(blockId);
+        }
+    })();
+    kramdownInFlight.set(blockId, promise);
+    return promise;
+}
+
+// 预取所有“主事件”块的 kramdown 文本。跨刷新复用短缓存，并限制并发，
+// 防止大数据库一次生成数百个 getBlockKramdown 请求。
 async function prefetchKramdownForMainEvents(viewData: any[] | null | undefined): Promise<Map<string, string>> {
     const cache = new Map<string, string>();
     if (!viewData || !Array.isArray(viewData)) return cache;
 
-    // 收集所有需要预取的块 id（与原循环内的条件保持一致：块 id 存在且为主事件）
-    const blockIds: string[] = [];
+    // 收集所有需要预取的块 id（与原循环内的条件保持一致：块 id 存在且为主事件）。
+    const blockIds = new Set<string>();
     for (const view of viewData) {
         if (!view?.data) continue;
         for (const item of view.data) {
             const eventBlockId = item['事件']?.id || '';
-            if (eventBlockId && (item['主事件']?.content || false) && !cache.has(eventBlockId)) {
-                cache.set(eventBlockId, ''); // 占位，避免重复收集
-                blockIds.push(eventBlockId);
+            if (eventBlockId && (item['主事件']?.content || false)) {
+                blockIds.add(eventBlockId);
             }
         }
     }
-    if (blockIds.length === 0) return cache;
+    if (blockIds.size === 0) return cache;
 
-    // 并行获取；单条失败不影响其它条目（与原先 try 包裹的整体语义保持宽松兼容）
-    const results = await Promise.all(
-        blockIds.map(async (blockId) => {
-            try {
-                const res = await api.getBlockKramdown(blockId);
-                return [blockId, res?.kramdown || ''] as const;
-            } catch (e) {
-                console.warn('预取 kramdown 失败:', blockId, e);
-                return [blockId, ''] as const;
-            }
-        })
-    );
-    for (const [blockId, kramdown] of results) {
-        cache.set(blockId, kramdown);
-    }
+    const ids = Array.from(blockIds);
+    const workerCount = Math.min(8, ids.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: workerCount }, async () => {
+        while (nextIndex < ids.length) {
+            const blockId = ids[nextIndex++];
+            cache.set(blockId, await getCachedKramdown(blockId));
+        }
+    });
+    await Promise.all(workers);
     return cache;
 }
 
@@ -818,7 +857,9 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     kramdown = kramdownCache.get(eventBlockId) || '';
                 }
                 events.push({
-                    id: eventBlockId, // FullCalendar 的事件 id 仍使用块 id 方便定位
+                    // 同一块可被绑定到多个 AV 行；FullCalendar 的 id 必须与去重键同样唯一。
+                    // blockId 保留在 extendedProps 中，供跳转与数据库写入使用。
+                    id: `normal:${view.from.rootid}:${eventItemId || eventBlockId}`,
                     title: item['事件']?.content || '',
                     start: startDate,
                     end: endDate,
@@ -943,7 +984,7 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     }
 
                     events.push({
-                        id: eventBlockId,
+                        id: `recurring:${view.from.rootid}:${eventItemId || eventBlockId}`,
                         title: item['事件']?.content || '',
                         start: startDate,
                         // end: endDate, // 对于rrule事件，不设置end（那是系列结束时间）
