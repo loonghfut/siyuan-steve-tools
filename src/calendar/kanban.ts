@@ -575,7 +575,7 @@ function convertEventsToNested(events: KBCalendarEvent[], includeReferencedEvent
         parentIds.add(clonedEvent.extendedProps.blockId);
 
         // 处理周期事件状态
-        if (clonedEvent.extendedProps?.isRecurring && clonedEvent.extendedProps.source !== 'qqcalendar') {
+        if (clonedEvent.extendedProps?.isRecurring) {
             const okday = clonedEvent.extendedProps.okday;
             if (okday) {
                 const completedDates = okday.split(',').map(d => d.trim());

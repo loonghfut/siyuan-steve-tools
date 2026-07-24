@@ -76,7 +76,7 @@ const customStats = calendarStatsManager.getCustomRangeStats(
     events,
     new Date('2024-01-01'),
     new Date('2024-12-31'),
-    ['siyuan', 'qqcalendar'] // 可选：指定数据源
+    ['siyuan', 'icsSubscription'] // 可选：指定数据源
 );
 ```
 
@@ -211,7 +211,7 @@ src/calendar/
 5. **归档事件识别**: 默认统计已包含“归档”事件（includeArchived 默认 true），统计模块会识别多种书写，例如："归档"、"已归档"、"archived"、"archive" 等。
 
 1. **性能考虑**: 大量事件时，统计计算可能需要一些时间
-2. **数据源**: 支持思源数据库、QQ日历、ICS订阅、Lifelog等多种数据源
+2. **数据源**: 支持思源数据库、ICS订阅、Lifelog等多种数据源
 3. **时区处理**: 所有时间统计都基于本地时区
 4. **内存使用**: 统计数据会临时存储在内存中，刷新页面后清除
 

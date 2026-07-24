@@ -1,4 +1,9 @@
 import { moduleInstances } from '..';
+import {
+    SPECIAL_CALENDAR_SOURCES,
+    SPECIAL_CALENDAR_SOURCE_LABELS,
+    isSpecialCalendarSource,
+} from './calendar-sources';
 
 // 分组配置接口
 export interface ViewGroup {
@@ -21,7 +26,7 @@ const defaultGroups: ViewGroup[] = [
         id: 'external',
         name: '外部日历',
         icon: '外',
-        viewIds: ['qqcalendar', 'icsSubscription'],
+        viewIds: ['icsSubscription'],
         isExpanded: true,
         isHidden: false
     },
@@ -61,6 +66,14 @@ export function initializeGroups() {
     if (userGroups.length === 0) {
         userGroups = [...defaultGroups];
         saveUserGroups(userGroups);
+    } else {
+        const sanitizedGroups = userGroups.map(group => ({
+            ...group,
+            viewIds: group.viewIds.filter(viewId => viewId !== 'qqcalendar'),
+        }));
+        if (sanitizedGroups.some((group, index) => group.viewIds.length !== userGroups[index].viewIds.length)) {
+            saveUserGroups(sanitizedGroups);
+        }
     }
     isUngroupedHidden = loadUngroupedVisibility();
 }
@@ -172,23 +185,17 @@ export function getUngroupedViews(allViewIds: string[]): string[] {
 
 /** 获取所有视图 ID（含特殊视图），并去重 */
 export function getAllViewIds(viewIDs: any[]): string[] {
-    const allSpecialViewIds = ['qqcalendar', 'icsSubscription', 'lifelog', 'recurring'];
     const allSiyuanViewIds = viewIDs.map(v => v.viewId);
-    return [...new Set([...allSpecialViewIds, ...allSiyuanViewIds])];
+    return [...new Set([...SPECIAL_CALENDAR_SOURCES, ...allSiyuanViewIds])];
 }
 
 /** 视图 id → 显示名（特殊视图走预定义表，其余走 viewIDs 查找） */
 export function getViewLabel(viewId: string, viewIDs: any[]): string | null {
-    switch (viewId) {
-        case 'qqcalendar': return 'QQ邮箱日历';
-        case 'icsSubscription': return 'ICS订阅日历';
-        case 'lifelog': return 'Lifelog 记录';
-        case 'recurring': return '周期事件';
-        default: {
-            const view = viewIDs.find(v => v.viewId === viewId);
-            return view ? view.name : null;
-        }
+    if (isSpecialCalendarSource(viewId)) {
+        return SPECIAL_CALENDAR_SOURCE_LABELS[viewId];
     }
+    const view = viewIDs.find(v => v.viewId === viewId);
+    return view ? view.name : null;
 }
 
 // 视图筛选 UI 入口在 view-filter-panel.ts 中实现，并由 calendar.ts 直接引用。

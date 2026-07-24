@@ -4,6 +4,10 @@
  */
 
 import { showMessage } from 'siyuan';
+import {
+    SPECIAL_CALENDAR_SOURCES,
+    SPECIAL_CALENDAR_SOURCE_LABELS,
+} from '../calendar-sources';
 
 export interface CalendarStatsData {
     // 事件统计
@@ -97,7 +101,7 @@ export class CalendarDataStats {
                 start: new Date(new Date().getFullYear(), 0, 1), // 今年1月1日
                 end: new Date(new Date().getFullYear(), 11, 31), // 今年12月31日
             },
-            includeSources: ['siyuan', 'qqcalendar', 'icsSubscription', 'lifelog'],
+            includeSources: ['siyuan', ...SPECIAL_CALENDAR_SOURCES],
             includeRecurring: true,
             // 默认包含归档事件以便统计中能识别归档计数
             includeArchived: true,
@@ -455,11 +459,9 @@ export class CalendarDataStats {
      * 获取来源显示名称
      */
     private getSourceDisplayName(source: string): string {
-        const sourceNames = {
-            'siyuan': '思源数据库',
-            'qqcalendar': 'QQ邮箱日历',
-            'icsSubscription': 'ICS订阅',
-            'lifelog': '生活记录',
+        const sourceNames: Record<string, string> = {
+            siyuan: '思源数据库',
+            ...SPECIAL_CALENDAR_SOURCE_LABELS,
         };
         return sourceNames[source] || source;
     }

@@ -21,13 +21,12 @@ import { addquikaddButton, getCursorElement } from "./quickadd";
 import { M_caldata } from "./M_caldata";
 import { ics_alist } from "./share/alist";
 import { ics_s3 } from "./share/s3";
-import { CalDAVClient } from "./share/qqcaldav";
 import { WebDAVSync } from "./share/webdav";
 import { ICSSubscription } from "./share/ics_discribe";
 import { Calendar } from "@fullcalendar/core";
 // import { insertHtml, THIS } from "./insertHtml"; // 未使用，保留注释以供未来参考
 import { ICSImporter } from "./ics/ics_siyuan";
-import { Dida365Service } from "./dida/dida_serv";
+import { Dida365Service } from "./dida/features/dida-service";
 // import { AVManager } from "@/api/db_pro"; // 未使用
 import { IAVOperator } from "@/api/db_interface";
 import { extractDataAvId } from "@/api/api3";
@@ -91,9 +90,7 @@ export class M_calendar {
     public calConfig: M_caldata;
     public alistPlugin: ics_alist;
     public s3Client: ics_s3;
-    public QQCalDAVClient: CalDAVClient;
     public webdavClient: WebDAVSync;
-    public qqFullCalendarEvents;
     public icsSubscription: ICSSubscription;
     public calendarAV: IAVOperator;
 
@@ -329,16 +326,6 @@ export class M_calendar {
             await this.shareicsinit();
         }
 
-        if (this_settingdata["cal-qq-email"] && this_settingdata["cal-qq-code"] && this_settingdata["cal-qq-enable"]) {
-            this.QQCalDAVClient = new CalDAVClient(this_settingdata["cal-qq-email"], this_settingdata["cal-qq-code"]);
-            await this.QQCalDAVClient.init();
-            const qqCalendars_url = this_settingdata["cal-qq-calendar-url"];
-            // 确保首次进入面板即拉取并写入 QQ 事件缓存
-            await this.QQCalDAVClient.updateEventsFromQQCalDAV(qqCalendars_url);
-            this.qqFullCalendarEvents = this.QQCalDAVClient.getEventsFromQQCalDAV();
-            refreshKanban();
-            console.debug("QQevent", this.qqFullCalendarEvents);
-        }
         await init_viewValue({ viewId: this.calConfig.get("viewId"), viewName: this.calConfig.get("viewName") });
         // this.plugin.eventBus.on("click-blockicon", quickadd_event_more);//无法实现
         this.av_ids = await this.getAVreferenceid_pro();

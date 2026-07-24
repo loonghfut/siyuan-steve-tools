@@ -139,7 +139,7 @@ function convertEventsToNestedLocal(events: KBCalendarEvent[]): NestedKBCalendar
       event.children = event.children.map(c => buildNested({ ...c }, depth + 1));
     }
     // 周期事件当天完成状态替换
-    if (event.extendedProps?.isRecurring && event.extendedProps.source !== 'qqcalendar') {
+    if (event.extendedProps?.isRecurring) {
       const okday = event.extendedProps.okday;
       if (okday) {
         const completedDates = okday.split(',').map(d => d.trim());

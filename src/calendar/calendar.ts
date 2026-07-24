@@ -25,6 +25,7 @@ import { getCategoryColor, getLifelogColor } from '../lifelog/styles/colors';
 import { LifelogView } from './lifelog-view';
 import { createViewFilterMenu, initializeGroups } from './initializeGroups';
 import { calendarStatsManager } from './stats';
+import { isSpecialCalendarSource } from './calendar-sources';
 //审查ok
 
 
@@ -327,10 +328,6 @@ export async function run(
 
             if (settingdata["cal-create-way"] === "1") {
                 if (info.event._def.extendedProps.isRecurring) {
-                    if (info.event._def.extendedProps.source === 'qqcalendar') {
-                        myF.updataqqcalendar(info);
-                        return;
-                    }
                     // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                     myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                     return;
@@ -351,11 +348,6 @@ export async function run(
                 // console.debug("双击事件", info.event);
                 if (info.event._def.extendedProps.isRecurring) {
                     console.debug("周期条件进入");
-                    if (info.event._def.extendedProps.source === 'qqcalendar') {
-                        console.debug("qqcalendar", info.event.id);
-                        myF.updataqqcalendar(info);
-                        return;
-                    }
                     // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                     myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                     return;
@@ -378,13 +370,7 @@ export async function run(
             }
             // console.debug('dateClick', info);
             const viewIDs = await myF.getViewId(av_ids)
-            let rootid;
-            if (filterViewId.includes('qqcalendar')) {
-                rootid = 'qqcalendar'; // 特殊标识，用于在createEventInDatabase中区分
-                console.debug("QQ日历事件创建");
-            } else {
-                rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
-            }
+            const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
             // 若当前选择的均为只读或无有效视图，阻止创建
             if (!rootid) {
                 showMessage('当前选择的视图不支持直接创建事件', 3000, 'info');
@@ -460,42 +446,6 @@ export async function run(
         },
         // 事件拖放处理
         eventDrop: async function (info) {
-            // 检查是否是QQ日历事件
-            if (info.event.extendedProps.source === 'qqcalendar') {
-                showDropTimeIndicator(info);
-                try {
-                    const calendarId = settingdata['cal-qq-calendar-url'];
-                    const success = await moduleInstances['M_calendar'].QQCalDAVClient.updateEvent(
-                        calendarId,
-                        info.event.id,
-                        {
-                            title: info.event.title,
-                            start: info.event.start,
-                            end: info.event.end || new Date(info.event.start.getTime() + 60 * 60 * 1000),
-                            description: info.event.extendedProps.description || '',
-                        }
-                    );
-
-                    if (success) {
-                        setTimeout(() => {
-                            const qqCalUrl = settingdata['cal-qq-calendar-url'];
-                            moduleInstances['M_calendar'].QQCalDAVClient.updateEventsFromQQCalDAV(qqCalUrl).then(() => {
-                                calendar.refetchEvents();
-                                showMessage('QQ日历事件已更新', 3000);
-                            });
-                        }, 1000);
-                    } else {
-                        info.revert();
-                    }
-                } catch (error) {
-                    console.error('更新QQ日历事件失败:', error);
-                    showMessage('更新事件失败', -1, 'error');
-                    info.revert();
-                }
-
-                return;
-            }
-
             if (info.event._def.extendedProps.isRecurring) {
                 showMessage("不支持拖动哦");
                 //撤回拖动
@@ -552,43 +502,6 @@ export async function run(
         },
 
         eventResize: async function (info) {
-            // 检查是否是QQ日历事件
-            if (info.event.extendedProps.source === 'qqcalendar') {
-                showResizeTimeIndicator(info);
-
-                try {
-                    const calendarId = settingdata['cal-qq-calendar-url'];
-                    const success = await moduleInstances['M_calendar'].QQCalDAVClient.updateEvent(
-                        calendarId,
-                        info.event.id,
-                        {
-                            title: info.event.title,
-                            start: info.event.start,
-                            end: info.event.end,
-                            description: info.event.extendedProps.description || '',
-                        }
-                    );
-
-                    if (success) {
-                        setTimeout(() => {
-                            const qqCalUrl = settingdata['cal-qq-calendar-url'];
-                            moduleInstances['M_calendar'].QQCalDAVClient.updateEventsFromQQCalDAV(qqCalUrl).then(() => {
-                                calendar.refetchEvents();
-                                showMessage('QQ日历事件已更新', 3000);
-                            });
-                        }, 1000);
-                    } else {
-                        info.revert();
-                    }
-                } catch (error) {
-                    console.error('更新QQ日历事件失败:', error);
-                    showMessage('更新事件失败', -1, 'error');
-                    info.revert();
-                }
-
-                return;
-            }
-
             if (info.event._def.extendedProps.isRecurring) {
                 showMessage("不支持修改哦");
                 info.revert();
@@ -656,25 +569,9 @@ export async function run(
             refreshButton: {
                 icon: REFRESH_ICON,
                 hint: '刷新',
-                click: async function () {
-                    try {
-                        showMessage('正在刷新视图...', 3000);
-                        // 若启用了 QQ 日历并已配置日历 URL，则优先刷新 QQ 日历事件缓存
-                        const qqClient = moduleInstances['M_calendar']?.QQCalDAVClient as any;
-                        const qqCalUrl = settingdata['cal-qq-calendar-url'];
-                        if (qqClient && qqCalUrl) {
-                            try {
-                                showMessage('正在同步 QQ 日历…', 2000, 'info');
-                                await qqClient.updateEventsFromQQCalDAV(qqCalUrl);
-                            } catch (qqErr) {
-                                console.warn('同步 QQ 日历失败，将继续刷新本地视图', qqErr);
-                                showMessage('QQ 日历同步失败，已跳过', 3000, 'info');
-                            }
-                        }
-                    } finally {
-                        // 无论 QQ 日历是否成功，都刷新看板/日历视图
-                        refreshKanban();
-                    }
+                click: function () {
+                    showMessage('正在刷新视图...', 3000);
+                    refreshKanban();
                 }
             },
             // 统计功能按钮
@@ -719,23 +616,6 @@ export async function run(
                     return;
                 }
                 let allEvents = [];
-                /////////////////////QQ日历////////////////////////
-                try {
-                    if (moduleInstances['M_calendar']?.QQCalDAVClient) {
-                        const qqEvents = moduleInstances["M_calendar"].QQCalDAVClient?.getEventsFromQQCalDAV();
-                        if (qqEvents && Array.isArray(qqEvents)) {
-                            // 检查是否应该显示QQ日历事件（仅当筛选包含该视图时）
-                            const showQQEvents = filterViewId.includes('qqcalendar');
-
-                            if (showQQEvents) {
-                                allEvents = allEvents.concat(qqEvents);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error fetching QQ calendar events:', error);
-                    // Continue execution without QQ calendar events
-                }
                 //////////////////////ics订阅////////////////////////
                 try {
                     if (moduleInstances['M_calendar']?.icsSubscription) {
@@ -801,13 +681,13 @@ export async function run(
                 }
 
                 /////////////////////思源////////////////////////
-                const specialKeys = new Set(['qqcalendar', 'icsSubscription', 'lifelog', 'recurring']);
-                const needsNormalEvents = filterViewId.some((id) => !specialKeys.has(id));
+                const hasSpecialSource = filterViewId.some(isSpecialCalendarSource);
+                const needsNormalEvents = filterViewId.some((id) => !isSpecialCalendarSource(id));
                 // 1. 获取引用ID（普通事件）
                 av_ids = needsNormalEvents ? await moduleInstances['M_calendar'].getAVreferenceid() : [];
                 const showRecurring = filterViewId.includes('recurring');
-                // 仅当既没有普通视图引用、又未选择任何特殊来源（QQ/ICS/Lifelog/周期）时才早退
-                if (!av_ids?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription') && !showRecurring) {
+                // 没有普通视图引用且未选择特殊来源时，无需继续请求数据。
+                if (!av_ids?.length && !hasSpecialSource) {
                     console.warn('No reference IDs found and no view selected');
                     successCallback([]);
                     return;
@@ -823,7 +703,7 @@ export async function run(
                 const viewIDs_zq = (showRecurring && av_ids_zq?.length) ? await myF.getViewId(av_ids_zq) : [];
 
                 // 修改视图ID检查逻辑
-                if (!viewIDs?.length && !filterViewId.includes('lifelog') && !filterViewId.includes('qqcalendar') && !filterViewId.includes('icsSubscription') && !showRecurring) {
+                if (!viewIDs?.length && !hasSpecialSource) {
                     console.warn('No view IDs found and no special views selected');
                     successCallback([]);
                     return;
@@ -942,10 +822,6 @@ export async function run(
                     e.preventDefault();
                     if (settingdata["cal-create-way"] === "1") {
                         if (info.event._def.extendedProps.isRecurring) {
-                            if (info.event._def.extendedProps.source === 'qqcalendar') {
-                                myF.updataqqcalendar(info);
-                                return;
-                            }
                             // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                             myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                             return;
@@ -964,11 +840,6 @@ export async function run(
                         clearTimeout(clickTimeout);
                         clicks2 = 0;
                         if (info.event._def.extendedProps.isRecurring) {
-                            if (info.event._def.extendedProps.source === 'qqcalendar') {
-                                console.debug("qqcalendar", info.event.id);
-                                myF.updataqqcalendar(info);
-                                return;
-                            }
                             // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
                             myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
                             return;
@@ -1030,7 +901,7 @@ export async function run(
             if (timeEl && colorConfig?.text) (timeEl as HTMLElement).style.color = colorConfig.text;
             if (titleEl && colorConfig?.text) (titleEl as HTMLElement).style.color = colorConfig.text;
 
-            if (info.event.extendedProps.isRecurring && info.event.extendedProps.source !== 'qqcalendar') {
+            if (info.event.extendedProps.isRecurring) {
                 const isCompleted = isEventCompleted(info.event);
                 // 动态更新 status 属性
                 // console.debug('Before update:', {...info.event.extendedProps}); // 记录更新前的属性
@@ -1084,14 +955,6 @@ export async function run(
                 console.debug('info.event:', info?.event._def);
                 if (info?.event) {
                     console.debug('info.event.extendedProps:', info.event.extendedProps);
-                }
-            }
-            // // steveTools.outlog(info);
-            if (info.event.extendedProps.source === 'qqcalendar') {
-                info.el.classList.add('qq-calendar-event');
-                const titleEl = info.el.querySelector('.fc-event-title');
-                if (titleEl) {
-                    titleEl.insertAdjacentHTML('afterbegin', '<span class="qq-calendar-badge">QQ</span>');
                 }
             }
             // 添加提示框
@@ -1496,12 +1359,9 @@ function displayStatusDropZone(calendarEl: HTMLElement, info) {
             header.parentElement.insertBefore(statusDropZone, header);
         }
     }
-    // 根据事件类型设置提示文本
     if (info.event.extendedProps.isRecurring) {
-        if (info.event.extendedProps.source === 'qqcalendar') {
-            statusDropZone.innerHTML = '<div>QQ日历事件不支持修改状态</div>';
-            statusDropZone.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
-        }
+        statusDropZone.innerHTML = '<div>拖放到标题处将当前日期标记为完成</div>';
+        statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
     } else {
         statusDropZone.innerHTML = '<div>拖放到标题处将事件标记为"归档"</div>';
         statusDropZone.style.backgroundColor = 'rgba(0, 128, 0, 0.2)';
@@ -1534,16 +1394,10 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
             // 取消默认的拖动行为
             // info.revert = true;
 
-            // 根据事件类型执行不同的操作
             if (info.event.extendedProps.isRecurring) {
-                if (info.event.extendedProps.source === 'qqcalendar') {
-                    showMessage('QQ日历事件不支持状态修改', 3000, 'error');
-                    return;
-                } else {
-                    // 周期性事件处理（在模块级 helper 中无法拿到具体 calendar 实例引用）
-                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
-                    showMessage('已将当前日期标记为完成', 3000);
-                }
+                // 周期性事件处理（在模块级 helper 中无法拿到具体 calendar 实例引用）
+                myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                showMessage('已将当前日期标记为完成', 3000);
             } else {
                 // 普通事件处理
                 try {

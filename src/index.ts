@@ -143,9 +143,6 @@ export default class steveTools extends Plugin {
       if (settingdata["cal-ics-enable-subscribe"]) {
         enabledFeatures.push("ics");
       }
-      if (settingdata["cal-qq-enable"]) {
-        enabledFeatures.push("qq");
-      }
       if (settingdata["wps-pic-enable"]) {
         enabledFeatures.push("wps-pic");
       }

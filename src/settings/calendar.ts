@@ -42,12 +42,7 @@ export const calendarDefaults: Record<string, any> = {
 标签： {{tags}}
 描述：{{description}}
 重复规则： {{recurrence}}`,
-    // qq 邮箱
-    "cal-qq-code": "",
-    "cal-qq-email": "",
     "cal-share": "",
-    "cal-qq-calendar-url": "",
-    "cal-qq-enable": false,
     // 滴答清单
     "cal-dida-enable": false,
     "cal-dida-token": "",
@@ -176,15 +171,6 @@ export const calendarGroup = (ctx: BuildContext): SettingGroupDefinition => ({
                 { type: "textinput", title: "WebDAV用户名", description: "WebDAV 用户名", key: "cal-webdav-username", value: ctx.settings["cal-webdav-username"] },
                 { type: "textinput", title: "WebDAV密码", description: "WebDAV 密码", key: "cal-webdav-password", value: ctx.settings["cal-webdav-password"] },
                 { type: "textinput", title: "WebDAV远程路径", description: "远程保存路径", key: "cal-webdav-path", value: ctx.settings["cal-webdav-path"] },
-            ]
-        },
-        {
-            name: "qq邮箱日历",
-            items: [
-                { type: "checkbox", title: "启用QQ邮箱日历(beta)", description: "展示QQ邮箱日历事件", key: "cal-qq-enable", value: ctx.settings["cal-qq-enable"] },
-                { type: "textinput", title: "QQ邮箱地址", description: "对接QQ邮箱填写", key: "cal-qq-email", value: ctx.settings["cal-qq-email"] },
-                { type: "textinput", title: "QQ邮箱授权码", description: "对接QQ邮箱填写", key: "cal-qq-code", value: ctx.settings["cal-qq-code"] },
-                { type: "select", title: "QQ日历选择", description: "选择需要同步的QQ日历", key: "cal-qq-calendar-url", value: ctx.settings["cal-qq-calendar-url"], dynamicOptions: async (c) => { try { const list = await c.moduleInstances?.M_calendar?.QQCalDAVClient?.getCalendars(); if (Array.isArray(list) && list.length) { const m: Record<string, string> = { "": "无" }; list.forEach((cal: any) => { m[cal.url] = `${cal.displayName}${cal.description ? ` (${cal.description})` : ""}`; }); return m; } } catch (e) { console.error(e); } return { "": "请先配置QQ邮箱信息" }; } },
             ]
         },
         {

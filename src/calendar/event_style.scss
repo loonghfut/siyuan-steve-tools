@@ -144,27 +144,6 @@ $calendar-shadow-md: 0 10px 28px rgba(0, 0, 0, 0.16);
     border-color: var(--b3-card-info-color);
 }
 
-.qq-calendar-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 16px;
-    min-width: 20px;
-    margin-right: 4px;
-    padding: 0 4px;
-    border-radius: 999px;
-    font-size: 10px;
-    font-weight: 600;
-    line-height: 1;
-    background-color: var(--b3-card-info-background);
-    color: var(--b3-card-info-color);
-    vertical-align: 1px;
-}
-
-.qq-calendar-event {
-    border-radius: $calendar-radius-md !important;
-}
-
 .st-plan-button-count {
     display: inline-flex;
     align-items: center;
