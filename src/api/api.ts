@@ -321,7 +321,11 @@ export async function updateBlock(dataType: DataType, data: string, id: BlockId)
 
 export async function batchUpdateTaskListItemMarker(items: Array<{ id: BlockId; marker: string }>): Promise<IResdoOperations[]> {
     const url = '/api/block/batchUpdateTaskListItemMarker';
-    return request(url, { items });
+    const result = await request(url, { items });
+    if (!Array.isArray(result)) {
+        throw new Error(`更新任务列表项标记失败: ${String(result)}`);
+    }
+    return result;
 }
 
 

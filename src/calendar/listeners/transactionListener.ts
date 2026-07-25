@@ -12,7 +12,15 @@ import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
 } from '@/calendar/core/calendar-self-write';
-import { completeBoundSuperBlockTaskItems } from '@/calendar/listeners/bound-task-block-sync';
+import {
+    consumeTaskMarkerSyncWrite,
+    syncBoundSuperBlockTaskItems,
+} from '@/calendar/listeners/bound-task-block-sync';
+import {
+    consumeUserTaskToggle,
+    recordUserTaskToggle,
+    syncTaskBlockStatusToCalendar,
+} from '@/calendar/listeners/task-block-status-sync';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
@@ -51,7 +59,45 @@ function isLifelogSelfUpdateAttrs(op: WsOp): boolean {
     return false;
 }
 
+function getTaskListItemCompletion(op: WsOp): boolean | undefined {
+    if (op.action !== 'update' || typeof op.id !== 'string' || typeof op.data !== 'string') {
+        return undefined;
+    }
+    const taskItem = new DOMParser().parseFromString(op.data, 'text/html')
+        .querySelector<HTMLElement>('[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]');
+    if (!taskItem || taskItem.dataset.nodeId !== op.id) {
+        return undefined;
+    }
+    return taskItem.getAttribute('data-task') !== ' ';
+}
+
+function getTaskListItem(element: EventTarget | null): HTMLElement | null {
+    const source = element instanceof Element ? element : null;
+    return source?.closest<HTMLElement>('[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]') ?? null;
+}
+
+async function syncStatusToTaskItems(blockId: string, status: string): Promise<void> {
+    await api.setBlockAttrs(blockId, {
+        'custom-st-event': statusMap[status || '未完成'],
+    });
+    await syncBoundSuperBlockTaskItems(blockId, status);
+}
+
 export function registerTransactionListener(plugin: steveTools, calendarHost: CalendarListenerHost) {
+  const recordTaskToggleAfterEvent = (event: Event) => {
+    const taskItem = getTaskListItem(event.target);
+    if (!taskItem) return;
+    const before = taskItem.getAttribute('data-task') !== ' ';
+    queueMicrotask(() => {
+      const after = taskItem.getAttribute('data-task') !== ' ';
+      if (after !== before) {
+        recordUserTaskToggle(taskItem.dataset.nodeId, after);
+      }
+    });
+  };
+  document.addEventListener('click', recordTaskToggleAfterEvent, true);
+  document.addEventListener('keydown', recordTaskToggleAfterEvent, true);
+
   const wsMainHandler = async (e) => {
     const msg: WsMsg = e.detail;
     // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
@@ -73,7 +119,8 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
     const hasAttributeViewCellWrite = operations.some(op =>
       op.action === 'updateAttrViewCell' && !!op.avID
     );
-    const managedAvIds = hasAttributeViewCellWrite
+    const hasTaskListItemUpdate = operations.some(op => getTaskListItemCompletion(op) !== undefined);
+    const managedAvIds = hasAttributeViewCellWrite || hasTaskListItemUpdate
       ? new Set(await calendarHost.getManagedCalendarAvIds())
       : new Set<string>();
     let refreshNeeded = false;
@@ -91,7 +138,7 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
           console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell refresh', op.avID, op.rowID);
         }
 
-        if (op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID
+        if (Array.isArray(op?.data?.mSelect) && op.rowID && op.keyID
             && calendarHost.av_ids?.some(item => item.id === op.avID)) {
           try {
             const blockId = await api.getAttributeViewBoundBlockIDsByItemIDs(op.avID, [op.rowID]).then(data => data[op.rowID]);
@@ -102,11 +149,8 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
               if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
             }
             if (statusKeyDefinition && statusKeyDefinition.id === op.keyID) {
-              const status = op.data.mSelect[0].content;
-              await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[status] });
-              if (status === '完成') {
-                await completeBoundSuperBlockTaskItems(blockId);
-              }
+              const status = op.data.mSelect[0]?.content || '';
+              await syncStatusToTaskItems(blockId, status);
             }
           } catch (err) {
             console.error('状态列变化处理失败', err);
@@ -130,6 +174,16 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
 
       if (action === 'update') {
         invalidateKramdownCache(op.id);
+        const taskCompleted = getTaskListItemCompletion(op);
+        if (taskCompleted !== undefined
+            && !consumeTaskMarkerSyncWrite(op.id)
+            && consumeUserTaskToggle(op.id, taskCompleted)) {
+          try {
+            await syncTaskBlockStatusToCalendar(op.id, taskCompleted, managedAvIds);
+          } catch (error) {
+            console.warn('同步任务块状态到日程数据库失败:', op.id, error);
+          }
+        }
         const data = op.data;
         if (typeof data === 'string' && data.startsWith('<div data-marker')) {
           refreshNeeded = true;
@@ -186,12 +240,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
             if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
           }
           const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === keyID);
-          if (isStatus && selectValue) {
+          if (isStatus) {
             // 状态列：根据值设置自定义属性
-            await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
-            if (selectValue === '完成') {
-              await completeBoundSuperBlockTaskItems(blockId);
-            }
+            await syncStatusToTaskItems(blockId, selectValue || '');
             return;
           }
           // 其他列：刷新视图——但若是日历自写则跳过
@@ -228,15 +279,7 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
             const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === v.keyID);
             if (isStatus) {
               const selectValue = getSelectValue(v.value);
-              if (selectValue) {
-                await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
-                if (selectValue === '完成') {
-                  await completeBoundSuperBlockTaskItems(blockId);
-                }
-                continue;
-              }
-              // 没有值（被清空等），无法设置映射，改为刷新
-              refreshNeeded = true;
+              await syncStatusToTaskItems(blockId, selectValue || '');
               continue;
             }
             // 非状态列：标记需要刷新
@@ -257,6 +300,8 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
   });
 
   return () => {
+    document.removeEventListener('click', recordTaskToggleAfterEvent, true);
+    document.removeEventListener('keydown', recordTaskToggleAfterEvent, true);
     try {
       plugin.eventBus.off('ws-main', wsMainHandler);
     } catch (error) {
