@@ -560,12 +560,32 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             // 检查是否存在 didaID。如果存在，则为更新操作；否则为创建操作。
             if (siyuanTask.didaID?.content) {
                 const didaTaskId = siyuanTask.didaID.content;
-                const cachedTask = this.taskCache.get(didaTaskId);
+                let cachedTask = this.taskCache.get(didaTaskId);
                 if (!cachedTask) {
                     console.warn(`任务 ${didaTaskId} 不在缓存中，无法反向同步。`);
                     await this.getAllTasks();
-                    showMessage("请重试，无法获取到滴答事件，重试无效说明事件已经归档");
-                    return false;
+                    cachedTask = this.taskCache.get(didaTaskId);
+
+                    // 已完成任务不在未完成项目的 getAllTasks() 结果中；补充查询后再判定
+                    // 是否真的被滴答删除，避免把正常的已完成任务误报为“无法获取”。
+                    if (!cachedTask) {
+                        const completedTasks = await this.listCompletedTasks(this.getCompletedTaskQuery());
+                        for (const task of completedTasks) {
+                            if (task.id) this.taskCache.set(task.id, task);
+                        }
+                        cachedTask = this.taskCache.get(didaTaskId);
+                    }
+
+                    if (!cachedTask) {
+                        // 滴答侧已删除的任务会在常规同步中被归档。此后编辑思源中的
+                        // 历史记录不应不断触发无效的反向同步或向用户弹出“请重试”。
+                        console.info("[滴答同步] 远端任务不存在，跳过反向同步", {
+                            didaTaskId,
+                            blockId,
+                            status: siyuanTask.状态?.content,
+                        });
+                        return true;
+                    }
                 }
                 const currentProjectId = cachedTask.projectId;
                 const updatePayload: Partial<Task> = {};
