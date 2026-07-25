@@ -12,6 +12,7 @@ import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
 } from '@/calendar/core/calendar-self-write';
+import { completeBoundSuperBlockTaskItems } from '@/calendar/listeners/bound-task-block-sync';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
@@ -82,13 +83,13 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
       if (action === 'updateAttrViewCell') {
         // 与日程无关的 AV 编辑不再触发所有已打开日历重新加载。
         if (!op.avID || !managedAvIds.has(op.avID)) continue;
-        if (isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID)) {
-          console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell', op.avID, op.rowID);
-          continue;
+        const isCalendarSelfWrite = isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID);
+        if (!isCalendarSelfWrite) {
+          invalidateViewValueCache(op.avID);
+          refreshNeeded = true;
+        } else {
+          console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell refresh', op.avID, op.rowID);
         }
-
-        invalidateViewValueCache(op.avID);
-        refreshNeeded = true;
 
         if (op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID
             && calendarHost.av_ids?.some(item => item.id === op.avID)) {
@@ -101,7 +102,11 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
               if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
             }
             if (statusKeyDefinition && statusKeyDefinition.id === op.keyID) {
-              await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[op.data.mSelect[0].content] });
+              const status = op.data.mSelect[0].content;
+              await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[status] });
+              if (status === '完成') {
+                await completeBoundSuperBlockTaskItems(blockId);
+              }
             }
           } catch (err) {
             console.error('状态列变化处理失败', err);
@@ -184,6 +189,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
           if (isStatus && selectValue) {
             // 状态列：根据值设置自定义属性
             await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+            if (selectValue === '完成') {
+              await completeBoundSuperBlockTaskItems(blockId);
+            }
             return;
           }
           // 其他列：刷新视图——但若是日历自写则跳过
@@ -200,14 +208,6 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
         if (url.includes('/api/av/batchSetAttributeViewBlockAttrs') && Array.isArray(body?.values)) {
           const values: Array<{ keyID: string; itemID: string; value: any } & Record<string, any>> = body.values;
           if (values.length === 0) return;
-          // 日历自写早判：所有 values 都是日历自写时直接 return，省掉 ID 映射 & 字段查询
-          const allCalendarSelf = values.every(v =>
-            isCalendarSelfCellWrite(avID, v.itemID, v.keyID)
-          );
-          if (allCalendarSelf) {
-            console.debug('[CalendarSelfWrite] skip network batchSetAttributeViewBlockAttrs', avID, values.length);
-            return;
-          }
           // 先收集所有涉及的 itemID，并映射到 blockId
           const itemIDs = Array.from(new Set(values.map(v => v.itemID).filter(Boolean)));
           if (itemIDs.length === 0) return;
@@ -230,6 +230,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
               const selectValue = getSelectValue(v.value);
               if (selectValue) {
                 await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+                if (selectValue === '完成') {
+                  await completeBoundSuperBlockTaskItems(blockId);
+                }
                 continue;
               }
               // 没有值（被清空等），无法设置映射，改为刷新
@@ -237,7 +240,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
               continue;
             }
             // 非状态列：标记需要刷新
-            refreshNeeded = true;
+            if (!isCalendarSelfCellWrite(avID, v.itemID, v.keyID)) {
+              refreshNeeded = true;
+            }
           }
           if (refreshNeeded) {
             try { calendarHost.avButton(); } catch { }

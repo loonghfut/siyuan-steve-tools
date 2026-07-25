@@ -319,6 +319,11 @@ export async function updateBlock(dataType: DataType, data: string, id: BlockId)
     return request(url, payload);
 }
 
+export async function batchUpdateTaskListItemMarker(items: Array<{ id: BlockId; marker: string }>): Promise<IResdoOperations[]> {
+    const url = '/api/block/batchUpdateTaskListItemMarker';
+    return request(url, { items });
+}
+
 
 export async function deleteBlock(id: BlockId): Promise<IResdoOperations[]> {
     let data = {
