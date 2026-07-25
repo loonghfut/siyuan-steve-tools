@@ -11,16 +11,12 @@ import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
 import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
+    markCalendarBlockWrite,
 } from '@/calendar/core/calendar-self-write';
 import {
-    consumeTaskMarkerSyncWrite,
     syncBoundSuperBlockTaskItems,
 } from '@/calendar/listeners/bound-task-block-sync';
-import {
-    consumeUserTaskToggle,
-    recordUserTaskToggle,
-    syncTaskBlockStatusToCalendar,
-} from '@/calendar/listeners/task-block-status-sync';
+import { syncTaskBlockStatusToCalendar } from '@/calendar/listeners/task-block-status-sync';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
@@ -59,6 +55,10 @@ function isLifelogSelfUpdateAttrs(op: WsOp): boolean {
     return false;
 }
 
+const STATUS_SYNC_DEDUPE_TTL_MS = 2_000;
+const statusSyncQueues = new Map<string, Promise<void>>();
+const recentStatusSyncs = new Map<string, { status: string; expiresAt: number; promise: Promise<void> }>();
+
 function getTaskListItemCompletion(op: WsOp): boolean | undefined {
     if (op.action !== 'update' || typeof op.id !== 'string' || typeof op.data !== 'string') {
         return undefined;
@@ -71,33 +71,77 @@ function getTaskListItemCompletion(op: WsOp): boolean | undefined {
     return taskItem.getAttribute('data-task') !== ' ';
 }
 
-function getTaskListItem(element: EventTarget | null): HTMLElement | null {
-    const source = element instanceof Element ? element : null;
-    return source?.closest<HTMLElement>('[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]') ?? null;
+function getTaskStateChanges(transactions: any): Array<{ taskBlockId: string; completed: boolean }> {
+    if (!Array.isArray(transactions)) {
+        return [];
+    }
+    const changes: Array<{ taskBlockId: string; completed: boolean }> = [];
+    for (const transaction of transactions) {
+        const undoById = new Map<string, WsOp>();
+        for (const undo of transaction?.undoOperations || []) {
+            if (typeof undo?.id === 'string') {
+                undoById.set(undo.id, undo);
+            }
+        }
+        for (const operation of transaction?.doOperations || []) {
+            const completed = getTaskListItemCompletion(operation);
+            const previous = undoById.get(operation?.id);
+            const previousCompleted = previous ? getTaskListItemCompletion(previous) : undefined;
+            if (completed !== undefined && previousCompleted !== undefined && completed !== previousCompleted) {
+                changes.push({ taskBlockId: operation.id, completed });
+            }
+        }
+    }
+    return changes;
 }
 
 async function syncStatusToTaskItems(blockId: string, status: string): Promise<void> {
-    await api.setBlockAttrs(blockId, {
-        'custom-st-event': statusMap[status || '未完成'],
+    const normalizedStatus = status || '未完成';
+    const now = Date.now();
+    const recent = recentStatusSyncs.get(blockId);
+    if (recent && recent.status === normalizedStatus && recent.expiresAt > now) {
+        return recent.promise;
+    }
+
+    const previous = statusSyncQueues.get(blockId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(async () => {
+        // 这次属性写入来自日程同步，标记其 WS 回声以避免额外的日历刷新。
+        markCalendarBlockWrite(blockId, 'status');
+        await api.setBlockAttrs(blockId, {
+            'custom-st-event': statusMap[normalizedStatus],
+        });
+        await syncBoundSuperBlockTaskItems(blockId, normalizedStatus);
     });
-    await syncBoundSuperBlockTaskItems(blockId, status);
+    statusSyncQueues.set(blockId, next);
+
+    const sync = { status: normalizedStatus, expiresAt: now + STATUS_SYNC_DEDUPE_TTL_MS, promise: next };
+    recentStatusSyncs.set(blockId, sync);
+    window.setTimeout(() => {
+        if (recentStatusSyncs.get(blockId) === sync && sync.expiresAt <= Date.now()) {
+            recentStatusSyncs.delete(blockId);
+        }
+    }, STATUS_SYNC_DEDUPE_TTL_MS);
+
+    void next.then(() => {
+        if (statusSyncQueues.get(blockId) === next) {
+            statusSyncQueues.delete(blockId);
+        }
+        if (recentStatusSyncs.get(blockId) === sync) {
+            sync.promise = Promise.resolve();
+        }
+    }, error => {
+        if (statusSyncQueues.get(blockId) === next) {
+            statusSyncQueues.delete(blockId);
+        }
+        if (recentStatusSyncs.get(blockId) === sync) {
+            recentStatusSyncs.delete(blockId);
+        }
+        console.warn('同步日程状态到任务块失败:', blockId, error);
+    });
+    return next;
 }
 
 export function registerTransactionListener(plugin: steveTools, calendarHost: CalendarListenerHost) {
-  const recordTaskToggleAfterEvent = (event: Event) => {
-    const taskItem = getTaskListItem(event.target);
-    if (!taskItem) return;
-    const before = taskItem.getAttribute('data-task') !== ' ';
-    queueMicrotask(() => {
-      const after = taskItem.getAttribute('data-task') !== ' ';
-      if (after !== before) {
-        recordUserTaskToggle(taskItem.dataset.nodeId, after);
-      }
-    });
-  };
-  document.addEventListener('click', recordTaskToggleAfterEvent, true);
-  document.addEventListener('keydown', recordTaskToggleAfterEvent, true);
-
   const wsMainHandler = async (e) => {
     const msg: WsMsg = e.detail;
     // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
@@ -119,8 +163,7 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
     const hasAttributeViewCellWrite = operations.some(op =>
       op.action === 'updateAttrViewCell' && !!op.avID
     );
-    const hasTaskListItemUpdate = operations.some(op => getTaskListItemCompletion(op) !== undefined);
-    const managedAvIds = hasAttributeViewCellWrite || hasTaskListItemUpdate
+    const managedAvIds = hasAttributeViewCellWrite
       ? new Set(await calendarHost.getManagedCalendarAvIds())
       : new Set<string>();
     let refreshNeeded = false;
@@ -174,16 +217,6 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
 
       if (action === 'update') {
         invalidateKramdownCache(op.id);
-        const taskCompleted = getTaskListItemCompletion(op);
-        if (taskCompleted !== undefined
-            && !consumeTaskMarkerSyncWrite(op.id)
-            && consumeUserTaskToggle(op.id, taskCompleted)) {
-          try {
-            await syncTaskBlockStatusToCalendar(op.id, taskCompleted, managedAvIds);
-          } catch (error) {
-            console.warn('同步任务块状态到日程数据库失败:', op.id, error);
-          }
-        }
         const data = op.data;
         if (typeof data === 'string' && data.startsWith('<div data-marker')) {
           refreshNeeded = true;
@@ -202,12 +235,36 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
   // 追加：前端网络请求监听（仅监听 /api/av/* 的成功响应）
   // 用途：在 WebSocket 广播到达前，尽早感知“状态”列的变动并同步 block 自定义属性
   const interceptorHandle = interceptFetch({
-    filter: (url, method) => method === 'POST' && url.includes('/api/av/'),
+    filter: (url, method) => method === 'POST'
+      && (url.includes('/api/av/') || url.includes('/api/transactions')),
     onResponse: async (ctx) => {
       try {
         if (!ctx.resOk || ctx.resStatus !== 200) return;
         const url = ctx.url;
         const body = (ctx.reqBody || {}) as any;
+
+        if (url.includes('/api/transactions')) {
+          // 本插件更新任务 marker 使用 /api/block/batchUpdateTaskListItemMarker，
+          // 内核仅通过 WebSocket 广播结果，不会再由前端发起 /api/transactions。
+          // 因此这里只处理用户实际提交的 transaction，天然不会监听到插件自身写入。
+          const responseCode = typeof ctx.resBody === 'object' && ctx.resBody !== null
+            ? (ctx.resBody as any).code
+            : undefined;
+          if (responseCode !== undefined && responseCode !== 0) return;
+
+          const changes = getTaskStateChanges(body.transactions);
+          if (changes.length === 0) return;
+
+          const managedAvIds = await calendarHost.getManagedCalendarAvIds();
+          for (const change of changes) {
+            await syncTaskBlockStatusToCalendar(
+              change.taskBlockId,
+              change.completed,
+              managedAvIds,
+            );
+          }
+          return;
+        }
 
         // 只对我们关心的数据库进行处理
         const avID: string | undefined = body?.avID;
@@ -300,8 +357,6 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
   });
 
   return () => {
-    document.removeEventListener('click', recordTaskToggleAfterEvent, true);
-    document.removeEventListener('keydown', recordTaskToggleAfterEvent, true);
     try {
       plugin.eventBus.off('ws-main', wsMainHandler);
     } catch (error) {

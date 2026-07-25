@@ -1,36 +1,10 @@
 import * as api from '@/api/api';
 
-const pendingUserTaskToggles = new Map<string, { completed: boolean; expiresAt: number }>();
-const USER_TOGGLE_TTL_MS = 10_000;
-
 interface TaskBlockStatusBinding {
     avId: string;
     itemId: string;
     statusKeyId: string;
     superBlockId: string;
-}
-
-export function recordUserTaskToggle(taskBlockId: string | undefined, isCompleted: boolean): void {
-    if (!taskBlockId) {
-        return;
-    }
-    pendingUserTaskToggles.set(taskBlockId, {
-        completed: isCompleted,
-        expiresAt: Date.now() + USER_TOGGLE_TTL_MS,
-    });
-}
-
-export function consumeUserTaskToggle(taskBlockId: string | undefined, isCompleted: boolean): boolean {
-    if (!taskBlockId) {
-        return false;
-    }
-    const pending = pendingUserTaskToggles.get(taskBlockId);
-    if (!pending || pending.expiresAt <= Date.now()) {
-        pendingUserTaskToggles.delete(taskBlockId);
-        return false;
-    }
-    pendingUserTaskToggles.delete(taskBlockId);
-    return pending.completed === isCompleted;
 }
 
 /** Writes the status of the schedule(s) bound to a manually toggled task item. */

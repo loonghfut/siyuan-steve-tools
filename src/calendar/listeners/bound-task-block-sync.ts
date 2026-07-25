@@ -1,18 +1,9 @@
 import * as api from '@/api/api';
 
-const pendingTaskMarkerWrites = new Map<string, number>();
 const syncQueues = new Map<string, Promise<void>>();
 const recentStatusSyncs = new Map<string, { completed: boolean; expiresAt: number; promise: Promise<void> }>();
-const TASK_MARKER_WRITE_TTL_MS = 10_000;
 const STATUS_SYNC_DEDUPE_TTL_MS = 2_000;
-
-function clearExpiredTaskMarkerWrites(now = Date.now()): void {
-    for (const [taskBlockId, expiresAt] of pendingTaskMarkerWrites) {
-        if (expiresAt <= now) {
-            pendingTaskMarkerWrites.delete(taskBlockId);
-        }
-    }
-}
+const MAX_SYNC_ATTEMPTS = 3;
 
 function clearExpiredStatusSyncs(now = Date.now()): void {
     for (const [superBlockId, sync] of recentStatusSyncs) {
@@ -49,7 +40,14 @@ export function syncBoundSuperBlockTaskItems(superBlockId: string, status: strin
         expiresAt: now + STATUS_SYNC_DEDUPE_TTL_MS,
         promise: next,
     });
-    void next.finally(() => {
+    const currentSync = recentStatusSyncs.get(superBlockId)!;
+    window.setTimeout(() => {
+        if (recentStatusSyncs.get(superBlockId) === currentSync
+            && currentSync.expiresAt <= Date.now()) {
+            recentStatusSyncs.delete(superBlockId);
+        }
+    }, STATUS_SYNC_DEDUPE_TTL_MS);
+    void next.then(() => {
         if (syncQueues.get(superBlockId) === next) {
             syncQueues.delete(superBlockId);
         }
@@ -58,66 +56,52 @@ export function syncBoundSuperBlockTaskItems(superBlockId: string, status: strin
             // 保留短暂结果用于合并同一次 AV 写入的 fetch/WS 双重回声。
             latest.promise = Promise.resolve();
         }
+    }, error => {
+        if (syncQueues.get(superBlockId) === next) {
+            syncQueues.delete(superBlockId);
+        }
+        if (recentStatusSyncs.get(superBlockId)?.promise === next) {
+            recentStatusSyncs.delete(superBlockId);
+        }
+        console.warn('同步超级块内任务块状态失败:', superBlockId, error);
     });
     return next;
 }
 
-/** Returns true once for task-item writes that this module initiated from an AV status change. */
-export function consumeTaskMarkerSyncWrite(taskBlockId: string | undefined): boolean {
-    if (!taskBlockId) {
-        return false;
-    }
-    const now = Date.now();
-    clearExpiredTaskMarkerWrites(now);
-    const expiresAt = pendingTaskMarkerWrites.get(taskBlockId);
-    if (!expiresAt) {
-        return false;
-    }
-    pendingTaskMarkerWrites.delete(taskBlockId);
-    return expiresAt > now;
-}
-
 async function syncTaskItems(superBlockId: string, shouldBeCompleted: boolean): Promise<void> {
-    try {
-        const doms = await api.getBlockDOMs([superBlockId]);
-        const dom = doms?.[superBlockId];
-        if (!dom) {
-            return;
-        }
-
-        const parsedDocument = new DOMParser().parseFromString(dom, 'text/html');
-        const taskItems = Array.from(parsedDocument.querySelectorAll<HTMLElement>(
-            '[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]',
-        ));
-        const taskIdsToUpdate = taskItems
-            .filter(item => (item.getAttribute('data-task') !== ' ') !== shouldBeCompleted)
-            .map(item => item.dataset.nodeId)
-            .filter((id): id is string => !!id);
-
-        if (taskIdsToUpdate.length === 0) {
-            return;
-        }
-
-        const now = Date.now();
-        clearExpiredTaskMarkerWrites(now);
-        const expiresAt = now + TASK_MARKER_WRITE_TTL_MS;
-        for (const taskId of taskIdsToUpdate) {
-            pendingTaskMarkerWrites.set(taskId, expiresAt);
-        }
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_SYNC_ATTEMPTS; attempt += 1) {
         try {
+            const doms = await api.getBlockDOMs([superBlockId]);
+            const dom = doms?.[superBlockId];
+            if (!dom) {
+                return;
+            }
+
+            const parsedDocument = new DOMParser().parseFromString(dom, 'text/html');
+            const taskItems = Array.from(parsedDocument.querySelectorAll<HTMLElement>(
+                '[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]',
+            ));
+            const taskIdsToUpdate = taskItems
+                .filter(item => (item.getAttribute('data-task') !== ' ') !== shouldBeCompleted)
+                .map(item => item.dataset.nodeId)
+                .filter((id): id is string => !!id);
+
+            if (taskIdsToUpdate.length === 0) {
+                return;
+            }
+
             await api.batchUpdateTaskListItemMarker(taskIdsToUpdate.map(id => ({
                 id,
                 marker: shouldBeCompleted ? 'X' : ' ',
             })));
+            return;
         } catch (error) {
-            for (const taskId of taskIdsToUpdate) {
-                if (pendingTaskMarkerWrites.get(taskId) === expiresAt) {
-                    pendingTaskMarkerWrites.delete(taskId);
-                }
+            lastError = error;
+            if (attempt < MAX_SYNC_ATTEMPTS) {
+                await new Promise(resolve => window.setTimeout(resolve, attempt * 500));
             }
-            throw error;
         }
-    } catch (error) {
-        console.warn('同步超级块内任务块状态失败:', superBlockId, error);
     }
+    throw lastError;
 }
