@@ -3,7 +3,7 @@ import { Dida365ApiClient } from "@/calendar/integrations/dida/api/dida-api-clie
 import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "@/calendar/integrations/dida/dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
-import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getBlockAttrs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateForDida, formatDateToISO, formatLocalDate } from "@/calendar/integrations/dida/siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
@@ -23,6 +23,10 @@ import {
     renderDidaTemplate,
 } from "@/calendar/integrations/dida/mappers/task-template-mapper";
 import { SiyuanTaskChangeSource } from "@/calendar/integrations/dida/sync/siyuan-task-change-source";
+
+/** 与 AV 的 didaID 列保持一致的块级属性，便于脱离数据库定位滴答任务。 */
+const DIDA_TASK_ID_ATTR = "custom-dida-id";
+
 export class DidaTaskSyncFeature implements DidaSyncFeature {
     readonly id = "tasks";
     private apiClient: Dida365ApiClient;
@@ -32,6 +36,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     // private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
     private readonly store = new TaskSyncStore();
     private get taskCache() { return this.store.tasks; }
+    private get didaTaskIdsByBlock() { return this.store.didaTaskIdsByBlock; }
     private isSyncing = false; // 新增同步锁
     private get creatingDidaIds() { return this.store.creatingDidaIds; }
     private get pendingSiyuanCreates() { return this.store.pendingSiyuanCreates; }
@@ -47,6 +52,33 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     private pendingSiyuanSyncTimer: NodeJS.Timeout | null = null; // 思源待同步队列刷新计时器
     private autoSyncInterval?: number;
     private initialSyncTimer?: number;
+
+    private async writeDidaTaskIdAttr(blockId: string, didaTaskId: string | undefined): Promise<void> {
+        if (!blockId || !didaTaskId) return;
+        await setBlockAttrs(blockId, { [DIDA_TASK_ID_ATTR]: didaTaskId });
+        this.didaTaskIdsByBlock.set(blockId, didaTaskId);
+    }
+
+    /** 块属性优先；AV didaID 仅兼容历史数据。 */
+    private async readDidaTaskId(blockId: string | undefined, task?: any): Promise<string> {
+        if (blockId) {
+            const cached = this.didaTaskIdsByBlock.get(blockId);
+            if (cached) return cached;
+            try {
+                const attrs = await getBlockAttrs(blockId);
+                const attrTaskId = attrs?.[DIDA_TASK_ID_ATTR];
+                if (attrTaskId) {
+                    this.didaTaskIdsByBlock.set(blockId, attrTaskId);
+                    return attrTaskId;
+                }
+            } catch (error) {
+                console.warn("读取块滴答 ID 属性失败，将回退至 AV didaID 列", blockId, error);
+            }
+        }
+
+        const legacyTaskId = task?.didaID?.content || "";
+        return legacyTaskId;
+    }
     private getCompletedTaskRetentionDays(): number {
         const raw = (settingdata as any)["cal-dida-completed-days"];
         if (raw === null || raw === undefined || raw === "") {
@@ -543,7 +575,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         console.debug("[滴答同步] 进入思源优先的确认同步", {
             blockId,
             itemID,
-            hasDidaID: !!siyuanTask.didaID?.content,
+            hasDidaID: !!(await this.readDidaTaskId(blockId, siyuanTask)),
             title: siyuanTask.事件?.content,
             status: siyuanTask.状态?.content,
         });
@@ -557,9 +589,9 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
      */
     private async syncSingleSiyuanTaskToDida(siyuanTask: any, blockId: string, itemID: string, viewData: any): Promise<boolean> {
         try {
-            // 检查是否存在 didaID。如果存在，则为更新操作；否则为创建操作。
-            if (siyuanTask.didaID?.content) {
-                const didaTaskId = siyuanTask.didaID.content;
+            // 块属性中已有滴答 ID 则更新，否则才创建新任务；AV didaID 仅兼容旧记录。
+            const didaTaskId = await this.readDidaTaskId(blockId, siyuanTask);
+            if (didaTaskId) {
                 let cachedTask = this.taskCache.get(didaTaskId);
                 if (!cachedTask) {
                     console.warn(`任务 ${didaTaskId} 不在缓存中，无法反向同步。`);
@@ -698,7 +730,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             try {
                 const latestViewData = await getViewValue([{ rootid: this.avId, viewId: '', name: '' }]);
                 const latestTask = latestViewData.flatMap(view => view.data || []).find((task: any) => task.事件?.id === blockId);
-                if (latestTask?.didaID?.content) {
+                if (await this.readDidaTaskId(blockId, latestTask)) {
                     console.debug(`任务 [${blockId}] 已经有 didaID，跳过创建。`);
                     return false;
                 }
@@ -757,24 +789,16 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                     this.lastSyncDirection.set(newDidaTask.id, 'siyuan-to-dida');
                     this.markPendingDidaUpdate(newDidaTask.id);
 
-                    const didaIdKeyID = await this.getKeyIDfromViewValue(viewData, 'didaID');
                     const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接');
 
                     console.debug("[滴答同步] 准备回写思源字段", {
                         blockId,
                         itemID,
                         didaTaskId: newDidaTask.id,
-                        didaIdKeyID,
                         linkKeyID,
                     });
 
                     const updatePromises: Promise<any>[] = [];
-
-                    if (didaIdKeyID) {
-                        updatePromises.push(updateAttrViewCell_pro(blockId, this.avId, didaIdKeyID, itemID, newDidaTask.id, "text"));
-                    } else {
-                        console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。");
-                    }
 
                     if (linkKeyID) {
                         const didaLink = `https://dida365.com/webapp/#p/${targetProjectId}/tasks/${newDidaTask.id}`;
@@ -787,12 +811,14 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                         await this.withDidaTagged(async () => {
                             await Promise.all(updatePromises);
                         });
+                        await this.writeDidaTaskIdAttr(blockId, newDidaTask.id);
                         console.debug(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
                         showStatusMessage("新任务已同步到滴答清单", 2000);
                         return true;
                     }
 
-                    showMessage("无法写回滴答任务信息，请检查数据库是否有名为 'didaID' 和 '链接' 的列", -1, "error");
+                    showMessage("无法写回滴答任务链接，请检查数据库是否有名为 '链接' 的列", -1, "error");
+                    await this.writeDidaTaskIdAttr(blockId, newDidaTask.id);
                     return true;
                 }
 
@@ -862,13 +888,17 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             // 遍历所有 viewValue，合并所有任务数据
             const existingTasks = viewValue.flatMap(view => view.data || []);
 
-            // 创建现有任务的映射表（基于 didaID）
+            // 创建现有任务的映射表：块属性优先，AV didaID 仅兼容历史记录。
             const existingTasksMap = new Map();
-            existingTasks.forEach((task: any) => {
-                if (task.didaID?.content) {
-                    existingTasksMap.set(task.didaID.content, task);
+            const existingTaskIds = await Promise.all(existingTasks.map(async task => ({
+                task,
+                didaTaskId: await this.readDidaTaskId(task.事件?.id, task),
+            })));
+            for (const { task, didaTaskId } of existingTaskIds) {
+                if (didaTaskId) {
+                    existingTasksMap.set(didaTaskId, task);
                 }
-            });
+            }
 
             let syncCount = 0;
             let updateCount = 0;
@@ -1003,6 +1033,8 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
 
             // 创建块内容
             const statusCustomAttr = getDidaStatusAttr(taskData.状态?.content);
+            const didaTaskId = taskData.didaID?.content || "";
+            const didaTaskIdAttr = didaTaskId ? ` ${DIDA_TASK_ID_ATTR}="${didaTaskId}"` : "";
             const template = String((settingdata as any)["cal-dida-import-template"] || '').trim() || getDefaultDidaImportTemplate();
             const templateData = buildDidaImportTemplateData(taskData, blockId, itemID, titleBlockId, descriptionBlockId);
             const renderedBody = renderDidaTemplate(template, templateData).trim() || renderDidaTemplate(getDefaultDidaImportTemplate(), templateData).trim();
@@ -1012,9 +1044,12 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                 `{{{row
 ${renderedBody}
 }}}
-{: id="${blockId}" custom-st-event="${statusCustomAttr}"}`,
+{: id="${blockId}" custom-st-event="${statusCustomAttr}"${didaTaskIdAttr}}`,
                 targetId
             );
+            if (didaTaskId) {
+                this.didaTaskIdsByBlock.set(blockId, didaTaskId);
+            }
 
             // 添加到数据库
             await this.withDidaTagged(async () => {
@@ -1088,8 +1123,14 @@ ${renderedBody}
             // 更新块的自定义属性（状态）
             const statusCustomAttr = getDidaStatusAttr(newTaskData.状态?.content);
             await setBlockAttrs(blockId, {
-                "custom-st-event": statusCustomAttr
+                "custom-st-event": statusCustomAttr,
+                ...(newTaskData.didaID?.content
+                    ? { [DIDA_TASK_ID_ATTR]: newTaskData.didaID.content }
+                    : {}),
             });
+            if (newTaskData.didaID?.content) {
+                this.didaTaskIdsByBlock.set(blockId, newTaskData.didaID.content);
+            }
 
             // 同步更新滴答清单任务，确保其有正确的 S 链接
             if (newTaskData.didaID?.content) {
@@ -1231,7 +1272,6 @@ ${renderedBody}
                 tags: taskData?.标签?.content,
             });
             // 获取各字段的 keyID
-            const didaIdKeyID = await this.getKeyIDfromViewValue(viewValue, 'didaID');
             const eventKeyID = await this.getKeyIDfromViewValue(viewValue, '事件');
             const timeKeyID = await this.getKeyIDfromViewValue(viewValue, '开始时间');
             const priorityKeyID = await this.getKeyIDfromViewValue(viewValue, '优先级');
@@ -1242,18 +1282,6 @@ ${renderedBody}
 
             // 批量更新：收集所有需要更新的字段
             const updatePromises: Promise<any>[] = [];
-
-            // 更新 didaID (通常只在创建时写入)
-            if (didaIdKeyID && taskData.didaID?.content && !existingTask?.didaID?.content) {
-                updatePromises.push(updateAttrViewCell_pro(
-                    blockId,
-                    this.avId,
-                    didaIdKeyID,
-                    itemID,
-                    taskData.didaID.content,
-                    "text"
-                ));
-            }
 
             // 更新事件标题（需要单独处理，因为使用不同的API）
             if (eventKeyID && taskData.事件?.content) {
@@ -1497,7 +1525,7 @@ ${renderedBody}
             console.debug("[滴答同步] 读取到思源任务快照", {
                 blockId,
                 itemID,
-                hasDidaID: !!siyuanTask.didaID?.content,
+                hasDidaID: !!(await this.readDidaTaskId(blockId, siyuanTask)),
                 title: siyuanTask.事件?.content,
                 status: siyuanTask.状态?.content,
                 priority: siyuanTask.优先级?.content,
