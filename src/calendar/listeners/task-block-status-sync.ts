@@ -4,7 +4,7 @@ interface TaskBlockStatusBinding {
     avId: string;
     itemId: string;
     statusKeyId: string;
-    superBlockId: string;
+    boundBlockId: string;
 }
 
 /** Writes the status of the schedule(s) bound to a manually toggled task item. */
@@ -14,18 +14,14 @@ export async function syncTaskBlockStatusToCalendar(
     managedAvIds: Iterable<string>,
 ): Promise<void> {
     const superBlockId = await findContainingSuperBlock(taskBlockId);
-    if (!superBlockId) {
-        return;
-    }
-
-    const bindings = await findTaskBlockStatusBindings(superBlockId, managedAvIds);
+    const bindings = await findTaskBlockStatusBindings(taskBlockId, superBlockId, managedAvIds);
     if (bindings.length === 0) {
         return;
     }
 
     const status = isCompleted ? '完成' : '未完成';
     await Promise.all(bindings.map(binding => api.updateAttrViewCell_pro(
-        binding.superBlockId,
+        binding.boundBlockId,
         binding.avId,
         binding.statusKeyId,
         binding.itemId,
@@ -52,12 +48,20 @@ async function findContainingSuperBlock(taskBlockId: string): Promise<string | n
 }
 
 async function findTaskBlockStatusBindings(
-    superBlockId: string,
+    taskBlockId: string,
+    superBlockId: string | null,
     managedAvIds: Iterable<string>,
 ): Promise<TaskBlockStatusBinding[]> {
     const bindings: TaskBlockStatusBinding[] = [];
     for (const avId of managedAvIds) {
-        const itemId = (await api.getAttributeViewItemIDsByBoundIDs(avId, [superBlockId]))?.[superBlockId];
+        // 同一任务块本身可能已直接绑定到 AV；这种情况下它的状态应优先于
+        // 外层超级块的绑定状态。只有任务块未绑定时才回退至超级块。
+        let boundBlockId = taskBlockId;
+        let itemId = (await api.getAttributeViewItemIDsByBoundIDs(avId, [taskBlockId]))?.[taskBlockId];
+        if (!itemId && superBlockId && superBlockId !== taskBlockId) {
+            boundBlockId = superBlockId;
+            itemId = (await api.getAttributeViewItemIDsByBoundIDs(avId, [superBlockId]))?.[superBlockId];
+        }
         if (!itemId) {
             continue;
         }
@@ -67,7 +71,7 @@ async function findTaskBlockStatusBindings(
             ? keys.find((key: any) => key?.name === '状态')?.id
             : undefined;
         if (statusKeyId) {
-            bindings.push({ avId, itemId, statusKeyId, superBlockId });
+            bindings.push({ avId, itemId, statusKeyId, boundBlockId });
         }
     }
     return bindings;
