@@ -3,7 +3,7 @@ import { Dida365ApiClient } from "@/calendar/integrations/dida/api/dida-api-clie
 import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "@/calendar/integrations/dida/dida_interface";
 import steveTools, { settingdata } from "@/index";
 import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
-import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getBlockAttrs, setBlockAttrs, showStatusMessage, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
+import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getBlockAttrs, setBlockAttrs, showStatusMessage, sql, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateForDida, formatDateToISO, formatLocalDate } from "@/calendar/integrations/dida/siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
@@ -78,6 +78,31 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
 
         const legacyTaskId = task?.didaID?.content || "";
         return legacyTaskId;
+    }
+
+    /**
+     * 全量同步时一次性读取所有块级滴答 ID，避免对 AV 的每一行分别请求 attrs API。
+     * SQL 不可用时返回 null；调用方必须停止同步，不能将未知关联误判为待创建任务。
+     */
+    private async queryDidaTaskIdsByBlock(): Promise<Map<string, string> | null> {
+        try {
+            const rows = await sql(
+                "SELECT block_id, value FROM attributes WHERE name = 'custom-dida-id' AND type = 'b'",
+            );
+            if (!Array.isArray(rows)) {
+                throw new Error(`unexpected SQL result: ${String(rows)}`);
+            }
+            const idsByBlock = new Map<string, string>();
+            for (const row of rows) {
+                if (typeof row?.block_id === 'string' && typeof row?.value === 'string' && row.value) {
+                    idsByBlock.set(row.block_id, row.value);
+                }
+            }
+            return idsByBlock;
+        } catch (error) {
+            console.error("查询块滴答 ID 属性失败，已取消本轮滴答全量同步", error);
+            return null;
+        }
     }
     private getCompletedTaskRetentionDays(): number {
         const raw = (settingdata as any)["cal-dida-completed-days"];
@@ -889,14 +914,19 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             const existingTasks = viewValue.flatMap(view => view.data || []);
 
             // 创建现有任务的映射表：块属性优先，AV didaID 仅兼容历史记录。
+            const customDidaIdsByBlock = await this.queryDidaTaskIdsByBlock();
+            if (!customDidaIdsByBlock) {
+                showStatusMessage("无法读取思源块滴答 ID，已取消本轮同步", 5000, "dida-sync");
+                return false;
+            }
             const existingTasksMap = new Map();
-            const existingTaskIds = await Promise.all(existingTasks.map(async task => ({
-                task,
-                didaTaskId: await this.readDidaTaskId(task.事件?.id, task),
-            })));
-            for (const { task, didaTaskId } of existingTaskIds) {
+            for (const task of existingTasks) {
+                const blockId = task.事件?.id;
+                const didaTaskId = (typeof blockId === 'string' ? customDidaIdsByBlock.get(blockId) : undefined)
+                    || task.didaID?.content;
                 if (didaTaskId) {
                     existingTasksMap.set(didaTaskId, task);
+                    if (blockId) this.didaTaskIdsByBlock.set(blockId, didaTaskId);
                 }
             }
 
