@@ -1,6 +1,7 @@
 import { openWindow, showMessage } from 'siyuan';
 import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 import * as api from '@/api/api';
+import { createEmptyScheduleBlockquoteMarkdown } from '@/calendar/features/schedule-blockquote';
 
 /** Opens an empty schedule block in a new editor window. */
 export async function openScheduleEditor() {
@@ -11,9 +12,11 @@ export async function openScheduleEditor() {
 
     const dailyNote = await api.createDailyNote(window.siyuan.ws.app.appId, settingdata['cal-create-pos']);
     const blockId = await api.generateSiyuanID() as string;
+    const headingBlockId = await api.generateSiyuanID() as string;
+    const paragraphBlockId = await api.generateSiyuanID() as string;
     await api.appendBlock(
-        'dom',
-        `<div data-node-id="${blockId}" data-type="NodeSuperBlock" class="sb" data-sb-layout="row"><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div data-node-id="${await api.generateSiyuanID()}" data-type="NodeParagraph" class="p"><div contenteditable="true" spellcheck="false"></div><div class="protyle-attr" contenteditable="false">​</div></div><div class="protyle-attr" contenteditable="false">​</div></div>`,
+        'markdown',
+        createEmptyScheduleBlockquoteMarkdown(blockId, headingBlockId, paragraphBlockId),
         dailyNote.id,
     );
     openWindow({ height: 500, width: 400, doc: { id: blockId } });

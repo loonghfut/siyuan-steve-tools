@@ -14,7 +14,7 @@ import {
     markCalendarBlockWrite,
 } from '@/calendar/core/calendar-self-write';
 import {
-    syncBoundSuperBlockTaskItems,
+    syncBoundScheduleTaskItems,
 } from '@/calendar/listeners/bound-task-block-sync';
 import { syncTaskBlockStatusToCalendar } from '@/calendar/listeners/task-block-status-sync';
 
@@ -110,7 +110,7 @@ async function syncStatusToTaskItems(blockId: string, status: string): Promise<v
         await api.setBlockAttrs(blockId, {
             'custom-st-event': statusMap[normalizedStatus],
         });
-        await syncBoundSuperBlockTaskItems(blockId, normalizedStatus);
+        await syncBoundScheduleTaskItems(blockId, normalizedStatus);
     });
     statusSyncQueues.set(blockId, next);
 

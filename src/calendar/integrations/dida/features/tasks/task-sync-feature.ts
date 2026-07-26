@@ -24,6 +24,7 @@ import {
     renderDidaTemplate,
 } from "@/calendar/integrations/dida/mappers/task-template-mapper";
 import { SiyuanTaskChangeSource } from "@/calendar/integrations/dida/sync/siyuan-task-change-source";
+import { createScheduleBlockquoteMarkdown } from '@/calendar/features/schedule-blockquote';
 
 /** 与 AV 的 didaID 列保持一致的块级属性，便于脱离数据库定位滴答任务。 */
 const DIDA_TASK_ID_ATTR = "custom-dida-id";
@@ -1065,17 +1066,17 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             // 创建块内容
             const statusCustomAttr = getDidaStatusAttr(taskData.状态?.content);
             const didaTaskId = taskData.didaID?.content || "";
-            const didaTaskIdAttr = didaTaskId ? ` ${DIDA_TASK_ID_ATTR}="${didaTaskId}"` : "";
             const template = String((settingdata as any)["cal-dida-import-template"] || '').trim() || getDefaultDidaImportTemplate();
             const templateData = buildDidaImportTemplateData(taskData, blockId, itemID, titleBlockId, descriptionBlockId);
             const renderedBody = renderDidaTemplate(template, templateData).trim() || renderDidaTemplate(getDefaultDidaImportTemplate(), templateData).trim();
 
             await appendBlock(
                 "markdown",
-                `{{{row
-${renderedBody}
-}}}
-{: id="${blockId}" custom-st-event="${statusCustomAttr}"${didaTaskIdAttr}}`,
+                createScheduleBlockquoteMarkdown(renderedBody, {
+                    id: blockId,
+                    'custom-st-event': statusCustomAttr,
+                    ...(didaTaskId ? { [DIDA_TASK_ID_ATTR]: didaTaskId } : {}),
+                }),
                 targetId
             );
             if (didaTaskId) {

@@ -14,8 +14,8 @@ export async function syncTaskBlockStatusToCalendar(
     isCompleted: boolean,
     managedAvIds: Iterable<string>,
 ): Promise<void> {
-    const superBlockId = await findContainingSuperBlock(taskBlockId);
-    const bindings = await findTaskBlockStatusBindings(taskBlockId, superBlockId, managedAvIds);
+    const ancestorBlockIds = await getAncestorBlockIds(taskBlockId);
+    const bindings = await findTaskBlockStatusBindings(taskBlockId, ancestorBlockIds, managedAvIds);
     if (bindings.length === 0) {
         return;
     }
@@ -33,36 +33,38 @@ export async function syncTaskBlockStatusToCalendar(
     )));
 }
 
-async function findContainingSuperBlock(taskBlockId: string): Promise<string | null> {
+async function getAncestorBlockIds(taskBlockId: string): Promise<string[]> {
+    const ancestorBlockIds: string[] = [];
     let currentId: string | undefined = taskBlockId;
     for (let depth = 0; currentId && depth < 32; depth += 1) {
         const block = await api.getBlockByID(currentId);
         if (!block) {
-            return null;
-        }
-        if (block.type === 's') {
-            return block.id;
+            break;
         }
         currentId = block.parent_id;
+        if (currentId) {
+            ancestorBlockIds.push(currentId);
+        }
     }
-    return null;
+    return ancestorBlockIds;
 }
 
 async function findTaskBlockStatusBindings(
     taskBlockId: string,
-    superBlockId: string | null,
+    ancestorBlockIds: string[],
     managedAvIds: Iterable<string>,
 ): Promise<TaskBlockStatusBinding[]> {
     const bindings: TaskBlockStatusBinding[] = [];
+    const candidateBlockIds = [taskBlockId, ...ancestorBlockIds];
     for (const avId of managedAvIds) {
         // 同一任务块本身可能已直接绑定到 AV；这种情况下它的状态应优先于
-        // 外层超级块的绑定状态。只有任务块未绑定时才回退至超级块。
-        let boundBlockId = taskBlockId;
-        let itemId = (await api.getAttributeViewItemIDsByBoundIDs(avId, [taskBlockId]))?.[taskBlockId];
-        if (!itemId && superBlockId && superBlockId !== taskBlockId) {
-            boundBlockId = superBlockId;
-            itemId = (await api.getAttributeViewItemIDsByBoundIDs(avId, [superBlockId]))?.[superBlockId];
+        // 外层日程容器的绑定状态。否则按距离选择最近的已绑定祖先块。
+        const itemIdsByBlock = await api.getAttributeViewItemIDsByBoundIDs(avId, candidateBlockIds);
+        const boundBlockId = candidateBlockIds.find(blockId => itemIdsByBlock?.[blockId]);
+        if (!boundBlockId) {
+            continue;
         }
+        const itemId = itemIdsByBlock?.[boundBlockId];
         if (!itemId) {
             continue;
         }

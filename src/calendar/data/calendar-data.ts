@@ -20,6 +20,10 @@ import type { CalendarWriteReason } from '@/calendar/core/calendar-self-write';
 import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
 import { calendarCellWriteOptions } from '@/calendar/core/calendar-cell-writes';
 import { isSpecialCalendarSource } from '@/calendar/core/calendar-sources';
+import {
+    createEmptyScheduleBlockquoteMarkdown,
+    isEmptyScheduleBlockquoteMarkdown,
+} from '@/calendar/features/schedule-blockquote';
 
 // ================== 自定义类型补充（轻量，不破坏现有引用） ==================
 // 事件字段解析结果（行中的“事件”列）
@@ -1255,13 +1259,16 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     }
     const idid = await api.generateSiyuanID() as string;
 
-    await api.appendBlock("markdown", `{{{row
-#### 
-{: id="${await api.generateSiyuanID() as string}"}
-
-{: id="${await api.generateSiyuanID() as string}"}
-}}}
-{: id="${idid}"  custom-st-event="${statusMap[status] || 'todo'}"}`, daynote_id)
+    await api.appendBlock(
+        "markdown",
+        createEmptyScheduleBlockquoteMarkdown(
+            idid,
+            await api.generateSiyuanID() as string,
+            await api.generateSiyuanID() as string,
+            { 'custom-st-event': statusMap[status] || 'todo' },
+        ),
+        daynote_id,
+    )
     // const id = iddata[0].doOperations[0].id;
     const id = idid;
     const itemID = await api.generateSiyuanID() as string;
@@ -1351,7 +1358,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             // // steveTools.outlog("block:::", block.markdown);
             const markdownContent = block?.markdown?.trim() || '';
             // console.debug(markdownContent);
-            if (/^\{\{\{row\s*\}\}\}$/m.test(markdownContent)) {
+            if (isEmptyScheduleBlockquoteMarkdown(markdownContent)) {
                 await api.deleteBlock(id);
                 // steveTools.outlog('删除空白块');
                 dialog.destroy();

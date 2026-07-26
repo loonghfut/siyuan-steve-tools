@@ -4,6 +4,7 @@ import type steveTools from "@/index";
 import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
+import { createScheduleBlockquoteMarkdown } from '@/calendar/features/schedule-blockquote';
 
 interface ICSEvent {
     uid: string;
@@ -364,7 +365,7 @@ export class ICSImporter {
     }
 
     /**
-     * 生成日程超级块内容
+     * 生成日程引述块内容
      * 返回渲染后的内容与可选的模板内指定块 ID（当模板包含 {{SYID}} 时生成并返回）
      */
     private async generateEventBlock(event: ICSEvent): Promise<{ content: string; blockId?: string }> {
@@ -408,7 +409,7 @@ export class ICSImporter {
         const tagsText = event.tags && event.tags.length > 0 ?
             event.tags.map(tag => `#${tag}`).join(' ') : '';
 
-    // 仅当模板包含 {{SYID}} 时，生成一个思源块 ID 供模板内部使用（不绑定到最外层超级块）
+    // 仅当模板包含 {{SYID}} 时，生成一个思源块 ID 供模板内部使用（不绑定到最外层引述块）
     const needSYID = /\{\{\s*SYID\s*\}\}/.test(contentTemplate);
     const syid = needSYID ? await api.generateSiyuanID() as string : undefined;
 
@@ -434,11 +435,11 @@ export class ICSImporter {
         // 渲染用户自定义的内容部分
         const renderedContent = this.renderTemplate(contentTemplate, templateData);
 
-    // 包装成超级块并添加必要的属性（不在最外层绑定 SYID）
-        const content = `{{{row
-${renderedContent}
-}}}
-{: custom-ics-id="${event.uid}" custom-ics-event="true"}
+        // 包装成引述块并添加必要的属性（不在最外层绑定 SYID）
+        const content = `${createScheduleBlockquoteMarkdown(renderedContent, {
+            'custom-ics-id': event.uid,
+            'custom-ics-event': true,
+        })}
 
 {: custom-ics-id="null" }
 `;
@@ -447,7 +448,7 @@ ${renderedContent}
     }
 
     /**
-     * 获取默认模板内容（不包含超级块包装）
+     * 获取默认模板内容（不包含引述块包装）
      */
     private getDefaultContentTemplate(): string {
         return `### {{title}}
@@ -786,12 +787,12 @@ ${renderedContent}
                 }
                 console.debug(`处理事件:taggggg `, event.tags);
 
-                // 生成超级块内容（带指定 SYID）
+                // 生成引述块内容（带指定 SYID）
                 const { content: blockContent, blockId: targetBlockId2 } = await this.generateEventBlock(event);
 
                 // 插入到文档
                 const result = await api.appendBlock("markdown", blockContent, documentId);
-                console.debug(`生成超级块内容: ${blockContent}`);
+                console.debug(`生成引述块内容: ${blockContent}`);
                 // 如果插入成功且启用了数据库功能，添加到数据库
                 if (result && this.settings['cal-ics-add-to-database']) {
                     // 优先使用模板生成的 SYID；否则回退解析 append 结果中的新块 ID
