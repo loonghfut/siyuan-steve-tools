@@ -1,4 +1,5 @@
 import * as api from '@/api/api';
+import { calendarCellWriteOptions } from '@/calendar/core/calendar-cell-writes';
 
 interface TaskBlockStatusBinding {
     avId: string;
@@ -28,7 +29,7 @@ export async function syncTaskBlockStatusToCalendar(
         [{ content: status }],
         'select',
         undefined,
-        { source: 'calendar', reason: 'status' },
+        calendarCellWriteOptions('status'),
     )));
 }
 

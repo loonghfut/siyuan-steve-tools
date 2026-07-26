@@ -1,7 +1,7 @@
 import { EventInput } from '@fullcalendar/core';
 import { getBlockAttrs, sql } from '@/api/api';
-import { ATTRS } from '@/lifelog/module-lifelog';
-import { settingdata } from '@/index';
+import { ATTRS } from '@/lifelog/contracts';
+import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 
 // 把 "HH:mm" 或 "HH:mm:ss" 拆为 [h, m, s?]；非法值兜底为 0
 function parseTimeParts(time: string): [number, number, number] {

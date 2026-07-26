@@ -1,4 +1,4 @@
-import { moduleInstances } from '@/index';
+import { calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 import {
     SPECIAL_CALENDAR_SOURCES,
     SPECIAL_CALENDAR_SOURCE_LABELS,

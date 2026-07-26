@@ -1,7 +1,8 @@
 import { showMessage } from "siyuan";
 import { Dida365ApiClient } from "@/calendar/integrations/dida/api/dida-api-client";
 import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "@/calendar/integrations/dida/dida_interface";
-import steveTools, { settingdata } from "@/index";
+import type steveTools from "@/index";
+import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
 import { addBlockToDatabase_pro, appendBlock, createDailyNote, generateSiyuanID, getBlockAttrs, setBlockAttrs, showStatusMessage, sql, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateForDida, formatDateToISO, formatLocalDate } from "@/calendar/integrations/dida/siyuan_api";

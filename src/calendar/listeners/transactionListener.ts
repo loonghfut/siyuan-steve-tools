@@ -1,4 +1,4 @@
-import steveTools, { settingdata } from '@/index';
+import type steveTools from '@/index';
 import * as api from '@/api/api';
 import { scheduleCalendarRefresh } from '@/calendar/core/calendar-runtime';
 import {
@@ -7,7 +7,7 @@ import {
     statusMap,
 } from '@/calendar/data/calendar-data';
 import { interceptFetch } from '@/api/network-interceptor';
-import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
+import { isLifelogSelfWrite, ATTRS } from '@/lifelog/contracts';
 import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
@@ -145,7 +145,7 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
   const wsMainHandler = async (e) => {
     const msg: WsMsg = e.detail;
     // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
-    if (settingdata["cal-auto-syncing-update"] == true) {
+    if (calendarHost.isAutoSyncingUpdateEnabled()) {
       if (msg.cmd === 'syncing') {
         if (calendarHost.isAutoSyncingUpdateEnabled() && calendarHost.isListening()) {
           calendarHost.scheduleCalendarUpdate(2000);

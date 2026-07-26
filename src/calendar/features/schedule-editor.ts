@@ -1,5 +1,5 @@
 import { openWindow, showMessage } from 'siyuan';
-import { settingdata } from '@/index';
+import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 import * as api from '@/api/api';
 
 /** Opens an empty schedule block in a new editor window. */

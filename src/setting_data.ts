@@ -1,4 +1,4 @@
-import { calendarDefaults } from "./settings/calendar";
+import { calendarDefaults } from "./calendar/settings/calendar-settings";
 import { syncDefaults } from "./settings/sync";
 import { aiDefaults } from "./settings/ai";
 import { imageCompressionDefaults } from "./settings/imageCompression";

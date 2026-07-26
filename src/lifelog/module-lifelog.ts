@@ -1,34 +1,14 @@
 import { Plugin } from "siyuan";
 import { getBlockAttrs, setBlockAttrs, getBlockByID } from "../api/api";
 import { applyLifelogTypeStyles } from "./styles/colors";
+import {
+    ATTRS,
+    LIFELOG_CHANGED_EVENT,
+    clearLifelogSelfWrite,
+    markLifelogSelfWrite,
+} from './contracts';
 
-// 常量定义
-const LIFELOG_PREFIX = 'custom-lifelog-';
 const DAILY_NOTE_ATTR_PREFIX = 'custom-dailynote-';  // 思源 daily note 文档块属性前缀，完整格式: custom-dailynote-YYYYMMDD
-
-/**
- * 自定义事件名：lifelog 模块写完属性后广播，通知日历侧做"局部刷新"而非全量 refetch。
- * detail 为变更的 blockId 列表。
- *
- * 为什么不用 ws-main：我们自己的 setBlockAttrs 会触发思源再广播一次 transactions
- * （action=updateAttrs），日历侧 transactionListener 会据此全量刷新。
- * 用独立事件名绕开这条全量链路，让日历侧只针对 lifelog block 做增量更新。
- */
-export const LIFELOG_CHANGED_EVENT = 'steve-tools:lifelog-changed';
-
-// 标记当前正在由本模块写入属性。transactionListener 可据此跳过这些块触发的全量刷新。
-// 用 Set 而不是 boolean，是因为可能批量写多个块。
-const pendingWrittenIds: Set<string> = new Set();
-
-// Export the ATTRS constant
-export const ATTRS = {
-    time: `${LIFELOG_PREFIX}time`,
-    date: `${LIFELOG_PREFIX}date`,
-    type: `${LIFELOG_PREFIX}type`,
-    content: `${LIFELOG_PREFIX}content`,
-    created: `${LIFELOG_PREFIX}created`,
-    updated: `${LIFELOG_PREFIX}updated`,
-};
 
 // 实现简单的 debounce 函数
 function debounce<T extends (...args: any[]) => any>(
@@ -379,7 +359,7 @@ export class M_lifelog {
         // 被 transactionListener 当成"用户编辑"再次触发全量日历刷新。
         for (const u of updates) {
             if (u?.id) {
-                pendingWrittenIds.add(u.id);
+                markLifelogSelfWrite(u.id);
                 writtenIds.push(u.id);
             }
         }
@@ -408,7 +388,7 @@ export class M_lifelog {
             // 用 setTimeout 而非立即清除，确保 transactionListener 能看到标记。
             const idsToClean = writtenIds.slice();
             setTimeout(() => {
-                idsToClean.forEach(id => pendingWrittenIds.delete(id));
+                idsToClean.forEach(clearLifelogSelfWrite);
             }, 3000);
         }
     }
@@ -418,6 +398,3 @@ export class M_lifelog {
  * 判断某个 blockId 是否是 lifelog 模块自己刚写入的（用于 transactionListener
  * 过滤掉自反射的 updateAttrs，避免触发全量日历刷新）。
  */
-export function isLifelogSelfWrite(blockId: string): boolean {
-    return pendingWrittenIds.has(blockId);
-}

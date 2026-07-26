@@ -1,6 +1,6 @@
 import { convertProjectsToRecord } from "@/calendar/integrations/dida/dida_interface";
 import { DidaService } from "@/calendar/module-calendar";
-import type { SettingGroupDefinition, BuildContext } from "./types";
+import type { SettingGroupDefinition, BuildContext } from "@/settings/types";
 
 // 日程管理模块默认配置
 export const calendarDefaults: Record<string, any> = {

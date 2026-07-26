@@ -1,4 +1,4 @@
-import { moduleInstances } from '@/index';
+import { calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 import { av_ids } from './calendar-view';
 import {
     ViewGroup,

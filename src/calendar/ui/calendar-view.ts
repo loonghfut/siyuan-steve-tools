@@ -13,9 +13,8 @@ import {
     registerCalendarInstance,
     scheduleCalendarRefresh,
 } from '@/calendar/core/calendar-runtime';
-import { settingdata } from '@/index';
+import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 // import 'tippy.js/dist/tippy.css';
-import { moduleInstances } from '@/index';
 // import ICAL from 'ical.js';
 import solarLunar from 'solarlunar';
 import * as myF from '@/calendar/data/calendar-data';
@@ -23,6 +22,7 @@ import { showMessage } from 'siyuan';
 import { createFloatingCalendar } from './floating-calendar';
 import { updateAttrViewCell_pro, setBlockAttrs } from '@/api/api';
 import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
+import { calendarCellWriteOptions } from '@/calendar/core/calendar-cell-writes';
 
 //审查ok
 import { getCategoryColor, getLifelogColor } from '@/lifelog/styles/colors';
@@ -1412,7 +1412,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                             selectdata,
                             "select",
                             undefined,
-                            { source: 'calendar', reason: 'archive' },
+                            calendarCellWriteOptions('archive'),
                         ).then(() => {
                             showMessage('已将事件标记为归档', 3000);
                             // 本地更新事件状态：FullCalendar 重渲染时 eventDidMount 的归档样式

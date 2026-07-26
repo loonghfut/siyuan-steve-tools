@@ -1,7 +1,7 @@
 // 统一管理 ICS 文件生成逻辑（由 module-calendar.ts 抽离）
 import { createEvents, EventAttributes } from 'ics';
 import * as api from '@/api/api';
-import { settingdata } from '@/index';
+import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 import { RRule } from 'rrule';
 import { showMessage } from 'siyuan';
 

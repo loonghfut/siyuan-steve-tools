@@ -1,9 +1,8 @@
 import * as api from '@/api/api';
 import { ViewItem } from '@/calendar/core/types';
 import * as sy from 'siyuan'
-import { settingdata } from '@/index';
+import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 import { Calendar, DurationInput } from '@fullcalendar/core';
-import { moduleInstances } from '@/index';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/core/types";
 import { refetchPeerCalendars } from '@/calendar/core/calendar-runtime';
@@ -19,6 +18,7 @@ import { createDailynote } from '@frostime/siyuan-plugin-kits';
 import { getRequiredFields } from '@/calendar/config/field-config';
 import type { CalendarWriteReason } from '@/calendar/core/calendar-self-write';
 import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
+import { calendarCellWriteOptions } from '@/calendar/core/calendar-cell-writes';
 import { isSpecialCalendarSource } from '@/calendar/core/calendar-sources';
 
 // ================== 自定义类型补充（轻量，不破坏现有引用） ==================
@@ -143,7 +143,7 @@ export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr:
         : dateStr;
     try {
         const updateTasks: Promise<any>[] = [];
-        const writeOpts = { source: 'calendar' as const, reason: 'unscheduled' as const };
+        const writeOpts = calendarCellWriteOptions('unscheduled');
         updateTasks.push(api.updateAttrViewCell_pro(
             event.blockId,
             event.rootid,
@@ -1201,7 +1201,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         const updatePromises: Promise<any>[] = [];
         // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过；
         // 创建末尾会用 invalidateViewValueCache + refetchVisibleCalendarsDebounced 主动同步 UI
-        const createOpts = { source: 'calendar' as const, reason: 'create' as const };
+        const createOpts = calendarCellWriteOptions('create');
 
         if (categoryKeyID && categorie) {
             const categoryData: ISelectOption[] = [{ content: categorie }];
@@ -1401,7 +1401,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             ////块时间处理 - 批量更新优化
             const updatePromises2: Promise<any>[] = [];
             // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过
-            const createOpts2 = { source: 'calendar' as const, reason: 'create' as const };
+            const createOpts2 = calendarCellWriteOptions('create');
 
             updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts2));
 
@@ -1561,7 +1561,7 @@ export async function updateEventInDatabase(
 
     // 自写选项：默认按 reason 标记并抑制 post-batch refresh，让 FullCalendar 本地状态自然生效。
     const reason: CalendarWriteReason = options?.reason ?? 'drag';
-    const writeOpts = { source: 'calendar' as const, reason };
+    const writeOpts = calendarCellWriteOptions(reason);
 
     // 更新时间
     const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', rootid);
@@ -1755,7 +1755,7 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
     const target = event.blockId; // 优先使用 blockId
     const itemID = event.itemID;
     api.updateAttrViewCell_pro(target, event.rootid, event.okdayid, itemID, newOkday, "text",
-        undefined, { source: 'calendar', reason: 'recurring' });
+        undefined, calendarCellWriteOptions('recurring'));
     // 周期事件完成日字段是 text 列，patch 缓存让本地状态一致——只 patch 周期视图缓存，
     // 避免 '完成日期' 这个周期专属字段被注入到普通视图缓存里
     try {

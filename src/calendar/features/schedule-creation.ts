@@ -1,4 +1,4 @@
-import { settingdata } from '@/index';
+import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 import { av_ids, filterViewId, OUTcalendar } from '@/calendar/ui/calendar-view';
 import { createEventInDatabase, getViewId, getViewValue } from '@/calendar/data/calendar-data';
 

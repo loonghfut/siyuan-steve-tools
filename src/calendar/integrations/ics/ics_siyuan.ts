@@ -1,6 +1,7 @@
 import * as api from "@/api/api";
 import { fetchSyncPost, showMessage } from "siyuan";
-import steveTools, { settingdata, moduleInstances } from "@/index";
+import type steveTools from "@/index";
+import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 import { createDailynote } from "@frostime/siyuan-plugin-kits";
 import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
 

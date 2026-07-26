@@ -1,5 +1,5 @@
 import type { BuildContext, SettingGroupDefinition } from "./types";
-import { calendarGroup } from "./calendar";
+import { calendarGroup } from "@/calendar/settings/calendar-settings";
 import { syncGroup } from "./sync";
 import { aiGroup } from "./ai";
 import { handwritingGroup } from "./handwriting";

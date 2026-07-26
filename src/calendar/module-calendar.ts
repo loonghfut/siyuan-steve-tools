@@ -1,16 +1,19 @@
-import steveTools, { frontEnd, settingdata } from "@/index";
+import type steveTools from "@/index";
 import { EventAttributes } from 'ics';
 import * as api from "@/api/api"
 import { showMessage, openTab, Dialog, getFrontend, Menu } from "siyuan";
 import * as ic from "@/icon"
+import "./ui/styles/calendar-global.scss";
 import "./ui/styles/calendar-events.scss";
 declare const siyuan: any;
 import { init_viewValue, run, update_av_ids } from "./ui/calendar-view";
 import * as myF from "./data/calendar-data";
 import { CALENDAR_EVENTS_JSON_PATH, calendarPaths, configureCalendarPaths } from './config/calendar-paths';
 import { activeCalendars, scheduleCalendarRefresh, unregisterCalendarInstance } from './core/calendar-runtime';
+import { configureCalendarContext } from './core/calendar-context';
+import { registerCalendarCellWriteLifecycle } from './core/calendar-cell-write-lifecycle';
 import { registerTransactionListener } from './listeners/transactionListener';
-import { LIFELOG_CHANGED_EVENT } from '../lifelog/module-lifelog';
+import { LIFELOG_CHANGED_EVENT } from '../lifelog/contracts';
 import { LifelogView } from './integrations/lifelog-event-source';
 import { icsFileManager, transformEvents } from './integrations/ics/IcsFileManager';
 import { createScheduleInConfiguredDatabase } from './features/schedule-creation';
@@ -42,6 +45,7 @@ export class M_calendar {
     private switchProtyleLayoutHandler?: (e: any) => void;
     private wsMessageHandler?: (e: { data: string }) => Promise<void>;
     private unregisterTransactionListener?: () => void;
+    private unregisterCellWriteLifecycle?: () => void;
     /**
      * lifelog 增量更新处理器：lifelog 模块写完属性后广播 LIFELOG_CHANGED_EVENT，
      * 此处 invalidate 对应缓存并做一次 debounced refetch（只补差受影响 block，
@@ -100,6 +104,9 @@ export class M_calendar {
     public calendarAV: IAVOperator;
 
     async init(settingdata: { [x: string]: any; }) {
+        configureCalendarContext(settingdata, this);
+        this.unregisterCellWriteLifecycle?.();
+        this.unregisterCellWriteLifecycle = registerCalendarCellWriteLifecycle();
         this.plugin.addTab({
             type: "calendar",
             async init() {
@@ -244,13 +251,13 @@ export class M_calendar {
         //2025-2-9更新为插件api方式监听（抽离至 listeners/transactionListener.ts）
         this.unregisterTransactionListener = registerTransactionListener(this.plugin, this);
 
-        // lifelog 增量更新接入：lifelog 模块写完属性后会广播此事件，detail.ids 为变更 blockId 列表。
+        // lifelog 增量更新接入：lifelog 模块写完属性后会广播此事件，ids 为变更 blockId 列表。
         // 此处只需：1) invalidate 缓存（让下次 getLifelogEvents 重取这些 block）；
         //          2) debounced refetch 当前可见的日历实例（仅显示 lifelog 的）。
         // 不走 transactionListener 的全量刷新链路——那个已被
         // isLifelogSelfUpdateAttrs 过滤掉。
         this.lifelogChangedHandler = (e) => {
-            const ids: string[] | undefined = e?.detail?.ids;
+            const ids: string[] | undefined = e?.ids;
             if (ids && ids.length > 0) {
                 LifelogView.invalidate(ids);
             } else {
@@ -304,7 +311,7 @@ export class M_calendar {
         // // console.debug("avidMMMM22", settingdata["cal-av-id"]);
         //配置实现只在某一端上传ics
         const selectToPics = this_settingdata["SelectTOPics"];
-        if (!selectToPics || selectToPics === frontEnd) {
+        if (!selectToPics || selectToPics === front) {
             await this.shareicsinit();
         }
 
@@ -427,8 +434,8 @@ export class M_calendar {
     }
 
     private async shareicsinit() {
-        if (settingdata["cal-ics-enable-subscribe"]) {
-            this.icsSubscription = new ICSSubscription([settingdata["cal-ics-subscribe-url"]]);
+        if (this_settingdata["cal-ics-enable-subscribe"]) {
+            this.icsSubscription = new ICSSubscription([this_settingdata["cal-ics-subscribe-url"]]);
             await this.icsSubscription.init();
             console.debug("ST_ics状态:", this.icsSubscription.getEvents());
         }
@@ -595,6 +602,10 @@ export class M_calendar {
             }
             this.unregisterTransactionListener = undefined;
         }
+        if (this.unregisterCellWriteLifecycle) {
+            this.unregisterCellWriteLifecycle();
+            this.unregisterCellWriteLifecycle = undefined;
+        }
         if (this.lifelogChangedHandler) {
             try {
                 (this.plugin.eventBus as any).off(LIFELOG_CHANGED_EVENT, this.lifelogChangedHandler);
@@ -733,21 +744,21 @@ export class M_calendar {
             await icsFileManager.generateFromEventsJson(CALENDAR_EVENTS_JSON_PATH, calendarPaths.icsDataPath);
 
             const selectToPics = this_settingdata["SelectTOPics"];
-            if (!selectToPics || selectToPics === frontEnd) {
-                if (settingdata["cal-share"] === "s3") {
+            if (!selectToPics || selectToPics === front) {
+                if (this_settingdata["cal-share"] === "s3") {
                     const ics = await api.getFileBlob(calendarPaths.icsDataPath)
                     const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                     await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
                 }
-                if (settingdata["cal-share"] === "s3-diy") {
+                if (this_settingdata["cal-share"] === "s3-diy") {
                     const ics = await api.getFileBlob(calendarPaths.icsDataPath)
                     const file = new File([ics], "calendar.ics", { type: "text/calendar" });
                     await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
                 }
-                if (settingdata["cal-share"] === "webdav") {
+                if (this_settingdata["cal-share"] === "webdav") {
                     const ics = await api.getFileBlob(calendarPaths.icsDataPath)
                     const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                    await this.webdavClient.uploadFile(settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
+                    await this.webdavClient.uploadFile(this_settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
                 }
             }
         } catch (error) {
