@@ -37,7 +37,7 @@ import { getShapeHostElement } from '../utils/getShapeHostElement'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
-import { getShapeLowDetailThreshold } from '../utils/low-detail'
+import { getShapeLowDetailFontSize, getShapeLowDetailThreshold } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { getDefaultColorTheme } from '../utils/color-theme'
 import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, isSvgExportOutlineOnly, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
@@ -427,6 +427,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const efficientZoom = useValue('single-block efficient zoom', () => editor.getEfficientZoomLevel(), [editor])
 		const lowDetailThreshold = getShapeLowDetailThreshold()
 		const isSmallSingleBlock = !isEditingState && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
+		const lowDetailFontSize = getShapeLowDetailFontSize(Math.min(shape.props.w, shape.props.h), efficientZoom)
 		const containerRef = useRef<HTMLDivElement>(null)
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角
 		const prevCameraRef = useRef<any | null>(null)
@@ -1401,18 +1402,26 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 								height: '100%',
 								background: shape.props.transparentBackground ? theme[shape.props.color].semi : 'transparent',
 								pointerEvents: 'none',
-								padding: '4px 6px',
+								padding: '2px 4px',
 								boxSizing: 'border-box',
 								color: theme[shape.props.color].solid,
-								fontSize: '12px',
-								lineHeight: 1.3,
-								overflow: 'hidden',
+								fontSize: `${lowDetailFontSize}px`,
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								textAlign: 'center',
+							}}
+						>
+							<span style={{
 								display: '-webkit-box',
 								WebkitBoxOrient: 'vertical',
 								WebkitLineClamp: 2,
-							}}
-						>
-							{shape.props.previewText || (shape.props.blockId ? '单块' : '双击编辑')}
+								overflow: 'hidden',
+								lineHeight: 1.1,
+								wordBreak: 'break-word',
+							}}>
+								{shape.props.previewText || (shape.props.blockId ? '单块' : '双击编辑')}
+							</span>
 						</div>
 					)}
 					{!isEditingState && !isSmallSingleBlock && staticHtml && (

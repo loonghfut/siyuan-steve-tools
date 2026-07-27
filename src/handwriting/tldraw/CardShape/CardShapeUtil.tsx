@@ -20,7 +20,7 @@ import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
-import { getShapeLowDetailThreshold } from '../utils/low-detail'
+import { getShapeLowDetailFontSize, getShapeLowDetailThreshold } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
@@ -313,6 +313,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const efficientZoom = useValue('card efficient zoom', () => editor.getEfficientZoomLevel(), [editor])
 		const lowDetailThreshold = getShapeLowDetailThreshold()
 		const isSmallCard = !isEditingState && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
+		const lowDetailFontSize = getShapeLowDetailFontSize(Math.min(shape.props.w, shape.props.h), efficientZoom)
 		const isMainCard = Boolean(shape.props.isMain);
 		const collapsedTextSize = shape.props.collapsedTextSize || 21; // 折叠文字大小，默认21px
 		const collapsedTextAlign = shape.props.collapsedTextAlign || 'center'; // 折叠文字对齐，默认居中
@@ -1759,9 +1760,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							display: 'flex',
 							alignItems: 'center',
 							justifyContent: 'center',
-							padding: '6px',
+							padding: '2px 4px',
 							boxSizing: 'border-box',
-							fontSize: '12px',
+							fontSize: `${lowDetailFontSize}px`,
 							fontWeight: 500,
 							color: theme[shape.props.color].solid,
 							textAlign: 'center',
@@ -1771,7 +1772,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								WebkitBoxOrient: 'vertical',
 								WebkitLineClamp: 2,
 								overflow: 'hidden',
-								lineHeight: 1.3,
+								lineHeight: 1.1,
 								wordBreak: 'break-word',
 							}}>
 								{shape.props.previewText || (shape.props.blockId ? '卡片' : '双击编辑')}

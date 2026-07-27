@@ -1,4 +1,4 @@
-const MAX_LIGHTWEIGHT_PREVIEW_LENGTH = 160
+const MAX_LIGHTWEIGHT_PREVIEW_LENGTH = 36
 
 /**
  * Produce a compact plain-text summary that is safe to persist in shape props.
