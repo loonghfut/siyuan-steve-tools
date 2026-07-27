@@ -11,6 +11,8 @@ export type ICardShape = TLBaseShape<
 		color: TLDefaultColorStyle,
 		showMask: boolean,
 		blockId: string // 添加 blockId 属性
+		/** 已加载内容生成的简短文本，用于轻量预览。 */
+		previewText?: string
 		isNewlyCreated?: boolean
 		fontSize?: number // 添加字体大小属性
 		isMain?: boolean // 添加是否为主卡片属性

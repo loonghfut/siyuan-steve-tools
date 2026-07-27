@@ -9,6 +9,7 @@ const versions = createShapePropsMigrationIds(
     Addv: 1,
     AddrefreshNonce:2,
     AddCollapsedTextStyle: 3,
+    AddLightweightPreviewText: 4,
   }
 )
 
@@ -43,6 +44,15 @@ export const cardShapeMigrations = createShapePropsMigrationSequence({
       down(props) {
         delete props.collapsedTextSize
         delete props.collapsedTextAlign
+      },
+    },
+    {
+      id: versions.AddLightweightPreviewText,
+      up(props) {
+        props.previewText = props.previewText ?? ''
+      },
+      down(props) {
+        delete props.previewText
       },
     },
   ],

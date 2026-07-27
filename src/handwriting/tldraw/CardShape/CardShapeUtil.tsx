@@ -21,6 +21,7 @@ import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import { getShapeLowDetailThreshold } from '../utils/low-detail'
+import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
 import { getCardCollapsedHeight } from './card-collapse'
@@ -533,6 +534,20 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			event.preventDefault()
 			event.stopPropagation()
 		}
+		const previewTextRef = useRef(shape.props.previewText || '')
+		previewTextRef.current = shape.props.previewText || ''
+		const persistPreviewText = useCallback((previewText: string) => {
+			if (!previewText || previewText === previewTextRef.current) return
+			previewTextRef.current = previewText
+			editor.updateShape({
+				id: shape.id,
+				type: shape.type,
+				props: { previewText },
+			})
+		}, [editor, shape.id, shape.type])
+		const persistLightweightPreviewText = useCallback((html: string) => {
+			persistPreviewText(getLightweightPreviewTextFromHtml(html))
+		}, [persistPreviewText])
 		const enterMissingLinkedBlockState = useCallback(() => {
 			destroyRuntimeResources()
 			setHasMissingLinkedBlock(true)
@@ -1160,6 +1175,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (!forceRefresh) {
 					const cachedHtml = getCachedPreview(targetBlockId, fontSize);
 					if (cachedHtml) {
+						persistLightweightPreviewText(cachedHtml)
 						// 使用缓存的预览
 						if (staticPreviewRef.current?.parentElement === containerRef.current) {
 							removeStaticPreviewLinkHandlers()
@@ -1201,6 +1217,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 
 				if (cancelled || !domContent) return;
+				persistLightweightPreviewText(domContent)
 
 				// 对于 isMain 形状，获取文档信息（标题和题头图）
 				let docInfo: api.IResGetDocInfo | null = null;
@@ -1489,6 +1506,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							installStaticPreviewLinkHandlers(protyleHostRef.current)
 						}
 						try { protyleRef.current?.disable(); } catch { }
+						persistPreviewText(getLightweightPreviewTextFromElement(protyleHostRef.current))
 						// 如果刚从编辑状态退出，刷新内容以反映最新编辑
 						if (wasEditing) {
 							try { protyleRef.current?.reload(false); } catch { }
@@ -1507,7 +1525,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					destroyRuntimeResources();
 				}
 			};
-		}, [destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard]);
+		}, [destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard, persistLightweightPreviewText, persistPreviewText]);
 
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {
@@ -1746,11 +1764,18 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							fontSize: '12px',
 							fontWeight: 500,
 							color: theme[shape.props.color].solid,
-							whiteSpace: 'nowrap',
-							overflow: 'hidden',
-							textOverflow: 'ellipsis',
+							textAlign: 'center',
 						}}>
-							{shape.props.blockId ? '卡片' : '双击编辑'}
+							<span style={{
+								display: '-webkit-box',
+								WebkitBoxOrient: 'vertical',
+								WebkitLineClamp: 2,
+								overflow: 'hidden',
+								lineHeight: 1.3,
+								wordBreak: 'break-word',
+							}}>
+								{shape.props.previewText || (shape.props.blockId ? '卡片' : '双击编辑')}
+							</span>
 						</div>
 					)}
 					{!isEditingState && !isCollapsed && !isSmallCard && !canLoad && (

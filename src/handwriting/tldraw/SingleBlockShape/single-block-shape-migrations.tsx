@@ -3,6 +3,7 @@ import { createShapePropsMigrationIds, createShapePropsMigrationSequence } from 
 const versions = createShapePropsMigrationIds('single-block', {
 	addRefreshNonce: 1,
     addAllowBinding: 2,
+    addLightweightPreviewText: 3,
 })
 
 export const singleBlockShapeMigrations = createShapePropsMigrationSequence({
@@ -23,6 +24,15 @@ export const singleBlockShapeMigrations = createShapePropsMigrationSequence({
 			},
 			down(props) {
 				delete props.allowBinding
+			},
+		},
+		{
+			id: versions.addLightweightPreviewText,
+			up(props) {
+				props.previewText = props.previewText ?? ''
+			},
+			down(props) {
+				delete props.previewText
 			},
 		},
 	],

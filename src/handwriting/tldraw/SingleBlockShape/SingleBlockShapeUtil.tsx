@@ -38,6 +38,7 @@ import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, re
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
 import { getShapeLowDetailThreshold } from '../utils/low-detail'
+import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { getDefaultColorTheme } from '../utils/color-theme'
 import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, isSvgExportOutlineOnly, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
 import {
@@ -460,6 +461,20 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			event.preventDefault()
 			event.stopPropagation()
 		}
+		const previewTextRef = useRef(shape.props.previewText || '')
+		previewTextRef.current = shape.props.previewText || ''
+		const persistPreviewText = useCallback((previewText: string) => {
+			if (!previewText || previewText === previewTextRef.current) return
+			previewTextRef.current = previewText
+			editor.updateShape({
+				id: shape.id,
+				type: shape.type,
+				props: { previewText },
+			})
+		}, [editor, shape.id, shape.type])
+		const persistLightweightPreviewText = useCallback((html: string) => {
+			persistPreviewText(getLightweightPreviewTextFromHtml(html))
+		}, [persistPreviewText])
 
 
 		const destroyRuntimeResources = useCallback(() => {
@@ -651,6 +666,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			if (!forceRefresh) {
 				const cached = getCachedHtml(blockId, fontSize)
 				if (cached) {
+					persistLightweightPreviewText(cached)
 					setStaticHtml(cached)
 					return
 				}
@@ -668,6 +684,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			requestBlockDOM(blockId, fontSize).then(async (html) => {
 				if (cancelled) return
 				if (html) {
+					persistLightweightPreviewText(html)
 					setStaticHtml(html)
 					setHasLoadError(false)
 					return
@@ -678,6 +695,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (content) {
 					const fallbackHtml = await renderSimpleBlockHtml(content.content || content.markdown, fontSize)
 					setCachedHtml(blockId, fallbackHtml, fontSize)
+					persistLightweightPreviewText(fallbackHtml)
 					setStaticHtml(fallbackHtml)
 					setHasLoadError(false)
 				} else {
@@ -696,7 +714,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			})
 			
 			return () => { cancelled = true }
-		}, [isEditingState, isSmallSingleBlock, shape.props.blockId, shape.props.fontSize, shape.props.refreshNonce, isInViewport, canLoad, isViewportCullingEnabled])
+		}, [isEditingState, isSmallSingleBlock, shape.props.blockId, shape.props.fontSize, shape.props.refreshNonce, isInViewport, canLoad, isViewportCullingEnabled, persistLightweightPreviewText])
 
 		// ===== 静态内容渲染：在 staticHtml 挂载后执行 renderAllContentIdle =====
 		// 使用空闲调度，避免在拖动画布时阻塞主线程
@@ -1097,12 +1115,13 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				if (protyleRef.current && protyleHostRef.current && shape.props.blockId) {
 					const html = cacheFromProtyleHost(shape.props.blockId, protyleHostRef.current, shape.props.fontSize || 16)
 					if (html) {
+						persistPreviewText(getLightweightPreviewTextFromElement(protyleHostRef.current))
 						setStaticHtml(html)
 					}
 				}
 				destroyRuntimeResources()
 			}
-		}, [destroyRuntimeResources, isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce])
+		}, [destroyRuntimeResources, isEditingState, shape.id, shape.props.blockId, shape.props.refreshNonce, persistPreviewText])
 
 		useEffect(() => {
 			if (protyleRef.current?.protyle?.wysiwyg?.element) {
@@ -1377,14 +1396,24 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					</style>}
 					{!isEditingState && isSmallSingleBlock && (
 						<div
-							aria-hidden="true"
 							style={{
 								width: '100%',
 								height: '100%',
 								background: shape.props.transparentBackground ? theme[shape.props.color].semi : 'transparent',
 								pointerEvents: 'none',
+								padding: '4px 6px',
+								boxSizing: 'border-box',
+								color: theme[shape.props.color].solid,
+								fontSize: '12px',
+								lineHeight: 1.3,
+								overflow: 'hidden',
+								display: '-webkit-box',
+								WebkitBoxOrient: 'vertical',
+								WebkitLineClamp: 2,
 							}}
-						/>
+						>
+							{shape.props.previewText || (shape.props.blockId ? '单块' : '双击编辑')}
+						</div>
 					)}
 					{!isEditingState && !isSmallSingleBlock && staticHtml && (
 						<div

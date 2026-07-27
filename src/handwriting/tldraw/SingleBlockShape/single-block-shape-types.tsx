@@ -7,6 +7,8 @@ export type ISingleBlockShape = TLBaseShape<
 		h: number
 		color: TLDefaultColorStyle
 		blockId: string
+		/** 已加载内容生成的简短文本，用于轻量预览。 */
+		previewText?: string
 		/** 新建时标记：首次创建时为 true，用于延迟在编辑时创建思源块 */
 		isNewlyCreated?: boolean
 		fontSize?: number
