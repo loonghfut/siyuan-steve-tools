@@ -5,8 +5,8 @@
     import { whiteboardFilesUpdated } from '../whiteboards.store';
     import { closeTab } from '../tldraw-instance-manager';
     import { WhiteboardFileManager, WHITEBOARD_TRASH_DIR } from '../whiteboard-file-manager';
-    import type { PreviewShape } from '../utils/whiteboard-utils';
-    import { extractDrawingId, parseSyTimestamp, computeBounds, formatTime, projectShape, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from '../utils/whiteboard-utils';
+    import type { PreviewShape, ProjectedRect } from '../utils/whiteboard-utils';
+    import { extractDrawingId, parseSyTimestamp, projectAllShapes, formatTime, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from '../utils/whiteboard-utils';
 
     // 父层传入 plugin 以便打开白板
     export let plugin: Plugin;
@@ -20,6 +20,7 @@
         mtime: number;       // 文件修改时间 (用于排序)
         loadingPreview: boolean; // 缩略图是否加载中
         shapes: PreviewShape[]; // 用于缩略图
+        previewRects?: ProjectedRect[]; // 预计算的 SVG 矩形
         error?: string;      // 预览错误
         docId?: string;      // 关联文档ID
         tags?: string[];     // 标签列表
@@ -406,6 +407,7 @@
 
     async function refreshCard(card: WhiteboardCard) {
         card.shapes = [];
+        card.previewRects = [];
         card.error = undefined;
         card.loadingPreview = false;
         allCards = allCards;
@@ -549,6 +551,7 @@
             }
 
             card.shapes = shapes;
+            card.previewRects = projectAllShapes(shapes, 300, 200, SVG_PAD);
         } catch (e) {
             console.warn('缩略图加载失败:', e);
             card.error = '缩略图失败';
@@ -563,6 +566,11 @@
     // 懒加载缩略图：使用 IntersectionObserver
     let observer: IntersectionObserver;
     function setupObserver(node: HTMLElement, card: WhiteboardCard) {
+        const root = cardsGridEl ?? null;
+        if (observer && observer.root !== root) {
+            try { observer.disconnect(); } catch { /* ignore */ }
+            observer = undefined as unknown as IntersectionObserver;
+        }
         if (!observer) {
             // 增大 rootMargin 提前触发懒加载，降低滚动时空白缩略图的出现概率
             observer = new IntersectionObserver(entries => {
@@ -573,7 +581,7 @@
                         observer.unobserve(entry.target);
                     }
                 }
-            }, { root: null, rootMargin: '320px 0px 320px 0px', threshold: 0.05 });
+            }, { root, rootMargin: '320px 0px 320px 0px', threshold: 0.05 });
         }
         (node as any).__card = card;
         // always try to observe even if previously observed — IntersectionObserver.observe is idempotent
@@ -595,6 +603,11 @@
     // 触底哨兵观察器：滚动至底部自动加载下一批
     let batchObserver: IntersectionObserver;
     function initBatchObserver() {
+        const root = cardsGridEl ?? null;
+        if (batchObserver && batchObserver.root !== root) {
+            try { batchObserver.disconnect(); } catch { /* ignore */ }
+            batchObserver = undefined as unknown as IntersectionObserver;
+        }
         if (batchObserver || !sentinel) return;
         batchObserver = new IntersectionObserver(entries => {
             for (const entry of entries) {
@@ -602,7 +615,7 @@
                     loadNextBatch();
                 }
             }
-        }, { root: null, rootMargin: '200px 0px 200px 0px', threshold: 0.01 });
+        }, { root, rootMargin: '200px 0px 200px 0px', threshold: 0.01 });
         batchObserver.observe(sentinel);
     }
 
@@ -755,12 +768,7 @@
                         {:else}
                             <svg viewBox="0 0 300 200" class="preview-svg" preserveAspectRatio="xMidYMid meet">
                                 {#if card.shapes.length > 0}
-                                    {@const bounds = computeBounds(card.shapes)}
-                                    {@const viewW = 300 - SVG_PAD * 2}
-                                    {@const viewH = 200 - SVG_PAD * 2}
-                                    {@const scale = Math.min(viewW / bounds.width, viewH / bounds.height)}
-                                    {#each card.shapes as s}
-                                        {@const pos = projectShape(s, bounds, scale, SVG_PAD)}
+                                    {#each card.previewRects ?? [] as pos}
                                         <rect x={pos.x} y={pos.y} width={pos.w} height={pos.h} rx={SHAPE_RX} ry={SHAPE_RX} fill={SHAPE_FILL} stroke={SHAPE_STROKE} stroke-width="1" />
                                     {/each}
                                     <rect x="1" y="1" width="298" height="198" fill="none" stroke={BORDER_STROKE} />

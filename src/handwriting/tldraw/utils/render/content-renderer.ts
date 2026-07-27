@@ -105,12 +105,13 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 export async function renderAllContentIdle(
 	container: HTMLElement,
 	priority = 10,
-	taskId?: string
+	taskId?: string,
+	forceIdle = false
 ): Promise<void> {
 	const effectiveTaskId = taskId || `render-${++renderTaskIdCounter}`
 
 	// 如果不在交互中，直接同步渲染（更快的响应）
-	if (!isInteracting()) {
+	if (!forceIdle && !isInteracting()) {
 		await renderAllContent(container)
 		return
 	}

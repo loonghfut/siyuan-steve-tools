@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import type { WhiteboardItem} from "../utils/whiteboard-utils";
-    import { computeBounds, projectShape, formatTime, SVG_PAD, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from "../utils/whiteboard-utils";
+    import { formatTime, SHAPE_FILL, SHAPE_STROKE, BORDER_STROKE, SHAPE_RX } from "../utils/whiteboard-utils";
 
     export let item: WhiteboardItem;
     export let selectedIds: Set<string>;
@@ -15,7 +15,6 @@
     // 预览 SVG 计算常量
     const PREVIEW_W = 300;
     const PREVIEW_H = 200;
-    const PREVIEW_PAD = SVG_PAD; // 6
 
     function getLatestUpdate(item: WhiteboardItem) {
         return item.blkUpdated || item.docUpdated || item.mtime;
@@ -84,25 +83,12 @@
             {:else if item.loadingPreview}
                 <div class="preview-fallback">生成预览...</div>
             {:else if item.shapes.length > 0}
-                {@const bounds = computeBounds(item.shapes)}
-                {@const viewW = PREVIEW_W - PREVIEW_PAD * 2}
-                {@const viewH = PREVIEW_H - PREVIEW_PAD * 2}
-                {@const scale = Math.min(
-                    viewW / bounds.width,
-                    viewH / bounds.height,
-                )}
                 <svg
                     viewBox={`0 0 ${PREVIEW_W} ${PREVIEW_H}`}
                     class="preview-canvas"
                     preserveAspectRatio="xMidYMid meet"
                 >
-                    {#each item.shapes as shape}
-                        {@const pos = projectShape(
-                            shape,
-                            bounds,
-                            scale,
-                            PREVIEW_PAD,
-                        )}
+                    {#each item.previewRects ?? [] as pos}
                         <rect
                             x={pos.x}
                             y={pos.y}

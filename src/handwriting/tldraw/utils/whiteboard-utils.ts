@@ -31,6 +31,8 @@ export interface WhiteboardItem {
     tags: string[];
     loadingPreview: boolean;
     shapes: PreviewShape[];
+    /** 预览 SVG 的投影结果，在加载文件时预计算。 */
+    previewRects?: ProjectedRect[];
     previewError?: string;
 }
 
@@ -44,6 +46,7 @@ export interface WhiteboardCard {
     mtime: number;
     loadingPreview: boolean;
     shapes: PreviewShape[];
+    previewRects?: ProjectedRect[];
     error?: string;
 }
 

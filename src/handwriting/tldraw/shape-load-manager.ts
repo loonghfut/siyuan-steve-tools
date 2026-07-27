@@ -44,6 +44,7 @@ class ShapeLoadManager {
   private shapes: Map<TLShapeId, RegisteredShape> = new Map()
   private editors: Set<Editor> = new Set()
   private rafId: number | null = null
+  private immediateRecomputeQueued = false
   private lastRecomputeAt = 0
   private PRELOAD_MARGIN_WORLD = 1600
 
@@ -66,10 +67,20 @@ class ShapeLoadManager {
       metaProvider,
       onChange: onPermissionChange,
       lastAllowed: false,
-      lastComputed: { inViewport: true, distance: Infinity },
+      lastComputed: { inViewport: false, distance: Infinity },
     }
     this.shapes.set(shapeId, entry)
     this.ensureLoop()
+    // Do not let the initial optimistic component state start loading every shape.
+    // Recompute once after the current batch of React effects has registered.
+    onPermissionChange(false, entry.lastComputed)
+    if (!this.immediateRecomputeQueued) {
+      this.immediateRecomputeQueued = true
+      queueMicrotask(() => {
+        this.immediateRecomputeQueued = false
+        if (this.shapes.size > 0) this.recompute()
+      })
+    }
     return () => this.unregister(shapeId)
   }
 
@@ -204,10 +215,12 @@ class ShapeLoadManager {
       allowedCount++
     }
 
+    const computedById = new Map(sortable.map((item) => [item.id, item.meta]))
+
     // Notify changes
     for (const s of this.shapes.values()) {
       const newAllowed = allowedSet.has(s.id)
-      const computed = sortable.find((x) => x.id === s.id)?.meta || { inViewport: false, distance: Infinity }
+      const computed = computedById.get(s.id) || { inViewport: false, distance: Infinity }
       const changed = newAllowed !== s.lastAllowed || computed.inViewport !== s.lastComputed.inViewport
       s.lastAllowed = newAllowed
       s.lastComputed = computed

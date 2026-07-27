@@ -7,7 +7,7 @@
     import { closeTab } from '../tldraw-instance-manager';
     import WhiteboardCard from './whiteboard-card.svelte';
     import type { WhiteboardItem, PreviewShape } from '../utils/whiteboard-utils';
-    import { extractDrawingId, parseSyTimestamp } from '../utils/whiteboard-utils';
+    import { extractDrawingId, parseSyTimestamp, projectAllShapes, SVG_PAD } from '../utils/whiteboard-utils';
 
     export let plugin: Plugin;
 
@@ -612,6 +612,7 @@
 
             // 清除旧预览，触发重新加载
             item.shapes = [];
+            item.previewRects = [];
             item.previewError = undefined;
             item.loadingPreview = false;
 
@@ -703,6 +704,7 @@
             }
 
             item.shapes = shapes;
+            item.previewRects = projectAllShapes(shapes, 300, 200, SVG_PAD);
         } catch (e) {
             console.warn('缩略图加载失败:', e);
             item.previewError = '预览失败';
