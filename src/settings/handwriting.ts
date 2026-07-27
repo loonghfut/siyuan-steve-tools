@@ -22,7 +22,7 @@ export const handwritingDefaults: Record<string, any> = {
     "card-render-mode": "static-dom",
     "tldraw-header-image": true,
     "tldraw-max-active-shapes": 40,
-    // Card 屏幕尺寸低于此值时使用轻量预览，0 表示关闭。
+    // Card / 单块形状屏幕尺寸低于此值时使用轻量预览，0 表示关闭。
     "tldraw-card-low-detail-threshold": 48,
     // 全局禁止 JS 块执行脚本
     "js-shape-disable-execution": false,
@@ -90,7 +90,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "同步删除(不建议启用)", description: "删除画板块时同步删除笔记块", key: "SyncDelete", value: ctx.settings["SyncDelete"] },
                 { type: "checkbox", title: "全局禁止 JS 块执行脚本", description: "启用后所有 JS 形状将不执行脚本代码（安全模式）", key: "js-shape-disable-execution", value: ctx.settings["js-shape-disable-execution"] },
                 { type: "number", title: "最大激活形状数", description: "限制同时激活的形状数量以节省资源", key: "tldraw-max-active-shapes", value: ctx.settings["tldraw-max-active-shapes"] },
-                { type: "number", title: "Card 轻量预览阈值", description: "Card 的屏幕最小边小于此像素值时只显示轻量预览；设为 0 可关闭。默认 48。", key: "tldraw-card-low-detail-threshold", value: ctx.settings["tldraw-card-low-detail-threshold"] },
+                { type: "number", title: "Card / 单块轻量预览阈值", description: "Card 或单块的屏幕最小边小于此像素值时只显示轻量预览；设为 0 可关闭。默认 48。", key: "tldraw-card-low-detail-threshold", value: ctx.settings["tldraw-card-low-detail-threshold"] },
                 {
                     type: "select", title: "Card 渲染模式", description: "选择非编辑状态如何渲染 Card：性能优先或一致性优先", key: "card-render-mode", value: ctx.settings["card-render-mode"], options: {
                         "static-dom": "性能优先：非编辑为 Protyle 元素（无实例）",

@@ -20,6 +20,7 @@ import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
+import { getShapeLowDetailThreshold } from '../utils/low-detail'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
 import { getCardCollapsedHeight } from './card-collapse'
@@ -285,14 +286,14 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// const bounds = this.editor.getShapeGeometry(shape).bounds
 		const editor = this.editor
 		const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
-		const isEditing = this.editor.getEditingShapeId() === shape.id;
+		const isEditing = useValue('card is editing', () => editor.getEditingShapeId() === shape.id, [editor, shape.id])
 		const branchInteractionHint = useBranchInteractionHint()
 		const isRootAttachTarget =
 			branchInteractionHint?.mode === 'attach' &&
 			branchInteractionHint.slot === 'root' &&
 			(branchInteractionHint.targetShapeId === shape.id ||
 				(!branchInteractionHint.targetShapeId && branchInteractionHint.draggingShapeId === shape.id))
-		const [isEditingState, setIsEditingState] = useState(isEditing);
+		const isEditingState = isEditing
 		const [isInViewport, setIsInViewport] = useState(false);
 		const [canLoad, setCanLoad] = useState(false); // gating heavy render by global manager
 		const [hasMissingLinkedBlock, setHasMissingLinkedBlock] = useState(false);
@@ -309,10 +310,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		} | null>(null);
 		const isCollapsed = shape.props.isCollapsed || false;
 		const efficientZoom = useValue('card efficient zoom', () => editor.getEfficientZoomLevel(), [editor])
-		const configuredLowDetailThreshold = Number(settingdata['tldraw-card-low-detail-threshold'])
-		const lowDetailThreshold = Number.isFinite(configuredLowDetailThreshold)
-			? Math.min(500, Math.max(0, configuredLowDetailThreshold))
-			: 48
+		const lowDetailThreshold = getShapeLowDetailThreshold()
 		const isSmallCard = !isEditingState && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
 		const isMainCard = Boolean(shape.props.isMain);
 		const collapsedTextSize = shape.props.collapsedTextSize || 21; // 折叠文字大小，默认21px
@@ -336,6 +334,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			shape.props.renderMode === 'inherit' || !shape.props.renderMode
 				? globalRenderMode
 				: (shape.props.renderMode as Exclude<CardRenderMode, 'inherit'>);
+		// While editing, viewport admission must not cancel the queued Protyle mount.
+		const renderAdmission = isEditingState || !isViewportCullingEnabled || (isInViewport && canLoad)
+			? 'allowed'
+			: 'blocked'
 		const cardInnerEdgeShadow = 'inset 0 0 0 5px var(--b3-body-background, var(--b3-theme-background, #fff))'
 		const cardOuterShadow = isRootAttachTarget
 			? '0 0 0 4px rgba(34, 197, 94, 0.42), 0 0 20px rgba(34, 197, 94, 0.32)'
@@ -563,10 +565,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			editor.deleteShape(shape.id)
 		}, [editor, shape.id])
 
-
-		useEffect(() => {
-			setIsEditingState(isEditing);
-		}, [isEditing]);
 
 		// 编辑时临时置顶，退出编辑后恢复原层次
 		useEffect(() => {
@@ -931,7 +929,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				return;
 			}
 
-			const shouldRender = !isViewportCullingEnabled || isEditingState || (isInViewport && canLoad);
+			const shouldRender = renderAdmission === 'allowed';
 			if (!shouldRender) {
 				destroyRuntimeResources();
 				return;
@@ -1509,7 +1507,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					destroyRuntimeResources();
 				}
 			};
-		}, [destroyRuntimeResources, isEditingState, isInViewport, isViewportCullingEnabled, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, canLoad, fontSize, isSmallCard]);
+		}, [destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard]);
 
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {
