@@ -416,8 +416,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			(branchInteractionHint.targetShapeId === shape.id ||
 				(!branchInteractionHint.targetShapeId && branchInteractionHint.draggingShapeId === shape.id))
 		const isEditingState = isEditing
-		const [isInViewport, setIsInViewport] = useState(true)
-		const [canLoad, setCanLoad] = useState(true)
+		// Stay blocked until ShapeLoadManager computes this shape's visibility.
+		// Effects in the initial commit still see these values after registration.
+		const [isInViewport, setIsInViewport] = useState(false)
+		const [canLoad, setCanLoad] = useState(false)
 		const [hasAttrIcon, setHasAttrIcon] = useState(false)
 		const [hasLoadError, setHasLoadError] = useState(false)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false

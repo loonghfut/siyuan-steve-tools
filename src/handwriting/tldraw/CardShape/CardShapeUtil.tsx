@@ -1733,7 +1733,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							双击编辑以创建笔记块
 						</div>
 					)}
-					{/* 预览被限制（canLoad=false 且非编辑 && 未折叠）显示占位 */}
+					{/* 轻量预览和限流占位保持互斥，避免两个全尺寸元素同时布局。 */}
 					{isSmallCard && !isCollapsed && (
 						<div style={{
 							width: '100%',
@@ -1753,7 +1753,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							{shape.props.blockId ? '卡片' : '双击编辑'}
 						</div>
 					)}
-					{!isEditingState && !isCollapsed && !canLoad && (
+					{!isEditingState && !isCollapsed && !isSmallCard && !canLoad && (
 						<div style={{
 							width: '100%',
 							height: '100%',
