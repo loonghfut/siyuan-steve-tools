@@ -213,8 +213,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 	static override migrations = cardShapeMigrations
 
 	// [3]
-	override canCull(_shape: ICardShape) {
-		return false
+	override canCull(shape: ICardShape) {
+		// Keep the active editor mounted; all other cards can use tldraw's native culling.
+		return this.editor.getEditingShapeId() !== shape.id
 	}
 	override isAspectRatioLocked(_shape: ICardShape) {
 		return false
