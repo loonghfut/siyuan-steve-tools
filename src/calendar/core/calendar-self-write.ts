@@ -17,6 +17,7 @@ export type CalendarWriteReason =
     | 'drag'
     | 'resize'
     | 'status'
+    | 'task'
     | 'archive'
     | 'create'
     | 'recurring'
@@ -99,16 +100,33 @@ export function isCalendarSelfCellWrite(
     itemID?: string,
     keyID?: string,
 ): boolean {
-    if (!avID || !itemID) return false;
+    return getCalendarSelfCellWriteMark(avID, itemID, keyID) !== undefined;
+}
+
+/** Returns the reason for a pending Calendar AV cell write, if it is ours. */
+export function getCalendarSelfCellWriteReason(
+    avID?: string,
+    itemID?: string,
+    keyID?: string,
+): CalendarWriteReason | undefined {
+    return getCalendarSelfCellWriteMark(avID, itemID, keyID)?.reason;
+}
+
+function getCalendarSelfCellWriteMark(
+    avID?: string,
+    itemID?: string,
+    keyID?: string,
+): PendingMark | undefined {
+    if (!avID || !itemID) return undefined;
     const now = Date.now();
     sweepExpired(now);
     if (keyID) {
         const m = cellMarks.get(cellKey(avID, itemID, keyID));
-        return !!(m && m.expiresAt > now);
+        return m && m.expiresAt > now ? m : undefined;
     }
     // 仅在 keyID 缺失（如某些 ws-main op 形态）时才用 row 级降级匹配
     const r = rowMarks.get(rowKey(avID, itemID));
-    return !!(r && r.expiresAt > now);
+    return r && r.expiresAt > now ? r : undefined;
 }
 
 /** 判断 block 属性写入是否为自写。 */

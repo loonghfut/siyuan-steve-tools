@@ -11,6 +11,7 @@ import { isLifelogSelfWrite, ATTRS } from '@/lifelog/contracts';
 import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
+    getCalendarSelfCellWriteReason,
     markCalendarBlockWrite,
 } from '@/calendar/core/calendar-self-write';
 import {
@@ -174,6 +175,7 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
         // 与日程无关的 AV 编辑不再触发所有已打开日历重新加载。
         if (!op.avID || !managedAvIds.has(op.avID)) continue;
         const isCalendarSelfWrite = isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID);
+        const selfWriteReason = getCalendarSelfCellWriteReason(op.avID, op.rowID, op.keyID);
         if (!isCalendarSelfWrite) {
           invalidateViewValueCache(op.avID);
           refreshNeeded = true;
@@ -192,6 +194,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
               if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
             }
             if (statusKeyDefinition && statusKeyDefinition.id === op.keyID) {
+              if (selfWriteReason === 'task') {
+                continue;
+              }
               const status = op.data.mSelect[0]?.content || '';
               await syncStatusToTaskItems(blockId, status);
             }
@@ -298,6 +303,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
           }
           const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === keyID);
           if (isStatus) {
+            if (getCalendarSelfCellWriteReason(avID, itemID, keyID) === 'task') {
+              return;
+            }
             // 状态列：根据值设置自定义属性
             await syncStatusToTaskItems(blockId, selectValue || '');
             return;
@@ -335,6 +343,9 @@ export function registerTransactionListener(plugin: steveTools, calendarHost: Ca
             }
             const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === v.keyID);
             if (isStatus) {
+              if (getCalendarSelfCellWriteReason(avID, v.itemID, v.keyID) === 'task') {
+                continue;
+              }
               const selectValue = getSelectValue(v.value);
               await syncStatusToTaskItems(blockId, selectValue || '');
               continue;

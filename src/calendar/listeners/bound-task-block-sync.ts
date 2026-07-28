@@ -1,4 +1,5 @@
 import * as api from '@/api/api';
+import { getTaskItemsFromBlockDOM } from '@/calendar/listeners/task-item-dom';
 
 const syncQueues = new Map<string, Promise<void>>();
 const recentStatusSyncs = new Map<string, { completed: boolean; expiresAt: number; promise: Promise<void> }>();
@@ -78,14 +79,10 @@ async function syncTaskItems(scheduleBlockId: string, shouldBeCompleted: boolean
                 return;
             }
 
-            const parsedDocument = new DOMParser().parseFromString(dom, 'text/html');
-            const taskItems = Array.from(parsedDocument.querySelectorAll<HTMLElement>(
-                '[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]',
-            ));
+            const taskItems = getTaskItemsFromBlockDOM(dom);
             const taskIdsToUpdate = taskItems
-                .filter(item => (item.getAttribute('data-task') !== ' ') !== shouldBeCompleted)
-                .map(item => item.dataset.nodeId)
-                .filter((id): id is string => !!id);
+                .filter(item => item.completed !== shouldBeCompleted)
+                .map(item => item.id);
 
             if (taskIdsToUpdate.length === 0) {
                 return;
