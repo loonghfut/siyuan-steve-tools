@@ -442,6 +442,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// 标记内容是否已渲染（公式、图表等）
 		const [, setIsContentRendered] = useState(false)
 		const [isLoadingContent, setIsLoadingContent] = useState(false)
+		// When the load manager withholds a full DOM preview, retain a compact
+		// summary instead of presenting an action-oriented loading placeholder.
+		const shouldUseLightweightPreview = !isEditingState && (isSmallSingleBlock || !canLoad)
 		const detachKeyHandler = useRef<() => void>()
 		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
@@ -536,7 +539,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 
 		// 使用独立的尺寸测量 hook（自动处理尺寸更新）
 	// 如果有加载错误，跳过测量以避免异常增长
-	useSingleBlockSize(editor, shape, containerRef, protyleHostRef, isEditingState, isSmallSingleBlock || isLoadingContent || hasLoadError)
+	useSingleBlockSize(editor, shape, containerRef, protyleHostRef, isEditingState, shouldUseLightweightPreview || hasLoadError)
 		// 检测是否包含属性视图图标（数据库图标）
 		useEffect(() => {
 			if (isSmallSingleBlock) {
@@ -720,7 +723,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		// ===== 静态内容渲染：在 staticHtml 挂载后执行 renderAllContentIdle =====
 		// 使用空闲调度，避免在拖动画布时阻塞主线程
 		useEffect(() => {
-			if (!staticHtml || isEditingState || isSmallSingleBlock || !staticContentRef.current) return
+			if (!staticHtml || isEditingState || shouldUseLightweightPreview || !staticContentRef.current) return
 			
 			// 重置渲染状态
 			setIsContentRendered(false)
@@ -746,7 +749,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 				cancelAnimationFrame(rafId)
 				cancelIdleRender(renderTaskId)
 			}
-		}, [staticHtml, isEditingState, isSmallSingleBlock, shape.id])
+		}, [staticHtml, isEditingState, shouldUseLightweightPreview, shape.id])
 
 		// ===== 编辑态专用：创建和管理 Protyle 实例 =====
 		useEffect(() => {
@@ -1395,7 +1398,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							}
 						`}
 					</style>}
-					{!isEditingState && isSmallSingleBlock && (
+					{shouldUseLightweightPreview && (
 						<div
 							style={{
 								width: '100%',
@@ -1424,7 +1427,7 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							</span>
 						</div>
 					)}
-					{!isEditingState && !isSmallSingleBlock && staticHtml && (
+					{!isEditingState && !shouldUseLightweightPreview && staticHtml && (
 						<div
 							className="single-block-static-content"
 							ref={staticContentRef}
@@ -1456,23 +1459,6 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 							padding: '4px'
 						}}>
 							加载中...
-						</div>
-					)}
-					{/* 非编辑态：等待加载提示 */}
-					{!isEditingState && !isSmallSingleBlock && !staticHtml && !isLoadingContent && !canLoad && (
-						<div style={{
-							width: '100%',
-							height: '100%',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							fontSize: `${Math.min(shape.props.fontSize, 18)}px`,
-							color: theme[shape.props.color].solid,
-							opacity: 0.7,
-							textAlign: 'center',
-							padding: '4px'
-						}}>
-							双击加载内容
 						</div>
 					)}
 					{/* 非编辑态：新块占位符 */}

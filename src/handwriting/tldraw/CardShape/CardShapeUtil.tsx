@@ -313,6 +313,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const efficientZoom = useValue('card efficient zoom', () => editor.getEfficientZoomLevel(), [editor])
 		const lowDetailThreshold = getShapeLowDetailThreshold()
 		const isSmallCard = !isEditingState && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
+		// Shapes outside the full-preview budget keep their persisted text summary.
+		// This makes viewport culling visually consistent with low-zoom rendering.
+		const shouldUseLightweightPreview = !isEditingState && !isCollapsed && (isSmallCard || !canLoad)
 		const lowDetailFontSize = getShapeLowDetailFontSize(Math.min(shape.props.w, shape.props.h), efficientZoom)
 		const isMainCard = Boolean(shape.props.isMain);
 		const collapsedTextSize = shape.props.collapsedTextSize || 21; // 折叠文字大小，默认21px
@@ -1735,7 +1738,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							</div>
 						)
 					)}
-					{shape.props.isNewlyCreated && !shape.props.blockId && !isEditingState && (
+					{shape.props.isNewlyCreated && !shape.props.blockId && !isEditingState && !shouldUseLightweightPreview && (
 						<div style={{
 							width: '100%',
 							height: '100%',
@@ -1752,8 +1755,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							双击编辑以创建笔记块
 						</div>
 					)}
-					{/* 轻量预览和限流占位保持互斥，避免两个全尺寸元素同时布局。 */}
-					{isSmallCard && !isCollapsed && (
+					{/* 低缩放和限流状态共用同一套轻量预览。 */}
+					{shouldUseLightweightPreview && (
 						<div style={{
 							width: '100%',
 							height: '100%',
@@ -1777,23 +1780,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							}}>
 								{shape.props.previewText || (shape.props.blockId ? '卡片' : '双击编辑')}
 							</span>
-						</div>
-					)}
-					{!isEditingState && !isCollapsed && !isSmallCard && !canLoad && (
-						<div style={{
-							width: '100%',
-							height: '100%',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							fontSize: `${Math.min(shape.props.w / 6, shape.props.h / 2)}px`,
-							padding: '8px',
-							wordBreak: 'break-all',
-							color: theme[shape.props.color].solid,
-							textAlign: 'center',
-							opacity: 0.4,
-						}}>
-							双击加载内容
 						</div>
 					)}
 				</div>
