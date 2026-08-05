@@ -24,6 +24,8 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-max-active-shapes": 40,
     // Card / 单块形状屏幕尺寸低于此值时使用轻量预览，0 表示关闭。
     "tldraw-card-low-detail-threshold": 48,
+    // 当前视区内 Card / 单块形状达到此数量后才启用低缩放轻量预览，0 表示不限制数量。
+    "tldraw-card-low-detail-count-threshold": 90,
     // 全局禁止 JS 块执行脚本
     "js-shape-disable-execution": false,
     // 双击画板空白处创建的形状：text | single-block | card
@@ -91,6 +93,7 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "全局禁止 JS 块执行脚本", description: "启用后所有 JS 形状将不执行脚本代码（安全模式）", key: "js-shape-disable-execution", value: ctx.settings["js-shape-disable-execution"] },
                 { type: "number", title: "最大激活形状数", description: "限制同时激活的形状数量以节省资源", key: "tldraw-max-active-shapes", value: ctx.settings["tldraw-max-active-shapes"] },
                 { type: "number", title: "Card / 单块轻量预览阈值", description: "Card 或单块的屏幕最小边小于此像素值时只显示轻量预览；设为 0 可关闭。默认 48。", key: "tldraw-card-low-detail-threshold", value: ctx.settings["tldraw-card-low-detail-threshold"] },
+                { type: "number", title: "Card / 单块轻量预览数量阈值", description: "当前视区内 Card 与单块数量达到此值后才按屏幕尺寸启用轻量预览；设为 0 表示不限制数量。默认 10。", key: "tldraw-card-low-detail-count-threshold", value: ctx.settings["tldraw-card-low-detail-count-threshold"] },
                 {
                     type: "select", title: "Card 渲染模式", description: "选择非编辑状态如何渲染 Card：性能优先或一致性优先", key: "card-render-mode", value: ctx.settings["card-render-mode"], options: {
                         "static-dom": "性能优先：非编辑为 Protyle 元素（无实例）",

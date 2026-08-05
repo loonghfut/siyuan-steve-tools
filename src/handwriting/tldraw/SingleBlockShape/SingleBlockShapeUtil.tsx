@@ -37,7 +37,7 @@ import { getShapeHostElement } from '../utils/getShapeHostElement'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
-import { getShapeLowDetailFontSize, getShapeLowDetailThreshold } from '../utils/low-detail'
+import { getShapeLowDetailCountThreshold, getShapeLowDetailFontSize, getShapeLowDetailThreshold, getVisibleCardAndSingleBlockCount } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { getDefaultColorTheme } from '../utils/color-theme'
 import { getCachedSvgExportSnapshot, getSvgExportGlobalStyles, isSvgExportOutlineOnly, serializeElementForSvgExport } from '../utils/export-dom-snapshot'
@@ -425,8 +425,15 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 		const [hasLoadError, setHasLoadError] = useState(false)
 		const isViewportCullingEnabled = settingdata['tldraw-viewport-culling'] !== false
 		const efficientZoom = useValue('single-block efficient zoom', () => editor.getEfficientZoomLevel(), [editor])
+		const visibleCardAndSingleBlockCount = useValue(
+			'card and single-block low-detail count',
+			() => getVisibleCardAndSingleBlockCount(editor),
+			[editor],
+		)
 		const lowDetailThreshold = getShapeLowDetailThreshold()
-		const isSmallSingleBlock = !isEditingState && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
+		const lowDetailCountThreshold = getShapeLowDetailCountThreshold()
+		const hasEnoughShapesForLowDetail = lowDetailCountThreshold <= 0 || visibleCardAndSingleBlockCount >= lowDetailCountThreshold
+		const isSmallSingleBlock = !isEditingState && hasEnoughShapesForLowDetail && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
 		const lowDetailFontSize = getShapeLowDetailFontSize(Math.min(shape.props.w, shape.props.h), efficientZoom)
 		const containerRef = useRef<HTMLDivElement>(null)
 		// 保存进入编辑前的相机状态，用于退出编辑后恢复视角

@@ -1,7 +1,10 @@
+import type { Editor } from '@tldraw/tldraw'
 import { settingdata } from '@/index'
 
 const DEFAULT_LOW_DETAIL_THRESHOLD = 48
 const MAX_LOW_DETAIL_THRESHOLD = 500
+const DEFAULT_LOW_DETAIL_COUNT_THRESHOLD = 10
+const MAX_LOW_DETAIL_COUNT_THRESHOLD = 500
 
 /**
  * The persisted key predates SingleBlock support. Keep it stable so existing
@@ -11,6 +14,20 @@ export function getShapeLowDetailThreshold(): number {
 	const configuredThreshold = Number(settingdata['tldraw-card-low-detail-threshold'])
 	if (!Number.isFinite(configuredThreshold)) return DEFAULT_LOW_DETAIL_THRESHOLD
 	return Math.min(MAX_LOW_DETAIL_THRESHOLD, Math.max(0, configuredThreshold))
+}
+
+/** Number of Card / SingleBlock shapes visible before low-detail rendering is enabled. */
+export function getShapeLowDetailCountThreshold(): number {
+	const configuredThreshold = Number(settingdata['tldraw-card-low-detail-count-threshold'])
+	if (!Number.isFinite(configuredThreshold)) return DEFAULT_LOW_DETAIL_COUNT_THRESHOLD
+	return Math.min(MAX_LOW_DETAIL_COUNT_THRESHOLD, Math.max(0, configuredThreshold))
+}
+
+/** Count the Card / SingleBlock shapes tldraw currently intends to render in the viewport. */
+export function getVisibleCardAndSingleBlockCount(editor: Editor): number {
+	return editor.getRenderingShapes().reduce((count, { shape }) => {
+		return count + (shape.type === 'card' || shape.type === 'single-block' ? 1 : 0)
+	}, 0)
 }
 
 /** Keep lightweight-preview text close to 20 screen pixels where the shape allows it. */

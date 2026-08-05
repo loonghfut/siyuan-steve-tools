@@ -20,7 +20,7 @@ import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender } from '../utils/idle-scheduler'
-import { getShapeLowDetailFontSize, getShapeLowDetailThreshold } from '../utils/low-detail'
+import { getShapeLowDetailCountThreshold, getShapeLowDetailFontSize, getShapeLowDetailThreshold, getVisibleCardAndSingleBlockCount } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
 import { exportCardShapeToSvg } from './CardShapeExport'
@@ -311,8 +311,15 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		} | null>(null);
 		const isCollapsed = shape.props.isCollapsed || false;
 		const efficientZoom = useValue('card efficient zoom', () => editor.getEfficientZoomLevel(), [editor])
+		const visibleCardAndSingleBlockCount = useValue(
+			'card and single-block low-detail count',
+			() => getVisibleCardAndSingleBlockCount(editor),
+			[editor],
+		)
 		const lowDetailThreshold = getShapeLowDetailThreshold()
-		const isSmallCard = !isEditingState && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
+		const lowDetailCountThreshold = getShapeLowDetailCountThreshold()
+		const hasEnoughShapesForLowDetail = lowDetailCountThreshold <= 0 || visibleCardAndSingleBlockCount >= lowDetailCountThreshold
+		const isSmallCard = !isEditingState && hasEnoughShapesForLowDetail && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
 		// Shapes outside the full-preview budget keep their persisted text summary.
 		// This makes viewport culling visually consistent with low-zoom rendering.
 		const shouldUseLightweightPreview = !isEditingState && !isCollapsed && (isSmallCard || !canLoad)
