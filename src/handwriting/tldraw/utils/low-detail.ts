@@ -1,3 +1,4 @@
+import { computed, EditorAtom } from '@tldraw/tldraw'
 import type { Editor } from '@tldraw/tldraw'
 import { settingdata } from '@/index'
 
@@ -23,11 +24,20 @@ export function getShapeLowDetailCountThreshold(): number {
 	return Math.min(MAX_LOW_DETAIL_COUNT_THRESHOLD, Math.max(0, configuredThreshold))
 }
 
+// getRenderingShapes() is relatively expensive for large documents. Keep one
+// reactive, cached count per Editor so every Card / SingleBlock component
+// observes the same derived value instead of reducing the rendering list.
+const VisibleCardAndSingleBlockCount = new EditorAtom('visible card and single-block count', (editor) =>
+	computed('visible card and single-block count', () => {
+		return editor.getRenderingShapes().reduce((count, { shape }) => {
+			return count + (shape.type === 'card' || shape.type === 'single-block' ? 1 : 0)
+		}, 0)
+	}),
+)
+
 /** Count the Card / SingleBlock shapes tldraw currently intends to render in the viewport. */
 export function getVisibleCardAndSingleBlockCount(editor: Editor): number {
-	return editor.getRenderingShapes().reduce((count, { shape }) => {
-		return count + (shape.type === 'card' || shape.type === 'single-block' ? 1 : 0)
-	}, 0)
+	return VisibleCardAndSingleBlockCount.get(editor).get()
 }
 
 /** Keep lightweight-preview text close to 20 screen pixels where the shape allows it. */
