@@ -163,6 +163,18 @@ export class VisualEchartsUI {
           this.renderChartPreview().catch(() => {});
         },
       });
+      const initialSQL = this.opts?.initialSQL?.trim();
+      if (initialSQL) {
+        this.sqlUI.setSQL(initialSQL);
+        this.dataMode = 'sql';
+        const modeSwitch = this.container.querySelector('[data-mode-switch]') as HTMLSelectElement | null;
+        if (modeSwitch) modeSwitch.value = 'sql';
+        const querySection = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
+        const sqlSection = this.container.querySelector('[data-section="sql"]') as HTMLElement | null;
+        if (querySection) querySection.style.display = 'none';
+        if (sqlSection) sqlSection.style.display = '';
+        this.persist();
+      }
     }
   }
 
@@ -170,7 +182,19 @@ export class VisualEchartsUI {
 
 
   public resize() {
-    // 保留扩展点，当前无重算需求
+    try { this.echartsInst?.resize?.(); } catch { /* ignore */ }
+    try { (this.queryUI as any)?.resize?.(); } catch { /* ignore */ }
+    try { (this.sqlUI as any)?.resize?.(); } catch { /* ignore */ }
+  }
+
+  public destroy() {
+    try { this.echartsInst?.dispose?.(); } catch { /* ignore */ }
+    this.echartsInst = undefined;
+    try { (this.queryUI as any)?.destroy?.(); } catch { /* ignore */ }
+    try { (this.sqlUI as any)?.destroy?.(); } catch { /* ignore */ }
+    this.queryUI = undefined;
+    this.sqlUI = undefined;
+    this.container.innerHTML = '';
   }
 
   // 供外部读取 IIFE
@@ -216,7 +240,10 @@ export class VisualEchartsUI {
       // eslint-disable-next-line no-new-func
       const fn = new Function(`return ${iife};`);
       return fn();
-    } catch { return {}; }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`图表配置执行失败: ${message}`);
+    }
   }
 
   private async renderChartPreview() {
@@ -228,8 +255,20 @@ export class VisualEchartsUI {
       try { this.echartsInst.dispose(); } catch { }
     }
     this.echartsInst = echarts.init(this.chartDiv);
-    const option = this.buildOptionForPreview();
-    this.echartsInst.setOption(option, true);
+    try {
+      const option = this.buildOptionForPreview();
+      this.echartsInst.setOption(option, true);
+    } catch (error) {
+      try { this.echartsInst.dispose(); } catch { /* ignore */ }
+      this.echartsInst = undefined;
+      const message = error instanceof Error ? error.message : String(error);
+      this.previewBody.innerHTML = `<div class="ve-placeholder" style="color:var(--b3-card-error-color);">预览失败：${this.escapeHtml(message)}</div>`;
+      throw error;
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
   private togglePinPreview() {

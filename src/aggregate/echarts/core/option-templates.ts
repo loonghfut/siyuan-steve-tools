@@ -178,12 +178,12 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     ${gridPatch}
     option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false }${(function(){
       const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
-      return xName ? `, name: '${xName}'` : '';
+      return xName ? `, name: ${JSON.stringify(xName)}` : '';
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
         const yName = (stBar && stBar.yAxisName) || (stLine && stLine.yAxisName) || '';
-        return yName ? `, name: '${yName}'` : '';
+        return yName ? `, name: ${JSON.stringify(yName)}` : '';
       })()}
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     option.series = [${seriesJs}];
@@ -447,16 +447,16 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       return '';
     })()} }${(function(){
       const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
-      return xName ? `, name: '${xName}'` : '';
+      return xName ? `, name: ${JSON.stringify(xName)}` : '';
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
         const yLeftName = (stBar && stBar.yAxisLeftName) || (stLine && stLine.yAxisLeftName) || '';
-        return yLeftName ? `, name: '${yLeftName}'` : '';
+        return yLeftName ? `, name: ${JSON.stringify(yLeftName)}` : '';
       })()}
     }${needDualAxis ? (function(){
       const yRightName = (stBar && stBar.yAxisRightName) || (stLine && stLine.yAxisRightName) || '';
-      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: '${yRightName}'` : ''} }`;
+      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: ${JSON.stringify(yRightName)}` : ''} }`;
     })() : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];
@@ -962,16 +962,16 @@ export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
       return '';
     })()} }${(function () {
       const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
-      return xName ? `, name: '${xName}'` : '';
+      return xName ? `, name: ${JSON.stringify(xName)}` : '';
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function () {
       const yLeftName = (stBar && stBar.yAxisLeftName) || (stLine && stLine.yAxisLeftName) || '';
-      return yLeftName ? `, name: '${yLeftName}'` : '';
+      return yLeftName ? `, name: ${JSON.stringify(yLeftName)}` : '';
     })()}
     }${needDualAxis ? (function () {
       const yRightName = (stBar && stBar.yAxisRightName) || (stLine && stLine.yAxisRightName) || '';
-      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: '${yRightName}'` : ''} }`;
+      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: ${JSON.stringify(yRightName)}` : ''} }`;
     })() : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];

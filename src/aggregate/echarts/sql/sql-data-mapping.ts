@@ -209,7 +209,7 @@ export function buildSqlMappingExpressions(input: MappingInput): MappingOutput {
   let idxsExpr = '';
   if (sort !== 'none') {
     const asc = sort === 'asc';
-    idxsExpr = `(()=>{ var a = (${baseArr}); var idx = a.map(function(_,i){return i}); idx.sort(function(i,j){ var x=a[i], y=a[j]; if(x===y) return 0; return (x>b?1:-1)*${asc ? 1 : -1}; }); return idx; })()`;
+    idxsExpr = `(()=>{ var a = (${baseArr}); var idx = a.map(function(_,i){return i}); idx.sort(function(i,j){ var x=a[i], y=a[j]; if(x===y) return 0; return (x>y?1:-1)*${asc ? 1 : -1}; }); return idx; })()`;
     xExprFinal = `(()=>{ var a = (${baseArr}); var idx = ${idxsExpr}; return idx.map(function(i){ return a[i]; }); })()`;
   }
 

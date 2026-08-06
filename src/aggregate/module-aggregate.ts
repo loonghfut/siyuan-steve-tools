@@ -283,7 +283,7 @@ export class M_Aggregate {
                     await conf.load();
                     // 支持从 openTab 传入初始 SQL（例如从内容聚合器跳转而来）
                     const initData = (this as any).data || {};
-                    new VisualEchartsUI(container, {
+                    const ui = new VisualEchartsUI(container, {
                         persistKey: `visual-echarts-tab`,
                         initialSQL: initData.initialSQL,
                         loadSqlPresets: () => (conf.get('presets') || {}),
@@ -307,9 +307,11 @@ export class M_Aggregate {
                             });
                         }
                     });
+                    (this as any)._echartsUI = ui;
                 },
                 async destroy() {
-                    // 目前无显式销毁
+                    try { (this as any)._echartsUI?.destroy?.(); } catch {}
+                    delete (this as any)._echartsUI;
                 },
             });
         }
@@ -489,6 +491,8 @@ export class M_Aggregate {
 
     onunload() {
         console.debug("M_Aggregate unloaded");
+        this._aggregatorBlockInstance?.destroy();
+        this._aggregatorBlockInstance = undefined;
         // 如需销毁 UI，可在此处清理，并读取 _ui 以满足 noUnusedLocals
         if (this._ui) {
             // 例如：清空容器（如有需要）

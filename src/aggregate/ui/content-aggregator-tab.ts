@@ -12,6 +12,8 @@ export class ContentAggregatorTabUI {
   // 预留：顶部区域（当前未使用，避免未读警告不声明）
   private listWrap!: HTMLElement;
   private showPinnedOnly = false;
+  private renderSequence = 0;
+  private searchTimer?: number;
 
   constructor(container: HTMLElement, aggregator: aggregatorBlock) {
     this.container = container;
@@ -20,6 +22,8 @@ export class ContentAggregatorTabUI {
   }
 
   destroy() {
+    this.renderSequence++;
+    if (this.searchTimer) window.clearTimeout(this.searchTimer);
     this.container.innerHTML = "";
     // 无其它资源需要释放
   }
@@ -60,7 +64,10 @@ export class ContentAggregatorTabUI {
     const onlyPinned = this.container.querySelector('#ca-only-pinned') as HTMLInputElement;
 
     refreshBtn?.addEventListener('click', () => this.refresh());
-    searchInput?.addEventListener('input', () => this.renderList(searchInput.value));
+    searchInput?.addEventListener('input', () => {
+      if (this.searchTimer) window.clearTimeout(this.searchTimer);
+      this.searchTimer = window.setTimeout(() => this.renderList(searchInput.value), 200);
+    });
     if (onlyPinned) {
       onlyPinned.checked = this.showPinnedOnly;
       onlyPinned.addEventListener('change', () => {
@@ -73,11 +80,13 @@ export class ContentAggregatorTabUI {
   }
 
   private async renderList(filterText: string = '') {
+    const requestId = ++this.renderSequence;
     const listEl = this.listWrap;
     if (!listEl) return;
     listEl.innerHTML = '';
 
     const presets = await this.aggregator.getSqlPresets();
+    if (requestId !== this.renderSequence) return;
     const sortedEntries = Object.entries(presets).sort((a, b) => {
       const pa = a[1] as PresetItem; const pb = b[1] as PresetItem;
       const aTime = (pa.updatedAt || pa.lastExecuteTime || 0) as number;
@@ -103,33 +112,16 @@ export class ContentAggregatorTabUI {
       return;
     }
 
-    // 校验绑定有效性
-    const validityChecks = await Promise.all(
-      filtered.map(async n => {
-        const preset = presets[n];
-        let docValid = true; let docType: 'doc' | 'notebook' | undefined;
-        if (preset.targetDocId) {
-          const isDoc = await this.aggregator['checkDocValidity']?.(preset.targetDocId) || false;
-          if (isDoc) { docValid = true; docType = 'doc'; }
-          else {
-            const isNb = await (this.aggregator as any).isNotebookId(preset.targetDocId);
-            docValid = !!isNb; docType = isNb ? 'notebook' : undefined;
-          }
-        }
-        let databaseValid = true;
-        if (preset.targetDatabaseId) {
-          try { await (this.aggregator as any).avManager.getAttributeView(preset.targetDatabaseId); }
-          catch { databaseValid = false; }
-        }
-        return { name: n, docValid, docType, databaseValid };
-      })
-    );
-    const validityMap = new Map(validityChecks.map(v => [v.name, v]));
+    // 批量校验并按目标 ID 去重，避免每条预设重复请求同一个文档/数据库。
+    const validityMap = await this.aggregator.getTargetStatuses(presets, filtered);
+    if (requestId !== this.renderSequence) return;
 
     for (const n of filtered) {
       const preset = presets[n] as PresetItem;
       const validity = validityMap.get(n);
       const item = document.createElement('div');
+      const safeName = this.escapeHtml(n);
+      const safeSql = this.escapeHtml(String(preset.sql || ''));
       item.className = 'ca-item';
       item.style.cssText = 'padding:12px; background: var(--b3-theme-surface); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius);';
       const isPinned = !!((preset as any).pinned || (preset as any).starred || (preset as any).favorite || (preset as any).top || /^(?:[!*★☆]|🔖|pin:|star:)/i.test(n));
@@ -138,10 +130,10 @@ export class ContentAggregatorTabUI {
           <div style="flex:1; min-width:0;">
             <div class="ca-title" style="font-weight:500; color: var(--b3-theme-on-background); margin-bottom:6px; display:flex; gap:6px; align-items:center;">
               <svg style="width: 16px; height: 16px; fill: var(--b3-theme-primary);"><use xlink:href="#iconSQL"></use></svg>
-              ${n}
+              ${safeName}
               ${isPinned ? '<span style="font-size:11px;padding:2px 6px;background:var(--b3-theme-primary);color:var(--b3-theme-on-primary);border-radius:var(--b3-border-radius-s);">置顶</span>' : ''}
             </div>
-            <div class="ca-sql-snippet" style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" title="点击在可视化SQL编辑器中打开以修改">${preset.sql}</div>
+            <div class="ca-sql-snippet" style="font-size:12px; color: var(--b3-theme-on-surface); font-family: var(--b3-font-family-code); background: var(--b3-protyle-code-background); padding:6px 8px; border-radius: var(--b3-border-radius-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" title="点击在可视化SQL编辑器中打开以修改">${safeSql}</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
               ${preset.template ? `<span style=\"font-size:11px;padding:2px 8px;background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); border-radius: var(--b3-border-radius-s);\">自定义模板</span>` : ''}
               ${preset.updatedAt ? (() => {
@@ -206,14 +198,20 @@ export class ContentAggregatorTabUI {
 
       useBtn?.addEventListener('click', async (e) => {
         e.stopPropagation();
-        await this.aggregator.runPresetByName(n);
+        const button = useBtn as HTMLButtonElement;
+        if (button.disabled) return;
+        button.disabled = true;
+        const label = button.textContent;
+        button.textContent = '执行中…';
+        try { await this.aggregator.runPresetByName(n); }
+        finally { button.disabled = false; button.textContent = label; }
       });
 
       pinBtn?.addEventListener('click', async (e) => {
         e.stopPropagation();
         try {
           const newPinned = !isPinned;
-          await (this.aggregator as any).updatePresetPinned(n, newPinned);
+          await this.aggregator.updatePresetPinned(n, newPinned);
           showMessage(newPinned ? '已置顶该预设' : '已取消置顶', 2500, 'info');
           await this.refresh();
         } catch {
@@ -228,7 +226,7 @@ export class ContentAggregatorTabUI {
           try {
             const sql = String((presets[n] as any)?.sql || '').trim();
             if (!sql) { showMessage('无有效 SQL', 2000, 'info'); return; }
-            const pluginName = String(((this.aggregator as any)?._plugin?.name) || '');
+            const pluginName = this.aggregator.getPluginName();
             await openTab({
               app: (window as any).siyuan.ws.app,
               custom: { icon: 'iconSQL', title: 'SQL 视图', id: pluginName + 'visual-sql', data: { id: null, presetName: n } },
@@ -254,7 +252,7 @@ export class ContentAggregatorTabUI {
             e.stopPropagation();
             try {
               if (preset.targetDocId && validity?.docValid) {
-                const resolved = await (this.aggregator as any).resolveInsertDocId(preset.targetDocId);
+                const resolved = await this.aggregator.resolveTargetDocId(preset.targetDocId);
                 const blockId = resolved?.docId || preset.targetDocId;
                 await openTab({
                   app: (window as any).siyuan.ws.app,
@@ -267,7 +265,7 @@ export class ContentAggregatorTabUI {
                   keepCursor: false,
                 });
               } else if (preset.targetDatabaseId && validity?.databaseValid) {
-                const dbBlockId = await (this.aggregator as any).resolveAttributeViewBlockId(preset.targetDatabaseId);
+                const dbBlockId = await this.aggregator.resolveAttributeViewBlockId(preset.targetDatabaseId);
                 if (!dbBlockId) throw new Error('DB block not found');
                 await openTab({
                   app: (window as any).siyuan.ws.app,
@@ -293,7 +291,7 @@ export class ContentAggregatorTabUI {
         (docBadge as HTMLElement).addEventListener('click', async (e) => {
           e.stopPropagation();
           try {
-            const resolved = await (this.aggregator as any).resolveInsertDocId(preset.targetDocId);
+            const resolved = await this.aggregator.resolveTargetDocId(preset.targetDocId);
             const blockId = resolved?.docId || preset.targetDocId;
             await openTab({
               app: (window as any).siyuan.ws.app,
@@ -316,7 +314,7 @@ export class ContentAggregatorTabUI {
         (dbBadge as HTMLElement).addEventListener('click', async (e) => {
           e.stopPropagation();
           try {
-            const dbBlockId = await (this.aggregator as any).resolveAttributeViewBlockId(preset.targetDatabaseId);
+            const dbBlockId = await this.aggregator.resolveAttributeViewBlockId(preset.targetDatabaseId);
             if (!dbBlockId) throw new Error('DB block not found');
             await openTab({
               app: (window as any).siyuan.ws.app,
@@ -342,6 +340,11 @@ export class ContentAggregatorTabUI {
     const presets = await this.aggregator.getSqlPresets();
     const p = presets[name] as PresetItem;
     if (!panel) return;
+    const safeSql = this.escapeHtml(String(p.sql || ''));
+    const safeTemplate = this.escapeHtml(String(p.template || ''));
+    const safeDocId = this.escapeHtml(String(p.targetDocId || ''));
+    const safeDatabaseId = this.escapeHtml(String(p.targetDatabaseId || ''));
+    const safeLastInsertTime = this.escapeHtml(String(p.lastInsertTime || ''));
 
     panel.style.display = 'block';
     panel.dataset.mode = 'editor';
@@ -352,7 +355,7 @@ export class ContentAggregatorTabUI {
             <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconSQL"></use></svg>
             SQL 查询
           </label>
-          <textarea id="ie-sql" class="b3-text-field" readonly style="width:100%; height:35px; resize:vertical; font-family: var(--b3-font-family-code); font-size:13px; background: var(--b3-theme-surface-light); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); padding:8px;">${p.sql}</textarea>
+          <textarea id="ie-sql" class="b3-text-field" readonly style="width:100%; height:35px; resize:vertical; font-family: var(--b3-font-family-code); font-size:13px; background: var(--b3-theme-surface-light); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); padding:8px;">${safeSql}</textarea>
           <div style="font-size:12px;color:var(--b3-theme-on-surface-light); margin-top:4px;">SQL 查询不可在此编辑,请在插件设置中修改</div>
           <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button id="ie-preview" class="b3-button b3-button--outline" style="font-size:12px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;">
@@ -369,7 +372,7 @@ export class ContentAggregatorTabUI {
             <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconEdit"></use></svg>
             自定义模板
           </label>
-          <textarea id="ie-template" class="b3-text-field" placeholder="留空则使用插件设置的默认模板" style="width:100%; height:180px; resize:vertical; font-family: var(--b3-font-family-code); font-size:13px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); padding:8px; line-height:1.5;">${p.template || ''}</textarea>
+          <textarea id="ie-template" class="b3-text-field" placeholder="留空则使用插件设置的默认模板" style="width:100%; height:180px; resize:vertical; font-family: var(--b3-font-family-code); font-size:13px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); padding:8px; line-height:1.5;">${safeTemplate}</textarea>
           <div style="font-size:12px;color:var(--b3-theme-on-surface-light); margin-top:4px; display:flex; align-items:center; gap:4px;">
             <svg style="width:12px;height:12px;"><use xlink:href="#iconInfo"></use></svg>优先级: 预设模板 > 插件全局模板
           </div>
@@ -379,12 +382,12 @@ export class ContentAggregatorTabUI {
             <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconLink"></use></svg>
             目标文档/笔记本 ID (可选)
           </label>
-          <input id="ie-target-doc" class="b3-text-field" value="${p.targetDocId || ''}" placeholder="输入文档ID，或笔记本ID以插入日记" style="width:100%; padding:8px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:13px;" />
+          <input id="ie-target-doc" class="b3-text-field" value="${safeDocId}" placeholder="输入文档ID，或笔记本ID以插入日记" style="width:100%; padding:8px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:13px;" />
           <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
             <label for="ie-doc-insert-mode" style="font-size:12px; color: var(--b3-theme-on-surface);">文档插入位置:</label>
             <select id="ie-doc-insert-mode" class="b3-select">
-              <option value="append" ${((p as any).docInsertMode === 'append') || (!('docInsertMode' in p) && ((this.aggregator as any)._settingdata?.['aggregate-insert-mode'] !== 'prepend')) ? 'selected' : ''}>末尾 (append)</option>
-              <option value="prepend" ${((p as any).docInsertMode === 'prepend') || (!('docInsertMode' in p) && ((this.aggregator as any)._settingdata?.['aggregate-insert-mode'] === 'prepend')) ? 'selected' : ''}>开头 (prepend)</option>
+              <option value="append" ${(p.docInsertMode || this.aggregator.getDefaultDocInsertMode()) === 'append' ? 'selected' : ''}>末尾 (append)</option>
+              <option value="prepend" ${(p.docInsertMode || this.aggregator.getDefaultDocInsertMode()) === 'prepend' ? 'selected' : ''}>开头 (prepend)</option>
             </select>
           </div>
         </div>
@@ -393,7 +396,7 @@ export class ContentAggregatorTabUI {
             <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconDatabase"></use></svg>
             目标数据库 ID (可选)
           </label>
-          <input id="ie-target-db" class="b3-text-field" value="${p.targetDatabaseId || ''}" placeholder="输入属性视图 (数据库) ID" style="width:100%; padding:8px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:13px;" />
+          <input id="ie-target-db" class="b3-text-field" value="${safeDatabaseId}" placeholder="输入属性视图 (数据库) ID" style="width:100%; padding:8px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:13px;" />
           <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
             <label for="ie-db-id-field" style="font-size:12px; color: var(--b3-theme-on-surface);">加入数据库时使用的 ID 字段:</label>
             <select id="ie-db-id-field" class="b3-select">
@@ -408,11 +411,11 @@ export class ContentAggregatorTabUI {
         <div>
           <label style="display:block; margin-bottom:6px; font-weight:500; color: var(--b3-theme-on-background); font-size:14px;">
             <svg style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><use xlink:href="#iconHistory"></use></svg>
-            上次插入时间戳 (可选)
+            重置增量水位 (可选)
           </label>
-          <input id="ie-last-insert-time" class="b3-text-field" value="${p.lastInsertTime || ''}" placeholder="YYYYMMDDHHmmss" style="width:100%; padding:8px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:13px; font-family: var(--b3-font-family-code);" />
+          <input id="ie-last-insert-time" class="b3-text-field" value="${safeLastInsertTime}" placeholder="YYYYMMDDHHmmss" style="width:100%; padding:8px; border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); font-size:13px; font-family: var(--b3-font-family-code);" />
           <div style="font-size:12px;color:var(--b3-theme-on-surface-light); margin-top:4px; display:flex; align-items:center; gap:4px;">
-            <svg style="width:12px;height:12px;"><use xlink:href="#iconInfo"></use></svg>用于过滤已插入内容，留空重置。
+            <svg style="width:12px;height:12px;"><use xlink:href="#iconInfo"></use></svg>填写后同时重置文档和数据库水位；日常执行会分别维护两者。
           </div>
         </div>
         <div style="display:flex; justify-content:flex-end; gap:8px; padding-top:8px; border-top:1px solid var(--b3-border-color);">
@@ -438,20 +441,27 @@ export class ContentAggregatorTabUI {
       const dbField = ((panel.querySelector('#ie-db-id-field') as HTMLSelectElement)?.value === 'parent_id' ? 'parent_id' : 'id') as 'id' | 'parent_id';
       const insertMode = ((panel.querySelector('#ie-doc-insert-mode') as HTMLSelectElement)?.value === 'prepend' ? 'prepend' : 'append') as 'append' | 'prepend';
 
-      // 更新
-      (p as any).docInsertMode = insertMode || undefined;
-      p.template = tpl || undefined;
-      p.targetDocId = docId || undefined;
-      p.targetDatabaseId = dbId || undefined;
-      p.lastInsertTime = lastTime || undefined;
-      p.databaseIdField = dbId ? dbField : undefined;
-
-      await this.aggregator.updatePresetTemplate(name, tpl);
-      await this.aggregator.updatePresetTargetDocId(name, docId);
-      await this.aggregator.updatePresetTargetDatabaseId(name, dbId);
-      await this.aggregator.updatePresetLastInsertTime(name, lastTime);
-      await this.aggregator.updatePresetDatabaseIdField(name, p.databaseIdField || '');
-      await (this.aggregator as any).updatePresetDocInsertMode(name, insertMode);
+      if (lastTime && !/^\d{14}$/.test(lastTime)) {
+        showMessage('上次插入时间戳必须为 YYYYMMDDHHmmss', 3000, 'error');
+        return;
+      }
+      try {
+        await this.aggregator.updatePreset(name, {
+          docInsertMode: insertMode,
+          template: tpl || undefined,
+          targetDocId: docId || undefined,
+          targetDatabaseId: dbId || undefined,
+          lastInsertTime: lastTime || undefined,
+          documentLastInsertTime: lastTime || undefined,
+          documentCursor: lastTime ? { time: lastTime } : undefined,
+          databaseLastInsertTime: lastTime || undefined,
+          databaseCursor: lastTime ? { time: lastTime } : undefined,
+          databaseIdField: dbId ? dbField : undefined,
+        });
+      } catch (error: any) {
+        showMessage(`保存失败: ${error?.message || String(error)}`, 4000, 'error');
+        return;
+      }
 
       showMessage('预设已更新', 3000, 'info');
       await this.refresh();
@@ -468,12 +478,21 @@ export class ContentAggregatorTabUI {
       if (!upper.includes(' LIMIT ')) previewSql += ' LIMIT 5';
       let excludeId: string | undefined;
       if (currentDocId) {
-        const resolved = await (this.aggregator as any).resolveInsertDocId(currentDocId);
+        const resolved = await this.aggregator.resolveTargetDocId(currentDocId);
         excludeId = resolved?.docId || undefined;
       }
-      const results = await (this.aggregator as any).executeSql(previewSql, excludeId, currentLastTime || undefined);
-      (this.aggregator as any).renderResultTable(results, previewContainer);
-      previewContainer.style.display = 'block';
+      try {
+        btnPreview.disabled = true;
+        btnPreview.textContent = '查询中…';
+        const results = await this.aggregator.executeSql(previewSql, excludeId, currentLastTime || undefined);
+        this.aggregator.renderResultTable(results, previewContainer);
+        previewContainer.style.display = 'block';
+      } catch (error: any) {
+        showMessage(`查询失败: ${error?.message || String(error)}`, 4000, 'error');
+      } finally {
+        btnPreview.disabled = false;
+        btnPreview.textContent = '预览查询结果';
+      }
     });
 
     // 跳转到“SQL 可视化生成器”页签并自动应用对应预设
@@ -481,7 +500,7 @@ export class ContentAggregatorTabUI {
       try {
         const sql = String(p.sql || '').trim();
         if (!sql) { showMessage('无有效 SQL', 2000, 'info'); return; }
-        const pluginName = String(((this.aggregator as any)?._plugin?.name) || '');
+        const pluginName = this.aggregator.getPluginName();
         await openTab({
           app: (window as any).siyuan.ws.app,
           custom: { icon: 'iconSQL', title: 'SQL 视图', id: pluginName + 'visual-sql', data: { id: null, presetName: name } },
@@ -608,9 +627,9 @@ export class ContentAggregatorTabUI {
         p.nextExecuteTime = undefined;
         p.lastExecuteTime = undefined;
       } else if (mode === 'interval') {
-        const value = parseInt(valueInput?.value || '1');
+        const value = Number(valueInput?.value);
         const unit = (unitSelect?.value as 'minutes' | 'hours' | 'days');
-        if (!value || value < 1) { showMessage('请输入有效的时间间隔', 3000, 'error'); return; }
+        if (!Number.isInteger(value) || value < 1) { showMessage('请输入有效的整数时间间隔', 3000, 'error'); return; }
         const ms = unit === 'minutes' ? value * 60 * 1000 : unit === 'hours' ? value * 60 * 60 * 1000 : value * 24 * 60 * 60 * 1000;
         p.timerInterval = ms;
         p.timerUnit = unit;
@@ -619,8 +638,12 @@ export class ContentAggregatorTabUI {
         p.dailyMinute = undefined;
         p.nextExecuteTime = Date.now() + ms;
       } else {
-        const h = Math.max(0, Math.min(23, parseInt(dhInput?.value || '0')));
-        const mm = Math.max(0, Math.min(59, parseInt(dmInput?.value || '0')));
+        const h = Number(dhInput?.value);
+        const mm = Number(dmInput?.value);
+        if (!Number.isInteger(h) || h < 0 || h > 23 || !Number.isInteger(mm) || mm < 0 || mm > 59) {
+          showMessage('请输入有效的每日执行时间（小时 0-23，分钟 0-59）', 3000, 'error');
+          return;
+        }
         p.dailyHour = h; p.dailyMinute = mm;
         p.timerInterval = undefined;
         // nextExecuteTime: 今天/明天的最近一次
@@ -629,15 +652,16 @@ export class ContentAggregatorTabUI {
         p.nextExecuteTime = now.getTime() < today.getTime() ? today.getTime() : (() => { const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(h, mm, 0, 0); return t.getTime(); })();
       }
 
-      await (this.aggregator as any).updatePresetTimerSettings(name, p, { skipUpdatedAt: false });
+      try {
+        await this.aggregator.updatePreset(name, p);
+      } catch (error: any) {
+        showMessage(`保存定时设置失败: ${error?.message || String(error)}`, 4000, 'error');
+        return;
+      }
 
       // 尝试立即应用到定时器
       try {
-        const tm = (this.aggregator as any).timerManager;
-        if (tm) {
-          if (enabled) await tm.startTimer(name, p);
-          else tm.stopTimer(name);
-        }
+        await this.aggregator.reloadPresetTimer(name, p);
       } catch { }
 
       showMessage('定时设置已更新', 3000, 'info');
@@ -646,5 +670,9 @@ export class ContentAggregatorTabUI {
       panel.innerHTML = '';
       delete panel.dataset.mode;
     });
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 }

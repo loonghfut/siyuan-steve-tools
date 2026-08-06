@@ -98,7 +98,7 @@ class ChartSettingsBuilder {
       axisTick: { show: false }, 
       axisLine: { show: false },
       axisLabel: { rotate: ${xLabelRotate}, interval: 0 },
-      name: '${xAxisName}'
+      name: ${JSON.stringify(xAxisName)}
     }];`;
   }
 
@@ -116,7 +116,7 @@ class ChartSettingsBuilder {
       axisTick: { show: false }, 
       axisLine: { show: false }, 
       splitLine: { show: ${splitLine.show}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLine.type}' } },
-      name: '${yAxisLeftName}'
+      name: ${JSON.stringify(yAxisLeftName)}
     }`;
     
     if (needDualAxis) {
@@ -125,7 +125,7 @@ class ChartSettingsBuilder {
       axisTick: { show: false }, 
       axisLine: { show: false }, 
       splitLine: { show: false },
-      name: '${yAxisRightName}'
+      name: ${JSON.stringify(yAxisRightName)}
     }`;
     }
     
@@ -360,6 +360,12 @@ export class VisualEchartsSqlUI {
 
   public getSQL(): string {
     return this.sql;
+  }
+
+  public destroy(): void {
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
+    this.root.innerHTML = '';
   }
 
   // 统一的变化处理:可视化时自动生成表达式,然后保存并刷新预览
@@ -971,7 +977,7 @@ export class VisualEchartsSqlUI {
   }
 
   // 从 SQL 查询结果加载字段名
-  private loadKeys() {
+  private async loadKeys() {
     try {
       if (this.loadingKeys) return;
       this.loadingKeys = true;
@@ -983,14 +989,14 @@ export class VisualEchartsSqlUI {
         return;
       }
 
-      // 使用同步 XMLHttpRequest 获取 SQL 查询结果
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/query/sql', false);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.send(JSON.stringify({ stmt: sql }));
+      const response = await fetch('/api/query/sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stmt: sql }),
+      });
 
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const result = JSON.parse(xhr.responseText || '[]');
+      if (response.ok) {
+        const result = await response.json();
         const rawRows = Array.isArray(result) ? result : (result.data || []);
 
         // 使用预处理器处理数据
@@ -1021,7 +1027,7 @@ export class VisualEchartsSqlUI {
           this.toast('查询结果为空');
         }
       } else {
-        this.toast('查询失败');
+        this.toast(`查询失败（${response.status}）`);
       }
     } catch (e) {
       this.toast('查询出错');
