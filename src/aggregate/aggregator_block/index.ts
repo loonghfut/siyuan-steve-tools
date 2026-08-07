@@ -478,6 +478,13 @@ export class aggregatorBlock {
         }
     }
 
+    /** 保存 SQL 可视化预设，供内容聚合器内嵌的预设工作台复用。 */
+    async saveSqlPresets(presets: Record<string, any>): Promise<void> {
+        if (!this.pluginConfig) throw new Error('内容聚合器配置不可用');
+        this.pluginConfig.set('presets', presets || {});
+        await this.pluginConfig.save();
+    }
+
 
     // 2. 生成预设选择面板（支持模板编辑）
     /**

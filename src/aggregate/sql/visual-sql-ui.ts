@@ -125,6 +125,8 @@ export class VisualSqlUI {
   private currentPresetName?: string;
   private currentPresetEl?: HTMLElement;
   private lastAppliedPresetName?: string;
+  /** 防止旧的异步预设匹配结果覆盖当前刚选中的预设名称。 */
+  private presetMatchVersion = 0;
   private multiOutsideCloser?: (e: MouseEvent) => void;
 
   constructor(container: HTMLElement, options?: VisualSqlUIOptions) {
@@ -162,6 +164,25 @@ export class VisualSqlUI {
       // 读取一次布局属性以确保浏览器完成重排（轻量“强制回流”）
       void this.container.offsetHeight;
     });
+  }
+
+  /** 返回当前已应用或刚保存的预设名称，供嵌入宿主回写业务配置。 */
+  public getCurrentPresetName(): string {
+    return (this.currentPresetName || '').trim();
+  }
+
+  /** 以预设名称应用筛选，避免宿主依赖 UI 的私有实现细节。 */
+  public async applyPreset(name: string, options?: { applyCollapse?: boolean }): Promise<boolean> {
+    const presetName = (name || '').trim();
+    if (!presetName) return false;
+    const presets = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+    const snapshot = presets?.[presetName];
+    if (!snapshot) return false;
+    this.currentPresetName = presetName;
+    this.lastAppliedPresetName = presetName;
+    this.hydrateState({ ...snapshot, currentPresetName: presetName }, { applyCollapse: options?.applyCollapse ?? false });
+    this.rebuildSql();
+    return true;
   }
 
   private html(strings: TemplateStringsArray, ...values: any[]) {
@@ -621,7 +642,7 @@ export class VisualSqlUI {
           const s = p[name];
           if (!s) return;
           this.currentPresetName = name;
-          this.hydrateState(s, { applyCollapse: false });
+          this.hydrateState({ ...s, currentPresetName: name }, { applyCollapse: false });
           this.rebuildSql();
           this.toast('已应用预设');
           this.closePresetQuickMenu();
@@ -768,8 +789,10 @@ export class VisualSqlUI {
     } else {
       this.scheduleQuery(sql);
     }
-    // 重建后根据当前筛选与已保存预设的内容一致性，自动更新“当前预设”标签
-    this.refreshCurrentPresetByContent().catch(() => { });
+    // 重建后根据当前筛选与已保存预设的内容一致性，自动更新“当前预设”标签。
+    // 预设读取可能是异步的，因此只允许最新一次重建的匹配结果写回标签。
+    const presetMatchVersion = ++this.presetMatchVersion;
+    this.refreshCurrentPresetByContent(presetMatchVersion).catch(() => { });
   }
 
   // ===== 实时查询 =====
@@ -1825,9 +1848,11 @@ export class VisualSqlUI {
   }
 
   // 根据当前筛选状态，自动匹配并展示对应的预设名
-  private async refreshCurrentPresetByContent() {
+  private async refreshCurrentPresetByContent(version: number) {
     try {
       const presets = this.opts.loadPresets ? await this.opts.loadPresets() : this.loadPresets();
+      // 用户可能已经选择/保存了另一个预设；忽略较早请求的迟到结果。
+      if (version !== this.presetMatchVersion) return;
       const snap = this.getStateSnapshot();
       const matched = this.findDuplicatePresetName(presets, snap);
       const prev = this.currentPresetName || '';
@@ -1965,6 +1990,8 @@ export class VisualSqlUI {
     const presetWithSQL = {
       ...snap,
       name: name,
+      // 预设本身不应携带其他预设的 UI 选择状态。
+      currentPresetName: name,
       sql: compiledSQL,
       _compiledAt: new Date().toISOString()
     };
@@ -1975,6 +2002,9 @@ export class VisualSqlUI {
     // 保留旧预设里自定义的额外字段（如模板、定时器配置等），仅覆盖当前筛选相关数据。
     presets[name] = mergedPreset;
     await (this.opts.savePresets ? this.opts.savePresets(presets) : (async () => this.savePresets(presets))());
+    this.currentPresetName = name;
+    this.lastAppliedPresetName = name;
+    this.updateCurrentPresetLabel();
     this.toast(existingPreset ? '预设已覆盖保存' : '已保存筛选预设');
   }
 
@@ -2050,7 +2080,7 @@ export class VisualSqlUI {
           const s = p[name];
           if (!s) return;
           this.currentPresetName = name;
-          this.hydrateState(s, { applyCollapse: false });
+          this.hydrateState({ ...s, currentPresetName: name }, { applyCollapse: false });
           this.rebuildSql();
           this.toast('已应用预设');
           close();
@@ -2061,7 +2091,7 @@ export class VisualSqlUI {
           const s = p[name];
           if (!s) return;
           this.currentPresetName = name;
-          this.hydrateState(s, { applyCollapse: false });
+          this.hydrateState({ ...s, currentPresetName: name }, { applyCollapse: false });
           this.rebuildSql();
           this.toast('已应用预设');
           close();

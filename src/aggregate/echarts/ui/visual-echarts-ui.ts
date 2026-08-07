@@ -82,7 +82,8 @@ export class VisualEchartsUI {
                 <option value="sql">SQL</option>
               </select>
             </label>
-            ${this.opts?.onGotoSQL ? '<button class="agg-btn" data-goto-sql title="跳转到 SQL 编辑位置"><svg><use xlink:href="#iconSQL"></use></svg>转到 SQL</button>' : ''}
+            ${this.loadSqlPresetsProvider ? '<button class="agg-btn" data-apply-sql-preset title="直接选择 SQL 可视化生成器保存的预设"><svg><use xlink:href="#iconSQL"></use></svg>使用 SQL 预设</button>' : ''}
+            ${this.opts?.onGotoSQL ? '<button class="agg-btn" data-goto-sql title="在当前窗口打开 SQL 可视化生成器"><svg><use xlink:href="#iconSQL"></use></svg>新建 / 编辑 SQL 预设</button>' : ''}
             <button class="agg-btn agg-btn--icon ${this.previewPinned ? 'agg-is-active' : ''}" title="顶住预览" data-pin-preview>
               <svg><use xlink:href="#iconPin"></use></svg>
             </button>
@@ -126,6 +127,11 @@ export class VisualEchartsUI {
         try { this.opts?.onGotoSQL?.(); } catch { /* ignore */ }
       });
     }
+    (this.container.querySelector('[data-apply-sql-preset]') as HTMLButtonElement | null)?.addEventListener('click', (ev) => {
+      ev.stopPropagation(); ev.preventDefault();
+      this.switchMode('sql');
+      this.sqlUI?.openPresetPicker();
+    });
     // 初始化查询模式子 UI
     const queryContainer = this.container.querySelector('[data-query-container]') as HTMLElement | null;
     if (queryContainer) {

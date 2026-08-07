@@ -1,6 +1,7 @@
 import { showMessage, openTab } from "siyuan";
 import { aggregatorBlock } from "../aggregator_block";
 import type { PresetItem } from "../echarts/types/types";
+import { openSqlPresetWorkbench } from "../sql/sql-preset-workbench";
 
 /**
  * 内容聚合器 页签版 UI（非模态）
@@ -44,6 +45,7 @@ export class ContentAggregatorTabUI {
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--b3-theme-on-surface);">
               <input id="ca-only-pinned" type="checkbox" /> 仅显示置顶
             </label>
+            <button id="ca-new-sql-preset" class="b3-button b3-button--outline" title="在当前页面新建 SQL 可视化预设">新建 SQL 预设</button>
             <button id="ca-refresh" class="b3-button b3-button--outline" title="刷新预设列表">刷新</button>
           </div>
         </div>
@@ -60,10 +62,12 @@ export class ContentAggregatorTabUI {
     this.listWrap = this.container.querySelector('#ca-list') as HTMLElement;
 
     const refreshBtn = this.container.querySelector('#ca-refresh') as HTMLButtonElement;
+    const newSqlPresetBtn = this.container.querySelector('#ca-new-sql-preset') as HTMLButtonElement;
     const searchInput = this.container.querySelector('#ca-search') as HTMLInputElement;
     const onlyPinned = this.container.querySelector('#ca-only-pinned') as HTMLInputElement;
 
     refreshBtn?.addEventListener('click', () => this.refresh());
+    newSqlPresetBtn?.addEventListener('click', () => this.openSqlPresetWorkbench());
     searchInput?.addEventListener('input', () => {
       if (this.searchTimer) window.clearTimeout(this.searchTimer);
       this.searchTimer = window.setTimeout(() => this.renderList(searchInput.value), 200);
@@ -219,20 +223,12 @@ export class ContentAggregatorTabUI {
         }
       });
 
-      // 点击列表中的 SQL 预览，跳转到“SQL 可视化生成器”页签并自动应用对应预设
+      // 点击 SQL 预览，在当前页面上方打开可视化预设工作台。
       if (sqlSnippet) {
         sqlSnippet.addEventListener('click', async (e) => {
           e.stopPropagation();
           try {
-            const sql = String((presets[n] as any)?.sql || '').trim();
-            if (!sql) { showMessage('无有效 SQL', 2000, 'info'); return; }
-            const pluginName = this.aggregator.getPluginName();
-            await openTab({
-              app: (window as any).siyuan.ws.app,
-              custom: { icon: 'iconSQL', title: 'SQL 视图', id: pluginName + 'visual-sql', data: { id: null, presetName: n } },
-              keepCursor: false,
-            });
-            window.dispatchEvent(new CustomEvent('siyuan-steve-tools:apply-visual-sql-preset', { detail: { presetName: n } }));
+            await this.openSqlPresetWorkbench(n);
           } catch (err) {
             showMessage('打开 SQL 编辑器失败', 3000, 'error');
           }
@@ -356,7 +352,7 @@ export class ContentAggregatorTabUI {
             SQL 查询
           </label>
           <textarea id="ie-sql" class="b3-text-field" readonly style="width:100%; height:35px; resize:vertical; font-family: var(--b3-font-family-code); font-size:13px; background: var(--b3-theme-surface-light); border:1px solid var(--b3-border-color); border-radius: var(--b3-border-radius); padding:8px;">${safeSql}</textarea>
-          <div style="font-size:12px;color:var(--b3-theme-on-surface-light); margin-top:4px;">SQL 查询不可在此编辑,请在插件设置中修改</div>
+          <div style="font-size:12px;color:var(--b3-theme-on-surface-light); margin-top:4px;">可通过“在可视化SQL中编辑”直接修改并保存此预设</div>
           <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button id="ie-preview" class="b3-button b3-button--outline" style="font-size:12px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;">
               <svg style="width:12px;height:12px;"><use xlink:href="#iconEye"></use></svg>预览查询结果
@@ -495,21 +491,24 @@ export class ContentAggregatorTabUI {
       }
     });
 
-    // 跳转到“SQL 可视化生成器”页签并自动应用对应预设
+    // 在当前页面上方打开可视化预设工作台，应用后刷新预设列表。
     btnOpenSQLEditor?.addEventListener('click', async () => {
       try {
-        const sql = String(p.sql || '').trim();
-        if (!sql) { showMessage('无有效 SQL', 2000, 'info'); return; }
-        const pluginName = this.aggregator.getPluginName();
-        await openTab({
-          app: (window as any).siyuan.ws.app,
-          custom: { icon: 'iconSQL', title: 'SQL 视图', id: pluginName + 'visual-sql', data: { id: null, presetName: name } },
-          keepCursor: false,
-        });
-        window.dispatchEvent(new CustomEvent('siyuan-steve-tools:apply-visual-sql-preset', { detail: { presetName: name } }));
+        await this.openSqlPresetWorkbench(name);
       } catch {
         showMessage('打开 SQL 编辑器失败', 3000, 'error');
       }
+    });
+  }
+
+  private async openSqlPresetWorkbench(presetName?: string): Promise<void> {
+    await openSqlPresetWorkbench({
+      presetName,
+      loadPresets: () => this.aggregator.getSqlPresets(),
+      savePresets: (presets) => this.aggregator.saveSqlPresets(presets),
+      onUse: async () => {
+        await this.refresh();
+      },
     });
   }
 

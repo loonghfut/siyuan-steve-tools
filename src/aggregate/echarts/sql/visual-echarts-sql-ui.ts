@@ -362,6 +362,11 @@ export class VisualEchartsSqlUI {
     return this.sql;
   }
 
+  /** 供图表宿主直接打开共享 SQL 预设选择器。 */
+  public openPresetPicker(): void {
+    this.openPresetModal();
+  }
+
   public destroy(): void {
     if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
     this.debounceTimer = null;
@@ -2344,7 +2349,8 @@ export class VisualEchartsSqlUI {
           const s = p[name];
           if (!s) return;
           this.hydrateState(s);
-          this.rebuildCode();
+          this.debounceLoadKeys();
+          this.onChanged();
           this.toast('已应用预设');
           close();
         });
@@ -2359,7 +2365,8 @@ export class VisualEchartsSqlUI {
           const s = p[name];
           if (!s) return;
           this.hydrateState(s);
-          this.rebuildCode();
+          this.debounceLoadKeys();
+          this.onChanged();
           this.toast('已应用预设');
           close();
         });
