@@ -58,32 +58,34 @@ export class VisualEchartsUI {
   private render() {
     this.container.innerHTML = `
       <div class="ve-wrap">
-        <div class="ve-toolbar">
-          <div class="ve-tool-group" style="flex:1; gap:6px">
-            <button class="ve-btn ve-primary" data-refresh title="重新根据查询渲染预览">
-              <span class="ve-btn__icon">🔄</span>刷新
+        <div class="agg-toolbar">
+          <div class="agg-tool-group" style="flex:1;">
+            <button class="agg-btn agg-btn--primary" data-refresh title="重新根据查询渲染预览">
+              <svg><use xlink:href="#iconRefresh"></use></svg>刷新
             </button>
-            <button class="ve-btn" data-copy-block-top title="复制当前查询图表块到剪贴板">
-              <span class="ve-btn__icon">📋</span>复制图表块
+            <button class="agg-btn" data-copy-block-top title="复制当前查询图表块到剪贴板">
+              <svg><use xlink:href="#iconCopy"></use></svg>复制图表块
             </button>
-            <button class="ve-btn" data-save-config title="保存当前配置为预设">
-              <span class="ve-btn__icon">💾</span>保存配置
+            <button class="agg-btn" data-save-config title="保存当前配置为预设">
+              <svg><use xlink:href="#iconFile"></use></svg>保存配置
             </button>
-            <button class="ve-btn" data-manage-config title="管理配置预设">
-              <span class="ve-btn__icon">📦</span>管理配置
+            <button class="agg-btn" data-manage-config title="管理配置预设">
+              <svg><use xlink:href="#iconList"></use></svg>管理配置
             </button>
           </div>
-          <div class="ve-sep"></div>
-          <div class="ve-tool-group">
-            <label class="ve-field" style="margin:0; display:flex; align-items:center; gap:6px;">
-              <span style="font-size:12px; color:var(--b3-theme-on-surface);">数据源:</span>
-              <select class="veq-input" data-mode-switch style="width:100px">
+          <div class="agg-sep"></div>
+          <div class="agg-tool-group">
+            <label class="agg-field" style="margin:0;">
+              <span>数据源:</span>
+              <select class="b3-select" data-mode-switch style="width:100px">
                 <option value="database">数据库</option>
                 <option value="sql">SQL</option>
               </select>
             </label>
-            ${this.opts?.onGotoSQL ? '<button class="ve-btn ve-link" data-goto-sql title="跳转到 SQL 编辑位置">转到 SQL ➜</button>' : ''}
-            <button class="ve-btn ve-icon ${this.previewPinned ? 'active' : ''}" title="置顶预览" data-pin-preview>📌</button>
+            ${this.opts?.onGotoSQL ? '<button class="agg-btn" data-goto-sql title="跳转到 SQL 编辑位置"><svg><use xlink:href="#iconSQL"></use></svg>转到 SQL</button>' : ''}
+            <button class="agg-btn agg-btn--icon ${this.previewPinned ? 'agg-is-active' : ''}" title="顶住预览" data-pin-preview>
+              <svg><use xlink:href="#iconPin"></use></svg>
+            </button>
           </div>
         </div>
         <div class="ve-card" data-section="preview">
@@ -285,6 +287,7 @@ export class VisualEchartsUI {
     if (previewCard) previewCard.classList.toggle('pinned', !!this.previewPinned);
     if (pinBtn) {
       pinBtn.classList.toggle('active', !!this.previewPinned);
+      pinBtn.classList.toggle('agg-is-active', !!this.previewPinned);
       pinBtn.title = this.previewPinned ? '取消顶住' : '顶住';
     }
   }

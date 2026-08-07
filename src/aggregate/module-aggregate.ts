@@ -1,4 +1,5 @@
 import steveTools from "@/index";
+import "./ui/aggregate-theme.scss";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
 import { VisualEchartsUI } from "./echarts/ui/visual-echarts-ui";
 import { Dialog, Menu, openTab } from "siyuan";
