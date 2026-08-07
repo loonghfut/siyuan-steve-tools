@@ -46,12 +46,12 @@ export const MODULE_CONFIG: ModuleConfig = {
         settingKey: 'img-compress-enable',
         logMessage: '图片压缩模块加载'
     },
-    // M_handwriting: {
-    //     class: M_handwriting,
-    //     name: 'M_handwriting',
-    //     settingKey: 'handwriting-enable',
-    //     logMessage: '画板模块加载'
-    // },
+    M_handwriting: {
+        class: M_handwriting,
+        name: 'M_handwriting',
+        settingKey: 'handwriting-enable',
+        logMessage: '画板模块加载'
+    },
     M_lifelog: {
         class: M_lifelog,
         name: 'M_lifelog',
