@@ -169,6 +169,7 @@ function useSingleBlockSize(
 	const prevEditingRef = useRef(isEditingState)
 	// 记录上次测量的高度，用于锁定期间保持稳定
 	const lastHeightRef = useRef<number | null>(null)
+	const measurementFrameRef = useRef<number | null>(null)
 
 	// 检测编辑态切换，临时锁定高度
 	useEffect(() => {
@@ -238,11 +239,35 @@ function useSingleBlockSize(
 		shouldSkipMeasurement,
 	])
 
-	// 在每次渲染后立即测量尺寸
+	const scheduleShapeSizeUpdate = useCallback(() => {
+		if (shouldSkipMeasurement || measurementFrameRef.current !== null) return
+		measurementFrameRef.current = requestAnimationFrame(() => {
+			measurementFrameRef.current = null
+			updateShapeSize()
+		})
+	}, [shouldSkipMeasurement, updateShapeSize])
+
+	// 仅在测量输入变化时同步一次；后续 DOM 变化由观察器合帧处理。
 	useLayoutEffect(() => {
 		if (shouldSkipMeasurement) return
 		updateShapeSize()
-	})
+	}, [shouldSkipMeasurement, updateShapeSize])
+
+	useEffect(() => {
+		if (shouldSkipMeasurement && measurementFrameRef.current !== null) {
+			cancelAnimationFrame(measurementFrameRef.current)
+			measurementFrameRef.current = null
+		}
+	}, [shouldSkipMeasurement])
+
+	useEffect(() => {
+		return () => {
+			if (measurementFrameRef.current !== null) {
+				cancelAnimationFrame(measurementFrameRef.current)
+				measurementFrameRef.current = null
+			}
+		}
+	}, [])
 
 	// 使用 ResizeObserver 监听 DOM 尺寸变化
 	useLayoutEffect(() => {
@@ -257,14 +282,14 @@ function useSingleBlockSize(
 		if (!target) return
 
 		const observer = new ResizeObserver(() => {
-			updateShapeSize()
+			scheduleShapeSizeUpdate()
 		})
 		observer.observe(target)
 
 		return () => {
 			observer.disconnect()
 		}
-	}, [updateShapeSize, isEditingState, shouldSkipMeasurement])
+	}, [isEditingState, scheduleShapeSizeUpdate, shouldSkipMeasurement])
 
 	// 使用 MutationObserver 监听 DOM 内容变化
 	useLayoutEffect(() => {
@@ -279,14 +304,14 @@ function useSingleBlockSize(
 		if (!target) return
 
 		const observer = new MutationObserver(() => {
-			updateShapeSize()
+			scheduleShapeSizeUpdate()
 		})
 		observer.observe(target, { subtree: true, childList: true, attributes: true, characterData: true })
 
 		return () => {
 			observer.disconnect()
 		}
-	}, [updateShapeSize, isEditingState, shouldSkipMeasurement])
+	}, [isEditingState, scheduleShapeSizeUpdate, shouldSkipMeasurement])
 
 	// 监听图片加载完成后重新测量
 	useEffect(() => {
@@ -302,7 +327,7 @@ function useSingleBlockSize(
 
 		const handlers: Array<() => void> = []
 		target.querySelectorAll('img').forEach((img) => {
-			const handler = () => updateShapeSize()
+			const handler = () => scheduleShapeSizeUpdate()
 			img.addEventListener('load', handler)
 			handlers.push(() => img.removeEventListener('load', handler))
 		})
@@ -310,7 +335,7 @@ function useSingleBlockSize(
 		return () => {
 			handlers.forEach((off) => off())
 		}
-	}, [updateShapeSize, isEditingState, shouldSkipMeasurement])
+	}, [isEditingState, scheduleShapeSizeUpdate, shouldSkipMeasurement])
 
 	return { updateShapeSize }
 }

@@ -16,7 +16,7 @@ import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { BranchLineStyle, IBranchShape, TREE_TABLE_CELL_PADDING } from './branch-shape-types'
 import { toggleBranchCollapsed } from './branch-collapse'
-import { beginBranchAttachmentDrag, getAllBranchAttachedShapeIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, runWithSuppressedRootContentMoveIds, updateBranchAttachmentAfterDrag } from './branch-layout'
+import { beginBranchAttachmentDrag, getAllBranchAttachedShapeIds, getBranchInteractionHintForShape, getBranchRenderInfo, getBranchRootRenderPoint, layoutBranchChildren, runWithSuppressedRootContentMoveIds, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHintForBranch } from './branch-interaction-state'
 import { getDefaultColorTheme } from '../utils/color-theme'
 
@@ -533,10 +533,10 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	}
 
 	override getBoundsSnapGeometry(shape: IBranchShape) {
-		const info = getBranchRenderInfo(this.editor, shape)
+		const root = getBranchRootRenderPoint(this.editor, shape)
 		// The semantic center of a branch is its root node. Snapping to the
 		// whole branch frame is misleading when children exist only on one side.
-		return { points: [{ x: info.rootX, y: info.rootY }] }
+		return { points: [root] }
 	}
 
 	override canBind() {
