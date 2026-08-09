@@ -1,7 +1,12 @@
 import { computed, Editor, EditorAtom, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { settingdata } from '@/index'
 import { IBranchShape } from './branch-shape-types'
-import { getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from './branch-layout'
+import {
+	getAllBranchAttachedShapeIds,
+	getAllBranchChildIds,
+	layoutBranchChildren,
+	relayoutBranchesContainingShapes,
+} from './branch-layout'
 import { beginBranchResize, endBranchResize } from './keep-branch-layouts-updated'
 
 // The timing is deliberately a little slower than a toolbar click. This makes
@@ -14,6 +19,50 @@ const branchLayoutAnimation = {
 }
 
 type ShapeSnapshot = Pick<TLShape, 'id' | 'type' | 'x' | 'y' | 'props'>
+
+/**
+ * A branch layout can move its ancestors, descendants, and siblings in the
+ * same connected tree. Keep animation snapshots constrained to that tree
+ * instead of cloning every shape on the page.
+ */
+function getBranchAnimationShapeIds(editor: Editor, rootBranchId: TLShapeId) {
+	const currentPageShapeIds = editor.getCurrentPageShapeIds()
+	const branchShapeIds = BranchShapeIds.get(editor).get().get('branch')
+	const branches = Array.from(branchShapeIds || [])
+		.filter((branchId) => currentPageShapeIds.has(branchId as TLShapeId))
+		.map((branchId) => editor.getShape<IBranchShape>(branchId as TLShapeId))
+		.filter((branch): branch is IBranchShape => branch?.type === 'branch')
+	const attachedIdsByBranchId = new Map<string, string[]>()
+	const branchIdsByAttachedId = new Map<string, string[]>()
+
+	for (const branch of branches) {
+		const branchId = branch.id as string
+		const attachedIds = getAllBranchAttachedShapeIds(branch)
+		attachedIdsByBranchId.set(branchId, attachedIds)
+		for (const attachedId of attachedIds) {
+			const branchIds = branchIdsByAttachedId.get(attachedId)
+			if (branchIds) branchIds.push(branchId)
+			else branchIdsByAttachedId.set(attachedId, [branchId])
+		}
+	}
+
+	const shapeIds = new Set<string>()
+	const pendingIds = [rootBranchId as string]
+	for (let index = 0; index < pendingIds.length; index++) {
+		const id = pendingIds[index]
+		if (shapeIds.has(id)) continue
+		shapeIds.add(id)
+
+		for (const attachedId of attachedIdsByBranchId.get(id) || []) {
+			if (!shapeIds.has(attachedId)) pendingIds.push(attachedId)
+		}
+		for (const branchId of branchIdsByAttachedId.get(id) || []) {
+			if (!shapeIds.has(branchId)) pendingIds.push(branchId)
+		}
+	}
+
+	return shapeIds
+}
 
 function addBranchDescendantShapeIds(
 	branch: IBranchShape,
@@ -165,13 +214,14 @@ export function getBranchShapeVisibility(shape: TLShape, editor: Editor) {
 	return isShapeHiddenByCollapsedBranch(editor, shape) ? 'hidden' : 'inherit'
 }
 
-function capturePageShapes(editor: Editor) {
-	return new Map<string, ShapeSnapshot>(
-		editor.getCurrentPageShapes().map((shape) => [
-			shape.id as string,
-			{ id: shape.id, type: shape.type, x: shape.x, y: shape.y, props: shape.props },
-		])
-	)
+function captureShapes(editor: Editor, shapeIds: Iterable<string>) {
+	const snapshots = new Map<string, ShapeSnapshot>()
+	for (const id of shapeIds) {
+		const shape = editor.getShape(id as TLShapeId)
+		if (!shape) continue
+		snapshots.set(id, { id: shape.id, type: shape.type, x: shape.x, y: shape.y, props: shape.props })
+	}
+	return snapshots
 }
 
 function runWithoutHistory(editor: Editor, callback: () => void) {
@@ -201,7 +251,20 @@ function getPositionAtPageCenter(editor: Editor, shape: TLShape, pageCenter: { x
 }
 
 function restoreShapeSnapshots(editor: Editor, snapshots: Map<string, ShapeSnapshot>) {
-	if (snapshots.size > 0) editor.updateShapes(Array.from(snapshots.values()) as any[])
+	const updates = Array.from(snapshots.values()).filter((snapshot) => {
+		const current = editor.getShape(snapshot.id)
+		return !!current && !isSameShapeSnapshot(current, snapshot)
+	})
+	if (updates.length > 0) editor.updateShapes(updates as any[])
+}
+
+function isSameShapeSnapshot(shape: TLShape, snapshot: ShapeSnapshot) {
+	return shape.type === snapshot.type && shape.x === snapshot.x && shape.y === snapshot.y && shape.props === snapshot.props
+}
+
+function didShapeChange(before: Map<string, ShapeSnapshot>, target: ShapeSnapshot) {
+	const previous = before.get(target.id as string)
+	return !previous || !isSameShapeSnapshot(target as TLShape, previous)
 }
 
 function isBranchCollapseAnimationEnabled() {
@@ -241,8 +304,13 @@ function finishBranchAnimation(editor: Editor, branchId: TLShapeId, delay = BRAN
 	}, delay)
 }
 
-function collapseBranch(editor: Editor, branch: IBranchShape, descendants: Set<string>) {
-	const beforeLayout = capturePageShapes(editor)
+function collapseBranch(
+	editor: Editor,
+	branch: IBranchShape,
+	descendants: Set<string>,
+	animationShapeIds: Set<string>
+) {
+	const beforeLayout = captureShapes(editor, animationShapeIds)
 	const root = getBranchRootPagePoint(editor, branch)
 	beginBranchResize(editor, branch.id)
 
@@ -260,7 +328,7 @@ function collapseBranch(editor: Editor, branch: IBranchShape, descendants: Set<s
 		layoutBranchChildren(editor, compactBranch)
 		relayoutBranchesContainingShapes(editor, [compactBranch.id], new Set())
 	})
-	const compactTargets = capturePageShapes(editor)
+	const compactTargets = captureShapes(editor, animationShapeIds)
 
 	runWithoutHistory(editor, () => restoreShapeSnapshots(editor, beforeLayout))
 
@@ -275,6 +343,7 @@ function collapseBranch(editor: Editor, branch: IBranchShape, descendants: Set<s
 			updates.push(getPositionAtPageCenter(editor, current, root))
 			continue
 		}
+		if (!didShapeChange(beforeLayout, target)) continue
 
 		// The final state is collapsed, but retaining the expanded renderer until
 		// the final frame makes the branch lines visibly contract with the layout.
@@ -301,15 +370,20 @@ function collapseBranch(editor: Editor, branch: IBranchShape, descendants: Set<s
 	}, BRANCH_TRANSITION_DURATION)
 }
 
-function expandBranch(editor: Editor, branch: IBranchShape, descendants: Set<string>) {
-	const beforeLayout = capturePageShapes(editor)
+function expandBranch(
+	editor: Editor,
+	branch: IBranchShape,
+	descendants: Set<string>,
+	animationShapeIds: Set<string>
+) {
+	const beforeLayout = captureShapes(editor, animationShapeIds)
 	const root = getBranchRootPagePoint(editor, branch)
 	beginBranchResize(editor, branch.id)
 
 	// Calculate the eventual full layout while descendants remain hidden. We
 	// then rewind the visual state and animate one coherent set of targets.
 	applyCollapsedState(editor, branch, false, false)
-	const targets = capturePageShapes(editor)
+	const targets = captureShapes(editor, animationShapeIds)
 	const descendantSet = new Set(descendants)
 	const startUpdates: any[] = []
 
@@ -324,6 +398,8 @@ function expandBranch(editor: Editor, branch: IBranchShape, descendants: Set<str
 
 		const previous = beforeLayout.get(id)
 		if (!previous) continue
+		const target = targets.get(id)
+		if (!target || !didShapeChange(beforeLayout, target)) continue
 		const isExpandingBranch = id === (branch.id as string)
 		startUpdates.push({
 			...previous,
@@ -336,7 +412,9 @@ function expandBranch(editor: Editor, branch: IBranchShape, descendants: Set<str
 	})
 
 	window.requestAnimationFrame(() => {
-		const animationTargets = Array.from(targets.values()).filter((target) => editor.getShape(target.id))
+		const animationTargets = Array.from(targets.values()).filter(
+			(target) => descendants.has(target.id as string) || (editor.getShape(target.id) && didShapeChange(beforeLayout, target))
+		)
 		animateShapeUpdates(editor, animationTargets)
 		finishBranchAnimation(editor, branch.id)
 	})
@@ -361,14 +439,15 @@ export function toggleBranchCollapsed(editor: Editor, branchId: TLShapeId | stri
 		applyCollapsedState(editor, branch, isCollapsed, false)
 		return true
 	}
+	const animationShapeIds = getBranchAnimationShapeIds(editor, branch.id)
 
 	if (isCollapsed) {
 		animatingBranchIds.add(id)
-		collapseBranch(editor, branch, descendants)
+		collapseBranch(editor, branch, descendants, animationShapeIds)
 		return true
 	}
 
 	animatingBranchIds.add(id)
-	expandBranch(editor, branch, descendants)
+	expandBranch(editor, branch, descendants, animationShapeIds)
 	return true
 }
