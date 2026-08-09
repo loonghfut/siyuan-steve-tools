@@ -117,7 +117,21 @@ export function resolveAutoPortId(
  * 解析只依赖形状中心（而非对侧端口位置），避免两端均为 auto 时的循环依赖。
  */
 export function resolveConnectorBindingPortId(editor: Editor, binding: ConnectorBinding): string {
+	return resolveConnectorBindingPortIdWithOppositePoint(editor, binding)
+}
+
+/**
+ * Resolve a connector binding port. During a handle drag, callers can supply
+ * the pending opposite endpoint's final anchor so the preview uses the exact
+ * same auto-port decision as the binding will use after it is committed.
+ */
+export function resolveConnectorBindingPortIdWithOppositePoint(
+	editor: Editor,
+	binding: ConnectorBinding,
+	forcedOppositePoint?: { x: number; y: number }
+): string {
 	if (binding.props.portId !== AUTO_PORT_ID) return binding.props.portId
+	if (forcedOppositePoint) return resolveAutoPortId(editor, binding.toId, forcedOppositePoint)
 
 	const connector = editor.getShape<IBezierConnectorShape>(binding.fromId)
 	if (!connector) return 'input'
@@ -144,14 +158,15 @@ export function resolveConnectorBindingPortId(editor: Editor, binding: Connector
  */
 export function getConnectorBindingPositionInPageSpace(
 	editor: Editor,
-	binding: ConnectorBinding
+	binding: ConnectorBinding,
+	oppositePoint?: { x: number; y: number }
 ): { x: number; y: number } | null {
 	const targetShape = editor.getShape(binding.toId)
 	if (!targetShape) return null
 
 	// 获取目标形状上的端口位置（auto 端口先解析为实际端口）
 	const ports = getShapePorts(editor, targetShape)
-	const portId = resolveConnectorBindingPortId(editor, binding)
+	const portId = resolveConnectorBindingPortIdWithOppositePoint(editor, binding, oppositePoint)
 	const port = ports?.[portId]
 	if (!port) {
 		// 遗留数据保护：目标是连接线类形状时不回退（避免连接器互指造成几何递归）

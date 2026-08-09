@@ -34,11 +34,13 @@ import {
 	getConnectorBindingPositionInPageSpace,
 	createOrUpdateConnectorBinding,
 	removeConnectorBinding,
-	resolveConnectorBindingPortId,
+	resolveConnectorBindingPortIdWithOppositePoint,
 	AUTO_PORT_ID,
+	resolveAutoPortId,
 } from './bezier-connector-binding'
 import { getConnectionTargetAtPoint } from './port-utils'
 import { getPortState, setEligiblePortsIfChanged, setHintingPortIfChanged, setHighlightConnectorIfChanged } from './port-state'
+import { getShapePorts } from './shape-ports'
 import { getDefaultColorTheme } from '../utils/color-theme'
 import { openConnectorExtensionMenu } from './connector-extension-menu-state'
 import { clearConnectorCreationMark, takeConnectorCreationMark } from './connector-creation-state'
@@ -162,7 +164,7 @@ function getBezierLabelPosition(
  * 只在松手时（onHandleDragEnd）真正写入 binding，避免在 drag 回调中嵌套更新 store
  */
 export type PendingBindingTarget =
-	| { kind: 'set'; targetId: TLShapeId; portId: string; terminal: PortTerminal }
+	| { kind: 'set'; targetId: TLShapeId; portId: string; previewPortId: string; terminal: PortTerminal }
 	| { kind: 'remove'; terminal: PortTerminal }
 
 const pendingBindingTargets = new Map<TLShapeId, PendingBindingTarget>()
@@ -307,16 +309,34 @@ export function getConnectorTerminals(
 	// 直到松手 onHandleDragEnd 提交 binding 变更后才跳到新位置
 	const pending = pendingBindingTargets.get(connector.id)
 	const pendingTerminal = pending?.terminal
+	const pendingTargetCenter = pending?.kind === 'set'
+		? (() => {
+			const bounds = editor.getShapePageBounds(pending.targetId)
+			return bounds ? { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 } : undefined
+		})()
+		: undefined
+	const getBoundPortId = (binding: NonNullable<typeof bindings.start>) =>
+		resolveConnectorBindingPortIdWithOppositePoint(
+			editor,
+			binding,
+			binding.props.terminal === pendingTerminal ? undefined : pendingTargetCenter
+		)
+	const getBoundPosition = (binding: NonNullable<typeof bindings.start>) =>
+		getConnectorBindingPositionInPageSpace(
+			editor,
+			binding,
+			binding.props.terminal === pendingTerminal ? undefined : pendingTargetCenter
+		)
 
 	// 从绑定获取位置（拖拽中的一端跳过，走 props 回退）
 	if (bindings.start && pendingTerminal !== 'start') {
-		const inPageSpace = getConnectorBindingPositionInPageSpace(editor, bindings.start)
+		const inPageSpace = getBoundPosition(bindings.start)
 		if (inPageSpace) {
 			start = Mat.applyToPoint(shapeTransform, inPageSpace)
 		}
 	}
 	if (bindings.end && pendingTerminal !== 'end') {
-		const inPageSpace = getConnectorBindingPositionInPageSpace(editor, bindings.end)
+		const inPageSpace = getBoundPosition(bindings.end)
 		if (inPageSpace) {
 			end = Mat.applyToPoint(shapeTransform, inPageSpace)
 		}
@@ -334,24 +354,22 @@ export function getConnectorTerminals(
 	let endPortId: string | undefined
 	if (bindings.start) {
 		startShapeId = bindings.start.toId
-		startPortId = resolveConnectorBindingPortId(editor, bindings.start)
+		startPortId = getBoundPortId(bindings.start)
 	}
 	if (bindings.end) {
 		endShapeId = bindings.end.toId
-		endPortId = resolveConnectorBindingPortId(editor, bindings.end)
+		endPortId = getBoundPortId(bindings.end)
 	}
 
 	// 拖拽过程中，优先使用未提交的 pendingBindingTargets 提供的端口信息以便实时显示
 	if (pending) {
 		if (pending.kind === 'set') {
-			// auto 端口在拖拽预览时不指定方向，让控制点走主轴回退逻辑
-			const pendingPortId = pending.portId === AUTO_PORT_ID ? undefined : pending.portId
 			if (pending.terminal === 'start') {
 				startShapeId = pending.targetId
-				startPortId = pendingPortId
+				startPortId = pending.previewPortId
 			} else {
 				endShapeId = pending.targetId
-				endPortId = pendingPortId
+				endPortId = pending.previewPortId
 			}
 		} else if (pending.kind === 'remove') {
 			if (pending.terminal === 'start') {
@@ -821,23 +839,36 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		if (target) {
 			const targetShape = this.editor.getShape(target.shapeId)
 			if (targetShape) {
+				const oppositeTerminal: PortTerminal = draggingTerminal === 'start' ? 'end' : 'start'
+				const oppositePoint = oppositeBinding
+					? (() => {
+						const bounds = this.editor.getShapePageBounds(oppositeBinding.toId)
+						return bounds ? { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 } : undefined
+					})()
+					: shapeTransform.applyToPoint(connector.props[oppositeTerminal])
+				// createOrUpdateConnectorBinding normalizes ordinary shapes to auto.
+				// Resolve that future port now so the hint and preview cannot jump on drop.
+				const usesAutoPort = targetShape.type !== 'mind-map'
+				const previewPortId = usesAutoPort && oppositePoint
+					? resolveAutoPortId(this.editor, target.shapeId, oppositePoint)
+					: target.port.id
+				const previewPort = getShapePorts(this.editor, targetShape)?.[previewPortId] ?? target.port
 				const targetPortInPage = this.editor
 					.getShapePageTransform(targetShape)
-					.applyToPoint(target.port)
+					.applyToPoint(previewPort)
 				const targetPortOnConnector = Mat.applyToPoint(inverseShapeTransform, targetPortInPage)
 
 				// 更新 hinting 状态以便端口可视化高亮
-				setHintingPortIfChanged(this.editor, { shapeId: target.shapeId, portId: target.port.id })
+				setHintingPortIfChanged(this.editor, { shapeId: target.shapeId, portId: previewPort.id })
 				// 高亮当前连接器用于视觉引导
 				setHighlightConnectorIfChanged(this.editor, connectorId)
 				// 只存储目标信息，不写 store
-				// 非精确命中（落在形状本体上）时记录 auto 端口，之后随相对位置自动换边
-				// mind-map 端口按节点定位（nodeId:direction），auto 无法解析到具体节点，始终锁定实际端口
-				const useAutoPort = !target.precise && targetShape.type !== 'mind-map'
+				// 普通形状的绑定都会在提交时归一化为 auto；思维导图保留具体节点端口。
 				pendingBindingTargets.set(connectorId, {
 					kind: 'set',
 					targetId: target.shapeId,
-					portId: useAutoPort ? AUTO_PORT_ID : target.port.id,
+					portId: usesAutoPort ? AUTO_PORT_ID : previewPort.id,
+					previewPortId: previewPort.id,
 					terminal: draggingTerminal,
 				})
 
