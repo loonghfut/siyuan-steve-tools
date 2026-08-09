@@ -15,6 +15,7 @@ import {
 import { branchShapeMigrations } from './branch-shape-migrations'
 import { branchShapeProps } from './branch-shape-props'
 import { BranchLineStyle, IBranchShape, TREE_TABLE_CELL_PADDING } from './branch-shape-types'
+import { toggleBranchCollapsed } from './branch-collapse'
 import { beginBranchAttachmentDrag, getAllBranchAttachedShapeIds, getBranchInteractionHintForShape, getBranchRenderInfo, layoutBranchChildren, runWithSuppressedRootContentMoveIds, updateBranchAttachmentAfterDrag } from './branch-layout'
 import { clearBranchInteractionHint, setBranchInteractionHint, useBranchInteractionHintForBranch } from './branch-interaction-state'
 import { getDefaultColorTheme } from '../utils/color-theme'
@@ -30,6 +31,8 @@ const OUTER_FRAME_DASHARRAY = '8 4'
 const OUTER_FRAME_RX = 12
 const BRANCH_HIT_SLOP = 4
 const EMPTY_BRANCH_RADIUS = 12
+const COLLAPSED_COUNT_BADGE_RADIUS = 13
+const COLLAPSED_COUNT_BADGE_GAP = 7
 
 type BranchChildRenderInfo = ReturnType<typeof getBranchRenderInfo>['children'][number]
 
@@ -75,6 +78,27 @@ function isFloatingFrameStyle(lineStyle: BranchLineStyle) {
 
 function isTreeTableStyle(lineStyle: BranchLineStyle) {
 	return lineStyle === 'tree-table'
+}
+
+function getCollapsedBranchBounds(
+	info: ReturnType<typeof getBranchRenderInfo>,
+	isEmpty: boolean,
+	leftChildCount: number,
+	rightChildCount: number
+) {
+	const radius = isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius
+	const root = info.rootBounds || {
+		x: info.rootX - radius,
+		y: info.rootY - radius,
+		w: radius * 2,
+		h: radius * 2,
+	}
+	const badgeOffset = COLLAPSED_COUNT_BADGE_RADIUS + COLLAPSED_COUNT_BADGE_GAP
+	const left = root.x - (leftChildCount > 0 ? badgeOffset * 2 : 4)
+	const right = root.x + root.w + (rightChildCount > 0 ? badgeOffset * 2 : 4)
+	const top = Math.min(root.y - 4, info.rootY - COLLAPSED_COUNT_BADGE_RADIUS)
+	const bottom = Math.max(root.y + root.h + 4, info.rootY + COLLAPSED_COUNT_BADGE_RADIUS)
+	return new Box(left, top, right - left, bottom - top)
 }
 
 function getTreeTableLayout(
@@ -538,7 +562,21 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			lineStyle: 'curve-solid',
 			snapDistance: 160,
 			showBackground: false,
-			version: 7,
+			isCollapsed: false,
+			version: 8,
+		}
+	}
+
+	override getInterpolatedProps(startShape: IBranchShape, endShape: IBranchShape, progress: number) {
+		const interpolate = (start: number, end: number) => start + (end - start) * progress
+		return {
+			...endShape.props,
+			w: interpolate(startShape.props.w, endShape.props.w),
+			h: interpolate(startShape.props.h, endShape.props.h),
+			rootX: interpolate(
+				startShape.props.rootX ?? startShape.props.w / 2,
+				endShape.props.rootX ?? endShape.props.w / 2
+			),
 		}
 	}
 
@@ -548,13 +586,17 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const children = []
 		const hitTargets: BranchHitTarget[] = []
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
+		const isCollapsed = shape.props.isCollapsed === true
+		const visibleChildren = isCollapsed ? [] : info.children
 		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
 		const isTreeTable = isTreeTableStyle(lineStyle)
 		const isAutoFrameEnhanced = info.autoFrame.enabled
-		const showBackground = shape.props.showBackground === true && !isTreeTable
+		const showBackground = shape.props.showBackground === true && !isTreeTable && !isCollapsed
 		const isEmpty = !info.rootShapeId && info.children.length === 0
+		const collapsedLeftChildCount = info.children.filter((child) => child.side === 'left').length
+		const collapsedRightChildCount = info.children.filter((child) => child.side === 'right').length
 
-		if (isAutoFrameEnhanced && !isFloatingStyle) {
+		if (isAutoFrameEnhanced && !isFloatingStyle && !isCollapsed) {
 			hitTargets.push({
 				type: 'rect',
 				x: OUTER_FRAME_INSET,
@@ -577,7 +619,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			})
 		}
 
-		if (isFloatingStyle) {
+		if (isFloatingStyle && !isCollapsed) {
 			const frame = new Rectangle2d({
 				x: OUTER_FRAME_INSET,
 				y: OUTER_FRAME_INSET,
@@ -596,9 +638,9 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			})
 		}
 
-		if (isTreeTable) {
+		if (isTreeTable && !isCollapsed) {
 			const tableRootRadius = isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius
-			const table = getTreeTableLayout(info.rootBounds, info.rootX, info.rootY, tableRootRadius, info.children)
+			const table = getTreeTableLayout(info.rootBounds, info.rootX, info.rootY, tableRootRadius, visibleChildren)
 			const tableOutline = getTreeTableOutline(table, lineWidth)
 			children.push(
 				new Rectangle2d({
@@ -668,7 +710,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			})
 		}
 
-		for (const child of info.children) {
+		for (const child of visibleChildren) {
 			const pathGeometry = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle).geometry
 			children.push(...pathGeometry)
 			for (const geometry of pathGeometry) {
@@ -683,7 +725,9 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		return new BranchGeometry2d(
 			children,
 			hitTargets,
-			new Box(0, 0, Math.max(shape.props.w, 1), Math.max(shape.props.h, 1))
+			isCollapsed
+				? getCollapsedBranchBounds(info, isEmpty, collapsedLeftChildCount, collapsedRightChildCount)
+				: new Box(0, 0, Math.max(shape.props.w, 1), Math.max(shape.props.h, 1))
 		)
 	}
 
@@ -758,14 +802,17 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 			() => getBranchRenderInfo(editor, shape),
 			[editor, shape]
 		)
-		const hasChildren = info.children.length > 0
-		const isEmpty = !info.rootShapeId && !hasChildren
+		const isCollapsed = shape.props.isCollapsed === true
+		const hasDescendants = info.children.length > 0
+		const visibleChildren = isCollapsed ? [] : info.children
+		const hasChildren = visibleChildren.length > 0
+		const isEmpty = !info.rootShapeId && !hasDescendants
 		const lineWidth = Math.max(shape.props.lineWidth || 3, 1)
 		const lineStyle = getBranchLineStyle(shape)
 		const isFloatingStyle = isFloatingFrameStyle(lineStyle)
 		const isTreeTable = isTreeTableStyle(lineStyle)
-		const treeTable = isTreeTable
-			? getTreeTableLayout(info.rootBounds, info.rootX, info.rootY, isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius, info.children)
+		const treeTable = isTreeTable && !isCollapsed
+			? getTreeTableLayout(info.rootBounds, info.rootX, info.rootY, isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius, visibleChildren)
 			: null
 		const hasRootContent = !!info.rootShapeId && !!info.rootBounds
 		const interactionHint = useBranchInteractionHintForBranch(shape.id as string)
@@ -781,11 +828,11 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const treeTableStroke = showHint ? accentColor : color
 		const rootHaloRadius = info.rootRadius + (isAttachTarget ? (isAbsorbingShape ? 11 : 10) : isMovingBranch ? 7 : isDetachTarget ? 8 : 0)
 		const isAutoFrameEnhanced = info.autoFrame.enabled
-		const showBackground = shape.props.showBackground === true && !isTreeTable
+		const showBackground = shape.props.showBackground === true && !isTreeTable && !isCollapsed
 		const backgroundInset = isAutoFrameEnhanced ? 2 : 1
 		const backgroundOpacity = isAutoFrameEnhanced ? 0.12 : 0.08
 		const backgroundRx = isAutoFrameEnhanced ? 12 : 8
-		const showAutoOuterFrame = isAutoFrameEnhanced && !isFloatingStyle && !isTreeTable
+		const showAutoOuterFrame = isAutoFrameEnhanced && !isFloatingStyle && !isTreeTable && !isCollapsed
 		const isNestedTreeTable = isTreeTable && info.isNestedInTreeTable
 		const floatingFrameInset = OUTER_FRAME_INSET
 		const floatingFrameStrokeWidth = OUTER_FRAME_STROKE_WIDTH
@@ -794,6 +841,25 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		const floatingFrameRx = OUTER_FRAME_RX
 		const floatingRootOuterRadius = info.rootRadius + 5
 		const floatingRootInnerRadius = Math.max(info.rootRadius - 1, 4)
+		const collapsedLeftChildCount = info.children.filter((child) => child.side === 'left').length
+		const collapsedRightChildCount = info.children.filter((child) => child.side === 'right').length
+		const collapsedRootRadius = isEmpty ? EMPTY_BRANCH_RADIUS : info.rootRadius
+		const collapsedRootLeft = info.rootBounds ? info.rootBounds.x : info.rootX - collapsedRootRadius
+		const collapsedRootRight = info.rootBounds
+			? info.rootBounds.x + info.rootBounds.w
+			: info.rootX + collapsedRootRadius
+		const collapsedBadgeY = info.rootBounds ? info.rootBounds.y + info.rootBounds.h / 2 : info.rootY
+		const collapsedLeftBadgeX = collapsedRootLeft - COLLAPSED_COUNT_BADGE_GAP - COLLAPSED_COUNT_BADGE_RADIUS
+		const collapsedRightBadgeX = collapsedRootRight + COLLAPSED_COUNT_BADGE_GAP + COLLAPSED_COUNT_BADGE_RADIUS
+		const preventCollapsedBadgeCanvasInteraction = (event: React.PointerEvent<SVGGElement>) => {
+			event.preventDefault()
+			event.stopPropagation()
+		}
+		const expandFromCollapsedBadge = (event: React.MouseEvent<SVGGElement>) => {
+			event.preventDefault()
+			event.stopPropagation()
+			toggleBranchCollapsed(editor, shape.id)
+		}
 		return (
 			<SVGContainer className="BranchShape">
 				<rect
@@ -882,7 +948,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						))}
 					</g>
 				)}
-				{isFloatingStyle && (
+				{isFloatingStyle && !isCollapsed && (
 					<rect
 						x={floatingFrameInset}
 						y={floatingFrameInset}
@@ -900,7 +966,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				)}
 				{showHint && (
 					<g pointerEvents="none">
-						{isMovingBranch && (
+						{isMovingBranch && !isCollapsed && (
 							<rect
 								x={1}
 								y={1}
@@ -1035,9 +1101,69 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 						opacity={hasChildren || showHint ? 1 : 0.9}
 					/>
 				)}
+				{isCollapsed && hasDescendants && (
+					<g pointerEvents="none">
+						{collapsedLeftChildCount > 0 && (
+							<g
+								pointerEvents="all"
+								style={{ cursor: 'pointer' }}
+								onPointerDown={preventCollapsedBadgeCanvasInteraction}
+								onClick={expandFromCollapsedBadge}
+							>
+								<circle
+									cx={collapsedLeftBadgeX}
+									cy={collapsedBadgeY}
+									r={COLLAPSED_COUNT_BADGE_RADIUS}
+									fill={color}
+									stroke="var(--b3-theme-background, #ffffff)"
+									strokeWidth={2.5}
+								/>
+								<text
+									x={collapsedLeftBadgeX}
+									y={collapsedBadgeY}
+									dy="0.35em"
+									fill="var(--b3-theme-background, #ffffff)"
+									fontSize={collapsedLeftChildCount > 99 ? 8 : collapsedLeftChildCount > 9 ? 10 : 11}
+									fontWeight={700}
+									textAnchor="middle"
+								>
+									{collapsedLeftChildCount > 99 ? '99+' : collapsedLeftChildCount}
+								</text>
+							</g>
+						)}
+						{collapsedRightChildCount > 0 && (
+							<g
+								pointerEvents="all"
+								style={{ cursor: 'pointer' }}
+								onPointerDown={preventCollapsedBadgeCanvasInteraction}
+								onClick={expandFromCollapsedBadge}
+							>
+								<circle
+									cx={collapsedRightBadgeX}
+									cy={collapsedBadgeY}
+									r={COLLAPSED_COUNT_BADGE_RADIUS}
+									fill={color}
+									stroke="var(--b3-theme-background, #ffffff)"
+									strokeWidth={2.5}
+								/>
+								<text
+									x={collapsedRightBadgeX}
+									y={collapsedBadgeY}
+									dy="0.35em"
+									fill="var(--b3-theme-background, #ffffff)"
+									fontSize={collapsedRightChildCount > 99 ? 8 : collapsedRightChildCount > 9 ? 10 : 11}
+									fontWeight={700}
+									textAnchor="middle"
+								>
+									{collapsedRightChildCount > 99 ? '99+' : collapsedRightChildCount}
+								</text>
+							</g>
+						)}
+					</g>
+				)}
 				{hasChildren && !isFloatingStyle && !isTreeTable && (
 					<g fill="none" stroke={color} strokeWidth={lineWidth} strokeLinecap="round" strokeLinejoin="round">
-						{info.children.map((child) => {
+						{visibleChildren.map((child) => {
 							const pathInfo = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle)
 							const isActiveSide = isAttachTarget && activeSide === child.side
 							return (
@@ -1060,6 +1186,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 	indicator(shape: IBranchShape) {
 		const info = getBranchRenderInfo(this.editor, shape)
 		const lineStyle = getBranchLineStyle(shape)
+		const visibleChildren = shape.props.isCollapsed ? [] : info.children
 
 		return (
 			<g>
@@ -1081,7 +1208,7 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 				) : (
 					<circle cx={info.rootX} cy={info.rootY} r={info.rootRadius} />
 				)}
-				{lineStyle !== 'frame-floating' && lineStyle !== 'tree-table' && info.children.map((child) => {
+				{lineStyle !== 'frame-floating' && lineStyle !== 'tree-table' && visibleChildren.map((child) => {
 					const pathInfo = getBranchPathInfo(info.rootX, info.rootY, child, lineStyle)
 					return (
 						<path

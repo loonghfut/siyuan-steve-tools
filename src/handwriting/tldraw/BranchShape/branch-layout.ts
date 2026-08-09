@@ -42,6 +42,13 @@ type Bounds = {
 export type BranchSide = 'left' | 'right'
 type BranchAttachmentSlot = 'root' | 'side'
 
+export type BranchLayoutOptions = {
+	animation?: {
+		duration: number
+		easing?: (progress: number) => number
+	}
+}
+
 export type SingleBranchParentInfo = {
 	branch: IBranchShape
 	side: BranchSide
@@ -745,7 +752,17 @@ export function beginBranchAttachmentDrag(editor: Editor, shape: TLShape) {
 	}
 }
 
-export function layoutBranchChildren(editor: Editor, branch: IBranchShape, childIds = getAllBranchChildIds(branch)) {
+export function layoutBranchChildren(
+	editor: Editor,
+	branch: IBranchShape,
+	childIds = getAllBranchChildIds(branch),
+	options?: BranchLayoutOptions
+) {
+	if (branch.props.isCollapsed === true) {
+		layoutCollapsedBranch(editor, branch, options)
+		return
+	}
+
 	const branches = getCurrentBranches(editor)
 	const childSet = new Set(normalizeBranchChildIds(editor, branch, childIds, branches))
 	const leftIds = normalizeSideChildIds(editor, branch, 'left', undefined, branches).filter((id) => childSet.has(id))
@@ -878,7 +895,60 @@ export function layoutBranchChildren(editor: Editor, branch: IBranchShape, child
 		})
 	}
 
-	if (updates.length > 0) editor.updateShapes(updates)
+	applyBranchLayoutUpdates(editor, updates, options)
+}
+
+/**
+ * A collapsed branch keeps its descendants and their coordinates, but its own
+ * layout box shrinks to the root node so an enclosing branch can reflow around
+ * the compact representation.
+ */
+function layoutCollapsedBranch(editor: Editor, branch: IBranchShape, options?: BranchLayoutOptions) {
+	const rootContent = getBranchRootContent(editor, branch)
+	const rootPagePoint = rootContent
+		? getPageShapeCenter(editor, rootContent.shape)
+		: getBranchRootPagePoint(editor, branch)
+	const rootWidth = rootContent?.bounds.w ?? ROOT_DIAMETER
+	const rootHeight = rootContent?.bounds.h ?? ROOT_DIAMETER
+	const nextRootX = rootWidth / 2
+	const nextW = Math.max(rootWidth, 1)
+	const nextH = Math.max(rootHeight, 1)
+	const nextPageX = rootPagePoint.x - nextRootX
+	const nextPageY = rootPagePoint.y - nextH / 2
+	const nextPosition = getPointInShapeParentSpace(editor, branch, {
+		x: nextPageX,
+		y: nextPageY,
+	})
+
+	const unchanged =
+		sameNumber(branch.x, nextPosition.x) &&
+		sameNumber(branch.y, nextPosition.y) &&
+		sameNumber(branch.props.w, nextW) &&
+		sameNumber(branch.props.h, nextH) &&
+		sameNumber(branch.props.rootX, nextRootX)
+	if (unchanged) return
+
+	const update = {
+		id: branch.id,
+		type: 'branch',
+		x: nextPosition.x,
+		y: nextPosition.y,
+		props: {
+			...branch.props,
+			w: nextW,
+			h: nextH,
+			rootX: nextRootX,
+		},
+	} as const
+
+	if (options?.animation) editor.animateShape(update, { animation: options.animation })
+	else editor.updateShape<IBranchShape>(update)
+}
+
+function applyBranchLayoutUpdates(editor: Editor, updates: any[], options?: BranchLayoutOptions) {
+	if (updates.length === 0) return
+	if (options?.animation) editor.animateShapes(updates, { animation: options.animation })
+	else editor.updateShapes(updates)
 }
 
 /**
@@ -953,6 +1023,8 @@ function removeChildFromDraft(draft: BranchIdsDraft, childId: string) {
 
 function applyDraftToBranch(editor: Editor, draft: BranchIdsDraft) {
 	const { branch, leftChildIds, rightChildIds, rootShapeId } = draft
+	const previousChildIds = new Set(getAllBranchChildIds(branch))
+	const hasNewDirectChild = [...leftChildIds, ...rightChildIds].some((id) => !previousChildIds.has(id))
 	if (
 		sameIds(leftChildIds, branch.props.leftChildIds || []) &&
 		sameIds(rightChildIds, branch.props.rightChildIds) &&
@@ -969,6 +1041,9 @@ function applyDraftToBranch(editor: Editor, draft: BranchIdsDraft) {
 			leftChildIds,
 			rightChildIds,
 			rootShapeId,
+			// A newly attached child should be immediately visible instead of
+			// disappearing into an already collapsed branch.
+			isCollapsed: hasNewDirectChild ? false : branch.props.isCollapsed,
 		},
 	})
 	return true
@@ -1294,7 +1369,12 @@ function buildBranchParentIndex(branches: IBranchShape[]) {
 	return parentsByChildId
 }
 
-export function relayoutBranchesContainingShapes(editor: Editor, shapeIds: TLShapeId[], visited = new Set<string>()) {
+export function relayoutBranchesContainingShapes(
+	editor: Editor,
+	shapeIds: TLShapeId[],
+	visited = new Set<string>(),
+	options?: BranchLayoutOptions
+) {
 	const branches = getCurrentBranches(editor)
 	if (branches.length === 0) return
 
@@ -1342,7 +1422,7 @@ export function relayoutBranchesContainingShapes(editor: Editor, shapeIds: TLSha
 
 	for (const branch of sortBranchesForLayout(editor, affectedBranchIds)) {
 		const latestBranch = editor.getShape<IBranchShape>(branch.id)
-		if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch)
+		if (latestBranch?.type === 'branch') layoutBranchChildren(editor, latestBranch, undefined, options)
 	}
 }
 

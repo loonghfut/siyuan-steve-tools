@@ -45,6 +45,8 @@ export const handwritingDefaults: Record<string, any> = {
     "tldraw-prompt-card-title": false,
     // 文档树显示白板按钮
     "tldraw-show-in-file-tree": true,
+    // Branch 展开 / 收缩的空间过渡动画
+    "tldraw-branch-collapse-animation": false,
     "tldraw-agent-actions-enable": false,
     "tldraw-agent-enabled-actions": DEFAULT_TLDRAW_AGENT_ACTION_NAMES,
     ...h6StyleDefaults,
@@ -85,7 +87,18 @@ export const handwritingGroup = (ctx: BuildContext): SettingGroupDefinition => (
                 { type: "checkbox", title: "文档树显示白板按钮", description: "在文档树每个条目左侧显示白板图标按钮", key: "tldraw-show-in-file-tree", value: ctx.settings["tldraw-show-in-file-tree"] },
             ]
         },
-        h6StyleGroup(ctx),
+        {
+            name: "样式设置", items: [
+                ...h6StyleGroup(ctx).items,
+                {
+                    type: "checkbox",
+                    title: "Branch 展开/收缩动画",
+                    description: "启用后，Branch 会以收缩和生长的过渡效果切换；关闭后立即完成布局调整。",
+                    key: "tldraw-branch-collapse-animation",
+                    value: ctx.settings["tldraw-branch-collapse-animation"],
+                },
+            ],
+        },
         {
             name: "高级设置", items: [
                 { type: "select", title: "画板数据块备用创建位置", description: "选择日记本", key: "tl-draw-create-note-id", value: ctx.settings["tl-draw-create-note-id"], options: (() => { const nb = (window as any).siyuan?.notebooks; if (!Array.isArray(nb) || !nb.length) return { "": "无可用日记本" }; return Object.fromEntries(nb.map((n: any) => [n.id, n.name])); })() },

@@ -17,4 +17,5 @@ export {
 } from './create-branch-single-block'
 export * from './branch-shape-types'
 export * from './branch-layout'
+export * from './branch-collapse'
 export * from './branch-interaction-state'

@@ -8,6 +8,7 @@ const versions = createShapePropsMigrationIds('branch', {
 	AddRootShapeId: 5,
 	MigrateChildIdsToRightChildIds: 6,
 	AddTreeTableStyle: 7,
+	AddCollapsedState: 8,
 })
 
 export const branchShapeMigrations = createShapePropsMigrationSequence({
@@ -87,6 +88,17 @@ export const branchShapeMigrations = createShapePropsMigrationSequence({
 			down(props) {
 				if (props.lineStyle === 'tree-table') props.lineStyle = 'curve-solid'
 				props.version = 6
+			},
+		},
+		{
+			id: versions.AddCollapsedState,
+			up(props) {
+				props.isCollapsed = props.isCollapsed ?? false
+				props.version = 8
+			},
+			down(props) {
+				delete props.isCollapsed
+				props.version = 7
 			},
 		},
 	],

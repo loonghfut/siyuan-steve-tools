@@ -40,6 +40,7 @@ import { MindMapShapeTool } from './MindMapShape/MindMapShapeTool';
 import { BranchShapeUtil } from './BranchShape/BranchShapeUtil';
 import { BranchShapeTool } from './BranchShape/BranchShapeTool';
 import { keepBranchLayoutsUpdated } from './BranchShape/keep-branch-layouts-updated';
+import { getBranchShapeVisibility } from './BranchShape/branch-collapse';
 import { setupDoubleClickHandler, type DoubleClickCreationType } from './utils/setupDoubleClickHandler';
 import { ConfiguredEmbedShapeUtil } from './utils/custom-embeds';
 import { tldrawkey } from '@/../my/key';
@@ -389,6 +390,7 @@ export class TldrawManager {
                     bindingUtils={customBindingUtils}
                     tools={customTools}
                     overlayUtils={customOverlayUtils}
+                    getShapeVisibility={getBranchShapeVisibility}
                     overrides={uiOverrides}
                     options={this.options}
                     components={components}

@@ -28,6 +28,8 @@ export type IBranchShape = TLBaseShape<
 		lineStyle?: BranchLineStyle
 		snapDistance: number
 		showBackground?: boolean
+		/** Whether this branch's descendant subtree is hidden on the canvas. */
+		isCollapsed?: boolean
 		version?: number
 	}
 >
