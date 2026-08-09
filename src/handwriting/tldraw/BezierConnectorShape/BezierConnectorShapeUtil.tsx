@@ -512,7 +512,7 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 			if (isEditing) return
 			// 让 tldraw 不把这次 pointer down 当作画布交互
 			editor.markEventAsHandled(e)
-			;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+				; (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
 
 			dragState.current.isDragging = true
 			dragState.current.didDrag = false
@@ -545,7 +545,7 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 			if (!dragState.current.isDragging) return
 			dragState.current.isDragging = false
 			try {
-				;(e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId)
+				; (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId)
 			} catch {
 				// ignore
 			}
@@ -704,6 +704,9 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	override canResize() {
 		return false
 	}
+	override hideInMinimap() {
+		return true
+	}
 	override hideResizeHandles() {
 		return true
 	}
@@ -798,13 +801,13 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 		const inverseShapeTransform = Mat.Inverse(shapeTransform)
 		const handlePagePosition = shapeTransform.applyToPoint(handle)
 
-			// 简单节流：若位置未发生实际变化，则跳过后续的计算与状态写入
-			const key = `${Math.round(handlePagePosition.x)}:${Math.round(handlePagePosition.y)}:${draggingTerminal}`
-			const lastKey = handleLastDragKey.get(connectorId)
-			if (lastKey === key) {
-				return connector
-			}
-			handleLastDragKey.set(connectorId, key)
+		// 简单节流：若位置未发生实际变化，则跳过后续的计算与状态写入
+		const key = `${Math.round(handlePagePosition.x)}:${Math.round(handlePagePosition.y)}:${draggingTerminal}`
+		const lastKey = handleLastDragKey.get(connectorId)
+		if (lastKey === key) {
+			return connector
+		}
+		handleLastDragKey.set(connectorId, key)
 
 		// 排除连接器自身；同时排除对侧已绑定的形状，防止拖回同一形状产生自环
 		const excludeShapeIds = new Set<TLShapeId>([connectorId])
