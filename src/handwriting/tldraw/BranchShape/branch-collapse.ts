@@ -1,4 +1,4 @@
-import { Editor, TLShape, TLShapeId } from '@tldraw/tldraw'
+import { computed, Editor, EditorAtom, TLShape, TLShapeId } from '@tldraw/tldraw'
 import { settingdata } from '@/index'
 import { IBranchShape } from './branch-shape-types'
 import { getAllBranchChildIds, layoutBranchChildren, relayoutBranchesContainingShapes } from './branch-layout'
@@ -15,19 +15,11 @@ const branchLayoutAnimation = {
 
 type ShapeSnapshot = Pick<TLShape, 'id' | 'type' | 'x' | 'y' | 'props'>
 
-function getCurrentBranches(editor: Editor) {
-	return editor
-		.getCurrentPageShapes()
-		.filter((shape): shape is IBranchShape => shape.type === 'branch')
-}
-
-/**
- * Returns every visual descendant of a branch. A branch's own root content is
- * intentionally excluded, while root content belonging to nested branches is
- * included as part of the descendant subtree.
- */
-export function getBranchDescendantShapeIds(editor: Editor, branch: IBranchShape) {
-	const descendants = new Set<string>()
+function addBranchDescendantShapeIds(
+	branch: IBranchShape,
+	descendants: Set<string>,
+	getChildBranch: (childId: string) => IBranchShape | undefined
+) {
 	const visitedBranchIds = new Set<string>()
 	const rootBranchId = branch.id as string
 
@@ -41,8 +33,8 @@ export function getBranchDescendantShapeIds(editor: Editor, branch: IBranchShape
 			// collapse control itself.
 			if (childId !== rootBranchId) descendants.add(childId)
 
-			const child = editor.getShape<IBranchShape>(childId as TLShapeId)
-			if (child?.type !== 'branch') continue
+			const child = getChildBranch(childId)
+			if (!child) continue
 
 			if (child.props.rootShapeId && child.props.rootShapeId !== rootBranchId) {
 				descendants.add(child.props.rootShapeId)
@@ -52,16 +44,52 @@ export function getBranchDescendantShapeIds(editor: Editor, branch: IBranchShape
 	}
 
 	visitBranch(branch)
+}
+
+/**
+ * Returns every visual descendant of a branch. A branch's own root content is
+ * intentionally excluded, while root content belonging to nested branches is
+ * included as part of the descendant subtree.
+ */
+export function getBranchDescendantShapeIds(editor: Editor, branch: IBranchShape) {
+	const descendants = new Set<string>()
+	addBranchDescendantShapeIds(branch, descendants, (childId) => {
+		const child = editor.getShape<IBranchShape>(childId as TLShapeId)
+		return child?.type === 'branch' ? child : undefined
+	})
 	return descendants
 }
 
+// Keep the branch-type index and the derived hidden set scoped to an Editor.
+// This avoids sharing state between whiteboards while letting tldraw invalidate
+// only on page or Branch-record changes.
+const BranchShapeIds = new EditorAtom('branch shape ids', (editor) => editor.store.query.index('shape', 'type'))
+
+const CollapsedBranchDescendantShapeIds = new EditorAtom('collapsed branch descendant shape ids', (editor) =>
+	computed('collapsed branch descendant shape ids', () => {
+		const hiddenShapeIds = new Set<string>()
+		const currentPageShapeIds = editor.getCurrentPageShapeIds()
+		const branchShapeIds = BranchShapeIds.get(editor).get().get('branch')
+		if (!branchShapeIds) return hiddenShapeIds
+
+		for (const branchId of branchShapeIds) {
+			if (!currentPageShapeIds.has(branchId as TLShapeId)) continue
+			const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
+			if (branch?.type !== 'branch' || !branch.props.isCollapsed) continue
+
+			addBranchDescendantShapeIds(branch, hiddenShapeIds, (childId) => {
+				if (!branchShapeIds.has(childId as TLShapeId)) return undefined
+				const child = editor.getShape<IBranchShape>(childId as TLShapeId)
+				return child?.type === 'branch' ? child : undefined
+			})
+		}
+
+		return hiddenShapeIds
+	})
+)
+
 export function isShapeHiddenByCollapsedBranch(editor: Editor, shape: TLShape) {
-	const shapeId = shape.id as string
-	for (const branch of getCurrentBranches(editor)) {
-		if (!branch.props.isCollapsed) continue
-		if (getBranchDescendantShapeIds(editor, branch).has(shapeId)) return true
-	}
-	return false
+	return CollapsedBranchDescendantShapeIds.get(editor).get().has(shape.id as string)
 }
 
 /** Provides tldraw's rendering and hit-testing visibility for collapsed trees. */
