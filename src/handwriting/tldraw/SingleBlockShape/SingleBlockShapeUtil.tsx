@@ -417,6 +417,9 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			(branchInteractionHint.targetShapeId === shape.id ||
 				(!branchInteractionHint.targetShapeId && branchInteractionHint.draggingShapeId === shape.id))
 		const isEditingState = isEditing
+		// 始终指向最新编辑态，供 shapeLoadManager 的 metaProvider 读取（避免把 isEditingState 放进 effect 依赖导致重注册）
+		const isEditingStateRef = useRef(isEditingState);
+		isEditingStateRef.current = isEditingState;
 		// Stay blocked until ShapeLoadManager computes this shape's visibility.
 		// Effects in the initial commit still see these values after registration.
 		const [isInViewport, setIsInViewport] = useState(false)
@@ -640,19 +643,22 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 			return () => clearTimeout(timer)
 		}, [isEditing, shape.id])
 
+		// register with global shape load manager (drives visibility + load admission)
+		// 注意：依赖只放 shape.id，编辑态切换通过 isEditingStateRef 读取，避免每次编辑翻转都 unregister/register，
+		// 否则 shapeLoadManager 的悲观重置会让入场状态短暂回落到 blocked，导致退出编辑时闪一下。
 		useEffect(() => {
 			shapeLoadManager.attachEditor(editor as any)
 			const unregister = shapeLoadManager.register(
 				shape.id,
 				editor as any,
-				() => ({ editing: isEditingState }),
+				() => ({ editing: isEditingStateRef.current }),
 				(allowed, meta) => {
 					setCanLoad(allowed)
 					setIsInViewport(meta.inViewport)
 				}
 			)
 			return unregister
-		}, [isEditingState, shape.id])
+		}, [shape.id])
 
 		// ===== 核心优化：只在编辑态创建 Protyle，非编辑态使用静态 HTML =====
 		

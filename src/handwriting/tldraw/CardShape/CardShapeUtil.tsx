@@ -322,7 +322,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const isSmallCard = !isEditingState && hasEnoughShapesForLowDetail && lowDetailThreshold > 0 && Math.min(shape.props.w, shape.props.h) * efficientZoom < lowDetailThreshold
 		// Shapes outside the full-preview budget keep their persisted text summary.
 		// This makes viewport culling visually consistent with low-zoom rendering.
-		const shouldUseLightweightPreview = !isEditingState && !isCollapsed && (isSmallCard || !canLoad)
+		const exitEditGraceUntilRef = useRef(0)
+		// 退出编辑的宽限期内不降级为轻量预览，避免相机动画过程中尺寸/缩放抖动引发的闪动
+		const inExitGrace = Date.now() < exitEditGraceUntilRef.current
+		const shouldUseLightweightPreview = !isEditingState && !isCollapsed && (isSmallCard || !canLoad) && !inExitGrace
 		const lowDetailFontSize = getShapeLowDetailFontSize(Math.min(shape.props.w, shape.props.h), efficientZoom)
 		const isMainCard = Boolean(shape.props.isMain);
 		const collapsedTextSize = shape.props.collapsedTextSize || 21; // 折叠文字大小，默认21px
@@ -363,6 +366,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 		// 追踪上一次的编辑状态，用于检测编辑->非编辑的切换
 		const prevIsEditingRef = useRef(isEditingState);
+		// 始终指向最新编辑态，供 shapeLoadManager 的 metaProvider 读取（避免把 isEditingState 放进 effect 依赖导致重注册）
+		const isEditingStateRef = useRef(isEditingState);
+		isEditingStateRef.current = isEditingState;
+		// 退出编辑后的短暂宽限期：期间不销毁/不降级为轻量预览，避免相机动画与准入重算造成的闪动
+		const [exitEditGrace, setExitEditGrace] = useState(false);
+		const exitEditGraceTimerRef = useRef<number | null>(null);
 		const refreshNonceRef = useRef(shape.props.refreshNonce);
 		// 每个新卡片只询问一次用户标题，避免编辑态重渲染时重复弹窗
 		const userTitlePromptedRef = useRef(false)
@@ -505,6 +514,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 全局由 shapeLoadManager 计算可见性，无需本地定时轮询
 		const loadHandleRef = useRef<ProtyleLoadHandle | null>(null)
 
+		const setProtyleHostVisible = useCallback((visible: boolean) => {
+			const host = protyleHostRef.current
+			if (host) host.style.display = visible ? '' : 'none'
+		}, [])
+
 		const destroyRuntimeResources = useCallback(() => {
 			if (loadHandleRef.current) {
 				loadHandleRef.current.cancel()
@@ -630,9 +644,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		}, [shape.props.h])
 
 		// 检测编辑状态变化：从编辑 -> 非编辑时，使静态预览缓存失效
+		const prevEditingForCacheRef = useRef(isEditingState);
 		useEffect(() => {
-			const wasEditing = prevIsEditingRef.current;
-			prevIsEditingRef.current = isEditingState;
+			const wasEditing = prevEditingForCacheRef.current;
+			prevEditingForCacheRef.current = isEditingState;
 
 			// 从编辑状态退出时，使该 blockId 的缓存失效，确保下次使用最新内容
 			if (wasEditing && !isEditingState && blockId) {
@@ -871,19 +886,21 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 
 		// register with global shape load manager (drives visibility + load admission)
+		// 注意：依赖只放 shape.id，编辑态切换通过 isEditingStateRef 读取，避免每次编辑翻转都 unregister/register，
+		// 否则 shapeLoadManager 的悲观重置会让入场状态短暂回落到 blocked，导致退出编辑时闪一下。
 		useEffect(() => {
 			shapeLoadManager.attachEditor(this.editor as any)
 			const unregister = shapeLoadManager.register(
 				shape.id,
 				this.editor as any,
-				() => ({ editing: isEditingState }),
+				() => ({ editing: isEditingStateRef.current }),
 				(allowed, meta) => {
 					setCanLoad(allowed)
 					setIsInViewport(meta.inViewport)
 				}
 			)
 			return unregister
-		}, [isEditingState, shape.id])
+		}, [shape.id])
 
 		// 移除轻量预览逻辑，统一使用 Protyle 渲染
 
@@ -945,19 +962,39 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				manualRefreshTriggered;
 			// 更新引用以记录最新的 nonce
 			refreshNonceRef.current = shape.props.refreshNonce;
+
+			// 检测刚从编辑态退出：在宽限期内不降级/不销毁，避免相机动画与准入重算造成的闪动
+			const wasEditing = prevIsEditingRef.current && !isEditingState;
+			prevIsEditingRef.current = isEditingState;
+			if (wasEditing) {
+				exitEditGraceUntilRef.current = Date.now() + 600;
+				setExitEditGrace(true);
+				if (exitEditGraceTimerRef.current) window.clearTimeout(exitEditGraceTimerRef.current);
+				exitEditGraceTimerRef.current = window.setTimeout(() => {
+					exitEditGraceUntilRef.current = 0;
+					setExitEditGrace(false);
+				}, 600);
+			}
+			const inExitGrace = Date.now() < exitEditGraceUntilRef.current;
+
 			// 折叠状态下不渲染 Protyle
 			if (isCollapsed && !isEditingState) {
 				destroyRuntimeResources();
 				return;
 			}
-			if (isSmallCard) {
+			if (isSmallCard && !inExitGrace) {
 				destroyRuntimeResources();
 				return;
 			}
 
 			const shouldRender = renderAdmission === 'allowed';
 			if (!shouldRender) {
-				destroyRuntimeResources();
+				// live-protyle 模式仅在实例存在时隐藏而非销毁，等待准入恢复后复用，避免闪动
+				if (effectiveRenderMode === 'live-protyle' && protyleRef.current) {
+					setProtyleHostVisible(false);
+				} else {
+					destroyRuntimeResources();
+				}
 				return;
 			}
 
@@ -1444,9 +1481,6 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 			let cancelled = false;
 
-			// 检测是否刚从编辑状态退出（用于强制刷新缓存）
-			const wasEditing = prevIsEditingRef.current && !isEditingState;
-
 			(async () => {
 				if (isEditingState) {
 					// 进入编辑：移除静态预览，创建或复用 Protyle
@@ -1469,6 +1503,9 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 						containerRef.current.appendChild(protyleHostRef.current);
 					}
+					// A live Protyle may have been retained but hidden while it was
+					// outside the load budget. Editing must always make that host visible.
+					setProtyleHostVisible(true);
 					removeStaticPreviewLinkHandlers()
 					try { protyleRef.current?.enable(); } catch { }
 				} else {
@@ -1511,6 +1548,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (protyleHostRef.current && containerRef.current && protyleHostRef.current.parentElement !== containerRef.current) {
 							containerRef.current.appendChild(protyleHostRef.current);
 						}
+						setProtyleHostVisible(true);
 						// 禁用交互但保留实例
 						if (protyleHostRef.current) {
 							removeStaticPreviewLinkHandlers()
@@ -1518,25 +1556,40 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						try { protyleRef.current?.disable(); } catch { }
 						persistPreviewText(getLightweightPreviewTextFromElement(protyleHostRef.current))
-						// 如果刚从编辑状态退出，刷新内容以反映最新编辑
-						if (wasEditing) {
-							try { protyleRef.current?.reload(false); } catch { }
-						}
+						// live-protyle 模式下实例在编辑时一直保留，内容已是最新，无需再 reload（reload 反而会造成闪动）
 					}
 				}
 			})()
 
-			// 组件卸载清理（仅在真正卸载时销毁，编辑状态切换不触发）
+			// 组件卸载/依赖变更清理
 			return () => {
 				cancelled = true;
 				cancelIdleRender(renderTaskId);
-				// 对于 live-protyle 模式，不在编辑切换时销毁资源
-				// 仅当组件真正卸载或渲染条件不满足时才销毁
-				if (isCollapsed || !shouldRender) {
+				// live-protyle 不在编辑切换/临时不通不过准入时销毁资源，仅折叠或真正卸载时销毁
+				if (isCollapsed || (effectiveRenderMode !== 'live-protyle' && !shouldRender)) {
 					destroyRuntimeResources();
 				}
 			};
-		}, [destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard, persistLightweightPreviewText, persistPreviewText]);
+		}, [destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard, exitEditGrace, persistLightweightPreviewText, persistPreviewText]);
+
+		// 真正卸载时（切换到其它白板 / 删除卡片）销毁 Protyle，避免 live 模式下实例被保留后泄漏
+		useEffect(() => {
+			return () => {
+				if (exitEditGraceTimerRef.current) {
+					window.clearTimeout(exitEditGraceTimerRef.current);
+					exitEditGraceTimerRef.current = null;
+				}
+				exitEditGraceUntilRef.current = 0;
+				if (protyleRef.current) {
+					safeDestroyProtyle(protyleRef.current);
+					protyleRef.current = null;
+				}
+				if (protyleHostRef.current?.parentElement) {
+					try { protyleHostRef.current.parentElement.removeChild(protyleHostRef.current); } catch { }
+				}
+				protyleHostRef.current = null;
+			};
+		}, [shape.id]);
 
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {

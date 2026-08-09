@@ -42,6 +42,9 @@ interface RegisteredShape {
 
 class ShapeLoadManager {
   private shapes: Map<TLShapeId, RegisteredShape> = new Map()
+  // Permission snapshots survive one synchronous unregister/register effect
+  // cycle, preventing a brief fallback to "blocked" during a re-registration.
+  private snapshots: Map<TLShapeId, { lastAllowed: boolean; lastComputed: ComputedMeta }> = new Map()
   private editors: Set<Editor> = new Set()
   private rafId: number | null = null
   private immediateRecomputeQueued = false
@@ -61,19 +64,20 @@ class ShapeLoadManager {
       existing.onChange = onPermissionChange
       return () => this.unregister(shapeId)
     }
+    const snapshot = this.snapshots.get(shapeId)
     const entry: RegisteredShape = {
       id: shapeId,
       editor,
       metaProvider,
       onChange: onPermissionChange,
-      lastAllowed: false,
-      lastComputed: { inViewport: false, distance: Infinity },
+      lastAllowed: snapshot ? snapshot.lastAllowed : false,
+      lastComputed: snapshot ? snapshot.lastComputed : { inViewport: false, distance: Infinity },
     }
     this.shapes.set(shapeId, entry)
+    // A remounted component starts with its own local state. Always deliver the
+    // cached permission, otherwise a no-op recompute would leave it blocked.
+    onPermissionChange(entry.lastAllowed, entry.lastComputed)
     this.ensureLoop()
-    // Do not let the initial optimistic component state start loading every shape.
-    // Recompute once after the current batch of React effects has registered.
-    onPermissionChange(false, entry.lastComputed)
     if (!this.immediateRecomputeQueued) {
       this.immediateRecomputeQueued = true
       queueMicrotask(() => {
@@ -85,7 +89,16 @@ class ShapeLoadManager {
   }
 
   unregister(shapeId: TLShapeId) {
+    const existing = this.shapes.get(shapeId)
+    if (existing) {
+      this.snapshots.set(shapeId, { lastAllowed: existing.lastAllowed, lastComputed: existing.lastComputed })
+    }
     this.shapes.delete(shapeId)
+    // Effect cleanups and their replacements run synchronously. Retain the
+    // snapshot for that hand-off only; discard orphaned shape ids afterwards.
+    queueMicrotask(() => {
+      if (!this.shapes.has(shapeId)) this.snapshots.delete(shapeId)
+    })
     if (this.shapes.size === 0) this.stopLoop()
   }
 
