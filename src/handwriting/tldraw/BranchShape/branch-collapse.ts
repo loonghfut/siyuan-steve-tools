@@ -60,6 +60,74 @@ export function getBranchDescendantShapeIds(editor: Editor, branch: IBranchShape
 	return descendants
 }
 
+/** Applies one collapsed state to a branch and every nested branch below it. */
+function setBranchSubtreeCollapsed(editor: Editor, branchId: TLShapeId | string, isCollapsed: boolean) {
+	const rootBranch = editor.getShape<IBranchShape>(branchId as TLShapeId)
+	if (!rootBranch || rootBranch.type !== 'branch') return false
+
+	if (isCollapsed) {
+		const descendants = getBranchDescendantShapeIds(editor, rootBranch)
+		const selectedDescendants = editor
+			.getSelectedShapeIds()
+			.filter((shapeId) => descendants.has(shapeId as string))
+		if (selectedDescendants.length > 0) editor.deselect(...selectedDescendants)
+	}
+
+	const visited = new Set<string>()
+	const branchesInLayoutOrder: TLShapeId[] = []
+	const collectBranches = (branch: IBranchShape) => {
+		const id = branch.id as string
+		if (visited.has(id)) return
+		visited.add(id)
+
+		for (const childId of getAllBranchChildIds(branch)) {
+			const child = editor.getShape<IBranchShape>(childId as TLShapeId)
+			if (child?.type === 'branch') collectBranches(child)
+		}
+		// Children first ensures every parent measures the updated nested layout.
+		branchesInLayoutOrder.push(branch.id)
+	}
+	collectBranches(rootBranch)
+
+	editor.run(() => {
+		for (const id of branchesInLayoutOrder) {
+			const branch = editor.getShape<IBranchShape>(id)
+			if (!branch || branch.type !== 'branch' || branch.props.isCollapsed === isCollapsed) continue
+			editor.updateShape<IBranchShape>({
+				id: branch.id,
+				type: 'branch',
+				props: { ...branch.props, isCollapsed },
+			})
+		}
+
+		for (const id of branchesInLayoutOrder) {
+			const branch = editor.getShape<IBranchShape>(id)
+			if (branch?.type === 'branch') layoutBranchChildren(editor, branch)
+		}
+		relayoutBranchesContainingShapes(editor, [rootBranch.id], new Set())
+	})
+
+	return true
+}
+
+/**
+ * Bulk operations are committed in one history step and deliberately skip
+ * per-branch animations, avoiding a queue of competing nested transitions.
+ */
+export function collapseBranchSubtree(editor: Editor, branchId: TLShapeId | string) {
+	return setBranchSubtreeCollapsed(editor, branchId, true)
+}
+
+export function expandBranchSubtree(editor: Editor, branchId: TLShapeId | string) {
+	return setBranchSubtreeCollapsed(editor, branchId, false)
+}
+
+export function toggleBranchSubtreeCollapsed(editor: Editor, branchId: TLShapeId | string) {
+	const branch = editor.getShape<IBranchShape>(branchId as TLShapeId)
+	if (!branch || branch.type !== 'branch') return false
+	return setBranchSubtreeCollapsed(editor, branch.id, !branch.props.isCollapsed)
+}
+
 // Keep the branch-type index and the derived hidden set scoped to an Editor.
 // This avoids sharing state between whiteboards while letting tldraw invalidate
 // only on page or Branch-record changes.

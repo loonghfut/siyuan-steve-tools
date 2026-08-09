@@ -39,6 +39,7 @@ import {
     getAllBranchChildIds,
     getBranchRootParent,
     toggleBranchCollapsed,
+    toggleBranchSubtreeCollapsed,
 } from '../../BranchShape'
 import type { ISingleBlockShape } from '../../SingleBlockShape/single-block-shape-types'
 import { ConnectorExtensionMenu } from '../../BezierConnectorShape/ConnectorExtensionMenu'
@@ -235,7 +236,7 @@ export const InFrontOfCanvas: React.FC = () => {
         transition: 'all 0.2s ease',
     }
 
-    const HoverButton = ({ onClick, title, children, style, active, pending }: any) => {
+    const HoverButton = ({ onClick, onContextMenu, title, children, style, active, pending }: any) => {
         const [hover, setHover] = React.useState(false)
         
         const getBackground = () => {
@@ -262,6 +263,7 @@ export const InFrontOfCanvas: React.FC = () => {
                 onMouseEnter={() => setHover(true)}
                 onMouseLeave={() => setHover(false)}
                 onClick={onClick}
+                onContextMenu={onContextMenu}
                 title={title}
             >
                 {children}
@@ -351,7 +353,12 @@ export const InFrontOfCanvas: React.FC = () => {
                                     style={buttonStyle}
                                     active={selectedBranch.props.isCollapsed === true}
                                     onClick={() => toggleBranchCollapsed(editor, selectionInfo.id)}
-                                    title={selectedBranch.props.isCollapsed ? '展开分支' : '收缩分支'}
+                                    onContextMenu={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        toggleBranchSubtreeCollapsed(editor, selectionInfo.id)
+                                    }}
+                                    title={`${selectedBranch.props.isCollapsed ? '展开分支' : '收缩分支'}（右键：${selectedBranch.props.isCollapsed ? '展开所有子项' : '折叠所有子项'}）`}
                                 >
                                     {selectedBranch.props.isCollapsed ? <Icons.BranchExpand /> : <Icons.BranchCollapse />}
                                 </HoverButton>
@@ -432,7 +439,12 @@ export const InFrontOfCanvas: React.FC = () => {
                                             style={buttonStyle}
                                             active={rootParentBranch.props.isCollapsed === true}
                                             onClick={() => toggleBranchCollapsed(editor, rootParentBranch.id)}
-                                            title={rootParentBranch.props.isCollapsed ? '展开分支' : '收缩分支'}
+                                            onContextMenu={(event) => {
+                                                event.preventDefault()
+                                                event.stopPropagation()
+                                                toggleBranchSubtreeCollapsed(editor, rootParentBranch.id)
+                                            }}
+                                            title={`${rootParentBranch.props.isCollapsed ? '展开分支' : '收缩分支'}（右键：${rootParentBranch.props.isCollapsed ? '展开所有子项' : '折叠所有子项'}）`}
                                         >
                                             {rootParentBranch.props.isCollapsed ? <Icons.BranchExpand /> : <Icons.BranchCollapse />}
                                         </HoverButton>
