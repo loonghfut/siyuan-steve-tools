@@ -136,18 +136,13 @@ function getBezierLabelSize(editor: Editor, shape: IBezierConnectorShape) {
  */
 function getBezierLabelPosition(
 	editor: Editor,
-	connector: IBezierConnectorShape
+	connector: IBezierConnectorShape,
+	providedBezier?: CubicBezier2d
 ): { box: Box } {
-	const { start, end, startPortId, endPortId } = getConnectorTerminals(editor, connector)
-	const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-
-	// 创建贝塞尔曲线几何体
-	const bezier = new CubicBezier2d({
-		start: Vec.From(start),
-		cp1: Vec.From(cp1),
-		cp2: Vec.From(cp2),
-		end: Vec.From(end),
-	})
+	const bezier = providedBezier ?? (() => {
+		const { start, end, startPortId, endPortId } = getConnectorTerminals(editor, connector)
+		return getBezierLayout(start, end, startPortId, endPortId).bezier
+	})()
 
 	// 在标签位置插值获取中心点
 	const labelPosition = clamp(connector.props.labelPosition, 0, 1)
@@ -268,12 +263,45 @@ function getConnectionControlPoints(
 	return [cp1, cp2]
 }
 
-/**
- * 生成 SVG 路径
- */
-function getConnectionPath(start: VecLike, end: VecLike, startPortId?: string, endPortId?: string): string {
+interface BezierLayout {
+	bezier: CubicBezier2d
+	path: string
+}
+
+function getBezierLayout(start: VecLike, end: VecLike, startPortId?: string, endPortId?: string): BezierLayout {
 	const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-	return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
+	return {
+		bezier: new CubicBezier2d({
+			start: Vec.From(start),
+			cp1: Vec.From(cp1),
+			cp2: Vec.From(cp2),
+			end: Vec.From(end),
+		}),
+		path: `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`,
+	}
+}
+
+/**
+ * Build the even-odd clipping path used everywhere a label covers a connector.
+ * Keeping this in one place prevents the rendered connector, selection indicator,
+ * and SVG export from drifting apart.
+ */
+function getLabelClipPath(bezier: CubicBezier2d, labelBounds: Box): string {
+	const bounds = bezier.bounds
+	const padding = 100
+	const hole = labelBounds.clone()
+	return [
+		`M ${bounds.minX - padding} ${bounds.minY - padding}`,
+		`L ${bounds.maxX + padding} ${bounds.minY - padding}`,
+		`L ${bounds.maxX + padding} ${bounds.maxY + padding}`,
+		`L ${bounds.minX - padding} ${bounds.maxY + padding}`,
+		'Z',
+		`M ${hole.minX} ${hole.minY}`,
+		`L ${hole.maxX} ${hole.minY}`,
+		`L ${hole.maxX} ${hole.maxY}`,
+		`L ${hole.minX} ${hole.maxY}`,
+		'Z',
+	].join(' ')
 }
 
 function getStrokeDasharray(strokeStyle?: IBezierConnectorShape['props']['strokeStyle']) {
@@ -401,18 +429,27 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 		() => getConnectorTerminals(editor, connector),
 		[editor, connector]
 	)
-	const { highlightConnectorId, flashConnectorId } = useValue('connector-highlights', () => {
-		const s = getPortState(editor)
-		return { highlightConnectorId: s.highlightConnectorId, flashConnectorId: s.flashConnectorId }
-	}, [editor])
-	const isHighlighted = highlightConnectorId === connector.id
-	const isFlashing = flashConnectorId === connector.id
+	// Subscribe to per-connector booleans rather than a freshly allocated global
+	// state object. A hint change should only re-render the old/new connector.
+	const isHighlighted = useValue(
+		'connector-highlighted',
+		() => getPortState(editor).highlightConnectorId === connector.id,
+		[editor, connector.id]
+	)
+	const isFlashing = useValue(
+		'connector-flashing',
+		() => getPortState(editor).flashConnectorId === connector.id,
+		[editor, connector.id]
+	)
 
 	// 标签相关
 	const isEditing = useValue('isEditing', () => editor.getEditingShapeId() === connector.id, [editor, connector.id])
-	const isSelected = useValue('isSelected', () => editor.getOnlySelectedShapeId() === connector.id, [editor, connector.id])
+	const isSelected = useValue(
+		'isSelected',
+		() => editor.getSelectedShapeIds().includes(connector.id),
+		[editor, connector.id]
+	)
 	const showLabel = isEditing || !isEmptyRichText(connector.props.richText)
-	const labelPosition = getBezierLabelPosition(editor, connector)
 	const fontSize = getBezierLabelFontSize(connector)
 	const labelColor = theme[connector.props.color].solid
 
@@ -421,15 +458,14 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 		[connector.id]
 	)
 
-	const bezier = React.useMemo(() => {
-		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-		return new CubicBezier2d({
-			start: Vec.From(start),
-			cp1: Vec.From(cp1),
-			cp2: Vec.From(cp2),
-			end: Vec.From(end),
-		})
+	const layout = React.useMemo(() => {
+		return getBezierLayout(start, end, startPortId, endPortId)
 	}, [start, end, startPortId, endPortId])
+	const bezier = layout.bezier
+	const labelPosition = React.useMemo(
+		() => getBezierLabelPosition(editor, connector, bezier),
+		[editor, connector, bezier]
+	)
 
 	// 直接拖拽文字框：仿照 tldraw 的 PointingArrowLabel
 	const dragState = React.useRef<{
@@ -539,42 +575,18 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 						<clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
 							<path
 								clipRule="evenodd"
-								d={(() => {
-									const b = bezier.bounds
-									const pad = 100
-									const outerLeft = b.minX - pad
-									const outerTop = b.minY - pad
-									const outerRight = b.maxX + pad
-									const outerBottom = b.maxY + pad
-
-									// 缺口按整个 label box 裁掉（与 tldraw arrow 一致），确保曲线不穿过文字框
-									const hole = labelPosition.box.clone().expandBy(0)
-									return [
-										`M ${outerLeft} ${outerTop}`,
-										`L ${outerRight} ${outerTop}`,
-										`L ${outerRight} ${outerBottom}`,
-										`L ${outerLeft} ${outerBottom}`,
-										`Z`,
-										`M ${hole.minX} ${hole.minY}`,
-										`L ${hole.maxX} ${hole.minY}`,
-										`L ${hole.maxX} ${hole.maxY}`,
-										`L ${hole.minX} ${hole.maxY}`,
-										`Z`,
-									].join(' ')
-								})()}
+								d={getLabelClipPath(bezier, labelPosition.box)}
 							/>
 						</clipPath>
 					</defs>
 				)}
-				{renderConnectorPathAndEndpoints(
-					start,
-					end,
+				{renderConnectorPath(
+					layout.path,
 					connector.props,
 					theme,
-					startPortId,
-					endPortId,
 					isHighlighted,
 					isFlashing,
+					isSelected,
 					showLabel ? clipPathId : undefined
 				)}
 			</SVGContainer>
@@ -627,57 +639,37 @@ function BezierConnectorComponent({ connector }: { connector: IBezierConnectorSh
 /**
  * 抽取出的渲染函数：在 component 和 toSvg 中复用，避免样式/行为不同步
  */
-function renderConnectorPathAndEndpoints(
-	start: VecLike,
-	end: VecLike,
+function renderConnectorPath(
+	path: string,
 	props: IBezierConnectorShape['props'],
 	theme: ReturnType<typeof getDefaultColorTheme>,
-	startPortId?: string,
-	endPortId?: string
-	, isHighlighted: boolean = false, isFlashing: boolean = false,
+	isHighlighted: boolean = false,
+	isFlashing: boolean = false,
+	isSelected: boolean = false,
 	clipPathId?: string
 ) {
-	const d = getConnectionPath(start, end, startPortId, endPortId)
-	const r = Math.max(3, (props.strokeWidth || 2) + 1)
 	const color = (theme && theme[props.color] && theme[props.color].solid) || props.color || theme.black.solid
 	const strokeStyle = props.strokeStyle ?? 'solid'
 	const strokeDasharray = getStrokeDasharray(strokeStyle)
-	const isFlowing = strokeStyle === 'flowing'
-	// 如果需要高亮或闪烁，先画一条宽的半透明路径作为 glow/halo
-	const highlight = isHighlighted || isFlashing
-	const highlightWidth = Math.max(0, (props.strokeWidth || 2) + (isHighlighted ? 3 : 0) + (isFlashing ? 2 : 0))
-	const highlightOpacity = isFlashing ? 0.6 : 0.28
+	const isFlowing = strokeStyle === 'flowing' && (isSelected || isHighlighted || isFlashing)
+	// Keep drag feedback on the same path. A small width change is easier to
+	// read than a second translucent glow path and avoids doubling SVG paint.
+	const isFeedback = isHighlighted || isFlashing
+	const strokeWidth = Math.max(0.5, (props.strokeWidth || 2) + (isFlashing ? 1 : isHighlighted ? 0.5 : 0))
 
 	return (
 		<>
-			{highlight && (
-				<path
-					d={d}
-					stroke={color}
-					strokeWidth={highlightWidth}
-					strokeLinecap="round"
-					fill="none"
-					strokeOpacity={highlightOpacity}
-					strokeDasharray={strokeDasharray}
-					clipPath={clipPathId ? `url(#${clipPathId})` : undefined}
-				/>
-			)}
 			<path
-				d={d}
+				d={path}
 				stroke={color}
-				strokeWidth={props.strokeWidth}
+				strokeWidth={strokeWidth}
 				strokeLinecap="round"
 				fill="none"
+				strokeOpacity={isFeedback && isFlashing ? 0.9 : 1}
 				strokeDasharray={strokeDasharray}
 				className={isFlowing ? 'bezier-connector-path bezier-connector-path--flowing' : 'bezier-connector-path'}
 				clipPath={clipPathId ? `url(#${clipPathId})` : undefined}
 			/>
-			{start && (
-				<circle cx={start.x} cy={start.y} r={r} fill={color} stroke="none" />
-			)}
-			{end && (
-				<circle cx={end.x} cy={end.y} r={r} fill={color} stroke="none" />
-			)}
 		</>
 	)
 }
@@ -735,19 +727,13 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	getGeometry(connector: IBezierConnectorShape) {
 		const isEditing = this.editor.getEditingShapeId() === connector.id
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
-		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-
-		const bodyGeom = new CubicBezier2d({
-			start: Vec.From(start),
-			cp1: Vec.From(cp1),
-			cp2: Vec.From(cp2),
-			end: Vec.From(end),
-		})
+		const layout = getBezierLayout(start, end, startPortId, endPortId)
+		const bodyGeom = layout.bezier
 
 		// 如果正在编辑或有文本，添加标签几何体
 		let labelGeom: Rectangle2d | undefined
 		if (isEditing || !isEmptyRichText(connector.props.richText)) {
-			const labelPosition = getBezierLabelPosition(this.editor, connector)
+			const labelPosition = getBezierLabelPosition(this.editor, connector, layout.bezier)
 			labelGeom = new Rectangle2d({
 				x: labelPosition.box.x,
 				y: labelPosition.box.y,
@@ -765,7 +751,7 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 
 	override getIndicatorPath(connector: IBezierConnectorShape) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
-		return new Path2D(getConnectionPath(start, end, startPortId, endPortId))
+		return new Path2D(getBezierLayout(start, end, startPortId, endPortId).path)
 	}
 
 	override getText(shape: IBezierConnectorShape) {
@@ -982,19 +968,12 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	override toSvg(connector: IBezierConnectorShape, ctx: SvgExportContext) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
 		const theme = getDefaultColorTheme({ isDarkMode: ctx.isDarkMode })
-		const labelPosition = getBezierLabelPosition(this.editor, connector)
+		const layout = getBezierLayout(start, end, startPortId, endPortId)
+		const labelPosition = getBezierLabelPosition(this.editor, connector, layout.bezier)
 		const isEmpty = isEmptyRichText(connector.props.richText)
 		const fontSize = getBezierLabelFontSize(connector)
 		const labelColor = theme[connector.props.color].solid
 		const clipPathId = `bezier-connector-export-clip-${connector.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-		const bezier = new CubicBezier2d({
-			start: Vec.From(start),
-			cp1: Vec.From(cp1),
-			cp2: Vec.From(cp2),
-			end: Vec.From(end),
-		})
-
 		return (
 			<g>
 				{!isEmpty && (
@@ -1002,38 +981,16 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 						<clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
 							<path
 								clipRule="evenodd"
-								d={(() => {
-									const b = bezier.bounds
-									const pad = 100
-									const outerLeft = b.minX - pad
-									const outerTop = b.minY - pad
-									const outerRight = b.maxX + pad
-									const outerBottom = b.maxY + pad
-									const hole = labelPosition.box.clone().expandBy(0)
-									return [
-										`M ${outerLeft} ${outerTop}`,
-										`L ${outerRight} ${outerTop}`,
-										`L ${outerRight} ${outerBottom}`,
-										`L ${outerLeft} ${outerBottom}`,
-										`Z`,
-										`M ${hole.minX} ${hole.minY}`,
-										`L ${hole.maxX} ${hole.minY}`,
-										`L ${hole.maxX} ${hole.maxY}`,
-										`L ${hole.minX} ${hole.maxY}`,
-										`Z`,
-									].join(' ')
-								})()}
+								d={getLabelClipPath(layout.bezier, labelPosition.box)}
 							/>
 						</clipPath>
 					</defs>
 				)}
-				{renderConnectorPathAndEndpoints(
-					start,
-					end,
+				{renderConnectorPath(
+					layout.path,
 					connector.props,
 					theme,
-					startPortId,
-					endPortId,
+					false,
 					false,
 					false,
 					!isEmpty ? clipPathId : undefined
@@ -1058,20 +1015,12 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 	// 渲染选中指示器
 	indicator(connector: IBezierConnectorShape) {
 		const { start, end, startPortId, endPortId } = getConnectorTerminals(this.editor, connector)
-		const strokeStyle = connector.props.strokeStyle ?? 'solid'
 		const isEmpty = isEmptyRichText(connector.props.richText)
 		const isEditing = this.editor.getEditingShapeId() === connector.id
 		const clipPathId = `bezier-connector-indicator-clip-${connector.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-
-		const labelPosition = getBezierLabelPosition(this.editor, connector)
+		const layout = getBezierLayout(start, end, startPortId, endPortId)
+		const labelPosition = getBezierLabelPosition(this.editor, connector, layout.bezier)
 		const labelBounds = labelPosition.box
-		const [cp1, cp2] = getConnectionControlPoints(start, end, startPortId, endPortId)
-		const bezier = new CubicBezier2d({
-			start: Vec.From(start),
-			cp1: Vec.From(cp1),
-			cp2: Vec.From(cp2),
-			end: Vec.From(end),
-		})
 
 		// 如果正在编辑，只显示标签框的指示器
 		if (isEditing && !isEmpty) {
@@ -1094,36 +1043,16 @@ export class BezierConnectorShapeUtil extends ShapeUtil<IBezierConnectorShape> {
 						<clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
 							<path
 								clipRule="evenodd"
-								d={(() => {
-									const b = bezier.bounds
-									const pad = 100
-									const outerLeft = b.minX - pad
-									const outerTop = b.minY - pad
-									const outerRight = b.maxX + pad
-									const outerBottom = b.maxY + pad
-									const hole = labelBounds.clone().expandBy(0)
-									return [
-										`M ${outerLeft} ${outerTop}`,
-										`L ${outerRight} ${outerTop}`,
-										`L ${outerRight} ${outerBottom}`,
-										`L ${outerLeft} ${outerBottom}`,
-										`Z`,
-										`M ${hole.minX} ${hole.minY}`,
-										`L ${hole.maxX} ${hole.minY}`,
-										`L ${hole.maxX} ${hole.maxY}`,
-										`L ${hole.minX} ${hole.maxY}`,
-										`Z`,
-									].join(' ')
-								})()}
+								d={getLabelClipPath(layout.bezier, labelBounds)}
 							/>
 						</clipPath>
 					</defs>
 				)}
 				<path
-					d={getConnectionPath(start, end, startPortId, endPortId)}
-					strokeWidth={Math.max(0.5, (connector.props.strokeWidth || 0) - 1.5)}
+					d={layout.path}
+					strokeWidth={Math.max(0.5, connector.props.strokeWidth || 1)}
 					strokeLinecap="round"
-					strokeDasharray={getStrokeDasharray(strokeStyle)}
+					strokeDasharray={getStrokeDasharray(connector.props.strokeStyle)}
 					fill="none"
 					clipPath={!isEmpty ? `url(#${clipPathId})` : undefined}
 				/>

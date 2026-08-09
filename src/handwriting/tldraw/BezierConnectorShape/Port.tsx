@@ -90,17 +90,16 @@ export const Port = memo(function Port({ shapeId, portId, isSelected = false }: 
 
 	const { port, hitSize, dotSize, defaultDotColor } = portData
 	const isInput = port.terminal === 'end'
-	// Standard shapes expose four visual ports, but connection creation has a
-	// single entry point: the bottom port. Keep the other ports rendered so they
-	// can still act as binding targets and receive hint/flash feedback. Mind-map
-	// ports use namespaced ids, so they retain their existing entry behavior.
+	// Standard shapes use the bottom port as their sole connection-creation
+	// entry point. The other logical ports remain available for automatic binding
+	// and hit testing, but are intentionally not rendered in the overlay.
 	const isStandardPort = portId === 'input' || portId === 'output' || portId === 'top' || portId === 'bottom'
 	const canStartConnection = !isStandardPort || portId === 'bottom'
 
 	const left = typeof port.x === 'number' ? `${port.x}px` : undefined
 	const top = typeof port.y === 'number' ? `${port.y}px` : undefined
 
-	const scale = isHinting ? 1.4 : 1
+	const scale = isHinting ? 1.15 : 1
 	let extraOffsetX = 0
 	let extraOffsetY = 0
 	if (settingdata["showCardBorder"]) {

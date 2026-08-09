@@ -1,6 +1,5 @@
-import { Editor, TLShapeId, VecLike, createComputedCache } from '@tldraw/tldraw'
+import { Box, Editor, TLShapeId, VecLike, createComputedCache } from '@tldraw/tldraw'
 import { ShapePort, PortTerminal } from './bezier-connector-types'
-import { getShapeConnections } from './bezier-connector-binding'
 import { getShapePorts, isPortSnappableShape, isShapeHitTargetable } from './shape-ports'
 
 // 重新导出便于其他模块使用
@@ -10,6 +9,8 @@ export { getShapePorts, getPortPagePosition, isConnectableShape } from './shape-
  * 缓存每个 shape 的 page-space 端口位置与 bbox
  * 通过 createComputedCache 实现，当 shape 改变时自动失效
  */
+const MAX_PORT_HIT_MARGIN = 200
+
 const shapePagePortsCache = createComputedCache(
 	'shape page ports',
 	(editor: Editor, shapeOrId: any) => {
@@ -59,7 +60,6 @@ export function getPortAtPoint(
 ): {
 	shapeId: TLShapeId
 	port: ShapePort
-	existingConnections: ReturnType<typeof getShapeConnections>
 } | null {
 	// 默认基础识别范围（当无法计算形状大小时回退使用）
 	const baseMargin = opts?.margin ?? 28
@@ -67,8 +67,17 @@ export function getPortAtPoint(
 	// 获取当前画布缩放级别，用于缩放 margin 以保持屏幕空间的 hit area 一致性
 	const zoom = editor.getZoomLevel()
 
-	// 获取当前页面的所有形状
-	const shapes = editor.getCurrentPageShapes()
+	// Use tldraw's R-tree index to avoid walking the entire page on every
+	// pointer move. shapeMargin is capped at MAX_PORT_HIT_MARGIN below, so every
+	// potentially matching port belongs to a shape intersecting this search box.
+	const candidateShapeIds = editor.getShapeIdsInsideBounds(
+		new Box(
+			point.x - MAX_PORT_HIT_MARGIN,
+			point.y - MAX_PORT_HIT_MARGIN,
+			MAX_PORT_HIT_MARGIN * 2,
+			MAX_PORT_HIT_MARGIN * 2
+		)
+	)
 
 	// 找到最近的端口（用平方距离避免开根号）
 	let bestResult: {
@@ -77,7 +86,9 @@ export function getPortAtPoint(
 		distanceSq: number
 	} | null = null
 
-	for (const shape of shapes) {
+	for (const shapeId of candidateShapeIds) {
+		const shape = editor.getShape(shapeId)
+		if (!shape) continue
 		// 跳过排除的形状
 		if (opts?.excludeShapeId && shape.id === opts.excludeShapeId) continue
 		if (opts?.excludeShapeIds?.has(shape.id)) continue
@@ -97,7 +108,7 @@ export function getPortAtPoint(
 		const rawMargin = bbox
 			? Math.max(baseMargin, Math.min(Math.sqrt((bbox.maxX - bbox.minX) ** 2 + (bbox.maxY - bbox.minY) ** 2) * 0.13, 38))
 			: baseMargin
-		const shapeMargin = Math.max(8, Math.min(rawMargin / zoom, 200))
+		const shapeMargin = Math.max(8, Math.min(rawMargin / zoom, MAX_PORT_HIT_MARGIN))
 
 		// 快速过滤：若点不在 bbox + margin 内，跳过该 shape
 		if (bbox) {
@@ -137,13 +148,9 @@ export function getPortAtPoint(
 
 	if (!bestResult) return null
 
-	// 获取现有连接
-	const existingConnections = getShapeConnections(editor, bestResult.shapeId).filter((c) => c.ownPortId === bestResult!.port.id)
-
 	return {
 		shapeId: bestResult.shapeId,
 		port: bestResult.port,
-		existingConnections,
 	}
 }
 
@@ -157,7 +164,6 @@ export interface ConnectionTarget {
 	port: ShapePort
 	/** 是否精确命中端口 */
 	precise: boolean
-	existingConnections: ReturnType<typeof getShapeConnections>
 }
 
 /**
@@ -223,8 +229,7 @@ export function getConnectionTargetAtPoint(
 	const port = cache.portDefs?.[bestPortId]
 	if (!port) return null
 
-	const existingConnections = getShapeConnections(editor, hitShape.id).filter((c) => c.ownPortId === port.id)
-	return { shapeId: hitShape.id, port, precise: false, existingConnections }
+	return { shapeId: hitShape.id, port, precise: false }
 }
 
 /**

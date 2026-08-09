@@ -41,12 +41,10 @@ export class InteractionHintOverlayUtil extends OverlayUtil<InteractionOverlay> 
 		const portState = getPortState(this.editor)
 		const pendingState = getPendingConnectedSingleBlockState(this.editor)
 		return Boolean(
-			portState.hintingPort ||
-			portState.flashPort ||
-			portState.highlightConnectorId ||
-			portState.flashConnectorId ||
-			pendingState.anchorId
-		)
+				portState.hintingPort ||
+				portState.flashPort ||
+				pendingState.anchorId
+			)
 	}
 
 	override getOverlays(): InteractionOverlay[] {
@@ -88,23 +86,6 @@ export class InteractionHintOverlayUtil extends OverlayUtil<InteractionOverlay> 
 					},
 				})
 			}
-		}
-
-		for (const connectorId of [portState.highlightConnectorId, portState.flashConnectorId]) {
-			const bounds = getShapeBounds(this.editor, connectorId)
-			if (!bounds) continue
-			const isFlash = connectorId === portState.flashConnectorId
-			overlays.push({
-				id: `${isFlash ? 'st-connector-flash' : 'st-connector-highlight'}:${connectorId}`,
-				type: InteractionHintOverlayUtil.type,
-				props: {
-					kind: 'bounds',
-					box: bounds.clone().expandBy(12 / this.editor.getZoomLevel()),
-					color: isFlash ? '#22c55e' : '#3b82f6',
-					lineDash: isFlash ? undefined : [8 / this.editor.getZoomLevel(), 6 / this.editor.getZoomLevel()],
-					fill: isFlash ? 'rgba(34, 197, 94, 0.08)' : 'rgba(59, 130, 246, 0.06)',
-				},
-			})
 		}
 
 		if (pendingState.anchorId) {
