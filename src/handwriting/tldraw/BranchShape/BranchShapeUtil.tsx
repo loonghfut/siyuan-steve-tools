@@ -508,6 +508,10 @@ export class BranchShapeUtil extends ShapeUtil<IBranchShape> {
 		return false
 	}
 
+	override hideInMinimap() {
+    	return true
+  	}
+
 	override hideResizeHandles() {
 		return true
 	}
