@@ -122,15 +122,15 @@ export async function renderAllContentIdle(
 	const effectiveTaskId = taskId || `render-${++renderTaskIdCounter}`
 
 	// 如果不在交互中，直接同步渲染（更快的响应）
-	if (!forceIdle && !isInteracting()) {
+	// if (!forceIdle && !isInteracting()) {
 		await renderAllContent(container)
 		return
-	}
+	// }
 
 	// 在交互中，使用空闲调度
-	await scheduleIdleRender(effectiveTaskId, async () => {
-		await renderAllContent(container)
-	}, priority)
+	// await scheduleIdleRender(effectiveTaskId, async () => {
+	// 	await renderAllContent(container)
+	// }, priority)
 }
 
 /**
