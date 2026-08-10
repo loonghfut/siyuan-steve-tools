@@ -74,21 +74,32 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 		// ProtyleMethod.htmlRender(container)
 		ProtyleMethod.highlightRender(container)
 		
-		// 渲染数据库视图：从 container 中提取带有 data-av-id 的元素
-		const avElements = container.querySelectorAll('[data-av-id]')
-		avElements.forEach(avElement => {
-			const blockID = avElement.getAttribute('data-node-id')
-			if (blockID) {
-				const Tprotyle = new Protyle(window.siyuan.ws.app, document.createElement('div'), { 
-					blockId: blockID, 
-					rootId: blockID 
+		// avRender is asynchronous and records a render token on each database view.
+		// Rendering the whole container once avoids concurrent calls invalidating each
+		// other's token; the temporary Protyle must remain alive until it settles.
+		const attributeViews = Array.from(
+			container.querySelectorAll<HTMLElement>('[data-type="NodeAttributeView"][data-av-id]')
+		)
+		const blockId = attributeViews.find((view) => Boolean(view.dataset.nodeId))?.dataset.nodeId
+		const needsAttributeViewRender = attributeViews.some(
+			(view) => view.getAttribute('data-render') !== 'true'
+		)
+		if (blockId && needsAttributeViewRender && window.siyuan?.ws?.app) {
+			let temporaryProtyle: Protyle | null = null
+			try {
+				temporaryProtyle = new Protyle(window.siyuan.ws.app, document.createElement('div'), {
+					blockId,
+					rootId: blockId,
 				})
-				const protyle = Tprotyle.protyle;
-				ProtyleMethod.avRender(container, protyle)
-				// 销毁临时 Protyle 实例
-				Tprotyle.destroy();
+				await ProtyleMethod.avRender(container, temporaryProtyle.protyle)
+			} finally {
+				try {
+					temporaryProtyle?.destroy()
+				} catch (err) {
+					console.warn('销毁数据库临时 Protyle 失败:', err)
+				}
 			}
-		})
+		}
 	
 	} catch (err) {
 		console.warn('内容渲染失败:', err)

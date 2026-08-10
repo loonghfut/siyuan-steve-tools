@@ -1036,6 +1036,11 @@ export class TldrawManager {
         container.addEventListener('pointerup', handlePointerUp, { passive: true });
         container.addEventListener('pointercancel', handlePointerUp, { passive: true });
         container.addEventListener('wheel', handleWheel, { passive: true });
+        // A drag may finish outside the editor container. Without this fallback,
+        // the idle scheduler can remain paused and static card rendering never runs.
+        window.addEventListener('pointerup', handlePointerUp, true);
+        window.addEventListener('pointercancel', handlePointerUp, true);
+        window.addEventListener('blur', handlePointerUp);
         
         // 使用 store 监听器来检测形状变化（拖动、调整大小等）
         // 性能优化：增加节流间隔，减少CPU占用
@@ -1056,6 +1061,9 @@ export class TldrawManager {
             container.removeEventListener('pointerup', handlePointerUp);
             container.removeEventListener('pointercancel', handlePointerUp);
             container.removeEventListener('wheel', handleWheel);
+            window.removeEventListener('pointerup', handlePointerUp, true);
+            window.removeEventListener('pointercancel', handlePointerUp, true);
+            window.removeEventListener('blur', handlePointerUp);
             unsubscribe();
             setInteracting(false);
         };
