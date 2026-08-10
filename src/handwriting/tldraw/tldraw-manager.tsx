@@ -15,7 +15,6 @@ import {
     TLShapeId,
     defaultBindingUtils,
     ArrowShapeUtil,
-    FrameShapeUtil,
     TLOverlayUtilConstructor,
 } from '@tldraw/tldraw';
 import '@tldraw/tldraw/tldraw.css';
@@ -57,6 +56,7 @@ import type { AgentDocOutlineBoardOptions } from './agent/tools/internal/documen
 import type { AgentPlanApplyOptions } from './agent/tools/internal/planning/plan-runner';
 import { InteractionHintOverlayUtil } from './ui-overrides/overlay-utils/InteractionHintOverlayUtil';
 import { syncTldrawThemeFromSiyuan } from './utils/siyuan-theme';
+import { ZoomInvariantFrameShapeUtil } from './FrameShape/ZoomInvariantFrameShapeUtil';
 const assetUrls = createAssetUrlsWithCustomIcons();
 
 
@@ -69,7 +69,7 @@ const configuredArrowShapeUtil = ArrowShapeUtil.configure({
 })
 // 启用原生 Frame 的颜色样式：颜色同时用于背景、边框和标题。
 // configure 会将 color 注册为样式属性，因此默认样式面板会自动显示颜色选择器。
-const configuredFrameShapeUtil = FrameShapeUtil.configure({ showColors: true })
+const configuredFrameShapeUtil = ZoomInvariantFrameShapeUtil.configure({ showColors: true })
 // 从默认形状工具中过滤掉已配置的工具，避免重复定义。
 const filteredDefaultShapeUtils = defaultShapeUtils.filter(
     util => util.type !== 'arrow' && util.type !== 'embed' && util.type !== 'frame'

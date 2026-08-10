@@ -73,7 +73,7 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 		ProtyleMethod.plantumlRender(container, CDN)
 		// ProtyleMethod.htmlRender(container)
 		ProtyleMethod.highlightRender(container)
-		
+
 		// avRender is asynchronous and records a render token on each database view.
 		// Rendering the whole container once avoids concurrent calls invalidating each
 		// other's token; the temporary Protyle must remain alive until it settles.
@@ -100,7 +100,7 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 				}
 			}
 		}
-	
+
 	} catch (err) {
 		console.warn('内容渲染失败:', err)
 	}
@@ -123,11 +123,11 @@ export async function renderAllContentIdle(
 
 	// 如果不在交互中，直接同步渲染（更快的响应）
 	// if (!forceIdle && !isInteracting()) {
-		await renderAllContent(container)
-		return
+	await renderAllContent(container)
+	return
 	// }
 
-	// 在交互中，使用空闲调度
+	// 在交互中，使用空闲调度TODO：感觉空闲调度的逻辑有问题
 	// await scheduleIdleRender(effectiveTaskId, async () => {
 	// 	await renderAllContent(container)
 	// }, priority)
