@@ -19,7 +19,7 @@ import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
-import { cancelIdleRender } from '../utils/idle-scheduler'
+import { cancelIdleRender, isIdleRenderCancelledError } from '../utils/idle-scheduler'
 import { getShapeLowDetailCountThreshold, getShapeLowDetailFontSize, getShapeLowDetailThreshold, getVisibleCardAndSingleBlockCount } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
@@ -1246,7 +1246,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							installStaticPreviewLinkHandlers(clone);
 							containerRef.current.appendChild(clone);
 							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-							await renderAllContentIdle(clone, 10, renderTaskId, true);
+							await renderAllContentIdle(clone, 10, renderTaskId);
 							if (cancelled) return;
 							return;
 						}
@@ -1438,7 +1438,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						remainder.forEach((n) => frag.appendChild(n));
 						previewWrapper.insertBefore(frag, placeholder);
 						try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-						await renderAllContentIdle(previewWrapper, 10, renderTaskId, true);
+						await renderAllContentIdle(previewWrapper, 10, renderTaskId);
 						if (placeholder.parentElement === previewWrapper) {
 							previewWrapper.removeChild(placeholder);
 						}
@@ -1469,7 +1469,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				containerRef.current.appendChild(previewWrapper);
 				// 先把 protyle-html 转为普通 DOM，再运行后续渲染
 				try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-				await renderAllContentIdle(previewWrapper, 10, renderTaskId, true);
+				await renderAllContentIdle(previewWrapper, 10, renderTaskId);
 
 				if (cancelled) return;
 
@@ -1559,7 +1559,11 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						// live-protyle 模式下实例在编辑时一直保留，内容已是最新，无需再 reload（reload 反而会造成闪动）
 					}
 				}
-			})()
+			})().catch((error) => {
+				if (!isIdleRenderCancelledError(error)) {
+					console.warn('卡片静态内容渲染失败:', error)
+				}
+			})
 
 			// 组件卸载/依赖变更清理
 			return () => {

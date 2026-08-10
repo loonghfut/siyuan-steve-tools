@@ -36,7 +36,7 @@ import { createArrowBetweenShapes } from '../utils/addConnectedSingleBlock'
 import { getShapeHostElement } from '../utils/getShapeHostElement'
 import { getCachedHtml, setCachedHtml, cacheFromProtyleHost, invalidateCache, requestBlockDOM, getBlockContent, renderSimpleBlockHtml } from '../block-html-cache'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
-import { cancelIdleRender } from '../utils/idle-scheduler'
+import { cancelIdleRender, isIdleRenderCancelledError } from '../utils/idle-scheduler'
 import { getShapeLowDetailCountThreshold, getShapeLowDetailFontSize, getShapeLowDetailThreshold, getVisibleCardAndSingleBlockCount } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { getDefaultColorTheme } from '../utils/color-theme'
@@ -778,8 +778,10 @@ export class SingleBlockShapeUtil extends ShapeUtil<ISingleBlockShape> {
 					// 使用空闲调度渲染，在交互时会暂停
 					renderAllContentIdle(staticContentRef.current, 10, renderTaskId).then(() => {
 						if (!cancelled) setIsContentRendered(true)
-					}).catch(() => {
-						// 忽略渲染错误
+					}).catch((error) => {
+						if (!isIdleRenderCancelledError(error)) {
+							console.warn('单块静态内容渲染失败:', error)
+						}
 					})
 				}
 			})

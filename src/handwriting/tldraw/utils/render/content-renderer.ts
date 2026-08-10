@@ -7,7 +7,7 @@
  * - 使用思源原生渲染方法，保证一致性
  */
 import { Protyle, ProtyleMethod } from 'siyuan'
-import { scheduleIdleRender, isInteracting } from '../idle-scheduler'
+import { IdleRenderCancelledError, isIdleRenderCancelledError, isInteracting, scheduleIdleRender } from '../idle-scheduler'
 import { getBlockDOMsWithEmbed } from '@/api/api'
 
 // 用于生成唯一的渲染任务 ID
@@ -20,8 +20,15 @@ const CDN = undefined // 使用思源默认 CDN
  * 渲染容器内的所有内容
  * @param container 容器元素
  */
-export async function renderAllContent(container: HTMLElement): Promise<void> {
+export async function renderAllContent(container: HTMLElement, signal?: AbortSignal): Promise<void> {
+	const throwIfAborted = () => {
+		if (signal?.aborted) throw new IdleRenderCancelledError()
+	}
+
 	try {
+		throwIfAborted()
+		// 已被 React 替换的预览不应继续触发网络/DOM 渲染。
+		if (signal && !container.isConnected) return
 		// 处理嵌入块
 		const embedNodes = Array.from(
 			container.querySelectorAll('[data-type="NodeBlockQueryEmbed"]')
@@ -36,6 +43,7 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 			if (uniqueIds.length > 0) {
 				try {
 					const embedDomMap = await getBlockDOMsWithEmbed(uniqueIds);
+					throwIfAborted()
 					if (embedDomMap) {
 						const buildFragmentFromHtml = (html: string) => {
 							const temp = document.createElement('div');
@@ -92,6 +100,7 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 					rootId: blockId,
 				})
 				await ProtyleMethod.avRender(container, temporaryProtyle.protyle)
+				throwIfAborted()
 			} finally {
 				try {
 					temporaryProtyle?.destroy()
@@ -102,7 +111,10 @@ export async function renderAllContent(container: HTMLElement): Promise<void> {
 		}
 
 	} catch (err) {
-		console.warn('内容渲染失败:', err)
+		if (!isIdleRenderCancelledError(err)) {
+			console.warn('内容渲染失败:', err)
+		}
+		throw err
 	}
 }
 
@@ -121,16 +133,21 @@ export async function renderAllContentIdle(
 ): Promise<void> {
 	const effectiveTaskId = taskId || `render-${++renderTaskIdCounter}`
 
-	// 如果不在交互中，直接同步渲染（更快的响应）
-	// if (!forceIdle && !isInteracting()) {
-	await renderAllContent(container)
-	return
-	// }
+	// 非交互、且调用方未明确要求延后时立即完成，保持普通内容的响应速度。
+	if (!forceIdle && !isInteracting()) {
+		await renderAllContent(container)
+		return
+	}
 
-	// 在交互中，使用空闲调度TODO：感觉空闲调度的逻辑有问题
-	// await scheduleIdleRender(effectiveTaskId, async () => {
-	// 	await renderAllContent(container)
-	// }, priority)
+	try {
+		await scheduleIdleRender(effectiveTaskId, async (signal) => {
+			await renderAllContent(container, signal)
+		}, priority)
+	} catch (error) {
+		// 组件 cleanup 主动取消是预期控制流；调用方不应因此把预览标成失败。
+		if (isIdleRenderCancelledError(error)) return
+		throw error
+	}
 }
 
 /**
