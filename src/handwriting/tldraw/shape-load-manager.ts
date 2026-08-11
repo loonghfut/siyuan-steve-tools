@@ -234,7 +234,12 @@ class ShapeLoadManager {
     for (const s of this.shapes.values()) {
       const newAllowed = allowedSet.has(s.id)
       const computed = computedById.get(s.id) || { inViewport: false, distance: Infinity }
-      const changed = newAllowed !== s.lastAllowed || computed.inViewport !== s.lastComputed.inViewport
+      // Refresh ordering when the viewport center moved meaningfully, while
+      // avoiding callbacks on every 500ms recompute during tiny camera motion.
+      const distanceChanged = Number.isFinite(computed.distance) && Number.isFinite(s.lastComputed.distance)
+        ? Math.abs(computed.distance - s.lastComputed.distance) >= 128
+        : computed.distance !== s.lastComputed.distance
+      const changed = newAllowed !== s.lastAllowed || computed.inViewport !== s.lastComputed.inViewport || distanceChanged
       s.lastAllowed = newAllowed
       s.lastComputed = computed
       if (changed) {

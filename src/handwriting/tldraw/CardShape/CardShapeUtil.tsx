@@ -427,6 +427,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const staticPreviewRef = useRef<HTMLElement | null>(null)
 		const cardContentVirtualizerRef = useRef<CardContentVirtualizer | null>(null)
 		const staticPreviewLoadRef = useRef<ContentLoadHandle | null>(null)
+		const staticPreviewPriorityRef = useRef(Number.MAX_SAFE_INTEGER)
 		const staticPreviewHandlersRef = useRef<{
 			target: HTMLElement
 			pointerDown: (event: PointerEvent) => void
@@ -942,6 +943,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				this.editor as any,
 				() => ({ editing: isEditingStateRef.current }),
 				(allowed, meta) => {
+					const distance = Number.isFinite(meta.distance) ? Math.max(0, meta.distance) : 1_000_000
+					const centerPriority = Math.min(100, Math.floor(distance / 160))
+					// The load manager already measures distance from the viewport center.
+					// Reuse that score so static preview construction follows the same order.
+					staticPreviewPriorityRef.current = meta.inViewport ? centerPriority : 1_000 + centerPriority
+					staticPreviewLoadRef.current?.setPriority(staticPreviewPriorityRef.current)
 					setCanLoad(allowed)
 					setIsInViewport(meta.inViewport)
 				}
@@ -1296,7 +1303,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 							configureStaticPreviewMedia(clone)
 							containerRef.current.appendChild(clone);
 							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-							await renderAllContentIdle(clone, 10, renderTaskId, true);
+							await renderAllContentIdle(clone, staticPreviewPriorityRef.current, renderTaskId, true);
 							if (cancelled) return;
 							return;
 						}
@@ -1462,7 +1469,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						} catch (error) {
 							console.warn('convertProtyleHtmlToDom failed', error)
 						}
-						await renderAllContentIdle(mountedContainer, 10, renderTaskId, true)
+						await renderAllContentIdle(mountedContainer, staticPreviewPriorityRef.current, renderTaskId, true)
 					},
 				})
 				cardContentVirtualizerRef.current = virtualizer
@@ -1472,7 +1479,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy')
 					})
 					try { convertProtyleHtmlToDom(previewWrapper); } catch (error) { console.warn('convertProtyleHtmlToDom failed', error) }
-					await renderAllContentIdle(previewWrapper, 10, renderTaskId, true)
+					await renderAllContentIdle(previewWrapper, staticPreviewPriorityRef.current, renderTaskId, true)
 				}
 
 				if (cancelled) return;
@@ -1488,7 +1495,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				staticPreviewLoadRef.current?.cancel()
 				const handle = enqueueStaticPreviewLoad(
 					`static-card-preview-${shape.id}`,
-					1,
+					staticPreviewPriorityRef.current,
 					async (signal) => {
 						if (cancelled || signal.aborted) return
 						await useStaticPreviewFromGetDoc(targetBlockId, forceRefresh)

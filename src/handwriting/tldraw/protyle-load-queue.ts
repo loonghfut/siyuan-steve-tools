@@ -14,19 +14,29 @@ interface Task {
 
 export interface ContentLoadHandle {
 	cancel(): void
+	setPriority(priority: number): void
 	readonly finished: Promise<void>
 	readonly signal: AbortSignal
 }
 
 export type ProtyleLoadHandle = ContentLoadHandle
 
+export interface ContentLoadQueueOptions {
+	/** Wait one microtask so a batch of newly visible shapes can be priority-sorted. */
+	deferStart?: boolean
+}
+
 /** Shared bounded queue for heavyweight Card content creation work. */
 export class ContentLoadQueue {
 	private tasks: Task[] = []
 	private running = new Set<Task>()
 	private orderSeed = 0
+	private processQueued = false
 
-	constructor(private readonly concurrency: number) {}
+	constructor(
+		private readonly concurrency: number,
+		private readonly options: ContentLoadQueueOptions = {},
+	) {}
 
 	enqueue(key: string, priority: number, runner: ContentLoadRunner): ContentLoadHandle {
 		const controller = new AbortController()
@@ -60,7 +70,7 @@ export class ContentLoadQueue {
 
 		this.tasks.push(task)
 		this.sortQueue()
-		this.process()
+		this.requestProcess()
 
 		const handle: ProtyleLoadHandle = {
 			cancel: () => {
@@ -69,8 +79,13 @@ export class ContentLoadQueue {
 				if (task.status === 'queued') {
 					this.tasks = this.tasks.filter((item) => item !== task)
 					task.resolve()
-					this.process()
+					this.requestProcess()
 				}
+			},
+			setPriority: (priority) => {
+				if (task.status !== 'queued') return
+				task.priority = priority
+				this.sortQueue()
 			},
 			finished,
 			signal: controller.signal,
@@ -99,6 +114,19 @@ export class ContentLoadQueue {
 		}
 	}
 
+	private requestProcess() {
+		if (!this.options.deferStart) {
+			this.process()
+			return
+		}
+		if (this.processQueued) return
+		this.processQueued = true
+		queueMicrotask(() => {
+			this.processQueued = false
+			this.process()
+		})
+	}
+
 	private async runTask(task: Task) {
 		try {
 			await task.runner(task.controller.signal)
@@ -115,7 +143,7 @@ export class ContentLoadQueue {
 			}
 		} finally {
 			this.running.delete(task)
-			this.process()
+			this.requestProcess()
 		}
 	}
 }
