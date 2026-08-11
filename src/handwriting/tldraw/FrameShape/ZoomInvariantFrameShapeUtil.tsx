@@ -65,4 +65,7 @@ export class ZoomInvariantFrameShapeUtil extends FrameShapeUtil {
 			</>
 		)
 	}
+	override hideInMinimap() {
+		return true
+	}
 }
