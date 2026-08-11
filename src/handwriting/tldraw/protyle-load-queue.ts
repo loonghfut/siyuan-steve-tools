@@ -1,9 +1,9 @@
-type Runner = (signal: AbortSignal) => Promise<void>
+export type ContentLoadRunner = (signal: AbortSignal) => Promise<void>
 
 interface Task {
 	key: string
 	priority: number
-	runner: Runner
+	runner: ContentLoadRunner
 	controller: AbortController
 	status: 'queued' | 'running' | 'done'
 	order: number
@@ -12,20 +12,23 @@ interface Task {
 	reject: (err: unknown) => void
 }
 
-export interface ProtyleLoadHandle {
+export interface ContentLoadHandle {
 	cancel(): void
 	readonly finished: Promise<void>
 	readonly signal: AbortSignal
 }
 
-class ProtyleLoadQueue {
+export type ProtyleLoadHandle = ContentLoadHandle
+
+/** Shared bounded queue for heavyweight Card content creation work. */
+export class ContentLoadQueue {
 	private tasks: Task[] = []
 	private running = new Set<Task>()
 	private orderSeed = 0
 
 	constructor(private readonly concurrency: number) {}
 
-	enqueue(key: string, priority: number, runner: Runner): ProtyleLoadHandle {
+	enqueue(key: string, priority: number, runner: ContentLoadRunner): ContentLoadHandle {
 		const controller = new AbortController()
 		let resolveFinished: () => void = () => {}
 		let rejectFinished: (err: unknown) => void = () => {}
@@ -118,8 +121,8 @@ class ProtyleLoadQueue {
 }
 
 const DEFAULT_CONCURRENCY = 2
-const queue = new ProtyleLoadQueue(DEFAULT_CONCURRENCY)
+const queue = new ContentLoadQueue(DEFAULT_CONCURRENCY)
 
-export function enqueueProtyleLoad(key: string, priority: number, runner: Runner): ProtyleLoadHandle {
+export function enqueueProtyleLoad(key: string, priority: number, runner: ContentLoadRunner): ProtyleLoadHandle {
 	return queue.enqueue(key, priority, runner)
 }

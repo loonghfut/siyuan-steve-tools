@@ -184,6 +184,11 @@ export class CardContentVirtualizer {
 			this.resizeObserver.observe(element)
 		}
 
-		void this.onMount?.(this.container)
+		const mounted = this.onMount?.(this.container)
+		if (mounted) {
+			void Promise.resolve(mounted).catch((error) => {
+				if (!this.destroyed) console.warn('Card virtualized content mount failed', error)
+			})
+		}
 	}
 }

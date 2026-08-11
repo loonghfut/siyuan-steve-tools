@@ -36,6 +36,10 @@ class IdleScheduler {
 
 	private readonly INTERACTION_DELAY_MS = 150
 	private readonly MIN_IDLE_TIME_MS = 10
+	// Static Card preview tasks are queued behind this scheduler. A shorter
+	// timeout keeps visible previews responsive when requestIdleCallback has no
+	// generous idle slice, while still starting only one expensive task at once.
+	private readonly IDLE_TASK_TIMEOUT_MS = 300
 
 	setInteracting(value: boolean) {
 		if (value) {
@@ -126,7 +130,7 @@ class IdleScheduler {
 		if (hasIdleCallback) {
 			this.currentIdleId = requestIdleCallback(
 				(deadline) => this.processQueue(deadline),
-				{ timeout: 1000 }
+				{ timeout: this.IDLE_TASK_TIMEOUT_MS }
 			)
 		} else {
 			setTimeout(() => this.processQueue(null), 0)

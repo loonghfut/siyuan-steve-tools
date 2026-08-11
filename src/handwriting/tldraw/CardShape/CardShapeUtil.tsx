@@ -15,8 +15,9 @@ import { openTab, Protyle, showMessage, TProtyleAction } from 'siyuan';
 import * as api from '@/api/api';
 import { settingdata } from '@/index';
 import { buildTldrawLink } from '../utils/link-builder';
-import { enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
+import { ContentLoadHandle, enqueueProtyleLoad, ProtyleLoadHandle } from '../protyle-load-queue'
 import { shapeLoadManager } from '../shape-load-manager'
+import { enqueueStaticPreviewLoad } from '../static-preview-load-queue'
 import { PortsOverlay } from '../BezierConnectorShape/Port'
 import { renderAllContentIdle } from '../utils/render/content-renderer'
 import { cancelIdleRender, isIdleRenderCancelledError } from '../utils/idle-scheduler'
@@ -64,6 +65,13 @@ type DefaultCardBlockType = 'heading' | 'blockquote'
 
 function containsNonVirtualizableMedia(element: HTMLElement) {
 	return element.matches(NON_VIRTUALIZABLE_MEDIA_SELECTOR) || Boolean(element.querySelector(NON_VIRTUALIZABLE_MEDIA_SELECTOR))
+}
+
+function configureStaticPreviewMedia(root: HTMLElement) {
+	// 卡片预览不播放视频；仅加载元数据可避免多个可见 Card 同时触发媒体解码。
+	root.querySelectorAll<HTMLVideoElement>('video').forEach((video) => {
+		if (!video.hasAttribute('preload')) video.preload = 'metadata'
+	})
 }
 
 function getDefaultCardBlockType(): DefaultCardBlockType {
@@ -418,6 +426,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		// 非编辑态下的静态预览节点（由 Protyle contentElement 克隆而来）
 		const staticPreviewRef = useRef<HTMLElement | null>(null)
 		const cardContentVirtualizerRef = useRef<CardContentVirtualizer | null>(null)
+		const staticPreviewLoadRef = useRef<ContentLoadHandle | null>(null)
 		const staticPreviewHandlersRef = useRef<{
 			target: HTMLElement
 			pointerDown: (event: PointerEvent) => void
@@ -556,6 +565,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			if (loadHandleRef.current) {
 				loadHandleRef.current.cancel()
 				loadHandleRef.current = null
+			}
+			if (staticPreviewLoadRef.current) {
+				staticPreviewLoadRef.current.cancel()
+				staticPreviewLoadRef.current = null
 			}
 			destroyCardContentVirtualizer()
 			removeStaticPreviewLinkHandlers()
@@ -1280,9 +1293,10 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 							staticPreviewRef.current = clone;
 							installStaticPreviewLinkHandlers(clone);
+							configureStaticPreviewMedia(clone)
 							containerRef.current.appendChild(clone);
 							try { convertProtyleHtmlToDom(clone); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-							await renderAllContentIdle(clone, 10, renderTaskId);
+							await renderAllContentIdle(clone, 10, renderTaskId, true);
 							if (cancelled) return;
 							return;
 						}
@@ -1427,6 +1441,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 
 				// 静态预览会先挂载，再按实际 Card 可见高度窗口化正文顶层块。
+				configureStaticPreviewMedia(previewWrapper)
 				staticPreviewRef.current = previewWrapper;
 				installStaticPreviewLinkHandlers(previewWrapper);
 				containerRef.current.appendChild(previewWrapper);
@@ -1441,12 +1456,13 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						mountedContainer.querySelectorAll('img').forEach((img) => {
 							if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy')
 						})
+						configureStaticPreviewMedia(mountedContainer)
 						try {
 							convertProtyleHtmlToDom(mountedContainer)
 						} catch (error) {
 							console.warn('convertProtyleHtmlToDom failed', error)
 						}
-						await renderAllContentIdle(mountedContainer, 10, renderTaskId)
+						await renderAllContentIdle(mountedContainer, 10, renderTaskId, true)
 					},
 				})
 				cardContentVirtualizerRef.current = virtualizer
@@ -1456,7 +1472,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy')
 					})
 					try { convertProtyleHtmlToDom(previewWrapper); } catch (error) { console.warn('convertProtyleHtmlToDom failed', error) }
-					await renderAllContentIdle(previewWrapper, 10, renderTaskId)
+					await renderAllContentIdle(previewWrapper, 10, renderTaskId, true)
 				}
 
 				if (cancelled) return;
@@ -1468,6 +1484,25 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			};
 
 			let cancelled = false;
+			const loadStaticPreview = async (targetBlockId: string, forceRefresh: boolean) => {
+				staticPreviewLoadRef.current?.cancel()
+				const handle = enqueueStaticPreviewLoad(
+					`static-card-preview-${shape.id}`,
+					1,
+					async (signal) => {
+						if (cancelled || signal.aborted) return
+						await useStaticPreviewFromGetDoc(targetBlockId, forceRefresh)
+					},
+				)
+				staticPreviewLoadRef.current = handle
+				try {
+					await handle.finished
+				} finally {
+					if (staticPreviewLoadRef.current === handle) {
+						staticPreviewLoadRef.current = null
+					}
+				}
+			}
 
 			(async () => {
 				if (isEditingState) {
@@ -1503,7 +1538,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						const id = containerRef.current?.getAttribute('blockid') || blockId;
 						if (!id) return;
 						if (isMainCard) {
-							await useStaticPreviewFromGetDoc(id, wasEditing || manualRefreshTriggered);
+							await loadStaticPreview(id, wasEditing || manualRefreshTriggered);
 							if (cancelled) return;
 						} else {
 							// 普通块：使用 getDoc API 直接获取静态 DOM
@@ -1517,7 +1552,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 								protyleHostRef.current = null;
 							}
 							// 如果是手动刷新，则强制 bypass 缓存并通过 API 重新获取 DOM
-							await useStaticPreviewFromGetDoc(id, manualRefreshTriggered || wasEditing);
+							await loadStaticPreview(id, manualRefreshTriggered || wasEditing);
 							if (cancelled) return;
 						}
 					} else {
@@ -1558,6 +1593,8 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			// 组件卸载/依赖变更清理
 			return () => {
 				cancelled = true;
+				staticPreviewLoadRef.current?.cancel()
+				staticPreviewLoadRef.current = null
 				cancelIdleRender(renderTaskId);
 				// live-protyle 不在编辑切换/临时不通不过准入时销毁资源，仅折叠或真正卸载时销毁
 				if (isCollapsed || (effectiveRenderMode !== 'live-protyle' && !shouldRender)) {
