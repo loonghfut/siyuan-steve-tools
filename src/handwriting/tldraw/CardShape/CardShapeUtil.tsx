@@ -23,6 +23,7 @@ import { cancelIdleRender, isIdleRenderCancelledError } from '../utils/idle-sche
 import { getShapeLowDetailCountThreshold, getShapeLowDetailFontSize, getShapeLowDetailThreshold, getVisibleCardAndSingleBlockCount } from '../utils/low-detail'
 import { getLightweightPreviewTextFromElement, getLightweightPreviewTextFromHtml } from '../utils/lightweight-preview'
 import { convertProtyleHtmlToDom } from '../utils/render/content-html-converter'
+import { CardContentVirtualizer } from './card-content-virtualizer'
 import { exportCardShapeToSvg } from './CardShapeExport'
 import { getCardCollapsedHeight } from './card-collapse'
 import { getDefaultColorTheme } from '../utils/color-theme'
@@ -47,12 +48,23 @@ const draggingBranchCardIds = new Set<string>()
 const staticPreviewCache = new Map<string, { html: string; fontSize: number }>();
 const MAX_CACHE_SIZE = 50;
 
-// 限制首屏渲染规模，避免一次性插入过多 DOM
-const INITIAL_NODE_LIMIT = 80;
-const INITIAL_TEXT_LIMIT = 8000;
+// Card 的静态预览会按思源顶层块进行窗口化；只有当前可显示的块会留在 DOM 中。
 const SIYUAN_BLOCK_ID_RE = /\b\d{14}-[0-9a-z]{7}\b/i
 const STEVE_TOOLS_PLUGIN_URL_RE = /^(?:https:\/\/|siyuan:\/\/)plugins\/siyuan-steve-tools\//i
+const NON_VIRTUALIZABLE_MEDIA_SELECTOR = [
+	'[data-type="NodeVideo"]',
+	'[data-type="NodeAudio"]',
+	'[data-type="NodeIFrame"]',
+	'[data-type="NodeWidget"]',
+	'video',
+	'audio',
+	'iframe',
+].join(', ')
 type DefaultCardBlockType = 'heading' | 'blockquote'
+
+function containsNonVirtualizableMedia(element: HTMLElement) {
+	return element.matches(NON_VIRTUALIZABLE_MEDIA_SELECTOR) || Boolean(element.querySelector(NON_VIRTUALIZABLE_MEDIA_SELECTOR))
+}
 
 function getDefaultCardBlockType(): DefaultCardBlockType {
 	return settingdata['tldraw-card-default-block-type'] === 'blockquote' ? 'blockquote' : 'heading'
@@ -405,6 +417,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 		const protyleHostRef = useRef<HTMLDivElement | null>(null)
 		// 非编辑态下的静态预览节点（由 Protyle contentElement 克隆而来）
 		const staticPreviewRef = useRef<HTMLElement | null>(null)
+		const cardContentVirtualizerRef = useRef<CardContentVirtualizer | null>(null)
 		const staticPreviewHandlersRef = useRef<{
 			target: HTMLElement
 			pointerDown: (event: PointerEvent) => void
@@ -432,6 +445,26 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 			target.classList.remove('card-static-content')
 			staticPreviewHandlersRef.current = null
 		}, [])
+		const destroyCardContentVirtualizer = useCallback(() => {
+			cardContentVirtualizerRef.current?.destroy()
+			cardContentVirtualizerRef.current = null
+		}, [])
+		// tldraw 已经在 shape store 中发出尺寸更新；只用它刷新静态预览窗口，
+		// 不额外监听 DOM scroll，避免把画布滚动事件引入每张 Card。
+		useEffect(() => {
+			const unsubscribe = editor.store.listen((entry) => {
+				const updated = entry.changes.updated[shape.id]
+				if (!updated) return
+				const [from, to] = updated
+				if (from.typeName !== 'shape' || to.typeName !== 'shape') return
+				const previous = from as ICardShape
+				const current = to as ICardShape
+				if (previous.props.w !== current.props.w || previous.props.h !== current.props.h) {
+					cardContentVirtualizerRef.current?.refresh()
+				}
+			}, { scope: 'document', source: 'all' })
+			return unsubscribe
+		}, [editor, shape.id])
 		const openStaticLinkTarget = useCallback((target: { blockId: string | null; href: string }) => {
 			if (target.blockId) {
 				if (!window.siyuan?.ws?.app) return
@@ -524,6 +557,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				loadHandleRef.current.cancel()
 				loadHandleRef.current = null
 			}
+			destroyCardContentVirtualizer()
 			removeStaticPreviewLinkHandlers()
 			if (staticPreviewRef.current?.parentElement) {
 				try {
@@ -545,7 +579,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 			}
 			protyleHostRef.current = null
-		}, [removeStaticPreviewLinkHandlers])
+		}, [destroyCardContentVirtualizer, removeStaticPreviewLinkHandlers])
 
 
 		const containerRef = useRef<HTMLDivElement>(null)
@@ -1111,6 +1145,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					const currentContainer = containerRef.current;
 					if (!currentContainer) return;
 					if (staticPreviewRef.current?.parentElement === currentContainer) {
+						destroyCardContentVirtualizer()
 						removeStaticPreviewLinkHandlers()
 						try {
 							currentContainer.removeChild(staticPreviewRef.current);
@@ -1226,6 +1261,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						persistLightweightPreviewText(cachedHtml)
 						// 使用缓存的预览
 						if (staticPreviewRef.current?.parentElement === containerRef.current) {
+							destroyCardContentVirtualizer()
 							removeStaticPreviewLinkHandlers()
 							containerRef.current.removeChild(staticPreviewRef.current);
 						}
@@ -1279,6 +1315,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
 				// 移除旧的静态预览
 				if (staticPreviewRef.current?.parentElement === containerRef.current) {
+					destroyCardContentVirtualizer()
 					removeStaticPreviewLinkHandlers()
 					containerRef.current.removeChild(staticPreviewRef.current);
 				}
@@ -1389,92 +1426,43 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					}
 				}
 
-				// 图片懒加载，避免首屏同步解码
-				previewWrapper.querySelectorAll('img').forEach((img) => {
-					if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy');
-				});
-
-				// 对超大文档做首屏截断，并提供懒加载剩余内容
-				const installIncrementalRender = () => {
-					const children = Array.from(previewWrapper.children);
-					const remainder: Element[] = [];
-					let keptNodes = 0;
-					let keptText = 0;
-
-					for (const node of children) {
-						// 题头与标题区域直接保留
-						if (node.classList.contains('protyle-top') || node.classList.contains('protyle-title')) {
-							continue;
-						}
-						const textLen = (node.textContent || '').length;
-						const hitLimit = keptNodes >= INITIAL_NODE_LIMIT || keptText >= INITIAL_TEXT_LIMIT;
-						if (hitLimit) {
-							remainder.push(node);
-							continue;
-						}
-						keptNodes += 1;
-						keptText += textLen;
-					}
-
-					if (!remainder.length) return true;
-
-					remainder.forEach((n) => previewWrapper.removeChild(n));
-
-					const placeholder = document.createElement('div');
-					placeholder.style.padding = '16px';
-					placeholder.style.textAlign = 'center';
-					placeholder.style.color = 'var(--b3-theme-on-surface, #666)';
-					placeholder.style.opacity = '0.8';
-					placeholder.style.cursor = 'pointer';
-					placeholder.style.userSelect = 'none';
-					placeholder.textContent = '文档较大，点击或滚动以加载剩余内容';
-
-					let loaded = false;
-					const loadRest = async () => {
-						if (loaded || cancelled) return;
-						loaded = true;
-						placeholder.textContent = '正在加载剩余内容...';
-						const frag = document.createDocumentFragment();
-						remainder.forEach((n) => frag.appendChild(n));
-						previewWrapper.insertBefore(frag, placeholder);
-						try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-						await renderAllContentIdle(previewWrapper, 10, renderTaskId);
-						if (placeholder.parentElement === previewWrapper) {
-							previewWrapper.removeChild(placeholder);
-						}
-					};
-
-					placeholder.addEventListener('click', loadRest, { once: true });
-
-					// 当滚动接近占位符时自动加载
-					if ('IntersectionObserver' in window) {
-						const obs = new IntersectionObserver((entries) => {
-							if (entries.some((e) => e.isIntersecting)) {
-								obs.disconnect();
-								loadRest();
-							}
-						}, { root: previewWrapper, rootMargin: '200px' });
-						obs.observe(placeholder);
-					}
-
-					previewWrapper.appendChild(placeholder);
-					return false;
-				};
-
-				const allowCache = installIncrementalRender();
-
-				// 渲染所有内容类型（公式、图表等）需要依赖已挂载的 DOM，先挂载再渲染
+				// 静态预览会先挂载，再按实际 Card 可见高度窗口化正文顶层块。
 				staticPreviewRef.current = previewWrapper;
 				installStaticPreviewLinkHandlers(previewWrapper);
 				containerRef.current.appendChild(previewWrapper);
-				// 先把 protyle-html 转为普通 DOM，再运行后续渲染
-				try { convertProtyleHtmlToDom(previewWrapper); } catch (e) { console.warn('convertProtyleHtmlToDom failed', e); }
-				await renderAllContentIdle(previewWrapper, 10, renderTaskId);
+				destroyCardContentVirtualizer()
+				const virtualizer = CardContentVirtualizer.create(previewWrapper, {
+					isPinned: (element) =>
+						element.classList.contains('protyle-top') || element.classList.contains('protyle-title'),
+					// 原生媒体/嵌入节点的加载状态绑定在 DOM 实例上。窗口化会重建
+					// outerHTML，因此含这些节点的预览保留完整 DOM，避免视频反复加载。
+					shouldSkipVirtualization: (content) => content.some(containsNonVirtualizableMedia),
+					onMount: async (mountedContainer) => {
+						mountedContainer.querySelectorAll('img').forEach((img) => {
+							if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy')
+						})
+						try {
+							convertProtyleHtmlToDom(mountedContainer)
+						} catch (error) {
+							console.warn('convertProtyleHtmlToDom failed', error)
+						}
+						await renderAllContentIdle(mountedContainer, 10, renderTaskId)
+					},
+				})
+				cardContentVirtualizerRef.current = virtualizer
+
+				if (!virtualizer) {
+					previewWrapper.querySelectorAll('img').forEach((img) => {
+						if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy')
+					})
+					try { convertProtyleHtmlToDom(previewWrapper); } catch (error) { console.warn('convertProtyleHtmlToDom failed', error) }
+					await renderAllContentIdle(previewWrapper, 10, renderTaskId)
+				}
 
 				if (cancelled) return;
 
-				// 仅在未截断时缓存，避免缓存巨大 DOM
-				if (allowCache) {
+				// 虚拟化预览只保存当前窗口，不能作为完整文档缓存。
+				if (!virtualizer) {
 					cacheStaticPreview(targetBlockId, previewWrapper.outerHTML, fontSize);
 				}
 			};
@@ -1485,6 +1473,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				if (isEditingState) {
 					// 进入编辑：移除静态预览，创建或复用 Protyle
 					if (staticPreviewRef.current?.parentElement === containerRef.current) {
+						destroyCardContentVirtualizer()
 						removeStaticPreviewLinkHandlers()
 						containerRef.current.removeChild(staticPreviewRef.current);
 					}
@@ -1540,6 +1529,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 						}
 						// 移除可能存在的静态预览
 						if (staticPreviewRef.current?.parentElement === containerRef.current) {
+							destroyCardContentVirtualizer()
 							removeStaticPreviewLinkHandlers()
 							containerRef.current.removeChild(staticPreviewRef.current);
 						}
@@ -1574,11 +1564,12 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 					destroyRuntimeResources();
 				}
 			};
-		}, [destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard, exitEditGrace, persistLightweightPreviewText, persistPreviewText]);
+		}, [destroyCardContentVirtualizer, destroyRuntimeResources, isEditingState, renderAdmission, shape.id, blockId, shape.props.refreshNonce, isCollapsed, effectiveRenderMode, fontSize, isSmallCard, exitEditGrace, persistLightweightPreviewText, persistPreviewText]);
 
 		// 真正卸载时（切换到其它白板 / 删除卡片）销毁 Protyle，避免 live 模式下实例被保留后泄漏
 		useEffect(() => {
 			return () => {
+				destroyCardContentVirtualizer()
 				if (exitEditGraceTimerRef.current) {
 					window.clearTimeout(exitEditGraceTimerRef.current);
 					exitEditGraceTimerRef.current = null;
@@ -1593,7 +1584,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 				}
 				protyleHostRef.current = null;
 			};
-		}, [shape.id]);
+		}, [destroyCardContentVirtualizer, shape.id]);
 
 		const handlePointerEvent = (e: React.PointerEvent) => {
 			if (isEditingState) {
