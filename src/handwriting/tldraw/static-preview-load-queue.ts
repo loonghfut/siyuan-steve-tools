@@ -4,7 +4,7 @@ import { ContentLoadQueue, type ContentLoadHandle, type ContentLoadRunner } from
 // separate from interactive Protyle creation. Two previews can fetch and build
 // concurrently for responsive entry, while expensive follow-up rendering stays
 // serialized by the idle scheduler.
-const staticPreviewLoadQueue = new ContentLoadQueue(4)
+const staticPreviewLoadQueue = new ContentLoadQueue(6)
 
 export function enqueueStaticPreviewLoad(
 	key: string,
