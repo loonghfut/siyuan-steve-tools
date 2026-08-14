@@ -2,7 +2,7 @@ import type { BuildContext, SettingGroupDefinition } from "./types";
 import { calendarGroup } from "@/calendar/settings/calendar-settings";
 import { syncGroup } from "./sync";
 import { aiGroup } from "./ai";
-import { handwritingGroup } from "./handwriting";
+// import { handwritingGroup } from "./handwriting";
 import { lifelogGroup } from "./lifelog";
 import { wpsGroup } from "./wps";
 import { commonGroup } from "./common";
@@ -20,7 +20,7 @@ export function buildSettingGroups(ctx: BuildContext): SettingGroupDefinition[] 
     syncGroup(ctx),
     aiGroup(ctx),
     imageCompressionGroup(ctx),
-    handwritingGroup(ctx),
+    // handwritingGroup(ctx),
     lifelogGroup(ctx),
     wpsGroup(ctx),
     aggregateGroup(ctx),

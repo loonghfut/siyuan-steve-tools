@@ -24,7 +24,7 @@ win端s3同步后，docker端感知s3同步。
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
 压缩媒体资源后再导入思源。  
-5. tldraw白板：【已接入思源智能体】  
+5. [tldraw白板](siyuan://bazaar/plugins/siyuan-steve-tldraw/readme)：【已接入思源智能体】 【为减少包体积，已经独立为[ST白板](siyuan://bazaar/plugins/siyuan-steve-tldraw/readme)】   
 模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转  
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
