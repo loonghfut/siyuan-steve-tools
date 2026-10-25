@@ -22,7 +22,11 @@ export const SQL_DEFAULT_CAP = 1000;
 
 /**
  * 去掉语句末尾的分号。
- * 内核在默认模式下用 `CheckSingleStatement` 拒绝多语句，带分号的语句会被判为多语句而报错。
+ *
+ * 内核在默认模式下用 `CheckSingleStatement` 拒绝多语句，但它**允许**尾部分号
+ * （分号后只有空白/注释时仍算同一条语句，见 kernel/sql/stmt_validate.go）。
+ * 这里去分号的真正原因是：随后要在语句末尾追加 "LIMIT n"，带着分号会拼出
+ * "SELECT ...; LIMIT n" 这样的真·第二条语句而被判为多语句。
  */
 export function normalizeSqlStatement(stmt: string): string {
     return (stmt || "").trim().replace(/;\s*$/, "");
@@ -133,7 +137,141 @@ export function ensureSqlLimit(stmt: string, limit: number = SQL_DEFAULT_CAP): s
         return normalized;
     }
     const cap = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : SQL_DEFAULT_CAP;
-    return `${normalized} LIMIT ${cap}`;
+    // 必须换行拼接：若语句以 `-- 行注释` 结尾，同一行的 " LIMIT n" 会被注释吞掉，
+    // 语句实际没有 LIMIT，内核就会套用默认上限（默认 64）造成静默截断。
+    return `${normalized}\nLIMIT ${cap}`;
+}
+
+/**
+ * 查找语句中第一个**外层**子句关键字的位置（不在括号内、不在注释/字符串里）。
+ *
+ * 与 hasOuterLimitClause 一样只看**最后一条**非空语句：分号会重置匹配状态。
+ * 用于把 WHERE 条件插到正确的外层作用域——若不跳过括号深度，
+ * 子查询里的 ORDER BY / GROUP BY 会被误判成外层子句，条件就会插进子查询里。
+ *
+ * @returns 关键字的起始下标；没找到返回 -1
+ */
+export function findOuterClauseIndex(stmt: string, keywords: string[]): number {
+    const text = stmt || "";
+    // 多词关键字（"GROUP BY" / "ORDER BY"）按首词建索引，命中后再比对完整关键字。
+    const byFirstWord = new Map<string, string[]>();
+    for (const keyword of keywords) {
+        const first = keyword.trim().toLowerCase().split(/\s+/)[0];
+        if (!first) {
+            continue;
+        }
+        const list = byFirstWord.get(first) ?? [];
+        list.push(keyword.trim().toLowerCase());
+        byFirstWord.set(first, list);
+    }
+    let depth = 0;
+    let found = -1;
+    let nextStatement = false;
+
+    for (let i = 0; i < text.length;) {
+        const ch = text[i];
+
+        if (ch === " " || ch === "\t" || ch === "\r" || ch === "\n" || ch === "\f") {
+            i++;
+            continue;
+        }
+
+        // 行注释
+        if (text.startsWith("--", i)) {
+            i += 2;
+            while (i < text.length && text[i] !== "\n") {
+                i++;
+            }
+            continue;
+        }
+
+        // 块注释
+        if (text.startsWith("/*", i)) {
+            const end = text.indexOf("*/", i + 2);
+            if (end === -1) {
+                break;
+            }
+            i = end + 4;
+            continue;
+        }
+
+        // 语句分隔符：后一条语句的子句才是"最后一条语句"的外层子句
+        if (ch === ";" && depth === 0) {
+            nextStatement = true;
+            i++;
+            continue;
+        }
+        if (nextStatement) {
+            found = -1;
+            nextStatement = false;
+        }
+
+        // 引号包裹的标识符/字符串，跳过其中内容
+        if (ch === "'" || ch === '"' || ch === "`" || ch === "[") {
+            const end = ch === "[" ? "]" : ch;
+            i++;
+            while (i < text.length) {
+                if (text[i] === end) {
+                    i++;
+                    // 连续两个引号表示转义，继续留在引号内
+                    if (ch !== "[" && i < text.length && text[i] === end) {
+                        i++;
+                        continue;
+                    }
+                    break;
+                }
+                i++;
+            }
+            continue;
+        }
+
+        if (ch === "(") {
+            depth++;
+        } else if (ch === ")") {
+            depth--;
+        }
+
+        // 关键字扫描
+        if (isSqlWordByte(ch)) {
+            const start = i;
+            while (i < text.length && isSqlWordByte(text[i])) {
+                i++;
+            }
+            if (depth === 0 && found === -1) {
+                const word = text.slice(start, i).toLowerCase();
+                const candidates = byFirstWord.get(word);
+                if (candidates && candidates.some((keyword) => matchesKeywordAt(text, start, keyword))) {
+                    found = start;
+                }
+            }
+            continue;
+        }
+        i++;
+    }
+    return found;
+}
+
+/**
+ * 判断 text[start] 处是否匹配完整关键字（允许关键字内部有任意空白）。
+ * 词边界要求：关键字之后不能再跟单词字符，避免 "ORDER BYX" 误判为 "ORDER BY"。
+ */
+function matchesKeywordAt(text: string, start: number, keyword: string): boolean {
+    const parts = keyword.split(/\s+/);
+    let pos = start;
+    for (const part of parts) {
+        while (pos < text.length && /\s/.test(text[pos])) {
+            pos++;
+        }
+        if (text.slice(pos, pos + part.length).toLowerCase() !== part) {
+            return false;
+        }
+        pos += part.length;
+        const after = text[pos];
+        if (after !== undefined && isSqlWordByte(after)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /** 判断单词字符（思源 kernel/sql/query_limit.go 的 isSQLLimitWordByte 同款判定）。 */

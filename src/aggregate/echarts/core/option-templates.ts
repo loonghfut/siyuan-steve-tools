@@ -211,6 +211,8 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
 export interface EchartsAvTplCtx extends EchartsTplCtx {
   avID: string;
   viewID?: string;  // 可选：指定视图 ID，否则使用默认视图
+  /** 数据库块 ID。思源 3.8 起用它解析「块当前视图」与「块级上下文筛选」。 */
+  blockId?: string;
   dbName?: string;  // 数据库名称
   viewName?: string; // 视图名称
   showDbNameAndViewName?: boolean; // 是否在标题下面显示数据库名称和视图名称
@@ -390,7 +392,8 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     // 使用 renderAttributeView 获取包含列定义与行值的完整数据
     var __payload = { id: ${JSON.stringify(ctx.avID)}, page: ${String(page)}, pageSize: ${String(pageSize)} };
     ${ctx.viewID ? `__payload.viewID = ${JSON.stringify(ctx.viewID)};` : ''}
-    ${keyword ? `__payload.keyword = ${JSON.stringify(keyword)};` : ''}
+    ${ctx.blockId ? `__payload.blockID = ${JSON.stringify(ctx.blockId)};` : ''}
+    ${keyword ? `__payload.query = ${JSON.stringify(keyword)};` : ''}
     var rd = callAvSync('renderAttributeView', __payload) || {};
     ${genNormalizeAvResponseSnippet()}
     ${genBuildFlatRowsSnippet()}

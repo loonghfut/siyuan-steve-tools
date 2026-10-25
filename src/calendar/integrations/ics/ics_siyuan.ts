@@ -30,6 +30,14 @@ export class ICSImporter {
         this.init();
     }
 
+    /**
+     * 设置热更新：更新缓存的配置。
+     * 订阅地址、导入模式、模板、目标数据库等都在导入时读取，更新后立即生效。
+     */
+    updateSettings(settings: any) {
+        this.settings = settings;
+    }
+
     async init() {
         console.debug('ICSImporter init called');
         //获取日记id

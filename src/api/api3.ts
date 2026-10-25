@@ -228,3 +228,47 @@ export async function getallavids() {
     console.debug("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
     return avIds;
 }
+
+// AV ID → 数据库块 ID 的缓存。映射基本不可变（av id 就写在块的 markdown 里），60 秒 TTL 足够。
+const AV_BLOCK_ID_CACHE_TTL = 60 * 1000;
+const avBlockIdCache = new Map<string, { ts: number; id: string }>();
+
+/**
+ * 解析 AV ID（属性视图 ID）所在数据库块（type='av'）的块 ID。
+ *
+ * 思源 3.8 起，renderAttributeView 依靠块 ID 解析「块当前视图」与「块级上下文筛选」
+ * （kernel/model/attribute_view.go 的 resolveAttributeViewView / GetAttributeViewContextFilter），
+ * 所以渲染数据库视图时需要带上块 ID。
+ *
+ * 同一个 avID 理论上可能被多个块引用（例如数据库镜像）：此时按"最近更新"取一个并告警，
+ * 避免静默取到非预期的块、导致筛选出的行与文档不一致。
+ */
+export async function resolveAvBlockId(avID: string): Promise<string> {
+    if (!avID) return "";
+    const cached = avBlockIdCache.get(avID);
+    const now = Date.now();
+    if (cached && (now - cached.ts) < AV_BLOCK_ID_CACHE_TTL) {
+        return cached.id;
+    }
+    try {
+        const safe = avID.replace(/'/g, "''");
+        const rows = await api.sql(
+            `SELECT id FROM blocks
+             WHERE type = 'av'
+               AND markdown LIKE '%NodeAttributeView%data-av-id%'
+               AND markdown LIKE '%${safe}%'
+             ORDER BY updated DESC
+             LIMIT 10`
+        );
+        const ids = (Array.isArray(rows) ? rows : []).map((row: any) => String(row?.id || "")).filter(Boolean);
+        const id = ids[0] || "";
+        if (ids.length > 1) {
+            console.warn(`数据库 ${avID} 被多个块引用（${ids.join(", ")}），按最近更新取 ${id}；块级上下文筛选可能与文档不一致。`);
+        }
+        avBlockIdCache.set(avID, { ts: now, id });
+        return id;
+    } catch (e) {
+        console.warn(`解析数据库块 ID 失败 (${avID}):`, e);
+        return "";
+    }
+}

@@ -9,6 +9,7 @@ import zhCnLocale from '@fullcalendar/core/locales/zh-cn';
 import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import {
+    activeCalendars,
     refetchPeerCalendars,
     registerCalendarInstance,
     scheduleCalendarRefresh,
@@ -152,6 +153,31 @@ export async function init_viewValue(data: { viewId: string, viewName: string })
     filterViewId = data.viewId ? data.viewId.split(',') : [];
     // 初始化分组配置
     initializeGroups();
+}
+
+/**
+ * 把最新设置应用到已存在的日历实例。
+ *
+ * 只处理 FullCalendar 支持动态更新的选项（每周起始日与时间轴刻度），
+ * 视图类型、工具栏按钮等属于创建期配置，需要重新打开日历才生效。
+ */
+export function applyCalendarSettingsToInstances() {
+    const options: Array<[Parameters<Calendar["setOption"]>[0], any]> = [
+        ['firstDay', settingdata["cal-week-start"] === "sunday" ? 0 : 1],
+        ['slotDuration', validateTimeFormat(settingdata["cal-slot-duration"], '01:00:00')],
+        ['slotMinTime', validateTimeFormat(settingdata["cal-slot-min-time"], '00:00:00')],
+        ['slotMaxTime', validateTimeFormat(settingdata["cal-slot-max-time"], '24:00:00')],
+        ['snapDuration', validateTimeFormat(settingdata["cal-snap-duration"], '00:15:00')],
+    ];
+    for (const calendar of activeCalendars) {
+        for (const [name, value] of options) {
+            try {
+                calendar.setOption(name, value);
+            } catch (error) {
+                console.warn('应用日历设置失败', name, error);
+            }
+        }
+    }
 }
 
 

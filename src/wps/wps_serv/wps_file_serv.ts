@@ -7,6 +7,7 @@ import { F5, generateLinkCard } from "@/api/api3";
 import * as ic from "@/icon"
 import { api, createDailynote } from "@frostime/siyuan-plugin-kits";
 import { confirmDialog } from "@/libs/dialog";
+import { resolveProtyleHtmlLink } from "@/libs/protyle-html";
 import { fetchWpsFiles } from "../wps_files_api";
 import { openTab } from "siyuan";
 import { getWpsBrowserEnvScript, getWpsWebviewAttributes, getWpsWebviewUserAgent } from "../webview_env";
@@ -33,6 +34,11 @@ interface WpsFileRecord {
     file_src: string;
     time: string;
 }
+
+/**
+ * 解一层 HTML 实体转义。
+ * 仅用于兼容思源 3.7 及更早的 protyle-html（data-content 被额外转义过一次）。
+ */
 
 export class WpsFileServ {
     private settingdata: any;
@@ -239,6 +245,17 @@ export class WpsFileServ {
         this.plugin.eventBus.on("switch-protyle", this.switchProtyleHandler);
     }
 
+    /**
+     * 设置热更新：更新缓存的配置，并重新应用依赖设置的行为（后台休眠时长、暗色反色样式）。
+     * 不重复注册监听，也不重建 dock/webview（webview 地址变化需重载插件才生效）。
+     */
+    updateSettings(settingdata: any) {
+        this.settingdata = settingdata;
+        this.bgSleepMs = this.getMinutesSetting('wps-file-background-sleep-minutes', 8) * 60 * 1000;
+        // 注入 CSS 实现暗色主题反色（只在设置开启时注入）
+        this._ensureInvertStyleTag(!!this.settingdata?.["wps-webview-invert-dark"]);
+    }
+
     async onLayoutReady() {
         this.WPSfile = window.siyuanWPS;
         this.ensureBackgroundWpsLoader();
@@ -303,20 +320,17 @@ export class WpsFileServ {
                 click: async () => {
                     try {
                         const protyleHtml = blockEl.querySelector('protyle-html');
-                        const dataContent = protyleHtml?.getAttribute('data-content') || '';
-                        const decoded = dataContent
-                            .replace(/&lt;/g, '<')
-                            .replace(/&gt;/g, '>')
-                            .replace(/&amp;/g, '&')
-                            .replace(/&quot;/g, '"')
-                            .replace(/&#39;/g, "'");
-                        const match = decoded.match(/<a[^>]+?(?:data-link|href)="([^"]+)"/i);
-                        const url = match?.[1];
+                        const resolved = resolveProtyleHtmlLink({
+                            dataContent: protyleHtml?.getAttribute('data-content') || '',
+                            shadowHtml: (protyleHtml as any)?.shadowRoot?.innerHTML || '',
+                        });
+                        const url = resolved?.url || '';
+                        const html = resolved?.html || '';
                         if (!url) { showMessage('未能解析链接', 2000, 'error'); return; }
                         let title = '';
                         try {
                             const tmp = document.createElement('div');
-                            tmp.innerHTML = decoded;
+                            tmp.innerHTML = html;
                             const titleEl = tmp.querySelector('.link-card-inner > div[style*="flex:1"] > div:first-child');
                             title = titleEl?.textContent?.trim() || '';
                         } catch { }

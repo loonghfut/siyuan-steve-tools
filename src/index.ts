@@ -137,9 +137,22 @@ export default class steveTools extends Plugin {
         await this.pluginConfig?.load?.();
       }
       // 推给支持热更新的模块，避免整体重载带来的状态丢失。
-      moduleInstances["M_lifelog"]?.updateSettings?.(settingdata);
-      moduleInstances["M_ai"]?.updateSettings?.(settingdata);
-      moduleInstances["M_Minutiae"]?.updateSettings?.(settingdata, { skipBgRefresh: true });
+      // 遍历所有模块而不是只写死几个：漏掉任何一个，该模块的设置就会永久停留在旧值
+      // （之前内核会整包重载插件，所有模块都能拿到新设置）。
+      for (const moduleName in moduleInstances) {
+        const instance = moduleInstances[moduleName] as unknown as {
+          updateSettings?: (settings: any, options?: any) => void | Promise<void>;
+        };
+        if (typeof instance?.updateSettings !== "function") {
+          console.warn(`模块 ${moduleName} 未实现 updateSettings，设置变更后需要手动刷新插件才会生效。`);
+          continue;
+        }
+        try {
+          await instance.updateSettings(settingdata);
+        } catch (error) {
+          console.warn(`模块 ${moduleName} 应用新设置失败`, error);
+        }
+      }
       this.applyPageInvert();
     } catch (error) {
       console.warn("STtools 同步插件配置失败:", error);

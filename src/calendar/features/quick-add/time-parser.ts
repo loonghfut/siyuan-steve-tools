@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { showMessage } from 'siyuan';
-import { resolveAiProviderConfig } from '@/api/ai-provider';
+import { buildAiEndpoint, buildAiRequestBody, extractAiText, resolveAiProviderConfig } from '@/api/ai-provider';
 
 function mapDayCharToJsDay(dayChar: string): number {
     // ...existing code...
@@ -375,56 +375,59 @@ Your response:
     `;
 
     try {
-        // 只支持 OpenAI 兼容协议；其它协议（anthropic-messages 等）请求体结构不同。
-        if (provider.protocol && provider.protocol !== 'openai' && provider.protocol !== 'openai-responses') {
+        // 思源的 baseURL 是**基址**，请求端点要按协议追加（/chat/completions 或 /responses）。
+        // 只支持 OpenAI 兼容的两种协议；其它协议（anthropic-messages 等）请求体结构不同。
+        const endpoint = buildAiEndpoint(provider.baseURL, provider.protocol);
+        if (!endpoint) {
             console.warn(`AI 提供商协议 ${provider.protocol} 不支持日程时间识别，回退到原始解析器。`);
             return parseScheduleTime(content);
         }
-        const response = await fetch(`${provider.baseURL}`, {
+        const systemPrompt = "You are an expert at parsing dates and times from Chinese text and formatting them according to instructions.";
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
                 ...(provider.headers || {}),
             },
-            body: JSON.stringify({
-                model: `${provider.model}`,
-                messages: [
-                    { role: "system", content: "You are an expert at parsing dates and times from Chinese text and formatting them according to instructions." },
-                    { role: "user", content: prompt }
-                ],
-                temperature: provider.temperature,
-                max_tokens: provider.maxTokens,
-
-            }),
+            body: JSON.stringify(buildAiRequestBody(
+                provider.protocol,
+                provider.model,
+                systemPrompt,
+                prompt,
+                provider.temperature,
+                provider.maxTokens,
+            )),
         });
 
         if (!response.ok) {
             const errorBody = await response.text();
-            console.error(`DeepSeek API error: ${response.status} ${response.statusText}`, errorBody);
-            console.warn(`DeepSeek API error. Falling back to original parser for content: "${content}".`);
+            console.error(`AI API error: ${response.status} ${response.statusText}`, errorBody);
+            console.warn(`AI API error. Falling back to original parser for content: "${content}".`);
             return parseScheduleTime(content);
         }
 
         const completion = await response.json();
-        const aiResponse = completion.choices[0]?.message?.content?.trim();
+        // 两种协议的响应结构不同：openai 是 choices[0].message.content，
+        // openai-responses 是 output[].content[].text。
+        const aiResponse = extractAiText(completion, provider.protocol);
 
         if (aiResponse && aiResponse.toLowerCase() !== "null") {
             const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
             if (dateTimeRegex.test(aiResponse)) {
                 return aiResponse;
             } else {
-                console.warn(`DeepSeek AI returned a malformed date-time: "${aiResponse}" for content: "${content}". Falling back to original parser.`);
+                console.warn(`AI returned a malformed date-time: "${aiResponse}" for content: "${content}". Falling back to original parser.`);
                 return parseScheduleTime(content);
             }
         } else {
-            console.debug(`DeepSeek AI could not parse date/time from content: "${content}". Falling back to original parser.`);
+            console.debug(`AI could not parse date/time from content: "${content}". Falling back to original parser.`);
             return parseScheduleTime(content);
         }
 
     } catch (error) {
-        console.error("Error calling DeepSeek API:", error);
-        console.warn(`DeepSeek API call failed. Falling back to original parser for content: "${content}".`);
+        console.error("Error calling AI API:", error);
+        console.warn(`AI API call failed. Falling back to original parser for content: "${content}".`);
         return parseScheduleTime(content);
     }
 }

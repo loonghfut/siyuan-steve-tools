@@ -6,7 +6,7 @@ import { showMessage } from "siyuan";
 import { AggregateCursor, PresetItem, SQLRawRow } from "../echarts/types/types";
 import { TimerManager } from "./TimerManager";
 import { maxCursor, normalizeCursor } from "../domain/incremental-cursor";
-import { ensureSqlLimit, SQL_UNLIMITED_CAP } from "@/libs/sql-limit";
+import { ensureSqlLimit, findOuterClauseIndex, SQL_UNLIMITED_CAP } from "@/libs/sql-limit";
 import type { AggregateRunResult, AggregateTargetRunResult } from "../domain/run-result";
 
 export class aggregatorBlock {
@@ -392,6 +392,15 @@ export class aggregatorBlock {
         document.body.appendChild(overlay);
 
         return { element: dialog, destroy };
+    }
+
+    /**
+     * 设置热更新：更新配置。
+     * 聚合器的多处逻辑（插入位置、预览列、预览模板、时间字段等）实时读取该配置，
+     * 更新后立即生效。
+     */
+    public updateSettings(settingdata: any) {
+        this._settingdata = settingdata;
     }
 
     async init(settingdata: any) {
@@ -1475,14 +1484,21 @@ export class aggregatorBlock {
         return value.replace(/'/g, "''");
     }
 
-    /** Add a predicate before ORDER BY/LIMIT instead of producing invalid trailing SQL. */
+    /**
+     * Add a predicate before the outer ORDER BY/GROUP BY/LIMIT instead of producing invalid trailing SQL.
+     *
+     * 只在外层作用域里找子句：子查询内部的 ORDER BY / GROUP BY 属于内层，
+     * 若按"首个正则匹配"定位，条件会被插进子查询，外层就失去过滤（取到错数据）。
+     */
     private appendSqlCondition(sqlText: string, condition: string): string {
         const stmt = sqlText.trim().replace(/;\s*$/, '');
-        const clause = /\s+(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT|OFFSET)\b/i.exec(stmt);
-        const at = clause?.index ?? stmt.length;
-        const head = stmt.slice(0, at);
-        const tail = stmt.slice(at);
-        return `${head}${/\bWHERE\b/i.test(head) ? ' AND ' : ' WHERE '}${condition}${tail}`;
+        const at = findOuterClauseIndex(stmt, ["GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET"]);
+        const head = at >= 0 ? stmt.slice(0, at) : stmt;
+        const tail = at >= 0 ? stmt.slice(at) : '';
+        // tail 是子句关键字本身（不含前导空白），条件与子句之间必须补一个空格，
+        // 否则会拼出 "root_id != 1ORDER BY ..." 这样的非法 SQL。
+        const separator = tail && !/^\s/.test(tail) ? ' ' : '';
+        return `${head}${/\bWHERE\b/i.test(head) ? ' AND ' : ' WHERE '}${condition}${separator}${tail}`;
     }
 
     // 查询失败会抛出错误，让调用方能与“查询成功但无结果”明确区分。

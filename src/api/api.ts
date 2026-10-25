@@ -537,12 +537,89 @@ export async function renderAttributeView(
 
 // **************************************** SQL ****************************************
 
+export interface ISqlResult {
+    rows: any[];
+    /** 服务端本次生效的行数上限（思源 3.8 起，未自带 LIMIT 时套用「查询结果上限」设置）。 */
+    limit?: number;
+    /** 结果是否被服务端截断。 */
+    truncated?: boolean;
+}
+
+/**
+ * 执行 SQL 并返回结果与截断信息。
+ *
+ * 思源 3.8 起，`/api/query/sql` 会对**没有自带外层 LIMIT** 的语句套用服务端默认上限，
+ * 截断信息放在响应信封顶层（limit / truncated）。这里显式透出，
+ * 避免"数据莫名变少"却无从察觉。
+ */
+export async function sqlWithMeta(sql: string): Promise<ISqlResult> {
+    let response = await fetchSyncPost('/api/query/sql', { stmt: sql }) as IWebSocketData & { limit?: number; truncated?: boolean };
+    if (response.code !== 0) {
+        // 原实现失败时返回字符串，调用方会在 .map / 迭代时抛 TypeError。
+        // 这里统一返回空数组，但保留告警，避免"查询失败"被当成"没有数据"而静默。
+        console.warn(`SQL 查询失败（code ${response.code}）：${response.msg || ""}\n${sql}`);
+        return { rows: [], truncated: false };
+    }
+    let rows = Array.isArray(response.data) ? response.data : [];
+    return { rows, limit: response.limit, truncated: response.truncated === true };
+}
+
 export async function sql(sql: string): Promise<any[]> {
-    let sqldata = {
-        stmt: sql,
-    };
-    let url = '/api/query/sql';
-    return request(url, sqldata);
+    let result = await sqlWithMeta(sql);
+    if (result.truncated) {
+        console.warn(`SQL 结果被服务端截断（上限 ${result.limit} 行），请在语句中自带 LIMIT。`);
+    }
+    return result.rows;
+}
+
+// **************************************** Calendar Undated ****************************************
+
+export interface IAVCalendarUndated {
+    rows: any[];
+    total: number;
+}
+
+/**
+ * 获取日历视图中「日期为空」的条目（待安排）。
+ *
+ * 思源 3.8 的日历布局会把无日期的条目移出常规 rows
+ * （kernel/av/layout_calendar.go 的 Calendar.UndatedRows 标记为 json:"-" 不序列化），
+ * 需要单独调用本接口取回，否则这些事件会从插件日历里凭空消失。
+ * 接口契约见 kernel/apicontract/av_requests.go 的 AVCalendarUndatedRequest。
+ */
+export async function getAttributeViewCalendarUndated(avID: string, options: {
+    blockID?: string;
+    viewID?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+} = {}): Promise<IAVCalendarUndated> {
+    if (!avID) return { rows: [], total: 0 };
+    // 内核按页返回（默认 50，见 kernel/api/av.go 的 avPage），这里循环取全量，
+    // 否则待安排条目超过一页时会被静默丢弃。
+    const pageSize = options.pageSize && options.pageSize > 0 ? options.pageSize : 100;
+    let page = options.page && options.page > 0 ? options.page : 1;
+    const rows: any[] = [];
+    let total = 0;
+    // 上限 100 页（10000 行）防止异常情况下无限翻页
+    for (let guard = 0; guard < 100; guard++) {
+        const data: Record<string, unknown> = { id: avID, page, pageSize };
+        if (options.blockID) data.blockID = options.blockID;
+        if (options.viewID) data.viewID = options.viewID;
+        if (options.query) data.query = options.query;
+        const res = await request('/api/av/getAttributeViewCalendarUndated', data);
+        const pageRows = Array.isArray(res?.rows) ? res.rows : [];
+        total = typeof res?.total === "number" ? res.total : 0;
+        rows.push(...pageRows);
+        if (pageRows.length === 0 || rows.length >= total) {
+            break;
+        }
+        page++;
+    }
+    if (rows.length < total) {
+        console.warn(`待安排条目未取全：已取 ${rows.length} 行，共 ${total} 行。`);
+    }
+    return { rows, total };
 }
 
 export async function getBlockByID(blockId: string): Promise<Block> {

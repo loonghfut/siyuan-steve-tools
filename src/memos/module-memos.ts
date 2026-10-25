@@ -1,6 +1,6 @@
 import steveTools from "@/index";
 import { showMessage } from "siyuan";
-import { MemosSyncService, MemosSyncResult, SyncState } from "./memos-sync-service";
+import { MemosSyncService, MemosSyncResult, MemosPluginSettings, SyncState } from "./memos-sync-service";
 
 function formatDateTimeLabel(value?: string) {
     if (!value) return "";
@@ -74,6 +74,34 @@ export class M_Memos {
         this.updateButtonState('idle');
     }
 
+    /**
+     * 从当前配置构造同步服务所需的设置。
+     */
+    private buildSyncSettings(): MemosPluginSettings {
+        return {
+            baseUrl: String(this.settingdata["memos-base-url"] || '').trim(),
+            token: String(this.settingdata["memos-token"] || '').trim(),
+            notebookId: String(this.settingdata["memos-notebook"] || '').trim(),
+            includeArchived: !!this.settingdata["memos-include-archived"],
+            incrementalSync: this.settingdata["memos-incremental-sync"] !== false,
+            lastSyncCursor: String(this.settingdata["memos-last-sync-cursor"] || ''),
+            syncAttachments: this.settingdata["memos-sync-attachments"] !== false,
+            assetsDir: String(this.settingdata["memos-assets-dir"] || '/assets/'),
+            pageSize: Number(this.settingdata["memos-page-size"] || 200),
+            anchorTemplate: String(this.settingdata["memos-anchor-template"] || '- {{title}}'),
+            customTemplate: String(this.settingdata["memos-custom-template"] || ''),
+        };
+    }
+
+    /**
+     * 设置热更新：更新配置并同步给已创建的同步服务（地址/token 变化时重建其内部客户端）。
+     * 同步按钮与状态提示不受影响。
+     */
+    updateSettings(settingdata: any) {
+        this.settingdata = settingdata;
+        this.syncService?.updateSettings?.(this.buildSyncSettings());
+    }
+
     private async handleSync() {
         if (this.isSyncing) {
             showMessage("Memos 同步正在进行中，请稍候...", 3000, "info");
@@ -101,19 +129,7 @@ export class M_Memos {
         this.updateButtonState('syncing');
 
         try {
-            this.syncService = new MemosSyncService({
-                baseUrl,
-                token,
-                notebookId,
-                includeArchived: !!this.settingdata["memos-include-archived"],
-                incrementalSync: this.settingdata["memos-incremental-sync"] !== false,
-                lastSyncCursor: String(this.settingdata["memos-last-sync-cursor"] || ''),
-                syncAttachments: this.settingdata["memos-sync-attachments"] !== false,
-                assetsDir: String(this.settingdata["memos-assets-dir"] || '/assets/'),
-                pageSize: Number(this.settingdata["memos-page-size"] || 200),
-                anchorTemplate: String(this.settingdata["memos-anchor-template"] || '- {{title}}'),
-                customTemplate: String(this.settingdata["memos-custom-template"] || ''),
-            });
+            this.syncService = new MemosSyncService(this.buildSyncSettings());
 
             this.syncService.setStateChangeCallback((state, message) => {
                 this.updateButtonState(state);

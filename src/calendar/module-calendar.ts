@@ -6,7 +6,7 @@ import * as ic from "@/icon"
 import "./ui/styles/calendar-global.scss";
 import "./ui/styles/calendar-events.scss";
 declare const siyuan: any;
-import { init_viewValue, run, update_av_ids } from "./ui/calendar-view";
+import { init_viewValue, run, update_av_ids, applyCalendarSettingsToInstances } from "./ui/calendar-view";
 import * as myF from "./data/calendar-data";
 import { CALENDAR_EVENTS_JSON_PATH, calendarPaths, configureCalendarPaths } from './config/calendar-paths';
 import { activeCalendars, scheduleCalendarRefresh, unregisterCalendarInstance } from './core/calendar-runtime';
@@ -29,6 +29,7 @@ import { Dida365Service } from "./integrations/dida/features/dida-service";
 // import { AVManager } from "@/api/db_pro"; // 未使用
 import { IAVOperator } from "@/api/db_interface";
 import { extractDataAvId } from "@/api/api3";
+import { applyTopBarButton } from "@/libs/topbar";
 
 
 
@@ -53,6 +54,16 @@ export class M_calendar {
      */
     private lifelogChangedHandler?: (e: any) => void;
     private lifelogRefreshTimer?: ReturnType<typeof setTimeout>;
+    /** ICS 导入器实例（缓存了设置，需要随设置变化更新） */
+    private icsImporter?: ICSImporter;
+    /** 当前生效的 ICS 订阅地址，用于判断订阅是否需要重新拉取 */
+    private icsSubscribeUrl = "";
+    /** 分享（S3/WebDAV）相关配置的快照，用于判断分享客户端是否需要重建 */
+    private shareConfigSnapshot = "";
+    /** 顶栏按钮：「立刻生成ics文件」 */
+    private handUpdateTopBar?: HTMLElement;
+    /** 顶栏按钮：「日程视图」 */
+    private showViewTopBar?: HTMLElement;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
@@ -100,7 +111,7 @@ export class M_calendar {
     public calConfig: M_caldata;
     public s3Client: ics_s3;
     public webdavClient: WebDAVSync;
-    public icsSubscription: ICSSubscription;
+    public icsSubscription?: ICSSubscription;
     public calendarAV: IAVOperator;
 
     async init(settingdata: { [x: string]: any; }) {
@@ -155,30 +166,10 @@ export class M_calendar {
         this.plugin.eventBus.on("switch-protyle", this.switchProtyleInitHandler);
 
         // // steveTools.outlog(this_settingdata["cal-hand-update"]);
-        if (this_settingdata["cal-hand-update"] == true) {
-            this.plugin.addTopBar({
-                icon: "iconSTcal",
-                title: "立刻生成ics文件",
-                position: "right",
-                callback: async () => {
-                    await this.getEventsFromSiYuanDatabase()
-                    showMessage("日历文件生成结束", 3000, "info");
-                }
-            });
-        }
+        // 顶栏按钮（随设置显隐，热更新时复用同一条目）
+        this.applyTopBarButtons();
         if (this_settingdata["cal-ics-subscribe-import"] == true) {
-            new ICSImporter(this.plugin);
-        }
-        if (this_settingdata["cal-show-view"] == true) {
-            const topBarElement = this.plugin.addTopBar({
-                icon: "iconCalendar",
-                title: "日程视图",
-                position: "left",
-                callback: async () => {
-                    let rect = topBarElement.getBoundingClientRect();
-                    this.addMenu(rect);
-                }
-            });
+            this.icsImporter = new ICSImporter(this.plugin);
         }
         let D_calendar_day: any;
         this.plugin.addDock({
@@ -209,35 +200,7 @@ export class M_calendar {
         if (this_settingdata["cal-auto-update"] == true) {
             // // steveTools.outlog("自动更新日历文件");
             //监听
-            this.wsMessageHandler = async (e: { data: string; }) => {
-                if (!islisten) {
-                    return;
-                }
-                // if (1) { return; }
-                const msg = JSON.parse(e.data);
-                if (msg.cmd === "transactions") {
-                    const operations = (msg.data || []).flatMap((transaction: any) => transaction?.doOperations || []);
-                    const cellWrites = operations.filter((op: any) =>
-                        op?.action === 'updateAttrViewCell' && op?.avID
-                    );
-                    if (cellWrites.length > 0) {
-                        const managedAvIds = new Set(await this.getManagedCalendarAvIds());
-                        const hasCalendarWrite = cellWrites.some((op: any) => managedAvIds.has(op.avID));
-                        if (hasCalendarWrite && !this.isUpdating) {
-                            this.isUpdating = true;
-                            setTimeout(async () => {
-                                try {
-                                    await this.getEventsFromSiYuanDatabase();
-                                    console.debug("更新日历文件<2>");
-                                } finally {
-                                    this.isUpdating = false;
-                                }
-                            }, 10000);
-                        }
-                    }
-                }
-            };
-            siyuan.ws.ws.addEventListener('message', this.wsMessageHandler);
+            this.applyAutoUpdateListener();
             //// 暂时不用
             // 每15分钟调用一次await this.getEventsFromSiYuanDatabase()
             // setInterval(async () => {
@@ -286,6 +249,112 @@ export class M_calendar {
         // eventBus.on/off 的签名限定为 keyof IEventBusMap（思源内置事件），
         // 自定义事件名需断言。这是思源插件常见做法，eventBus 内部按字符串匹配。
         (this.plugin.eventBus as any).on(LIFELOG_CHANGED_EVENT, this.lifelogChangedHandler);
+    }
+
+    /**
+     * 设置热更新（跨端改动设置后由插件入口调用）。
+     *
+     * 只更新缓存的配置并重新应用受影响的行为：
+     * 不重复注册事件监听、不重复创建 dock/topbar。
+     */
+    updateSettings(settingdata: any) {
+        const shareSnapshot = M_calendar.getShareConfigSnapshot(settingdata);
+        const shareChanged = shareSnapshot !== this.shareConfigSnapshot;
+        this_settingdata = settingdata;
+        // 让日历内部（视图、数据、ics 集成等）读到最新配置
+        configureCalendarContext(settingdata, this);
+        // ics 文件名（订阅地址）
+        configureCalendarPaths(settingdata["cal-url"]);
+        // ICS 导入器缓存了配置
+        this.icsImporter?.updateSettings?.(settingdata);
+        // 顶栏按钮显隐
+        this.applyTopBarButtons();
+        // 自动更新监听开关
+        this.applyAutoUpdateListener();
+        // 已有日历实例应用新的时间轴配置并重新取数
+        applyCalendarSettingsToInstances();
+        scheduleCalendarRefresh();
+        // ICS 订阅地址变化时重新拉取（地址未变则跳过）
+        void this.refreshIcsSubscription();
+        // 分享配置变化时重建本端已存在的分享客户端
+        if (shareChanged) {
+            void this.refreshShareClients();
+        }
+        this.shareConfigSnapshot = shareSnapshot;
+    }
+
+    /**
+     * 根据设置应用顶栏按钮的显隐。
+     * 顶栏条目用固定 id 注册，重复调用只会更新同一条目，不会新增。
+     */
+    private applyTopBarButtons() {
+        this.handUpdateTopBar = applyTopBarButton(this.plugin, this.handUpdateTopBar, "st-cal-hand-update", {
+            icon: "iconSTcal",
+            title: "立刻生成ics文件",
+            position: "right",
+            callback: async () => {
+                await this.getEventsFromSiYuanDatabase()
+                showMessage("日历文件生成结束", 3000, "info");
+            }
+        }, this_settingdata["cal-hand-update"] == true);
+        this.showViewTopBar = applyTopBarButton(this.plugin, this.showViewTopBar, "st-cal-show-view", {
+            icon: "iconCalendar",
+            title: "日程视图",
+            position: "left",
+            callback: async () => {
+                let rect = this.showViewTopBar!.getBoundingClientRect();
+                this.addMenu(rect);
+            }
+        }, this_settingdata["cal-show-view"] == true);
+    }
+
+    /**
+     * 根据设置开启/关闭「自动更新日历文件」的 WebSocket 监听。
+     * 幂等：已开启时不会重复注册，已关闭时会移除监听。
+     */
+    private applyAutoUpdateListener() {
+        const enabled = this_settingdata["cal-auto-update"] == true;
+        if (enabled && !this.wsMessageHandler) {
+            this.wsMessageHandler = this.createAutoUpdateHandler();
+            siyuan.ws.ws.addEventListener('message', this.wsMessageHandler);
+        } else if (!enabled && this.wsMessageHandler) {
+            siyuan.ws.ws.removeEventListener('message', this.wsMessageHandler);
+            this.wsMessageHandler = undefined;
+        }
+    }
+
+    /**
+     * 创建「自动更新日历文件」的 WebSocket 监听器。
+     */
+    private createAutoUpdateHandler() {
+        return async (e: { data: string; }) => {
+            if (!islisten) {
+                return;
+            }
+            // if (1) { return; }
+            const msg = JSON.parse(e.data);
+            if (msg.cmd === "transactions") {
+                const operations = (msg.data || []).flatMap((transaction: any) => transaction?.doOperations || []);
+                const cellWrites = operations.filter((op: any) =>
+                    op?.action === 'updateAttrViewCell' && op?.avID
+                );
+                if (cellWrites.length > 0) {
+                    const managedAvIds = new Set(await this.getManagedCalendarAvIds());
+                    const hasCalendarWrite = cellWrites.some((op: any) => managedAvIds.has(op.avID));
+                    if (hasCalendarWrite && !this.isUpdating) {
+                        this.isUpdating = true;
+                        setTimeout(async () => {
+                            try {
+                                await this.getEventsFromSiYuanDatabase();
+                                console.debug("更新日历文件<2>");
+                            } finally {
+                                this.isUpdating = false;
+                            }
+                        }, 10000);
+                    }
+                }
+            }
+        };
     }
 
     async onLayoutReady() {
@@ -434,16 +503,70 @@ export class M_calendar {
     }
 
     private async shareicsinit() {
-        if (this_settingdata["cal-ics-enable-subscribe"]) {
-            this.icsSubscription = new ICSSubscription([this_settingdata["cal-ics-subscribe-url"]]);
-            await this.icsSubscription.init();
-            console.debug("ST_ics状态:", this.icsSubscription.getEvents());
+        await this.refreshIcsSubscription();
+        if (this_settingdata["cal-share"] === "s3" || this_settingdata["cal-share"] === "s3-diy") {
+            await this.createS3Client();
         }
+        if (this_settingdata["cal-share"] === "webdav") {
+            await this.createWebdavClient();
+        }
+        this.shareConfigSnapshot = M_calendar.getShareConfigSnapshot(this_settingdata);
+    }
+
+    /**
+     * 拉取 ICS 订阅内容。
+     * 订阅地址变化时重建订阅对象并重新拉取，地址未变则跳过（避免重复请求）。
+     */
+    private async refreshIcsSubscription() {
+        if (!this_settingdata["cal-ics-enable-subscribe"]) {
+            this.icsSubscription = undefined;
+            this.icsSubscribeUrl = "";
+            return;
+        }
+        const url = String(this_settingdata["cal-ics-subscribe-url"] || "");
+        if (this.icsSubscription && this.icsSubscribeUrl === url) {
+            return;
+        }
+        this.icsSubscribeUrl = url;
+        this.icsSubscription = new ICSSubscription([url]);
+        await this.icsSubscription.init();
+        console.debug("ST_ics状态:", this.icsSubscription.getEvents());
+    }
+
+    /**
+     * 分享方式变化时按**目标方式**准备客户端。
+     *
+     * 目标方式此前从未用过时客户端并不存在；若只在"已存在时重建"，
+     * 上传分支会拿到 undefined 抛 TypeError，且错误被吞掉后用户看不到任何提示。
+     */
+    private async refreshShareClients() {
+        const share = this_settingdata["cal-share"];
+        if (share === "s3" || share === "s3-diy") {
+            // 切走 WebDAV 时不再保留旧客户端
+            this.webdavClient = undefined;
+            await this.createS3Client();
+            return;
+        }
+        if (share === "webdav") {
+            this.s3Client = undefined;
+            await this.createWebdavClient();
+            return;
+        }
+        // 关闭分享：两种客户端都不再使用
+        this.s3Client = undefined;
+        this.webdavClient = undefined;
+    }
+
+    /**
+     * 创建 S3 分享客户端（按设置区分内置与自定义桶）。
+     */
+    private async createS3Client() {
         if (this_settingdata["cal-share"] === "s3") {
             this.s3Client = new ics_s3({});
             this.s3Client.load_date_from_siyuan();
             this.s3Client.init();
             console.debug("ST_s3状态:", await this.s3Client.testConnection());
+            return;
         }
         if (this_settingdata["cal-share"] === "s3-diy") {
             const bucket = this_settingdata["cal-s3-bucket"];
@@ -454,21 +577,41 @@ export class M_calendar {
             this.s3Client.init();
             console.debug("ST_s3状态:", await this.s3Client.testConnection());
         }
-        if (this_settingdata["cal-share"] === "webdav") {
-            const serverUrl = this_settingdata["cal-webdav-url"];
-            const username = this_settingdata["cal-webdav-username"];
-            const password = this_settingdata["cal-webdav-password"];
-            const remotePath = this_settingdata["cal-webdav-path"];
+    }
 
-            this.webdavClient = new WebDAVSync({
-                serverUrl,
-                username,
-                password,
-                remotePath
-            });
-            await this.webdavClient.init();
-            console.debug("WebDAV状态:", await this.webdavClient.testConnection());
-        }
+    /**
+     * 创建 WebDAV 分享客户端。
+     */
+    private async createWebdavClient() {
+        const serverUrl = this_settingdata["cal-webdav-url"];
+        const username = this_settingdata["cal-webdav-username"];
+        const password = this_settingdata["cal-webdav-password"];
+        const remotePath = this_settingdata["cal-webdav-path"];
+
+        this.webdavClient = new WebDAVSync({
+            serverUrl,
+            username,
+            password,
+            remotePath
+        });
+        await this.webdavClient.init();
+        console.debug("WebDAV状态:", await this.webdavClient.testConnection());
+    }
+
+    /**
+     * 分享相关配置的快照，用于判断分享客户端是否需要重建。
+     */
+    private static getShareConfigSnapshot(settings: any): string {
+        return JSON.stringify([
+            settings?.["cal-share"],
+            settings?.["cal-s3-bucket"],
+            settings?.["cal-s3-accessKeyId"],
+            settings?.["cal-s3-secretAccessKey"],
+            settings?.["cal-webdav-url"],
+            settings?.["cal-webdav-username"],
+            settings?.["cal-webdav-password"],
+            settings?.["cal-webdav-path"],
+        ]);
     }
 
     public avButton() {
@@ -747,20 +890,30 @@ export class M_calendar {
 
             const selectToPics = this_settingdata["SelectTOPics"];
             if (!selectToPics || selectToPics === front) {
-                if (this_settingdata["cal-share"] === "s3") {
-                    const ics = await api.getFileBlob(calendarPaths.icsDataPath)
-                    const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                    await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
-                }
-                if (this_settingdata["cal-share"] === "s3-diy") {
-                    const ics = await api.getFileBlob(calendarPaths.icsDataPath)
-                    const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                    await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
+                if (this_settingdata["cal-share"] === "s3" || this_settingdata["cal-share"] === "s3-diy") {
+                    if (!this.s3Client) {
+                        // 客户端缺失（例如分享方式刚被切换）时按当前设置补建，避免 undefined 调用
+                        await this.createS3Client();
+                    }
+                    if (this.s3Client) {
+                        const ics = await api.getFileBlob(calendarPaths.icsDataPath)
+                        const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                        await this.s3Client.uploadFile(calendarPaths.icsPublicPath, file);
+                    } else {
+                        showMessage("S3 分享客户端未就绪，请检查分享设置", 3000, "error");
+                    }
                 }
                 if (this_settingdata["cal-share"] === "webdav") {
-                    const ics = await api.getFileBlob(calendarPaths.icsDataPath)
-                    const file = new File([ics], "calendar.ics", { type: "text/calendar" });
-                    await this.webdavClient.uploadFile(this_settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
+                    if (!this.webdavClient) {
+                        await this.createWebdavClient();
+                    }
+                    if (this.webdavClient) {
+                        const ics = await api.getFileBlob(calendarPaths.icsDataPath)
+                        const file = new File([ics], "calendar.ics", { type: "text/calendar" });
+                        await this.webdavClient.uploadFile(this_settingdata["cal-url"] || "1.ics", file);//特殊处理，不自动建文件夹防止权限报错
+                    } else {
+                        showMessage("WebDAV 分享客户端未就绪，请检查分享设置", 3000, "error");
+                    }
                 }
             }
         } catch (error) {

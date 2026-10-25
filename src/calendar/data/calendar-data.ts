@@ -1,4 +1,5 @@
 import * as api from '@/api/api';
+import { resolveAvBlockId } from '@/api/api3';
 import { ViewItem } from '@/calendar/core/types';
 import * as sy from 'siyuan'
 import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
@@ -15,7 +16,7 @@ import {
 } from '@/calendar/features/quick-add/content-metadata';
 import { parseScheduleTime } from '@/calendar/features/quick-add/time-parser';
 import { createDailynote } from '@frostime/siyuan-plugin-kits';
-import { getRequiredFields } from '@/calendar/config/field-config';
+import { getRequiredFields, readCalendarDateKeyID, resolveCalendarDateFieldName } from '@/calendar/config/field-config';
 import type { CalendarWriteReason } from '@/calendar/core/calendar-self-write';
 import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
 import { calendarCellWriteOptions } from '@/calendar/core/calendar-cell-writes';
@@ -254,53 +255,8 @@ const viewIdInFlight = new Map<string, Promise<ViewItem[]>>();
 const viewValueInFlight = new Map<string, Promise<any[]>>();
 
 // 思源 3.8 起，renderAttributeView 需要数据库块 ID 才能解析「块级上下文筛选」
-// （custom-sy-av-context-filter）与「块当前视图」。AV ID → 数据库块 ID 的映射几乎不变，
-// 用短 TTL 缓存 + single-flight 避免每次 refetch 都多打一次 SQL。
-const AV_BLOCK_ID_CACHE_TTL = 60 * 1000;
-const avBlockIdCache = new Map<string, { ts: number; id: string }>();
-const avBlockIdInFlight = new Map<string, Promise<string>>();
-
-/**
- * 解析 AV ID 对应的数据库块 ID。
- * 找不到时返回空字符串（此时内核会回退到 AV 的第一个视图）。
- *
- * 该映射基本不可变——av id 就写在数据库块的 markdown 里，块不会换 id，
- * 因此 60 秒 TTL 缓存足够安全。
- */
-async function resolveAvBlockId(avID: string): Promise<string> {
-    if (!avID) return '';
-    const cached = avBlockIdCache.get(avID);
-    const now = Date.now();
-    if (cached && (now - cached.ts) < AV_BLOCK_ID_CACHE_TTL) {
-        return cached.id;
-    }
-    const inFlight = avBlockIdInFlight.get(avID);
-    if (inFlight) return inFlight;
-
-    const promise = (async () => {
-        try {
-            const safe = avID.replace(/'/g, "''");
-            const rows = await api.sql(
-                `SELECT id FROM blocks
-                 WHERE type = 'av'
-                   AND markdown LIKE '%NodeAttributeView%data-av-id%'
-                   AND markdown LIKE '%${safe}%'
-                 ORDER BY updated DESC
-                 LIMIT 1`
-            );
-            const id = Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : '';
-            avBlockIdCache.set(avID, { ts: Date.now(), id });
-            return id;
-        } catch (error) {
-            console.warn(`解析数据库块 ID 失败 (${avID}):`, error);
-            return '';
-        } finally {
-            avBlockIdInFlight.delete(avID);
-        }
-    })();
-    avBlockIdInFlight.set(avID, promise);
-    return promise;
-}
+// （custom-sy-av-context-filter）与「块当前视图」。
+// AV ID → 数据库块 ID 的解析统一放在 @/api/api3 的 resolveAvBlockId（带 TTL 缓存）。
 
 // 主事件的 kramdown 不属于 AV 渲染响应，但日历刷新会频繁重复转换相同的行。
 // 用短缓存和 single-flight 避免每个日历实例在每次 refetch 时再次产生 N 个请求。
@@ -465,7 +421,16 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
                 const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId, {
                     blockID: viewId_Data.blockId,
                 });
-                const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type, viewId_Data.viewId);
+                // viewType 在响应顶层：思源用它标识本次渲染的布局（table|list|gallery|kanban|calendar）。
+                const data = await extractDataFromTable(
+                    viewValue.view,
+                    viewId_Data.rootid,
+                    isZQ,
+                    type,
+                    viewId_Data.viewId,
+                    viewValue.viewType,
+                    viewId_Data.blockId,
+                );
                 viewValueCache.set(cacheKey, { ts: Date.now(), data });
                 return data;
             } catch (error) {
@@ -486,8 +451,17 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
 
 
 
-async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal", viewID?: string) {
+async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal", viewID?: string, viewType?: string, blockID?: string) {
     // console.debug("🚧🚧🚧🚧🚧🚧", data);
+    // 思源 3.8 扩展了 AV 布局类型（kernel/av/av.go 的 LayoutType：table|list|gallery|kanban|calendar）。
+    // 布局类型在**响应顶层**的 viewType（kernel/apicontract/av_response.go 的 AVArchiveRenderData.ViewType）。
+    //
+    // list / calendar 布局都直接复用表格的行列结构——内核把它们序列化成 AVTable
+    // （kernel/api/av_contract_mapping.go 的 avContractView：*av.List / *av.Calendar → NewAVTableInstance），
+    // 所以字段映射与行解析完全复用表格分支，无需特殊处理。
+    const layoutType = String(viewType || '').toLowerCase();
+    const isCalendarLayout = layoutType === 'calendar';
+
     const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
     const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
     // 兼容：含有 groups 的分组看板（看板分组后顶层 cards 为空，真实数据在 groups[i].cards 内）
@@ -497,16 +471,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     const isGroupedTableView = isTableView && hasGroups && (!Array.isArray(data.rows) || data.rows.length === 0);
 
     if (!isGalleryView && !isTableView) {
-        // 思源 3.8 扩展了 AV 布局类型（kernel/av/av.go 的 LayoutType：table|list|gallery|kanban|calendar）。
-        // 日历/列表布局的行结构与表格不同，插件当前无法解析——给出明确提示，
-        // 避免用户看到"日历空白"却不知原因。
-        const layoutType = String(data?.layoutType || data?.type || '').toLowerCase();
-        if (layoutType === 'calendar' || layoutType === 'list') {
-            console.warn(`暂不支持的数据库视图布局: ${layoutType}`);
-            sy.showMessage(`该数据库视图为「${layoutType === 'calendar' ? '日历' : '列表'}」布局，STtools 日历暂不支持，请改用表格或卡片布局。`, 5000, 'error');
-        } else {
-            console.warn('Invalid or unrecognized data structure received:', data);
-        }
+        console.warn('Invalid or unrecognized data structure received:', data);
         return [];
     }
 
@@ -535,6 +500,12 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
             });
         }
     });
+
+    // 日历布局用 settings.dateKeyID 指定「哪一列是日期」（kernel/av/layout_calendar.go 的 CalendarSettings）。
+    // 这一列未必叫「开始时间」，因此按 keyID 反查列名，事件时间以它为准；取不到再回退到「开始时间」。
+    let dateFieldName = isCalendarLayout
+        ? resolveCalendarDateFieldName(fields, readCalendarDateKeyID(data))
+        : '开始时间';
 
     // 2. 检查缺失的字段并创建（仅在启用自动创建功能时）
     if (settingdata["cal-auto-create-fields"]) {
@@ -577,6 +548,11 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
 
                 // 使用更新后的数据
                 data = updatedData;
+
+                // 日历布局的日期列在新建字段后可能变化，重新按 dateKeyID 定位一次。
+                if (isCalendarLayout) {
+                    dateFieldName = resolveCalendarDateFieldName(updatedFields, readCalendarDateKeyID(data));
+                }
             } catch (error) {
                 console.error('创建字段时出错:', error);
                 // 即使创建字段失败，也继续处理现有数据
@@ -591,13 +567,27 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
         items = isGroupedGalleryView
             ? data.groups.flatMap((g: any) => (Array.isArray(g.cards) ? g.cards : []))
             : data.cards;
-    } else { // table view
+    } else { // table view（含 list / calendar 布局，两者复用表格结构）
         items = isGroupedTableView
             ? data.groups.flatMap((g: any) => (Array.isArray(g.rows) ? g.rows : []))
             : data.rows;
     }
     if (!items || !Array.isArray(items)) {
         return [];
+    }
+
+    // 日历布局：内核把「日期为空」的条目移出了常规 rows
+    // （kernel/av/layout_calendar.go 的 Calendar.UndatedRows 标记为 json:"-" 不随响应返回），
+    // 需要单独取回，否则这些待安排事件会从插件日历里消失。
+    if (isCalendarLayout) {
+        try {
+            const undated = await api.getAttributeViewCalendarUndated(avID, { blockID, viewID });
+            if (undated.rows.length) {
+                items = items.concat(undated.rows);
+            }
+        } catch (error) {
+            console.warn("获取日历待安排条目失败", error);
+        }
     }
 
     try {
@@ -638,8 +628,9 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                     };
                 }
 
-                // 提取开始时间
-                const timeCell = getCell('开始时间');
+                // 提取开始时间。日历布局下日期列由 settings.dateKeyID 指定（见上文 dateFieldName），
+                // 取到的值仍按「开始时间」存放，下游逻辑无需区分布局。
+                const timeCell = getCell(dateFieldName);
                 if (timeCell) {
                     const dateValue = timeCell.date;
                     rowData['开始时间'] = {

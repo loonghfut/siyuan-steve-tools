@@ -1,7 +1,7 @@
 import { buildIIFEFromAVCtx, EchartsAvTplCtx } from '../core/option-templates';
 import { buildRadarIIFEFromAVCtx } from '../core/radar-template';
 import { buildDbMappingExpressions, SeriesItem } from '../av_data/db-data-mapping';
-import { getallavids } from '../../../api/api3';
+import { getallavids, resolveAvBlockId } from '../../../api/api3';
 import { AVManager } from '../../../api/db_pro';
 import { getFieldNamesForUI } from '../av_data/av-response-mapping';
 import { 
@@ -41,6 +41,8 @@ export class VisualEchartsQueryUI {
   private avList: Array<{ id: string; name: string }> = [];
   private avManager = new AVManager('');
   private selectedAvID: string = '';
+  /** 数据库块 ID。思源 3.8 起用它解析「块当前视图」与「块级上下文筛选」。 */
+  private selectedAvBlockId: string = '';
   private selectedViewID: string = '';
   private selectedViewName: string = '';
   private showDbId: boolean = false; // 开关：切换 DB 下拉显示名称或 avID
@@ -145,6 +147,8 @@ export class VisualEchartsQueryUI {
       avID: this.selectedAvID || '',
       // 传递 viewID
       viewID: this.selectedViewID || '',
+      // 传递数据库块 ID：思源 3.8 起用它解析块当前视图与块级上下文筛选
+      blockId: this.selectedAvBlockId || '',
       dbName: dbName,
       viewName: viewName,
       showDbNameAndViewName: this.showDbNameAndViewName,
@@ -1507,7 +1511,13 @@ export class VisualEchartsQueryUI {
       viewSel.innerHTML = '<option value="">加载视图中…</option>';
   // 使用 renderAttributeView 获取视图列表与默认 viewID
   // 注意：page/pageSize 传入正数，避免内核异常
-  const res = await this.avManager.renderAttributeView(avID, { page: 1, pageSize: 99999 });
+  // 思源 3.8 起用数据库块 ID 解析「块当前视图」与「块级上下文筛选」，不带则回退到 AV 首个视图。
+  this.selectedAvBlockId = await resolveAvBlockId(avID);
+  const res = await this.avManager.renderAttributeView(avID, {
+    page: 1,
+    pageSize: 99999,
+    blockID: this.selectedAvBlockId || undefined,
+  });
       const views = Array.isArray((res as any).views) ? (res as any).views : [];
       const defaultViewID = (res as any).viewID || '';
       if (!views.length) {
