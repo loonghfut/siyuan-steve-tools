@@ -1,4 +1,5 @@
 import { genUnwrapAttrValFn, genNormalizeAvResponseSnippet, genBuildFlatRowsSnippet } from '../av_data/av-iife-snippets';
+import { ensureSqlLimit, SQL_UNLIMITED_CAP } from '@/libs/sql-limit';
 export interface EchartsTplCtx {
   title?: string;
   legend?: string[];
@@ -553,7 +554,8 @@ export function buildPresetCountIIFE(
   const safeItems = (items || []).map(it => ({
     name: String(it?.name ?? ''),
     // 将反引号转义以便嵌入到模板字符串
-    sql: String(it?.sql ?? '').replace(/`/g, '\\`')
+    // 思源 3.8 起未自带 LIMIT 的语句会被服务端截断到默认上限，嵌入文档前先补齐。
+    sql: ensureSqlLimit(String(it?.sql ?? '').replace(/`/g, '\\`'), SQL_UNLIMITED_CAP)
   }));
   const itemsJson = JSON.stringify(safeItems);
   const t = (function(){
@@ -911,7 +913,7 @@ export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
       return [];
     }
     const option = {};
-    const rows = fetchSqlSync(${JSON.stringify(ctx.sql)});
+    const rows = fetchSqlSync(${JSON.stringify(ensureSqlLimit(ctx.sql, SQL_UNLIMITED_CAP))});
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
     ${(function () {
       const titleAlign = stCommon.title?.textAlign;

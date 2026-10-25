@@ -1,5 +1,5 @@
 import { showMessage } from 'siyuan';
-import { api } from '@frostime/siyuan-plugin-kits';
+import * as api from '@/api/api';
 import { createSchedule } from '../schedule-creation';
 
 const wait = (duration: number) => new Promise(resolve => setTimeout(resolve, duration));

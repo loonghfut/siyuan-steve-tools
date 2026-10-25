@@ -107,9 +107,6 @@
       // pass option to avoid switching background when called during initial load
       moduleInstances["M_Minutiae"].updateSettings(settings, { skipBgRefresh });
     }
-    if (moduleInstances["M_handwriting"]) {
-      moduleInstances["M_handwriting"].updateSettings(settings);
-    }
   }
 
   onMount(async () => {

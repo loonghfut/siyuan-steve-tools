@@ -492,6 +492,14 @@ export interface RenderAttributeViewOptions {
     query?: string;
     groupPaging?: Record<string, unknown>;
     ignoreRows?: boolean;
+    /**
+     * 数据库块 ID（`type = 'av'` 的块）。
+     *
+     * 思源 3.8 起，内核会用它来解析该块的「当前视图」（custom-sy-av-view）与
+     * 「块级上下文筛选」（custom-sy-av-context-filter）。不传则回退到 AV 的第一个视图，
+     * 块级筛选也不会生效。参见 kernel/apicontract/av_requests.go 的 RenderAttributeViewRequest。
+     */
+    blockID?: string;
 }
 
 /**
@@ -512,6 +520,7 @@ export async function renderAttributeView(
         page: options.page ?? 1,
     };
     if (viewID !== undefined) data.viewID = viewID;
+    if (options.blockID !== undefined) data.blockID = options.blockID;
     if (options.query !== undefined) data.query = options.query;
     if (options.groupPaging !== undefined) data.groupPaging = options.groupPaging;
     if (options.ignoreRows !== undefined) data.ignoreRows = options.ignoreRows;
@@ -720,7 +729,6 @@ export async function currentTime(): Promise<number> {
 // **************************************** User ****************************************
 export async function refresh() {
     location.reload();
-    // fetch('/api/system/reloadUI', { method: 'POST' })
 }
 
 export async function sync() {
@@ -829,7 +837,9 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
                     {
                         action: "insertAttrViewBlock",
                         avID: databaseId,
-                        ignoreFillFilter: true,
+                        // 内核事务字段名是 ignoreDefaultFill（kernel/model/attribute_view.go 的 Operation）。
+                        // 之前的 ignoreFillFilter 不是合法字段，会被静默丢弃。
+                        ignoreDefaultFill: true,
                         srcs: [
                             {
                                 id: id,
@@ -925,7 +935,7 @@ async function processAddBlockQueueForAvID(avID: string) {
 
         // 使用批量API添加所有块
         const result = await avManager.addAttributeViewBlocks(avID, sources, {
-            ignoreFillFilter: true
+            ignoreDefaultFill: true
         });
 
         // 成功后解析所有Promise

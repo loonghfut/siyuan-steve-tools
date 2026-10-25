@@ -459,10 +459,6 @@ export class MemosSyncService {
         return !!String(this.settings.customTemplate || '').trim();
     }
 
-    private hasAnchorTemplate(): boolean {
-        return !!String(this.settings.anchorTemplate || '').trim();
-    }
-
     private isIncrementalActive(): boolean {
         return !!this.settings.incrementalSync && !!this.parseCursorTime(this.settings.lastSyncCursor);
     }

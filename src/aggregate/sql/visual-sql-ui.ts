@@ -3,6 +3,7 @@ import { VisualSqlBuilder, BlockType, OrderDir } from './visual-sql-builder';
 import { VisualSqlAdvancedUI } from './visual-sql-advanced-ui';
 import { getalltages } from '@/api/api3';
 import { sql as runSql } from '@/api/api';
+import { ensureSqlLimit } from '@/libs/sql-limit';
 
 export interface VisualSqlUIButton {
   label: string; // 按钮文本
@@ -830,9 +831,10 @@ export class VisualSqlUI {
   }
 
   private ensureLimit(sql: string): string {
-    // 已设置 LIMIT 则尊重；否则默认限制 64 行，避免卡顿
-    if (/\blimit\b/i.test(sql)) return sql;
-    return sql + ' LIMIT 64';
+    // 已设置外层 LIMIT 则尊重；否则默认限制 64 行，避免卡顿。
+    // 走统一工具，顺带去掉末尾分号——思源 3.8 的内核在默认模式下拒绝多语句，
+    // 直接拼接 " LIMIT 64" 会把 "SELECT ...;" 变成两条语句而报错。
+    return ensureSqlLimit(sql, 64);
   }
 
   private renderLoading(stmt: string) {

@@ -7,10 +7,12 @@ function extractDataAvId(markdown: string): string | null {
 }
 
 export async function getAVreferenceid_pro(forwhat: string = 'dida') {
+    // 思源 3.8 起 /api/query/sql 会给未自带 LIMIT 的语句套用服务端默认上限（默认 64），
+    // 这里显式放开上限，保持升级前的全量语义。
     const sqlStr = `SELECT markdown, content
         FROM blocks
         WHERE name = '${forwhat}'
-        AND markdown LIKE '%NodeAttributeView%data-av-id%';`;
+        AND markdown LIKE '%NodeAttributeView%data-av-id%' LIMIT 9999999;`;
 
     const res = await api.sql(sqlStr);
     const avIds = res.map(item => ({

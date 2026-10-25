@@ -6,6 +6,7 @@ import { showMessage } from "siyuan";
 import { AggregateCursor, PresetItem, SQLRawRow } from "../echarts/types/types";
 import { TimerManager } from "./TimerManager";
 import { maxCursor, normalizeCursor } from "../domain/incremental-cursor";
+import { ensureSqlLimit, SQL_UNLIMITED_CAP } from "@/libs/sql-limit";
 import type { AggregateRunResult, AggregateTargetRunResult } from "../domain/run-result";
 
 export class aggregatorBlock {
@@ -1501,6 +1502,11 @@ export class aggregatorBlock {
                 : `${timeField} > '${time}'`;
             stmt = this.appendSqlCondition(stmt, condition);
         }
+
+        // 思源 3.8 起 /api/query/sql 会给未自带 LIMIT 的语句套用服务端默认上限（默认 64），
+        // 而聚合器的增量游标依赖完整结果集（否则超出上限的块会被静默跳过），
+        // 这里在所有条件拼装完成之后补 LIMIT，保持外层 LIMIT 仍在最后。
+        stmt = ensureSqlLimit(stmt, SQL_UNLIMITED_CAP);
 
         try {
             const res = await runSql(stmt);

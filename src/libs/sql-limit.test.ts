@@ -1,0 +1,67 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import { ensureSqlLimit, hasOuterLimitClause, normalizeSqlStatement, SQL_UNLIMITED_CAP } from "./sql-limit.ts";
+
+describe("normalizeSqlStatement", () => {
+    it("去掉末尾分号与空白", () => {
+        assert.equal(normalizeSqlStatement("SELECT 1;   "), "SELECT 1");
+        assert.equal(normalizeSqlStatement("  SELECT 1  "), "SELECT 1");
+    });
+});
+
+describe("hasOuterLimitClause", () => {
+    it("识别最后一条语句的外层 LIMIT", () => {
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks LIMIT 10"), true);
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks limit 10 offset 5"), true);
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks LIMIT 10 OFFSET 5"), true);
+    });
+
+    it("没有 LIMIT 时返回 false", () => {
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks"), false);
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks;"), false);
+    });
+
+    it("子查询里的 LIMIT 不算外层 LIMIT", () => {
+        assert.equal(hasOuterLimitClause("SELECT * FROM (SELECT id FROM x LIMIT 3) t"), false);
+    });
+
+    it("注释里的 LIMIT 不算外层 LIMIT", () => {
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks -- LIMIT 5"), false);
+        assert.equal(hasOuterLimitClause("SELECT * FROM blocks /* LIMIT 5 */"), false);
+    });
+
+    it("字符串字面量里的 LIMIT 不算外层 LIMIT", () => {
+        assert.equal(hasOuterLimitClause("SELECT 'limit me' FROM blocks"), false);
+        assert.equal(hasOuterLimitClause('SELECT "a limit b" FROM blocks'), false);
+    });
+
+    it("多语句时只看最后一条", () => {
+        assert.equal(hasOuterLimitClause("SELECT * FROM a; SELECT * FROM b LIMIT 7"), true);
+        assert.equal(hasOuterLimitClause("SELECT * FROM a LIMIT 7; SELECT * FROM b"), false);
+    });
+});
+
+describe("ensureSqlLimit", () => {
+    it("没有 LIMIT 时补上限额", () => {
+        assert.equal(ensureSqlLimit("SELECT * FROM blocks", 100), "SELECT * FROM blocks LIMIT 100");
+    });
+
+    it("已有 LIMIT 时原样返回", () => {
+        assert.equal(ensureSqlLimit("SELECT * FROM blocks LIMIT 10", 100), "SELECT * FROM blocks LIMIT 10");
+    });
+
+    it("补限额前先去掉末尾分号，避免被内核判为多语句", () => {
+        assert.equal(ensureSqlLimit("SELECT * FROM blocks;", 100), "SELECT * FROM blocks LIMIT 100");
+    });
+
+    it("空语句原样返回", () => {
+        assert.equal(ensureSqlLimit("", 100), "");
+        assert.equal(ensureSqlLimit("   ", 100), "");
+    });
+
+    it("支持全量上限常量", () => {
+        assert.equal(ensureSqlLimit("SELECT * FROM blocks", SQL_UNLIMITED_CAP),
+            `SELECT * FROM blocks LIMIT ${SQL_UNLIMITED_CAP}`);
+    });
+});

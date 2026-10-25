@@ -16,7 +16,6 @@ import {
     KeyType,
     LayoutType,
     RenderAttributeViewResponse,
-    SearchAttributeViewNonRelationKeyResponse,
     SearchAttributeViewRelationKeyResponse,
     SearchAttributeViewResponse,
     SetAttributeViewBlockAttrResponse,
@@ -193,13 +192,15 @@ export class AVManager {
      */
     async renderAttributeView(
         avID: string,
-        options: { viewID?: string; page?: number; pageSize?: number; query?: any } = {}
+        options: { viewID?: string; blockID?: string; page?: number; pageSize?: number; query?: any } = {}
     ): Promise<RenderAttributeViewResponse> {
         if (!avID) throw new Error('avID不能为空');
 
         const params = {
             id: avID,
             viewID: options.viewID || undefined,
+            // 思源 3.8 起，内核用它解析块的当前视图与块级上下文筛选。
+            blockID: options.blockID || undefined,
             page: options.page || 1,
             pageSize: options.pageSize || 99999,
             query: options.query || undefined
@@ -412,17 +413,6 @@ export class AVManager {
     }
 
     /**
-     * 搜索非关联键
-     * @param avID - 属性视图ID
-     * @param keyword - 搜索关键词
-     * @returns 搜索结果
-     */
-    async searchNonRelationKey(avID: string, keyword: string): Promise<SearchAttributeViewNonRelationKeyResponse> {
-        if (!avID || !keyword) throw new Error('avID和keyword不能为空');
-        return await this.request('searchAttributeViewNonRelationKey', { avID, keyword });
-    }
-
-    /**
      * 搜索关联键
      * @param avID - 属性视图ID
      * @param keyword - 搜索关键词
@@ -472,7 +462,7 @@ export class AVManager {
     async addAttributeViewBlocks(avID: string, sources: BlockSource[], options: {
         blockID?: string;
         previousID?: string;
-        ignoreFillFilter?: boolean;
+        ignoreDefaultFill?: boolean;
     } = {}): Promise<void> {
         if (!avID || !Array.isArray(sources)) {
             throw new Error('avID不能为空，sources必须是数组');
@@ -483,7 +473,10 @@ export class AVManager {
             srcs: sources,
             blockID: options.blockID || undefined,
             previousID: options.previousID || undefined,
-            ignoreFillFilter: options.ignoreFillFilter !== false
+            // 内核契约字段名是 ignoreDefaultFill（kernel/apicontract/av_requests.go）。
+            // 之前的 ignoreFillFilter 不是合法字段，会被解码器静默丢弃，
+            // 导致「新建条目时跳过默认值填充」的意图从未生效。
+            ignoreDefaultFill: options.ignoreDefaultFill !== false
         };
 
         // 移除undefined值
@@ -776,7 +769,7 @@ export class AVManager {
     }>, options: {
         blockID?: string;
         previousID?: string;
-        ignoreFillFilter?: boolean;
+        ignoreDefaultFill?: boolean;
     } = {}): Promise<void> {
         if (!Array.isArray(blocks)) throw new Error('blocks必须是数组');
 
@@ -916,7 +909,7 @@ export class AVManager {
      * @returns 布局类型数组
      */
     getLayoutTypes(): LayoutType[] {
-        return ['table', 'board', 'calendar', 'gallery'];
+        return ['table', 'list', 'gallery', 'kanban', 'calendar'];
     }
 
     /**
@@ -1008,7 +1001,7 @@ class AVOperator implements IAVOperator {
         options: {
             blockID?: string;
             previousID?: string;
-            ignoreFillFilter?: boolean;
+            ignoreDefaultFill?: boolean;
         } = {}
     ): Promise<void> {
         return await this.manager.addAttributeViewBlocks(this.avID, sources, options);

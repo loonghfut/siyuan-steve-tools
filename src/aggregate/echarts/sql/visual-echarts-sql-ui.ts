@@ -1,6 +1,7 @@
 import { buildSqlMappingExpressions, SeriesItem } from './sql-data-mapping';
 import { preprocessSqlData } from './sql-data-preprocessor';
 import { FilterCondition, buildFilterExpression, renderFilterList, createEmptyFilter } from '../ui/filter-manager';
+import { ensureSqlLimit, SQL_UNLIMITED_CAP } from '@/libs/sql-limit';
 
 /**
  * 统一的 ECharts 设置生成器
@@ -997,7 +998,8 @@ export class VisualEchartsSqlUI {
       const response = await fetch('/api/query/sql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stmt: sql }),
+        // 思源 3.8 起未自带 LIMIT 的语句会被服务端截断到默认上限，这里显式补齐。
+        body: JSON.stringify({ stmt: ensureSqlLimit(sql, SQL_UNLIMITED_CAP) }),
       });
 
       if (response.ok) {
@@ -1110,7 +1112,12 @@ export class VisualEchartsSqlUI {
       return `(() => { return { title: { text: '${title || '请添加SQL预设'}' }, xAxis: { type: 'category', data: [] }, yAxis: { type: 'value' }, series: [] }; })()`;
     }
 
-    const presetsJson = JSON.stringify(this.multiSqlPresets.map(p => ({ name: p.name, sql: p.sql })));
+    // 思源 3.8 起未自带 LIMIT 的语句会被服务端截断到默认上限，嵌入到文档的图表代码
+    // 也必须自带 LIMIT，否则文档里的图表与编辑态看到的行数会不一致。
+    const presetsJson = JSON.stringify(this.multiSqlPresets.map(p => ({
+        name: p.name,
+        sql: ensureSqlLimit(p.sql, SQL_UNLIMITED_CAP),
+    })));
     
     // 获取当前图表类型
     const chartType = this.chartType;
@@ -1558,7 +1565,7 @@ export class VisualEchartsSqlUI {
     }
     
     const option = {};
-    var rawRows = fetchSqlSync(${JSON.stringify(sql)});
+    var rawRows = fetchSqlSync(${JSON.stringify(ensureSqlLimit(sql, SQL_UNLIMITED_CAP))});
     const rows = preprocessData(rawRows);
     
     // 计算 X轴 数据

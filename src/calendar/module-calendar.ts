@@ -416,7 +416,7 @@ export class M_calendar {
             label: "日历视图",
             click: async () => {
                 if (front == "browser-mobile" || front == "mobile") {
-                    await this.openRiChengViewDialog(true, "", settingdata["cal-default-view"]);
+                    await this.openRiChengViewDialog(true, "", this_settingdata["cal-default-view"]);
                 } else {
                     await this.openRiChengView();
                 }
@@ -473,7 +473,9 @@ export class M_calendar {
 
     public avButton() {
         setTimeout(async () => {
-            const targetSpans = Array.from(document.querySelectorAll('span[data-type="av-add-more"]'))
+            // 思源 3.8 把「新增行」按钮从 span 换成了 button（app/src/protyle/render/av/headerEditing.ts），
+            // 这里不限定元素名，避免升级后匹配不到节点导致按钮注入静默失效。
+            const targetSpans = Array.from(document.querySelectorAll('[data-type="av-add-more"]'))
                 .filter(span => span.closest('[name="日程"]'));
             // // steveTools.outlog(targetSpans, "targetSpans");
 
@@ -678,7 +680,7 @@ export class M_calendar {
         const sqlStr = `SELECT markdown
         FROM blocks
         WHERE name = '${forwhat}'
-        AND markdown LIKE '%NodeAttributeView%data-av-id%';`
+        AND markdown LIKE '%NodeAttributeView%data-av-id%' LIMIT 9999999;`
             ;
         const res = await api.sql(sqlStr);
         // steveTools.outlog(res);
@@ -692,7 +694,7 @@ export class M_calendar {
         const sqlStr = `SELECT markdown, content
         FROM blocks
         WHERE name = '${forwhat}'
-        AND markdown LIKE '%NodeAttributeView%data-av-id%';`;
+        AND markdown LIKE '%NodeAttributeView%data-av-id%' LIMIT 9999999;`;
 
         const res = await api.sql(sqlStr);
         // // steveTools.outlog("RES:::::::::",res);

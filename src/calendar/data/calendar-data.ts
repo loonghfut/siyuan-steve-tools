@@ -253,6 +253,55 @@ const viewValueCache = new Map<string, { ts: number; data: any[] }>();
 const viewIdInFlight = new Map<string, Promise<ViewItem[]>>();
 const viewValueInFlight = new Map<string, Promise<any[]>>();
 
+// 思源 3.8 起，renderAttributeView 需要数据库块 ID 才能解析「块级上下文筛选」
+// （custom-sy-av-context-filter）与「块当前视图」。AV ID → 数据库块 ID 的映射几乎不变，
+// 用短 TTL 缓存 + single-flight 避免每次 refetch 都多打一次 SQL。
+const AV_BLOCK_ID_CACHE_TTL = 60 * 1000;
+const avBlockIdCache = new Map<string, { ts: number; id: string }>();
+const avBlockIdInFlight = new Map<string, Promise<string>>();
+
+/**
+ * 解析 AV ID 对应的数据库块 ID。
+ * 找不到时返回空字符串（此时内核会回退到 AV 的第一个视图）。
+ *
+ * 该映射基本不可变——av id 就写在数据库块的 markdown 里，块不会换 id，
+ * 因此 60 秒 TTL 缓存足够安全。
+ */
+async function resolveAvBlockId(avID: string): Promise<string> {
+    if (!avID) return '';
+    const cached = avBlockIdCache.get(avID);
+    const now = Date.now();
+    if (cached && (now - cached.ts) < AV_BLOCK_ID_CACHE_TTL) {
+        return cached.id;
+    }
+    const inFlight = avBlockIdInFlight.get(avID);
+    if (inFlight) return inFlight;
+
+    const promise = (async () => {
+        try {
+            const safe = avID.replace(/'/g, "''");
+            const rows = await api.sql(
+                `SELECT id FROM blocks
+                 WHERE type = 'av'
+                   AND markdown LIKE '%NodeAttributeView%data-av-id%'
+                   AND markdown LIKE '%${safe}%'
+                 ORDER BY updated DESC
+                 LIMIT 1`
+            );
+            const id = Array.isArray(rows) && rows[0]?.id ? String(rows[0].id) : '';
+            avBlockIdCache.set(avID, { ts: Date.now(), id });
+            return id;
+        } catch (error) {
+            console.warn(`解析数据库块 ID 失败 (${avID}):`, error);
+            return '';
+        } finally {
+            avBlockIdInFlight.delete(avID);
+        }
+    })();
+    avBlockIdInFlight.set(avID, promise);
+    return promise;
+}
+
 // 主事件的 kramdown 不属于 AV 渲染响应，但日历刷新会频繁重复转换相同的行。
 // 用短缓存和 single-flight 避免每个日历实例在每次 refetch 时再次产生 N 个请求。
 const KRAMDOWN_CACHE_TTL = 10 * 1000;
@@ -370,10 +419,13 @@ export async function getViewId(va_ids: string[]): ViewData {
                 // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
                 const rootname = view.name ? `${view.name}-` : "";
                 const rootid = view.id;
+                // 思源 3.8 起需要数据库块 ID 才能解析当前视图与块级上下文筛选。
+                const blockId = await resolveAvBlockId(va_id);
                 const data: ViewItem[] = view.views.map((viewItem) => ({
                     rootid: rootid,
                     viewId: viewItem.id,
-                    name: rootname + viewItem.name
+                    name: rootname + viewItem.name,
+                    blockId: blockId || undefined,
                 }));
                 viewIdCache.set(va_id, { ts: Date.now(), data });
                 return data;
@@ -410,8 +462,10 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
 
         const promise = (async () => {
             try {
-                const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId);
-                const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type);
+                const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId, {
+                    blockID: viewId_Data.blockId,
+                });
+                const data = await extractDataFromTable(viewValue.view, viewId_Data.rootid, isZQ, type, viewId_Data.viewId);
                 viewValueCache.set(cacheKey, { ts: Date.now(), data });
                 return data;
             } catch (error) {
@@ -432,7 +486,7 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
 
 
 
-async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal") {
+async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal", viewID?: string) {
     // console.debug("🚧🚧🚧🚧🚧🚧", data);
     const isGalleryView = data && data.hasOwnProperty('fields') && data.hasOwnProperty('cards');
     const isTableView = data && data.hasOwnProperty('columns') && data.hasOwnProperty('rows');
@@ -443,7 +497,16 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     const isGroupedTableView = isTableView && hasGroups && (!Array.isArray(data.rows) || data.rows.length === 0);
 
     if (!isGalleryView && !isTableView) {
-        console.warn('Invalid or unrecognized data structure received:', data);
+        // 思源 3.8 扩展了 AV 布局类型（kernel/av/av.go 的 LayoutType：table|list|gallery|kanban|calendar）。
+        // 日历/列表布局的行结构与表格不同，插件当前无法解析——给出明确提示，
+        // 避免用户看到"日历空白"却不知原因。
+        const layoutType = String(data?.layoutType || data?.type || '').toLowerCase();
+        if (layoutType === 'calendar' || layoutType === 'list') {
+            console.warn(`暂不支持的数据库视图布局: ${layoutType}`);
+            sy.showMessage(`该数据库视图为「${layoutType === 'calendar' ? '日历' : '列表'}」布局，STtools 日历暂不支持，请改用表格或卡片布局。`, 5000, 'error');
+        } else {
+            console.warn('Invalid or unrecognized data structure received:', data);
+        }
         return [];
     }
 
@@ -495,7 +558,9 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 }
 
                 // 重新获取视图数据以包含新创建的字段
-                const updatedViewValue = await api.renderAttributeView(avID);
+                // 显式带上 viewID：思源 3.8 移除了 AV 顶层持久化的「当前视图」，
+                // 不传 viewID 会回退到第一个视图，可能与当前视图的列/字段结构不一致。
+                const updatedViewValue = await api.renderAttributeView(avID, viewID);
                 const updatedData = updatedViewValue.view;
 
                 // 更新字段映射

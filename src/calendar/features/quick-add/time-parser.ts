@@ -1,5 +1,6 @@
 import dayjs from 'dayjs';
 import { showMessage } from 'siyuan';
+import { resolveAiProviderConfig } from '@/api/ai-provider';
 
 function mapDayCharToJsDay(dayChar: string): number {
     // ...existing code...
@@ -343,12 +344,14 @@ export async function parseScheduleTimeWithAi(content: string): Promise<string |
         return null;
     }
 
-    const apiKey = window.siyuan.config.ai.openAI.apiKey;
+    // 思源 3.7 起 AI 设置改为 config.ai.providers[]，旧的 config.ai.openAI 已移除。
+    const provider = resolveAiProviderConfig();
+    const apiKey = provider?.apiKey;
 
-    if (!apiKey) {
-        console.error("DeepSeek API key is not set. Please set the DEEPSEEK_API_KEY environment variable.");
+    if (!provider || !apiKey) {
+        console.error("思源 AI 提供商未配置 API Key，无法使用 AI 识别日程时间。");
         // 回退到原始解析器
-        console.warn("Falling back to original parser due to missing DeepSeek API key.");
+        console.warn("Falling back to original parser due to missing AI provider API key.");
         return parseScheduleTime(content);
     }
 
@@ -372,20 +375,26 @@ Your response:
     `;
 
     try {
-        const response = await fetch(`${window.siyuan.config.ai.openAI.apiBaseURL}`, { // DeepSeek API endpoint
+        // 只支持 OpenAI 兼容协议；其它协议（anthropic-messages 等）请求体结构不同。
+        if (provider.protocol && provider.protocol !== 'openai' && provider.protocol !== 'openai-responses') {
+            console.warn(`AI 提供商协议 ${provider.protocol} 不支持日程时间识别，回退到原始解析器。`);
+            return parseScheduleTime(content);
+        }
+        const response = await fetch(`${provider.baseURL}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
+                ...(provider.headers || {}),
             },
             body: JSON.stringify({
-                model: `${window.siyuan.config.ai.openAI.apiModel}`, // 替换为实际的 DeepSeek 模型名称
+                model: `${provider.model}`,
                 messages: [
                     { role: "system", content: "You are an expert at parsing dates and times from Chinese text and formatting them according to instructions." },
                     { role: "user", content: prompt }
                 ],
-                temperature: `${window.siyuan.config.ai.openAI.apiTemperature}`,
-                max_tokens: `${window.siyuan.config.ai.openAI.apiMaxTokens}`,
+                temperature: provider.temperature,
+                max_tokens: provider.maxTokens,
 
             }),
         });

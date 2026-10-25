@@ -12,8 +12,12 @@ STEVETOOLS
 ### 若介意请勿使用。
 
 ### 免费使用遇到问题不用反馈，若有BUG影响到我的使用，我自然会修，过了几个版本BUG还在，麻烦自己拉源码修。  
-若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。
+若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。  
 为方便和打赏用户沟通，故临时建了反馈QQ群（随时可能解散），加之前请填一下[申请表](https://www.kdocs.cn/wo/sl/v1lC0R0)
+
+### 兼容性
+已适配思源笔记 **3.8**（含 3.8.x），同时保留 3.7 的兼容能力，`minAppVersion` 仍为 3.7.0。  
+若只想面向 3.8+ 用户，把 `plugin.json` 里的 `minAppVersion` 改成 `3.8.0` 即可。
 
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
@@ -24,7 +28,7 @@ win端s3同步后，docker端感知s3同步。
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
 压缩媒体资源后再导入思源。  
-5. [tldraw白板](siyuan://bazaar/plugins/siyuan-steve-tldraw/readme)：【已接入思源智能体】 【为减少包体积，已经独立为[ST白板](siyuan://bazaar/plugins/siyuan-steve-tldraw/readme)】   
+5. tldraw白板：已独立为[ST白板](siyuan://bazaar/plugins/siyuan-steve-tldraw/readme)插件，本插件不再内置白板代码。  
 模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转  
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
@@ -41,35 +45,21 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.54.0 (2026年08月14日)
-- feat(aggregate): 重构内容聚合器定时器与领域模型，修复渲染、逻辑与竞态问题 (loonghfut)
-- feat(aggregate): 重构Echarts UI类名与交互样式，新增聚合模块主题样式文件 (loonghfut)
-- feat(aggregate): 新增SQL可视化预设工作台，内容聚合器支持内嵌打开与编辑预设 (loonghfut)
-- 1 (loonghfut)
-- fix(handwriting): 修复退出编辑时的闪动及加载状态抖动问题 (loonghfut)
-- feat(bezier-connector): 拖拽预览时支持基于对侧端点位置解析 auto 端口 (loonghfut)
-- fix(bezier-connector): 限制标准形状仅 bottom 端口可作为连接创建入口 (loonghfut)
-- refactor(bezier-connector): 优化端口命中检测性能并简化连接线渲染逻辑 (loonghfut)
-- feat(branch-collapse): 实现分支折叠/展开交互能力与配置项支持 (loonghfut)
-- feat(branch-shape-util): 补充小地图渲染控制接口 (loonghfut)
-- refactor(branch-collapse): 优化分支折叠后代计算并引入 EditorAtom 响应式缓存 (loonghfut)
-- feat(bezier-connector): 补充连接器小地图隐藏支持并修正代码缩进格式 (loonghfut)
-- feat(branch-collapse): 实现分支子树批量折叠/展开能力并新增右键触发交互 (loonghfut)
-- perf(branch-collapse): 优化分支折叠动画快照捕获逻辑，仅收集关联分支形状降低性能开销 (loonghfut)
-- perf(branch-layout, single-block-shape): 优化分支索引查询与 DOM 测量性能 (loonghfut)
-- perf(single-block-shape): 优化 canCull 逻辑允许非编辑态卡片被剔除，并修正代码缩进格式 (loonghfut)
-- fix(tldraw-manager, content-renderer): 补充全局交互事件监听修复容器外拖拽结束渲染停滞问题，重构数据库视图渲染逻辑避免并发冲突并增强异常处理 (loonghfut)
-- feat(tldraw-manager): 启用原生 Frame 形状工具并配置颜色样式支持 (loonghfut)
-- refactor(content-renderer): 移除renderAllContentIdle函数中冗余的条件渲染与空闲调度逻辑 (loonghfut)
-- feat(tldraw-manager, FrameShape, content-renderer): 替换原生Frame形状工具为缩放不变形自定义实现，调整渲染空闲调度相关注释 (loonghfut)
-- refactor(idle-scheduler, content-renderer, card-shape, single-block-shape): 重构空闲调度器支持AbortSignal取消机制，移除renderAllContentIdle冗余forceIdle参数，优化渲染错误处理区分主动取消与实际异常 (loonghfut)
-- feat(frame-shape): 添加hideInMinimap方法，在小地图中隐藏缩放不变形Frame形状 (loonghfut)
-- feat(card): 添加 CardContentVirtualizer 实现静态预览窗口化，提升长文档渲染性能 (loonghfut)
-- refactor(card): 拆分静态预览加载队列，渲染器支持静态预览标记，视频仅预加载元数据 (loonghfut)
-- perf(static-preview-load-queue): 将静态预览加载队列并发数从4提升至6，优化长文档预览加载性能 (loonghfut)
-- perf(static-preview-load-queue, shape-load-manager, card): 优化静态预览加载优先级与队列调度，减少微小视口移动的不必要回调 (loonghfut)
-- feat(handwriting): 禁用画板模块以减小包体积，白板已独立为ST白板插件 (loonghfut)
-- chore(plugin): 升级版本号至 0.54.0 (loonghfut)
+### v0.55.0 (2026年10月25日)
+- refactor(handwriting): 移除白板（tldraw）模块全部代码，画板已独立为「ST白板」插件，移除约 5.5 万行源码 (loonghfut)
+- chore(deps): 移除 @tldraw/assets、@tldraw/mermaid、@tldraw/tldraw、react、react-dom 依赖 (loonghfut)
+- refactor(settings): 移除画板设置项、h6 样式设置与白板专属设置组件 (loonghfut)
+- feat(siyuan): 适配思源笔记 3.8，升级 siyuan 类型依赖至 ^1.2.9 (loonghfut)
+- fix(sql): 适配思源 3.8 的 /api/query/sql 默认行数上限，插件侧 SQL 统一显式补齐 LIMIT，避免聚合/图表结果被静默截断 (loonghfut)
+- feat(calendar): 数据库视图渲染补传 blockID，恢复思源 3.8 的块级上下文筛选与当前视图解析 (loonghfut)
+- fix(calendar): 适配思源 3.8 将 av-add-more 由 span 改为 button，修复日历「新增行」按钮注入失效 (loonghfut)
+- fix(calendar): 适配思源 3.7+ 的 config.ai.providers 配置结构，修复 AI 识别日程时间功能 (loonghfut)
+- fix(plugin): 覆写 onDataChanged，避免思源 3.8 在跨端保存设置时把整个插件卸载重载 (loonghfut)
+- fix(av): 修正 addAttributeViewBlocks 的内核契约字段名为 ignoreDefaultFill，此前该字段一直被静默丢弃 (loonghfut)
+- fix(av): 移除思源 3.8.8 已下线的 searchAttributeViewNonRelationKey 路由调用 (loonghfut)
+- fix(av): 布局类型枚举对齐内核（board → kanban，补齐 list/calendar）(loonghfut)
+- fix(calendar): 数据库视图为日历/列表布局时给出明确提示，不再静默显示空白 (loonghfut)
+- chore(plugin): 升级版本号至 0.55.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
