@@ -100,7 +100,6 @@ export default defineConfig({
                 warn(warning);
             },
             plugins: [
-                patchTldrawLoopbackDev(),
                 ...(isDev ? [
                     livereload(outputDir),
                     {
@@ -199,41 +198,6 @@ function cleanupDistFiles(options: { patterns: string[], distDir: string }) {
                         console.error(`Failed to clean up ${file}:`, error);
                     }
                 }
-            }
-        }
-    };
-}
-
-/**
- * 让 tldraw 在本地 loopback 地址下也视为开发环境。
- *
- * SiYuan 3.7 dev14 会以 https://127.0.0.1 打开插件页面，
- * 而 tldraw 默认只把 localhost 视作开发环境，导致 Hobby License
- * 被当成生产环境校验。这个构建后补丁只替换 tldraw 的开发判断，
- * 不改 SiYuan 源码。
- */
-function patchTldrawLoopbackDev() {
-    const targetPattern = /window\.location\.hostname===["']localhost["']/g;
-    const replacement = '["localhost","127.0.0.1","::1"].includes(window.location.hostname.toLowerCase())';
-
-    return {
-        name: 'patch-tldraw-loopback-dev',
-        enforce: 'post' as const,
-        async writeBundle() {
-            const filePath = resolve(__dirname, outputDir, 'index.js');
-
-            try {
-                const code = await fs.readFile(filePath, 'utf8');
-                const patched = code.replace(targetPattern, replacement);
-
-                if (patched !== code) {
-                    await fs.writeFile(filePath, patched, 'utf8');
-                    console.log(`[patch-tldraw-loopback-dev] patched ${filePath}`);
-                } else {
-                    console.warn(`[patch-tldraw-loopback-dev] no tldraw localhost check found in ${filePath}`);
-                }
-            } catch (error) {
-                console.warn(`[patch-tldraw-loopback-dev] failed for ${filePath}`, error);
             }
         }
     };

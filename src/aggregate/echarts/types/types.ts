@@ -1,5 +1,14 @@
 export type ChartType = 'bar' | 'line' | 'scatter' | 'pie';
 
+/**
+ * 增量聚合的断点。时间相同时使用块 ID 作为稳定的次级排序键，避免秒级时间戳
+ * 下的同批数据被跳过。
+ */
+export interface AggregateCursor {
+  time: string;
+  blockId?: string;
+}
+
 export interface PresetItem {
   name: string;
   sql: string;
@@ -18,7 +27,15 @@ export interface PresetItem {
    */
   databaseIdField?: 'id' | 'parent_id';
   template?: string;     // 可选的独立模板
-  lastInsertTime?: string; // 上次插入文档的时间戳(思源格式: YYYYMMDDHHmmss)
+  /** @deprecated 旧版共享水位；保留用于兼容已有预设。 */
+  lastInsertTime?: string;
+  /** 文档与数据库必须各自推进水位，避免一方失败时另一方的数据被跳过。 */
+  documentCursor?: AggregateCursor;
+  databaseCursor?: AggregateCursor;
+  /** 兼容旧版 UI 的文档时间水位。 */
+  documentLastInsertTime?: string;
+  /** 兼容旧版 UI 的数据库时间水位。 */
+  databaseLastInsertTime?: string;
   
   // 定时更新相关配置
   timerEnabled?: boolean;  // 是否启用定时更新
@@ -38,6 +55,9 @@ export interface PresetItem {
   dailyMinute?: number;    // 0-59
   lastExecuteTime?: number;  // 上次执行时间(时间戳)
   nextExecuteTime?: number;  // 下次执行时间(时间戳)
+  /** 最近一次运行状态，供定时任务与 UI 区分成功、无数据和失败。 */
+  lastRunError?: string;
+  lastRunSummary?: string;
   /**
    * 预设项最近修改时间（时间戳，毫秒）。用于在 UI 中按“最近修改”排序。
    * 在任何更新预设配置的保存操作时应更新该字段。

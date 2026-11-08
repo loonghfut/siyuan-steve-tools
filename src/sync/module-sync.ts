@@ -65,6 +65,16 @@ export class M_sync {
         // steveTools.outlog("同步模块初始化完成");
     }
 
+    /**
+     * 设置热更新：同步地址与 token 缓存在模块级变量中，
+     * WebSocket 监听在触发时才读取这两个变量，因此这里只需更新变量即可生效，
+     * 无需重新注册监听。
+     */
+    updateSettings(settingdata: any) {
+        url = settingdata["sync-url"] || "";
+        token = settingdata["sync-token"] || "";
+    }
+
     async testSync() {
         // steveTools.outlog("测试同步...");
         let res: any = await api.testSync(url, token);

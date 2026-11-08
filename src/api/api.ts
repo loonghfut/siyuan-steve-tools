@@ -7,29 +7,21 @@
  */
 
 import { fetchPost, fetchSyncPost, IOperation, IWebSocketData, Protyle } from "siyuan";
-import { ISelectOption } from "@/calendar/interface";
 import { settingdata } from "..";
 import { AVManager } from "./db_pro";
 import {
-    markCalendarCellWrite,
-    type CalendarWriteReason,
-} from "@/calendar/calendar-self-write";
+    notifyAttributeViewCellBatchUpdated,
+    notifyAttributeViewCellQueued,
+    type AVCellWriteOptions,
+} from "./attribute-view-cell-lifecycle";
 // 创建 AVManager 实例 - 可以根据需要进行配置
 const avManager = new AVManager();
 
-/**
- * AV 单元格写入选项。仅在调用方主动声明 source==='calendar' 时影响行为：
- * - markSelfWrite (默认 true): 入队即把 (avID, itemID, keyID) 标记为日历自写，
- *   transactionListener 看到 ws/fetch 回声会跳过 refreshKanban。
- * - suppressPostRefresh (默认 true): 本批结尾的 refreshAttributeView 跳过——
- *   若一批里全部为自写，省掉一次全量 refetch；只要混入一条非自写仍会刷新。
- * 不传 options 时与历史行为完全一致。
- */
-export interface AVCellWriteOptions {
-    source?: 'calendar' | 'other';
-    reason?: CalendarWriteReason;
-    markSelfWrite?: boolean;
-    suppressPostRefresh?: boolean;
+export type { AVCellWriteOptions } from "./attribute-view-cell-lifecycle";
+
+interface ISelectOption {
+    color?: string;
+    content: string;
 }
 
 // 请求队列，使用批量处理优化性能
@@ -319,6 +311,15 @@ export async function updateBlock(dataType: DataType, data: string, id: BlockId)
     return request(url, payload);
 }
 
+export async function batchUpdateTaskListItemMarker(items: Array<{ id: BlockId; marker: string }>): Promise<IResdoOperations[]> {
+    const url = '/api/block/batchUpdateTaskListItemMarker';
+    const result = await request(url, { items });
+    if (!Array.isArray(result)) {
+        throw new Error(`更新任务列表项标记失败: ${String(result)}`);
+    }
+    return result;
+}
+
 
 export async function deleteBlock(id: BlockId): Promise<IResdoOperations[]> {
     let data = {
@@ -485,23 +486,44 @@ export async function getAttributeViewItemIDsByBoundIDs(avID: string, blockIDs: 
     return request(url, data);
 }
 
-export async function renderAttributeView(avid: BlockId, viewID?: string) {
-    let data: any;
-    if (viewID === undefined) {
-        data = {
-            id: avid, // avID,
-            // viewID: '20241003141312-30yk3cr',//测试可以不用这个参数 //TODO：多视图的情况下需要
-            pageSize: 99999,
-            page: 1
-        }
-    } else {
-        data = {
-            id: avid, // avID,
-            viewID: viewID,
-            pageSize: 99999,
-            page: 1
-        }
-    }
+export interface RenderAttributeViewOptions {
+    page?: number;
+    pageSize?: number;
+    query?: string;
+    groupPaging?: Record<string, unknown>;
+    ignoreRows?: boolean;
+    /**
+     * 数据库块 ID（`type = 'av'` 的块）。
+     *
+     * 思源 3.8 起，内核会用它来解析该块的「当前视图」（custom-sy-av-view）与
+     * 「块级上下文筛选」（custom-sy-av-context-filter）。不传则回退到 AV 的第一个视图，
+     * 块级筛选也不会生效。参见 kernel/apicontract/av_requests.go 的 RenderAttributeViewRequest。
+     */
+    blockID?: string;
+}
+
+/**
+ * Render an Attribute View.
+ *
+ * `ignoreRows` is useful for metadata-only reads (for example, enumerating
+ * view IDs). SiYuan then skips row filter/sort/calculation work instead of
+ * building a full view only for callers to discard its rows.
+ */
+export async function renderAttributeView(
+    avid: BlockId,
+    viewID?: string,
+    options: RenderAttributeViewOptions = {},
+) {
+    const data: Record<string, unknown> = {
+        id: avid,
+        pageSize: options.pageSize ?? 99999,
+        page: options.page ?? 1,
+    };
+    if (viewID !== undefined) data.viewID = viewID;
+    if (options.blockID !== undefined) data.blockID = options.blockID;
+    if (options.query !== undefined) data.query = options.query;
+    if (options.groupPaging !== undefined) data.groupPaging = options.groupPaging;
+    if (options.ignoreRows !== undefined) data.ignoreRows = options.ignoreRows;
 
     const url = '/api/av/renderAttributeView';
     return request(url, data);
@@ -515,12 +537,89 @@ export async function renderAttributeView(avid: BlockId, viewID?: string) {
 
 // **************************************** SQL ****************************************
 
+export interface ISqlResult {
+    rows: any[];
+    /** 服务端本次生效的行数上限（思源 3.8 起，未自带 LIMIT 时套用「查询结果上限」设置）。 */
+    limit?: number;
+    /** 结果是否被服务端截断。 */
+    truncated?: boolean;
+}
+
+/**
+ * 执行 SQL 并返回结果与截断信息。
+ *
+ * 思源 3.8 起，`/api/query/sql` 会对**没有自带外层 LIMIT** 的语句套用服务端默认上限，
+ * 截断信息放在响应信封顶层（limit / truncated）。这里显式透出，
+ * 避免"数据莫名变少"却无从察觉。
+ */
+export async function sqlWithMeta(sql: string): Promise<ISqlResult> {
+    let response = await fetchSyncPost('/api/query/sql', { stmt: sql }) as IWebSocketData & { limit?: number; truncated?: boolean };
+    if (response.code !== 0) {
+        // 原实现失败时返回字符串，调用方会在 .map / 迭代时抛 TypeError。
+        // 这里统一返回空数组，但保留告警，避免"查询失败"被当成"没有数据"而静默。
+        console.warn(`SQL 查询失败（code ${response.code}）：${response.msg || ""}\n${sql}`);
+        return { rows: [], truncated: false };
+    }
+    let rows = Array.isArray(response.data) ? response.data : [];
+    return { rows, limit: response.limit, truncated: response.truncated === true };
+}
+
 export async function sql(sql: string): Promise<any[]> {
-    let sqldata = {
-        stmt: sql,
-    };
-    let url = '/api/query/sql';
-    return request(url, sqldata);
+    let result = await sqlWithMeta(sql);
+    if (result.truncated) {
+        console.warn(`SQL 结果被服务端截断（上限 ${result.limit} 行），请在语句中自带 LIMIT。`);
+    }
+    return result.rows;
+}
+
+// **************************************** Calendar Undated ****************************************
+
+export interface IAVCalendarUndated {
+    rows: any[];
+    total: number;
+}
+
+/**
+ * 获取日历视图中「日期为空」的条目（待安排）。
+ *
+ * 思源 3.8 的日历布局会把无日期的条目移出常规 rows
+ * （kernel/av/layout_calendar.go 的 Calendar.UndatedRows 标记为 json:"-" 不序列化），
+ * 需要单独调用本接口取回，否则这些事件会从插件日历里凭空消失。
+ * 接口契约见 kernel/apicontract/av_requests.go 的 AVCalendarUndatedRequest。
+ */
+export async function getAttributeViewCalendarUndated(avID: string, options: {
+    blockID?: string;
+    viewID?: string;
+    query?: string;
+    page?: number;
+    pageSize?: number;
+} = {}): Promise<IAVCalendarUndated> {
+    if (!avID) return { rows: [], total: 0 };
+    // 内核按页返回（默认 50，见 kernel/api/av.go 的 avPage），这里循环取全量，
+    // 否则待安排条目超过一页时会被静默丢弃。
+    const pageSize = options.pageSize && options.pageSize > 0 ? options.pageSize : 100;
+    let page = options.page && options.page > 0 ? options.page : 1;
+    const rows: any[] = [];
+    let total = 0;
+    // 上限 100 页（10000 行）防止异常情况下无限翻页
+    for (let guard = 0; guard < 100; guard++) {
+        const data: Record<string, unknown> = { id: avID, page, pageSize };
+        if (options.blockID) data.blockID = options.blockID;
+        if (options.viewID) data.viewID = options.viewID;
+        if (options.query) data.query = options.query;
+        const res = await request('/api/av/getAttributeViewCalendarUndated', data);
+        const pageRows = Array.isArray(res?.rows) ? res.rows : [];
+        total = typeof res?.total === "number" ? res.total : 0;
+        rows.push(...pageRows);
+        if (pageRows.length === 0 || rows.length >= total) {
+            break;
+        }
+        page++;
+    }
+    if (rows.length < total) {
+        console.warn(`待安排条目未取全：已取 ${rows.length} 行，共 ${total} 行。`);
+    }
+    return { rows, total };
 }
 
 export async function getBlockByID(blockId: string): Promise<Block> {
@@ -707,7 +806,6 @@ export async function currentTime(): Promise<number> {
 // **************************************** User ****************************************
 export async function refresh() {
     location.reload();
-    // fetch('/api/system/reloadUI', { method: 'POST' })
 }
 
 export async function sync() {
@@ -816,7 +914,9 @@ export async function addBlockToDatabase(id: string, databaseId: string) {
                     {
                         action: "insertAttrViewBlock",
                         avID: databaseId,
-                        ignoreFillFilter: true,
+                        // 内核事务字段名是 ignoreDefaultFill（kernel/model/attribute_view.go 的 Operation）。
+                        // 之前的 ignoreFillFilter 不是合法字段，会被静默丢弃。
+                        ignoreDefaultFill: true,
                         srcs: [
                             {
                                 id: id,
@@ -912,7 +1012,7 @@ async function processAddBlockQueueForAvID(avID: string) {
 
         // 使用批量API添加所有块
         const result = await avManager.addAttributeViewBlocks(avID, sources, {
-            ignoreFillFilter: true
+            ignoreDefaultFill: true
         });
 
         // 成功后解析所有Promise
@@ -1023,16 +1123,9 @@ export async function updateAttrViewCell_pro(
             reject
         });
 
-        // 日历自写：入队时立刻登记标记。原因：队列有 150-2000ms 延迟，
-        // ws-main 广播可能在 await batchUpdateCells 返回前到达，提前标记保证
-        // transactionListener 命中。
-        if (options?.source === 'calendar' && options.markSelfWrite !== false) {
-            try {
-                markCalendarCellWrite(avID, itemID, keyID, options.reason);
-            } catch (e) {
-                console.warn('[CalendarSelfWrite] markCalendarCellWrite 失败', e);
-            }
-        }
+        // Notify feature observers synchronously. This happens before the
+        // delayed batch request so self-write markers are ready for ws echoes.
+        notifyAttributeViewCellQueued({ avID, itemID, keyID, options });
 
         // console.debug(`📝 [队列] 添加单元格更新请求，队列当前长度: ${cellUpdateQueue.length}, avID: ${avID}`);
 
@@ -1143,12 +1236,7 @@ async function processQueue() {
 
                 // console.debug(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
                 // 批量更新完成后的后续处理
-                // 仅当本批"全部"为日历自写且未禁用 suppressPostRefresh 时，跳过 refreshKanban。
-                // 混入任何非自写更新仍触发刷新，保证外部调用方行为不变。
-                const allCalendarSelf = updates.every(u =>
-                    u.options?.source === 'calendar' && u.options.suppressPostRefresh !== false
-                );
-                await handlePostBatchUpdateActions(avID, { skipRefresh: allCalendarSelf });
+                await handlePostBatchUpdateActions(avID, updates);
             } else {
                 // 如果没有有效更新，拒绝所有Promise
                 updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
@@ -1174,14 +1262,18 @@ async function processQueue() {
 }
 
 // 处理批量更新完成后的后续操作
-async function handlePostBatchUpdateActions(avID: string, opts?: { skipRefresh?: boolean }) {
+async function handlePostBatchUpdateActions(
+    avID: string,
+    updates: Array<{ avID: string; itemID: string; keyID: string; options?: AVCellWriteOptions }>,
+) {
     try {
-        if (opts?.skipRefresh) {
-            console.debug(`[CalendarSelfWrite] skip post-batch refresh for av ${avID}`);
-            return;
-        }
-        // 1. 触发视图刷新
-        await refreshAttributeView(avID);
+        await notifyAttributeViewCellBatchUpdated({
+            avID,
+            updates,
+            // A feature that owns a local optimistic update can opt out. Any
+            // regular write in the batch still asks observers to refresh.
+            shouldRefresh: updates.some(update => update.options?.suppressPostRefresh !== true),
+        });
 
         //有BUG会漏事件和重复事件
         // // 2. 判断是否为滴答清单事件并处理
@@ -1189,16 +1281,6 @@ async function handlePostBatchUpdateActions(avID: string, opts?: { skipRefresh?:
 
     } catch (error) {
         console.warn(`⚠️ [后续处理] 批量更新后续处理出错，avID: ${avID}`, error);
-    }
-}
-
-// 刷新属性视图
-async function refreshAttributeView(avID: string) {
-    try {
-        refreshKanban();
-        // console.debug(`🔄 [视图刷新] 成功刷新视图，avID: ${avID}`);
-    } catch (error) {
-        console.warn(`⚠️ [视图刷新] 刷新视图失败，avID: ${avID}`, error);
     }
 }
 
@@ -1410,10 +1492,6 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
         };
     }
 }
-
-import { refreshKanban } from "@/calendar/kanban";
-
-
 
 // **************************************** Status Bar ****************************************
 export async function showStatusMessage(message: string, timeout: number = 3000, id?: string) {

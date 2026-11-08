@@ -1,7 +1,6 @@
 import { M_calendar } from "./calendar/module-calendar";
 import { M_sync } from "./sync/module-sync";
 import { M_ai } from "./ai/ai";
-import { M_handwriting } from "./handwriting/module-handwriting";
 import { M_imageCompression } from "./ImageCompression/module-imageCompression";
 import { M_lifelog } from "./lifelog/module-lifelog";
 
@@ -46,12 +45,7 @@ export const MODULE_CONFIG: ModuleConfig = {
         settingKey: 'img-compress-enable',
         logMessage: '图片压缩模块加载'
     },
-    M_handwriting: {
-        class: M_handwriting,
-        name: 'M_handwriting',
-        settingKey: 'handwriting-enable',
-        logMessage: '画板模块加载'
-    },
+    // 画板（白板）模块已独立为「ST白板」插件，代码已从本插件移除。
     M_lifelog: {
         class: M_lifelog,
         name: 'M_lifelog',
@@ -100,7 +94,6 @@ export type ModuleClasses = {
     M_calendar?: M_calendar;
     M_sync?: M_sync;
     M_ai?: M_ai;
-    M_handwriting?: M_handwriting;
     M_imageCompression?: M_imageCompression;
     M_lifelog?: M_lifelog;
     M_Wps?: M_Wps;

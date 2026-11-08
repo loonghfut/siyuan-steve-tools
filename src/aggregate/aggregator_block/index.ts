@@ -2,9 +2,12 @@ import steveTools from "@/index";
 import { getBlockByID, sql as runSql, lsNotebooks, createDailyNote, appendBlock, prependBlock } from '@/api/api';
 import { AVManager } from "@/api/db_pro";
 import { PluginConfig } from '@/savedata';
-import { showMessage, openTab } from "siyuan";
-import { PresetItem, SQLRawRow } from "../echarts/types/types";
+import { showMessage } from "siyuan";
+import { AggregateCursor, PresetItem, SQLRawRow } from "../echarts/types/types";
 import { TimerManager } from "./TimerManager";
+import { maxCursor, normalizeCursor } from "../domain/incremental-cursor";
+import { ensureSqlLimit, findOuterClauseIndex, SQL_UNLIMITED_CAP } from "@/libs/sql-limit";
+import type { AggregateRunResult, AggregateTargetRunResult } from "../domain/run-result";
 
 export class aggregatorBlock {
     private _settingdata: any;
@@ -19,24 +22,28 @@ export class aggregatorBlock {
     // 定时任务管理器
     private timerManager?: TimerManager;
 
+    // 同一预设的手动与定时执行共用此锁，避免重复插入。
+    private presetRunLocks = new Map<string, Promise<AggregateRunResult>>();
+
     constructor(plugin: steveTools, pluginConfig?: PluginConfig) {
         this._plugin = plugin;
         this.pluginConfig = pluginConfig;
     }
 
-    // 获取思源格式的时间戳(14位: YYYYMMDDHHmmss)
-    private getSiyuanTimestamp(date: Date = new Date()): string {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hour = String(date.getHours()).padStart(2, '0');
-        const minute = String(date.getMinutes()).padStart(2, '0');
-        const second = String(date.getSeconds()).padStart(2, '0');
-        return `${year}${month}${day}${hour}${minute}${second}`;
+    public getPluginName(): string {
+        return this._plugin.name;
+    }
+
+    public getDefaultDocInsertMode(): 'append' | 'prepend' {
+        return this._settingdata?.['aggregate-insert-mode'] === 'prepend' ? 'prepend' : 'append';
+    }
+
+    public async reloadPresetTimer(presetName: string, preset: PresetItem): Promise<void> {
+        await this.timerManager?.reloadTimer(presetName, preset);
     }
 
     // 检查文档是否有效
-    private async checkDocValidity(docId: string): Promise<boolean> {
+    public async checkDocValidity(docId: string): Promise<boolean> {
         if (!docId || !docId.trim()) return false;
         try {
             const data = await getBlockByID(docId);
@@ -116,7 +123,7 @@ export class aggregatorBlock {
      * @deprecated 弹窗形式已删除。此方法现已弃用，仅保留以避免破坏向后兼容性。
      * 表格渲染现在仅在页签 UI (ContentAggregatorTabUI) 中使用。
      */
-    private renderResultTable(rows: any[], container: HTMLElement): void {
+    public renderResultTable(rows: any[], container: HTMLElement): void {
         const total = rows.length;
         if (!total) {
             container.innerHTML = `
@@ -387,6 +394,15 @@ export class aggregatorBlock {
         return { element: dialog, destroy };
     }
 
+    /**
+     * 设置热更新：更新配置。
+     * 聚合器的多处逻辑（插入位置、预览列、预览模板、时间字段等）实时读取该配置，
+     * 更新后立即生效。
+     */
+    public updateSettings(settingdata: any) {
+        this._settingdata = settingdata;
+    }
+
     async init(settingdata: any) {
         this._settingdata = settingdata;
 
@@ -470,6 +486,13 @@ export class aggregatorBlock {
             console.debug('[aggregatorBlock] getSqlPresets failed', e);
             return {};
         }
+    }
+
+    /** 保存 SQL 可视化预设，供内容聚合器内嵌的预设工作台复用。 */
+    async saveSqlPresets(presets: Record<string, any>): Promise<void> {
+        if (!this.pluginConfig) throw new Error('内容聚合器配置不可用');
+        this.pluginConfig.set('presets', presets || {});
+        await this.pluginConfig.save();
     }
 
 
@@ -1043,7 +1066,7 @@ export class aggregatorBlock {
                             border-radius: var(--b3-border-radius);
                         ">
                             <div style="margin-bottom: 8px;">❌ 查询失败</div>
-                            <div style="font-size: 12px;">${error.message || '未知错误'}</div>
+                            <div style="font-size: 12px;">${this.escapeHtml(error?.message || String(error) || '未知错误')}</div>
                         </div>
                     `;
                     previewContainer.style.display = 'block';
@@ -1066,7 +1089,7 @@ export class aggregatorBlock {
      * @deprecated 弹窗形式已删除。此方法现已弃用。
      * 定时设置现在通过页签 UI (ContentAggregatorTabUI) 完成。
      */
-    private async showTimerSettings(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<boolean> {
+    public async showTimerSettings(name: string, preset: PresetItem, allPresets: Record<string, PresetItem>): Promise<boolean> {
         return new Promise((resolve) => {
             const currentEnabled = preset.timerEnabled || false;
             const currentMode = (preset.timerMode || 'interval') as ('interval'|'daily');
@@ -1415,62 +1438,99 @@ export class aggregatorBlock {
         }
     }
 
-    // 3. 根据用户选择的 SQL 代码，进行 SQL 查询。
-    // 执行 SQL 并返回行数据（数组）
-    async executeSql(sqlText: string, excludeDocId?: string, lastInsertTime?: string): Promise<SQLRawRow[]> {
+    private getIncrementalTimeField(): string {
+        const configured = String(this._settingdata?.['aggregate-time-field'] || 'created').trim();
+        return /^[A-Za-z_][A-Za-z0-9_]*$/.test(configured) ? configured : 'created';
+    }
+
+    /** Batch target validation for the list UI; shared IDs are checked once per refresh. */
+    public async getTargetStatuses(
+        presets: Record<string, PresetItem>,
+        names: string[],
+    ): Promise<Map<string, { docValid: boolean; docType?: 'doc' | 'notebook'; databaseValid: boolean }>> {
+        const documentChecks = new Map<string, Promise<{ valid: boolean; type?: 'doc' | 'notebook' }>>();
+        const databaseChecks = new Map<string, Promise<boolean>>();
+        const checkDocument = (id: string) => {
+            let check = documentChecks.get(id);
+            if (!check) {
+                check = (async () => {
+                    if (await this.checkDocValidity(id)) return { valid: true, type: 'doc' as const };
+                    const valid = await this.isNotebookId(id);
+                    return { valid, type: valid ? 'notebook' as const : undefined };
+                })();
+                documentChecks.set(id, check);
+            }
+            return check;
+        };
+        const checkDatabase = (id: string) => {
+            let check = databaseChecks.get(id);
+            if (!check) {
+                check = this.avManager.getAttributeView(id).then(() => true).catch(() => false);
+                databaseChecks.set(id, check);
+            }
+            return check;
+        };
+
+        const entries = await Promise.all(names.map(async name => {
+            const preset = presets[name];
+            const document = preset?.targetDocId ? await checkDocument(preset.targetDocId) : { valid: true };
+            const databaseValid = preset?.targetDatabaseId ? await checkDatabase(preset.targetDatabaseId) : true;
+            return [name, { docValid: document.valid, docType: document.type, databaseValid }] as const;
+        }));
+        return new Map(entries);
+    }
+
+    private escapeSqlLiteral(value: string): string {
+        return value.replace(/'/g, "''");
+    }
+
+    /**
+     * Add a predicate before the outer ORDER BY/GROUP BY/LIMIT instead of producing invalid trailing SQL.
+     *
+     * 只在外层作用域里找子句：子查询内部的 ORDER BY / GROUP BY 属于内层，
+     * 若按"首个正则匹配"定位，条件会被插进子查询，外层就失去过滤（取到错数据）。
+     */
+    private appendSqlCondition(sqlText: string, condition: string): string {
+        const stmt = sqlText.trim().replace(/;\s*$/, '');
+        const at = findOuterClauseIndex(stmt, ["GROUP BY", "HAVING", "ORDER BY", "LIMIT", "OFFSET"]);
+        const head = at >= 0 ? stmt.slice(0, at) : stmt;
+        const tail = at >= 0 ? stmt.slice(at) : '';
+        // tail 是子句关键字本身（不含前导空白），条件与子句之间必须补一个空格，
+        // 否则会拼出 "root_id != 1ORDER BY ..." 这样的非法 SQL。
+        const separator = tail && !/^\s/.test(tail) ? ' ' : '';
+        return `${head}${/\bWHERE\b/i.test(head) ? ' AND ' : ' WHERE '}${condition}${separator}${tail}`;
+    }
+
+    // 查询失败会抛出错误，让调用方能与“查询成功但无结果”明确区分。
+    async executeSql(sqlText: string, excludeDocId?: string, cursor?: string | AggregateCursor): Promise<SQLRawRow[]> {
+        if (!sqlText || !sqlText.trim()) return [];
+        let stmt = sqlText.trim();
+        if (excludeDocId) {
+            stmt = this.appendSqlCondition(stmt, `root_id != '${this.escapeSqlLiteral(excludeDocId)}'`);
+        }
+
+        const normalizedCursor = normalizeCursor(cursor);
+        if (normalizedCursor) {
+            const timeField = this.getIncrementalTimeField();
+            const time = this.escapeSqlLiteral(normalizedCursor.time);
+            const condition = normalizedCursor.blockId
+                ? `(${timeField} > '${time}' OR (${timeField} = '${time}' AND id > '${this.escapeSqlLiteral(normalizedCursor.blockId)}'))`
+                : `${timeField} > '${time}'`;
+            stmt = this.appendSqlCondition(stmt, condition);
+        }
+
+        // 思源 3.8 起 /api/query/sql 会给未自带 LIMIT 的语句套用服务端默认上限（默认 64），
+        // 而聚合器的增量游标依赖完整结果集（否则超出上限的块会被静默跳过），
+        // 这里在所有条件拼装完成之后补 LIMIT，保持外层 LIMIT 仍在最后。
+        stmt = ensureSqlLimit(stmt, SQL_UNLIMITED_CAP);
+
         try {
-            if (!sqlText || !sqlText.trim()) return [];
-            let stmt = sqlText.trim();
-
-            // 如果提供了排除的文档ID，自动添加过滤条件
-            if (excludeDocId) {
-                // 检查SQL是否已经有WHERE子句
-                const upperStmt = stmt.toUpperCase();
-                const hasWhere = upperStmt.includes(' WHERE ');
-
-                // 构建过滤条件：排除指定的文档ID
-                const excludeCondition = `root_id != '${excludeDocId}'`;
-
-                if (hasWhere) {
-                    // 如果已经有WHERE子句，在其后添加AND条件
-                    stmt = stmt.replace(/(\s+where\s+)/i, `$1${excludeCondition} AND `);
-                } else {
-                    // 如果没有WHERE子句，添加WHERE条件
-                    stmt += ` WHERE ${excludeCondition}`;
-                }
-
-                console.debug('[aggregatorBlock] Modified SQL with exclude condition:', stmt);
-            }
-
-            // 如果提供了 lastInsertTime，添加时间过滤条件
-            if (lastInsertTime && lastInsertTime.length === 14) {
-                // 获取用户设置的时间字段（created 或 updated）
-                const timeField = this._settingdata['aggregate-time-field'] || 'created';
-
-                // 思源的时间戳格式是秒，与 lastInsertTime 一致
-                const upperStmt = stmt.toUpperCase();
-                const hasWhere = upperStmt.includes(' WHERE ');
-
-                // 构建时间过滤条件：只查询在 lastInsertTime 之后创建/更新的内容
-                const timeCondition = `${timeField} > '${lastInsertTime}'`;
-
-                if (hasWhere) {
-                    // 如果已经有WHERE子句，在其后添加AND条件
-                    stmt = stmt.replace(/(\s+where\s+)/i, `$1${timeCondition} AND `);
-                } else {
-                    // 如果没有WHERE子句，添加WHERE条件
-                    stmt += ` WHERE ${timeCondition}`;
-                }
-
-                console.debug(`[aggregatorBlock] Modified SQL with time filter (${timeField} > ${lastInsertTime}):`, stmt);
-            }
-
             const res = await runSql(stmt);
-            if (!Array.isArray(res)) return [];
-            return res;
-        } catch (e) {
-            console.error('[aggregatorBlock] executeSql error', e);
-            return [];
+            if (!Array.isArray(res)) throw new Error('SQL 查询返回了非数组结果');
+            return res as SQLRawRow[];
+        } catch (error) {
+            console.error('[aggregatorBlock] executeSql error', error);
+            throw error;
         }
     }
 
@@ -1486,85 +1546,123 @@ export class aggregatorBlock {
      * promptForDocId 已移除 - 仅用于弹窗流程，页签中有自己的处理方式
      */
 
+    private getTargetCursor(preset: PresetItem, target: 'document' | 'database'): AggregateCursor | undefined {
+        const specific = target === 'document' ? preset.documentCursor : preset.databaseCursor;
+        const specificTime = target === 'document' ? preset.documentLastInsertTime : preset.databaseLastInsertTime;
+        if (specific || specificTime) return normalizeCursor(specific || specificTime);
+        const hasModernCursor = ['documentCursor', 'databaseCursor', 'documentLastInsertTime', 'databaseLastInsertTime']
+            .some(key => Object.prototype.hasOwnProperty.call(preset, key));
+        if (hasModernCursor) return undefined;
+        const legacyTime = target === 'document'
+            ? (preset.documentLastInsertTime || preset.lastInsertTime)
+            : (preset.databaseLastInsertTime || preset.lastInsertTime);
+        return normalizeCursor(specific || legacyTime);
+    }
+
+    private async updateTargetCursor(name: string, target: 'document' | 'database', cursor: AggregateCursor): Promise<void> {
+        const patch: Partial<PresetItem> = target === 'document'
+            ? { documentCursor: cursor, documentLastInsertTime: cursor.time, lastInsertTime: cursor.time }
+            : { databaseCursor: cursor, databaseLastInsertTime: cursor.time };
+        await this.updatePreset(name, patch, { skipUpdatedAt: true });
+    }
+
+    /** Shared manual/timer execution path with independent target cursors. */
+    public async runPreset(name: string): Promise<AggregateRunResult> {
+        const active = this.presetRunLocks.get(name);
+        if (active) return active;
+        const run = this.runPresetInternal(name);
+        this.presetRunLocks.set(name, run);
+        try {
+            return await run;
+        } finally {
+            if (this.presetRunLocks.get(name) === run) this.presetRunLocks.delete(name);
+        }
+    }
+
+    private async runPresetInternal(name: string): Promise<AggregateRunResult> {
+        const result: AggregateRunResult = { presetName: name, targets: [], queryErrors: [] };
+        const preset = (await this.getSqlPresets())[name] as PresetItem | undefined;
+        if (!preset) throw new Error(`未找到预设: ${name}`);
+        if (!preset.targetDocId && !preset.targetDatabaseId) throw new Error('请先在预设中配置目标文档或数据库');
+
+        const timeField = this.getIncrementalTimeField();
+        let resolvedDocId: string | undefined;
+        if (preset.targetDocId) {
+            const resolved = await this.resolveTargetDocId(preset.targetDocId);
+            if (resolved) resolvedDocId = resolved.docId;
+            else result.targets.push({ target: 'document', queriedRows: 0, insertedCount: 0, skippedCount: 0, error: '目标文档或笔记本无效' });
+        }
+
+        if (resolvedDocId) {
+            const target: AggregateTargetRunResult = { target: 'document', queriedRows: 0, insertedCount: 0, skippedCount: 0 };
+            try {
+                const rows = await this.executeSql(preset.sql, resolvedDocId, this.getTargetCursor(preset, 'document'));
+                target.queriedRows = rows.length;
+                if (rows.length) {
+                    await this.insertMarkdownToDoc(resolvedDocId, this.renderTemplate(preset, rows), name);
+                    target.insertedCount = rows.length;
+                    const cursor = maxCursor(rows, timeField);
+                    if (cursor) {
+                        await this.updateTargetCursor(name, 'document', cursor);
+                        target.cursor = cursor;
+                    }
+                }
+            } catch (error: any) {
+                target.error = error?.message || String(error);
+                result.queryErrors.push(`文档: ${target.error}`);
+            }
+            result.targets.push(target);
+        }
+
+        if (preset.targetDatabaseId) {
+            const target: AggregateTargetRunResult = { target: 'database', queriedRows: 0, insertedCount: 0, skippedCount: 0 };
+            try {
+                const rows = await this.executeSql(preset.sql, resolvedDocId, this.getTargetCursor(preset, 'database'));
+                target.queriedRows = rows.length;
+                if (rows.length) {
+                    const write = await this.insertBlocksToDatabase(preset.targetDatabaseId, rows, name);
+                    target.insertedCount = write.insertedCount;
+                    target.skippedCount = write.skippedCount;
+                    if (write.skippedCount) {
+                        // A cursor beyond an uninsertable row would lose it forever. Keep
+                        // the database cursor unchanged and make the partial run visible.
+                        target.error = `${write.skippedCount} 行缺少可用块 ID，数据库水位未推进`;
+                        result.queryErrors.push(`数据库: ${target.error}`);
+                    } else {
+                        const insertedIds = new Set(write.insertedIds);
+                        const cursor = maxCursor(rows.filter(row => insertedIds.has(this.findDatabaseBlockId(row, preset.databaseIdField))), timeField);
+                        if (cursor) {
+                            await this.updateTargetCursor(name, 'database', cursor);
+                            target.cursor = cursor;
+                        }
+                    }
+                }
+            } catch (error: any) {
+                target.error = error?.message || String(error);
+                result.queryErrors.push(`数据库: ${target.error}`);
+            }
+            result.targets.push(target);
+        }
+        return result;
+    }
+
     // 直接按名称执行预设（无选择器）
     public async runPresetByName(name: string): Promise<void> {
         try {
-            const all = await this.getSqlPresets();
-            const preset = all[name];
-            if (!preset) {
-                showMessage(`未找到预设: ${name}`, 4000, 'info');
-                return;
-            }
-
-            let targetDocId = preset.targetDocId;
-            const targetDatabaseId = preset.targetDatabaseId;
-            if (!targetDocId && !targetDatabaseId) {
-                showMessage('请先在预设中配置目标文档或数据库', 4000, 'info');
-                return;
-            }
-            const lastInsertTime = preset.lastInsertTime || '';
-
-            let resolvedDoc: { docId: string; type: 'doc' | 'notebook' } | null = null;
-            if (targetDocId) {
-                const resolved = await this.resolveInsertDocId(targetDocId);
-                if (resolved) { resolvedDoc = resolved; targetDocId = resolved.docId; }
-            }
-
-            const sqlResult = await this.executeSql(preset.sql, resolvedDoc?.docId, lastInsertTime);
-            if (!sqlResult || sqlResult.length === 0) {
-                showMessage('没有新数据可插入', 3000, 'info');
-                return;
-            }
-
-            const operations: string[] = [];
-            const errors: string[] = [];
-
-            if (resolvedDoc?.docId) {
-                try {
-                    const renderedMd = this.renderTemplate(preset, sqlResult);
-                    await this.insertMarkdownToDoc(resolvedDoc.docId, renderedMd, name);
-                    operations.push(`文档 ${sqlResult.length} 条`);
-                } catch (e: any) {
-                    errors.push(`文档: ${e?.message || String(e)}`);
-                }
-            }
-
-            if (targetDatabaseId) {
-                try {
-                    const insertedCount = await this.insertBlocksToDatabase(targetDatabaseId, sqlResult, name);
-                    operations.push(`数据库 ${insertedCount} 块`);
-                } catch (e: any) {
-                    errors.push(`数据库: ${e?.message || String(e)}`);
-                }
-            }
-
-            if (operations.length) {
-                showMessage(`执行完成：${operations.join('，')}`, 3000, 'info');
-            }
-            if (errors.length) {
-                showMessage(`部分失败：${errors.join('；')}`, 5000, 'error');
-            }
-            if (!operations.length && !errors.length) {
-                showMessage('未执行任何插入操作，请检查预设配置', 4000, 'info');
-            }
-
-            // 手动执行后更新 lastExecuteTime 以供右键菜单显示最近执行时间
-            try {
-                if (this.pluginConfig) {
-                    await this.pluginConfig.load();
-                    const current = this.pluginConfig.get('presets') || {};
-                    if (current[name]) {
-                        current[name].lastExecuteTime = Date.now();
-                        this.pluginConfig.set('presets', current);
-                        await this.pluginConfig.save();
-                    }
-                }
-            } catch (err) {
-                console.warn('[aggregatorBlock] 更新 lastExecuteTime 失败', err);
-            }
-        } catch (e: any) {
-            console.error('[aggregatorBlock] runPresetByName error', e);
-            showMessage(`执行失败: ${e?.message || String(e)}`, 5000, 'error');
+            const result = await this.runPreset(name);
+            const operations = result.targets
+                .filter(target => target.insertedCount > 0)
+                .map(target => target.target === 'document'
+                    ? `文档 ${target.insertedCount} 条`
+                    : `数据库 ${target.insertedCount} 块${target.skippedCount ? `（跳过 ${target.skippedCount} 条）` : ''}`);
+            const errors = result.targets.filter(target => target.error).map(target => `${target.target === 'document' ? '文档' : '数据库'}: ${target.error}`);
+            if (operations.length) showMessage(`执行完成：${operations.join('，')}`, 3000, 'info');
+            else if (!errors.length) showMessage('查询成功，但没有新数据可插入', 3000, 'info');
+            if (errors.length) showMessage(`部分失败：${errors.join('；')}`, 5000, 'error');
+            await this.updatePreset(name, { lastExecuteTime: Date.now() }, { skipUpdatedAt: true });
+        } catch (error: any) {
+            console.error('[aggregatorBlock] runPresetByName error', error);
+            showMessage(`执行失败: ${error?.message || String(error)}`, 5000, 'error');
         }
     }
 
@@ -1623,10 +1721,9 @@ export class aggregatorBlock {
             });
         });
 
-        // 用分隔符连接所有 row 的渲染结果
-        // const separator = this._settingdata['aggregate-row-separator'] || '';
-        // return renderedRows.join(`\n\n${separator}\n\n`);
-        return renderedRows.join(`\n\n \n\n`);
+        // 用设置中的分隔符连接所有 row；未设置时保持原有的空白行效果。
+        const separator = String(this._settingdata?.['aggregate-row-separator'] || '').trim();
+        return renderedRows.join(separator ? `\n\n${separator}\n\n` : '\n\n');
     }
 
     // 插入 Markdown 到指定文档（支持开头/末尾两种模式）
@@ -1641,18 +1738,22 @@ export class aggregatorBlock {
             }
             // 读取插入模式：优先预设项，其次全局设置，默认 append
             let insertMode: 'append' | 'prepend' = 'append';
+            let hasPresetInsertMode = false;
             if (presetName) {
                 try {
                     const presets = await this.getSqlPresets();
                     const preset = presets[presetName] as PresetItem | undefined;
                     if (preset && (preset as any).docInsertMode && (preset as any).docInsertMode !== '') {
                         const m = String((preset as any).docInsertMode);
-                        if (m === 'prepend' || m === 'append') insertMode = m;
+                        if (m === 'prepend' || m === 'append') {
+                            insertMode = m;
+                            hasPresetInsertMode = true;
+                        }
                     }
                 } catch {}
             }
-            if (!presetName || insertMode === 'append') {
-                // 如果全局设置覆盖
+            if (!hasPresetInsertMode) {
+                // 仅当预设未指定时采用全局设置；预设配置始终优先。
                 const globalMode = String(this._settingdata?.['aggregate-insert-mode'] || '').trim();
                 if (globalMode === 'prepend') insertMode = 'prepend';
             }
@@ -1662,11 +1763,6 @@ export class aggregatorBlock {
             } else {
                 await appendBlock('markdown', markdown, docId);
             }
-            // 插入成功后更新预设的 lastInsertTime
-            if (presetName) {
-                const currentTime = this.getSiyuanTimestamp(); // 当前时间戳(思源格式)
-                await this.updatePresetLastInsertTime(presetName, currentTime);
-            }
         } catch (e) {
             console.error('[aggregatorBlock] insertMarkdownToDoc error', e);
             throw e;
@@ -1674,36 +1770,41 @@ export class aggregatorBlock {
     }
 
     // 将查询到的块绑定到指定的数据库（属性视图）
-    async insertBlocksToDatabase(databaseId: string, rows: SQLRawRow[], presetName?: string): Promise<number> {
+    private findDatabaseBlockId(row: SQLRawRow, configuredField?: 'id' | 'parent_id'): string | undefined {
+        const candidateKeys = configuredField === 'parent_id'
+            ? ['parent_id', 'block_parent_id', 'id', 'block_id', 'blockId']
+            : ['id', 'block_id', 'blockId', 'parent_id', 'block_parent_id'];
+        for (const key of candidateKeys) {
+            const value = row[key];
+            if (typeof value === 'string' && value.trim()) return value.trim();
+        }
+        return undefined;
+    }
+
+    async insertBlocksToDatabase(
+        databaseId: string,
+        rows: SQLRawRow[],
+        presetName?: string,
+    ): Promise<{ insertedCount: number; insertedIds: string[]; skippedCount: number }> {
         if (!databaseId || !databaseId.trim()) {
             throw new Error('无效的数据库 ID');
         }
         if (!Array.isArray(rows) || rows.length === 0) {
-            return 0;
+            return { insertedCount: 0, insertedIds: [], skippedCount: 0 };
         }
 
         // 构建候选字段顺序：若预设指定使用 parent_id，则优先 parent_id；否则优先 id
         const configuredField: ('id' | 'parent_id') | undefined = (presetName
             ? (await this.getSqlPresets())[presetName]?.databaseIdField
             : undefined) as ('id' | 'parent_id') | undefined;
-        const candidateKeys = configuredField === 'parent_id'
-            ? ['parent_id', 'block_parent_id', 'id', 'block_id', 'blockId']
-            : ['id', 'block_id', 'blockId', 'parent_id', 'block_parent_id'];
         const blockIds: string[] = [];
+        let skippedCount = 0;
 
         for (const row of rows) {
-            if (!row || typeof row !== 'object') continue;
-            let foundId: string | undefined;
-            for (const key of candidateKeys) {
-                const value = row[key];
-                if (typeof value === 'string' && value.trim()) {
-                    foundId = value.trim();
-                    break;
-                }
-            }
-            if (foundId) {
-                blockIds.push(foundId);
-            }
+            if (!row || typeof row !== 'object') { skippedCount++; continue; }
+            const foundId = this.findDatabaseBlockId(row, configuredField);
+            if (foundId) blockIds.push(foundId);
+            else skippedCount++;
         }
 
         const uniqueIds = Array.from(new Set(blockIds));
@@ -1718,11 +1819,10 @@ export class aggregatorBlock {
                 itemID: this.avManager.generateId()
             }));
             await this.avManager.batchAddBlocks(databaseId, sources);
-            if (presetName) {
-                const currentTime = this.getSiyuanTimestamp();
-                await this.updatePresetLastInsertTime(presetName, currentTime);
+            if (skippedCount) {
+                console.warn(`[aggregatorBlock] 数据库插入跳过 ${skippedCount} 行：缺少可用块 ID`);
             }
-            return uniqueIds.length;
+            return { insertedCount: uniqueIds.length, insertedIds: uniqueIds, skippedCount };
         } catch (error) {
             console.error('[aggregatorBlock] insertBlocksToDatabase error', error);
             throw error;
@@ -1805,6 +1905,28 @@ export class aggregatorBlock {
                 destroy();
             });
         });
+    }
+
+    /** Atomically validate, merge and persist one preset update. */
+    public async updatePreset(
+        presetName: string,
+        patch: Partial<PresetItem>,
+        options?: { skipUpdatedAt?: boolean },
+    ): Promise<PresetItem> {
+        if (!this.pluginConfig) throw new Error('内容聚合器配置不可用');
+        await this.pluginConfig.load();
+        const presets = this.pluginConfig.get<Record<string, PresetItem>>('presets', {});
+        const existing = presets[presetName];
+        if (!existing) throw new Error(`未找到预设: ${presetName}`);
+        const updated: PresetItem = {
+            ...existing,
+            ...patch,
+            ...(options?.skipUpdatedAt ? {} : { updatedAt: Date.now() }),
+        };
+        presets[presetName] = updated;
+        this.pluginConfig.set('presets', presets);
+        await this.pluginConfig.save();
+        return updated;
     }
 
     // 更新预设的目标文档 ID

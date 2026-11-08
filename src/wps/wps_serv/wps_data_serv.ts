@@ -38,6 +38,14 @@ export class WpsDataServ {
         this.checkIsNewData();
     }
 
+    /**
+     * 设置热更新：仅更新缓存的配置。
+     * 接口地址、token、字段列表、笔记本与模板都在每次导入时读取，更新后立即生效。
+     */
+    updateSettings(settingdata: any) {
+        this.settingdata = settingdata;
+    }
+
     private async checkIsNewData() {
         const result = await runWpsScriptSync({
             url: this.settingdata['wps-data-url'],

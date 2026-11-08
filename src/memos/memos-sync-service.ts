@@ -316,8 +316,8 @@ export class MemosClient {
 }
 
 export class MemosSyncService {
-    private readonly settings: MemosPluginSettings;
-    private readonly client: MemosClient;
+    private settings: MemosPluginSettings;
+    private client: MemosClient;
     private syncState: SyncState = 'idle';
     private syncedCount = 0;
     private skippedCount = 0;
@@ -352,6 +352,17 @@ export class MemosSyncService {
 
     setStateChangeCallback(callback: (state: SyncState, message: string) => void) {
         this.onStateChange = callback;
+    }
+
+    /**
+     * 设置热更新：合并新的设置。
+     * 地址或令牌变化时重建内部客户端（客户端在构造时固化地址与令牌）。
+     */
+    updateSettings(settings: Partial<MemosPluginSettings>) {
+        this.settings = { ...this.settings, ...settings };
+        if (settings.baseUrl !== undefined || settings.token !== undefined) {
+            this.client = new MemosClient(this.settings.baseUrl, this.settings.token);
+        }
     }
 
     getState(): SyncState {
@@ -457,10 +468,6 @@ export class MemosSyncService {
 
     private hasCustomTemplate(): boolean {
         return !!String(this.settings.customTemplate || '').trim();
-    }
-
-    private hasAnchorTemplate(): boolean {
-        return !!String(this.settings.anchorTemplate || '').trim();
     }
 
     private isIncrementalActive(): boolean {

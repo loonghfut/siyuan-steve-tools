@@ -43,6 +43,7 @@ export function buildRadarIIFEFromAVCtx(ctx: EchartsAvTplCtx & any) {
     ${genUnwrapAttrValFn()}
     var __payload = { id: ${JSON.stringify(ctx.avID)}, page: ${String(page)}, pageSize: ${String(pageSize)} };
     ${ctx.viewID ? `__payload.viewID = ${JSON.stringify(ctx.viewID)};` : ''}
+    ${ctx.blockId ? `__payload.blockID = ${JSON.stringify(ctx.blockId)};` : ''}
     var rd = callAvSync('renderAttributeView', __payload) || {};
     ${genNormalizeAvResponseSnippet()}
     ${genBuildFlatRowsSnippet()}

@@ -5,6 +5,7 @@ export class PluginConfig {
     //记得load一下
     private configPath: string;
     private config: { [key: string]: any };
+    private saveQueue: Promise<void> = Promise.resolve();
 
     constructor(pluginName: string, M_name: string) {
         this.configPath = `/data/storage/petal/${pluginName}/${M_name}/config.json`;
@@ -34,17 +35,22 @@ export class PluginConfig {
     /**
      * 保存配置到文件
      */
-    async save(): Promise<void> {
-        try {
-            const configString = JSON.stringify(this.config, null, 2);
-            const blob = new Blob([configString], { type: 'application/json' });
-            await putFile(this.configPath, false, blob);
-            console.debug("配置文件保存成功:", this.configPath);
-        } catch (error) {
-            console.error("保存配置文件失败:", error);
-            throw error;
-        }
-        this.load(); // 重新加载配置
+    save(): Promise<void> {
+        // Capture a snapshot at call time and serialize writes. Reloading after an
+        // un-awaited save used to race with subsequent edits and could overwrite them.
+        const configString = JSON.stringify(this.config, null, 2);
+        const write = this.saveQueue.then(async () => {
+            try {
+                const blob = new Blob([configString], { type: 'application/json' });
+                await putFile(this.configPath, false, blob);
+                console.debug("配置文件保存成功:", this.configPath);
+            } catch (error) {
+                console.error("保存配置文件失败:", error);
+                throw error;
+            }
+        });
+        this.saveQueue = write.catch(() => undefined);
+        return write;
     }
 
     /**

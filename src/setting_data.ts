@@ -1,8 +1,7 @@
-import { calendarDefaults } from "./settings/calendar";
+import { calendarDefaults } from "./calendar/settings/calendar-settings";
 import { syncDefaults } from "./settings/sync";
 import { aiDefaults } from "./settings/ai";
 import { imageCompressionDefaults } from "./settings/imageCompression";
-import { handwritingDefaults } from "./settings/handwriting";
 import { lifelogDefaults } from "./settings/lifelog";
 import { wpsDefaults } from "./settings/wps";
 import { commonDefaults } from "./settings/common";
@@ -17,7 +16,6 @@ export const defaultSettings: Record<string, any> = {
     ...syncDefaults,
     ...aiDefaults,
     ...imageCompressionDefaults,
-    ...handwritingDefaults,
     ...lifelogDefaults,
     ...wpsDefaults,
     ...commonDefaults,

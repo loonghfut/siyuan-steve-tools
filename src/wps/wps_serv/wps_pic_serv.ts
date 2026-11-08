@@ -34,6 +34,14 @@ export class WpsPicServ {
     }
 
 
+    /**
+     * 设置热更新：仅更新缓存的配置。
+     * 接口地址与 token 在每次请求时读取，更新后立即生效，不重复注册监听。
+     */
+    updateSettings(settingdata: any) {
+        this.settingdata = settingdata;
+    }
+
     async selectImageAndSend() {
         const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 

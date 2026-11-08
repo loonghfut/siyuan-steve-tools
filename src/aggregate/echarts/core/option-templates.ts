@@ -1,4 +1,5 @@
 import { genUnwrapAttrValFn, genNormalizeAvResponseSnippet, genBuildFlatRowsSnippet } from '../av_data/av-iife-snippets';
+import { ensureSqlLimit, SQL_UNLIMITED_CAP } from '@/libs/sql-limit';
 export interface EchartsTplCtx {
   title?: string;
   legend?: string[];
@@ -178,12 +179,12 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
     ${gridPatch}
     option.xAxis = [{ type: 'category', boundaryGap: ${ctx.boundaryGap ? 'true':'false'}, data: (${xExpr}), axisTick: { show:false }, axisLine: { show:false }${(function(){
       const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
-      return xName ? `, name: '${xName}'` : '';
+      return xName ? `, name: ${JSON.stringify(xName)}` : '';
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
         const yName = (stBar && stBar.yAxisName) || (stLine && stLine.yAxisName) || '';
-        return yName ? `, name: '${yName}'` : '';
+        return yName ? `, name: ${JSON.stringify(yName)}` : '';
       })()}
     }${needDualAxis ? ", { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false } }" : ''}]`};
     option.series = [${seriesJs}];
@@ -210,6 +211,8 @@ export function buildIIFEFromCtx(ctx: EchartsTplCtx) {
 export interface EchartsAvTplCtx extends EchartsTplCtx {
   avID: string;
   viewID?: string;  // 可选：指定视图 ID，否则使用默认视图
+  /** 数据库块 ID。思源 3.8 起用它解析「块当前视图」与「块级上下文筛选」。 */
+  blockId?: string;
   dbName?: string;  // 数据库名称
   viewName?: string; // 视图名称
   showDbNameAndViewName?: boolean; // 是否在标题下面显示数据库名称和视图名称
@@ -389,7 +392,8 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
     // 使用 renderAttributeView 获取包含列定义与行值的完整数据
     var __payload = { id: ${JSON.stringify(ctx.avID)}, page: ${String(page)}, pageSize: ${String(pageSize)} };
     ${ctx.viewID ? `__payload.viewID = ${JSON.stringify(ctx.viewID)};` : ''}
-    ${keyword ? `__payload.keyword = ${JSON.stringify(keyword)};` : ''}
+    ${ctx.blockId ? `__payload.blockID = ${JSON.stringify(ctx.blockId)};` : ''}
+    ${keyword ? `__payload.query = ${JSON.stringify(keyword)};` : ''}
     var rd = callAvSync('renderAttributeView', __payload) || {};
     ${genNormalizeAvResponseSnippet()}
     ${genBuildFlatRowsSnippet()}
@@ -447,16 +451,16 @@ export function buildIIFEFromAVCtx(ctx: EchartsAvTplCtx) {
       return '';
     })()} }${(function(){
       const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
-      return xName ? `, name: '${xName}'` : '';
+      return xName ? `, name: ${JSON.stringify(xName)}` : '';
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function(){
         const yLeftName = (stBar && stBar.yAxisLeftName) || (stLine && stLine.yAxisLeftName) || '';
-        return yLeftName ? `, name: '${yLeftName}'` : '';
+        return yLeftName ? `, name: ${JSON.stringify(yLeftName)}` : '';
       })()}
     }${needDualAxis ? (function(){
       const yRightName = (stBar && stBar.yAxisRightName) || (stLine && stLine.yAxisRightName) || '';
-      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: '${yRightName}'` : ''} }`;
+      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: ${JSON.stringify(yRightName)}` : ''} }`;
     })() : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];
@@ -553,7 +557,8 @@ export function buildPresetCountIIFE(
   const safeItems = (items || []).map(it => ({
     name: String(it?.name ?? ''),
     // 将反引号转义以便嵌入到模板字符串
-    sql: String(it?.sql ?? '').replace(/`/g, '\\`')
+    // 思源 3.8 起未自带 LIMIT 的语句会被服务端截断到默认上限，嵌入文档前先补齐。
+    sql: ensureSqlLimit(String(it?.sql ?? '').replace(/`/g, '\\`'), SQL_UNLIMITED_CAP)
   }));
   const itemsJson = JSON.stringify(safeItems);
   const t = (function(){
@@ -911,7 +916,7 @@ export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
       return [];
     }
     const option = {};
-    const rows = fetchSqlSync(${JSON.stringify(ctx.sql)});
+    const rows = fetchSqlSync(${JSON.stringify(ensureSqlLimit(ctx.sql, SQL_UNLIMITED_CAP))});
     option.title = { text: ${JSON.stringify(ctx.title || '')} };
     ${(function () {
       const titleAlign = stCommon.title?.textAlign;
@@ -962,16 +967,16 @@ export function buildIIFEFromSQLCtx(ctx: EchartsSqlTplCtx) {
       return '';
     })()} }${(function () {
       const xName = (stBar && stBar.xAxisName) || (stLine && stLine.xAxisName) || '';
-      return xName ? `, name: '${xName}'` : '';
+      return xName ? `, name: ${JSON.stringify(xName)}` : '';
     })()} }];
     option.yAxis = ${`[{
       type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show: ${splitTypeShow ? 'true' : 'false'}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLineStyleType}' } }${(function () {
       const yLeftName = (stBar && stBar.yAxisLeftName) || (stLine && stLine.yAxisLeftName) || '';
-      return yLeftName ? `, name: '${yLeftName}'` : '';
+      return yLeftName ? `, name: ${JSON.stringify(yLeftName)}` : '';
     })()}
     }${needDualAxis ? (function () {
       const yRightName = (stBar && stBar.yAxisRightName) || (stLine && stLine.yAxisRightName) || '';
-      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: '${yRightName}'` : ''} }`;
+      return `, { type: 'value', axisTick: { show:false }, axisLine: { show:false }, splitLine: { show:false }${yRightName ? `, name: ${JSON.stringify(yRightName)}` : ''} }`;
     })() : ''}]`};
     ` : ''}
     option.series = [${seriesJs}];

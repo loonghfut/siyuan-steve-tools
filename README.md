@@ -20,12 +20,16 @@ Free users: if you encounter problems, don't report them unless they affect my p
 
 To facilitate communication with donors, I created a temporary feedback QQ group (may be dissolved anytime). Please fill in the application form before joining: https://www.kdocs.cn/wo/sl/v1lC0R0
 
+### Compatibility
+Adapted to SiYuan Note **3.8** (including 3.8.x) while keeping 3.7 compatibility, so `minAppVersion` stays at 3.7.0.
+To target 3.8+ users only, change `minAppVersion` to `3.8.0` in `plugin.json`.
+
 Available features (see plugin demos and tutorials at https://ld246.com/search?q=sttools):
-1. Interconnected schedule management: deeply integrates with SiYuan to provide calendar and kanban views, generate .ics calendar files for syncing with calendar apps via URL subscription (Thunderbird, Xiaomi Calendar, Apple Calendar, etc.), and basic integration with TickTick. (Demo and tutorials linked in the original README.)
+1. Interconnected schedule management: deeply integrates with SiYuan to provide calendar views, generate .ics calendar files for syncing with calendar apps via URL subscription (Thunderbird, Xiaomi Calendar, Apple Calendar, etc.), and basic integration with TickTick. (Demo and tutorials linked in the original README.)
 2. Docker sync awareness: Windows S3 synchronization is detected by the Docker side.
 3. AI web sidebar: embeds several AI web pages for convenient use.
 4. Media compression: compress media before importing into SiYuan.
-5. tldraw whiteboard: similar to AFFINE, tightly integrated with SiYuan. Supports embedding SiYuan blocks and link navigation.
+5. tldraw whiteboard: moved to a standalone plugin (ST白板); the whiteboard code is no longer bundled in this plugin.
 6. Lifelog: open-source alternative (for a better experience, consider YeGui plugin). Implemented via PR by BoysFight.
 7. WPS integration: embed, preview, edit, and sync office files in SiYuan; import spreadsheet-like data and upload images.
 8. Aggregation queries: visual SQL builder to query the SiYuan database with multiple filters and sorting, preview results and embed them as blocks; visual chart generator based on DB/SQL queries.

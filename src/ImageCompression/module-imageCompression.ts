@@ -3,6 +3,7 @@ import * as api from "@/api/api"
 import { IProtyle, showMessage } from "siyuan";
 import imageCompression from 'browser-image-compression';
 import { getCursorBlockId } from "@/api/api2";
+import { applyTopBarButton } from "@/libs/topbar";
 declare const siyuan: any;
 
 export class M_imageCompression {
@@ -10,6 +11,8 @@ export class M_imageCompression {
     private settingdata: any;
     private selectionChangeHandler?: () => void;
     private switchProtyleHandler?: (event: any) => Promise<void>;
+    private compressTopBar?: HTMLElement;
+    private pasteTopBar?: HTMLElement;
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
@@ -427,32 +430,42 @@ export class M_imageCompression {
 
     init(settingdata?: any) {
         this.settingdata = settingdata || {};
+        this.applyTopBarButtons();
+    }
+
+    /**
+     * 设置热更新：更新配置并重新应用顶栏按钮显隐。
+     * 顶栏条目用固定 id 注册，重复调用只会更新同一条目，不会新增，因此这里是幂等的。
+     */
+    updateSettings(settingdata: any) {
+        this.settingdata = settingdata || {};
+        this.applyTopBarButtons();
+    }
+
+    /**
+     * 根据设置应用「压缩资源」「粘贴并压缩」两个顶栏按钮的显隐。
+     */
+    private applyTopBarButtons() {
         // 可选的粘贴按钮：是否显示由设置控制
         const showPaste = this.settingdata?.['img-compress-show-paste'] !== false; // 默认显示
         // const showPasteRaw = this.settingdata?.['img-compress-show-paste-raw'] !== false; // 默认显示
         const showCompressTopBar = this.settingdata?.['img-compress-show-topbar'] !== false; // 默认显示
-        if (showCompressTopBar) {
-            this.plugin.addTopBar({
+        this.compressTopBar = applyTopBarButton(this.plugin, this.compressTopBar, "st-img-compress", {
             icon: "iconImgDown",
             title: "压缩资源",
             position: "right",
             callback: () => {
                 this.openFileDialog();
             }
-            });
-        }
-
-
-        if (showPaste) {
-            this.plugin.addTopBar({
-                icon: "iconPaste",
-                title: "粘贴并压缩",
-                position: "right",
-                callback: () => {
-                    this.pasteFromClipboard(false);
-                }
-            });
-        }
+        }, showCompressTopBar);
+        this.pasteTopBar = applyTopBarButton(this.plugin, this.pasteTopBar, "st-img-compress-paste", {
+            icon: "iconPaste",
+            title: "粘贴并压缩",
+            position: "right",
+            callback: () => {
+                this.pasteFromClipboard(false);
+            }
+        }, showPaste);
 
         // if (showPasteRaw) {
         //     this.plugin.addTopBar({

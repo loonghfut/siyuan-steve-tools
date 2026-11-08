@@ -99,16 +99,20 @@
   async function saveSettings(skipBgRefresh = false) {
     Object.assign(runtimeSettingdata, settings);
     await plugin.saveData(myfile, settings);
-    // 更新 LifeLog 模块的设置
-    if (moduleInstances["M_lifelog"]) {
-      moduleInstances["M_lifelog"].updateSettings(settings);
-    }
-    if (moduleInstances["M_Minutiae"]) {
-      // pass option to avoid switching background when called during initial load
-      moduleInstances["M_Minutiae"].updateSettings(settings, { skipBgRefresh });
-    }
-    if (moduleInstances["M_handwriting"]) {
-      moduleInstances["M_handwriting"].updateSettings(settings);
+    // 通知所有支持热更新的模块（统一遍历，避免漏掉某个模块导致设置不生效）
+    for (const moduleName in moduleInstances) {
+      const instance = moduleInstances[moduleName] as any;
+      if (typeof instance?.updateSettings !== "function") continue;
+      try {
+        if (moduleName === "M_Minutiae") {
+          // pass option to avoid switching background when called during initial load
+          await instance.updateSettings(settings, { skipBgRefresh });
+        } else {
+          await instance.updateSettings(settings);
+        }
+      } catch (error) {
+        console.warn(`模块 ${moduleName} 应用新设置失败`, error);
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import { buildSqlMappingExpressions, SeriesItem } from './sql-data-mapping';
 import { preprocessSqlData } from './sql-data-preprocessor';
 import { FilterCondition, buildFilterExpression, renderFilterList, createEmptyFilter } from '../ui/filter-manager';
+import { ensureSqlLimit, SQL_UNLIMITED_CAP } from '@/libs/sql-limit';
 
 /**
  * 统一的 ECharts 设置生成器
@@ -98,7 +99,7 @@ class ChartSettingsBuilder {
       axisTick: { show: false }, 
       axisLine: { show: false },
       axisLabel: { rotate: ${xLabelRotate}, interval: 0 },
-      name: '${xAxisName}'
+      name: ${JSON.stringify(xAxisName)}
     }];`;
   }
 
@@ -116,7 +117,7 @@ class ChartSettingsBuilder {
       axisTick: { show: false }, 
       axisLine: { show: false }, 
       splitLine: { show: ${splitLine.show}, lineStyle: { color: 'rgba(0, 0, 0, .38)', type: '${splitLine.type}' } },
-      name: '${yAxisLeftName}'
+      name: ${JSON.stringify(yAxisLeftName)}
     }`;
     
     if (needDualAxis) {
@@ -125,7 +126,7 @@ class ChartSettingsBuilder {
       axisTick: { show: false }, 
       axisLine: { show: false }, 
       splitLine: { show: false },
-      name: '${yAxisRightName}'
+      name: ${JSON.stringify(yAxisRightName)}
     }`;
     }
     
@@ -360,6 +361,17 @@ export class VisualEchartsSqlUI {
 
   public getSQL(): string {
     return this.sql;
+  }
+
+  /** 供图表宿主直接打开共享 SQL 预设选择器。 */
+  public openPresetPicker(): void {
+    this.openPresetModal();
+  }
+
+  public destroy(): void {
+    if (this.debounceTimer) window.clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
+    this.root.innerHTML = '';
   }
 
   // 统一的变化处理:可视化时自动生成表达式,然后保存并刷新预览
@@ -971,7 +983,7 @@ export class VisualEchartsSqlUI {
   }
 
   // 从 SQL 查询结果加载字段名
-  private loadKeys() {
+  private async loadKeys() {
     try {
       if (this.loadingKeys) return;
       this.loadingKeys = true;
@@ -983,14 +995,15 @@ export class VisualEchartsSqlUI {
         return;
       }
 
-      // 使用同步 XMLHttpRequest 获取 SQL 查询结果
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/query/sql', false);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.send(JSON.stringify({ stmt: sql }));
+      const response = await fetch('/api/query/sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // 思源 3.8 起未自带 LIMIT 的语句会被服务端截断到默认上限，这里显式补齐。
+        body: JSON.stringify({ stmt: ensureSqlLimit(sql, SQL_UNLIMITED_CAP) }),
+      });
 
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const result = JSON.parse(xhr.responseText || '[]');
+      if (response.ok) {
+        const result = await response.json();
         const rawRows = Array.isArray(result) ? result : (result.data || []);
 
         // 使用预处理器处理数据
@@ -1021,7 +1034,7 @@ export class VisualEchartsSqlUI {
           this.toast('查询结果为空');
         }
       } else {
-        this.toast('查询失败');
+        this.toast(`查询失败（${response.status}）`);
       }
     } catch (e) {
       this.toast('查询出错');
@@ -1099,7 +1112,12 @@ export class VisualEchartsSqlUI {
       return `(() => { return { title: { text: '${title || '请添加SQL预设'}' }, xAxis: { type: 'category', data: [] }, yAxis: { type: 'value' }, series: [] }; })()`;
     }
 
-    const presetsJson = JSON.stringify(this.multiSqlPresets.map(p => ({ name: p.name, sql: p.sql })));
+    // 思源 3.8 起未自带 LIMIT 的语句会被服务端截断到默认上限，嵌入到文档的图表代码
+    // 也必须自带 LIMIT，否则文档里的图表与编辑态看到的行数会不一致。
+    const presetsJson = JSON.stringify(this.multiSqlPresets.map(p => ({
+        name: p.name,
+        sql: ensureSqlLimit(p.sql, SQL_UNLIMITED_CAP),
+    })));
     
     // 获取当前图表类型
     const chartType = this.chartType;
@@ -1547,7 +1565,7 @@ export class VisualEchartsSqlUI {
     }
     
     const option = {};
-    var rawRows = fetchSqlSync(${JSON.stringify(sql)});
+    var rawRows = fetchSqlSync(${JSON.stringify(ensureSqlLimit(sql, SQL_UNLIMITED_CAP))});
     const rows = preprocessData(rawRows);
     
     // 计算 X轴 数据
@@ -2338,7 +2356,8 @@ export class VisualEchartsSqlUI {
           const s = p[name];
           if (!s) return;
           this.hydrateState(s);
-          this.rebuildCode();
+          this.debounceLoadKeys();
+          this.onChanged();
           this.toast('已应用预设');
           close();
         });
@@ -2353,7 +2372,8 @@ export class VisualEchartsSqlUI {
           const s = p[name];
           if (!s) return;
           this.hydrateState(s);
-          this.rebuildCode();
+          this.debounceLoadKeys();
+          this.onChanged();
           this.toast('已应用预设');
           close();
         });

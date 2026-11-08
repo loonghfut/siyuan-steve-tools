@@ -1,4 +1,5 @@
 import steveTools from "@/index";
+import "./ui/aggregate-theme.scss";
 import { VisualSqlUI } from "./sql/visual-sql-ui";
 import { VisualEchartsUI } from "./echarts/ui/visual-echarts-ui";
 import { Dialog, Menu, openTab } from "siyuan";
@@ -15,17 +16,23 @@ export class M_Aggregate {
     private _ui?: VisualSqlUI; // 嵌入式 UI 引用（仅生命周期持有）
     private _tabInstances = new Map<string, VisualSqlUI>(); // Tab 实例映射
     private _aggregatorBlockInstance?: aggregatorBlock; // 内容聚合器实例
+    /**
+     * 模块配置。页签/弹窗的初始化回调在运行期才执行，若捕获 init 的参数值，
+     * 跨端改设置后新开的界面仍会用旧值，因此统一从实例字段读取。
+     */
+    private _settingdata: any = {};
     constructor(plugin: steveTools) {
         this.plugin = plugin;
     }
 
-    async init(_settingdata: any) {
+    async init(settingdata: any) {
         console.debug("Aggregate 模块初始化");
-        if (_settingdata["aggregate-enable-content-aggregator"]) {
+        this._settingdata = settingdata || {};
+        if (this._settingdata["aggregate-enable-content-aggregator"]) {
             // Provide PluginConfig for persistent presets storage
             const confAgg = new PluginConfig(this.plugin.name, 'aggregate-sql');
             await confAgg.load();
-            await (this._aggregatorBlockInstance = new aggregatorBlock(this.plugin, confAgg)).init(_settingdata);
+            await (this._aggregatorBlockInstance = new aggregatorBlock(this.plugin, confAgg)).init(this._settingdata);
 
             // 注册 内容聚合器 为思源选项卡
             const aggregate = this;
@@ -45,14 +52,14 @@ export class M_Aggregate {
             });
         }
 
-        if (_settingdata["aggregate-enable-sql-visualizer"]) {
+        if (this._settingdata["aggregate-enable-sql-visualizer"]) {
             const topBarElement = this.plugin.addTopBar({
                 icon: "iconSQL",
                 title: "聚合",
                 position: "right",
                 callback: async () => {
                     const rect = topBarElement.getBoundingClientRect();
-                    this.addMenu(rect, _settingdata);
+                    this.addMenu(rect);
                 }
             });
 
@@ -142,19 +149,19 @@ export class M_Aggregate {
                     const id = new Date().getTime().toString();
                     this.element.innerHTML = `<div id="visual-sql-tab-${id}" style="width:100%;height:100%;overflow:auto;"></div>`;
                     const container = document.getElementById(`visual-sql-tab-${id}`)! as HTMLElement;
-                    const previewCols = (_settingdata["aggregate-sql-preview-columns"] || "").trim();
+                    const previewCols = (aggregate._settingdata["aggregate-sql-preview-columns"] || "").trim();
                     // 使用插件级配置存储筛选预设
                     const conf = new PluginConfig(aggregate.plugin.name, 'aggregate-sql');
                     await conf.load();
                     const ui = new VisualSqlUI(container, {
                         previewColumns: previewCols,
-                        previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                        previewColMaxWidth: Number(aggregate._settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                         noPreviewHeightLimit: true,
                         showPresetControls: true,
                         segmentEmbed: {
-                            start: String(_settingdata["aggregate-segment-embed-start"] || ""),
-                            end: String(_settingdata["aggregate-segment-embed-end"] || ""),
-                            intervalDays: Number(_settingdata["aggregate-segment-embed-interval-days"]) || 7,
+                            start: String(aggregate._settingdata["aggregate-segment-embed-start"] || ""),
+                            end: String(aggregate._settingdata["aggregate-segment-embed-end"] || ""),
+                            intervalDays: Number(aggregate._settingdata["aggregate-segment-embed-interval-days"]) || 7,
                         },
                         buttons: [
                             {
@@ -187,8 +194,8 @@ export class M_Aggregate {
                                             });
                                             const cont = document.getElementById(`visual-sql-from-echarts-tab-${id}`)!;
                                             new VisualSqlUI(cont, {
-                                                previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
-                                                previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                                previewColumns: (aggregate._settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                                previewColMaxWidth: Number(aggregate._settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                                                 loadPresets: () => (conf.get('presets') || {}),
                                                 savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                                                 showPresetControls: true,
@@ -283,7 +290,7 @@ export class M_Aggregate {
                     await conf.load();
                     // 支持从 openTab 传入初始 SQL（例如从内容聚合器跳转而来）
                     const initData = (this as any).data || {};
-                    new VisualEchartsUI(container, {
+                    const ui = new VisualEchartsUI(container, {
                         persistKey: `visual-echarts-tab`,
                         initialSQL: initData.initialSQL,
                         loadSqlPresets: () => (conf.get('presets') || {}),
@@ -299,17 +306,19 @@ export class M_Aggregate {
                             });
                             const cont = document.getElementById(`visual-sql-from-echarts-tab-open-${id}`)!;
                             new VisualSqlUI(cont, {
-                                previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
-                                previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                previewColumns: (aggregate._settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                previewColMaxWidth: Number(aggregate._settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                                 loadPresets: () => (conf.get('presets') || {}),
                                 savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                                 showPresetControls: true,
                             });
                         }
                     });
+                    (this as any)._echartsUI = ui;
                 },
                 async destroy() {
-                    // 目前无显式销毁
+                    try { (this as any)._echartsUI?.destroy?.(); } catch {}
+                    delete (this as any)._echartsUI;
                 },
             });
         }
@@ -336,15 +345,15 @@ export class M_Aggregate {
                     });
 
                     const container = document.getElementById('visual-sql-container-slash')!;
-                    const previewCols = (_settingdata["aggregate-sql-preview-columns"] || "").trim();
+                    const previewCols = (this._settingdata["aggregate-sql-preview-columns"] || "").trim();
                     // 在 Slash 面板中挂载 UI，并增加“插入代码块”按钮
                     const ui = new VisualSqlUI(container, {
                         previewColumns: previewCols,
-                        previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                        previewColMaxWidth: Number(this._settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                         segmentEmbed: {
-                            start: String(_settingdata["aggregate-segment-embed-start"] || ""),
-                            end: String(_settingdata["aggregate-segment-embed-end"] || ""),
-                            intervalDays: Number(_settingdata["aggregate-segment-embed-interval-days"]) || 7,
+                            start: String(this._settingdata["aggregate-segment-embed-start"] || ""),
+                            end: String(this._settingdata["aggregate-segment-embed-end"] || ""),
+                            intervalDays: Number(this._settingdata["aggregate-segment-embed-interval-days"]) || 7,
                         },
                         buttons: [
                             {
@@ -398,8 +407,8 @@ export class M_Aggregate {
                                             const conf = new PluginConfig(this.plugin.name, 'aggregate-sql');
                                             conf.load().then(() => {
                                                 new VisualSqlUI(cont, {
-                                                    previewColumns: (_settingdata["aggregate-sql-preview-columns"] || '').trim(),
-                                                    previewColMaxWidth: Number(_settingdata["aggregate-sql-preview-col-max-width"]) || 480,
+                                                    previewColumns: (this._settingdata["aggregate-sql-preview-columns"] || '').trim(),
+                                                    previewColMaxWidth: Number(this._settingdata["aggregate-sql-preview-col-max-width"]) || 480,
                                                     loadPresets: () => (conf.get('presets') || {}),
                                                     savePresets: async (obj) => { conf.set('presets', obj); await conf.save(); },
                                                     showPresetControls: true,
@@ -471,6 +480,16 @@ export class M_Aggregate {
 
 
 
+    /**
+     * 设置热更新：更新模块配置并转发给内部的内容聚合器。
+     * 聚合器实时读取自身配置（插入位置、预览列、模板等），更新后立即生效。
+     * 已创建的 SQL/ECharts 页签 UI 仍使用创建时的选项，需重新打开页签才会刷新。
+     */
+    updateSettings(settingdata: any) {
+        this._settingdata = settingdata || {};
+        this._aggregatorBlockInstance?.updateSettings?.(this._settingdata);
+    }
+
     mountUI(container: HTMLElement, previewColumns?: string, settings?: any) {
         this._ui = new VisualSqlUI(container, {
             previewColumns,
@@ -489,6 +508,8 @@ export class M_Aggregate {
 
     onunload() {
         console.debug("M_Aggregate unloaded");
+        this._aggregatorBlockInstance?.destroy();
+        this._aggregatorBlockInstance = undefined;
         // 如需销毁 UI，可在此处清理，并读取 _ui 以满足 noUnusedLocals
         if (this._ui) {
             // 例如：清空容器（如有需要）
@@ -502,7 +523,8 @@ export class M_Aggregate {
         }
     }
 
-    private addMenu(rect: DOMRect, _settingdata: any) {
+    private addMenu(rect: DOMRect) {
+        const _settingdata = this._settingdata;
         const menu = new Menu("topBarSQL", () => { });
         menu.addItem({
             icon: "iconSQL",

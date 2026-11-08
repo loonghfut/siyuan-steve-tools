@@ -1,21 +1,39 @@
-import steveTools, { settingdata } from '@/index';
-import { M_calendar } from '@/calendar/module-calendar';
+import type steveTools from '@/index';
 import * as api from '@/api/api';
-import { refreshKanban } from '@/calendar/kanban';
-import { statusMap } from '@/calendar/myF';
+import { scheduleCalendarRefresh } from '@/calendar/core/calendar-runtime';
+import {
+    invalidateKramdownCache,
+    invalidateViewValueCache,
+    statusMap,
+} from '@/calendar/data/calendar-data';
 import { interceptFetch } from '@/api/network-interceptor';
-import { isLifelogSelfWrite, ATTRS } from '@/lifelog/module-lifelog';
+import { isLifelogSelfWrite, ATTRS } from '@/lifelog/contracts';
 import {
     isCalendarSelfBlockWrite,
     isCalendarSelfCellWrite,
-} from '@/calendar/calendar-self-write';
+    getCalendarSelfCellWriteReason,
+    markCalendarBlockWrite,
+} from '@/calendar/core/calendar-self-write';
+import {
+    syncBoundScheduleTaskItems,
+} from '@/calendar/listeners/bound-task-block-sync';
+import { syncTaskBlockStatusToCalendar } from '@/calendar/listeners/task-block-status-sync';
 
 interface WsOp { action: string;[k: string]: any }
 interface WsMsg { cmd: string; data?: any[] }
 
+interface CalendarListenerHost {
+  av_ids: Array<{ id: string }>;
+  avButton(): void;
+  isAutoSyncingUpdateEnabled(): boolean;
+  isListening(): boolean;
+  scheduleCalendarUpdate(delay?: number): void;
+  getManagedCalendarAvIds(): Promise<string[]>;
+}
+
 /**
  * 判断一个 updateAttrs 操作是不是 lifelog 模块自己刚写入的（自反射）。
- * 命中则跳过全量 refreshKanban —— 因为 lifelog 写完属性后会自己发
+ * 命中则跳过全量日历刷新——因为 lifelog 写完属性后会自己发
  * LIFELOG_CHANGED_EVENT 通知日历做局部增量更新，再走全量 refresh 是重复劳动。
  *
  * 判定条件（任一命中即视为自写）：
@@ -38,65 +56,182 @@ function isLifelogSelfUpdateAttrs(op: WsOp): boolean {
     return false;
 }
 
-export function registerTransactionListener(plugin: steveTools, M_calendar: M_calendar) {
+const STATUS_SYNC_DEDUPE_TTL_MS = 2_000;
+const statusSyncQueues = new Map<string, Promise<void>>();
+const recentStatusSyncs = new Map<string, { status: string; expiresAt: number; promise: Promise<void> }>();
+
+function getTaskListItemCompletion(op: WsOp): boolean | undefined {
+    if (op.action !== 'update' || typeof op.id !== 'string' || typeof op.data !== 'string') {
+        return undefined;
+    }
+    const taskItem = new DOMParser().parseFromString(op.data, 'text/html')
+        .querySelector<HTMLElement>('[data-type="NodeListItem"][data-subtype="t"][data-task][data-node-id]');
+    if (!taskItem || taskItem.dataset.nodeId !== op.id) {
+        return undefined;
+    }
+    return taskItem.getAttribute('data-task') !== ' ';
+}
+
+function getTaskStateChanges(transactions: any): Array<{ taskBlockId: string; completed: boolean }> {
+    if (!Array.isArray(transactions)) {
+        return [];
+    }
+    const changes: Array<{ taskBlockId: string; completed: boolean }> = [];
+    for (const transaction of transactions) {
+        const undoById = new Map<string, WsOp>();
+        for (const undo of transaction?.undoOperations || []) {
+            if (typeof undo?.id === 'string') {
+                undoById.set(undo.id, undo);
+            }
+        }
+        for (const operation of transaction?.doOperations || []) {
+            const completed = getTaskListItemCompletion(operation);
+            const previous = undoById.get(operation?.id);
+            const previousCompleted = previous ? getTaskListItemCompletion(previous) : undefined;
+            if (completed !== undefined && previousCompleted !== undefined && completed !== previousCompleted) {
+                changes.push({ taskBlockId: operation.id, completed });
+            }
+        }
+    }
+    return changes;
+}
+
+async function syncStatusToTaskItems(blockId: string, status: string): Promise<void> {
+    const normalizedStatus = status || '未完成';
+    const now = Date.now();
+    const recent = recentStatusSyncs.get(blockId);
+    if (recent && recent.status === normalizedStatus && recent.expiresAt > now) {
+        return recent.promise;
+    }
+
+    const previous = statusSyncQueues.get(blockId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(async () => {
+        // 这次属性写入来自日程同步，标记其 WS 回声以避免额外的日历刷新。
+        markCalendarBlockWrite(blockId, 'status');
+        await api.setBlockAttrs(blockId, {
+            'custom-st-event': statusMap[normalizedStatus],
+        });
+        await syncBoundScheduleTaskItems(blockId, normalizedStatus);
+    });
+    statusSyncQueues.set(blockId, next);
+
+    const sync = { status: normalizedStatus, expiresAt: now + STATUS_SYNC_DEDUPE_TTL_MS, promise: next };
+    recentStatusSyncs.set(blockId, sync);
+    window.setTimeout(() => {
+        if (recentStatusSyncs.get(blockId) === sync && sync.expiresAt <= Date.now()) {
+            recentStatusSyncs.delete(blockId);
+        }
+    }, STATUS_SYNC_DEDUPE_TTL_MS);
+
+    void next.then(() => {
+        if (statusSyncQueues.get(blockId) === next) {
+            statusSyncQueues.delete(blockId);
+        }
+        if (recentStatusSyncs.get(blockId) === sync) {
+            sync.promise = Promise.resolve();
+        }
+    }, error => {
+        if (statusSyncQueues.get(blockId) === next) {
+            statusSyncQueues.delete(blockId);
+        }
+        if (recentStatusSyncs.get(blockId) === sync) {
+            recentStatusSyncs.delete(blockId);
+        }
+        console.warn('同步日程状态到任务块失败:', blockId, error);
+    });
+    return next;
+}
+
+export function registerTransactionListener(plugin: steveTools, calendarHost: CalendarListenerHost) {
   const wsMainHandler = async (e) => {
     const msg: WsMsg = e.detail;
     // 处理同步结束触发（以前直接在 module-calendar 里监听 ws，现在统一在这里）
-    if (settingdata["cal-auto-syncing-update"] == true) {
+    if (calendarHost.isAutoSyncingUpdateEnabled()) {
       if (msg.cmd === 'syncing') {
-        if (M_calendar.isAutoSyncingUpdateEnabled() && M_calendar.isListening()) {
-          M_calendar.scheduleCalendarUpdate(2000);
+        if (calendarHost.isAutoSyncingUpdateEnabled() && calendarHost.isListening()) {
+          calendarHost.scheduleCalendarUpdate(2000);
         }
       }
     }
     if (msg.cmd !== 'transactions') return;
-    const op: WsOp | undefined = msg?.data?.[0]?.doOperations?.[0];
-    if (!op) return;
-    const action = op.action;
-    if (action === 'updateAttrs' || action === 'updateAttrViewCell') {
-      // lifelog 自写入引起的 updateAttrs：跳过全量 refreshKanban，
-      // 由 LIFELOG_CHANGED_EVENT 走局部增量更新路径。
-      if (action === 'updateAttrs' && isLifelogSelfUpdateAttrs(op)) {
-        return;
-      }
-      // 日历自写：拖拽/调整大小/状态/归档/周期 等本地已经更新好 UI 的 AV 单元格写入，
-      // 不需要再走全量 refreshKanban。匹配 (avID, rowID, keyID) 三元组或 blockId。
-      if (action === 'updateAttrViewCell'
-          && isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID)) {
-        console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell', op.avID, op.rowID);
-        return;
-      }
-      if (action === 'updateAttrs' && isCalendarSelfBlockWrite(op.id)) {
-        console.debug('[CalendarSelfWrite] skip ws-main updateAttrs', op.id);
-        return;
-      }
-      M_calendar.avButton();
-      refreshKanban();
-      if (op.avID && op?.data?.mSelect?.[0]?.content && op.rowID && op.keyID) {
-        if (M_calendar.av_ids && M_calendar.av_ids.map(i => i.id).includes(op.avID)) {
+    // 一次事务可带多条 doOperation。只读取第一条会漏掉批量编辑，既无法失效
+    // 对应 AV 缓存，也可能让日历一直显示旧数据。
+    const operations = (msg.data || []).flatMap(transaction => transaction?.doOperations || []);
+    if (operations.length === 0) return;
+
+    // 只有 AV 单元格写入才需要查询受管理 AV 集合；普通块属性变更不应因此
+    // 额外执行两次 blocks SQL。
+    const hasAttributeViewCellWrite = operations.some(op =>
+      op.action === 'updateAttrViewCell' && !!op.avID
+    );
+    const managedAvIds = hasAttributeViewCellWrite
+      ? new Set(await calendarHost.getManagedCalendarAvIds())
+      : new Set<string>();
+    let refreshNeeded = false;
+
+    for (const op of operations) {
+      const action = op.action;
+      if (action === 'updateAttrViewCell') {
+        // 与日程无关的 AV 编辑不再触发所有已打开日历重新加载。
+        if (!op.avID || !managedAvIds.has(op.avID)) continue;
+        const isCalendarSelfWrite = isCalendarSelfCellWrite(op.avID, op.rowID, op.keyID);
+        const selfWriteReason = getCalendarSelfCellWriteReason(op.avID, op.rowID, op.keyID);
+        if (!isCalendarSelfWrite) {
+          invalidateViewValueCache(op.avID);
+          refreshNeeded = true;
+        } else {
+          console.debug('[CalendarSelfWrite] skip ws-main updateAttrViewCell refresh', op.avID, op.rowID);
+        }
+
+        if (Array.isArray(op?.data?.mSelect) && op.rowID && op.keyID
+            && calendarHost.av_ids?.some(item => item.id === op.avID)) {
           try {
             const blockId = await api.getAttributeViewBoundBlockIDsByItemIDs(op.avID, [op.rowID]).then(data => data[op.rowID]);
             const avDetails = await api.getAttributeViewKeys(blockId);
-            // console.debug("获取到的属性视图信息🚧🚧:", avDetails);
             let statusKeyDefinition: any;
             if (avDetails && avDetails[0]?.keyValues) {
               const statusKeyValue = avDetails[0].keyValues.find(kv => kv.key && kv.key.name === '状态');
               if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
             }
             if (statusKeyDefinition && statusKeyDefinition.id === op.keyID) {
-              await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[op.data.mSelect[0].content] });
+              if (selfWriteReason === 'task') {
+                continue;
+              }
+              const status = op.data.mSelect[0]?.content || '';
+              await syncStatusToTaskItems(blockId, status);
             }
           } catch (err) {
             console.error('状态列变化处理失败', err);
           }
         }
+        continue;
+      }
+
+      if (action === 'updateAttrs') {
+        // 块属性变更无法直接得知它是否绑定到日程 AV，保留原有刷新语义；
+        // 同时仅失效相应块的文本缓存，避免下一次转换使用旧 kramdown。
+        if (isLifelogSelfUpdateAttrs(op)) continue;
+        if (isCalendarSelfBlockWrite(op.id)) {
+          console.debug('[CalendarSelfWrite] skip ws-main updateAttrs', op.id);
+          continue;
+        }
+        invalidateKramdownCache(op.id);
+        refreshNeeded = true;
+        continue;
+      }
+
+      if (action === 'update') {
+        invalidateKramdownCache(op.id);
+        const data = op.data;
+        if (typeof data === 'string' && data.startsWith('<div data-marker')) {
+          refreshNeeded = true;
+        }
       }
     }
-    if (action === 'update') {
-      const data = op.data;
-      if (typeof data === 'string' && data.startsWith('<div data-marker')) {
-        refreshKanban();
-      }
+
+    if (refreshNeeded) {
+      calendarHost.avButton();
+      scheduleCalendarRefresh();
     }
   };
 
@@ -105,16 +240,40 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
   // 追加：前端网络请求监听（仅监听 /api/av/* 的成功响应）
   // 用途：在 WebSocket 广播到达前，尽早感知“状态”列的变动并同步 block 自定义属性
   const interceptorHandle = interceptFetch({
-    filter: (url, method) => method === 'POST' && url.includes('/api/av/'),
+    filter: (url, method) => method === 'POST'
+      && (url.includes('/api/av/') || url.includes('/api/transactions')),
     onResponse: async (ctx) => {
       try {
         if (!ctx.resOk || ctx.resStatus !== 200) return;
         const url = ctx.url;
         const body = (ctx.reqBody || {}) as any;
 
+        if (url.includes('/api/transactions')) {
+          // 本插件更新任务 marker 使用 /api/block/batchUpdateTaskListItemMarker，
+          // 内核仅通过 WebSocket 广播结果，不会再由前端发起 /api/transactions。
+          // 因此这里只处理用户实际提交的 transaction，天然不会监听到插件自身写入。
+          const responseCode = typeof ctx.resBody === 'object' && ctx.resBody !== null
+            ? (ctx.resBody as any).code
+            : undefined;
+          if (responseCode !== undefined && responseCode !== 0) return;
+
+          const changes = getTaskStateChanges(body.transactions);
+          if (changes.length === 0) return;
+
+          const managedAvIds = await calendarHost.getManagedCalendarAvIds();
+          for (const change of changes) {
+            await syncTaskBlockStatusToCalendar(
+              change.taskBlockId,
+              change.completed,
+              managedAvIds,
+            );
+          }
+          return;
+        }
+
         // 只对我们关心的数据库进行处理
         const avID: string | undefined = body?.avID;
-        if (!avID || !M_calendar.av_ids || !M_calendar.av_ids.map(i => i.id).includes(avID)) return;
+        if (!avID || !calendarHost.av_ids?.some(item => item.id === avID)) return;
 
         // 抽取选择值（兼容 select/mSelect）
         const getSelectValue = (v: any): string | undefined => {
@@ -138,17 +297,17 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
 
           const avDetails = await api.getAttributeViewKeys(blockId);
           let statusKeyDefinition: any;
-          let priorityKeyDefinition: any;
           if (avDetails && avDetails[0]?.keyValues) {
             const statusKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '状态');
             if (statusKeyValue) statusKeyDefinition = statusKeyValue.key;
-            const priorityKeyValue = avDetails[0].keyValues.find((kv: any) => kv.key && kv.key.name === '优先级');
-            if (priorityKeyValue) priorityKeyDefinition = priorityKeyValue.key;
           }
           const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === keyID);
-          if (isStatus && selectValue) {
+          if (isStatus) {
+            if (getCalendarSelfCellWriteReason(avID, itemID, keyID) === 'task') {
+              return;
+            }
             // 状态列：根据值设置自定义属性
-            await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+            await syncStatusToTaskItems(blockId, selectValue || '');
             return;
           }
           // 其他列：刷新视图——但若是日历自写则跳过
@@ -156,8 +315,8 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
             console.debug('[CalendarSelfWrite] skip network setAttributeViewBlockAttr', avID, itemID);
             return;
           }
-          try { M_calendar.avButton(); } catch { }
-          try { refreshKanban(); } catch { }
+          try { calendarHost.avButton(); } catch { }
+          try { scheduleCalendarRefresh(); } catch { }
           return;
         }
 
@@ -165,14 +324,6 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
         if (url.includes('/api/av/batchSetAttributeViewBlockAttrs') && Array.isArray(body?.values)) {
           const values: Array<{ keyID: string; itemID: string; value: any } & Record<string, any>> = body.values;
           if (values.length === 0) return;
-          // 日历自写早判：所有 values 都是日历自写时直接 return，省掉 ID 映射 & 字段查询
-          const allCalendarSelf = values.every(v =>
-            isCalendarSelfCellWrite(avID, v.itemID, v.keyID)
-          );
-          if (allCalendarSelf) {
-            console.debug('[CalendarSelfWrite] skip network batchSetAttributeViewBlockAttrs', avID, values.length);
-            return;
-          }
           // 先收集所有涉及的 itemID，并映射到 blockId
           const itemIDs = Array.from(new Set(values.map(v => v.itemID).filter(Boolean)));
           if (itemIDs.length === 0) return;
@@ -192,21 +343,21 @@ export function registerTransactionListener(plugin: steveTools, M_calendar: M_ca
             }
             const isStatus = !!(statusKeyDefinition && statusKeyDefinition.id === v.keyID);
             if (isStatus) {
-              const selectValue = getSelectValue(v.value);
-              if (selectValue) {
-                await api.setBlockAttrs(blockId, { 'custom-st-event': statusMap[selectValue] });
+              if (getCalendarSelfCellWriteReason(avID, v.itemID, v.keyID) === 'task') {
                 continue;
               }
-              // 没有值（被清空等），无法设置映射，改为刷新
-              refreshNeeded = true;
+              const selectValue = getSelectValue(v.value);
+              await syncStatusToTaskItems(blockId, selectValue || '');
               continue;
             }
             // 非状态列：标记需要刷新
-            refreshNeeded = true;
+            if (!isCalendarSelfCellWrite(avID, v.itemID, v.keyID)) {
+              refreshNeeded = true;
+            }
           }
           if (refreshNeeded) {
-            try { M_calendar.avButton(); } catch { }
-            try { refreshKanban(); } catch { }
+            try { calendarHost.avButton(); } catch { }
+            try { scheduleCalendarRefresh(); } catch { }
           }
           return;
         }

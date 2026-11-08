@@ -58,32 +58,35 @@ export class VisualEchartsUI {
   private render() {
     this.container.innerHTML = `
       <div class="ve-wrap">
-        <div class="ve-toolbar">
-          <div class="ve-tool-group" style="flex:1; gap:6px">
-            <button class="ve-btn ve-primary" data-refresh title="重新根据查询渲染预览">
-              <span class="ve-btn__icon">🔄</span>刷新
+        <div class="agg-toolbar">
+          <div class="agg-tool-group" style="flex:1;">
+            <button class="agg-btn agg-btn--primary" data-refresh title="重新根据查询渲染预览">
+              <svg><use xlink:href="#iconRefresh"></use></svg>刷新
             </button>
-            <button class="ve-btn" data-copy-block-top title="复制当前查询图表块到剪贴板">
-              <span class="ve-btn__icon">📋</span>复制图表块
+            <button class="agg-btn" data-copy-block-top title="复制当前查询图表块到剪贴板">
+              <svg><use xlink:href="#iconCopy"></use></svg>复制图表块
             </button>
-            <button class="ve-btn" data-save-config title="保存当前配置为预设">
-              <span class="ve-btn__icon">💾</span>保存配置
+            <button class="agg-btn" data-save-config title="保存当前配置为预设">
+              <svg><use xlink:href="#iconFile"></use></svg>保存配置
             </button>
-            <button class="ve-btn" data-manage-config title="管理配置预设">
-              <span class="ve-btn__icon">📦</span>管理配置
+            <button class="agg-btn" data-manage-config title="管理配置预设">
+              <svg><use xlink:href="#iconList"></use></svg>管理配置
             </button>
           </div>
-          <div class="ve-sep"></div>
-          <div class="ve-tool-group">
-            <label class="ve-field" style="margin:0; display:flex; align-items:center; gap:6px;">
-              <span style="font-size:12px; color:var(--b3-theme-on-surface);">数据源:</span>
-              <select class="veq-input" data-mode-switch style="width:100px">
+          <div class="agg-sep"></div>
+          <div class="agg-tool-group">
+            <label class="agg-field" style="margin:0;">
+              <span>数据源:</span>
+              <select class="b3-select" data-mode-switch style="width:100px">
                 <option value="database">数据库</option>
                 <option value="sql">SQL</option>
               </select>
             </label>
-            ${this.opts?.onGotoSQL ? '<button class="ve-btn ve-link" data-goto-sql title="跳转到 SQL 编辑位置">转到 SQL ➜</button>' : ''}
-            <button class="ve-btn ve-icon ${this.previewPinned ? 'active' : ''}" title="置顶预览" data-pin-preview>📌</button>
+            ${this.loadSqlPresetsProvider ? '<button class="agg-btn" data-apply-sql-preset title="直接选择 SQL 可视化生成器保存的预设"><svg><use xlink:href="#iconSQL"></use></svg>使用 SQL 预设</button>' : ''}
+            ${this.opts?.onGotoSQL ? '<button class="agg-btn" data-goto-sql title="在当前窗口打开 SQL 可视化生成器"><svg><use xlink:href="#iconSQL"></use></svg>新建 / 编辑 SQL 预设</button>' : ''}
+            <button class="agg-btn agg-btn--icon ${this.previewPinned ? 'agg-is-active' : ''}" title="顶住预览" data-pin-preview>
+              <svg><use xlink:href="#iconPin"></use></svg>
+            </button>
           </div>
         </div>
         <div class="ve-card" data-section="preview">
@@ -124,6 +127,11 @@ export class VisualEchartsUI {
         try { this.opts?.onGotoSQL?.(); } catch { /* ignore */ }
       });
     }
+    (this.container.querySelector('[data-apply-sql-preset]') as HTMLButtonElement | null)?.addEventListener('click', (ev) => {
+      ev.stopPropagation(); ev.preventDefault();
+      this.switchMode('sql');
+      this.sqlUI?.openPresetPicker();
+    });
     // 初始化查询模式子 UI
     const queryContainer = this.container.querySelector('[data-query-container]') as HTMLElement | null;
     if (queryContainer) {
@@ -163,6 +171,18 @@ export class VisualEchartsUI {
           this.renderChartPreview().catch(() => {});
         },
       });
+      const initialSQL = this.opts?.initialSQL?.trim();
+      if (initialSQL) {
+        this.sqlUI.setSQL(initialSQL);
+        this.dataMode = 'sql';
+        const modeSwitch = this.container.querySelector('[data-mode-switch]') as HTMLSelectElement | null;
+        if (modeSwitch) modeSwitch.value = 'sql';
+        const querySection = this.container.querySelector('[data-section="query"]') as HTMLElement | null;
+        const sqlSection = this.container.querySelector('[data-section="sql"]') as HTMLElement | null;
+        if (querySection) querySection.style.display = 'none';
+        if (sqlSection) sqlSection.style.display = '';
+        this.persist();
+      }
     }
   }
 
@@ -170,7 +190,19 @@ export class VisualEchartsUI {
 
 
   public resize() {
-    // 保留扩展点，当前无重算需求
+    try { this.echartsInst?.resize?.(); } catch { /* ignore */ }
+    try { (this.queryUI as any)?.resize?.(); } catch { /* ignore */ }
+    try { (this.sqlUI as any)?.resize?.(); } catch { /* ignore */ }
+  }
+
+  public destroy() {
+    try { this.echartsInst?.dispose?.(); } catch { /* ignore */ }
+    this.echartsInst = undefined;
+    try { (this.queryUI as any)?.destroy?.(); } catch { /* ignore */ }
+    try { (this.sqlUI as any)?.destroy?.(); } catch { /* ignore */ }
+    this.queryUI = undefined;
+    this.sqlUI = undefined;
+    this.container.innerHTML = '';
   }
 
   // 供外部读取 IIFE
@@ -216,7 +248,10 @@ export class VisualEchartsUI {
       // eslint-disable-next-line no-new-func
       const fn = new Function(`return ${iife};`);
       return fn();
-    } catch { return {}; }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`图表配置执行失败: ${message}`);
+    }
   }
 
   private async renderChartPreview() {
@@ -228,8 +263,20 @@ export class VisualEchartsUI {
       try { this.echartsInst.dispose(); } catch { }
     }
     this.echartsInst = echarts.init(this.chartDiv);
-    const option = this.buildOptionForPreview();
-    this.echartsInst.setOption(option, true);
+    try {
+      const option = this.buildOptionForPreview();
+      this.echartsInst.setOption(option, true);
+    } catch (error) {
+      try { this.echartsInst.dispose(); } catch { /* ignore */ }
+      this.echartsInst = undefined;
+      const message = error instanceof Error ? error.message : String(error);
+      this.previewBody.innerHTML = `<div class="ve-placeholder" style="color:var(--b3-card-error-color);">预览失败：${this.escapeHtml(message)}</div>`;
+      throw error;
+    }
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
   private togglePinPreview() {
@@ -246,6 +293,7 @@ export class VisualEchartsUI {
     if (previewCard) previewCard.classList.toggle('pinned', !!this.previewPinned);
     if (pinBtn) {
       pinBtn.classList.toggle('active', !!this.previewPinned);
+      pinBtn.classList.toggle('agg-is-active', !!this.previewPinned);
       pinBtn.title = this.previewPinned ? '取消顶住' : '顶住';
     }
   }

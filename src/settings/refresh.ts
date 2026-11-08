@@ -4,7 +4,6 @@ export const refreshKeys = new Set<string>([
   // "cal-enable",
   // "sync-enable",
   // "ai-enable",
-  // "handwriting-enable",
   // "img-compress-enable",
 ]);
 

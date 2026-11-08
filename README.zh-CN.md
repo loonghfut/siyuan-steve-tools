@@ -12,19 +12,23 @@ STEVETOOLS
 ### 若介意请勿使用。
 
 ### 免费使用遇到问题不用反馈，若有BUG影响到我的使用，我自然会修，过了几个版本BUG还在，麻烦自己拉源码修。  
-若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。
+若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。  
 为方便和打赏用户沟通，故临时建了反馈QQ群（随时可能解散），加之前请填一下[申请表](https://www.kdocs.cn/wo/sl/v1lC0R0)
+
+### 兼容性
+已适配思源笔记 **3.8**（含 3.8.x），同时保留 3.7 的兼容能力，`minAppVersion` 仍为 3.7.0。  
+若只想面向 3.8+ 用户，把 `plugin.json` 里的 `minAppVersion` 改成 `3.8.0` 即可。
 
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  
-和思源深度融合的日历视图和看板视图, 同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。     
+和思源深度融合的日历视图，同时用于生成日历文件ics，实现日程同步到支持url订阅的日历软件中，比如thunderbird，小米日历，苹果日历等，支持订阅ics链接导入其他软件日程，支持与滴答清单的初步联动。
 2. docker同步感知：    
 win端s3同步后，docker端感知s3同步。  
 3. ai网页侧边栏：    
 嵌入了一些ai的网页，方便使用。    
 4. 媒体资源压缩：  
 压缩媒体资源后再导入思源。  
-5. tldraw白板：【已接入思源智能体】  
+5. tldraw白板：已独立为[ST白板](siyuan://bazaar/plugins/siyuan-steve-tldraw/readme)插件，本插件不再内置白板代码。  
 模仿AFFINE，深度绑定思源的tldraw白板，支持嵌入思源块和链接跳转  
 6. Lifelog：（开源替代，如需更好体验请使用[叶归插件](https://simplest-frontend.feishu.cn/docx/B3NndXHi7oLLXJxnxQmcczRsnse)）  
 用法基本和叶归插件一样，由[BoysFight](https://github.com/BoysFight) PR实现。  
@@ -41,11 +45,31 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.48.0 (2026年07月04日)
-- feat(tldraw-agent): tldraw_shape_command 新增 contentMarkdown 字段，支持直接修改卡片链接的思源块内容 (loonghfut)
-- feat(tldraw-agent): tldraw_shape_command 新增 confirmContentUpdate 字段，卡片内容更新需用户明确确认 (loonghfut)
-- fix(CardShape): 调整卡片 pointerEvents 和 touchAction 逻辑，修复编辑状态下的交互判断 (loonghfut)
-- chore(plugin): bump version to 0.48.0 (loonghfut)
+### v0.55.0 (2026年10月25日)
+- fix(calendar): 切换分享方式后按目标方式准备客户端，避免 ICS 上传时客户端缺失导致崩溃 (loonghfut)
+- fix(calendar): 日历布局的待安排条目改为按页取全量，避免超过一页时静默丢失 (loonghfut)
+- fix(ai): AI 模型选择对齐思源，命中用户选中的模型即使用，不再静默改用别的模型 (loonghfut)
+- fix(wps): 解析 protyle-html 链接改用 shadowRoot 原始 HTML，避免把正文里的转义字面量误抓成链接 (loonghfut)
+- fix(aggregate): 聚合模块设置统一从实例读取，避免模块与内容聚合器持有两份不同步的配置 (loonghfut)
+- fix(sql): SQL 查询失败时给出告警，避免「查询失败」被当成「没有数据」而静默 (loonghfut)
+- fix(sql): 修正 SQL 补 LIMIT 时被行注释吞掉的问题（以 `--` 结尾的语句会退回服务端默认上限） (loonghfut)
+- fix(sql): 修正聚合器 WHERE 条件被插进子查询的问题，条件现在只作用于外层作用域 (loonghfut)
+- feat(calendar): 支持思源 3.8 新增的「列表」与「日历」数据库视图布局（复用表格行列结构，并按 dateKeyID 定位日期列、取回待安排条目） (loonghfut)
+- fix(calendar): AI 识别日程时间改用思源 AI 提供商配置，请求端点与协议按 openai / openai-responses 正确拼装 (loonghfut)
+- fix(ai): AI 提供商模型选择顺序对齐思源，优先匹配用户当前选中的模型 (loonghfut)
+- fix(plugin): 补齐各模块的设置热更新，跨端改设置不再只有部分模块生效 (loonghfut)
+- fix(wps): 修正对 protyle-html data-content 的多余转义解码，避免抓到错误链接 (loonghfut)
+- fix(aggregate): ECharts 数据库视图补传数据库块 ID，恢复块级上下文筛选 (loonghfut)
+- refactor(handwriting): 移除白板（tldraw）模块全部代码，画板已独立为「ST白板」插件，移除约 5.5 万行源码 (loonghfut)
+- chore(deps): 移除 @tldraw/assets、@tldraw/mermaid、@tldraw/tldraw、react、react-dom 依赖 (loonghfut)
+- refactor(settings): 移除画板设置项、h6 样式设置与白板专属设置组件 (loonghfut)
+- feat(siyuan): 适配思源笔记 3.8，升级 siyuan 类型依赖至 ^1.2.9 (loonghfut)
+- fix(sql): 适配思源 3.8 的 /api/query/sql 默认行数上限，插件侧 SQL 统一显式补齐 LIMIT，避免聚合/图表结果被静默截断 (loonghfut)
+- feat(calendar): 数据库视图渲染补传 blockID，恢复思源 3.8 的块级上下文筛选与当前视图解析 (loonghfut)
+- fix(calendar): 适配思源 3.8 将 av-add-more 由 span 改为 button，修复日历「新增行」按钮注入失效 (loonghfut)
+- fix(plugin): 覆写 onDataChanged，避免思源 3.8 在跨端保存设置时把整个插件卸载重载 (loonghfut)
+- fix(av): 修正 addAttributeViewBlocks 的内核契约字段名为 ignoreDefaultFill，此前该字段一直被静默丢弃 (loonghfut)
+- chore(plugin): 升级版本号至 0.55.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)

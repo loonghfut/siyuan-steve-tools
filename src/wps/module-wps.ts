@@ -35,6 +35,17 @@ export class M_Wps {
         }
     }
 
+    /**
+     * 设置热更新：更新配置并同步给已创建的子服务。
+     * 子服务只更新自身缓存的配置，不会重复注册监听或重建 dock/webview。
+     */
+    updateSettings(settingdata: any) {
+        this.settingdata = settingdata;
+        this.wpsPicServ?.updateSettings?.(settingdata);
+        this.wpsDataServ?.updateSettings?.(settingdata);
+        this.wpsFileServ?.updateSettings?.(settingdata);
+    }
+
     async onLayoutReady() {
         // console.debug("Wps onLayoutReady");
         if (this.settingdata["wps-pic-enable"]) {

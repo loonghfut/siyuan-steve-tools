@@ -152,7 +152,9 @@ export interface Sort {
 }
 
 // 枚举类型
-export type LayoutType = 'table' | 'board' | 'calendar' | 'gallery';
+// 布局类型与思源内核一致（kernel/av/av.go 的 LayoutType 常量）：
+// table | calendar | list | gallery | kanban
+export type LayoutType = 'table' | 'list' | 'gallery' | 'kanban' | 'calendar';
 
 export type KeyType =
     | 'text'
@@ -217,7 +219,8 @@ export interface AddAttributeViewBlocksRequest {
     avID: string;
     blockID?: string;
     previousID?: string;
-    ignoreFillFilter?: boolean;
+    /** 内核契约字段名（kernel/apicontract/av_requests.go）。 */
+    ignoreDefaultFill?: boolean;
     srcs: BlockSource[];
 }
 
@@ -361,10 +364,6 @@ export interface GetAttributeViewFilterSortResponse {
     sorts: Sort[];
 }
 
-export interface SearchAttributeViewNonRelationKeyResponse {
-    keys: AttributeViewKey[];
-}
-
 export interface SearchAttributeViewRelationKeyResponse {
     keys: AttributeViewKey[];
 }
@@ -432,7 +431,7 @@ export interface IAVOperator {
     addBlocks(sources: BlockSource[], options?: {
         blockID?: string;
         previousID?: string;
-        ignoreFillFilter?: boolean;
+        ignoreDefaultFill?: boolean;
     }): Promise<void>;
     removeBlocks(srcIDs: string[]): Promise<void>;
 

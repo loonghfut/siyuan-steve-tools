@@ -18,6 +18,7 @@ import {
   // ICard,
   // ICardData,
   // fetchPost
+  type TPluginDataChangeReason,
 } from "siyuan";
 import "@/index.scss";
 import * as api from "@/api/api";
@@ -116,14 +117,53 @@ export default class steveTools extends Plugin {
     check();
   }
 
+  /**
+   * 思源 3.8 起，插件若未覆盖 onDataChanged，自身存储被其它端改写时会被**整体卸载重载**
+   * （思源 app/src/plugin/loader.ts 的 shouldReloadOnDataChange → app/src/plugin/lifecycle.ts 的 runDataChange）。
+   * 本插件的设置会跨端保存（设置面板、memos/wucai/ai 同步都会写插件存储），
+   * 整体重载会重建 dock 与浮动日历并清空内存态，因此这里只同步配置并推给支持热更新的模块。
+   *
+   * @param reason 数据变更来源：sync 为跨设备同步合并，overwrite 为其它前端实例写入
+   */
+  async onDataChanged(reason?: TPluginDataChangeReason) {
+    try {
+      console.debug(`STtools 插件配置被外部修改（${reason ?? "unknown"}），正在同步…`);
+      const data = await this.loadData(myfile);
+      if (data && typeof data === "object") {
+        settingdata = { ...settingdata, ...data };
+      }
+      // 模块级配置（PluginConfig）同样存放在插件存储目录下，一并刷新。
+      if (settingdata["PluginUsageStatistics"]) {
+        await this.pluginConfig?.load?.();
+      }
+      // 推给支持热更新的模块，避免整体重载带来的状态丢失。
+      // 遍历所有模块而不是只写死几个：漏掉任何一个，该模块的设置就会永久停留在旧值
+      // （之前内核会整包重载插件，所有模块都能拿到新设置）。
+      for (const moduleName in moduleInstances) {
+        const instance = moduleInstances[moduleName] as unknown as {
+          updateSettings?: (settings: any, options?: any) => void | Promise<void>;
+        };
+        if (typeof instance?.updateSettings !== "function") {
+          console.warn(`模块 ${moduleName} 未实现 updateSettings，设置变更后需要手动刷新插件才会生效。`);
+          continue;
+        }
+        try {
+          await instance.updateSettings(settingdata);
+        } catch (error) {
+          console.warn(`模块 ${moduleName} 应用新设置失败`, error);
+        }
+      }
+      this.applyPageInvert();
+    } catch (error) {
+      console.warn("STtools 同步插件配置失败:", error);
+    }
+  }
+
   private async Stats() {
     try {
       const enabledFeatures = [""];
       if (settingdata["cal-enable"]) {
         enabledFeatures.push("calendar");
-      }
-      if (settingdata["handwriting-enable"]) {
-        enabledFeatures.push("handwriting");
       }
       if (settingdata["ai-enable"]) {
         enabledFeatures.push("ai");
@@ -142,9 +182,6 @@ export default class steveTools extends Plugin {
       }
       if (settingdata["cal-ics-enable-subscribe"]) {
         enabledFeatures.push("ics");
-      }
-      if (settingdata["cal-qq-enable"]) {
-        enabledFeatures.push("qq");
       }
       if (settingdata["wps-pic-enable"]) {
         enabledFeatures.push("wps-pic");
