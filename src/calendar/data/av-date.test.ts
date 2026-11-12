@@ -4,6 +4,8 @@ import {
     extractCalendarCellDateRange,
     formatLocalDailyNoteDate,
     parseRenderedTemplateTimestamp,
+    resolveFullCalendarEventRange,
+    resolveSiYuanUpdateDateRange,
     supportsNativeDailyNoteDate,
 } from './av-date.ts';
 
@@ -81,4 +83,52 @@ test('extractCalendarCellDateRange supports date, created, updated, cleared date
     assert.equal(templated.isNotTime, false);
     assert.equal(new Date(templated.start!).getHours(), 9);
     assert.equal(new Date(templated.start!).getMinutes(), 30);
+});
+
+test('resolveFullCalendarEventRange converts inclusive all-day end to exclusive FullCalendar end', () => {
+    const start = new Date(2026, 8, 19, 8, 0, 0, 0).getTime();
+    const sameDayEnd = new Date(2026, 8, 19, 8, 0, 0, 0).getTime();
+    const single = resolveFullCalendarEventRange({ start, end: sameDayEnd, allDay: true });
+    assert.equal(formatLocalDailyNoteDate(single.start), '2026-09-19');
+    assert.equal(single.end, null);
+
+    const nextDayEnd = new Date(2026, 8, 20, 8, 0, 0, 0).getTime();
+    const multi = resolveFullCalendarEventRange({ start, end: nextDayEnd, allDay: true });
+    assert.equal(formatLocalDailyNoteDate(multi.start), '2026-09-19');
+    assert.equal(formatLocalDailyNoteDate(multi.end!), '2026-09-21');
+});
+
+test('resolveSiYuanUpdateDateRange converts exclusive FullCalendar all-day end back to inclusive SiYuan end', () => {
+    const updated = resolveSiYuanUpdateDateRange({
+        startStr: '2026-09-19',
+        endStr: '2026-09-21',
+        allDay: true,
+    });
+    assert.equal(updated.startInput, '2026-09-19');
+    assert.equal(updated.endInput, '2026-09-20');
+    assert.equal(updated.hasEndDate, true);
+    assert.equal(new Date(updated.startMs!).getHours(), 8);
+    assert.equal(formatLocalDailyNoteDate(new Date(updated.endMs!)), '2026-09-20');
+
+    const single = resolveSiYuanUpdateDateRange({
+        startStr: '2026-09-19',
+        endStr: '',
+        allDay: true,
+    });
+    assert.equal(single.startInput, '2026-09-19');
+    assert.equal(single.endInput, undefined);
+    assert.equal(single.hasEndDate, false);
+});
+
+test('resolveSiYuanUpdateDateRange preserves timed event strings and fallback duration', () => {
+    const timed = resolveSiYuanUpdateDateRange({
+        startStr: '2026-09-19T09:30:00',
+        endStr: '',
+        allDay: false,
+        defaultDurationHours: 2,
+    });
+    assert.equal(timed.startInput, '2026-09-19T09:30:00');
+    assert.equal(timed.endInput, undefined);
+    assert.equal(timed.endMs! - timed.startMs!, 2 * 60 * 60 * 1000);
+    assert.equal(timed.hasEndDate, true);
 });

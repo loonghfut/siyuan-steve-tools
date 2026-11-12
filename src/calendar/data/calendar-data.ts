@@ -6,7 +6,7 @@ import { calendarSettings as settingdata, calendarModules as moduleInstances, ge
 import { Calendar, DurationInput } from '@fullcalendar/core';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/core/types";
-import { refetchPeerCalendars } from '@/calendar/core/calendar-runtime';
+import { refetchPeerCalendars, scheduleCalendarRefresh } from '@/calendar/core/calendar-runtime';
 import {
     parseCategory,
     parseDescription,
@@ -15,7 +15,12 @@ import {
     parseTitle,
 } from '@/calendar/features/quick-add/content-metadata';
 import { parseScheduleTime } from '@/calendar/features/quick-add/time-parser';
-import { extractCalendarCellDateRange } from './av-date';
+import {
+    extractCalendarCellDateRange,
+    resolveFullCalendarEventRange,
+    resolveSiYuanUpdateDateRange,
+} from './av-date';
+import { extractViewItemsFromAvResponse } from './av-view';
 import { createDailyNoteForDate } from './daily-note';
 import { getRequiredFields, readCalendarDateKeyID, resolveCalendarDateFieldName } from '@/calendar/config/field-config';
 import type { CalendarWriteReason } from '@/calendar/core/calendar-self-write';
@@ -90,6 +95,15 @@ export interface UnscheduledEvent {
 }
 
 let currentUnscheduledEvents: UnscheduledEvent[] = [];
+type UnscheduledRemoveListener = (target: { blockId?: string; itemID?: string }) => void;
+const unscheduledRemoveListeners = new Set<UnscheduledRemoveListener>();
+
+export function subscribeUnscheduledRemoval(listener: UnscheduledRemoveListener): () => void {
+    unscheduledRemoveListeners.add(listener);
+    return () => {
+        unscheduledRemoveListeners.delete(listener);
+    };
+}
 
 export function setUnscheduledEvents(events: UnscheduledEvent[]): void {
     currentUnscheduledEvents = events;
@@ -99,8 +113,8 @@ export function getUnscheduledEvents(): UnscheduledEvent[] {
     return currentUnscheduledEvents;
 }
 
-export function findUnscheduledEvent(blockId: string, itemID?: string): UnscheduledEvent | undefined {
-    return currentUnscheduledEvents.find(event => {
+export function findUnscheduledEventInList(events: UnscheduledEvent[], blockId: string, itemID?: string): UnscheduledEvent | undefined {
+    return events.find(event => {
         const matchesBlock = event.blockId === blockId;
         if (itemID) {
             return matchesBlock && event.itemID === itemID;
@@ -109,13 +123,16 @@ export function findUnscheduledEvent(blockId: string, itemID?: string): Unschedu
     });
 }
 
-export function removeUnscheduledEvent(target: UnscheduledEvent | { blockId?: string; itemID?: string }): void {
+export function removeUnscheduledEventFromList(
+    events: UnscheduledEvent[],
+    target: UnscheduledEvent | { blockId?: string; itemID?: string },
+): UnscheduledEvent[] {
     if (!target) {
-        return;
+        return events;
     }
     const blockId = (target as any)?.blockId as string | undefined;
     const itemID = (target as any)?.itemID as string | undefined;
-    currentUnscheduledEvents = currentUnscheduledEvents.filter(event => {
+    return events.filter(event => {
         const blockMatch = blockId ? event.blockId === blockId : false;
         const itemMatch = itemID ? event.itemID === itemID : false;
         if (blockId && itemID) {
@@ -131,7 +148,32 @@ export function removeUnscheduledEvent(target: UnscheduledEvent | { blockId?: st
     });
 }
 
-export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr: string, allDay: boolean): Promise<boolean> {
+export function findUnscheduledEvent(blockId: string, itemID?: string): UnscheduledEvent | undefined {
+    return findUnscheduledEventInList(currentUnscheduledEvents, blockId, itemID);
+}
+
+export function removeUnscheduledEvent(target: UnscheduledEvent | { blockId?: string; itemID?: string }): void {
+    if (!target) {
+        return;
+    }
+    currentUnscheduledEvents = removeUnscheduledEventFromList(currentUnscheduledEvents, target);
+    const blockId = (target as any)?.blockId as string | undefined;
+    const itemID = (target as any)?.itemID as string | undefined;
+    for (const listener of Array.from(unscheduledRemoveListeners)) {
+        try {
+            listener({ blockId, itemID });
+        } catch (err) {
+            console.warn('通知待安排移除监听器失败:', err);
+        }
+    }
+}
+
+export async function scheduleUnscheduledEvent(
+    event: UnscheduledEvent,
+    dateStr: string,
+    allDay: boolean,
+    originator?: Calendar | null,
+): Promise<boolean> {
     if (!event) {
         sy.showMessage('未找到目标事件，无法安排', 3000, 'error');
         return false;
@@ -176,20 +218,25 @@ export async function scheduleUnscheduledEvent(event: UnscheduledEvent, dateStr:
         // patch viewValueCache 让缓存与 UI 一致：start 字段必须是毫秒数，与 extractDataFromTable
         // 存储的 dateValue.content 一致；FullCalendar 那边的 ISO 字符串需要先转成 millis
         try {
-            const startMs = formattedDate ? new Date(formattedDate).getTime() : null;
+            const range = resolveSiYuanUpdateDateRange({
+                startStr: formattedDate,
+                allDay,
+                defaultDurationHours: Number(settingdata['cal-time']) || 0,
+            });
             patchViewValueRow(event.rootid, event.itemID, {
                 '开始时间': {
-                    start: Number.isFinite(startMs) ? startMs : null,
-                    end: null,
-                    hasEndDate: false,
+                    start: range.startMs,
+                    end: range.endMs,
+                    hasEndDate: range.hasEndDate,
+                    isNotTime: false,
                 },
                 '全天': { content: !!allDay },
             });
         } catch (e) { /* ignore cache patch failure */ }
         removeUnscheduledEvent(event);
         api.handleDidaListEvent(event.rootid, event.blockId, event.itemID);
-        // 同步其他可见日历（drop 回调里已对发起 calendar 自身做了 refetch）
-        refetchPeerCalendars(null);
+        // 同步其他可见日历
+        refetchPeerCalendars(originator ?? null);
         return true;
     } catch (error) {
         console.error('安排事件时出错:', error);
@@ -258,6 +305,7 @@ const viewValueInFlight = new Map<string, Promise<any[]>>();
 // 思源 3.8 起，renderAttributeView 需要数据库块 ID 才能解析「块级上下文筛选」
 // （custom-sy-av-context-filter）与「块当前视图」。
 // AV ID → 数据库块 ID 的解析统一放在 @/api/api3 的 resolveAvBlockId（带 TTL 缓存）。
+const CALENDAR_AV_BLOCK_NAMES = ['日程', '周期'] as const;
 
 // 主事件的 kramdown 不属于 AV 渲染响应，但日历刷新会频繁重复转换相同的行。
 // 用短缓存和 single-flight 避免每个日历实例在每次 refetch 时再次产生 N 个请求。
@@ -357,7 +405,8 @@ export function invalidateViewIdCache(avID?: string): void {
 // Get view IDs and names
 export async function getViewId(va_ids: string[]): ViewData {
     const now = Date.now();
-    const tasks = va_ids.map(async (va_id) => {
+    const uniqueAvIds = Array.from(new Set((Array.isArray(va_ids) ? va_ids : []).filter(Boolean)));
+    const tasks = uniqueAvIds.map(async (va_id) => {
         const cached = viewIdCache.get(va_id);
         if (cached && (now - cached.ts) < VIEW_ID_CACHE_TTL) {
             return cached.data;
@@ -373,17 +422,21 @@ export async function getViewId(va_ids: string[]): ViewData {
                     ignoreRows: true,
                     pageSize: 1,
                 });
-                // # https://github.com/loonghfut/siyuan-steve-tools/issues/6
-                const rootname = view.name ? `${view.name}-` : "";
-                const rootid = view.id;
+                const initial = extractViewItemsFromAvResponse(view, va_id);
+                if (!initial.valid) {
+                    console.warn(`跳过无效或已失效的属性视图 ${va_id}:`, view);
+                    viewIdCache.set(va_id, { ts: Date.now(), data: [] });
+                    return [] as ViewItem[];
+                }
+                if (initial.items.length === 0) {
+                    viewIdCache.set(va_id, { ts: Date.now(), data: [] });
+                    return [] as ViewItem[];
+                }
                 // 思源 3.8 起需要数据库块 ID 才能解析当前视图与块级上下文筛选。
-                const blockId = await resolveAvBlockId(va_id);
-                const data: ViewItem[] = view.views.map((viewItem) => ({
-                    rootid: rootid,
-                    viewId: viewItem.id,
-                    name: rootname + viewItem.name,
-                    blockId: blockId || undefined,
-                }));
+                const blockId = await resolveAvBlockId(va_id, { preferredNames: CALENDAR_AV_BLOCK_NAMES });
+                const data: ViewItem[] = blockId
+                    ? initial.items.map((item) => ({ ...item, blockId }))
+                    : initial.items;
                 viewIdCache.set(va_id, { ts: Date.now(), data });
                 return data;
             } catch (error) {
@@ -422,6 +475,10 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
                 const viewValue = await api.renderAttributeView(viewId_Data.rootid, viewId_Data.viewId, {
                     blockID: viewId_Data.blockId,
                 });
+                if (!viewValue || typeof viewValue !== 'object' || !viewValue.view) {
+                    console.warn(`跳过无效的属性视图数据 ${viewId_Data.viewId}:`, viewValue);
+                    return [] as any[];
+                }
                 // viewType 在响应顶层：思源用它标识本次渲染的布局（table|list|gallery|kanban|calendar）。
                 const data = await extractDataFromTable(
                     viewValue.view,
@@ -547,22 +604,23 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 // 重新获取视图数据以包含新创建的字段
                 // 显式带上 viewID 与 blockID：思源 3.8 移除了 AV 顶层持久化的「当前视图」，
                 // 不传 viewID 会回退到第一个视图，不传 blockID 会丢失块级上下文筛选。
-                const resolvedBlockID = blockID || await resolveAvBlockId(avID);
+                const resolvedBlockID = blockID || await resolveAvBlockId(avID, { preferredNames: CALENDAR_AV_BLOCK_NAMES });
                 const updatedViewValue = await api.renderAttributeView(avID, viewID, {
                     blockID: resolvedBlockID,
                 });
-                const updatedData = updatedViewValue.view;
+                const updatedData = (updatedViewValue && typeof updatedViewValue === 'object') ? updatedViewValue.view : null;
+                if (updatedData) {
+                    // 更新字段映射（复用分组视图回退与空值保护）
+                    const updatedFields = resolveViewFields(updatedData, isGalleryView);
+                    populateFieldMap(fieldMap, updatedFields);
 
-                // 更新字段映射（复用分组视图回退与空值保护）
-                const updatedFields = resolveViewFields(updatedData, isGalleryView);
-                populateFieldMap(fieldMap, updatedFields);
+                    // 使用更新后的数据
+                    data = updatedData;
 
-                // 使用更新后的数据
-                data = updatedData;
-
-                // 日历布局的日期列在新建字段后可能变化，重新按 dateKeyID 定位一次。
-                if (isCalendarLayout) {
-                    dateFieldName = resolveCalendarDateFieldName(updatedFields, readCalendarDateKeyID(data));
+                    // 日历布局的日期列在新建字段后可能变化，重新按 dateKeyID 定位一次。
+                    if (isCalendarLayout) {
+                        dateFieldName = resolveCalendarDateFieldName(updatedFields, readCalendarDateKeyID(data));
+                    }
                 }
             } catch (error) {
                 console.error('创建字段时出错:', error);
@@ -592,7 +650,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     // 需要单独取回，否则这些待安排事件会从插件日历里消失。
     if (isCalendarLayout) {
         try {
-            const resolvedBlockID = blockID || await resolveAvBlockId(avID);
+            const resolvedBlockID = blockID || await resolveAvBlockId(avID, { preferredNames: CALENDAR_AV_BLOCK_NAMES });
             const undated = await api.getAttributeViewCalendarUndated(avID, { blockID: resolvedBlockID, viewID });
             if (undated.rows.length) {
                 items = items.concat(undated.rows);
@@ -650,6 +708,7 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                         end: extractedDate.end,
                         keyID: extractedDate.keyID,
                         hasEndDate: extractedDate.hasEndDate,
+                        isNotTime: Boolean(extractedDate.isNotTime),
                     };
                 }
 
@@ -863,7 +922,16 @@ async function prefetchKramdownForMainEvents(viewData: any[] | null | undefined)
     return cache;
 }
 
-export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: any[]): Promise<CalendarEventItem[]> {
+export interface ConvertCalendarEventsOptions {
+    updateGlobalUnscheduled?: boolean;
+    onUnscheduledCollected?: (events: UnscheduledEvent[]) => void;
+}
+
+export async function convertToFullCalendarEvents(
+    viewData: any[],
+    viewData_zq: any[],
+    options?: ConvertCalendarEventsOptions,
+): Promise<CalendarEventItem[]> {
     const events: CalendarEventItem[] = [];
     const addedEventIds = new Set<string>();
     const unscheduledCollector: UnscheduledEvent[] = [];
@@ -914,15 +982,23 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                 const endDate = item['开始时间']?.end ? new Date(parseInt(item['开始时间'].end)) : null;
 
                 // 优先判断逻辑：
-                // 1. 首先判断是否有开始时间，没有则直接为全天事件
-                // 2. 然后使用数据库中的全天设置
+                // 1. 无开始时间或 SiYuan 日期单元格标记为 isNotTime（仅日期，无具体时刻）则视为全天事件
+                // 2. 否则使用数据库中的全天复选框设置
                 // 3. 最后按时间判断（0点为全天事件）
-                const isAllDay = !hasStartTime
+                const isNotTime = Boolean(item['开始时间']?.isNotTime);
+                const hasAllDayField = item['全天']?.content !== undefined;
+                const isAllDay = !hasStartTime || isNotTime
                     ? true
-                    : (item['全天']?.content !== undefined
-                        ? item['全天'].content
+                    : (hasAllDayField
+                        ? Boolean(item['全天'].content)
                         : (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
                             (!endDate || (endDate.getHours() === 0 && endDate.getMinutes() === 0))));
+
+                const fcRange = resolveFullCalendarEventRange({
+                    start: startDate,
+                    end: endDate,
+                    allDay: isAllDay,
+                });
 
                 let kramdown = "";
                 if (eventBlockId && (item['主事件']?.content || false)) {
@@ -933,8 +1009,8 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
                     // blockId 保留在 extendedProps 中，供跳转与数据库写入使用。
                     id: `normal:${view.from.rootid}:${eventItemId || eventBlockId}`,
                     title: item['事件']?.content || '',
-                    start: startDate,
-                    end: endDate,
+                    start: fcRange.start,
+                    end: fcRange.end,
                     allDay: isAllDay,
                     extendedProps: {
                         blockId: eventBlockId, // 原块 id（跳转用）
@@ -1094,7 +1170,10 @@ export async function convertToFullCalendarEvents(viewData: any[], viewData_zq: 
             }
         }
     }
-    setUnscheduledEvents(unscheduledCollector);
+    options?.onUnscheduledCollected?.(unscheduledCollector);
+    if (options?.updateGlobalUnscheduled !== false) {
+        setUnscheduledEvents(unscheduledCollector);
+    }
     return events;
 }
 //查看事件
@@ -1307,6 +1386,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         sy.showMessage('已添加事件', 2000, "info", "1");
         // 滴答更新
         api.handleDidaListEvent(to_db_id, direct.directid, itemID);
+        if (isrefresh) {
+            scheduleCalendarRefresh(200);
+        }
         return true;
     }
 
@@ -1477,10 +1559,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
             const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
             //// 新：用户自定义改动开始时间,优先级,分类
-            const category2 = (document.getElementById('st-category') as HTMLSelectElement).value;
-            const newdateStr = (document.getElementById('st-start-time') as HTMLInputElement).value
-            const priority = (document.getElementById('st-priority') as HTMLSelectElement).value;
-            const isAllDay = (document.getElementById('st-all-day') as HTMLInputElement).checked;
+            const category2 = (dialog.element.querySelector('#st-category') as HTMLSelectElement).value;
+            const newdateStr = (dialog.element.querySelector('#st-start-time') as HTMLInputElement).value
+            const priority = (dialog.element.querySelector('#st-priority') as HTMLSelectElement).value;
+            const isAllDay = (dialog.element.querySelector('#st-all-day') as HTMLInputElement).checked;
             if (newdateStr) {
                 dateStr = newdateStr;
             }
@@ -1555,13 +1637,19 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                             checkUploadingTimer = null;
                         }
                         if (isrefresh) {
-                            setTimeout(() => calendar?.refetchEvents(), 1000);
+                            scheduleCalendarRefresh(500);
+                            if (calendar) {
+                                setTimeout(() => calendar.refetchEvents(), 500);
+                            }
                         }
                     }
                 }, 100);
             } else {
                 if (isrefresh) {
-                    setTimeout(() => calendar?.refetchEvents(), 1000);//TODO:优化速度
+                    scheduleCalendarRefresh(500);
+                    if (calendar) {
+                        setTimeout(() => calendar.refetchEvents(), 500);
+                    }
                 }
             }
             // 提示用户
@@ -1639,7 +1727,7 @@ export async function updateEventInDatabase(
     info: any,
     calendar: Calendar,
     viewValue,
-    is_more_one_day: boolean = false,
+    _is_more_one_day: boolean = false,
     options?: {
         refetchOnSuccess?: boolean;
         refetchDelayMs?: number;
@@ -1649,17 +1737,19 @@ export async function updateEventInDatabase(
     // 更新思源数据库中的时间
     const blockId = info.event._def.extendedProps.blockId; // 块 id（展示 / 跳转）
     const itemID = info.event._def.extendedProps.itemID;
-    const newStartDate = info.event.startStr;
-    let newEndDate = info.event.endStr;
-    if (is_more_one_day && /^\d{4}-\d{2}-\d{2}$/.test(info.event.endStr)) {
-        const endDate = new Date(info.event.endStr);
-        endDate.setDate(endDate.getDate() - 1);
-        newEndDate = endDate.toISOString();
-    }
+    const isAllDay = Boolean(info.event.allDay);
+    const wasAllDay = info.oldEvent ? Boolean(info.oldEvent.allDay) : false;
+    const dateRange = resolveSiYuanUpdateDateRange({
+        startStr: info.event.startStr,
+        endStr: info.event.endStr,
+        start: info.event.start,
+        end: info.event.end,
+        allDay: isAllDay,
+        defaultDurationHours: Number(settingdata['cal-time']) || 0,
+    });
+    const newStartDate = dateRange.startInput;
+    const newEndDate = dateRange.endInput;
     const rootid = info.event._def.extendedProps.rootid;
-    // 检测是否拖拽到全天区域或从全天区域拖拽出来
-    const isAllDay = info.event.allDay;
-    const wasAllDay = info.oldEvent ? info.oldEvent.allDay : false;
 
     // 准备批量更新的promise数组
     const updatePromises: Promise<any>[] = [];
@@ -1693,15 +1783,13 @@ export async function updateEventInDatabase(
     //
     // 注意 cache 字段格式：extractDataFromTable 把 SiYuan 的 dateValue.content/content2
     // 直接存进缓存（数值毫秒），convertToFullCalendarEvents 用 parseInt 解析。
-    // 而 FullCalendar 的 startStr/endStr 是 ISO 字符串。直接写 ISO 进去会被 parseInt
-    // 截成 4 位年份，导致其他日历实例渲染到 1970-01-01。这里转成毫秒。
+    // 使用与 api.updateAttrViewCell_pro 完全一致的毫秒时间戳与闭区间语义。
     try {
-        const startMs = newStartDate ? new Date(newStartDate).getTime() : null;
-        const endMs = newEndDate ? new Date(newEndDate).getTime() : null;
         const timePatch: any = {
-            start: Number.isFinite(startMs) ? startMs : null,
-            end: Number.isFinite(endMs) ? endMs : null,
-            hasEndDate: !!endMs,
+            start: dateRange.startMs,
+            end: dateRange.endMs,
+            hasEndDate: dateRange.hasEndDate,
+            isNotTime: false,
         };
         const fieldPatch: Record<string, any> = { '开始时间': timePatch };
         // 仅当全天字段确实写入了 DB 才同步 cache，避免 DB 没写但 cache 撒谎
@@ -1835,7 +1923,11 @@ function debounce(func: Function, wait: number) {
 }
 
 
-export function changestatus_for_zq(event: CalendarEventExtendedProps, date: string, originator?: Calendar | null) {
+export function changestatus_for_zq(
+    event: CalendarEventExtendedProps,
+    date: string,
+    originator?: Calendar | null,
+): { okday: string; completed: boolean } | void {
     if (!event.okdayid) {
         sy.showMessage('未找到完成日期列', -1, "error");
         return;
@@ -1843,6 +1935,7 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
 
     let okdays = event.okday ? event.okday.split(',').map(d => d.trim()) : [];
     let newOkday = '';
+    let completed = false;
 
     if (okdays.includes(date)) {
         // 如果日期存在，则删除
@@ -1851,11 +1944,13 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
     } else {
         // 如果日期不存在，则添加
         okdays.push(date);
+        completed = true;
         sy.showMessage('已完成此事件', 3000, "info");
     }
 
     // 将数组转换回字符串
     newOkday = okdays.filter(Boolean).join(','); // filter(Boolean)用于移除空值
+    event.okday = newOkday;
 
     const target = event.blockId; // 优先使用 blockId
     const itemID = event.itemID;
@@ -1869,6 +1964,7 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
     // 同步可见日历实例。如果调用方提供了 originator，把它从刷新集合排除（它将在
     // FullCalendar 下个微任务里自然重渲染 isEventCompleted 状态）
     refetchPeerCalendars(originator ?? null);
+    return { okday: newOkday, completed };
 }
 
 
@@ -1881,7 +1977,7 @@ async function getColumnOptionsByName(
         const keys = await api.getAttributeViewKeysByAvID(dbId);
         let targetColumn = Array.isArray(keys) ? keys.find((col: any) => col?.name === columnName) : undefined;
         if (!targetColumn) {
-            const blockID = await resolveAvBlockId(dbId);
+            const blockID = await resolveAvBlockId(dbId, { preferredNames: CALENDAR_AV_BLOCK_NAMES });
             const view = await api.renderAttributeView(dbId, undefined, {
                 blockID,
                 ignoreRows: true,

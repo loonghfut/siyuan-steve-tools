@@ -210,7 +210,8 @@ div.fc-view-harness.fc-view-harness-active>div>table>thead>tr>th {
     background-color: $background-color;
     color: $text-color;
     border-radius: 6px;
-    overflow: hidden;
+    // 跨日事件以绝对定位从起始单元格横向延伸至后续日期，不能裁剪溢出内容
+    overflow: visible;
     transition: background-color 0.15s ease;
 }
 

@@ -1,4 +1,5 @@
-import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
+import { calendarModules as moduleInstances, calendarSettings as settingdata } from '@/calendar/core/calendar-context';
+import { getPreferredCalendar } from '@/calendar/core/calendar-runtime';
 import { av_ids, filterViewId, OUTcalendar } from '@/calendar/ui/calendar-view';
 import { createEventInDatabase, getViewId, getViewValue } from '@/calendar/data/calendar-data';
 
@@ -18,8 +19,24 @@ function formatLocalDateTime(date: Date) {
     return adjustedDate.toISOString().slice(0, 16);
 }
 
+function getEffectiveFilterViewIds(): string[] {
+    const configViewIds = moduleInstances['M_calendar']?.calConfig?.getViewIds?.();
+    if (Array.isArray(configViewIds) && configViewIds.length > 0) {
+        return configViewIds;
+    }
+    return filterViewId;
+}
+
+async function getEffectiveAvIds(): Promise<string[]> {
+    if (Array.isArray(av_ids) && av_ids.length > 0) {
+        return av_ids;
+    }
+    return (await moduleInstances['M_calendar']?.getAVreferenceid?.()) || [];
+}
+
 function getSelectedDatabaseId(viewIds: Awaited<ReturnType<typeof getViewId>>) {
-    return viewIds.find(view => filterViewId.includes(view.viewId))?.rootid;
+    const activeFilterIds = getEffectiveFilterViewIds();
+    return viewIds.find(view => activeFilterIds.includes(view.viewId))?.rootid;
 }
 
 /** Creates a schedule using the database currently selected in the calendar. */
@@ -35,11 +52,13 @@ export function createSchedule(
 
     recentCreation.startedAt = now;
     recentCreation.request = (async () => {
-        const viewIds = await getViewId(av_ids);
+        const effectiveAvIds = await getEffectiveAvIds();
+        const viewIds = await getViewId(effectiveAvIds);
         const viewValue = await getViewValue(viewIds);
+        const targetCalendar = getPreferredCalendar() || OUTcalendar;
         return createEventInDatabase(
             formatLocalDateTime(new Date()),
-            OUTcalendar,
+            targetCalendar,
             viewValue,
             getSelectedDatabaseId(viewIds),
             status,
@@ -63,9 +82,10 @@ export async function createScheduleInConfiguredDatabase(
 ) {
     const viewIds = await getViewId([settingdata['cal-db-id']]);
     const viewValue = await getViewValue(viewIds);
+    const targetCalendar = getPreferredCalendar() || OUTcalendar;
     return createEventInDatabase(
         formatLocalDateTime(new Date()),
-        OUTcalendar,
+        targetCalendar,
         viewValue,
         getSelectedDatabaseId(viewIds),
         status,

@@ -1,6 +1,7 @@
 // showMessage 若需要可在运行环境通过 window.showMessage 使用，这里不直接导入以避免未使用警告
 import { api } from "@frostime/siyuan-plugin-kits";
 import { getTag, TagItem } from "./api";
+import { selectPreferredAvBlock } from "./av-block";
 
 export function escapeHtml(s: string) {
     return String(s || "")
@@ -232,6 +233,12 @@ export async function getallavids() {
 // AV ID → 数据库块 ID 的缓存。映射基本不可变（av id 就写在块的 markdown 里），60 秒 TTL 足够。
 const AV_BLOCK_ID_CACHE_TTL = 60 * 1000;
 const avBlockIdCache = new Map<string, { ts: number; id: string }>();
+const warnedAmbiguousAvBlocks = new Map<string, string>();
+
+export interface ResolveAvBlockIdOptions {
+    /** 优先选择的数据库块名称（例如日历模块按 name IN ('日程', '周期') 发现数据库）。 */
+    preferredNames?: readonly string[];
+}
 
 /**
  * 解析 AV ID（属性视图 ID）所在数据库块（type='av'）的块 ID。
@@ -240,12 +247,21 @@ const avBlockIdCache = new Map<string, { ts: number; id: string }>();
  * （kernel/model/attribute_view.go 的 resolveAttributeViewView / GetAttributeViewContextFilter），
  * 所以渲染数据库视图时需要带上块 ID。
  *
- * 同一个 avID 理论上可能被多个块引用（例如数据库镜像）：此时按"最近更新"取一个并告警，
- * 避免静默取到非预期的块、导致筛选出的行与文档不一致。
+ * 对同一个 avID 被多个数据库镜像块引用的情况：
+ * - 优先避开配置了 custom-sy-av-context-filter 的子文档镜像块（并在其中优先匹配 preferredNames）；
+ * - 若所有引用块都未配置块级上下文筛选，在显式传入 viewID 时渲染结果完全一致，不再对正常镜像块刷屏告警；
+ * - 仅当多个候选块下最终选中块仍带上下文筛选时，才去重告警一次。
  */
-export async function resolveAvBlockId(avID: string): Promise<string> {
+export async function resolveAvBlockId(
+    avID: string,
+    options: ResolveAvBlockIdOptions = {},
+): Promise<string> {
     if (!avID) return "";
-    const cached = avBlockIdCache.get(avID);
+    const preferredNames = (options.preferredNames || [])
+        .map((name) => String(name || "").trim())
+        .filter(Boolean);
+    const cacheKey = preferredNames.length > 0 ? `${avID}::${preferredNames.join("|")}` : avID;
+    const cached = avBlockIdCache.get(cacheKey);
     const now = Date.now();
     if (cached && (now - cached.ts) < AV_BLOCK_ID_CACHE_TTL) {
         return cached.id;
@@ -253,20 +269,25 @@ export async function resolveAvBlockId(avID: string): Promise<string> {
     try {
         const safe = avID.replace(/'/g, "''");
         const rows = await api.sql(
-            `SELECT id FROM blocks
+            `SELECT id, name, ial, updated FROM blocks
              WHERE type = 'av'
                AND markdown LIKE '%NodeAttributeView%data-av-id%'
                AND markdown LIKE '%${safe}%'
              ORDER BY updated DESC
-             LIMIT 10`
+             LIMIT 50`
         );
-        const ids = (Array.isArray(rows) ? rows : []).map((row: any) => String(row?.id || "")).filter(Boolean);
-        const id = ids[0] || "";
-        if (ids.length > 1) {
-            console.warn(`数据库 ${avID} 被多个块引用（${ids.join(", ")}），按最近更新取 ${id}；块级上下文筛选可能与文档不一致。`);
+        const selection = selectPreferredAvBlock(Array.isArray(rows) ? rows : [], preferredNames);
+        if (selection.shouldWarnAmbiguousContext) {
+            const warnSignature = `${selection.ids.join(",")}=>${selection.id}`;
+            if (warnedAmbiguousAvBlocks.get(cacheKey) !== warnSignature) {
+                warnedAmbiguousAvBlocks.set(cacheKey, warnSignature);
+                console.warn(
+                    `数据库 ${avID} 被多个块引用（${selection.ids.join(", ")}）且选中的 ${selection.id} 存在块级上下文筛选，可能与其它引用文档不一致。`,
+                );
+            }
         }
-        avBlockIdCache.set(avID, { ts: now, id });
-        return id;
+        avBlockIdCache.set(cacheKey, { ts: now, id: selection.id });
+        return selection.id;
     } catch (e) {
         console.warn(`解析数据库块 ID 失败 (${avID}):`, e);
         return "";

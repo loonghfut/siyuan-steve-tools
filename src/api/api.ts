@@ -1476,7 +1476,11 @@ async function getDateTimestamps(dateStr: string): Promise<{ start: number, end:
         if (dateStr.includes('T')) {
             return new Date(dateStr);
         }
-        return new Date(dateStr + 'T08:00:00+08:00');
+        const match = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(dateStr.trim());
+        if (match) {
+            return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 8, 0, 0, 0);
+        }
+        return new Date(dateStr + 'T08:00:00');
     };
 
     const date = parseDate(dateStr);

@@ -1,7 +1,11 @@
-export function createFloatingCalendar(calendarEl: HTMLElement) {
-    let existingContainer = document.getElementById('float-calendar-container');
+let activeFloatingCleanup: (() => void) | null = null;
+
+export function createFloatingCalendar(_calendarEl?: HTMLElement) {
+    activeFloatingCleanup?.();
+    activeFloatingCleanup = null;
+    const existingContainer = document.getElementById('float-calendar-container');
     if (existingContainer) {
-        document.body.removeChild(existingContainer);
+        existingContainer.remove();
     }
 
     const floatContainer = document.createElement('div');
@@ -39,7 +43,7 @@ export function createFloatingCalendar(calendarEl: HTMLElement) {
     floatContainer.appendChild(titleEl);
 
 
-    calendarEl = document.createElement('div');
+    const calendarEl = document.createElement('div');
     calendarEl.id = 'fcalendar-float';
     calendarEl.style.height = '100%';
     floatContainer.appendChild(calendarEl);
@@ -102,9 +106,17 @@ export function createFloatingCalendar(calendarEl: HTMLElement) {
 
     // 清理函数
     const cleanup = () => {
+        isListenersActive = false;
+        clearTimeout(enterTimeout);
+        clearTimeout(leaveTimeout);
         floatContainer.removeEventListener('mouseenter', enterListener);
         floatContainer.removeEventListener('mouseleave', leaveListener);
+        if (activeFloatingCleanup === cleanup) {
+            activeFloatingCleanup = null;
+        }
+        floatContainer.remove();
     };
+    activeFloatingCleanup = cleanup;
 
     return {
         element: calendarEl,

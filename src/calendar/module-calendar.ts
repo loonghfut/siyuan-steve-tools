@@ -39,6 +39,12 @@ let this_settingdata: any = {};
 let islisten = true;
 let front: "desktop" | "desktop-window" | "mobile" | "browser-desktop" | "browser-mobile";
 const calendarinstance: Map<string, Calendar> = new Map();
+let calendarInstanceSeq = 0;
+function nextCalendarId(): string {
+    calendarInstanceSeq += 1;
+    return `${Date.now()}-${calendarInstanceSeq}`;
+}
+
 export class M_calendar {
     private plugin: steveTools;
     private loadedProtyleHandler?: () => void;
@@ -121,8 +127,8 @@ export class M_calendar {
         this.plugin.addTab({
             type: "calendar",
             async init() {
-                const id = new Date().getTime().toString();
-                let calendar: Calendar
+                const id = nextCalendarId();
+                let calendar: Calendar;
                 this.element.innerHTML = `
                 <div  id='calendarfu-${id}' ><div id='calendar-${id}' ></div></div>`;
                 calendar = await run(id, settingdata["cal-default-view"]);
@@ -172,6 +178,8 @@ export class M_calendar {
             this.icsImporter = new ICSImporter(this.plugin);
         }
         let D_calendar_day: any;
+        let dockInitTimer: ReturnType<typeof setTimeout> | undefined;
+        let dockDestroyed = false;
         this.plugin.addDock({
             config: {
                 position: "RightTop",
@@ -182,17 +190,40 @@ export class M_calendar {
             data: null,
             type: "cal-dock-day",
             resize: async () => {
-                D_calendar_day.updateSize();
+                D_calendar_day?.updateSize();
             },
             init: async function () {
                 const dock = this;
-                const id = new Date().getTime().toString();
+                const id = nextCalendarId();
+                dockDestroyed = false;
                 dock.element.innerHTML = `
                 <div id="calendar-${id}" class="cal-dock-container" ></div>
                 `;
-                setTimeout(async () => {
-                    D_calendar_day = await run(id, 'timeGridDay', '', 'title', 'viewFilter,refreshButton,planButton', '');
+                dockInitTimer = setTimeout(async () => {
+                    dockInitTimer = undefined;
+                    if (dockDestroyed) return;
+                    const cal = await run(id, 'timeGridDay', '', 'title', 'viewFilter,refreshButton,planButton', '');
+                    if (dockDestroyed) {
+                        if (cal) {
+                            unregisterCalendarInstance(cal);
+                            cal.destroy();
+                        }
+                        return;
+                    }
+                    D_calendar_day = cal;
                 }, 100);
+            },
+            destroy() {
+                dockDestroyed = true;
+                if (dockInitTimer !== undefined) {
+                    clearTimeout(dockInitTimer);
+                    dockInitTimer = undefined;
+                }
+                if (D_calendar_day) {
+                    unregisterCalendarInstance(D_calendar_day);
+                    D_calendar_day.destroy();
+                    D_calendar_day = null;
+                }
             },
         });
 
@@ -695,8 +726,10 @@ export class M_calendar {
     }
 
     async openRiChengViewDialog(isMobile: boolean = false, viewID = "", initialView = "dayGridMonth") {
-        const id = new Date().getTime().toString();
+        const id = nextCalendarId();
         let calendar: any;
+        let closed = false;
+        let initTimer: ReturnType<typeof setTimeout> | undefined;
         new Dialog({
             title: null,
             content: `<div><div id='calendar-${id}' class="mb-3"></div></div>`,
@@ -705,16 +738,36 @@ export class M_calendar {
             disableClose: false,
             hideCloseIcon: true,
             resizeCallback: () => {
-                calendar.updateSize();
+                calendar?.updateSize();
+            },
+            destroyCallback: () => {
+                closed = true;
+                if (initTimer !== undefined) {
+                    clearTimeout(initTimer);
+                    initTimer = undefined;
+                }
+                if (calendar) {
+                    unregisterCalendarInstance(calendar);
+                    calendar.destroy();
+                    calendar = null;
+                }
             },
         });
 
-        setTimeout(async () => {
-            if (viewID) {
-                calendar = await run(id, initialView, viewID, 'prev,next today');
-            } else {
-                calendar = await run(id, initialView);
+        initTimer = setTimeout(async () => {
+            initTimer = undefined;
+            if (closed) return;
+            const created = viewID
+                ? await run(id, initialView, viewID, 'prev,next today')
+                : await run(id, initialView);
+            if (closed) {
+                if (created) {
+                    unregisterCalendarInstance(created);
+                    created.destroy();
+                }
+                return;
             }
+            calendar = created;
         }, 100);
     }
 

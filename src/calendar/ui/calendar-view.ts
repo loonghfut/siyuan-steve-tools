@@ -10,9 +10,11 @@ import rrule from '@fullcalendar/rrule';
 import tippy from 'tippy.js';
 import {
     activeCalendars,
+    getPreferredCalendar,
     refetchPeerCalendars,
     registerCalendarInstance,
     scheduleCalendarRefresh,
+    unregisterCalendarInstance,
 } from '@/calendar/core/calendar-runtime';
 import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
 // import 'tippy.js/dist/tippy.css';
@@ -36,18 +38,14 @@ import { isSpecialCalendarSource } from '@/calendar/core/calendar-sources';
 
 export let isFilter = true;
 export let OUTcalendar: Calendar;
-let clicks1 = 0;
-let clicks2 = 0;
 export let viewValue: any;
-let viewValue_zq: any;
 export let filterViewId: string[] = [];
 export let av_ids: string[] = [];
 export let viewName = "";
 export let viewId = "";
-// export const Calendars_pro:{Calendar:Calendar,id:string}[] = []; //TODO:后面优化时用
-// let ishandrefetchEvents = true;
-//用于保存原始的时间槽间隔
+// 用于保存原始的时间槽间隔（以及向非固定视图的实例广播筛选变更版本号）
 let lastSavedLifelogSlotDuration: string;
+let globalFilterSyncVersion = 0;
 const calendarResizeCleanups = new WeakMap<HTMLElement, () => void>();
 const MIN_CALENDAR_HEIGHT = 320; // Avoid collapsing the calendar when layout space is tight.
 const CALENDAR_BOTTOM_GAP = 16;
@@ -69,9 +67,10 @@ const REMOVED_VIEW_IDS = new Set([
 // key 为 'YYYY-MM-DD'，避免每个日历单元格、每次重渲染都重复调用 solarLunar.solar2lunar。
 const lunarCache = new Map<string, any>();
 type PendingCalendarEventPatch = {
-    start: string;
+    start?: string;
     end?: string | null;
-    allDay: boolean;
+    allDay?: boolean;
+    status?: string;
     expiresAt: number;
 };
 const pendingCalendarEventPatches = new Map<string, PendingCalendarEventPatch>();
@@ -108,10 +107,12 @@ function rememberPendingCalendarEventPatch(event: any, ttlMs = 6000) {
     const itemId = event?._def?.extendedProps?.itemID || event?.extendedProps?.itemID;
     const key = getPendingCalendarEventKey(blockId, itemId);
     if (!key) return;
+    const extStatus = event?._def?.extendedProps?.status ?? event?.extendedProps?.status;
     pendingCalendarEventPatches.set(key, {
-        start: event?.start ? new Date(event.start).toISOString() : '',
+        start: event?.start ? new Date(event.start).toISOString() : undefined,
         end: event?.end ? new Date(event.end).toISOString() : null,
-        allDay: !!event?.allDay,
+        allDay: event?.allDay !== undefined ? !!event.allDay : undefined,
+        status: typeof extStatus === 'string' ? extStatus : undefined,
         expiresAt: Date.now() + ttlMs,
     });
 }
@@ -140,11 +141,24 @@ function applyPendingCalendarEventPatches(events: any[]) {
         if (!patch) return event;
         return {
             ...event,
-            start: patch.start,
-            end: patch.end,
-            allDay: patch.allDay,
+            ...(patch.start !== undefined ? { start: patch.start } : {}),
+            ...(patch.end !== undefined ? { end: patch.end } : {}),
+            ...(patch.allDay !== undefined ? { allDay: patch.allDay } : {}),
+            ...(patch.status !== undefined
+                ? { extendedProps: { ...ext, status: patch.status } }
+                : {}),
         };
     });
+}
+
+function toggleRecurringEventCompletion(event: any, calendar: Calendar) {
+    const dateKey = event?.start?.toISOString?.()?.split('T')?.[0];
+    if (!dateKey || !event?.extendedProps) return;
+    const result = myF.changestatus_for_zq(event.extendedProps, dateKey, calendar);
+    if (result) {
+        event.setExtendedProp('okday', result.okday);
+        event.setExtendedProp('status', result.completed ? '完成' : '未完成');
+    }
 }
 export async function init_viewValue(data: { viewId: string, viewName: string }) {
     viewId = data.viewId;
@@ -220,18 +234,38 @@ export async function run(
     // }
     cright = rightSegments.join(',');
     // 如果有指定的S_viewID则使用，否则从配置中获取
-    if (S_viewID) {
-        filterViewId = [S_viewID];
-    } else {
-        const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
-        filterViewId = configViewIds.length > 0 ? configViewIds : (viewId ? viewId.split(',') : []);
+    const pinnedViewId = S_viewID ? String(S_viewID) : '';
+    const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
+    const initialFilterIds = pinnedViewId
+        ? [pinnedViewId]
+        : (configViewIds.length > 0 ? configViewIds : (viewId ? viewId.split(',') : []));
+
+    const instanceState = {
+        pinnedViewId,
+        filterViewId: initialFilterIds,
+        avIds: [] as string[],
+        viewValue: [] as any[],
+        viewValueZq: [] as any[],
+        unscheduledEvents: [] as myF.UnscheduledEvent[],
+        dateClicks: 0,
+        dateClickTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+        eventClicks: 0,
+        eventClickTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+        contextClicks: 0,
+        contextClickTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+        syncedFilterVersion: globalFilterSyncVersion,
+    };
+    if (!pinnedViewId) {
+        filterViewId = initialFilterIds;
     }
 
-    let calendarEl: HTMLElement;
+    let calendarEl!: HTMLElement;
+    let floatingCleanup: (() => void) | null = null;
     if (id === "1") {
         // 创建悬浮容器
         const Fcalendar = createFloatingCalendar(calendarEl);
         calendarEl = Fcalendar.element;
+        floatingCleanup = Fcalendar.cleanup;
     } else if (id === "2") {//日历内插入视图逻辑
         console.debug(elementca)
         calendarEl = elementca;
@@ -247,9 +281,18 @@ export async function run(
     // 待安排面板控制器（封装渲染、拖拽与徽标更新）
     const unscheduled = createUnscheduledPanelController(
         calendarEl,
-        () => myF.getUnscheduledEvents()
+        () => instanceState.unscheduledEvents,
     );
-    const updatePlanButtonLabel = () => unscheduled.updatePlanButtonLabel(myF.getUnscheduledEvents().length);
+    const updatePlanButtonLabel = () => unscheduled.updatePlanButtonLabel(instanceState.unscheduledEvents.length);
+    const unsubscribeUnscheduledRemoval = myF.subscribeUnscheduledRemoval((removed) => {
+        const before = instanceState.unscheduledEvents.length;
+        instanceState.unscheduledEvents = myF.removeUnscheduledEventFromList(instanceState.unscheduledEvents, removed);
+        if (instanceState.unscheduledEvents.length !== before) {
+            updatePlanButtonLabel();
+        }
+    });
+    let activeTimeGhostEl: HTMLElement | null = null;
+    let timeGhostMoveHandler: ((e: MouseEvent) => void) | null = null;
 
     // 添加鼠标滚轮事件监听器
     calendarEl.addEventListener('wheel', (e) => {
@@ -324,12 +367,13 @@ export async function run(
                 return;
             }
             try {
-                const targetEvent = myF.findUnscheduledEvent(blockId, itemId);
+                const targetEvent = myF.findUnscheduledEventInList(instanceState.unscheduledEvents, blockId, itemId)
+                    ?? myF.findUnscheduledEvent(blockId, itemId);
                 if (!targetEvent) {
                     showMessage('未找到对应事件，请刷新后重试', 4000, 'error');
                     return;
                 }
-                const scheduled = await myF.scheduleUnscheduledEvent(targetEvent, info.dateStr, info.allDay);
+                const scheduled = await myF.scheduleUnscheduledEvent(targetEvent, info.dateStr, info.allDay, calendar);
                 if (!scheduled) {
                     return;
                 }
@@ -337,8 +381,8 @@ export async function run(
                 if (draggedEl.isConnected) {
                     draggedEl.remove();
                 }
+                instanceState.unscheduledEvents = myF.removeUnscheduledEventFromList(instanceState.unscheduledEvents, targetEvent);
                 updatePlanButtonLabel();
-                scheduleCalendarRefresh();
                 setTimeout(() => calendar.refetchEvents(), 200);
                 moduleInstances['M_calendar']?.scheduleCalendarUpdate?.(1500);
             } catch (error) {
@@ -363,7 +407,7 @@ export async function run(
         // 事件拖动结束时处理状态更改
         eventDragStop: function (info) {
             if (settingdata["cal-drag-change"]) {
-                displayStatusDropZone_done(calendarEl, info);
+                displayStatusDropZone_done(calendarEl, calendar, info);
             }
         },
         // 事件点击处理
@@ -371,28 +415,26 @@ export async function run(
 
             if (settingdata["cal-create-way"] === "1") {
                 if (info.event._def.extendedProps.isRecurring) {
-                    // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
+                    toggleRecurringEventCompletion(info.event, calendar);
                     return;
                 } else {
                     await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
                     return;
                 }
             }
-            let clickTimeout: NodeJS.Timeout;
-            clicks2++;
-            if (clicks2 === 1) {
-                clickTimeout = setTimeout(() => {
-                    clicks2 = 0;
+            instanceState.eventClicks++;
+            if (instanceState.eventClicks === 1) {
+                clearTimeout(instanceState.eventClickTimer);
+                instanceState.eventClickTimer = setTimeout(() => {
+                    instanceState.eventClicks = 0;
                 }, 400);
-            } else if (clicks2 === 2) {
-                clearTimeout(clickTimeout);
-                clicks2 = 0;
+            } else if (instanceState.eventClicks === 2) {
+                clearTimeout(instanceState.eventClickTimer);
+                instanceState.eventClicks = 0;
                 // console.debug("双击事件", info.event);
                 if (info.event._def.extendedProps.isRecurring) {
                     console.debug("周期条件进入");
-                    // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                    myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
+                    toggleRecurringEventCompletion(info.event, calendar);
                     return;
                 } else {
                     await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid);
@@ -407,33 +449,39 @@ export async function run(
         //// 双击触发(可选)
         dateClick: async function (info) {
             // 空筛选不允许创建事件
-            if (!filterViewId || filterViewId.length === 0) {
+            if (!instanceState.filterViewId || instanceState.filterViewId.length === 0) {
                 showMessage('未选择视图，无法创建事件。请先点击“视图选择”。', 3000, 'info');
                 return;
             }
             // console.debug('dateClick', info);
-            const viewIDs = await myF.getViewId(av_ids)
-            const rootid = viewIDs.find(v => filterViewId.includes(v.viewId))?.rootid;
+            const effectiveAvIds = instanceState.avIds.length > 0
+                ? instanceState.avIds
+                : (await moduleInstances['M_calendar'].getAVreferenceid()) || [];
+            if (effectiveAvIds.length > 0) {
+                instanceState.avIds = effectiveAvIds;
+            }
+            const viewIDs = await myF.getViewId(effectiveAvIds);
+            const rootid = viewIDs.find(v => instanceState.filterViewId.includes(v.viewId))?.rootid;
             // 若当前选择的均为只读或无有效视图，阻止创建
             if (!rootid) {
                 showMessage('当前选择的视图不支持直接创建事件', 3000, 'info');
                 return;
             }
             if (settingdata["cal-create-way"] === "1") {
-                await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
+                await myF.createEventInDatabase(info.dateStr, calendar, instanceState.viewValue, rootid);
                 return;
             }
-            let clickTimeout: NodeJS.Timeout;
-            clicks1++;
-            if (clicks1 === 1) {
-                clickTimeout = setTimeout(() => {
-                    clicks1 = 0;
+            instanceState.dateClicks++;
+            if (instanceState.dateClicks === 1) {
+                clearTimeout(instanceState.dateClickTimer);
+                instanceState.dateClickTimer = setTimeout(() => {
+                    instanceState.dateClicks = 0;
                 }, 400);
-            } else if (clicks1 === 2) {
-                clearTimeout(clickTimeout);
-                clicks1 = 0;
+            } else if (instanceState.dateClicks === 2) {
+                clearTimeout(instanceState.dateClickTimer);
+                instanceState.dateClicks = 0;
                 // steveTools.outlog("创建事件", info);
-                await myF.createEventInDatabase(info.dateStr, calendar, viewValue, rootid);
+                await myF.createEventInDatabase(info.dateStr, calendar, instanceState.viewValue, rootid);
             }
         },
         // 农历显示
@@ -501,7 +549,7 @@ export async function run(
                 rememberPendingCalendarEventPatch(info.event, 6000);
                 // 不再 refetchOnSuccess —— FullCalendar 已本地移动事件，AV 写入由
                 // calendar-self-write 标记体系让下游链路忽略，无需 refetch。
-                await myF.updateEventInDatabase(info, calendar, viewValue, false, {
+                await myF.updateEventInDatabase(info, calendar, instanceState.viewValue, false, {
                     reason: 'drag',
                 });
                 // 同步其他可见日历实例：myF 已 patch 了 viewValueCache，refetch 命中缓存几乎零开销。
@@ -516,9 +564,13 @@ export async function run(
         },
 
         eventResizeStart: function (_info) {
-            // 创建半透明的时间指示器跟随鼠标
+            // 创建半透明的时间指示器跟随鼠标（归属当前日历实例，避免多实例抢同一个全局节点）
+            activeTimeGhostEl?.remove();
+            if (timeGhostMoveHandler) {
+                document.removeEventListener('mousemove', timeGhostMoveHandler);
+            }
             const timeGhost = document.createElement('div');
-            timeGhost.id = 'fc-time-ghost';
+            timeGhost.className = 'fc-time-ghost';
             timeGhost.style.cssText = `
                 position: fixed;
                 background: rgba(0, 0, 0, 0.8);
@@ -531,17 +583,22 @@ export async function run(
                 box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             `;
             document.body.appendChild(timeGhost);
+            activeTimeGhostEl = timeGhost;
+            timeGhostMoveHandler = (e: MouseEvent) => updateTimeGhost(e, calendarEl, timeGhost);
             // 监听鼠标移动
-            document.addEventListener('mousemove', updateTimeGhost);
+            document.addEventListener('mousemove', timeGhostMoveHandler);
         },
 
         eventResizeStop: function () {
             // 移除时间指示器和事件监听器
-            const timeGhost = document.getElementById('fc-time-ghost');
-            if (timeGhost) {
-                timeGhost.remove();
+            if (activeTimeGhostEl) {
+                activeTimeGhostEl.remove();
+                activeTimeGhostEl = null;
             }
-            document.removeEventListener('mousemove', updateTimeGhost);
+            if (timeGhostMoveHandler) {
+                document.removeEventListener('mousemove', timeGhostMoveHandler);
+                timeGhostMoveHandler = null;
+            }
         },
 
         eventResize: async function (info) {
@@ -556,7 +613,7 @@ export async function run(
             try {
                 rememberPendingCalendarEventPatch(info.event, 6000);
                 // 同 eventDrop：本地已更新，跳过 refetch
-                await myF.updateEventInDatabase(info, calendar, viewValue, true, {
+                await myF.updateEventInDatabase(info, calendar, instanceState.viewValue, true, {
                     reason: 'resize',
                 });
                 refetchPeerCalendars(calendar);
@@ -588,17 +645,25 @@ export async function run(
                         calendarEl,
                         myF,
                         calendar,
-                        filterViewId,
-                        (ids: string[]) => { filterViewId = ids; },
+                        instanceState.filterViewId,
+                        (ids: string[]) => {
+                            instanceState.filterViewId = ids;
+                            if (!instanceState.pinnedViewId) {
+                                filterViewId = ids;
+                                globalFilterSyncVersion++;
+                                instanceState.syncedFilterVersion = globalFilterSyncVersion;
+                            }
+                        },
                         scheduleCalendarRefresh,
-                        lastSavedLifelogSlotDuration
+                        lastSavedLifelogSlotDuration,
+                        instanceState.avIds,
                     );
                 },
             },
             planButton: {
                 text: '安排',
                 click: () => {
-                    const pending = myF.getUnscheduledEvents();
+                    const pending = instanceState.unscheduledEvents;
                     if (!pending || pending.length === 0) {
                         showMessage('当前没有待安排的事件', 3000, 'info');
                         unscheduled.destroy();
@@ -652,8 +717,19 @@ export async function run(
             // const buttons = document.querySelectorAll('.fc-viewFilter-button');
             // buttons.forEach(btn => btn.textContent = viewName);
             try {
-                // 空筛选不显示任何事件
-                if (!filterViewId || filterViewId.length === 0) {
+                // 非固定单视图的实例（如主 Tab 与侧边栏 Dock）同步来自视图筛选面板的全局选择变化
+                if (!instanceState.pinnedViewId && instanceState.syncedFilterVersion !== globalFilterSyncVersion) {
+                    instanceState.filterViewId = moduleInstances['M_calendar'].calConfig.getViewIds();
+                    instanceState.syncedFilterVersion = globalFilterSyncVersion;
+                }
+                const activeFilterIds = instanceState.filterViewId;
+
+                // 空筛选不显示任何事件，同时清空待安排角标
+                if (!activeFilterIds || activeFilterIds.length === 0) {
+                    instanceState.viewValue = [];
+                    instanceState.viewValueZq = [];
+                    instanceState.unscheduledEvents = [];
+                    updatePlanButtonLabel();
                     successCallback([]);
                     return;
                 }
@@ -664,7 +740,7 @@ export async function run(
                         const icsEvents = moduleInstances['M_calendar'].icsSubscription.getEvents();
                         if (icsEvents && Array.isArray(icsEvents)) {
                             // 检查是否需要根据视图筛选（仅当筛选包含该视图时）
-                            const showIcsEvents = filterViewId.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
+                            const showIcsEvents = activeFilterIds.includes('icsSubscription'); // 使用适当的ID标识ICS订阅视图
                             if (showIcsEvents) {
                                 console.debug(`加载了 ${icsEvents.length} 个ICS订阅日历事件`);
                                 // 为每个ICS订阅事件添加不可拖拽属性和标识
@@ -691,11 +767,11 @@ export async function run(
 
                 /////////////////////Lifelog////////////////////////
                 try {
-                    const showLifelogEvents = filterViewId.includes('lifelog');
+                    const showLifelogEvents = activeFilterIds.includes('lifelog');
                     if (showLifelogEvents) {
                         const lifelogEvents = await LifelogView.getLifelogEvents(info.start, info.end);
                         console.debug('是否显示 Lifelog 事件:', showLifelogEvents);
-                        console.debug('当前过滤视图:', filterViewId);
+                        console.debug('当前过滤视图:', activeFilterIds);
                         console.debug('当前视图类型:', calendar.view.type);
 
                         if (lifelogEvents && Array.isArray(lifelogEvents)) {
@@ -723,23 +799,31 @@ export async function run(
                 }
 
                 /////////////////////思源////////////////////////
-                const hasSpecialSource = filterViewId.some(isSpecialCalendarSource);
-                const needsNormalEvents = filterViewId.some((id) => !isSpecialCalendarSource(id));
-                // 1. 获取引用ID（普通事件）
-                av_ids = needsNormalEvents ? await moduleInstances['M_calendar'].getAVreferenceid() : [];
-                const showRecurring = filterViewId.includes('recurring');
+                const hasSpecialSource = activeFilterIds.some(isSpecialCalendarSource);
+                const needsNormalEvents = activeFilterIds.some((id) => !isSpecialCalendarSource(id));
+                // 1. 获取引用ID（普通事件，局部保存，避免特殊视图实例清空全局 av_ids）
+                const fetchedAvIds = needsNormalEvents ? await moduleInstances['M_calendar'].getAVreferenceid() : [];
+                instanceState.avIds = fetchedAvIds || [];
+                if (fetchedAvIds?.length) {
+                    av_ids = fetchedAvIds;
+                }
+                const showRecurring = activeFilterIds.includes('recurring');
                 // 没有普通视图引用且未选择特殊来源时，无需继续请求数据。
-                if (!av_ids?.length && !hasSpecialSource) {
+                if (!instanceState.avIds?.length && !hasSpecialSource) {
                     console.warn('No reference IDs found and no view selected');
+                    instanceState.viewValue = [];
+                    instanceState.viewValueZq = [];
+                    instanceState.unscheduledEvents = [];
+                    updatePlanButtonLabel();
                     successCallback([]);
                     return;
                 }
 
                 // 2. 获取视图ID
-                const allViewIDs = av_ids?.length ? await myF.getViewId(av_ids) : [];
-                // 在拉取视图数据之前按 filterViewId 过滤：避免为用户未选择的视图也发起
+                const allViewIDs = instanceState.avIds?.length ? await myF.getViewId(instanceState.avIds) : [];
+                // 在拉取视图数据之前按 activeFilterIds 过滤：避免为用户未选择的视图也发起
                 // renderAttributeView 网络请求（原先先全量拉取再用 filterViewValue 丢弃，浪费请求）。
-                const viewIDs = allViewIDs.filter(v => filterViewId.includes(v.viewId));
+                const viewIDs = allViewIDs.filter(v => activeFilterIds.includes(v.viewId));
                 // 仅在需要显示周期事件时获取周期视图ID
                 const av_ids_zq = showRecurring ? await moduleInstances['M_calendar'].getAVreferenceid("周期") : [];
                 const viewIDs_zq = (showRecurring && av_ids_zq?.length) ? await myF.getViewId(av_ids_zq) : [];
@@ -747,20 +831,33 @@ export async function run(
                 // 修改视图ID检查逻辑
                 if (!viewIDs?.length && !hasSpecialSource) {
                     console.warn('No view IDs found and no special views selected');
+                    instanceState.viewValue = [];
+                    instanceState.viewValueZq = [];
+                    instanceState.unscheduledEvents = [];
+                    updatePlanButtonLabel();
                     successCallback([]);
                     return;
                 }
 
                 // 3. 获取视图数据（viewIDs 已仅含选中视图，不再发起多余请求）
-                viewValue = viewIDs?.length ? await myF.getViewValue(viewIDs) : [];
-                viewValue_zq = (showRecurring && viewIDs_zq?.length) ? await myF.getViewValue(viewIDs_zq, true) : [];
-                // console.debug("View data:", viewValue, "周期", viewValue_zq);
+                const rawViewValue = viewIDs?.length ? await myF.getViewValue(viewIDs) : [];
+                const rawViewValueZq = (showRecurring && viewIDs_zq?.length) ? await myF.getViewValue(viewIDs_zq, true) : [];
 
                 // 3.5 二次筛选（viewIDs 已过滤，这里主要保留"未找到匹配的视图"提示）
-                viewValue = await myF.filterViewValue(viewValue, filterViewId);
+                const filteredViewValue = await myF.filterViewValue(rawViewValue, activeFilterIds);
+                instanceState.viewValue = filteredViewValue;
+                instanceState.viewValueZq = rawViewValueZq;
+                if (!instanceState.pinnedViewId) {
+                    viewValue = filteredViewValue;
+                }
 
-                // 4. 转换事件数据
-                const events = await myF.convertToFullCalendarEvents(viewValue, viewValue_zq);
+                // 4. 转换事件数据（待安排列表由当前实例独占保存，避免双开互相覆盖）
+                const events = await myF.convertToFullCalendarEvents(filteredViewValue, rawViewValueZq, {
+                    updateGlobalUnscheduled: false,
+                    onUnscheduledCollected: (list) => {
+                        instanceState.unscheduledEvents = list;
+                    },
+                });
                 // console.debug('Fetched calendar events:', events);
                 allEvents = allEvents.concat(events);
 
@@ -849,26 +946,24 @@ export async function run(
                     e.preventDefault();
                     if (settingdata["cal-create-way"] === "1") {
                         if (info.event._def.extendedProps.isRecurring) {
-                            // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
+                            toggleRecurringEventCompletion(info.event, calendar);
                             return;
                         } else {
                             await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid, null, null, true);
                             return;
                         }
                     }
-                    let clickTimeout: NodeJS.Timeout;
-                    clicks2++;
-                    if (clicks2 === 1) {
-                        clickTimeout = setTimeout(() => {
-                            clicks2 = 0;
+                    instanceState.contextClicks++;
+                    if (instanceState.contextClicks === 1) {
+                        clearTimeout(instanceState.contextClickTimer);
+                        instanceState.contextClickTimer = setTimeout(() => {
+                            instanceState.contextClicks = 0;
                         }, 400);
-                    } else if (clicks2 === 2) {
-                        clearTimeout(clickTimeout);
-                        clicks2 = 0;
+                    } else if (instanceState.contextClicks === 2) {
+                        clearTimeout(instanceState.contextClickTimer);
+                        instanceState.contextClicks = 0;
                         if (info.event._def.extendedProps.isRecurring) {
-                            // console.debug('周期事件点击日期:', info.event.start.toLocaleDateString());
-                            myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0], calendar);
+                            toggleRecurringEventCompletion(info.event, calendar);
                             return;
                         } else {
                             await myF.showEvent(info.event.extendedProps.blockId, info.event.extendedProps.rootid, null, null, true);
@@ -990,8 +1085,10 @@ export async function run(
             const statusText = statusValForTip === '归档'
                 ? '归档'
                 : (isCompleted ? '完成' : (statusValForTip || '未设置'));
-            if (settingdata["cal-event-tooltip"]) tippy(info.el, {
-                content: `
+            if (settingdata["cal-event-tooltip"]) {
+                (info.el as any)._stTippy?.destroy?.();
+                (info.el as any)._stTippy = tippy(info.el, {
+                    content: `
                     <div class="event-tooltip">
                         <span class="event-tooltip__title">
                             ${info.event.title}
@@ -1010,14 +1107,22 @@ export async function run(
                             </div>
                         </div>
                     `,
-                allowHTML: true,
-                placement: 'auto',
-                interactive: true,
-                zIndex: window.siyuan.zIndex,
-                appendTo: document.body,
-                theme: 'light',
-                delay: [1000, 0]
-            });
+                    allowHTML: true,
+                    placement: 'auto',
+                    interactive: true,
+                    zIndex: window.siyuan.zIndex,
+                    appendTo: document.body,
+                    theme: 'light',
+                    delay: [1000, 0]
+                });
+            }
+        },
+        eventWillUnmount: function (info) {
+            const tip = (info.el as any)?._stTippy;
+            if (tip) {
+                tip.destroy();
+                delete (info.el as any)._stTippy;
+            }
         },
     });
     registerCalendarInstance(calendar);
@@ -1027,6 +1132,30 @@ export async function run(
     updatePlanButtonLabel();
     setupCalendarAutoHeight(calendarEl, calendar);
     setupWeekHorizontalSwipe(calendarEl, calendar);
+
+    const baseDestroy = calendar.destroy.bind(calendar);
+    calendar.destroy = () => {
+        clearTimeout(instanceState.dateClickTimer);
+        clearTimeout(instanceState.eventClickTimer);
+        clearTimeout(instanceState.contextClickTimer);
+        unsubscribeUnscheduledRemoval();
+        unscheduled.destroy();
+        if (activeTimeGhostEl) {
+            activeTimeGhostEl.remove();
+            activeTimeGhostEl = null;
+        }
+        if (timeGhostMoveHandler) {
+            document.removeEventListener('mousemove', timeGhostMoveHandler);
+            timeGhostMoveHandler = null;
+        }
+        calendarEl.querySelector('[data-st-status-drop-zone]')?.remove();
+        floatingCleanup?.();
+        unregisterCalendarInstance(calendar);
+        baseDestroy();
+        if (OUTcalendar === calendar) {
+            OUTcalendar = getPreferredCalendar() as Calendar;
+        }
+    };
     return calendar;
 }
 
@@ -1351,10 +1480,11 @@ function computeCalendarHeight(calendarEl: HTMLElement): number {
 }
 
 function displayStatusDropZone(calendarEl: HTMLElement, info) {
-    let statusDropZone = document.getElementById('status-drop-zone');
+    let statusDropZone = calendarEl.querySelector<HTMLElement>('[data-st-status-drop-zone]');
     if (!statusDropZone) {
         statusDropZone = document.createElement('div');
-        statusDropZone.id = 'status-drop-zone';
+        statusDropZone.className = 'status-drop-zone';
+        statusDropZone.setAttribute('data-st-status-drop-zone', 'true');
         statusDropZone.innerHTML = '<div>拖放到此处将切换事件状态</div>';
 
         // 添加样式
@@ -1393,9 +1523,9 @@ function displayStatusDropZone(calendarEl: HTMLElement, info) {
     statusDropZone.style.opacity = '1';
 }
 
-function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
+function displayStatusDropZone_done(calendarEl: HTMLElement, calendar: Calendar, info) {
     // 获取拖放区域和标题区域
-    const statusDropZone = document.getElementById('status-drop-zone');
+    const statusDropZone = calendarEl.querySelector<HTMLElement>('[data-st-status-drop-zone]');
     const headerToolbar = calendarEl.querySelector('.fc-header-toolbar');
     if (statusDropZone) {
         statusDropZone.style.opacity = '0';
@@ -1417,8 +1547,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
             // info.revert = true;
 
             if (info.event.extendedProps.isRecurring) {
-                // 周期性事件处理（在模块级 helper 中无法拿到具体 calendar 实例引用）
-                myF.changestatus_for_zq(info.event.extendedProps, info.event.start.toISOString().split('T')[0]);
+                toggleRecurringEventCompletion(info.event, calendar);
                 showMessage('已将当前日期标记为完成', 3000);
             } else {
                 // 普通事件处理
@@ -1445,6 +1574,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                             // 会基于 status 重新应用，无需全量刷新当前日历。
                             try {
                                 info.event.setExtendedProp('status', '归档');
+                                rememberPendingCalendarEventPatch(info.event, 6000);
                             } catch (e) { /* ignore */ }
                             // patch viewValueCache 让其他可见日历 refetch 时能看到归档态
                             try {
@@ -1460,7 +1590,7 @@ function displayStatusDropZone_done(calendarEl: HTMLElement, info) {
                                 setBlockAttrs(blockId, { 'custom-st-event': archivedAttr });
                             } catch (e) { /* ignore */ }
                             // 同步其他可见日历
-                            refetchPeerCalendars(null);
+                            refetchPeerCalendars(calendar);
                         }).catch(error => {
                             console.error('更新事件状态失败:', error);
                             showMessage('更新事件状态失败', 3000, 'error');
@@ -1620,12 +1750,11 @@ function validateTimeFormat(timeStr: string, defaultValue: string): string {
  * 更新跟随鼠标的时间指示器
  * @param e 鼠标事件
  */
-function updateTimeGhost(e: MouseEvent) {
-    const timeGhost = document.getElementById('fc-time-ghost');
+function updateTimeGhost(e: MouseEvent, calendarEl: HTMLElement, timeGhost: HTMLElement | null) {
     if (!timeGhost) return;
 
-    // 获取当前鼠标位置对应的时间格子
-    const fcGrid = document.querySelector('.fc-timegrid-body');
+    // 获取当前鼠标位置对应的时间格子（仅限当前日历实例内部 DOM）
+    const fcGrid = calendarEl.querySelector('.fc-timegrid-body');
     if (fcGrid) {
         const rect = fcGrid.getBoundingClientRect();
         const withinGrid =
@@ -1636,7 +1765,7 @@ function updateTimeGhost(e: MouseEvent) {
 
         if (withinGrid) {
             // 计算鼠标悬停位置对应的时间
-            const slots = document.querySelectorAll('.fc-timegrid-slot-label');
+            const slots = calendarEl.querySelectorAll('.fc-timegrid-slot-label');
             let hoveredTime = '未知时间';
 
             // 寻找最接近的时间刻度

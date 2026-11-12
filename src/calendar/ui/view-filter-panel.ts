@@ -1,4 +1,5 @@
 import { calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
+import { activeCalendars } from '@/calendar/core/calendar-runtime';
 import { av_ids } from './calendar-view';
 import {
     ViewGroup,
@@ -35,6 +36,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 }
 
 // ============== 主入口 ==============
+let activeViewFilterClose: (() => void) | null = null;
+
 export async function createViewFilterMenu(
     calendarEl: HTMLElement,
     myF: any,
@@ -42,19 +45,26 @@ export async function createViewFilterMenu(
     filterViewId: string[],
     setFilterViewId: (ids: string[]) => void,
     refreshCalendar: () => void,
-    lastSavedLifelogSlotDuration: string
+    lastSavedLifelogSlotDuration: string,
+    instanceAvIds?: string[],
 ) {
     const button = calendarEl.querySelector('.fc-viewFilter-button') as HTMLElement | null;
     if (!button) return;
 
+    // 如果已有展开的筛选浮层，先关闭避免双开冲突与监听器泄漏
+    activeViewFilterClose?.();
+
     // 同步 UI 状态与配置
     const configViewIds = moduleInstances['M_calendar'].calConfig.getViewIds();
-    if (JSON.stringify(configViewIds.sort()) !== JSON.stringify(filterViewId.sort())) {
+    if (JSON.stringify(configViewIds.slice().sort()) !== JSON.stringify(filterViewId.slice().sort())) {
         setFilterViewId(configViewIds);
         filterViewId = configViewIds;
     }
 
-    const viewIDs = await myF.getViewId(av_ids);
+    const effectiveAvIds = (instanceAvIds && instanceAvIds.length > 0)
+        ? instanceAvIds
+        : (av_ids?.length > 0 ? av_ids : await moduleInstances['M_calendar'].getAVreferenceid());
+    const viewIDs = await myF.getViewId(effectiveAvIds || []);
     const allViewIds = getAllViewIds(viewIDs);
 
     // ---- 菜单容器 ----
@@ -254,12 +264,18 @@ export async function createViewFilterMenu(
             const cur = moduleInstances['M_calendar'].calConfig.getViewIds();
             const willCheck = !cur.includes('lifelog');
             const next = willCheck ? [...cur, 'lifelog'] : cur.filter(id => id !== 'lifelog');
-            calendar.setOption('slotDuration', willCheck ? '00:10:00' : lastSavedLifelogSlotDuration);
+            const nextSlotDuration = willCheck ? '00:10:00' : lastSavedLifelogSlotDuration;
+            for (const cal of activeCalendars) {
+                try { cal.setOption('slotDuration', nextSlotDuration); } catch { /* ignore */ }
+            }
+            if (!activeCalendars.includes(calendar)) {
+                calendar.setOption('slotDuration', nextSlotDuration);
+            }
             moduleInstances['M_calendar'].calConfig.setViewIds(next);
             moduleInstances['M_calendar'].calConfig.set('viewName', '多视图');
             moduleInstances['M_calendar'].calConfig.save();
             setFilterViewId(next);
-            calendar.refetchEvents();
+            refreshCalendar();
         } else {
             moduleInstances['M_calendar'].calConfig.toggleViewId(viewId);
             moduleInstances['M_calendar'].calConfig.set('viewName', '多视图');
@@ -339,11 +355,18 @@ export async function createViewFilterMenu(
     setTimeout(() => searchInput.focus(), 60);
 
     // ---- 关闭逻辑 ----
+    let closed = false;
     function closeMenu() {
+        if (closed) return;
+        closed = true;
+        if (activeViewFilterClose === closeMenu) {
+            activeViewFilterClose = null;
+        }
         menu.classList.add('vf-leave');
         setTimeout(() => menu.remove(), 140);
         document.removeEventListener('mousedown', onDocMouseDown, true);
     }
+    activeViewFilterClose = closeMenu;
     function onDocMouseDown(e: MouseEvent) {
         const target = e.target as Node;
         if (!menu.contains(target) && target !== button && !button.contains(target)) {

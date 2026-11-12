@@ -15,9 +15,6 @@ STEVETOOLS
 若打赏过，遇到BUG可以反馈，我尽量抽出时间尽力解决一下；有个人需求可以提，如果实现简单我会顺手做了。  
 为方便和打赏用户沟通，故临时建了反馈QQ群（随时可能解散），加之前请填一下[申请表](https://www.kdocs.cn/wo/sl/v1lC0R0)
 
-### 兼容性
-已适配思源笔记 **3.8**（含 3.8.x），同时保留 3.7 的兼容能力，`minAppVersion` 仍为 3.7.0。  
-若只想面向 3.8+ 用户，把 `plugin.json` 里的 `minAppVersion` 改成 `3.8.0` 即可。
 
 #### 目前工具 ([插件演示和教程](https://ld246.com/search?q=sttools))
 1. 互联日程管理：   （[相关演示](https://ld246.com/article/1737464243546?r=stevehfut)） [简单教程](https://ld246.com/article/1738929421466?r=stevehfut)   [视频教程](https://ld246.com/article/1739584703693)  

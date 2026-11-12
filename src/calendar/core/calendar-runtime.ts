@@ -33,10 +33,17 @@ export function registerCalendarInstance(calendar: Calendar) {
 }
 
 export function unregisterCalendarInstance(calendar: Calendar) {
+    peerRefreshExclusions.delete(calendar);
     const index = activeCalendars.indexOf(calendar);
     if (index >= 0) {
         activeCalendars.splice(index, 1);
     }
+}
+
+/** Return the most recently registered connected FullCalendar instance, if any. */
+export function getPreferredCalendar(): Calendar | undefined {
+    pruneInactiveCalendars();
+    return activeCalendars.length > 0 ? activeCalendars[activeCalendars.length - 1] : undefined;
 }
 
 /** Debounced refresh for all visible calendar instances. */

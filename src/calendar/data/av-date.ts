@@ -169,3 +169,169 @@ export function extractCalendarCellDateRange(timeCell: any): ExtractedCalendarDa
         isNotTime: Boolean(dateValue.isNotTime),
     };
 }
+
+export interface FullCalendarEventRange {
+    start: Date;
+    end: Date | null;
+}
+
+export interface SiYuanUpdateDateRange {
+    startInput: string;
+    endInput?: string;
+    startMs: number | null;
+    endMs: number | null;
+    hasEndDate: boolean;
+}
+
+const DATE_ONLY_RE = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+
+function toLocalDate(input?: Date | number | string | null): Date | null {
+    if (input === undefined || input === null || input === '') {
+        return null;
+    }
+    if (input instanceof Date) {
+        return Number.isNaN(input.getTime()) ? null : new Date(input.getTime());
+    }
+    if (typeof input === 'string') {
+        const match = DATE_ONLY_RE.exec(input.trim());
+        if (match) {
+            const year = Number(match[1]);
+            const month = Number(match[2]);
+            const day = Number(match[3]);
+            const local = new Date(year, month - 1, day, 0, 0, 0, 0);
+            return Number.isNaN(local.getTime()) ? null : local;
+        }
+    }
+    const parsed = new Date(input);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function calendarDayStart(value: Date | number): number {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+}
+
+export function addLocalCalendarDays(value: Date | number, days: number): number {
+    const date = new Date(value);
+    date.setDate(date.getDate() + days);
+    return date.getTime();
+}
+
+function localMorningTimestamp(value: Date | number): number {
+    const date = new Date(value);
+    date.setHours(8, 0, 0, 0);
+    return date.getTime();
+}
+
+/**
+ * 将思源 AV 日期起止转换为 FullCalendar 事件起止。
+ * 与 SiYuan `kernel/av/layout_calendar.go` 的 `CalendarInterval` 保持一致：
+ * 全天事件在思源中结束日为闭区间（包含当天），而 FullCalendar 的 `end` 为半开区间（不包含结束日）。
+ */
+export function resolveFullCalendarEventRange(input: {
+    start: Date | number | string;
+    end?: Date | number | string | null;
+    allDay: boolean;
+}): FullCalendarEventRange {
+    const startDate = toLocalDate(input.start) ?? new Date(new Date().setHours(8, 0, 0, 0));
+    const endDate = toLocalDate(input.end);
+
+    if (!input.allDay) {
+        return {
+            start: startDate,
+            end: endDate,
+        };
+    }
+
+    const startDay = calendarDayStart(startDate);
+    if (!endDate) {
+        return {
+            start: new Date(startDay),
+            end: null,
+        };
+    }
+
+    const endDay = calendarDayStart(endDate);
+    if (endDay > startDay) {
+        return {
+            start: new Date(startDay),
+            end: new Date(addLocalCalendarDays(endDay, 1)),
+        };
+    }
+
+    return {
+        start: new Date(startDay),
+        end: null,
+    };
+}
+
+/**
+ * 将 FullCalendar 的拖放/缩放结果转换为思源 AV 写入值与本地缓存时间戳。
+ * 无论拖放（eventDrop）还是缩放（eventResize），全天事件都需要将 FullCalendar 的半开 `end` 还原为思源的闭区间结束日。
+ */
+export function resolveSiYuanUpdateDateRange(input: {
+    startStr?: string | null;
+    endStr?: string | null;
+    start?: Date | null;
+    end?: Date | null;
+    allDay: boolean;
+    defaultDurationHours?: number;
+}): SiYuanUpdateDateRange {
+    if (input.allDay) {
+        const startLocal = toLocalDate(input.startStr || input.start);
+        if (!startLocal) {
+            return { startInput: '', startMs: null, endMs: null, hasEndDate: false };
+        }
+        const startDay = calendarDayStart(startLocal);
+        const startInput = formatLocalDailyNoteDate(new Date(startDay)) || '';
+        const startMs = localMorningTimestamp(startDay);
+
+        const rawEnd = input.endStr ? toLocalDate(input.endStr) : toLocalDate(input.end);
+        let endInput: string | undefined;
+        let endMs: number | null = null;
+        if (rawEnd) {
+            // FullCalendar 全天事件的 end 是排他的 00:00；若落在非零时刻则保留当日。
+            const isMidnight = rawEnd.getHours() === 0
+                && rawEnd.getMinutes() === 0
+                && rawEnd.getSeconds() === 0
+                && rawEnd.getMilliseconds() === 0;
+            const inclusiveEndDay = isMidnight
+                ? addLocalCalendarDays(calendarDayStart(rawEnd), -1)
+                : calendarDayStart(rawEnd);
+            if (inclusiveEndDay > startDay) {
+                endInput = formatLocalDailyNoteDate(new Date(inclusiveEndDay));
+                endMs = localMorningTimestamp(inclusiveEndDay);
+            }
+        }
+
+        return {
+            startInput,
+            endInput,
+            startMs,
+            endMs,
+            hasEndDate: Boolean(endInput),
+        };
+    }
+
+    const startInput = input.startStr || (input.start ? input.start.toISOString() : '');
+    const endInput = input.endStr ? input.endStr : (input.end ? input.end.toISOString() : undefined);
+    const parsedStart = startInput ? toLocalDate(startInput) : null;
+    const startMs = parsedStart ? parsedStart.getTime() : null;
+    let endMs: number | null = null;
+    if (endInput) {
+        const parsedEnd = toLocalDate(endInput);
+        endMs = parsedEnd ? parsedEnd.getTime() : null;
+    } else if (startMs !== null) {
+        const hours = Number(input.defaultDurationHours) || 0;
+        endMs = startMs + hours * 60 * 60 * 1000;
+    }
+
+    return {
+        startInput,
+        endInput,
+        startMs,
+        endMs,
+        hasEndDate: endMs !== null,
+    };
+}
