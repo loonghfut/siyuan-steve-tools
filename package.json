@@ -14,7 +14,7 @@
     "b": "cross-env NODE_ENV=production vite build",
     "dev": "npm run d",
     "build": "npm run b",
-    "test": "node --experimental-strip-types --test src/libs/*.test.ts src/api/*.test.ts src/calendar/config/*.test.ts",
+    "test": "node --experimental-strip-types --test src/libs/*.test.ts src/api/*.test.ts src/calendar/config/*.test.ts src/calendar/data/*.test.ts src/calendar/integrations/dida/mappers/*.test.ts",
     "make-link": "node --no-warnings ./scripts/make_dev_link.js",
     "make-link-win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/elevate.ps1 -scriptPath ./scripts/make_dev_link.js",
     "make-install": "pnpm run build && node --no-warnings ./scripts/make_install.js",

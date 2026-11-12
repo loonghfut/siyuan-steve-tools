@@ -18,7 +18,7 @@ import { LifelogView } from './integrations/lifelog-event-source';
 import { icsFileManager, transformEvents } from './integrations/ics/IcsFileManager';
 import { createScheduleInConfiguredDatabase } from './features/schedule-creation';
 import { openScheduleEditor } from './features/schedule-editor';
-import { addQuickAddButton, getCursorContainer } from './features/quick-add';
+import { addQuickAddButton, runQuickAddFromProtyle, getCursorContainer } from './features/quick-add';
 import { M_caldata } from "./config/calendar-view-config";
 import { ics_s3 } from "./integrations/share/s3";
 import { WebDAVSync } from "./integrations/share/webdav";
@@ -115,7 +115,7 @@ export class M_calendar {
     public calendarAV: IAVOperator;
 
     async init(settingdata: { [x: string]: any; }) {
-        configureCalendarContext(settingdata, this);
+        configureCalendarContext(settingdata, this, this.plugin.app);
         this.unregisterCellWriteLifecycle?.();
         this.unregisterCellWriteLifecycle = registerCalendarCellWriteLifecycle();
         this.plugin.addTab({
@@ -262,11 +262,20 @@ export class M_calendar {
         const shareChanged = shareSnapshot !== this.shareConfigSnapshot;
         this_settingdata = settingdata;
         // 让日历内部（视图、数据、ics 集成等）读到最新配置
-        configureCalendarContext(settingdata, this);
+        configureCalendarContext(settingdata, this, this.plugin.app);
         // ics 文件名（订阅地址）
         configureCalendarPaths(settingdata["cal-url"]);
-        // ICS 导入器缓存了配置
-        this.icsImporter?.updateSettings?.(settingdata);
+        // ICS 导入器配置同步（开启时按需创建，关闭时销毁释放顶栏）
+        if (settingdata["cal-ics-subscribe-import"] == true) {
+            if (!this.icsImporter) {
+                this.icsImporter = new ICSImporter(this.plugin);
+            } else {
+                this.icsImporter.updateSettings?.(settingdata);
+            }
+        } else if (this.icsImporter) {
+            this.icsImporter.destroy?.();
+            this.icsImporter = undefined;
+        }
         // 顶栏按钮显隐
         this.applyTopBarButtons();
         // 自动更新监听开关
@@ -336,7 +345,7 @@ export class M_calendar {
             if (msg.cmd === "transactions") {
                 const operations = (msg.data || []).flatMap((transaction: any) => transaction?.doOperations || []);
                 const cellWrites = operations.filter((op: any) =>
-                    op?.action === 'updateAttrViewCell' && op?.avID
+                    (op?.action === 'updateAttrViewCell' || op?.action === 'updateAttrViewCells') && op?.avID
                 );
                 if (cellWrites.length > 0) {
                     const managedAvIds = new Set(await this.getManagedCalendarAvIds());
@@ -357,11 +366,25 @@ export class M_calendar {
         };
     }
 
+    private breadcrumbQuickAddRegistered = false;
+
     async onLayoutReady() {
-        this.switchProtyleLayoutHandler = (e) => {
-            addQuickAddButton(e);
-        };
-        this.plugin.eventBus.on('switch-protyle', this.switchProtyleLayoutHandler);
+        if (typeof (this.plugin as any).addBreadcrumbButton === 'function') {
+            this.plugin.addBreadcrumbButton({
+                id: 'st-cal-quick-add',
+                icon: 'iconCalendar',
+                title: '一键识别日程',
+                callback: (_event, protyle) => {
+                    void runQuickAddFromProtyle(protyle);
+                },
+            });
+            this.breadcrumbQuickAddRegistered = true;
+        } else {
+            this.switchProtyleLayoutHandler = (e) => {
+                addQuickAddButton(e);
+            };
+            this.plugin.eventBus.on('switch-protyle', this.switchProtyleLayoutHandler);
+        }
 
         //悬浮显示
         if (this_settingdata["cal-show-float-view"]) {
@@ -623,12 +646,15 @@ export class M_calendar {
             // // steveTools.outlog(targetSpans, "targetSpans");
 
             targetSpans.forEach(targetSpan => {
+                // 思源 3.8+ 将 av-add-more 与 av-add-template 包裹在 .av__new split-button 容器中，插入到容器外侧保持原生排版
+                const anchor = targetSpan.closest('.av__new') || targetSpan;
                 // 检查目标元素的右边是否已经存在按钮
-                if (!targetSpan.nextSibling || !(targetSpan.nextSibling instanceof HTMLElement) || !targetSpan.nextSibling.classList.contains('st-plugin-button')) {
+                if (!anchor.nextSibling || !(anchor.nextSibling instanceof HTMLElement) || !anchor.nextSibling.classList.contains('st-plugin-button')) {
                     // 创建一个新的按钮元素
                     const button = document.createElement('button');
                     button.innerHTML = '<svg><use xlink:href="#iconCalendar"></use></svg>';
                     button.className = 'block__icon ariaLabel st-plugin-button'; // 确保样式统一，并添加一个标识类
+                    button.setAttribute('aria-label', '打开日程视图');
 
                     // 添加按钮点击事件
                     button.addEventListener('click', async () => {
@@ -661,8 +687,8 @@ export class M_calendar {
                             await this.openRiChengViewDialog(false, dataId);
                         }
                     });
-                    // 将按钮插入到目标 <span> 元素的右边
-                    targetSpan.parentNode.insertBefore(button, targetSpan.nextSibling);
+                    // 将按钮插入到锚点元素的右边
+                    anchor.parentNode?.insertBefore(button, anchor.nextSibling);
                 }
             });
         }, 500); // 延迟 500 毫秒
@@ -694,7 +720,7 @@ export class M_calendar {
 
     async openRiChengView() {
         await openTab({
-            app: window.siyuan.ws.app,
+            app: this.plugin.app || window.siyuan.ws.app,
             custom: {
                 icon: "iconSTcal",
                 title: `日程视图`,
@@ -707,6 +733,14 @@ export class M_calendar {
 
 
     onunload() {
+        if (this.breadcrumbQuickAddRegistered) {
+            try {
+                this.plugin.removeBreadcrumbButton?.('st-cal-quick-add');
+            } catch (error) {
+                console.warn("移除面包屑日程按钮失败", error);
+            }
+            this.breadcrumbQuickAddRegistered = false;
+        }
         if (this.loadedProtyleHandler) {
             try {
                 this.plugin.eventBus.off("loaded-protyle-dynamic", this.loadedProtyleHandler);
@@ -762,6 +796,28 @@ export class M_calendar {
         if (this.lifelogRefreshTimer) {
             clearTimeout(this.lifelogRefreshTimer);
             this.lifelogRefreshTimer = undefined;
+        }
+        try {
+            this.icsImporter?.destroy?.();
+        } catch (error) {
+            console.warn("销毁 ICS 导入器失败", error);
+        }
+        this.icsImporter = undefined;
+        try {
+            this.handUpdateTopBar = applyTopBarButton(this.plugin, this.handUpdateTopBar, "st-cal-hand-update", {
+                icon: "iconSTcal",
+                title: "立刻生成ics文件",
+                position: "right",
+                callback: () => {},
+            }, false);
+            this.showViewTopBar = applyTopBarButton(this.plugin, this.showViewTopBar, "st-cal-show-view", {
+                icon: "iconCalendar",
+                title: "日程视图",
+                position: "left",
+                callback: () => {},
+            }, false);
+        } catch (error) {
+            console.warn("移除日历顶栏按钮失败", error);
         }
         try {
             DidaService?.destroy?.();

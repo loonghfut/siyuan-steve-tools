@@ -2,7 +2,7 @@ import * as api from '@/api/api';
 import { resolveAvBlockId } from '@/api/api3';
 import { ViewItem } from '@/calendar/core/types';
 import * as sy from 'siyuan'
-import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
+import { calendarSettings as settingdata, calendarModules as moduleInstances, getCalendarApp } from '@/calendar/core/calendar-context';
 import { Calendar, DurationInput } from '@fullcalendar/core';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/core/types";
@@ -15,7 +15,8 @@ import {
     parseTitle,
 } from '@/calendar/features/quick-add/content-metadata';
 import { parseScheduleTime } from '@/calendar/features/quick-add/time-parser';
-import { createDailynote } from '@frostime/siyuan-plugin-kits';
+import { extractCalendarCellDateRange } from './av-date';
+import { createDailyNoteForDate } from './daily-note';
 import { getRequiredFields, readCalendarDateKeyID, resolveCalendarDateFieldName } from '@/calendar/config/field-config';
 import type { CalendarWriteReason } from '@/calendar/core/calendar-self-write';
 import { markCalendarBlockWrite } from '@/calendar/core/calendar-self-write';
@@ -451,6 +452,37 @@ export async function getViewValue(viewIds_Data: ViewItem[], isZQ = false, type 
 
 
 
+/** Resolves field/column definitions from an AV view payload, falling back to `groups[0]` for grouped views. */
+function resolveViewFields(viewData: any, isGalleryView: boolean): any[] {
+    if (!viewData) {
+        return [];
+    }
+    const primary = isGalleryView ? viewData.fields : viewData.columns;
+    if (Array.isArray(primary) && primary.length > 0) {
+        return primary;
+    }
+    if (Array.isArray(viewData.groups) && viewData.groups.length > 0) {
+        const groupFields = isGalleryView ? viewData.groups[0]?.fields : viewData.groups[0]?.columns;
+        if (Array.isArray(groupFields)) {
+            return groupFields;
+        }
+    }
+    return Array.isArray(primary) ? primary : [];
+}
+
+/** Populates `fieldMap` from resolved field/column descriptors. */
+function populateFieldMap(fieldMap: Map<string, { id: string; index: number }>, fields: any[]): void {
+    fieldMap.clear();
+    fields.forEach((field: any, index: number) => {
+        if (field && field.name) {
+            fieldMap.set(field.name, {
+                id: field.id,
+                index, // index is for Table view
+            });
+        }
+    });
+}
+
 async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal", viewID?: string, viewType?: string, blockID?: string) {
     // console.debug("🚧🚧🚧🚧🚧🚧", data);
     // 思源 3.8 扩展了 AV 布局类型（kernel/av/av.go 的 LayoutType：table|list|gallery|kanban|calendar）。
@@ -481,25 +513,9 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     // 1. 创建字段映射
     // console.debug("DATA：", data);
     const fieldMap = new Map();
-    // 分组看板优先使用顶层 fields，否则回退到第一个分组的 fields
-    let fields = isGalleryView ? data.fields : data.columns;
-    if (isGroupedGalleryView) {
-        if (!fields || fields.length === 0) {
-            fields = data.groups[0]?.fields || [];
-        }
-    } else if (isGroupedTableView) {
-        if (!fields || fields.length === 0) {
-            fields = data.groups[0]?.columns || [];
-        }
-    }
-    fields.forEach((field: any, index: number) => {
-        if (field && field.name) {
-            fieldMap.set(field.name, {
-                id: field.id,
-                index: index // index is for Table view
-            });
-        }
-    });
+    // 分组看板/表格优先使用顶层 fields/columns，否则回退到第一个分组
+    const fields = resolveViewFields(data, isGalleryView);
+    populateFieldMap(fieldMap, fields);
 
     // 日历布局用 settings.dateKeyID 指定「哪一列是日期」（kernel/av/layout_calendar.go 的 CalendarSettings）。
     // 这一列未必叫「开始时间」，因此按 keyID 反查列名，事件时间以它为准；取不到再回退到「开始时间」。
@@ -529,22 +545,17 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 }
 
                 // 重新获取视图数据以包含新创建的字段
-                // 显式带上 viewID：思源 3.8 移除了 AV 顶层持久化的「当前视图」，
-                // 不传 viewID 会回退到第一个视图，可能与当前视图的列/字段结构不一致。
-                const updatedViewValue = await api.renderAttributeView(avID, viewID);
+                // 显式带上 viewID 与 blockID：思源 3.8 移除了 AV 顶层持久化的「当前视图」，
+                // 不传 viewID 会回退到第一个视图，不传 blockID 会丢失块级上下文筛选。
+                const resolvedBlockID = blockID || await resolveAvBlockId(avID);
+                const updatedViewValue = await api.renderAttributeView(avID, viewID, {
+                    blockID: resolvedBlockID,
+                });
                 const updatedData = updatedViewValue.view;
 
-                // 更新字段映射
-                fieldMap.clear();
-                const updatedFields = isGalleryView ? updatedData.fields : updatedData.columns;
-                updatedFields.forEach((field: any, index: number) => {
-                    if (field && field.name) {
-                        fieldMap.set(field.name, {
-                            id: field.id,
-                            index: index
-                        });
-                    }
-                });
+                // 更新字段映射（复用分组视图回退与空值保护）
+                const updatedFields = resolveViewFields(updatedData, isGalleryView);
+                populateFieldMap(fieldMap, updatedFields);
 
                 // 使用更新后的数据
                 data = updatedData;
@@ -581,7 +592,8 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     // 需要单独取回，否则这些待安排事件会从插件日历里消失。
     if (isCalendarLayout) {
         try {
-            const undated = await api.getAttributeViewCalendarUndated(avID, { blockID, viewID });
+            const resolvedBlockID = blockID || await resolveAvBlockId(avID);
+            const undated = await api.getAttributeViewCalendarUndated(avID, { blockID: resolvedBlockID, viewID });
             if (undated.rows.length) {
                 items = items.concat(undated.rows);
             }
@@ -631,13 +643,13 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 // 提取开始时间。日历布局下日期列由 settings.dateKeyID 指定（见上文 dateFieldName），
                 // 取到的值仍按「开始时间」存放，下游逻辑无需区分布局。
                 const timeCell = getCell(dateFieldName);
-                if (timeCell) {
-                    const dateValue = timeCell.date;
+                const extractedDate = extractCalendarCellDateRange(timeCell);
+                if (extractedDate) {
                     rowData['开始时间'] = {
-                        start: dateValue?.content || null,
-                        end: dateValue?.hasEndDate ? (dateValue?.content2 || null) : null,
-                        keyID: timeCell.keyID || '',
-                        hasEndDate: dateValue?.hasEndDate || false
+                        start: extractedDate.start,
+                        end: extractedDate.end,
+                        keyID: extractedDate.keyID,
+                        hasEndDate: extractedDate.hasEndDate,
                     };
                 }
 
@@ -1105,7 +1117,7 @@ export async function showEvent(blockID, _rootId?, isSeeMore = false, forceSeeMo
     }
     if (!seemore) {
         await sy.openTab({
-            app: window.siyuan.ws.app,
+            app: getCalendarApp(),
             doc: {
                 id: blockID,
                 action: ["cb-get-all", "cb-get-focus"],
@@ -1159,14 +1171,11 @@ export async function showEvent(blockID, _rootId?, isSeeMore = false, forceSeeMo
 
         // });
         const data = await api.getBlockAttrs(blockID);
+        // 不主动 new sy.Protyle：思源 3.8 openAttributePanel/openFileAttr 会复用已打开编辑器或自动托管并销毁 ghostProtyle，避免泄漏。
         sy.openAttributePanel({
             data: data,
             focusName: "av",
-            protyle: new sy.Protyle(window.siyuan.ws.app, document.createElement('div'), {
-                blockId: blockID,
-                rootId: blockID,
-            }).protyle,
-        })
+        });
     }
 }
 
@@ -1304,9 +1313,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     //// 创建一个新块
     let daynote_id;
     if (settingdata["cal-create-for-date"]) {
-        daynote_id = await createDailynote(settingdata["cal-create-pos"], new Date(dateStr));
+        daynote_id = await createDailyNoteForDate(settingdata["cal-create-pos"], dateStr);
     } else {
-        daynote_id = (await api.createDailyNote(window.siyuan.ws.app.appId, settingdata["cal-create-pos"])).id;
+        daynote_id = await createDailyNoteForDate(settingdata["cal-create-pos"]);
     }
     ////检查是否创建成功
     if (!daynote_id) {
@@ -1330,6 +1339,11 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     const itemID = await api.generateSiyuanID() as string;
     // // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
     // console.debug("dateStr:::", dateStr, "databaseId:::", to_db_id);
+    let cleanedUp = false;
+    let panel: sy.Protyle | null = null;
+    let debouncedHandleKeydown: ((e: Event) => void) | null = null;
+    let checkUploadingTimer: ReturnType<typeof setInterval> | null = null;
+
     const dialog = new sy.Dialog({
         title: `   <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             <span>添加事件</span>
@@ -1359,13 +1373,12 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         width: '700px',
         height: 'auto',
         destroyCallback: async () => {
+            cleanupDialog();
             if (!isok) {
                 sy.showMessage('已取消添加事件');
                 // await api.deleteBlock(id); //已知缺陷
                 setTimeout(async () => await api.deleteBlock(id), 1500);//防崩
             }
-            cancelBtn.removeEventListener('click', handleCancel);
-            okBtn.removeEventListener('click', handleKeydown);
         },
         hideCloseIcon: true,
         // disableClose: true,
@@ -1381,32 +1394,59 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     const allDayCheckbox = dialog.element.querySelector('#st-all-day') as HTMLInputElement;
     const startTimeInput = dialog.element.querySelector('#st-start-time') as HTMLInputElement;
 
-    allDayCheckbox.addEventListener('change', () => {
+    const handleAllDayChange = () => {
         if (allDayCheckbox.checked) {
             // 全天事件：设置为当天00:00
             const currentDate = startTimeInput.value.split('T')[0];
             startTimeInput.value = `${currentDate}T00:00`;
         }
-    });
+    };
+    allDayCheckbox.addEventListener('change', handleAllDayChange);
     ///////
     let ok = false;//防崩溃
-    const eventPanel = document.getElementById('eventPanel');
+    const eventPanel = dialog.element.querySelector('#eventPanel') as HTMLElement;
     const okBtn = dialog.element.querySelector('.b3-button--text');
     const cancelBtn = dialog.element.querySelector('.b3-button--cancel');
     const handleCancel = () => {
         dialog.destroy();
     };
 
+    const detachListeners = () => {
+        window.siyuan.ws.ws.removeEventListener('message', messageHandler);
+        allDayCheckbox?.removeEventListener('change', handleAllDayChange);
+        cancelBtn?.removeEventListener('click', handleCancel);
+        okBtn?.removeEventListener('click', handleKeydown);
+        if (debouncedHandleKeydown && panel?.protyle?.element) {
+            panel.protyle.element.removeEventListener('keydown', debouncedHandleKeydown);
+        }
+    };
+
+    const cleanupDialog = () => {
+        if (cleanedUp) {
+            return;
+        }
+        cleanedUp = true;
+        detachListeners();
+        if (checkUploadingTimer) {
+            clearInterval(checkUploadingTimer);
+            checkUploadingTimer = null;
+        }
+        try {
+            panel?.destroy();
+        } catch (err) {
+            console.warn('销毁创建事件 Protyle 实例失败:', err);
+        }
+        panel = null;
+    };
 
     const handleKeydown = async (e: KeyboardEvent) => {//添加事件主代码
         // console.debug(e);
         if (e.type === 'click' && !ok) { sy.showMessage('请先输入内容') }
         if ((e.key === 'Enter' && e.ctrlKey && ok) || e.type === 'click' && ok) {
             e.preventDefault();
-            window.siyuan.ws.ws.removeEventListener('message', messageHandler);
-            // await new Promise(resolve => setTimeout(resolve, 100));
             isok = true;
-            panel.protyle.element.removeEventListener('keydown', handleKeydown);
+            // 提前解绑输入与 WS 监听防止重复提交；panel 保留到 dialog.destroy() 后由 cleanupDialog 统一销毁，避免打断上传
+            detachListeners();
             // 删除空白块
             //// 获取块内容
             const block = await api.getBlockByID(id);
@@ -1507,11 +1547,13 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             // 滴答更新
             api.handleDidaListEvent(to_db_id, id, itemID);
             //////////////////
-            if (panel.isUploading()) {
-                const checkUploading = setInterval(() => {
-                    // // steveTools.outlog('destroyCallbackPANEL', panel.isUploading());
-                    if (!panel.isUploading()) {
-                        clearInterval(checkUploading);
+            if (panel?.isUploading()) {
+                checkUploadingTimer = setInterval(() => {
+                    if (!panel || !panel.isUploading()) {
+                        if (checkUploadingTimer) {
+                            clearInterval(checkUploadingTimer);
+                            checkUploadingTimer = null;
+                        }
                         if (isrefresh) {
                             setTimeout(() => calendar?.refetchEvents(), 1000);
                         }
@@ -1532,10 +1574,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         }
     };
 
-    cancelBtn.addEventListener('click', handleCancel);
-    okBtn.addEventListener('click', handleKeydown);
+    cancelBtn?.addEventListener('click', handleCancel);
+    okBtn?.addEventListener('click', handleKeydown);
 
-    const panel = new sy.Protyle(window.siyuan.ws.app, eventPanel, {
+    panel = new sy.Protyle(getCalendarApp(), eventPanel, {
         blockId: id,
         rootId: id,
         render: {
@@ -1564,7 +1606,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     window.siyuan.ws.ws.addEventListener('message', messageHandler);
     // // steveTools.outlog(msg);
 
-    const debouncedHandleKeydown = debounce(handleKeydown, 300);
+    debouncedHandleKeydown = debounce(handleKeydown, 300);
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
     // panel.focus();
 
@@ -1830,31 +1872,40 @@ export function changestatus_for_zq(event: CalendarEventExtendedProps, date: str
 }
 
 
+async function getColumnOptionsByName(
+    dbId: string,
+    columnName: string,
+    emptyFallback: string[],
+): Promise<string[]> {
+    try {
+        const keys = await api.getAttributeViewKeysByAvID(dbId);
+        let targetColumn = Array.isArray(keys) ? keys.find((col: any) => col?.name === columnName) : undefined;
+        if (!targetColumn) {
+            const blockID = await resolveAvBlockId(dbId);
+            const view = await api.renderAttributeView(dbId, undefined, {
+                blockID,
+                ignoreRows: true,
+            });
+            // 兼容表格和画廊视图
+            const columnsOrFields = view?.view?.columns || view?.view?.fields || [];
+            targetColumn = columnsOrFields.find((col: any) => col?.name === columnName);
+        }
+        if (!targetColumn) return ['无'];
+
+        const options = targetColumn.options?.map((option: any) => option.name) || [];
+        if (!options.length) {
+            return emptyFallback;
+        }
+        return options.sort();
+    } catch (error) {
+        console.error(`获取${columnName}列表失败:`, error);
+        return emptyFallback;
+    }
+}
+
 // 获取数据库中已有的分类列表
 async function getCategories(dbId: string): Promise<string[]> {
-    try {
-        const view = await api.renderAttributeView(dbId);
-
-        // 兼容表格和画廊视图
-        const columnsOrFields = view.view?.columns || view.view?.fields || [];
-        // 查找分类列
-        const categoryColumn = columnsOrFields.find((col: any) => col.name === '分类');
-        if (!categoryColumn) return ['无'];
-
-        // 直接从选项中获取分类名称
-        const categories = categoryColumn.options?.map((option: any) => option.name) || [];
-
-        // 如果没有预设选项，返回默认值
-        if (!categories.length) {
-            return ['无'];
-        }
-
-        // 返回排序后的分类列表
-        return categories.sort();
-    } catch (error) {
-        console.error('获取分类列表失败:', error);
-        return ['无'];
-    }
+    return getColumnOptionsByName(dbId, '分类', ['无']);
 }
 
 async function loadCategoryOptions(to_db_id: any, categorySelect: HTMLSelectElement) {
@@ -1880,33 +1931,7 @@ async function loadCategoryOptions(to_db_id: any, categorySelect: HTMLSelectElem
 
 // 获取数据库中已有的优先级列表
 async function getPriorities(dbId: string): Promise<string[]> {
-    try {
-        // console.debug('获取优先级列表:', dbId);
-        const view = await api.renderAttributeView(dbId);
-        // console.debug('获取优先级列表:', view);
-
-        // 兼容表格和画廊视图
-        const columnsOrFields = view.view?.columns || view.view?.fields || [];
-        // 查找优先级列
-        const priorityColumn = columnsOrFields.find((col: any) => col.name === '优先级');
-        // console.debug('获取优先级列表:', priorityColumn);
-        if (!priorityColumn) return ['无'];
-
-        // 直接从选项中获取优先级名称
-        const priorities = priorityColumn.options?.map((option: any) => option.name) || [];
-
-        // 如果没有预设选项，返回默认值
-        if (!priorities.length) {
-            return ['高', '中', '低', '无'];
-        }
-
-        // 返回排序后的优先级列表
-        // console.debug('获取优先级列表:', priorities);
-        return priorities.sort();
-    } catch (error) {
-        console.error('获取优先级列表失败:', error);
-        return ['高', '中', '低', '无'];
-    }
+    return getColumnOptionsByName(dbId, '优先级', ['高', '中', '低', '无']);
 }
 
 // 加载优先级选项

@@ -1,12 +1,140 @@
 import type { Task } from "../dida_interface";
 
 const STATUS_TAGS = ["完成", "进行中", "未完成", "归档"];
+const PRIORITY_MAP: Record<string, 0 | 1 | 3 | 5> = { "无": 0, "低": 1, "中": 3, "高": 5 };
 
 export function removeDidaLinks(title: string): string {
     return title
         .replace(/\s*\[D\]\(https:\/\/dida365\.com\/webapp\/#p\/[^/]+\/tasks\/[^)]+\)/g, "")
         .replace(/\s*\[S\]\(siyuan:\/\/blocks\/[^)]+\)/g, "")
         .trim();
+}
+
+/** 从滴答任务标题中提取回链的思源块 ID（`[S](siyuan://blocks/<id>)`）。 */
+export function extractSiyuanBlockIdFromDidaTitle(title?: string): string {
+    if (!title) return "";
+    const match = title.match(/\[S\]\(siyuan:\/\/blocks\/([^)\s]+)\)/);
+    return match?.[1] || "";
+}
+
+function normalizeDidaIsoTimestamp(dateInput: unknown): string | undefined {
+    if (!dateInput) return undefined;
+    const date = dateInput instanceof Date
+        ? dateInput
+        : (typeof dateInput === "string" || typeof dateInput === "number")
+            ? new Date(dateInput)
+            : null;
+    if (!date || Number.isNaN(date.getTime())) {
+        return undefined;
+    }
+    return date.toISOString().replace("Z", "+0000");
+}
+
+function areDidaTimestampsEqual(a?: string, b?: string): boolean {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    const parsedA = Date.parse(a);
+    const parsedB = Date.parse(b);
+    if (Number.isFinite(parsedA) && Number.isFinite(parsedB)) {
+        return parsedA === parsedB;
+    }
+    return a === b;
+}
+
+/** 将思源任务行转换为写回滴答的 updatePayload，保持与现有字段语义一致。 */
+export function buildDidaTaskUpdatePayload(
+    siyuanTask: any,
+    blockId: string,
+    cachedTask: Task,
+    defaultRemindersInput?: unknown,
+): Partial<Task> {
+    const updatePayload: Partial<Task> = {};
+    const statusText = siyuanTask?.状态?.content;
+    updatePayload.status = statusText === "完成" ? 2 : 0;
+
+    if (siyuanTask?.事件?.content) {
+        const originalTitle = removeDidaLinks(siyuanTask.事件.content);
+        updatePayload.title = `${originalTitle} [S](siyuan://blocks/${blockId})`;
+    }
+
+    const description = siyuanTask?.描述?.content;
+    if (description) {
+        updatePayload.content = description;
+    } else if (cachedTask.content) {
+        updatePayload.content = "";
+    }
+
+    const priorityText = siyuanTask?.优先级?.content;
+    if (priorityText && priorityText in PRIORITY_MAP) {
+        updatePayload.priority = PRIORITY_MAP[priorityText];
+    }
+
+    const newStartISO = siyuanTask?.开始时间?.start
+        ? normalizeDidaIsoTimestamp(siyuanTask.开始时间.start)
+        : undefined;
+    const newDueISO = siyuanTask?.开始时间?.end
+        ? normalizeDidaIsoTimestamp(siyuanTask.开始时间.end)
+        : undefined;
+    const timeChanged = !areDidaTimestampsEqual(newStartISO, cachedTask.startDate)
+        || !areDidaTimestampsEqual(newDueISO, cachedTask.dueDate);
+
+    if (siyuanTask?.开始时间) {
+        updatePayload.startDate = newStartISO;
+        updatePayload.dueDate = newDueISO;
+        updatePayload.isAllDay = false;
+        updatePayload.timeZone = "Asia/Shanghai";
+    } else {
+        updatePayload.startDate = undefined;
+        updatePayload.dueDate = undefined;
+        updatePayload.timeZone = "Asia/Shanghai";
+    }
+
+    if (timeChanged && (newStartISO || newDueISO)) {
+        const defaults = parseDidaReminders(defaultRemindersInput);
+        if (defaults.length > 0) {
+            updatePayload.reminders = defaults;
+        }
+    }
+
+    const rawTags = Array.isArray(siyuanTask?.标签?.content) ? siyuanTask.标签.content : [];
+    const tagsFromSiyuan = rawTags
+        .map((item: any) => typeof item === "string" ? item : item?.content)
+        .filter((tag: unknown): tag is string => typeof tag === "string" && tag.length > 0 && !STATUS_TAGS.includes(tag));
+    const statusTags: string[] = [];
+    if (statusText === "进行中") {
+        statusTags.push("进行中");
+    } else if (statusText === "归档") {
+        statusTags.push("归档");
+    }
+    updatePayload.tags = [...tagsFromSiyuan, ...statusTags];
+
+    return updatePayload;
+}
+
+/** 比较待写回滴答的变更集与缓存任务，无实质变化时跳过远端更新和冷却刷新。 */
+export function hasDidaTaskChanged(updatePayload: Partial<Task>, cachedTask: Task): boolean {
+    if ((updatePayload.status ?? 0) !== (cachedTask.status ?? 0)) return true;
+
+    if (updatePayload.title !== undefined) {
+        if (removeDidaLinks(updatePayload.title) !== removeDidaLinks(cachedTask.title || "")) {
+            return true;
+        }
+    }
+
+    if ((updatePayload.content ?? "") !== (cachedTask.content ?? "")) return true;
+
+    if (updatePayload.priority !== undefined && updatePayload.priority !== (cachedTask.priority ?? 0)) {
+        return true;
+    }
+
+    if (!areDidaTimestampsEqual(updatePayload.startDate, cachedTask.startDate)) return true;
+    if (!areDidaTimestampsEqual(updatePayload.dueDate, cachedTask.dueDate)) return true;
+
+    const newTags = [...(updatePayload.tags || [])].sort().join("\0");
+    const oldTags = [...(cachedTask.tags || [])].sort().join("\0");
+    if (newTags !== oldTags) return true;
+
+    return false;
 }
 
 export function getDidaStatusAttr(status?: string): "todo" | "inprogress" | "done" | "archive" {

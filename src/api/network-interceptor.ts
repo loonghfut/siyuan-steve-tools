@@ -49,14 +49,20 @@ const listeners: Listener[] = [];
 let idSeq = 1;
 
 // 活跃标签：用于给本次请求打标（例如只在滴答相关写入时标记，监听方据此跳过）
-const activeTags = new Set<string>();
+// 活跃标签计数：支持并发/嵌套的 tagged 作用域，避免内层提前结束清掉外层标记
+const activeTags = new Map<string, number>();
 
 export function beginTaggedRequests(tag: string) {
-  activeTags.add(tag);
+  activeTags.set(tag, (activeTags.get(tag) || 0) + 1);
 }
 
 export function endTaggedRequests(tag: string) {
-  activeTags.delete(tag);
+  const next = (activeTags.get(tag) || 0) - 1;
+  if (next <= 0) {
+    activeTags.delete(tag);
+  } else {
+    activeTags.set(tag, next);
+  }
 }
 
 /**
@@ -80,10 +86,10 @@ export function interceptFetch(opts: InterceptOptions = {}): InterceptorHandle {
       // 若存在活跃标签，则将标签信息注入到请求头（不会影响服务端处理，供拦截器识别）
       if (activeTags.size > 0) {
         const tagHeaderMap: Record<string, string> = {};
-        for (const t of activeTags) {
+        for (const t of activeTags.keys()) {
           tagHeaderMap[`x-st-tag-${t}`] = '1';
         }
-        const tagsList = Array.from(activeTags).join(',');
+        const tagsList = Array.from(activeTags.keys()).join(',');
         tagHeaderMap['x-st-tags'] = tagsList;
 
         if (init) {

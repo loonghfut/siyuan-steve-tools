@@ -2,7 +2,8 @@ import * as api from "@/api/api";
 import { fetchSyncPost, showMessage } from "siyuan";
 import type steveTools from "@/index";
 import { calendarSettings as settingdata, calendarModules as moduleInstances } from '@/calendar/core/calendar-context';
-import { createDailynote } from "@frostime/siyuan-plugin-kits";
+import { createDailyNoteForDate } from "@/calendar/data/daily-note";
+import { applyTopBarButton } from "@/libs/topbar";
 import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
 import { createScheduleBlockquoteMarkdown } from '@/calendar/features/schedule-blockquote';
 
@@ -22,7 +23,7 @@ interface ICSEvent {
 export class ICSImporter {
     private plugin: steveTools;
     private settings: any;
-    private topBarButton: any; // 添加对顶栏按钮的引用
+    private topBarButton?: HTMLElement; // 添加对顶栏按钮的引用
 
     constructor(plugin: steveTools) {
         this.plugin = plugin;
@@ -41,7 +42,7 @@ export class ICSImporter {
     async init() {
         console.debug('ICSImporter init called');
         //获取日记id
-        this.topBarButton = this.plugin.addTopBar({
+        this.topBarButton = applyTopBarButton(this.plugin, this.topBarButton, "st-cal-ics-import", {
             icon: "iconArrowDown",
             title: "导入ICS日程", // 标题可以考虑根据模式动态变化或在设置中说明
             position: "right",
@@ -69,25 +70,34 @@ export class ICSImporter {
                     if (importMode === 'daily-notes') {
                         await this.importEventsToDailyNotes(icsUrl, notebookIdForImport);
                     } else {
-                        const dailyNoteResponse = await api.createDailyNote(window.siyuan.ws.app.appId, notebookIdForImport);
-                        console.debug('创建的日记ID (单文档模式):', dailyNoteResponse);
-                        if (!dailyNoteResponse || !dailyNoteResponse.id) {
+                        const dailyNoteId = await createDailyNoteForDate(notebookIdForImport);
+                        console.debug('创建的日记ID (单文档模式):', dailyNoteId);
+                        if (!dailyNoteId) {
                             showMessage('无法创建日记 (单文档模式)，请检查设置的笔记本ID是否正确', 3000, 'error');
                             return;
                         }
                         // 将所有日程导入到这个新创建的日记文档中
-                        await this.importEventsToDocument(icsUrl, dailyNoteResponse.id);
+                        await this.importEventsToDocument(icsUrl, dailyNoteId);
                     }
                 } finally {
                     console.debug('导入操作完成');
                 }
             }
-        });
+        }, true);
 
         // 在后台检查ICS更新
         this.checkForUpdatesInBackground().catch(err => {
             console.error("后台ICS更新检查出错:", err);
         });
+    }
+
+    destroy() {
+        this.topBarButton = applyTopBarButton(this.plugin, this.topBarButton, "st-cal-ics-import", {
+            icon: "iconArrowDown",
+            title: "导入ICS日程",
+            position: "right",
+            callback: () => {},
+        }, false);
     }
 
     /**
@@ -483,6 +493,7 @@ export class ICSImporter {
             const sqlStr = `
                 SELECT id FROM blocks 
                 WHERE ial LIKE '%${uid}%'
+                LIMIT 1
             `;
             const result = await api.sql(sqlStr);
             return result.length > 0;
@@ -671,7 +682,7 @@ export class ICSImporter {
                     try {
                         console.debug(`尝试为日期 ${forDateSiyuan} 在笔记本 ${notebookIdForDailyNotes} 中创建/获取日记`);
                         const dateForNote = new Date(eventYear, parseInt(eventMonth) - 1, parseInt(eventDay));
-                        const dailyNoteResponse = await createDailynote(notebookIdForDailyNotes, dateForNote);
+                        const dailyNoteResponse = await createDailyNoteForDate(notebookIdForDailyNotes, dateForNote);
                         if (!dailyNoteResponse) {
                             showMessage(`无法为日期 ${forDateSiyuan} 创建或获取日记，跳过事件: ${event.title}`, 5000);
                             skippedCount++;

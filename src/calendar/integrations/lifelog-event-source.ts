@@ -88,12 +88,14 @@ export class LifelogView {
 
             // 一次性范围查询：拿到范围内所有 lifelog 日期属性对应的块 id + value
             // （原实现是逐天各发一次 sql，共 N 次往返；这里合并为 1 次）。
+            // 思源 3.8 起未自带外层 LIMIT 的 SQL 会套用服务端默认上限（默认 64），显式放开以免范围事件被静默截断。
             const rangeQuery = `
                 SELECT DISTINCT block_id, value
                 FROM attributes
                 WHERE name = '${ATTRS.date}'
                   AND value >= '${startDateStr}'
                   AND value <= '${endDateStr}'
+                LIMIT 9999999
             `;
             const rangeResult = await sql(rangeQuery);
 

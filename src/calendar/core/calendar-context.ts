@@ -7,6 +7,7 @@
  */
 export let calendarSettings: Record<string, any> = {};
 let calendarModule: any;
+let calendarApp: any;
 
 export const calendarModules: Record<string, any> = new Proxy({}, {
     get(_target, property) {
@@ -17,7 +18,18 @@ export const calendarModules: Record<string, any> = new Proxy({}, {
 export function configureCalendarContext(
     settings: Record<string, any>,
     module: any,
+    app?: any,
 ): void {
     calendarSettings = settings;
     calendarModule = module;
+    if (app !== undefined) {
+        calendarApp = app;
+    }
+}
+
+/**
+ * Returns the SiYuan App instance injected on the plugin, falling back to `window.siyuan?.ws?.app`.
+ */
+export function getCalendarApp(): any {
+    return calendarApp || calendarModule?.plugin?.app || (typeof window !== 'undefined' ? (window as any).siyuan?.ws?.app : undefined);
 }

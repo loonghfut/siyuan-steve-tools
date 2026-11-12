@@ -17,6 +17,7 @@ export interface SiyuanTaskChangeSourceOptions {
 export class SiyuanTaskChangeSource {
     private wsHandler?: (event: any) => void;
     private networkHandle: InterceptorHandle | null = null;
+    private readonly wsTimers = new Set<ReturnType<typeof setTimeout>>();
 
     constructor(private readonly options: SiyuanTaskChangeSourceOptions) {}
 
@@ -27,7 +28,12 @@ export class SiyuanTaskChangeSource {
             const detail = typeof structuredClone === "function"
                 ? structuredClone(event?.detail)
                 : JSON.parse(JSON.stringify(event?.detail));
-            setTimeout(() => void this.handleEvent({ detail }), 2000);
+            const timer = setTimeout(() => {
+                this.wsTimers.delete(timer);
+                if (this.options.isSyncing()) return;
+                void this.handleEvent({ detail });
+            }, 2000);
+            this.wsTimers.add(timer);
         };
         this.options.plugin.eventBus.on("ws-main", this.wsHandler);
         this.networkHandle = interceptFetch({
@@ -37,6 +43,10 @@ export class SiyuanTaskChangeSource {
     }
 
     destroy(): void {
+        for (const timer of this.wsTimers) {
+            clearTimeout(timer);
+        }
+        this.wsTimers.clear();
         if (this.wsHandler) {
             this.options.plugin.eventBus.off("ws-main", this.wsHandler);
             this.wsHandler = undefined;
@@ -57,7 +67,7 @@ export class SiyuanTaskChangeSource {
         const processed = new Set<string>();
 
         for (const operation of operations) {
-            if (!["updateAttrViewCell", "updateAttrs", "insertAttrViewBlock"].includes(operation?.action)) continue;
+            if (!["updateAttrViewCell", "updateAttrViewCells", "updateAttrs", "insertAttrViewBlock", "replaceAttrViewBlock"].includes(operation?.action)) continue;
             const avId = operation.avID || extractNewAvId(
                 operation?.data?.old?.["custom-avs"],
                 operation?.data?.new?.["custom-avs"],
@@ -71,10 +81,40 @@ export class SiyuanTaskChangeSource {
                 continue;
             }
 
+            if (operation.action === "replaceAttrViewBlock") {
+                // 思源 3.8 中将游离行绑定块或切换绑定块时发送 replaceAttrViewBlock：previousID 为 itemID，nextID 为新块 ID。
+                const itemID = operation.previousID || operation.itemID || operation.rowID;
+                if (!operation.isDetached && itemID) {
+                    let blockId = operation.nextID || "";
+                    if (!blockId) {
+                        const ids = await getAttributeViewBoundBlockIDsByItemIDs(avId, [itemID]);
+                        blockId = ids[itemID] || "";
+                    }
+                    this.emitQueuedTarget(processed, blockId, itemID, false);
+                }
+                continue;
+            }
+
+            if (operation.action === "updateAttrViewCells" && Array.isArray(operation.cellUpdates)) {
+                const cellItemIds: string[] = Array.from(new Set(
+                    operation.cellUpdates
+                        .map((cell: any) => cell?.itemID || cell?.rowID)
+                        .filter(Boolean)
+                ));
+                if (cellItemIds.length > 0) {
+                    const ids = await getAttributeViewBoundBlockIDsByItemIDs(avId, cellItemIds);
+                    for (const itemId of cellItemIds) {
+                        this.emitQueuedTarget(processed, ids[itemId], itemId, false);
+                    }
+                }
+                continue;
+            }
+
             let targetBlockId = "";
             let targetItemID = "";
-            if (operation.rowID) {
-                targetItemID = operation.rowID;
+            const rowOrItemId = operation.itemID || operation.rowID;
+            if (rowOrItemId) {
+                targetItemID = rowOrItemId;
                 const ids = await getAttributeViewBoundBlockIDsByItemIDs(avId, [targetItemID]);
                 targetBlockId = ids[targetItemID];
             } else if (operation.id) {
@@ -98,6 +138,10 @@ export class SiyuanTaskChangeSource {
             const headers = (context.headers || {}) as Record<string, string>;
             if (headers["x-st-tag-dida"] === "1" || headers["x-st-tags"]?.split(",").includes("dida")) return;
             if (this.options.isSyncing() || !context.resOk || context.resStatus !== 200) return;
+            const responseCode = typeof context.resBody === "object" && context.resBody !== null
+                ? context.resBody.code
+                : undefined;
+            if (typeof responseCode === "number" && responseCode !== 0) return;
 
             const avId = this.options.getAvId();
             const body = context.reqBody || {};

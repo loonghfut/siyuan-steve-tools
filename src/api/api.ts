@@ -894,10 +894,13 @@ export const downloadFile = (file: Blob) => {
     URL.revokeObjectURL(url);
 };
 
-export async function createDailyNote(app: string, notebookID: string) {
-    let data = {
+export async function createDailyNote(app: string, notebookID: string, date?: string) {
+    let data: { app: string; notebook: string; date?: string } = {
         app: app,
         notebook: notebookID
+    }
+    if (date) {
+        data.date = date;
     }
     let url = '/api/filetree/createDailyNote';
     return request(url, data);
@@ -999,6 +1002,8 @@ async function processAddBlockQueueForAvID(avID: string) {
     if (!blocks || blocks.length === 0) {
         return;
     }
+    // 在发起异步请求前先摘除当前批次，避免等待期间新入队的块被误删
+    addBlockQueue.delete(avID);
 
     try {
         console.debug(`🚀 [批量添加块] 开始处理 ${blocks.length} 个块，avID: ${avID}`);
@@ -1007,7 +1012,7 @@ async function processAddBlockQueueForAvID(avID: string) {
         const sources = blocks.map(block => ({
             id: block.id,
             isDetached: false,
-            itemID: block.itemID || this.generateId()
+            itemID: block.itemID || avManager.generateId()
         }));
 
         // 使用批量API添加所有块
@@ -1025,9 +1030,6 @@ async function processAddBlockQueueForAvID(avID: string) {
         // 错误时拒绝所有Promise
         blocks.forEach(block => block.reject(error));
     }
-
-    // 清除已处理的队列
-    addBlockQueue.delete(avID);
 }
 
 interface UpdateMainKeyParams {
@@ -1036,6 +1038,8 @@ interface UpdateMainKeyParams {
     content: string;
     blockID: string;
     itemID: string;
+    /** 富文本主键在 3.8.10+ 用纯文本替换时须显式传 rich: null */
+    rich?: unknown;
 }
 
 // Modify the function to accept an object parameter
@@ -1044,7 +1048,7 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
         const delay = settingdata['transaction-delay'] || 1000;
         setTimeout(async () => {
             try {
-                const { avID, keyID, content, blockID, itemID } = params; // Destructure the parameters
+                const { avID, keyID, content, blockID, itemID, rich } = params; // Destructure the parameters
                 const url = '/api/av/setAttributeViewBlockAttr';
                 const payload = {
                     avID: avID,
@@ -1053,7 +1057,9 @@ export async function updatemainkey(params: UpdateMainKeyParams): Promise<any> {
                     value: {
                         block: {
                             content: content,
-                            id: blockID
+                            id: blockID,
+                            // 思源 3.8.10+ (#21136) 要求纯文本改写富文本主键时显式传 rich: null
+                            rich: rich !== undefined ? rich : null,
                         },
                         isDetached: false // Assuming this remains false, adjust if needed
                     }
