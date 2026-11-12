@@ -155,9 +155,7 @@ function extractDateFromText(text: string, now: dayjs.Dayjs): ParsedDateResult {
             parseInt(fullYmdMatch[2], 10),
             parseInt(fullYmdMatch[3], 10),
         );
-        if (parsed) {
-            return { date: parsed, matched: true };
-        }
+        return parsed ? { date: parsed, matched: true } : { date: now, matched: false };
     }
 
     // 2. 紧凑 YYYYMMDD:（如 20261115: ）
@@ -169,9 +167,7 @@ function extractDateFromText(text: string, now: dayjs.Dayjs): ParsedDateResult {
             parseInt(compactYmdMatch[2], 10),
             parseInt(compactYmdMatch[3], 10),
         );
-        if (parsed) {
-            return { date: parsed, matched: true };
-        }
+        return parsed ? { date: parsed, matched: true } : { date: now, matched: false };
     }
 
     // 3. 中文 X月X日/号（先 date(1) 再改月，避免 3月31日 -> 4月5日 溢出到 5月）
@@ -183,9 +179,7 @@ function extractDateFromText(text: string, now: dayjs.Dayjs): ParsedDateResult {
             parseInt(cnMonthDayMatch[1], 10),
             parseInt(cnMonthDayMatch[2], 10),
         );
-        if (parsed) {
-            return { date: parsed, matched: true };
-        }
+        return parsed ? { date: parsed, matched: true } : { date: now, matched: false };
     }
 
     // 4. M/D 或 M-D（避开 HH:MM-HH:MM 时间段里的 MM-HH、分数 1/2/3 与 "11-12:30"）
@@ -326,8 +320,8 @@ function extractDateFromText(text: string, now: dayjs.Dayjs): ParsedDateResult {
         }
     }
 
-    // 11. 仅日：X号 / X日
-    const dayOnlyMatch = text.match(/(?<!\d)(0?[1-9]|[12]\d|3[01])[号日]/);
+    // 11. 仅日：X号 / X日（避免误匹配带月份的 X月X日 尾段）
+    const dayOnlyMatch = text.match(/(?<![\d月./\-])(0?[1-9]|[12]\d|3[01])[号日]/);
     if (dayOnlyMatch) {
         const day = parseInt(dayOnlyMatch[1], 10);
         const parsed = validateAndBuildYmd(now, now.year(), now.month() + 1, day);

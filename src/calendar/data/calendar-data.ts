@@ -14,7 +14,7 @@ import {
     parseTaskList,
     parseTitle,
 } from '@/calendar/features/quick-add/content-metadata';
-import { parseScheduleTime } from '@/calendar/features/quick-add/time-parser';
+import { parseScheduleTimeRange } from '@/calendar/features/quick-add/time-parser';
 import {
     extractCalendarCellDateRange,
     resolveFullCalendarEventRange,
@@ -1319,15 +1319,17 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             const itemID = await api.generateSiyuanID() as string;
             const blockdata = await api.getBlockKramdown(direct.directid);
             const rawKramdown = typeof blockdata === 'object' && blockdata?.kramdown ? blockdata.kramdown : '';
-            const ce = parseScheduleTime(rawKramdown);
+            const parsedTimeRange = parseScheduleTimeRange(rawKramdown);
             const minsub = parseTaskList(rawKramdown);
             const categorie = parseCategory(rawKramdown);
             const tags = parseTags(rawKramdown);
             const note = parseDescription(rawKramdown);
             const title = parseTitle(rawKramdown);
             const ismain = minsub.length > 0;
-            if (ce) {
-                dateStr = ce;
+            let endDateStr: string | undefined;
+            if (parsedTimeRange) {
+                dateStr = parsedTimeRange.start;
+                endDateStr = parsedTimeRange.end;
             }
 
             await api.addBlockToDatabase_pro(direct.directid, to_db_id, itemID);
@@ -1369,7 +1371,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts));
             }
             if (timeKeyID) {
-                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts));
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date", endDateStr, createOpts));
             }
             if (priorityKeyID) {
                 updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select", undefined, createOpts));
@@ -1576,7 +1578,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 ////块时间处理
                 const blockdata = await api.getBlockKramdown(id);
                 const rawKramdown = typeof blockdata === 'object' && blockdata?.kramdown ? blockdata.kramdown : '';
-                const ce = parseScheduleTime(rawKramdown);
+                const parsedTimeRange = parseScheduleTimeRange(rawKramdown);
                 const minsub = parseTaskList(rawKramdown);
                 const category1 = parseCategory(rawKramdown);
                 const tags = parseTags(rawKramdown);
@@ -1584,8 +1586,10 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 // 手动输入分类优先
                 const category = category1 || category2;
                 const ismain = minsub.length > 0;
-                if (ce) {
-                    dateStr = ce;
+                let endDateStr: string | undefined;
+                if (parsedTimeRange) {
+                    dateStr = parsedTimeRange.start;
+                    endDateStr = isAllDay ? undefined : parsedTimeRange.end;
                 }
                 ////块时间处理 - 批量更新优化
                 const updatePromises2: Promise<any>[] = [];
@@ -1593,7 +1597,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 const createOpts2 = calendarCellWriteOptions('create');
 
                 if (timeKeyID) {
-                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts2));
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date", endDateStr, createOpts2));
                 }
 
                 const selectdata: ISelectOption[] = [{ content: status }];
