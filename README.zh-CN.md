@@ -42,14 +42,19 @@ win端s3同步后，docker端感知s3同步。
 #### 更新日志:
 
 
-### v0.56.0 (2026年11月08日)
-- fix(branch): 修复分支子形状ID重映射时的重复消耗问题，避免childIds与rightChildIds别名冲突导致ID二次分配 (loonghfut)
-- feat(branch): 引入 branch-child 显式绑定系统，支持剪贴板复制粘贴分支结构关系 (loonghfut)
-- fix(branch): 修复分支绑定循环依赖、形状parentId缺失及历史重放误判问题 (loonghfut)
-- chore: update README.md (loonghfut)
-- feat(plugin): 补齐各模块设置热更新并修复多项兼容性问题 (loonghfut)
-- Merge branch 'main-4' into main-2 (loonghfut)
-- chore(plugin): 升级版本号至 0.56.0 (loonghfut)
+### v0.57.0 (2026年11月12日)
+- {"type":"feat","scope":"calendar","description":"重构日历模块热更新、增强滴答同步并新增 AV 日期与日记工具","body":"主要变更：
+- 新增 createDailyNoteForDate 与 AV 日期范围提取工具，支持按指定日期创建日记
+- 网络拦截器改用计数 Map 支持嵌套 tagged 作用域
+- 事务监听器补充 updateAttrViewCells/replaceAttrViewBlock 处理及状态同步
+- 滴答同步新增 task-mapper 载荷构建、回链提取与块级串行化写入
+- 面包屑快捷按钮支持思源 3.8.10+ 新布局并抽离 runQuickAddFromProtyle
+- ICS 导入器支持配置驱动的创建/销毁与顶栏按钮生命周期管理
+- 新增 task-mapper 与 av-date 单元测试","trailer":"同步更新 package.json 测试脚本路径"} (loonghfut)
+- feat(calendar): enhance schedule creation and view filtering (loonghfut)
+- fix: enhance schedule creation and block resolution logic (loonghfut)
+- feat(calendar): 更新日历事件创建逻辑，支持时间范围解析 (loonghfut)
+- chore: 更新版本号至 0.57.0 (loonghfut)
 
 
 更多详见[提交记录](https://github.com/loonghfut/siyuan-steve-tools/commits/main-2/)
