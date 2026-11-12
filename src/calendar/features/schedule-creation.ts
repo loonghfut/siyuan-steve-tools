@@ -1,7 +1,9 @@
+import { showMessage } from 'siyuan';
 import { calendarModules as moduleInstances, calendarSettings as settingdata } from '@/calendar/core/calendar-context';
 import { getPreferredCalendar } from '@/calendar/core/calendar-runtime';
 import { av_ids, filterViewId, OUTcalendar } from '@/calendar/ui/calendar-view';
-import { createEventInDatabase, getViewId, getViewValue } from '@/calendar/data/calendar-data';
+import { createEventInDatabase, getViewId } from '@/calendar/data/calendar-data';
+import { formatLocalDateTimeInput } from './quick-add/cursor-blocks';
 
 export interface ScheduleTarget {
     isdirect: boolean;
@@ -9,15 +11,7 @@ export interface ScheduleTarget {
 }
 
 const DEFAULT_TARGET: ScheduleTarget = { isdirect: false, directid: '' };
-let recentCreation: { startedAt: number; request: Promise<unknown> | null } = {
-    startedAt: 0,
-    request: null,
-};
-
-function formatLocalDateTime(date: Date) {
-    const adjustedDate = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-    return adjustedDate.toISOString().slice(0, 16);
-}
+const recentCreations = new Map<string, { startedAt: number; request: Promise<unknown> | null }>();
 
 function getEffectiveFilterViewIds(): string[] {
     const configViewIds = moduleInstances['M_calendar']?.calConfig?.getViewIds?.();
@@ -39,57 +33,73 @@ function getSelectedDatabaseId(viewIds: Awaited<ReturnType<typeof getViewId>>) {
     return viewIds.find(view => activeFilterIds.includes(view.viewId))?.rootid;
 }
 
+function runDeduplicatedCreation<T>(dedupKey: string, factory: () => Promise<T>): Promise<T> {
+    const now = Date.now();
+    const existing = recentCreations.get(dedupKey);
+    if (existing?.request && now - existing.startedAt < 1000) {
+        return existing.request as Promise<T>;
+    }
+
+    const request = factory().finally(() => {
+        setTimeout(() => {
+            const cur = recentCreations.get(dedupKey);
+            if (cur?.request === request) {
+                recentCreations.delete(dedupKey);
+            }
+        }, 1000);
+    });
+
+    recentCreations.set(dedupKey, { startedAt: now, request });
+    return request;
+}
+
 /** Creates a schedule using the database currently selected in the calendar. */
 export function createSchedule(
     status = '',
     target: ScheduleTarget = DEFAULT_TARGET,
     refreshAfterCreate = true,
 ) {
-    const now = Date.now();
-    if (recentCreation.request && now - recentCreation.startedAt < 1000) {
-        return recentCreation.request;
-    }
-
-    recentCreation.startedAt = now;
-    recentCreation.request = (async () => {
+    const dedupKey = `selected:${target.isdirect ? target.directid : 'dialog'}`;
+    return runDeduplicatedCreation(dedupKey, async () => {
         const effectiveAvIds = await getEffectiveAvIds();
         const viewIds = await getViewId(effectiveAvIds);
-        const viewValue = await getViewValue(viewIds);
+        const selectedDbId = getSelectedDatabaseId(viewIds) || settingdata['cal-db-id'];
         const targetCalendar = getPreferredCalendar() || OUTcalendar;
         return createEventInDatabase(
-            formatLocalDateTime(new Date()),
+            formatLocalDateTimeInput(new Date()),
             targetCalendar,
-            viewValue,
-            getSelectedDatabaseId(viewIds),
+            undefined,
+            selectedDbId,
             status,
             target,
             refreshAfterCreate,
         );
-    })().finally(() => {
-        setTimeout(() => {
-            recentCreation.request = null;
-        }, 1000);
     });
-
-    return recentCreation.request;
 }
 
 /** Creates a schedule in the database configured in settings. */
-export async function createScheduleInConfiguredDatabase(
+export function createScheduleInConfiguredDatabase(
     status = '',
     target: ScheduleTarget = DEFAULT_TARGET,
     refreshAfterCreate = true,
 ) {
-    const viewIds = await getViewId([settingdata['cal-db-id']]);
-    const viewValue = await getViewValue(viewIds);
-    const targetCalendar = getPreferredCalendar() || OUTcalendar;
-    return createEventInDatabase(
-        formatLocalDateTime(new Date()),
-        targetCalendar,
-        viewValue,
-        getSelectedDatabaseId(viewIds),
-        status,
-        target,
-        refreshAfterCreate,
-    );
+    const configuredDbId = settingdata['cal-db-id'];
+    if (!configuredDbId) {
+        showMessage('请先设置日程创建数据库');
+        return Promise.resolve(false);
+    }
+
+    const dedupKey = `configured:${configuredDbId}:${target.isdirect ? target.directid : 'dialog'}`;
+    return runDeduplicatedCreation(dedupKey, async () => {
+        const targetCalendar = getPreferredCalendar() || OUTcalendar;
+        return createEventInDatabase(
+            formatLocalDateTimeInput(new Date()),
+            targetCalendar,
+            undefined,
+            configuredDbId,
+            status,
+            target,
+            refreshAfterCreate,
+        );
+    });
 }

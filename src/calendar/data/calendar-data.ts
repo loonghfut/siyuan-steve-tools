@@ -2,7 +2,7 @@ import * as api from '@/api/api';
 import { resolveAvBlockId } from '@/api/api3';
 import { ViewItem } from '@/calendar/core/types';
 import * as sy from 'siyuan'
-import { calendarSettings as settingdata, calendarModules as moduleInstances, getCalendarApp } from '@/calendar/core/calendar-context';
+import { calendarSettings as settingdata, getCalendarApp } from '@/calendar/core/calendar-context';
 import { Calendar, DurationInput } from '@fullcalendar/core';
 // Define interfaces for better type safety
 import { ISelectOption } from "@/calendar/core/types";
@@ -1293,103 +1293,118 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     // 1. 创建面板HTML
     //// 获取当前日期的日记块ID
     //加一个错误判断
-    if (!settingdata["cal-create-pos"] || !settingdata["cal-db-id"]) {
-        sy.showMessage('请先设置日程创建位置和日程创建数据库');
-        return;
+    if (!to_db_id) {
+        sy.showMessage('请先设置日程创建数据库');
+        return false;
     }
+    if (!direct.isdirect && !settingdata["cal-create-pos"]) {
+        sy.showMessage('请先设置日程创建位置和日程创建数据库');
+        return false;
+    }
+
+    const keyMap = await resolveAvKeyIdMap(to_db_id, viewValue);
+    const getFieldKeyID = (fieldName: string) => keyMap.get(fieldName);
+
     if (direct.isdirect) {
-        // console.debug("createEventInDatabase:::", await checkBlockInEvent(direct.directid, to_db_id));
-        const itemID = await api.generateSiyuanID() as string; //直接使用块ID作为itemID
-        if (await checkBlockInEvent(direct.directid, to_db_id)) {
-            console.debug("目标数据库已存在此事件");
-            return;
-        }
-        //块时间处理
-        const blockdata = await api.getBlockKramdown(direct.directid);
-        // console.debug("blockdata:::", blockdata.kramdown);
-        const ce = parseScheduleTime(blockdata?.kramdown);
-        const minsub = parseTaskList(blockdata?.kramdown);
-        const categorie = parseCategory(blockdata?.kramdown);
-        const tags = parseTags(blockdata?.kramdown);
-        const note = parseDescription(blockdata?.kramdown);
-        const title = parseTitle(blockdata?.kramdown);
-        console.debug("title:::", title);
-        let ismain = false;
-        if (minsub.length > 0) {
-            ismain = true;
-        }
-        if (ce) {
-            dateStr = ce;
-            // console.debug("ce:::", ce);
-        }
-        // console.debug("dateStr:::", dateStr);
-        //块时间处理
+        try {
+            if (!direct.directid) {
+                sy.showMessage('未找到目标块 ID', 3000, 'error');
+                return false;
+            }
+            if (await checkBlockInEvent(direct.directid, to_db_id)) {
+                sy.showMessage('目标数据库已存在此事件', 2000, 'info');
+                return false;
+            }
 
-        await api.addBlockToDatabase_pro(direct.directid, to_db_id, itemID);
-        const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
-        const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
-        const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
-        const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', to_db_id);
-        const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
-        const tagsKeyID = await getKeyIDfromViewValue(viewValue, '标签', to_db_id);
-        const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
-        const titleKeyID = await getKeyIDfromViewValue(viewValue, '事件', to_db_id);
-        const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
-        if (titleKeyID && title) {
-            console.debug("titleKeyID:::", titleKeyID);
-            await api.updatemainkey({
-                avID: to_db_id,
-                blockID: direct.directid,
-                keyID: titleKeyID,
-                itemID: itemID,
-                content: title,
-            });
-        }
-        // 批量更新：不使用 await，让请求积累到队列中
-        const updatePromises: Promise<any>[] = [];
-        // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过；
-        // 创建末尾会用 invalidateViewValueCache + refetchVisibleCalendarsDebounced 主动同步 UI
-        const createOpts = calendarCellWriteOptions('create');
+            const itemID = await api.generateSiyuanID() as string;
+            const blockdata = await api.getBlockKramdown(direct.directid);
+            const rawKramdown = typeof blockdata === 'object' && blockdata?.kramdown ? blockdata.kramdown : '';
+            const ce = parseScheduleTime(rawKramdown);
+            const minsub = parseTaskList(rawKramdown);
+            const categorie = parseCategory(rawKramdown);
+            const tags = parseTags(rawKramdown);
+            const note = parseDescription(rawKramdown);
+            const title = parseTitle(rawKramdown);
+            const ismain = minsub.length > 0;
+            if (ce) {
+                dateStr = ce;
+            }
 
-        if (categoryKeyID && categorie) {
-            const categoryData: ISelectOption[] = [{ content: categorie }];
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, itemID, categoryData, "select", undefined, createOpts));
-        }
-        if (tagsKeyID && tags) {
-            const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, tagsKeyID, itemID, tagsData, "mSelect", undefined, createOpts));
-        }
-        if (noteKeyID && note) {
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts));
-        }
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts));
+            await api.addBlockToDatabase_pro(direct.directid, to_db_id, itemID);
+            const timeKeyID = getFieldKeyID('开始时间');
+            const statusKeyID = getFieldKeyID('状态');
+            const checkboxKeyID = getFieldKeyID('主事件');
+            const allDayKeyID = getFieldKeyID('全天');
+            const categoryKeyID = getFieldKeyID('分类');
+            const tagsKeyID = getFieldKeyID('标签');
+            const noteKeyID = getFieldKeyID('描述');
+            const titleKeyID = getFieldKeyID('事件');
+            const priorityKeyID = getFieldKeyID('优先级');
 
-        const selectdata: ISelectOption[] = [{ content: status }];
-        // console.debug("selectdata", selectdata);
-        // 2025/7/5新增默认添加优先级
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select", undefined, createOpts));
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select", undefined, createOpts));
-        // 设置自定义属性
-        markCalendarBlockWrite(direct.directid, 'create');
-        api.setBlockAttrs(direct.directid, { 'custom-st-event': statusMap[status] });
+            if (titleKeyID && title) {
+                await api.updatemainkey({
+                    avID: to_db_id,
+                    blockID: direct.directid,
+                    keyID: titleKeyID,
+                    itemID: itemID,
+                    content: title,
+                });
+            }
 
-        updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, itemID, ismain, "checkbox", undefined, createOpts));
-        // 默认设置为非全天事件
-        if (allDayKeyID) {
-            updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, allDayKeyID, itemID, false, "checkbox", undefined, createOpts));
-        }
+            // 批量更新：不使用 await，让请求积累到队列中
+            const updatePromises: Promise<any>[] = [];
+            // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过；
+            // 创建末尾会用 invalidateViewValueCache + scheduleCalendarRefresh 主动同步 UI
+            const createOpts = calendarCellWriteOptions('create');
 
-        // 等待所有更新完成
-        await Promise.all(updatePromises);
-        // create 新行：失效缓存让后续 refetch 能看到
-        try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
-        sy.showMessage('已添加事件', 2000, "info", "1");
-        // 滴答更新
-        api.handleDidaListEvent(to_db_id, direct.directid, itemID);
-        if (isrefresh) {
-            scheduleCalendarRefresh(200);
+            if (categoryKeyID && categorie) {
+                const categoryData: ISelectOption[] = [{ content: categorie }];
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, categoryKeyID, itemID, categoryData, "select", undefined, createOpts));
+            }
+            if (tagsKeyID && tags.length > 0) {
+                const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, tagsKeyID, itemID, tagsData, "mSelect", undefined, createOpts));
+            }
+            if (noteKeyID && note) {
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts));
+            }
+            if (timeKeyID) {
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts));
+            }
+            if (priorityKeyID) {
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, priorityKeyID, itemID, [{ content: "无" }], "select", undefined, createOpts));
+            }
+            if (statusKeyID) {
+                const selectdata: ISelectOption[] = [{ content: status }];
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, statusKeyID, itemID, selectdata, "select", undefined, createOpts));
+            }
+
+            // 设置自定义属性
+            markCalendarBlockWrite(direct.directid, 'create');
+            api.setBlockAttrs(direct.directid, { 'custom-st-event': statusMap[status] || 'todo' });
+
+            if (checkboxKeyID) {
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, checkboxKeyID, itemID, ismain, "checkbox", undefined, createOpts));
+            }
+            // 默认设置为非全天事件
+            if (allDayKeyID) {
+                updatePromises.push(api.updateAttrViewCell_pro(direct.directid, to_db_id, allDayKeyID, itemID, false, "checkbox", undefined, createOpts));
+            }
+
+            await Promise.all(updatePromises);
+            try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
+            sy.showMessage('已添加事件', 2000, "info", "1");
+            // 滴答更新
+            api.handleDidaListEvent(to_db_id, direct.directid, itemID);
+            if (isrefresh) {
+                scheduleCalendarRefresh(200);
+            }
+            return true;
+        } catch (error) {
+            console.error('直接添加事件到数据库失败:', error);
+            sy.showMessage(`添加事件失败: ${error instanceof Error ? error.message : String(error)}`, 4000, 'error');
+            return false;
         }
-        return true;
     }
 
     //// 创建一个新块
@@ -1529,136 +1544,127 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             isok = true;
             // 提前解绑输入与 WS 监听防止重复提交；panel 保留到 dialog.destroy() 后由 cleanupDialog 统一销毁，避免打断上传
             detachListeners();
-            // 删除空白块
-            //// 获取块内容
-            const block = await api.getBlockByID(id);
-            //// 如果块内容为空，则删除块
-            // // steveTools.outlog("block:::", block.markdown);
-            const markdownContent = block?.markdown?.trim() || '';
-            // console.debug(markdownContent);
-            if (isEmptyScheduleBlockquoteMarkdown(markdownContent)) {
-                await api.deleteBlock(id);
-                // steveTools.outlog('删除空白块');
-                dialog.destroy();
-                sy.showMessage('已取消添加事件');
-                return;
-            }
-            // 添加到日历
-            //2025-02-12 修改：添加到数据库通过{: custom-avs="数据库ID"}属性实现
-            //放弃：不稳定
-            //// 将块加入到数据库
-            await api.addBlockToDatabase_pro(id, to_db_id, itemID);
-            // 添加数据库属性
-            //// 添加时间和状态属性
-            const timeKeyID = await getKeyIDfromViewValue(viewValue, '开始时间', to_db_id);
-            const categoryKeyID = await getKeyIDfromViewValue(viewValue, '分类', to_db_id);
-            const tagsKeyID = await getKeyIDfromViewValue(viewValue, '标签', to_db_id);
-            const priorityKeyID = await getKeyIDfromViewValue(viewValue, '优先级', to_db_id);
-            const checkboxKeyID = await getKeyIDfromViewValue(viewValue, '主事件', to_db_id);
-            const allDayKeyID = await getKeyIDfromViewValue(viewValue, '全天', to_db_id);
-            const statusKeyID = await getKeyIDfromViewValue(viewValue, '状态', to_db_id);
-            const noteKeyID = await getKeyIDfromViewValue(viewValue, '描述', to_db_id);
-            //// 新：用户自定义改动开始时间,优先级,分类
-            const category2 = (dialog.element.querySelector('#st-category') as HTMLSelectElement).value;
-            const newdateStr = (dialog.element.querySelector('#st-start-time') as HTMLInputElement).value
-            const priority = (dialog.element.querySelector('#st-priority') as HTMLSelectElement).value;
-            const isAllDay = (dialog.element.querySelector('#st-all-day') as HTMLInputElement).checked;
-            if (newdateStr) {
-                dateStr = newdateStr;
-            }
-            ////块时间处理
-            const blockdata = await api.getBlockKramdown(id);
-            const ce = parseScheduleTime(blockdata?.kramdown);
-            const minsub = parseTaskList(blockdata?.kramdown);
-            const category1 = parseCategory(blockdata?.kramdown);
-            const tags = parseTags(blockdata?.kramdown);
-            const note = parseDescription(blockdata?.kramdown);
-            // 手动输入分类优先
-            const category = category1 || category2;
-            let ismain = false;
-            // console.debug("minsub", minsub);
-            if (minsub.length > 0) {
-                ismain = true;
-            }
-            if (ce) {
-                dateStr = ce;
-            }
-            ////块时间处理 - 批量更新优化
-            const updatePromises2: Promise<any>[] = [];
-            // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过
-            const createOpts2 = calendarCellWriteOptions('create');
+            try {
+                // 删除空白块
+                const block = await api.getBlockByID(id);
+                const markdownContent = block?.markdown?.trim() || '';
+                if (isEmptyScheduleBlockquoteMarkdown(markdownContent)) {
+                    await api.deleteBlock(id);
+                    dialog.destroy();
+                    sy.showMessage('已取消添加事件');
+                    return;
+                }
+                //// 将块加入到数据库
+                await api.addBlockToDatabase_pro(id, to_db_id, itemID);
+                // 添加数据库属性
+                const timeKeyID = getFieldKeyID('开始时间');
+                const categoryKeyID = getFieldKeyID('分类');
+                const tagsKeyID = getFieldKeyID('标签');
+                const priorityKeyID = getFieldKeyID('优先级');
+                const checkboxKeyID = getFieldKeyID('主事件');
+                const allDayKeyID = getFieldKeyID('全天');
+                const statusKeyID = getFieldKeyID('状态');
+                const noteKeyID = getFieldKeyID('描述');
+                //// 新：用户自定义改动开始时间,优先级,分类
+                const category2 = (dialog.element.querySelector('#st-category') as HTMLSelectElement).value;
+                const newdateStr = (dialog.element.querySelector('#st-start-time') as HTMLInputElement).value
+                const priority = (dialog.element.querySelector('#st-priority') as HTMLSelectElement).value;
+                const isAllDay = (dialog.element.querySelector('#st-all-day') as HTMLInputElement).checked;
+                if (newdateStr) {
+                    dateStr = newdateStr;
+                }
+                ////块时间处理
+                const blockdata = await api.getBlockKramdown(id);
+                const rawKramdown = typeof blockdata === 'object' && blockdata?.kramdown ? blockdata.kramdown : '';
+                const ce = parseScheduleTime(rawKramdown);
+                const minsub = parseTaskList(rawKramdown);
+                const category1 = parseCategory(rawKramdown);
+                const tags = parseTags(rawKramdown);
+                const note = parseDescription(rawKramdown);
+                // 手动输入分类优先
+                const category = category1 || category2;
+                const ismain = minsub.length > 0;
+                if (ce) {
+                    dateStr = ce;
+                }
+                ////块时间处理 - 批量更新优化
+                const updatePromises2: Promise<any>[] = [];
+                // 全部 cell 写入打 self-write 标记，让 transactionListener 与 post-batch refresh 跳过
+                const createOpts2 = calendarCellWriteOptions('create');
 
-            updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts2));
+                if (timeKeyID) {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, timeKeyID, itemID, dateStr, "date", undefined, createOpts2));
+                }
 
-            const selectdata: ISelectOption[] = [{ content: status }];
-            const priorityData: ISelectOption[] = [{ content: priority }];
-            const categoryData: ISelectOption[] = [{ content: category }];
-            console.debug("selectdata", selectdata);
+                const selectdata: ISelectOption[] = [{ content: status }];
+                const priorityData: ISelectOption[] = [{ content: priority }];
+                const categoryData: ISelectOption[] = [{ content: category }];
 
-            ///////////更新属性////////////////////
-            if (noteKeyID && note) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts2));
-            }
-            if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, itemID, categoryData, "select", undefined, createOpts2));
-            }
-            if (tags && tags.length > 0) {
-                const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, tagsKeyID, itemID, tagsData, "mSelect", undefined, createOpts2));
-            }
-            if (priority && priorityKeyID && priorityData) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, itemID, priorityData, "select", undefined, createOpts2));
-            }
-            if (status && statusKeyID && selectdata) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, itemID, selectdata, "select", undefined, createOpts2));
-                // 设置自定义属性
-                markCalendarBlockWrite(id, 'create');
-                api.setBlockAttrs(id, { 'custom-st-event': statusMap[status] });
-            }
-            if (checkboxKeyID) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, itemID, ismain, "checkbox", undefined, createOpts2));
-            }
-            if (allDayKeyID) {
-                updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, allDayKeyID, itemID, isAllDay, "checkbox", undefined, createOpts2));
-            }
+                ///////////更新属性////////////////////
+                if (noteKeyID && note) {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, noteKeyID, itemID, note, "text", undefined, createOpts2));
+                }
+                if (category && categoryKeyID && categoryData && category !== "加载中..." && category !== "无") {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, categoryKeyID, itemID, categoryData, "select", undefined, createOpts2));
+                }
+                if (tags && tags.length > 0 && tagsKeyID) {
+                    const tagsData: ISelectOption[] = tags.map(tag => ({ content: tag }));
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, tagsKeyID, itemID, tagsData, "mSelect", undefined, createOpts2));
+                }
+                if (priority && priorityKeyID && priorityData) {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, priorityKeyID, itemID, priorityData, "select", undefined, createOpts2));
+                }
+                if (status && statusKeyID && selectdata) {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, statusKeyID, itemID, selectdata, "select", undefined, createOpts2));
+                    markCalendarBlockWrite(id, 'create');
+                    api.setBlockAttrs(id, { 'custom-st-event': statusMap[status] || 'todo' });
+                }
+                if (checkboxKeyID) {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, checkboxKeyID, itemID, ismain, "checkbox", undefined, createOpts2));
+                }
+                if (allDayKeyID) {
+                    updatePromises2.push(api.updateAttrViewCell_pro(id, to_db_id, allDayKeyID, itemID, isAllDay, "checkbox", undefined, createOpts2));
+                }
 
-            // 等待所有更新完成
-            await Promise.all(updatePromises2);
-            // create 是新增行：缓存没有该行，必须显式失效，否则下面的 refetch 会读到不含新事件的旧 cache
-            try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
-            // 滴答更新
-            api.handleDidaListEvent(to_db_id, id, itemID);
-            //////////////////
-            if (panel?.isUploading()) {
-                checkUploadingTimer = setInterval(() => {
-                    if (!panel || !panel.isUploading()) {
-                        if (checkUploadingTimer) {
-                            clearInterval(checkUploadingTimer);
-                            checkUploadingTimer = null;
-                        }
-                        if (isrefresh) {
-                            scheduleCalendarRefresh(500);
-                            if (calendar) {
-                                setTimeout(() => calendar.refetchEvents(), 500);
+                await Promise.all(updatePromises2);
+                // create 是新增行：缓存没有该行，必须显式失效，否则下面的 refetch 会读到不含新事件的旧 cache
+                try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
+                // 滴答更新
+                api.handleDidaListEvent(to_db_id, id, itemID);
+                if (panel?.isUploading()) {
+                    checkUploadingTimer = setInterval(() => {
+                        if (!panel || !panel.isUploading()) {
+                            if (checkUploadingTimer) {
+                                clearInterval(checkUploadingTimer);
+                                checkUploadingTimer = null;
+                            }
+                            if (isrefresh) {
+                                scheduleCalendarRefresh(500);
+                                if (calendar) {
+                                    setTimeout(() => calendar.refetchEvents(), 500);
+                                }
                             }
                         }
-                    }
-                }, 100);
-            } else {
-                if (isrefresh) {
-                    scheduleCalendarRefresh(500);
-                    if (calendar) {
-                        setTimeout(() => calendar.refetchEvents(), 500);
+                    }, 100);
+                } else {
+                    if (isrefresh) {
+                        scheduleCalendarRefresh(500);
+                        if (calendar) {
+                            setTimeout(() => calendar.refetchEvents(), 500);
+                        }
                     }
                 }
-            }
-            // 提示用户
-            sy.showMessage('正在添加事件', -1, "info", "1");
-            setTimeout(() => {
+                // 提示用户
+                sy.showMessage('正在添加事件', -1, "info", "1");
+                setTimeout(() => {
+                    dialog.destroy();
+                    sy.showMessage('已添加事件', 2000, "info", "1");
+                }, 500);
+            } catch (error) {
+                console.error('提交添加事件失败:', error);
+                sy.showMessage(`添加事件失败: ${error instanceof Error ? error.message : String(error)}`, 4000, 'error');
                 dialog.destroy();
-                sy.showMessage('已添加事件', 2000, "info", "1");
-            }, 500);
-
+            }
         }
     };
 
@@ -1857,6 +1863,44 @@ function findKeyIDByIndex(viewValue: any[], key: string, rootid: string): string
 }
 
 //TODO：急急优化
+/**
+ * 解析目标数据库的字段名 → keyID 映射。
+ * 优先直接调用 SiYuan `/api/av/getAttributeViewKeysByAvID`（不依赖视图是否有行数据，
+ * 也不会因为无关视图渲染失败而触发反复渲染），必要时再从已有的 `viewValue` 补充。
+ */
+async function resolveAvKeyIdMap(avID: string, viewValue?: any): Promise<Map<string, string>> {
+    const map = new Map<string, string>();
+    if (!avID) {
+        return map;
+    }
+
+    try {
+        const keys = await api.getAttributeViewKeysByAvID(avID);
+        if (Array.isArray(keys)) {
+            for (const col of keys) {
+                if (col?.name && col?.id && !map.has(col.name)) {
+                    map.set(col.name, String(col.id));
+                }
+            }
+        }
+    } catch (error) {
+        console.warn(`获取数据库字段定义失败 (${avID}):`, error);
+    }
+
+    if (Array.isArray(viewValue)) {
+        const viewIndex = buildKeyIdIndex(viewValue).get(avID);
+        if (viewIndex) {
+            viewIndex.forEach((id, name) => {
+                if (!map.has(name)) {
+                    map.set(name, id);
+                }
+            });
+        }
+    }
+
+    return map;
+}
+
 async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string): Promise<string | undefined> {
     // 优先从 viewValue 已构建的索引中 O(1) 查找（同一 viewValue 多次调用时复用索引）
     if (Array.isArray(viewValue)) {
@@ -1866,48 +1910,9 @@ async function getKeyIDfromViewValue(viewValue: any, key: string, rootid: string
         }
     }
 
-    // 兜底：若 viewValue 不是数组或未命中，仍按原始线性扫描
-    const findKeyID = (data: any[]): string | undefined => {
-        for (const view of data) {
-            for (const item of view.data) {
-                if (item?.[key]?.keyID && view?.from?.rootid === rootid) {
-                    return item[key].keyID;
-                }
-            }
-        }
-        return undefined;
-    };
-
-    const existingKeyID = Array.isArray(viewValue) ? findKeyID(viewValue) : undefined;
-    if (existingKeyID) {
-        return existingKeyID;
-    }
-
-    // If not found, fetch fresh data
-    try {
-        sy.showMessage('添加事件中，请稍等...', -1, "info", "1");
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const Mcalendar = moduleInstances['M_calendar'];
-        const av_ids = await Mcalendar.getAVreferenceid();
-
-        if (!av_ids?.length) {
-            console.warn('No reference IDs found');
-            return undefined;
-        }
-
-        const viewIDs = await getViewId(av_ids);
-        if (!viewIDs?.length) {
-            console.warn('No view IDs found');
-            return undefined;
-        }
-
-        const freshViewValue = await getViewValue(viewIDs);
-        sy.showMessage('添加事件中，请稍等...', 1, "info", "1");
-        return findKeyIDByIndex(freshViewValue, key, rootid) ?? findKeyID(freshViewValue);
-    } catch (error) {
-        console.error('Error fetching key ID:', error);
-        return undefined;
-    }
+    // 直接向内核查询数据库列定义，避免因视图为空或无关视图渲染失败而重复 renderAttributeView
+    const keyMap = await resolveAvKeyIdMap(rootid, viewValue);
+    return keyMap.get(key);
 }
 
 function debounce(func: Function, wait: number) {

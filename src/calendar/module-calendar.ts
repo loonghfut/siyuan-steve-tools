@@ -18,7 +18,7 @@ import { LifelogView } from './integrations/lifelog-event-source';
 import { icsFileManager, transformEvents } from './integrations/ics/IcsFileManager';
 import { createScheduleInConfiguredDatabase } from './features/schedule-creation';
 import { openScheduleEditor } from './features/schedule-editor';
-import { addQuickAddButton, runQuickAddFromProtyle, getCursorContainer } from './features/quick-add';
+import { addQuickAddButton, runQuickAddFromProtyle, resolveTargetBlockIdsFromEditor } from './features/quick-add';
 import { M_caldata } from "./config/calendar-view-config";
 import { ics_s3 } from "./integrations/share/s3";
 import { WebDAVSync } from "./integrations/share/webdav";
@@ -477,55 +477,35 @@ export class M_calendar {
             langText: "创建日程（应用内弹窗）",
             hotkey: "",
             callback: async () => {
-                createScheduleInConfiguredDatabase();
+                try {
+                    await createScheduleInConfiguredDatabase();
+                } catch (error) {
+                    console.error("创建日程（应用内弹窗）失败:", error);
+                    showMessage(`创建日程失败: ${error instanceof Error ? error.message : String(error)}`, 4000, "error");
+                }
             },
         })
         this.plugin.addCommand({
             langKey: "ST_calendar_quick_pro",
             langText: "创建日程（光标所在块）",
             hotkey: "",
-            editorCallback: async () => {
-                const cursorElement = getCursorContainer();
-                console.debug("🚧🚧🚧elemet:", cursorElement);
-
-                // 1) 优先在常规块元素上查找（含 data-type 的块容器）
-                let cursorElementId = cursorElement?.closest('[data-type][data-node-id]')?.getAttribute('data-node-id') ?? null;
-
-                // 2) 列表项特殊处理，最高优先获取 .li 的 data-node-id
-                if ( cursorElement?.closest('.li')) {
-                    cursorElementId = cursorElement.closest('.li')!.getAttribute('data-node-id');
-                    console.debug("c🚧🚧🚧(li)", cursorElementId);
-                }
-
-                // 3) 兼容文档标题区域，例如：<div class="protyle-title ..." data-node-id="..."> ... </div>
-                if (!cursorElementId) {
-                    const titleEl = cursorElement?.closest('.protyle-title');
-                    if (titleEl) {
-                        cursorElementId = titleEl.getAttribute('data-node-id');
-                        console.debug("c🚧🚧🚧(title)", cursorElementId);
-                    }
-                }
-
-                // 4) 兜底：向上寻找最近的含 data-node-id 的祖先
-                if (!cursorElementId) {
-                    const nodeEl = cursorElement?.closest('[data-node-id]');
-                    if (nodeEl) {
-                        cursorElementId = nodeEl.getAttribute('data-node-id');
-                        console.debug("c🚧🚧🚧(any [data-node-id])", cursorElementId);
-                    }
-                }
-
-                console.debug("cursorElementId", cursorElementId);
-                const blockId = cursorElementId;
-                console.debug("🚧🚧🚧blockId", blockId);
-                if (!blockId) {
+            editorCallback: async (protyle) => {
+                const blockIds = resolveTargetBlockIdsFromEditor(protyle, window.getSelection());
+                if (blockIds.length === 0) {
                     showMessage("请先选中一个块", 3000, "error");
                     return;
                 }
-                
-                // console.debug("pro", blockId);
-                // console.debug("创建日程（光标所在块）", blockId);
-                createScheduleInConfiguredDatabase('', { isdirect: true, directid: blockId });
+
+                for (let i = 0; i < blockIds.length; i++) {
+                    const blockId = blockIds[i];
+                    const isLast = i === blockIds.length - 1;
+                    try {
+                        await createScheduleInConfiguredDatabase('', { isdirect: true, directid: blockId }, isLast);
+                    } catch (error) {
+                        console.error(`创建日程失败 (${blockId}):`, error);
+                        showMessage(`创建日程失败: ${error instanceof Error ? error.message : String(error)}`, 4000, "error");
+                    }
+                }
             },
         })
     }

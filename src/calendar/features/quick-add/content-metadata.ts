@@ -1,6 +1,6 @@
 export function getCursorContainer(): Element | null {
     const selection = window.getSelection();
-    if (selection.rangeCount === 0) return null;
+    if (!selection || selection.rangeCount === 0) return null;
     const node = selection.getRangeAt(0).startContainer;
     return node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element;
 }

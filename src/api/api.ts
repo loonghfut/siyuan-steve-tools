@@ -1222,31 +1222,33 @@ async function processQueue() {
                 })
             );
 
-            // 构建批量更新数据
+            const validEntries = processedUpdates.filter((entry) => Boolean(entry.keyName));
+            const invalidEntries = processedUpdates.filter((entry) => !entry.keyName);
 
-            const batchUpdates = processedUpdates
-                .filter(update => update.keyName) // 只处理有效的键名
-                .map(update => ({
-                    keyName: update.keyName!,
-                    rowID: update.itemID,
-                    value: update.processedValue
-                }));
+            for (const entry of invalidEntries) {
+                entry.reject(
+                    new Error(`Invalid keyName for update (avID=${avID}, keyID=${entry.keyID})`),
+                );
+            }
+
+            // 构建批量更新数据
+            const batchUpdates = validEntries.map((entry) => ({
+                keyName: entry.keyName!,
+                rowID: entry.itemID,
+                value: entry.processedValue,
+            }));
 
             if (batchUpdates.length > 0) {
                 // 使用批量API更新单元格
                 // console.debug(`🔄 [批量更新单元格] 发送批量更新请求，avID: ${avID}`, batchUpdates);
                 const result = await avManager.batchUpdateCells(avID, batchUpdates);
 
-                // 成功后解析所有Promise
-                updates.forEach(update => update.resolve(result));
+                // 成功后仅解析有效更新的 Promise
+                validEntries.forEach((entry) => entry.resolve(result));
 
                 // console.debug(`✅ [批量更新单元格] 成功更新 ${batchUpdates.length} 个单元格，avID: ${avID}`);
                 // 批量更新完成后的后续处理
-                await handlePostBatchUpdateActions(avID, updates);
-            } else {
-                // 如果没有有效更新，拒绝所有Promise
-                updates.forEach(update => update.reject(new Error('Invalid keyName for update')));
-                // console.warn(`⚠️  [批量更新单元格] 没有有效的键名，avID: ${avID}`);
+                await handlePostBatchUpdateActions(avID, validEntries);
             }
 
         } catch (error) {
