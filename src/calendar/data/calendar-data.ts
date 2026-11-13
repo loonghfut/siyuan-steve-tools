@@ -417,14 +417,32 @@ export async function getViewId(va_ids: string[]): ViewData {
 
         const promise = (async () => {
             try {
+                // 思源 3.8 起优先解析物理块 ID：
+                // 1) 帮助内核定位 notebook carrier box，防止跨笔记本/加密笔记本时查找不到 AV；
+                // 2) 向前端提供具体 blockID，避免退化为 [data-av-id="..."] 引发多实例 DOM 冲突。
+                const blockId = await resolveAvBlockId(va_id, { preferredNames: CALENDAR_AV_BLOCK_NAMES });
+
                 // 此处只需要 AV 元数据中的 views；不要为此构建并传回整张表。
                 const view = await api.renderAttributeView(va_id, undefined, {
                     ignoreRows: true,
                     pageSize: 1,
+                    blockID: blockId || undefined,
                 });
-                const initial = extractViewItemsFromAvResponse(view, va_id);
+                const initial = extractViewItemsFromAvResponse(view, va_id, blockId || undefined);
                 if (!initial.valid) {
-                    console.warn(`跳过无效或已失效的属性视图 ${va_id}:`, view);
+                    console.warn(`[Calendar:AV] 跳过无效或已失效的属性视图 ${va_id}:`, view);
+                    // 异步检索引用该失效 avID 的块，精确定位来源页面与块 ID
+                    api.sql(`SELECT id, root_id, type, name, hpath, updated FROM blocks WHERE markdown LIKE '%${va_id.replace(/'/g, "''")}%' LIMIT 5`)
+                        .then((referencingBlocks) => {
+                            if (Array.isArray(referencingBlocks) && referencingBlocks.length > 0) {
+                                console.warn(`[Calendar:AV] 引用该失效属性视图 (${va_id}) 的物理块列表:`, referencingBlocks);
+                            } else {
+                                console.warn(`[Calendar:AV] 未在 blocks 表中找到引用该失效属性视图 (${va_id}) 的物理块（可能在关闭的笔记本或回收站中）`);
+                            }
+                        })
+                        .catch((err) => {
+                            console.debug(`[Calendar:AV] 查询失效属性视图 (${va_id}) 引用来源失败:`, err);
+                        });
                     viewIdCache.set(va_id, { ts: Date.now(), data: [] });
                     return [] as ViewItem[];
                 }
@@ -432,11 +450,7 @@ export async function getViewId(va_ids: string[]): ViewData {
                     viewIdCache.set(va_id, { ts: Date.now(), data: [] });
                     return [] as ViewItem[];
                 }
-                // 思源 3.8 起需要数据库块 ID 才能解析当前视图与块级上下文筛选。
-                const blockId = await resolveAvBlockId(va_id, { preferredNames: CALENDAR_AV_BLOCK_NAMES });
-                const data: ViewItem[] = blockId
-                    ? initial.items.map((item) => ({ ...item, blockId }))
-                    : initial.items;
+                const data: ViewItem[] = initial.items;
                 viewIdCache.set(va_id, { ts: Date.now(), data });
                 return data;
             } catch (error) {
@@ -541,7 +555,6 @@ function populateFieldMap(fieldMap: Map<string, { id: string; index: number }>, 
 }
 
 async function extractDataFromTable(data: any, avID: string, isZQ = false, type = "normal", viewID?: string, viewType?: string, blockID?: string) {
-    // console.debug("🚧🚧🚧🚧🚧🚧", data);
     // 思源 3.8 扩展了 AV 布局类型（kernel/av/av.go 的 LayoutType：table|list|gallery|kanban|calendar）。
     // 布局类型在**响应顶层**的 viewType（kernel/apicontract/av_response.go 的 AVArchiveRenderData.ViewType）。
     //
@@ -568,7 +581,6 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
     const requiredFields = getRequiredFields(isZQ, type);
 
     // 1. 创建字段映射
-    // console.debug("DATA：", data);
     const fieldMap = new Map();
     // 分组看板/表格优先使用顶层 fields/columns，否则回退到第一个分组
     const fields = resolveViewFields(data, isGalleryView);
@@ -688,7 +700,6 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
             try {
                 // 提取事件
                 const eventCell = getCell('事件');
-                // console.debug("eventCell:", eventCell);
                 if (eventCell) {
                     rowData['事件'] = {
                         content: eventCell.block?.content || '',
@@ -733,7 +744,6 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                 // 提取标签
                 const tagCell = getCell('标签');
                 if (tagCell) {
-                    // console.debug("tagCell:::", tagCell);
                     rowData['标签'] = {
                         content: tagCell.mSelect?.map((item: ISelectOption) => item.content) || [],
                         keyID: tagCell.keyID || ''
@@ -823,14 +833,12 @@ async function extractDataFromTable(data: any, avID: string, isZQ = false, type 
                         keyID: didaIdCell.keyID || ''
                     };
                 }
-                // console.debug("rowData:::", rowData);
                 return rowData;
             } catch (error) {
                 console.error('Error processing row/card:', item, error);
                 return {};
             }
         });
-        // console.debug("extractDataFromTable🛠️🛠️ result:::", result);
         return result;
     } catch (error) {
         console.error('Error in extractDataFromTable:', error);
@@ -844,7 +852,6 @@ export async function filterViewValue(viewValue, filterKeys: string[] = []) {
     if (!filterKeys || filterKeys.length === 0) {
         return viewValue;
     }
-    // console.debug("filterKeys:::", filterKeys);
     // 筛选出匹配任一 ID 的视图
     const filteredViewValue = viewValue.filter(item =>
         filterKeys.includes(item.from.viewId)
@@ -1094,7 +1101,6 @@ export async function convertToFullCalendarEvents(
                         ? new Date(parseInt(item['开始时间'].start))
                         : new Date(new Date().setHours(0, 0, 0, 0));
                     const endDate = item['开始时间']?.end ? new Date(parseInt(item['开始时间'].end)) : null;
-                    // steveTools.outlog("startDate:::", startDate, "endDate:::", endDate);
                     // 对于周期事件，如果没有设置开始时间，默认为全天事件
                     const isAllDay = !hasStartTime;
                     // (startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
@@ -1278,8 +1284,8 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     let isok = false;
     status = status || "未完成";
     const to_db_id = db_id || settingdata["cal-db-id"];
+    console.debug(`[Calendar:CreateEvent] 开始创建日程: dateStr=${dateStr}, targetDb=${to_db_id}, isDirect=${direct.isdirect}, directId=${direct.directid}`);
 
-    // steveTools.outlog("viewValue:::createEventInDatabase", viewValue);
     function formatDateWithTime(dateStr: string, hour: number = 8): string {
         // 如果日期字符串已经包含时间部分，直接返回原值
         if (dateStr.includes('T')) {
@@ -1332,6 +1338,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 endDateStr = parsedTimeRange.end;
             }
 
+            console.debug(`[Calendar:CreateEvent] 直接关联块到数据库: directId=${direct.directid}, to_db_id=${to_db_id}, itemID=${itemID}`);
             await api.addBlockToDatabase_pro(direct.directid, to_db_id, itemID);
             const timeKeyID = getFieldKeyID('开始时间');
             const statusKeyID = getFieldKeyID('状态');
@@ -1394,6 +1401,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
             }
 
             await Promise.all(updatePromises);
+            console.debug(`[Calendar:CreateEvent] 直接关联事件创建完成: directId=${direct.directid}, to_db_id=${to_db_id}`);
             try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
             sy.showMessage('已添加事件', 2000, "info", "1");
             // 滴答更新
@@ -1433,11 +1441,9 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
         ),
         daynote_id,
     )
-    // const id = iddata[0].doOperations[0].id;
     const id = idid;
     const itemID = await api.generateSiyuanID() as string;
-    // // steveTools.outlog("iddata:::", iddata[0].doOperations[0].id);
-    // console.debug("dateStr:::", dateStr, "databaseId:::", to_db_id);
+    console.debug(`[Calendar:CreateEvent] 目标日记块已准备: daynote_id=${daynote_id}, 新建事件块 id=${id}, itemID=${itemID}`);
     let cleanedUp = false;
     let panel: sy.Protyle | null = null;
     let debouncedHandleKeydown: ((e: Event) => void) | null = null;
@@ -1557,6 +1563,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                     return;
                 }
                 //// 将块加入到数据库
+                console.debug(`[Calendar:CreateEvent] 正在将块绑定到数据库: id=${id}, avID=${to_db_id}, itemID=${itemID}`);
                 await api.addBlockToDatabase_pro(id, to_db_id, itemID);
                 // 添加数据库属性
                 const timeKeyID = getFieldKeyID('开始时间');
@@ -1631,6 +1638,7 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
                 }
 
                 await Promise.all(updatePromises2);
+                console.debug(`[Calendar:CreateEvent] 事件写入及属性更新完成: id=${id}, avID=${to_db_id}`);
                 // create 是新增行：缓存没有该行，必须显式失效，否则下面的 refetch 会读到不含新事件的旧 cache
                 try { invalidateViewValueCache(to_db_id); } catch (e) { /* ignore */ }
                 // 滴答更新
@@ -1702,22 +1710,15 @@ export async function createEventInDatabase(//OK:加一个是否刷新日历的�
     };
 
     window.siyuan.ws.ws.addEventListener('message', messageHandler);
-    // // steveTools.outlog(msg);
 
     debouncedHandleKeydown = debounce(handleKeydown, 300);
     panel.protyle.element.addEventListener('keydown', debouncedHandleKeydown);
-    // panel.focus();
-
-    // // steveTools.outlog("dasdsssssssssss::::::", panel);
     // 2. 添加到文档并显示
-
     // 3. 等待用户提交
-
 }
 
 export async function checkBlockInEvent(blockId: string, to_db_id: string) {
     const attrs = await api.getBlockAttrs(blockId);
-    // console.debug("attrs", attrs);
     // 判断 "custom-avs" 是否存在
     if ("custom-avs" in attrs) {
         const avsValue = attrs["custom-avs"];
@@ -1725,11 +1726,9 @@ export async function checkBlockInEvent(blockId: string, to_db_id: string) {
         const avsList = avsValue.split(',');
         // 判断 to_db_id 是否在数组中
         const isInEvent = avsList.includes(to_db_id);
-        // console.debug("Is block in the specified event database?", isInEvent);
         return isInEvent;
     }
     // 如果 "custom-avs" 不存在，则返回 false
-    // console.debug("Is block in the specified event database?", false);
     return false;
 }
 

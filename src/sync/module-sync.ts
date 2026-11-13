@@ -12,8 +12,6 @@ export class M_sync {
     constructor(_plugin: steveTools) {}
 
     init = async (settingdata) => {
-        // steveTools.outlog("同步模块初始化中...");
-        // this.settingdata = settingdata;
         url = settingdata["sync-url"];
         token = settingdata["sync-token"];
         // console.debug("url: ", url);
@@ -61,8 +59,6 @@ export class M_sync {
             // console.debug(msg);
         };
         siyuan.ws.ws.addEventListener('message', this.wsMessageHandler);
-
-        // steveTools.outlog("同步模块初始化完成");
     }
 
     /**
@@ -76,7 +72,6 @@ export class M_sync {
     }
 
     async testSync() {
-        // steveTools.outlog("测试同步...");
         let res: any = await api.testSync(url, token);
         console.debug("res: ", res);
         if (res) {

@@ -168,10 +168,8 @@ export class M_calendar {
         this.loadedProtyleHandler = this.avButton.bind(this);
         this.switchProtyleInitHandler = this.avButton.bind(this);
         this.plugin.eventBus.on("loaded-protyle-dynamic", this.loadedProtyleHandler);
-        // this.plugin.eventBus.on("loaded-protyle-static", this.avButton.bind(this));
         this.plugin.eventBus.on("switch-protyle", this.switchProtyleInitHandler);
 
-        // // steveTools.outlog(this_settingdata["cal-hand-update"]);
         // 顶栏按钮（随设置显隐，热更新时复用同一条目）
         this.applyTopBarButtons();
         if (this_settingdata["cal-ics-subscribe-import"] == true) {
@@ -229,15 +227,7 @@ export class M_calendar {
 
 
         if (this_settingdata["cal-auto-update"] == true) {
-            // // steveTools.outlog("自动更新日历文件");
-            //监听
             this.applyAutoUpdateListener();
-            //// 暂时不用
-            // 每15分钟调用一次await this.getEventsFromSiYuanDatabase()
-            // setInterval(async () => {
-            //     await this.getEventsFromSiYuanDatabase()
-            //     // steveTools.outlog("自动更新日历文件<1>");
-            // }, 900000);
         }
     // cal-auto-syncing-update 逻辑已迁移至 listeners/transactionListener.ts，通过 eventBus 'ws-main' 统一处理
         //解决 https://github.com/loonghfut/siyuan-steve-tools/issues/3
@@ -654,7 +644,6 @@ export class M_calendar {
             // 这里不限定元素名，避免升级后匹配不到节点导致按钮注入静默失效。
             const targetSpans = Array.from(document.querySelectorAll('[data-type="av-add-more"]'))
                 .filter(span => span.closest('[name="日程"]'));
-            // // steveTools.outlog(targetSpans, "targetSpans");
 
             targetSpans.forEach(targetSpan => {
                 // 思源 3.8+ 将 av-add-more 与 av-add-template 包裹在 .av__new split-button 容器中，插入到容器外侧保持原生排版
@@ -688,8 +677,6 @@ export class M_calendar {
                             });
 
                             dataId = closestBlock.getAttribute('data-id');
-                            // console.debug('data-id:', dataId);
-                            // steveTools.outlog('Selected AV block ID:', dataId);
                         }
 
                         if (front == "browser-mobile" || front == "mobile") {
@@ -861,7 +848,6 @@ export class M_calendar {
     }
 
     getCalUrl() {
-        // // steveTools.outlog(this_settingdata["cal-enable"]);
         if (this_settingdata["cal-enable"] == true) {
             const currentHost = "（思源伺服地址）";
             showMessage("日历订阅链接：" + currentHost + "/" + calendarPaths.icsPublicPath, 0, "info");
@@ -876,7 +862,6 @@ export class M_calendar {
             const eventsJson = JSON.stringify(events);
             const fileBlob = new Blob([eventsJson], { type: 'application/json' });
             await api.putFile(filePath, false, fileBlob);
-            // steveTools.outlog('事件数据已保存到' + filePath);
         } catch (error) {
             console.error('保存事件数据时出错：', error);
         }
@@ -885,7 +870,6 @@ export class M_calendar {
     async checkAndCreateEventsFile(filePath: string) {
         try {
             const response = await api.getFile(filePath);
-            // // steveTools.outlog(response);
             if (response.code === 404) {//TODO待改进判断
                 // 如果文件不存在，创建一个空的events.json文件
                 //删除其他.ics文件
@@ -893,9 +877,6 @@ export class M_calendar {
                 const eventsJson = JSON.stringify(emptyEvents);
                 const fileBlob = new Blob([eventsJson], { type: 'application/json' });
                 await api.putFile(filePath, false, fileBlob);
-                // steveTools.outlog('已创建空的 ' + filePath);
-            } else {
-                // steveTools.outlog(filePath + ' 文件已存在');
             }
         } catch (error) {
             console.error('检查或创建 events.json 文件时出错：', error);
@@ -909,43 +890,54 @@ export class M_calendar {
         if (cached && (now - cached.ts) < this.avIdCacheTTL) {
             return cached.value;
         }
-        const sqlStr = `SELECT markdown
+        const sqlStr = `SELECT id, root_id, type, name, hpath, updated, markdown
         FROM blocks
         WHERE name = '${forwhat}'
-        AND markdown LIKE '%NodeAttributeView%data-av-id%' LIMIT 9999999;`
-            ;
+        AND markdown LIKE '%NodeAttributeView%data-av-id%' LIMIT 9999999;`;
         const res = await api.sql(sqlStr);
-        // steveTools.outlog(res);
-        const avIds = res.map(item => extractDataAvId(item.markdown)).filter(id => id !== null);
+        const avIds: string[] = [];
+        const discovered: Array<{ avId: string; blockId: string; type: string; hpath: string; name: string }> = [];
+        if (Array.isArray(res)) {
+            for (const item of res) {
+                const avId = extractDataAvId(item?.markdown || '');
+                if (avId) {
+                    avIds.push(avId);
+                    discovered.push({
+                        avId,
+                        blockId: item.id,
+                        type: item.type,
+                        hpath: item.hpath,
+                        name: item.name,
+                    });
+                }
+            }
+        }
         this.avIdCache.set(forwhat, { ts: now, value: avIds });
-        // steveTools.outlog(avIds); // 输出: ['20241213113357-m9b143e', ...]
+        if (discovered.length > 0) {
+            console.debug(`[Calendar:AV-Discovery] 发现 ${discovered.length} 个 '${forwhat}' 数据库引用:`, discovered);
+        }
         return avIds;
 
     }
     async getAVreferenceid_pro(forwhat: string = '日程') {
-        const sqlStr = `SELECT markdown, content
+        const sqlStr = `SELECT id, root_id, type, name, hpath, updated, markdown, content
         FROM blocks
         WHERE name = '${forwhat}'
         AND markdown LIKE '%NodeAttributeView%data-av-id%' LIMIT 9999999;`;
 
         const res = await api.sql(sqlStr);
-        // // steveTools.outlog("RES:::::::::",res);
-        // steveTools.outlog(res);
-
-        const avIds = res.map(item => ({
-            id: extractDataAvId(item.markdown),
-            name: item.content?.split(' ')[0] || 'N/A'
-        })).filter(item => item.id !== null);
-
-        console.debug("avIds", avIds); // 输出: [{id: '20241213113357-m9b143e', name: '...'}, ...]
+        const avIds = Array.isArray(res)
+            ? res.map(item => ({
+                id: extractDataAvId(item?.markdown || ''),
+                name: item.content?.split(' ')[0] || 'N/A'
+            })).filter(item => item.id !== null)
+            : [];
 
         return avIds;
     }
 
     async getEventsFromSiYuanDatabase() {
         try {
-            // steveTools.outlog('开始生成ics文件');
-
             // 清理旧文件
             const listfiles = await api.readDir('data/public/stevetools/');
             for (const file of Object.values(listfiles)) {
@@ -969,7 +961,6 @@ export class M_calendar {
             if (avids_zq && Array.isArray(avids_zq) && avids_zq.length > 0) {
                 const viewIDs_zq = await myF.getViewId(avids_zq);
                 const viewValue_zq = await myF.getViewValue(viewIDs_zq, true);
-                // steveTools.outlog("EEEEEEEEEEEEEEEEEView data:", viewValue_zq);
                 const result_zq = transformEvents(viewValue_zq, true);
                 //TODO:周期事件的周期处理改为数据库单选
                 await this.addEventToGlobal(result_zq);
@@ -1021,12 +1012,9 @@ export class M_calendar {
             } else {
                 allEvents.push(newEvents);
             }
-            // steveTools.outlog('新事件已添加到全局变量');
-            // console.debug("allEvents", allEvents);
         } catch (error) {
             console.error('添加事件到全局变量时出错：', error);
         }
-        // steveTools.outlog("Aevent::::::::::::::::::::", allEvents);
     }
 
     // 上传全局事件数据到JSON文件
@@ -1034,10 +1022,8 @@ export class M_calendar {
         try {
             // 将全局事件数组保存回JSON文件
             const updatedEventsJson = JSON.stringify(allEvents);
-            // steveTools.outlog("updatedEventsJson", allEvents);
             const fileBlob = new Blob([updatedEventsJson], { type: 'application/json' });
             await api.putFile(jsonFilePath, false, fileBlob);
-            // steveTools.outlog('所有事件已保存到' + jsonFilePath);
         } catch (error) {
             console.error('上传事件到文件时出错：', error);
         }

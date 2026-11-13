@@ -480,7 +480,6 @@ export async function run(
             } else if (instanceState.dateClicks === 2) {
                 clearTimeout(instanceState.dateClickTimer);
                 instanceState.dateClicks = 0;
-                // steveTools.outlog("创建事件", info);
                 await myF.createEventInDatabase(info.dateStr, calendar, instanceState.viewValue, rootid);
             }
         },

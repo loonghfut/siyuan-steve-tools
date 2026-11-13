@@ -57,9 +57,72 @@ const MAX_WAIT_TIME = 5000; // 最大等待时间，防止单个请求等待太�
 const addBlockQueueTimers: Map<string, NodeJS.Timeout> = new Map();
 let cellUpdateQueueTimer: NodeJS.Timeout | null = null;
 let cellUpdateQueueStartTime: number | null = null; // 记录队列开始时间
+
+/**
+ * 原生直连 fetch：用于在 fetchSyncPost 被思源前端生命周期拦截（如多实例切换/后台标签页导致 !templateRequest.isCurrent()）
+ * 时进行兜底请求。插件运行在 Electron/Web 宿主窗口内，原生 fetch 会自动带上同源会话 cookie。
+ */
+async function fetchDirect(url: string, data: any): Promise<IWebSocketData> {
+    try {
+        const headers: Record<string, string> = {};
+        const appId = (window as any)?.siyuan?.config?.appId;
+        if (appId) {
+            headers["X-SiYuan-App-ID"] = appId;
+        }
+        let body: any;
+        if (typeof FormData !== "undefined" && data instanceof FormData) {
+            body = data;
+        } else if (data !== undefined) {
+            headers["Content-Type"] = "application/json";
+            body = typeof data === "string" ? data : JSON.stringify(data);
+        }
+        const resp = await fetch(url, {
+            method: "POST",
+            headers,
+            body,
+        });
+        if (resp.ok) {
+            return (await resp.json()) as IWebSocketData;
+        }
+        return {
+            code: -resp.status,
+            msg: resp.statusText,
+            data: null,
+        };
+    } catch (e: any) {
+        return {
+            code: -1,
+            msg: e?.message || "fetch direct failed",
+            data: null,
+        };
+    }
+}
+
 export async function request(url: string, data: any) {
-    let response: IWebSocketData = await fetchSyncPost(url, data);
-    let res = response.code === 0 ? response.data : `${url}error`;
+    let response: IWebSocketData | undefined;
+    try {
+        response = await fetchSyncPost(url, data);
+    } catch (err: any) {
+        console.debug(`[API] fetchSyncPost 调用异常 (${url})，回退到直连请求:`, err);
+        response = await fetchDirect(url, data);
+    }
+
+    // 关键生命周期兜底：
+    // 思源前端 app/src/util/fetch.ts 中，若请求在多实例/后台标签页切换时被判定为
+    // !templateRequest.isCurrent()，会静默丢弃内核 HTTP 200 结果并返回 { code: -1, msg: "", data: null }。
+    // 当检测到此种无 msg 的 -1 响应时，回退到原生直连 fetch 重新获取真实内核数据。
+    if (response && response.code === -1 && (!response.msg || response.msg === "")) {
+        console.debug(`[API] 检测到思源前端生命周期静默取消 (${url})，启用直连重试`);
+        const fallback = await fetchDirect(url, data);
+        if (fallback && fallback.code === 0) {
+            response = fallback;
+        }
+    }
+
+    if (response && response.code !== 0) {
+        console.warn(`[API] 内核请求返回错误: url=${url}, code=${response.code}, msg=${response.msg}`, data);
+    }
+    let res = response && response.code === 0 ? response.data : `${url}error`;
     return res;
 }
 

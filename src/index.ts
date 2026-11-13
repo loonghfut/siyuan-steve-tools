@@ -105,7 +105,6 @@ export default class steveTools extends Plugin {
 
   async onLayoutReady() {
     for (const moduleName in moduleInstances) {
-      // steveTools.outlog("onLayoutReady--" + moduleName);
       await moduleInstances[moduleName]?.onLayoutReady?.();
     }
 
