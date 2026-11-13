@@ -606,6 +606,8 @@ export interface ISqlResult {
     limit?: number;
     /** 结果是否被服务端截断。 */
     truncated?: boolean;
+    /** 查询是否成功（内核返回 code 0）。false 表示查询失败，rows 为空不代表没有数据。 */
+    ok?: boolean;
 }
 
 /**
@@ -621,10 +623,10 @@ export async function sqlWithMeta(sql: string): Promise<ISqlResult> {
         // 原实现失败时返回字符串，调用方会在 .map / 迭代时抛 TypeError。
         // 这里统一返回空数组，但保留告警，避免"查询失败"被当成"没有数据"而静默。
         console.warn(`SQL 查询失败（code ${response.code}）：${response.msg || ""}\n${sql}`);
-        return { rows: [], truncated: false };
+        return { rows: [], truncated: false, ok: false };
     }
     let rows = Array.isArray(response.data) ? response.data : [];
-    return { rows, limit: response.limit, truncated: response.truncated === true };
+    return { rows, limit: response.limit, truncated: response.truncated === true, ok: true };
 }
 
 export async function sql(sql: string): Promise<any[]> {

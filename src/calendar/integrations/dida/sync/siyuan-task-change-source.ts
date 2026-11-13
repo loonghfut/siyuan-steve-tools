@@ -12,6 +12,11 @@ export interface SiyuanTaskChangeSourceOptions {
     isSyncing: () => boolean;
     onForceTarget: (blockId: string, itemID: string) => Promise<void>;
     onQueuedTarget: (blockId: string, itemID: string, isDetached: boolean) => void;
+    /**
+     * 检测到外部写入数据库时失效行缓存。
+     * 去重依据是数据库 didaID 列，必须读到最新值；整批只失效一次，避免逐行重复渲染。
+     */
+    invalidateAvCache?: () => void;
 }
 
 export class SiyuanTaskChangeSource {
@@ -146,6 +151,9 @@ export class SiyuanTaskChangeSource {
             const avId = this.options.getAvId();
             const body = context.reqBody || {};
             if (!avId || body.avID !== avId) return;
+
+            // 外部写入数据库：先失效行缓存，保证后续去重判定读到的是最新列值
+            this.options.invalidateAvCache?.();
 
             if (context.url.includes("/api/av/setAttributeViewBlockAttr") && body.itemID) {
                 const ids = await getAttributeViewBoundBlockIDsByItemIDs(avId, [body.itemID]);

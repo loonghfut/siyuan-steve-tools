@@ -3,23 +3,28 @@ import { Dida365ApiClient } from "@/calendar/integrations/dida/api/dida-api-clie
 import { Project, Task, TaskCompletedQuery, TaskFilterQuery, TaskMoveOperation, TaskMoveResult } from "@/calendar/integrations/dida/dida_interface";
 import type steveTools from "@/index";
 import { calendarSettings as settingdata } from '@/calendar/core/calendar-context';
-import { getViewId, getViewValue } from "@/calendar/data/calendar-data";
-import { addBlockToDatabase_pro, appendBlock, generateSiyuanID, getBlockAttrs, setBlockAttrs, showStatusMessage, sqlWithMeta, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
+import { getViewId, getViewValue, invalidateViewValueCache, patchViewValueRow } from "@/calendar/data/calendar-data";
+import { addBlockToDatabase_pro, appendBlock, generateSiyuanID, getAttributeViewItemIDsByBoundIDs, getAttributeViewKeysByAvID, getBlockAttrs, setBlockAttrs, showStatusMessage, sqlWithMeta, updateAttrViewCell_pro, updatemainkey } from "@/api/api";
 import { formatDateForDida, formatDateToISO, formatLocalDate } from "@/calendar/integrations/dida/siyuan_api";
 import { createDidaDock, DidaLinkInterceptor } from "@/api/dockdida_pro";
 import * as ic from "@/icon"
 import { beginTaggedRequests, endTaggedRequests } from "@/api/network-interceptor";
 import type { DidaSyncFeature } from "@/calendar/integrations/dida/sync/sync-feature";
-import { TaskSyncStore } from "@/calendar/integrations/dida/storage/task-sync-store";
+import { TaskSyncStore, type PendingDidaIdWrite } from "@/calendar/integrations/dida/storage/task-sync-store";
 import {
+    buildCreatingIntent,
     buildDidaTaskUpdatePayload,
     extractSiyuanBlockIdFromDidaTitle,
+    findTaskBySiyuanBacklink,
     getDidaStatusAttr,
     hasDidaTaskChanged,
     hasSiyuanTaskChanged,
     mapDidaTaskToSiyuan,
+    mergePendingDidaIdWrite,
     parseDidaReminders,
     removeDidaLinks,
+    resolveDidaBinding,
+    resolvePendingDidaIdWriteAction,
 } from "@/calendar/integrations/dida/mappers/task-mapper";
 import {
     buildDidaImportTemplateData,
@@ -31,8 +36,20 @@ import { createScheduleBlockquoteMarkdown } from '@/calendar/features/schedule-b
 import { createDailyNoteForDate } from '@/calendar/data/daily-note';
 import { applyTopBarButton } from '@/libs/topbar';
 
-/** 与 AV 的 didaID 列保持一致的块级属性，便于脱离数据库定位滴答任务。 */
-const DIDA_TASK_ID_ATTR = "custom-dida-id";
+/** 旧版本把滴答任务 ID 写在块属性上，仅用于一次性回填到数据库 didaID 列。 */
+const LEGACY_DIDA_TASK_ID_ATTR = "custom-dida-id";
+
+/** 待补写去重键的持久化文件名：跨插件重启保留，避免去重键丢失后重复创建。 */
+const DIDA_PENDING_WRITES_FILE = "dida-pending-writes.json";
+
+/** 待补写去重键的最大重试次数，超过后停止自动重试并提示用户。 */
+const MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS = 5;
+
+/** 待补写队列落盘的超时时间：内核异常时不让 Promise 永久挂起、阻塞后续落盘。 */
+const PENDING_WRITE_SAVE_TIMEOUT_MS = 10000;
+
+/** 远端任务列表刷新的节流间隔：同源任务探测按此节流，避免一轮同步里反复请求远端。 */
+const REMOTE_TASK_REFRESH_THROTTLE_MS = 30000;
 
 export class DidaTaskSyncFeature implements DidaSyncFeature {
     readonly id = "tasks";
@@ -44,7 +61,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     // private doneListId: string | null = null; // 用于存储已完成任务列表ID cal-dida-finished-list
     private readonly store = new TaskSyncStore();
     private get taskCache() { return this.store.tasks; }
-    private get didaTaskIdsByBlock() { return this.store.didaTaskIdsByBlock; }
+    private get pendingDidaIdWrites() { return this.store.pendingDidaIdWrites; }
     private isSyncing = false; // 新增同步锁
     private syncEchoSuppressUntil = 0; // 全量同步结束后的 WS/AV 回声抑制截止时间
     private readonly siyuanSyncInFlight = new Map<string, Promise<{ ok: boolean; changed: boolean }>>();
@@ -62,6 +79,16 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     private pendingSiyuanSyncTimer: NodeJS.Timeout | null = null; // 思源待同步队列刷新计时器
     private autoSyncInterval?: number;
     private initialSyncTimer?: number;
+    /** 数据库列名 -> keyID 缓存，避免每次回写都请求 AV 键列表。 */
+    private avColumnKeyIds: Map<string, string> | null = null;
+    /** 已知仍带旧版滴答 ID 块属性的块：只有这些块才需要清理，避免每次写去重键都发一次 setBlockAttrs。 */
+    private readonly legacyAttrBlocks = new Set<string>();
+    /** 已经提示过"回写失败"的待补写记录，避免每轮同步重复弹提示。 */
+    private readonly pendingWriteNotified = new Set<string>();
+    /** 最近一次刷新远端任务列表的时间：用于"同源任务探测"的节流。 */
+    private lastRemoteTaskRefreshAt = 0;
+    /** 待补写去重键的落盘串行链，避免并发写同一文件导致快照乱序。 */
+    private pendingPersistChain: Promise<void> = Promise.resolve();
 
     private readonly isSyncOrEchoActive = (): boolean =>
         this.isSyncing || Date.now() < this.syncEchoSuppressUntil;
@@ -82,60 +109,730 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         return tracked;
     }
 
-    private async writeDidaTaskIdAttr(blockId: string, didaTaskId: string | undefined): Promise<void> {
-        if (!blockId || !didaTaskId) return;
-        await setBlockAttrs(blockId, { [DIDA_TASK_ID_ATTR]: didaTaskId });
-        this.didaTaskIdsByBlock.set(blockId, didaTaskId);
-    }
-
-    /** 块属性优先；AV didaID 仅兼容历史数据。 */
-    private async readDidaTaskId(blockId: string | undefined, task?: any): Promise<string> {
-        if (blockId) {
-            const cached = this.didaTaskIdsByBlock.get(blockId);
-            if (cached) return cached;
-            try {
-                const attrs = await getBlockAttrs(blockId);
-                const attrTaskId = attrs?.[DIDA_TASK_ID_ATTR];
-                if (attrTaskId) {
-                    this.didaTaskIdsByBlock.set(blockId, attrTaskId);
-                    return attrTaskId;
-                }
-            } catch (error) {
-                console.warn("读取块滴答 ID 属性失败，将回退至 AV didaID 列", blockId, error);
-            }
-        }
-
-        const legacyTaskId = task?.didaID?.content || "";
-        return legacyTaskId;
+    /**
+     * 读取思源行对应的滴答任务 ID。
+     * 去重的唯一依据是数据库 didaID 列，不存在任何内存影子数据。
+     */
+    private readDidaTaskId(task?: any): string {
+        return task?.didaID?.content || "";
     }
 
     /**
-     * 全量同步时一次性读取所有块级滴答 ID，避免对 AV 的每一行分别请求 attrs API。
-     * SQL 不可用时返回 null；调用方必须停止同步，不能将未知关联误判为待创建任务。
+     * 重新读取数据库行，确认 didaID 列当前的值。
+     * 返回 null 表示该行不存在或读取失败（状态未知），调用方应据此跳过创建，避免重复。
+     *
+     * 读取前必须失效行缓存：滴答库不在 getManagedCalendarAvIds() 里，外部编辑（用户手动
+     * 填写/修改 didaID 列）不会触发缓存失效，5 秒 TTL 内会读到旧值，导致"已有绑定被误判为
+     * 未绑定"而重复创建滴答任务。
      */
-    private async queryDidaTaskIdsByBlock(): Promise<Map<string, string> | null> {
+    private async readLatestDidaIdFromDatabase(itemID: string, blockId: string): Promise<string | null> {
+        try {
+            invalidateViewValueCache(this.avId ?? undefined);
+            const viewData = await this.getAvViewData("复核滴答任务绑定");
+            const rows = (viewData || []).flatMap((view: any) => view.data || []);
+            // itemID 为空时不能按 itemID 匹配，否则会命中第一条无 itemID 的行
+            const row = (itemID ? rows.find((task: any) => task.事件?.itemID === itemID) : undefined)
+                || rows.find((task: any) => task.事件?.id === blockId);
+            // 找不到行说明该行已被删除或不可见，此时不能判定为"未绑定"而去创建任务
+            if (!row) return null;
+            return this.readDidaTaskId(row);
+        } catch (error) {
+            console.warn("[滴答同步] 复核数据库 didaID 列失败", { blockId, itemID }, error);
+            return null;
+        }
+    }
+
+    /**
+     * 取得 didaID 列的 keyID：以数据库当前列信息为准，
+     * 列信息不可用时回退到行内 keyID 与视图数据。
+     */
+    private async resolveDidaIdKeyID(task?: any, viewValue?: any): Promise<string | null> {
+        let keyIds = await this.getAvColumnKeyIds();
+        if (keyIds && !keyIds.has('didaID')) {
+            // 列可能是刚添加或改名的，刷新一次缓存再判断
+            this.avColumnKeyIds = null;
+            keyIds = await this.getAvColumnKeyIds();
+        }
+        if (keyIds) return keyIds.get('didaID') || null;
+        const rowKeyID = task?.didaID?.keyID;
+        if (rowKeyID) return rowKeyID;
+        return await this.getKeyIDfromViewValue(viewValue, 'didaID');
+    }
+
+    /**
+     * 读取数据库的列名 -> keyID 映射。
+     * 请求失败时返回 null，表示「暂时查不到」，与「确实没有该列」区分开。
+     */
+    private async getAvColumnKeyIds(): Promise<Map<string, string> | null> {
+        if (this.avColumnKeyIds) return this.avColumnKeyIds;
+        if (!this.avId) return null;
+        try {
+            const keys = await getAttributeViewKeysByAvID(this.avId);
+            if (!Array.isArray(keys)) {
+                // 内核异常返回时不缓存，退回视图数据查找
+                console.warn("获取数据库列信息返回异常", keys);
+                return null;
+            }
+            const map = new Map<string, string>();
+            for (const key of keys as any[]) {
+                if (key?.name && key?.id) map.set(key.name, key.id);
+            }
+            this.avColumnKeyIds = map;
+            return map;
+        } catch (error) {
+            console.warn("获取数据库列信息失败", error);
+            return null;
+        }
+    }
+
+    /** 按列名解析 keyID：数据库列信息优先，视图数据兜底。 */
+    private async resolveColumnKeyID(columnName: string, viewValue?: any): Promise<string | null> {
+        let keyIds = await this.getAvColumnKeyIds();
+        if (keyIds && !keyIds.has(columnName)) {
+            // 列可能是刚添加的，刷新一次缓存再判断
+            this.avColumnKeyIds = null;
+            keyIds = await this.getAvColumnKeyIds();
+        }
+        if (keyIds) {
+            return keyIds.get(columnName) || null;
+        }
+        return await this.getKeyIDfromViewValue(viewValue, columnName);
+    }
+
+    /**
+     * 查找标题里已带本块回链的远端滴答任务。
+     *
+     * 这类任务是插件自己创建时写下的 [S] 回链，可以证明"这一行曾经绑定过该任务"，
+     * 典型用途是去重键写丢后（回写失败、进程崩溃、创建响应丢失）恢复绑定，
+     * 而不是新建第二个远端任务。数据库 didaID 列仍是去重的唯一依据，
+     * 这里只在列为空时作为"丢失去重键"的修复线索。
+     *
+     * verified 表示"远端列表是否被真正核对过"：为 false 时"没有匹配"并不代表远端真的没有，
+     * 调用方据此决定是继续创建还是先跳过本轮。
+     */
+    private async findRemoteTaskBySiyuanBlock(
+        blockId: string,
+        forceRefresh = false,
+    ): Promise<{ task?: Task; verified: boolean }> {
+        if (!blockId) return { verified: false };
+        const cached = findTaskBySiyuanBacklink(this.taskCache.values(), blockId);
+        if (cached) return { task: cached, verified: true };
+        // 缓存里没有：刷新一次远端任务列表再找，覆盖"创建成功但响应丢失/进程重启"的场景。
+        // 刷新会拉全量列表，因此按时间节流，避免同一轮里为多行反复请求远端；
+        // forceRefresh（创建意图核对）不受节流限制。
+        if (!forceRefresh && Date.now() - this.lastRemoteTaskRefreshAt < REMOTE_TASK_REFRESH_THROTTLE_MS) {
+            return { verified: false };
+        }
+        const refreshed = await this.refreshRemoteTaskCache();
+        if (!refreshed) return { verified: false };
+        return { task: findTaskBySiyuanBacklink(this.taskCache.values(), blockId), verified: true };
+    }
+
+    /**
+     * 刷新远端任务缓存（含已完成任务）。
+     * 返回 false 表示刷新失败：此时"远端没有同源任务"这个结论不可信。
+     */
+    private async refreshRemoteTaskCache(): Promise<boolean> {
+        try {
+            await this.getAllTasks();
+            const completedTasks = await this.listCompletedTasks(this.getCompletedTaskQuery());
+            for (const task of completedTasks) {
+                if (task.id) this.taskCache.set(task.id, task);
+            }
+            this.lastRemoteTaskRefreshAt = Date.now();
+            return true;
+        } catch (error) {
+            console.warn("[滴答同步] 刷新滴答任务列表失败，无法核对同源任务", error);
+            return false;
+        }
+    }
+
+    /**
+     * 兼容旧版按块属性去重：读取块上的旧版滴答 ID 属性。
+     * 旧版本把关联写在块属性 custom-dida-id 上而数据库列为空，这里用于恢复绑定。
+     */
+    private async readLegacyBlockDidaId(blockId: string): Promise<string> {
+        if (!blockId) return "";
+        try {
+            const attrs = await getBlockAttrs(blockId);
+            const value = attrs?.[LEGACY_DIDA_TASK_ID_ATTR] || "";
+            if (value) this.legacyAttrBlocks.add(blockId);
+            return value;
+        } catch (error) {
+            console.warn("[滴答同步] 读取旧版块滴答 ID 属性失败", blockId, error);
+            return "";
+        }
+    }
+
+    /**
+     * 绑定已落到数据库列后清空旧块属性，避免旧关联与用户后续修改冲突。
+     * 只清理"确实存在旧属性"的块，避免每次写去重键都多发一次 setBlockAttrs。
+     */
+    private async clearLegacyBlockDidaId(blockId: string): Promise<void> {
+        if (!blockId) return;
+        if (!this.legacyAttrBlocks.has(blockId)) return;
+        try {
+            await setBlockAttrs(blockId, { [LEGACY_DIDA_TASK_ID_ATTR]: "" });
+            this.legacyAttrBlocks.delete(blockId);
+        } catch (error) {
+            console.warn("[滴答同步] 清理旧版块滴答 ID 属性失败", { blockId }, error);
+        }
+    }
+
+    /**
+     * 把滴答任务 ID 写回数据库 didaID 列，这是后续去重所依赖的唯一数据来源。
+     *
+     * 写入失败（内核报错或列已失效）会先清空列缓存重试一次；仍失败则登记到待补写队列，
+     * 由下一轮同步重试落盘，期间用该队列阻止重复创建任务。
+     */
+    private async writeDidaTaskIdColumn(
+        blockId: string,
+        itemID: string,
+        didaTaskId: string,
+        viewValue?: any,
+        task?: any,
+    ): Promise<boolean> {
+        if (!didaTaskId) return false;
+        if (!itemID) {
+            // 缺少行 ID：单元格无法定位，写入与补偿都不可能成功。
+            // 此时登记待补写只会永久占位（补偿同样拿不到行 ID），所以只报错不登记。
+            console.error("缺少行 ID（itemID），无法写回 didaID 列。", { blockId, itemID });
+            return false;
+        }
+
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            const keyID = await this.resolveDidaIdKeyID(task, viewValue);
+            if (!keyID) {
+                console.error("无法找到 'didaID' 字段的 KeyID，无法写回滴答任务ID。", { blockId, itemID });
+                break;
+            }
+            try {
+                await this.withDidaTagged(async () => {
+                    await updateAttrViewCell_pro(blockId, this.avId, keyID, itemID, didaTaskId, "text");
+                });
+                // 同步日历的行缓存，避免 5 秒 TTL 内读到未绑定 didaID 的旧行而重复建块
+                patchViewValueRow(this.avId, itemID, { didaID: { content: didaTaskId } });
+                // 绑定已落到数据库列：旧版块属性必须清空，否则用户手动清空列后，
+                // 旧属性会把历史关联重新写回，抵消用户的解绑操作。
+                await this.clearLegacyBlockDidaId(blockId);
+                // 去重键已落盘：把待补写记录标记为"已落盘"，下一轮据此判断用户是否手动清空过
+                this.markPendingDidaIdWriteLanded(itemID, didaTaskId, blockId);
+                return true;
+            } catch (error) {
+                console.warn("[滴答同步] 写回 didaID 列失败", { blockId, itemID, attempt }, error);
+                // keyID 可能是失效的（列被改名或删除），清空缓存后重试一次
+                this.avColumnKeyIds = null;
+            }
+        }
+
+        this.rememberPendingDidaIdWrite(blockId, itemID, didaTaskId);
+        return false;
+    }
+
+    /** 待补写记录的键：去重键是行属性，所以以行 ID 为主，缺失时才退回块 ID。 */
+    private pendingDidaIdWriteKey(itemID: string, blockId?: string): string {
+        return itemID || blockId || "";
+    }
+
+    /** 登记待补写的去重键：期间用它阻止重复创建任务，并由下一轮同步重试落盘。 */
+    private rememberPendingDidaIdWrite(blockId: string, itemID: string, didaTaskId: string): void {
+        const key = this.pendingDidaIdWriteKey(itemID, blockId);
+        if (!key) return;
+        const previous = this.pendingDidaIdWrites.get(key);
+        this.pendingDidaIdWrites.set(key, mergePendingDidaIdWrite(previous, {
+            blockId,
+            itemID,
+            didaTaskId,
+        }));
+        this.persistPendingDidaIdWrites();
+    }
+
+    /**
+     * 登记"创建意图"：远端任务创建前落盘，拿到 ID 后补全。
+     * 创建响应丢失或进程崩溃时，凭这条记录到远端核对是否已建，避免重复创建远端任务。
+     */
+    private rememberCreatingIntent(blockId: string, itemID: string): void {
+        const key = this.pendingDidaIdWriteKey(itemID, blockId);
+        if (!key) return;
+        this.pendingDidaIdWrites.set(key, buildCreatingIntent(blockId, itemID));
+        this.persistPendingDidaIdWrites();
+    }
+
+    /** 查找该行是否存在"创建意图"记录（远端可能已建成、只是响应丢失）。 */
+    private findCreatingIntent(itemID: string, blockId: string): PendingDidaIdWrite | undefined {
+        const record = this.pendingDidaIdWrites.get(itemID) ?? this.pendingDidaIdWrites.get(blockId);
+        return record?.creating ? record : undefined;
+    }
+
+    /**
+     * 标记待补写记录的去重键已成功落盘。
+     * 记录本身先保留：下一轮补偿时据此区分"用户手动清空了列"与"尚未落盘"，避免把用户的
+     * 解绑操作静默还原。
+     */
+    private markPendingDidaIdWriteLanded(itemID: string, didaTaskId: string, blockId?: string): void {
+        const key = this.pendingDidaIdWriteKey(itemID, blockId);
+        if (!key) return;
+        const pending = this.pendingDidaIdWrites.get(key);
+        if (!pending) return;
+        // 去重键已写进数据库行，说明行确实存在，"行未登记"标记可以清掉
+        const hadRowUnregistered = pending.rowUnregistered === true;
+        pending.rowUnregistered = false;
+        if (!pending.didaTaskId) {
+            // 之前登记的是"创建意图"：现在拿到真实任务 ID，补全记录并标记已落盘
+            pending.didaTaskId = didaTaskId;
+            pending.creating = false;
+            pending.landed = true;
+            this.persistPendingDidaIdWrites();
+            return;
+        }
+        // 只标记同一个去重键：记录指向别的任务时不能借用"已落盘"结论
+        if (pending.didaTaskId !== didaTaskId) {
+            if (hadRowUnregistered) this.persistPendingDidaIdWrites();
+            return;
+        }
+        if (pending.landed) {
+            if (hadRowUnregistered) this.persistPendingDidaIdWrites();
+            return;
+        }
+        pending.landed = true;
+        this.persistPendingDidaIdWrites();
+    }
+
+    /**
+     * 标记"块已建出但未登记进数据库"：补偿流程会先补登记这一行，再写去重键。
+     * 该标记只在插件自己登记失败时置位，用户主动删除的行不会被重建。
+     */
+    private markPendingDidaIdWriteRowUnregistered(blockId: string, itemID: string): void {
+        const key = this.pendingDidaIdWriteKey(itemID, blockId);
+        if (!key) return;
+        const pending = this.pendingDidaIdWrites.get(key);
+        if (!pending) return;
+        pending.rowUnregistered = true;
+        this.persistPendingDidaIdWrites();
+    }
+
+    /** 移除待补写记录（去重键已落盘或绑定关系失效）。 */
+    private forgetPendingDidaIdWrite(itemID: string, blockId?: string): void {
+        const key = this.pendingDidaIdWriteKey(itemID, blockId);
+        this.pendingWriteNotified.delete(key);
+        if (!key || !this.pendingDidaIdWrites.delete(key)) return;
+        this.persistPendingDidaIdWrites();
+    }
+
+    /**
+     * 持久化待补写的去重键：插件重启/思源重启后仍能知道"这个块已经建过滴答任务"，
+     * 避免去重键未落盘时重建重复任务。写入串行化，避免并发写同一文件导致快照乱序。
+     * 返回落盘完成的 Promise，便于销毁时等待写完再清内存。
+     */
+    private persistPendingDidaIdWrites(): Promise<void> {
+        const entries = Array.from(this.pendingDidaIdWrites.values());
+        this.pendingPersistChain = this.pendingPersistChain
+            .then(() => this.savePendingDidaIdWrites(entries))
+            .then(() => undefined)
+            .catch(error => {
+                console.warn("[滴答同步] 持久化待补写去重键失败", error);
+            });
+        return this.pendingPersistChain;
+    }
+
+    /**
+     * 把待补写队列写入插件存储。
+     *
+     * 思源的 `saveData` 不会替调用方检查内核返回码，且网络异常或内核负数错误码可能让
+     * Promise 一直挂起——那会永久阻塞后续落盘。这里显式校验 code，并加超时与重试，
+     * 保证"待补写状态跨重启保留"不会静默失效。
+     */
+    private async savePendingDidaIdWrites(entries: PendingDidaIdWrite[]): Promise<void> {
+        const MAX_ATTEMPTS = 3;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                const response: any = await this.saveDataWithTimeout(DIDA_PENDING_WRITES_FILE, entries);
+                const code = response?.code;
+                if (typeof code === "number" && code !== 0) {
+                    throw new Error(`内核返回 code=${code} msg=${response?.msg || ""}`);
+                }
+                return;
+            } catch (error) {
+                if (attempt >= MAX_ATTEMPTS) {
+                    console.error("[滴答同步] 待补写去重键落盘失败，去重键可能无法跨重启保留", error);
+                    showMessage("滴答同步：待补写去重键保存失败，重启后可能出现重复任务", 5000, "error", "dida-sync");
+                    return;
+                }
+                console.warn("[滴答同步] 待补写去重键落盘失败，准备重试", { attempt }, error);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+    }
+
+    /** 带超时的 saveData：避免内核异常导致 Promise 永久挂起。 */
+    private async saveDataWithTimeout(fileName: string, data: any): Promise<any> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            return await Promise.race([
+                this.plugin.saveData(fileName, data),
+                new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`保存 ${fileName} 超时`)), PENDING_WRITE_SAVE_TIMEOUT_MS);
+                }),
+            ]);
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
+    /** 读取上次运行遗留的待补写去重键。 */
+    private async restorePendingDidaIdWrites(): Promise<void> {
+        try {
+            const data = await this.plugin.loadData(DIDA_PENDING_WRITES_FILE);
+            if (!Array.isArray(data)) return;
+            for (const item of data) {
+                // "创建意图"记录没有任务 ID，同样要恢复：它是远端是否已建的唯一线索
+                if (!item?.didaTaskId && item?.creating !== true) continue;
+                const key = this.pendingDidaIdWriteKey(item.itemID || "", item.blockId);
+                if (!key) continue;
+                this.pendingDidaIdWrites.set(key, {
+                    blockId: item.blockId || "",
+                    itemID: item.itemID || "",
+                    didaTaskId: item.didaTaskId || "",
+                    attempts: Number(item.attempts) || 1,
+                    landed: item.landed === true,
+                    creating: item.creating === true,
+                    rowUnregistered: item.rowUnregistered === true,
+                });
+            }
+            if (this.pendingDidaIdWrites.size > 0) {
+                console.info("[滴答同步] 已恢复待补写的 didaID 列记录", { count: this.pendingDidaIdWrites.size });
+            }
+        } catch (error) {
+            console.warn("[滴答同步] 读取待补写去重键失败", error);
+        }
+    }
+
+    /**
+     * 判断绑定块是否还存在：用于区分"行被删除"与"行只是不在当前视图里"。
+     *
+     * 注意：`getBlockAttrs` 对不存在的块同样返回空对象（内核只查 attributes 表），
+     * 无法用来判活，这里改用 blocks 表直查；查询不可用时按"仍在"处理，保留待补写记录。
+     */
+    private async isBlockAlive(blockId: string): Promise<boolean> {
+        if (!blockId) return false;
+        try {
+            const result = await sqlWithMeta(`SELECT id FROM blocks WHERE id = '${blockId}' LIMIT 1;`);
+            if (result.ok === false) {
+                console.warn("[滴答同步] 查询绑定块是否存在失败，按仍存在处理", { blockId });
+                return true;
+            }
+            return result.rows.length > 0;
+        } catch (error) {
+            console.warn("[滴答同步] 检查绑定块是否存在失败", { blockId }, error);
+            return true;
+        }
+    }
+
+    /**
+     * 查询块在当前数据库里绑定到哪一行。
+     *
+     * 返回 "" 表示块没有绑定到本数据库的任何行；返回 null 表示查询失败（状态未知）。
+     * 内核按 AV 的块键值表反查，不受视图过滤影响。
+     */
+    private async resolveBoundItemId(blockId: string): Promise<string | null> {
+        if (!this.avId || !blockId) return null;
+        try {
+            const ids = await getAttributeViewItemIDsByBoundIDs(this.avId, [blockId]);
+            // request() 在内核返回非 0 时会返回字符串而不是对象，这里必须先校验
+            if (!ids || typeof ids !== "object" || Array.isArray(ids)) return null;
+            const itemId = (ids as Record<string, string>)[blockId];
+            return typeof itemId === "string" ? itemId : "";
+        } catch (error) {
+            console.warn("[滴答同步] 查询块的数据库绑定行失败", { blockId }, error);
+            return null;
+        }
+    }
+
+    /**
+     * 确保块已经在数据库里登记为一行。
+     *
+     * 建块后"加入数据库"这一步可能失败（内核报错、请求超时），此时块存在但数据库里
+     * 没有对应行，去重键无处可写，下一轮同步会为同一个滴答任务再建一个块。
+     * 这里按"块绑定到哪一行"判断，避免误建重复行：
+     * - 已绑定到同一行：无需处理；
+     * - 未绑定：补登记这一行；
+     * - 绑定到别的行：块已被改绑到其它行，不重复登记；
+     * - 查询失败：按"不动"处理，宁可漏建也不重复建。
+     */
+    private async ensureRowRegistered(blockId: string, itemID: string): Promise<boolean> {
+        if (!this.avId || !blockId || !itemID) return false;
+        const boundItemId = await this.resolveBoundItemId(blockId);
+        if (boundItemId === null) return false;
+        if (boundItemId === itemID) return true;
+        if (boundItemId) {
+            console.info("[滴答同步] 块已绑定到别的行，不再补登记", { blockId, boundItemId, itemID });
+            return false;
+        }
+        try {
+            await this.withDidaTagged(async () => {
+                await addBlockToDatabase_pro(blockId, this.avId!, itemID);
+            });
+            console.info("[滴答同步] 已补登记数据库行", { blockId, itemID });
+            return true;
+        } catch (error) {
+            console.warn("[滴答同步] 补登记数据库行失败", { blockId, itemID }, error);
+            return false;
+        }
+    }
+
+    /**
+     * 上一轮未能落盘的 didaID 列写入，在本轮同步时重试。
+     *
+     * 判定依据（行 ID 为主键，换绑块后仍能定位到同一行）：
+     * - 行已不存在且绑定块也已删除：绑定关系失效，丢弃记录；
+     * - 列已有同一个去重键：已落盘，丢弃记录；
+     * - 列已被改绑到别的滴答任务：丢弃过期记录；
+     * - 列已被用户手动清空（landed 标记为已落盘）：尊重用户操作，不还原；
+     * - 其余情况：补写落盘。
+     */
+    private async flushPendingDidaIdWrites(rowsByItemId: Map<string, any>, viewValue?: any): Promise<void> {
+        if (this.pendingDidaIdWrites.size === 0) return;
+        for (const pending of Array.from(this.pendingDidaIdWrites.values())) {
+            if (pending.creating) {
+                // "创建意图"不是待补写的去重键：它由创建路径自己核对远端后处理，这里不参与补偿
+                continue;
+            }
+            const pendingKey = this.pendingDidaIdWriteKey(pending.itemID, pending.blockId);
+            const row = pending.itemID ? rowsByItemId.get(pending.itemID) : undefined;
+            const currentDidaId = row ? this.readDidaTaskId(row) : null;
+            let action = resolvePendingDidaIdWriteAction(
+                pending,
+                currentDidaId,
+                MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS,
+            );
+            if (action === "drop") {
+                // 去重键已落盘 / 已改绑 / 用户手动清空：记录不再需要
+                this.forgetPendingDidaIdWrite(pending.itemID, pending.blockId);
+                continue;
+            }
+            if (action === "unknown") {
+                // 行不可见：可能是行已被删除，也可能是当前视图没覆盖这一行。
+                // 只有绑定块也消失了才判定绑定失效；否则保留记录（宁可漏建，也不重复建）。
+                if (pending.blockId && !(await this.isBlockAlive(pending.blockId))) {
+                    console.info("[滴答同步] 待补写去重键对应的行与块均已不存在，丢弃记录", {
+                        blockId: pending.blockId,
+                        itemID: pending.itemID,
+                    });
+                    this.forgetPendingDidaIdWrite(pending.itemID, pending.blockId);
+                    continue;
+                }
+                if (pending.attempts >= MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS) {
+                    // 行不可见且连续回写都失败：判定该行已被删除，丢弃记录，避免永久占位
+                    console.info("[滴答同步] 行不可见且回写反复失败，判定该行已删除，丢弃待补写记录", {
+                        blockId: pending.blockId,
+                        itemID: pending.itemID,
+                    });
+                    this.forgetPendingDidaIdWrite(pending.itemID, pending.blockId);
+                    continue;
+                }
+                // 上一轮"块已建出、行未登记"：先补登记这一行，再写去重键。
+                // 该标记只在插件自己登记失败时置位，用户主动删除的行不会被重建。
+                if (pending.rowUnregistered && pending.blockId && pending.itemID) {
+                    const registered = await this.ensureRowRegistered(pending.blockId, pending.itemID);
+                    if (!registered) {
+                        pending.attempts = pending.attempts + 1;
+                        this.persistPendingDidaIdWrites();
+                        if (pending.attempts >= MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS) {
+                            console.info("[滴答同步] 数据库行补登记反复失败，丢弃待补写记录", {
+                                blockId: pending.blockId,
+                                itemID: pending.itemID,
+                            });
+                            this.forgetPendingDidaIdWrite(pending.itemID, pending.blockId);
+                        }
+                        continue;
+                    }
+                    pending.rowUnregistered = false;
+                    this.persistPendingDidaIdWrites();
+                }
+                // 块还在：行可能只是没被当前视图覆盖。内核按行 ID 定位单元格、不依赖视图，
+                // 因此仍尝试落盘；写失败说明行确实已不存在，按补偿失败处理。
+                action = "compensate";
+            }
+            if (action === "block" || pending.attempts >= MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS) {
+                // 反复落盘失败：停止重试并提示，避免每轮同步空转；记录保留以防重复创建
+                if (!this.pendingWriteNotified.has(pendingKey)) {
+                    this.pendingWriteNotified.add(pendingKey);
+                    console.error("[滴答同步] didaID 列多次回写失败，已停止自动重试，请检查数据库列与该行", {
+                        blockId: pending.blockId,
+                        itemID: pending.itemID,
+                        didaTaskId: pending.didaTaskId,
+                        attempts: pending.attempts,
+                    });
+                    showMessage("滴答任务的 didaID 回写多次失败，已停止自动重试，请检查数据库列", 5000, "error", "dida-sync");
+                }
+                continue;
+            }
+            const ok = await this.writeDidaTaskIdColumn(
+                pending.blockId,
+                pending.itemID,
+                pending.didaTaskId,
+                viewValue,
+                row,
+            );
+            if (ok) {
+                console.info("[滴答同步] 已补写 didaID 列", {
+                    blockId: pending.blockId,
+                    didaTaskId: pending.didaTaskId,
+                });
+            }
+        }
+    }
+
+    /** 查找某个滴答任务对应的待补写记录：去重键尚未落盘，不能据此重复建块或重复建任务。 */
+    private findPendingDidaIdWritesByTaskId(didaTaskId: string): PendingDidaIdWrite[] {
+        if (!didaTaskId) return [];
+        const matches: PendingDidaIdWrite[] = [];
+        for (const pending of this.pendingDidaIdWrites.values()) {
+            if (pending.didaTaskId === didaTaskId) matches.push(pending);
+        }
+        return matches;
+    }
+
+    /**
+     * 查询旧版本写在块属性上的滴答 ID，仅用于把历史关联回填到数据库 didaID 列。
+     * ok 为 false 表示查询失败（此时 ids 不可信，需要走逐块兜底扫描）。
+     */
+    private async queryLegacyBlockDidaIds(): Promise<{ ids: Map<string, string>; truncated: boolean; ok: boolean }> {
+        const idsByBlock = new Map<string, string>();
         try {
             const result = await sqlWithMeta(
-                "SELECT block_id, value FROM attributes WHERE name = 'custom-dida-id' AND type = 'b' LIMIT 9999999;",
+                `SELECT block_id, value FROM attributes WHERE name = '${LEGACY_DIDA_TASK_ID_ATTR}' AND type = 'b' LIMIT 9999999;`,
             );
             if (result.truncated) {
-                console.error("块滴答 ID 查询结果被截断，已取消本轮滴答全量同步", {
+                console.error("旧版块滴答 ID 查询结果被截断，历史关联可能缺失", {
                     limit: result.limit,
                     count: result.rows.length,
                 });
-                return null;
+                return { ids: idsByBlock, truncated: true, ok: true };
             }
-            const idsByBlock = new Map<string, string>();
+            if (result.ok === false) {
+                return { ids: idsByBlock, truncated: false, ok: false };
+            }
             for (const row of result.rows) {
                 if (typeof row?.block_id === 'string' && typeof row?.value === 'string' && row.value) {
                     idsByBlock.set(row.block_id, row.value);
                 }
             }
-            return idsByBlock;
+            return { ids: idsByBlock, truncated: false, ok: true };
         } catch (error) {
-            console.error("查询块滴答 ID 属性失败，已取消本轮滴答全量同步", error);
-            return null;
+            console.warn("查询旧版块滴答 ID 属性失败，跳过历史回填", error);
+            return { ids: idsByBlock, truncated: false, ok: false };
         }
+    }
+
+    /**
+     * 逐块兜底扫描旧版块属性：批量 SQL 不可用时使用。
+     * 扫描所有带块的行（不只列为空的行）：列为空的行用于回填关联，
+     * 列已填的行用于清掉残留旧属性，避免用户手动清空列后旧关联被写回。
+     */
+    private async migrateLegacyBlockDidaIdsByScan(
+        viewValue: any,
+        existingTasks: any[],
+        existingTasksMap: Map<string, any>,
+    ): Promise<void> {
+        const candidates = existingTasks.filter(task => !!task.事件?.id);
+        if (candidates.length === 0) return;
+
+        const legacyIds = new Map<string, string>();
+        const CONCURRENCY = 8;
+        for (let i = 0; i < candidates.length; i += CONCURRENCY) {
+            const chunk = candidates.slice(i, i + CONCURRENCY);
+            const found = await Promise.all(chunk.map(async task => ({
+                blockId: task.事件.id as string,
+                legacyId: await this.readLegacyBlockDidaId(task.事件.id as string),
+            })));
+            for (const item of found) {
+                if (item.legacyId) legacyIds.set(item.blockId, item.legacyId);
+            }
+        }
+        if (legacyIds.size === 0) return;
+
+        for (const task of existingTasks) {
+            const blockId = task.事件?.id;
+            const legacyId = blockId ? legacyIds.get(blockId) : undefined;
+            if (!legacyId) continue;
+            const itemID = task.事件?.itemID;
+            // 列里已有值的行：只需清掉旧属性，不改列
+            if (task.didaID?.content) {
+                await this.clearLegacyBlockDidaId(blockId);
+                continue;
+            }
+            if (!itemID) continue;
+            const ok = await this.writeDidaTaskIdColumn(blockId, itemID, legacyId, viewValue, task);
+            if (!ok) {
+                console.warn("[滴答同步] 回填数据库 didaID 列失败，本轮不会为该任务重复建块", { blockId, legacyId });
+                continue;
+            }
+            task.didaID = { content: legacyId, keyID: task.didaID?.keyID || "" };
+            existingTasksMap.set(legacyId, task);
+            console.info("[滴答同步] 已从旧版块属性回填数据库 didaID 列", { blockId, legacyId });
+        }
+    }
+
+    /**
+     * 一次性迁移：旧版本把滴答任务 ID 写在块属性上，数据库 didaID 列为空。
+     * 这里把块属性中的关联回填到数据库列，避免回退去重依据后重复建块。
+     * 返回 false 表示历史关联不完整，本轮同步应中止以免重复建块。
+     */
+    private async migrateLegacyBlockDidaIds(
+        viewValue: any,
+        existingTasks: any[],
+        existingTasksMap: Map<string, any>,
+    ): Promise<boolean> {
+        const legacy = await this.queryLegacyBlockDidaIds();
+        if (!legacy.ok) {
+            // 批量查询不可用：改用逐块扫描兜底，保证旧版块属性去重的数据不丢关联
+            console.warn("[滴答同步] 批量查询旧版块属性不可用，改用逐块扫描兜底");
+            await this.migrateLegacyBlockDidaIdsByScan(viewValue, existingTasks, existingTasksMap);
+            return true;
+        }
+        if (legacy.truncated) {
+            return false;
+        }
+
+        const legacyIds = legacy.ids;
+        if (legacyIds.size === 0) return true;
+        // 记录哪些块仍带旧版块属性：回填成功后需要清理这些属性
+        for (const blockId of legacyIds.keys()) {
+            this.legacyAttrBlocks.add(blockId);
+        }
+
+        // 列里已有值的行：旧属性同样要清掉，否则用户手动清空列后，
+        // 残留的旧属性会把历史关联写回列，抵消用户的解绑操作。
+        for (const task of existingTasks) {
+            const blockId = task.事件?.id;
+            if (!blockId || !task.didaID?.content) continue;
+            if (!legacyIds.get(blockId)) continue;
+            await this.clearLegacyBlockDidaId(blockId);
+        }
+
+        const pending = existingTasks.filter(task => !task.didaID?.content && task.事件?.id && legacyIds.get(task.事件.id));
+        if (pending.length === 0) return true;
+
+        for (const task of pending) {
+            const blockId = task.事件.id;
+            const itemID = task.事件.itemID;
+            const legacyId = legacyIds.get(blockId);
+            if (!itemID || !legacyId) continue;
+
+            // 回填失败时 writeDidaTaskIdColumn 会登记待补写记录，本轮据此避免重复建块
+            const ok = await this.writeDidaTaskIdColumn(blockId, itemID, legacyId, viewValue, task);
+            if (!ok) {
+                console.warn("[滴答同步] 回填数据库 didaID 列失败，本轮不会为该任务重复建块", { blockId, legacyId });
+                continue;
+            }
+            task.didaID = { content: legacyId, keyID: task.didaID?.keyID || "" };
+            existingTasksMap.set(legacyId, task);
+            // 回填成功后旧块属性已由 writeDidaTaskIdColumn 清理：否则用户手动清空 didaID 列后，
+            // 历史关联会再次被写回
+            console.info("[滴答同步] 已把块属性中的滴答 ID 回填到数据库 didaID 列", { blockId, legacyId });
+        }
+        return true;
     }
     private getCompletedTaskRetentionDays(): number {
         const raw = (settingdata as any)["cal-dida-completed-days"];
@@ -185,6 +882,9 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             onQueuedTarget: (blockId, itemID, isDetached) => {
                 this.enqueueSiyuanSyncTarget(blockId, itemID, isDetached);
             },
+            invalidateAvCache: () => {
+                invalidateViewValueCache(this.avId ?? undefined);
+            },
         });
         console.debug("Dida365Service initialized", this.todoListId);
         this.plugin.addIcons(`
@@ -228,6 +928,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             }, settingdata["cal-dida-sync-interval"] * 60 * 1000); // 转换为毫秒
         };
         await this.init_av();
+        await this.restorePendingDidaIdWrites();
         await this.getAllTasks(); // 初始化时加载滴答任务缓存
         this.changeSource.start();
     }
@@ -256,6 +957,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
 
     private async init_av() {
         this.avId = settingdata["cal-dida-db-id"]
+        this.avColumnKeyIds = null;
         if (!this.avId || this.avId.trim() === "") {
             showMessage("Dida365Service: avId is not set or is empty.");
             return;
@@ -550,6 +1252,9 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         }
 
         try {
+            // 去重依据是数据库 didaID 列：批次开始前先失效行缓存，确保读到用户最新改动。
+            // 整批只失效一次，后续目标复用同一份快照。
+            invalidateViewValueCache(this.avId ?? undefined);
             const viewData = await this.getAvViewData("刷新待同步思源队列");
             const allTasks = viewData.flatMap(view => view.data || []);
             const nextRound: typeof queue = [];
@@ -610,12 +1315,13 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             return false;
         }
 
+        // 去重依据是数据库 didaID 列：确认前先失效行缓存，避免读到 5 秒内的旧值
+        invalidateViewValueCache(this.avId ?? undefined);
         const viewData = await this.getAvViewData("确认思源任务同步到滴答");
         if (!viewData || !Array.isArray(viewData) || viewData.length === 0) {
             showMessage("无法获取数据库视图数据", -1, "error");
             return false;
         }
-
         const allTasks = viewData.flatMap(view => view.data || []);
         const siyuanTask = allTasks.find((task: any) => task.事件?.itemID === itemID);
         if (!siyuanTask) {
@@ -626,7 +1332,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         console.debug("[滴答同步] 进入思源优先的确认同步", {
             blockId,
             itemID,
-            hasDidaID: !!(await this.readDidaTaskId(blockId, siyuanTask)),
+            hasDidaID: !!this.readDidaTaskId(siyuanTask),
             title: siyuanTask.事件?.content,
             status: siyuanTask.状态?.content,
         });
@@ -647,8 +1353,134 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     ): Promise<{ ok: boolean; changed: boolean }> {
         return this.withBlockSyncFlight(blockId, async () => {
             try {
-                // 块属性中已有滴答 ID 则更新，否则才创建新任务；AV didaID 仅兼容旧记录。
-                const didaTaskId = await this.readDidaTaskId(blockId, siyuanTask);
+                // 绑定判定只看数据库 didaID 列；待补写记录仅用于修复上次落盘失败的场景。
+                // 记录以行 ID 为主键（换绑块后行 ID 不变），块 ID 只是兼容旧记录的兜底。
+                const pendingWrite = this.pendingDidaIdWrites.get(itemID)
+                    ?? this.pendingDidaIdWrites.get(blockId);
+                // landed 表示去重键此前已成功落盘：此时列被清空是用户主动解绑，不应自动还原
+                const pendingDidaId = pendingWrite && !pendingWrite.landed ? pendingWrite.didaTaskId : undefined;
+                const binding = resolveDidaBinding(siyuanTask, pendingDidaId);
+                let didaTaskId = binding.didaTaskId;
+                if (binding.action === "repair" && pendingWrite) {
+                    if (pendingWrite.attempts >= MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS) {
+                        // 补写已达重试上限：保留记录（防止重复创建），但不再空转重试
+                        console.warn("[滴答同步] didaID 列补写已达重试上限，本轮跳过处理以免重复创建", {
+                            blockId,
+                            didaTaskId: pendingWrite.didaTaskId,
+                            attempts: pendingWrite.attempts,
+                        });
+                        return { ok: false, changed: false };
+                    }
+                    // 上一轮去重键回写失败：先补写落盘，避免重复创建滴答任务
+                    // 补写同样带上视图数据与行对象，AV 键接口抖动时仍能定位 didaID 列
+                    const repaired = await this.writeDidaTaskIdColumn(
+                        pendingWrite.blockId,
+                        pendingWrite.itemID,
+                        pendingWrite.didaTaskId,
+                        viewData,
+                        siyuanTask,
+                    );
+                    if (!repaired) {
+                        console.warn("[滴答同步] didaID 列补写仍失败，跳过本轮处理以免重复创建", { blockId });
+                        return { ok: false, changed: false };
+                    }
+                    console.info("[滴答同步] didaID 列已补写，跳过重复创建", {
+                        blockId,
+                        didaTaskId: pendingWrite.didaTaskId,
+                    });
+                }
+                if (!didaTaskId) {
+                    // 兼容旧版按块属性去重：数据库列还没有值时，先看块上是否留有旧版关联，
+                    // 有则回填到列后再走更新流程，避免旧数据被当成新任务重复创建。
+                    const legacyDidaId = await this.readLegacyBlockDidaId(blockId);
+                    if (legacyDidaId) {
+                        const bound = await this.writeDidaTaskIdColumn(
+                            blockId,
+                            itemID,
+                            legacyDidaId,
+                            viewData,
+                            siyuanTask,
+                        );
+                        if (!bound) {
+                            // 回写失败时已登记待补写，本轮不再创建，避免重复滴答任务
+                            console.warn("[滴答同步] 旧版块属性关联回写失败，本轮跳过处理以免重复创建", {
+                                blockId,
+                                legacyDidaId,
+                            });
+                            return { ok: false, changed: false };
+                        }
+                        // 旧版块属性由 writeDidaTaskIdColumn 在写入成功后统一清理
+                        console.info("[滴答同步] 已从旧版块属性恢复 didaID 关联", { blockId, legacyDidaId });
+                        didaTaskId = legacyDidaId;
+                    }
+                }
+                if (!didaTaskId) {
+                    // 创建意图核对：上一轮登记过"正在创建"（远端可能已建成、只是响应丢了），
+                    // 必须先到远端核对，确认确实没有同源任务才能再建，否则会重复创建远端任务。
+                    const intent = this.findCreatingIntent(itemID, blockId);
+                    if (intent) {
+                        const probe = await this.findRemoteTaskBySiyuanBlock(blockId, true);
+                        if (!probe.verified) {
+                            // 远端列表核对不了：不能确定上一轮是否已建成，本轮不创建
+                            console.warn("[滴答同步] 无法核对远端任务列表，本轮跳过创建以免重复", { blockId });
+                            return { ok: false, changed: false };
+                        }
+                        if (probe.task) {
+                            // 远端其实已经建好了：复用它并把去重键补回列
+                            const bound = await this.writeDidaTaskIdColumn(
+                                blockId,
+                                itemID,
+                                probe.task.id,
+                                viewData,
+                                siyuanTask,
+                            );
+                            if (!bound) {
+                                console.warn("[滴答同步] 同源滴答任务的去重键回写失败，本轮跳过处理以免重复创建", {
+                                    blockId,
+                                    didaTaskId: probe.task.id,
+                                });
+                                return { ok: false, changed: false };
+                            }
+                            this.forgetPendingDidaIdWrite(itemID, blockId);
+                            console.info("[滴答同步] 远端已存在同源滴答任务，复用它而不是新建", {
+                                blockId,
+                                didaTaskId: probe.task.id,
+                            });
+                            didaTaskId = probe.task.id;
+                        } else {
+                            // 确认远端没有同源任务：上一轮确实没建成，清掉意图，正常创建
+                            this.forgetPendingDidaIdWrite(itemID, blockId);
+                        }
+                    }
+                }
+                if (!didaTaskId) {
+                    // 去重键可能曾经写丢（回写失败、进程崩溃、创建响应丢失）：
+                    // 远端任务标题里的 [S] 回链是"这一行曾经绑定过该任务"的证据，
+                    // 找到就复用它并把去重键补回列，绝不新建第二个远端任务。
+                    const probe = await this.findRemoteTaskBySiyuanBlock(blockId);
+                    const sameSourceTask = probe.task;
+                    if (sameSourceTask) {
+                        const bound = await this.writeDidaTaskIdColumn(
+                            blockId,
+                            itemID,
+                            sameSourceTask.id,
+                            viewData,
+                            siyuanTask,
+                        );
+                        if (!bound) {
+                            console.warn("[滴答同步] 同源滴答任务的去重键回写失败，本轮跳过处理以免重复创建", {
+                                blockId,
+                                didaTaskId: sameSourceTask.id,
+                            });
+                            return { ok: false, changed: false };
+                        }
+                        console.info("[滴答同步] 复用标题中已含本块回链的滴答任务，避免重复创建", {
+                            blockId,
+                            didaTaskId: sameSourceTask.id,
+                        });
+                        didaTaskId = sameSourceTask.id;
+                    }
+                }
                 if (didaTaskId) {
                     let cachedTask = this.taskCache.get(didaTaskId);
                     if (!cachedTask) {
@@ -735,13 +1567,23 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                     return { ok: false, changed: false };
                 }
 
+                if (!itemID) {
+                    // 没有行 ID 就无法把去重键写回 didaID 列：远端任务一旦创建成功，
+                    // 下一轮就找不到去重依据，必然重复创建。这里宁可不同步也不制造重复。
+                    console.error("[滴答同步] 数据库行缺少行 ID，无法持久化去重键，跳过创建", { blockId });
+                    showMessage("数据库行缺少行 ID，已跳过创建滴答任务以避免重复", -1, "error");
+                    return { ok: false, changed: false };
+                }
+
                 this.creatingDidaIds.add(blockId);
                 try {
-                    // 绕过内存缓存直接查一次最新块属性，防止并发写入后重复创建
-                    const latestAttrs = await getBlockAttrs(blockId);
-                    const freshDidaId = latestAttrs?.[DIDA_TASK_ID_ATTR] || siyuanTask.didaID?.content || "";
+                    // 创建前重新读一次数据库行，确认 didaID 列确实为空，防止并发写入后重复创建
+                    const freshDidaId = await this.readLatestDidaIdFromDatabase(itemID, blockId);
+                    if (freshDidaId === null) {
+                        console.warn(`任务 [${blockId}] 无法复核数据库 didaID 列，跳过创建以免重复。`);
+                        return { ok: false, changed: false };
+                    }
                     if (freshDidaId) {
-                        this.didaTaskIdsByBlock.set(blockId, freshDidaId);
                         console.debug(`任务 [${blockId}] 已有绑定滴答 ID [${freshDidaId}]，跳过创建。`);
                         return { ok: true, changed: false };
                     }
@@ -788,16 +1630,34 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                         payload: createTaskPayload,
                     });
 
+                    // 先登记"创建意图"并落盘：远端任务一旦建成，若响应丢失或进程崩溃，
+                    // 本地没有任务 ID 可记；凭这条记录下一轮能到远端核对是否已建，避免重复创建。
+                    this.rememberCreatingIntent(blockId, itemID);
+
                     const newDidaTask = await this.apiClient.createTask(createTaskPayload);
 
                     if (newDidaTask && newDidaTask.id) {
-                        // createTask 返回 ID 后立即落盘 custom-dida-id 与创建冷却，避免后续失败误阻断重试或引发重复创建
+                        // createTask 返回 ID 后立即记录关联与创建冷却，避免后续失败误阻断重试或引发重复创建
                         this.markPendingSiyuanCreate(blockId);
-                        await this.writeDidaTaskIdAttr(blockId, newDidaTask.id);
+                        // 创建意图已拿到真实任务 ID：补全记录，后续去重键写入失败时按普通待补写处理
+                        this.rememberPendingDidaIdWrite(blockId, itemID, newDidaTask.id);
                         this.taskCache.set(newDidaTask.id, newDidaTask);
                         this.lastModifiedTime.set(newDidaTask.id, Date.now());
                         this.lastSyncDirection.set(newDidaTask.id, 'siyuan-to-dida');
                         this.markPendingDidaUpdate(newDidaTask.id);
+
+                        // 去重键必须先于其它可能失败的操作落盘：
+                        // 远端任务已创建，一旦后续步骤失败却没有去重键，下一轮会重复创建滴答任务。
+                        const didaIdWritten = await this.writeDidaTaskIdColumn(
+                            blockId,
+                            itemID,
+                            newDidaTask.id,
+                            viewData,
+                            siyuanTask,
+                        );
+                        if (!didaIdWritten) {
+                            showMessage("滴答任务已创建，但 didaID 回写失败，可能产生重复任务，请检查数据库列", -1, "error");
+                        }
 
                         if (siyuanTask.状态?.content === '完成') {
                             await this.apiClient.completeTask(newDidaTask.projectId, newDidaTask.id);
@@ -805,17 +1665,24 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                             newDidaTask.completedTime = formatDateForDida(Date.now());
                         }
 
+                        // 链接列单独写，失败不影响去重
                         const linkKeyID = await this.getKeyIDfromViewValue(viewData, '链接');
                         if (linkKeyID) {
                             const didaLink = `https://dida365.com/webapp/#p/${targetProjectId}/tasks/${newDidaTask.id}`;
-                            await this.withDidaTagged(async () => {
-                                await updateAttrViewCell_pro(blockId, this.avId, linkKeyID, itemID, didaLink, "url");
-                            });
-                            console.debug(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，链接已回写`);
-                            showStatusMessage("新任务已同步到滴答清单", 2000);
+                            try {
+                                await this.withDidaTagged(async () => {
+                                    await updateAttrViewCell_pro(blockId, this.avId, linkKeyID, itemID, didaLink, "url");
+                                });
+                            } catch (error) {
+                                console.warn("[滴答同步] 写回滴答任务链接失败", { blockId, didaTaskId: newDidaTask.id }, error);
+                            }
                         } else {
+                            console.error("无法找到 '链接' 字段的 KeyID，无法写回滴答任务链接。");
                             showMessage("无法写回滴答任务链接，请检查数据库是否有名为 '链接' 的列", -1, "error");
                         }
+
+                        console.debug(`新思源任务 [${blockId}] 已同步到滴答，ID为 [${newDidaTask.id}]，ID 与链接已回写`);
+                        showStatusMessage("新任务已同步到滴答清单", 2000);
                         return { ok: true, changed: true };
                     }
 
@@ -874,6 +1741,14 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                 return false;
             }
 
+            // 每轮同步刷新数据库列信息
+            this.avColumnKeyIds = null;
+
+            // 每轮同步先失效行缓存再读取视图数据：
+            // 滴答库不在 getManagedCalendarAvIds() 内，用户在思源里手动改 didaID 列不会触发
+            // 缓存失效，5 秒 TTL 内会读到旧值，导致重复建块。
+            invalidateViewValueCache(this.avId ?? undefined);
+
             const viewValue = await this.getAvViewData("同步任务到思源");
 
             if (!viewValue || !Array.isArray(viewValue) || viewValue.length === 0) {
@@ -884,25 +1759,47 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             // 遍历所有 viewValue，合并所有任务数据
             const existingTasks = viewValue.flatMap(view => view.data || []);
 
-            // 创建现有任务的映射表：块属性优先，AV didaID 仅兼容历史记录。
-            const customDidaIdsByBlock = await this.queryDidaTaskIdsByBlock();
-            if (!customDidaIdsByBlock) {
-                showStatusMessage("无法读取思源块滴答 ID，已取消本轮同步", 5000, "dida-sync");
-                return false;
-            }
-            const existingTasksMap = new Map<string, any>();
+            // 按块 ID 索引现有行：回链兜底要用
             const existingTasksByBlockId = new Map<string, any>();
+            // 按行 ID 索引现有行：去重键是行属性，换绑块后行 ID 不变，补偿与去重判定都用它
+            const existingTasksByItemId = new Map<string, any>();
             for (const task of existingTasks) {
                 const blockId = task.事件?.id;
                 if (typeof blockId === 'string' && blockId) {
                     existingTasksByBlockId.set(blockId, task);
                 }
-                const didaTaskId = (typeof blockId === 'string' ? customDidaIdsByBlock.get(blockId) : undefined)
-                    || task.didaID?.content;
+                const itemID = task.事件?.itemID;
+                if (typeof itemID === 'string' && itemID) {
+                    existingTasksByItemId.set(itemID, task);
+                }
+            }
+
+            // 去重依据是数据库 didaID 列，列缺失时无法定位已有任务，直接中止以免重复建块
+            const didaIdKeyID = await this.resolveColumnKeyID('didaID', viewValue);
+            if (!didaIdKeyID) {
+                showMessage("数据库缺少 'didaID' 列，无法去重，已取消本轮同步。请在数据库中添加名为 'didaID' 的文本列", -1, "error", "dida-sync");
+                return false;
+            }
+
+            // 补写上一轮未能落盘的 didaID 列
+            // 补偿写入会就地更新行对象（patchViewValueRow），所以放在建立映射表之前：
+            // 本轮补写成功的绑定也能立即被后面的去重判定看到。
+            await this.flushPendingDidaIdWrites(existingTasksByItemId, viewValue);
+
+            // 创建现有任务的映射表：去重依据为数据库 didaID 列
+            const existingTasksMap = new Map<string, any>();
+            for (const task of existingTasks) {
+                const didaTaskId = task.didaID?.content || "";
                 if (didaTaskId) {
                     existingTasksMap.set(didaTaskId, task);
-                    if (blockId) this.didaTaskIdsByBlock.set(blockId, didaTaskId);
                 }
+            }
+
+            // 迁移：旧版本把关联写在块属性上，这里回填到数据库 didaID 列，避免重复建块
+            const migrated = await this.migrateLegacyBlockDidaIds(viewValue, existingTasks, existingTasksMap);
+            if (!migrated) {
+                showMessage("旧版滴答关联回填不完整，已取消本轮同步以免重复建块", -1, "error", "dida-sync");
+                return false;
             }
 
             let syncCount = 0;
@@ -930,18 +1827,60 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
 
                 let existingTask = existingTasksMap.get(didaTask.id);
                 if (!existingTask) {
+                    // 去重键尚未落盘时不能建块，否则同一滴答任务会出现重复块。
+                    // 记录以行 ID 为主键，这里按行 ID 定位对应行（换绑块后行 ID 不变）。
+                    const pendingBinds = this.findPendingDidaIdWritesByTaskId(didaTask.id);
+                    if (pendingBinds.length > 0) {
+                        let blocked = false;
+                        for (const pendingBind of pendingBinds) {
+                            const pendingRow = pendingBind.itemID
+                                ? existingTasksByItemId.get(pendingBind.itemID)
+                                : undefined;
+                            const currentDidaId = pendingRow ? this.readDidaTaskId(pendingRow) : null;
+                            const action = resolvePendingDidaIdWriteAction(
+                                pendingBind,
+                                currentDidaId,
+                                MAX_PENDING_DIDA_ID_WRITE_ATTEMPTS,
+                            );
+                            if (action === "drop") {
+                                if (currentDidaId === didaTask.id && pendingRow) {
+                                    // 行已绑定到该滴答任务：按已存在处理，避免重复建块
+                                    existingTask = pendingRow;
+                                    existingTasksMap.set(didaTask.id, pendingRow);
+                                } else {
+                                    // 已改绑 / 已落盘 / 用户手动清空：记录失效，丢弃
+                                    this.forgetPendingDidaIdWrite(pendingBind.itemID, pendingBind.blockId);
+                                }
+                                continue;
+                            }
+                            // unknown / block / compensate：去重键尚未可靠落盘，本轮不建块
+                            blocked = true;
+                        }
+                        if (blocked) {
+                            console.warn("[滴答同步] 该滴答任务的 didaID 尚未落盘，本轮跳过建块以免重复", {
+                                didaTaskId: didaTask.id,
+                            });
+                            continue;
+                        }
+                    }
+
                     const backlinkBlockId = extractSiyuanBlockIdFromDidaTitle(didaTask.title);
                     const fallbackTask = backlinkBlockId ? existingTasksByBlockId.get(backlinkBlockId) : undefined;
-                    if (fallbackTask) {
-                        const boundDidaId = customDidaIdsByBlock.get(backlinkBlockId)
-                            || this.didaTaskIdsByBlock.get(backlinkBlockId)
-                            || fallbackTask.didaID?.content;
+                    if (fallbackTask && !existingTask) {
+                        // 兼容旧版按块属性去重：列里没有值时，看块上是否留有旧版关联
+                        const boundDidaId = fallbackTask.didaID?.content
+                            || await this.readLegacyBlockDidaId(backlinkBlockId);
                         if (!boundDidaId || boundDidaId === didaTask.id) {
                             existingTask = fallbackTask;
                             existingTasksMap.set(didaTask.id, fallbackTask);
-                            customDidaIdsByBlock.set(backlinkBlockId, didaTask.id);
-                            await this.writeDidaTaskIdAttr(backlinkBlockId, didaTask.id);
-                            console.info("[滴答同步] 通过 [S] 回链补全块滴答 ID 关联，避免重复建块", {
+                            await this.writeDidaTaskIdColumn(
+                                backlinkBlockId,
+                                fallbackTask.事件?.itemID || "",
+                                didaTask.id,
+                                viewValue,
+                                fallbackTask,
+                            );
+                            console.info("[滴答同步] 通过 [S] 回链补全数据库 didaID 关联，避免重复建块", {
                                 blockId: backlinkBlockId,
                                 didaTaskId: didaTask.id,
                             });
@@ -1059,7 +1998,6 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
 
             // 创建块内容
             const statusCustomAttr = getDidaStatusAttr(taskData.状态?.content);
-            const didaTaskId = taskData.didaID?.content || "";
             const template = String((settingdata as any)["cal-dida-import-template"] || '').trim() || getDefaultDidaImportTemplate();
             const templateData = buildDidaImportTemplateData(taskData, blockId, itemID, titleBlockId, descriptionBlockId);
             const renderedBody = renderDidaTemplate(template, templateData).trim() || renderDidaTemplate(getDefaultDidaImportTemplate(), templateData).trim();
@@ -1069,18 +2007,45 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                 createScheduleBlockquoteMarkdown(renderedBody, {
                     id: blockId,
                     'custom-st-event': statusCustomAttr,
-                    ...(didaTaskId ? { [DIDA_TASK_ID_ATTR]: didaTaskId } : {}),
                 }),
                 targetId
             );
-            if (didaTaskId) {
-                this.didaTaskIdsByBlock.set(blockId, didaTaskId);
+
+            // 块已经建出来：先登记去重键。
+            // 这样即使"加入数据库"这一步失败（块在、行不在），也留有去重依据，
+            // 下一轮不会为同一个滴答任务再建一个块。
+            const newDidaTaskId = taskData.didaID?.content || "";
+            if (newDidaTaskId) {
+                this.rememberPendingDidaIdWrite(blockId, itemID, newDidaTaskId);
             }
 
             // 添加到数据库
-            await this.withDidaTagged(async () => {
-                await addBlockToDatabase_pro(blockId, this.avId!, itemID);
-            });
+            try {
+                await this.withDidaTagged(async () => {
+                    await addBlockToDatabase_pro(blockId, this.avId!, itemID);
+                });
+            } catch (error) {
+                console.warn("[滴答同步] 新建块加入数据库失败，尝试补登记", { blockId, itemID }, error);
+                // 请求可能已在内核生效（响应丢失），也可能确实没登记：按绑定行核对后再决定。
+                const registered = await this.ensureRowRegistered(blockId, itemID);
+                if (!registered) {
+                    // 行仍缺失：标记待补写，由补偿流程再补登记一次；
+                    // 本轮到此为止——行都没建好，后面的字段写入无处可落。
+                    this.markPendingDidaIdWriteRowUnregistered(blockId, itemID);
+                    showMessage("滴答任务对应的思源行登记失败，已暂缓本轮同步以免重复建块", 5000, "error", "dida-sync");
+                    return;
+                }
+            }
+
+            // 去重键必须先于其它可能失败的操作落盘：
+            // 行已建好，一旦后续步骤失败却没有去重键，下一轮会为同一滴答任务重复建块。
+            // 这里不依赖视图数据，列信息本身就足以定位 didaID 列。
+            if (newDidaTaskId) {
+                const didaIdWritten = await this.writeDidaTaskIdColumn(blockId, itemID, newDidaTaskId);
+                if (!didaIdWritten) {
+                    console.warn("[滴答同步] 新建思源行的 didaID 回写失败，已登记待补写", { blockId });
+                }
+            }
 
             // 获取 viewValue 用于获取 keyID
             const viewValue = await this.getAvViewData("创建思源任务");
@@ -1150,13 +2115,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             const statusCustomAttr = getDidaStatusAttr(newTaskData.状态?.content);
             await setBlockAttrs(blockId, {
                 "custom-st-event": statusCustomAttr,
-                ...(newTaskData.didaID?.content
-                    ? { [DIDA_TASK_ID_ATTR]: newTaskData.didaID.content }
-                    : {}),
             });
-            if (newTaskData.didaID?.content) {
-                this.didaTaskIdsByBlock.set(blockId, newTaskData.didaID.content);
-            }
 
             // 同步更新滴答清单任务，确保其有正确的 S 链接
             if (newTaskData.didaID?.content) {
@@ -1473,6 +2432,13 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                 return firstRecord[fieldName].keyID;
             }
 
+            // 首条记录可能没有该字段（如画廊视图中空单元格不返回），此时扫描全部记录兜底
+            for (const record of viewData.data) {
+                if (record?.[fieldName]?.keyID) {
+                    return record[fieldName].keyID;
+                }
+            }
+
             return null;
         } catch (error) {
             console.error(`获取字段 ${fieldName} 的 keyID 失败:`, error);
@@ -1486,7 +2452,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     private async createDailynote(parentId: string, date: Date): Promise<string> {
         return (await createDailyNoteForDate(parentId, date)) || "";
     }
-    destroy() {
+    async destroy(): Promise<void> {
         this.topBarButton = applyTopBarButton(this.plugin, this.topBarButton, "st-cal-dida-sync", {
             icon: "iconSTdida",
             title: "导入滴答清单数据",
@@ -1521,6 +2487,11 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         }
         this.syncEchoSuppressUntil = 0;
         this.siyuanSyncInFlight.clear();
+        this.avColumnKeyIds = null;
+        this.legacyAttrBlocks.clear();
+        // 待补写的去重键必须跨重启保留：等快照真正落盘后再清内存，
+        // 否则新实例恢复时可能读到旧快照，丢掉尚未落盘的去重键。
+        await this.persistPendingDidaIdWrites();
         this.store.clear();
     }
 
@@ -1536,6 +2507,9 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         try {
             // 1. 获取这一行（块）的完整数据，最重要的是拿到 didaID
             console.debug(`处理思源更新：块ID ${blockId}`);
+            // 去重依据是数据库 didaID 列：读取前先失效行缓存。
+            // 日历拖拽排程等路径不经过变更源，不会自动失效缓存，这里统一处理。
+            invalidateViewValueCache(this.avId ?? undefined);
             const viewData = await this.getAvViewData("处理思源更新");
             const allTasks = viewData.flatMap(view => view.data || []);
             const siyuanTask = allTasks.find((task: any) => task.事件?.itemID === itemID);
@@ -1555,7 +2529,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             console.debug("[滴答同步] 读取到思源任务快照", {
                 blockId,
                 itemID,
-                hasDidaID: !!(await this.readDidaTaskId(blockId, siyuanTask)),
+                hasDidaID: !!this.readDidaTaskId(siyuanTask),
                 title: siyuanTask.事件?.content,
                 status: siyuanTask.状态?.content,
                 priority: siyuanTask.优先级?.content,
@@ -1639,6 +2613,8 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                 throw new Error(`获取项目 (ID: ${projectId}) 的任务失败: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
+        // 记录刷新时间："同源任务探测"据此节流，避免一轮同步里反复拉取远端列表
+        this.lastRemoteTaskRefreshAt = Date.now();
         return allTasks;
     }
     /**
