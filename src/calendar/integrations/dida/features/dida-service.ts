@@ -31,7 +31,8 @@ export class Dida365Service {
         this.coordinator.register(this.habitFeature);
 
         if (!token?.trim()) {
-            showMessage("Dida365 fallback: Token is empty or invalid.", -1, "error");
+            // 带固定 id：内核按 id 折叠同名提示，避免反复初始化堆出一串永不关闭的提示条
+            showMessage("Dida365 fallback: Token is empty or invalid.", 5000, "error", "dida-sync");
             return;
         }
 

@@ -49,8 +49,17 @@ export class DidaTaskApi {
         return this.moveTasks([operation]);
     }
 
-    listCompletedTasks(query: TaskCompletedQuery = {}): Promise<Task[]> {
-        return this.http.request("/task/completed", { method: "POST", body: JSON.stringify(query) });
+    /**
+     * 查询已完成任务。
+     * timeoutMs 可单独放宽：宽时间窗查询（覆盖常规保留窗口之外的旧任务）返回量大，
+     * 用默认超时容易被判失败，进而让创建流程一直跳过。
+     */
+    listCompletedTasks(query: TaskCompletedQuery = {}, timeoutMs?: number): Promise<Task[]> {
+        return this.http.request("/task/completed", {
+            method: "POST",
+            body: JSON.stringify(query),
+            ...(timeoutMs ? { timeoutMs } : {}),
+        });
     }
 
     filterTasks(query: TaskFilterQuery = {}): Promise<Task[]> {

@@ -55,8 +55,8 @@ export class Dida365ApiClient {
         return this.tasks.moveTask(operation);
     }
 
-    listCompletedTasks(query: TaskCompletedQuery = {}): Promise<Task[]> {
-        return this.tasks.listCompletedTasks(query);
+    listCompletedTasks(query: TaskCompletedQuery = {}, timeoutMs?: number): Promise<Task[]> {
+        return this.tasks.listCompletedTasks(query, timeoutMs);
     }
 
     filterTasks(query: TaskFilterQuery = {}): Promise<Task[]> {
