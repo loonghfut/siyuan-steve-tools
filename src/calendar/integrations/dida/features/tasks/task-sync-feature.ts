@@ -154,6 +154,8 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
     private pendingPersistChain: Promise<void> = Promise.resolve();
     /** 待补写队列落盘失败是否已经提示过：连续失败不重复刷屏，落盘恢复后重置。 */
     private pendingSaveFailureNotified = false;
+    /** saveData 尚未结束时禁止启动新写入，避免旧快照晚到覆盖新快照。 */
+    private pendingSaveInFlight: Promise<void> | null = null;
 
     private readonly isSyncOrEchoActive = (): boolean =>
         this.isSyncing || Date.now() < this.syncEchoSuppressUntil;
@@ -329,6 +331,9 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             for (const task of completedTasks) {
                 if (task.id) this.taskCache.set(task.id, task);
             }
+            // 宽窗口索引可能包含已经被远端删除的任务；普通刷新成功后必须失效，
+            // 否则下一次宽查在节流窗口内仍会把旧任务重新绑定回来。
+            this.deepBacklinkTasks.clear();
             this.lastRemoteTaskRefreshAt = Date.now();
             // 未完成 + 已完成都拿到了：这是一次完整快照，可以用来判断"远端确实没有同源任务"
             this.taskCacheComplete = true;
@@ -598,7 +603,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
             creating: false,
             rowUnregistered: false,
         });
-        return this.persistPendingDidaIdWrites();
+        return this.persistPendingDidaIdWrites(true);
     }
 
     /**
@@ -612,7 +617,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         const key = this.pendingDidaIdWriteKey(itemID, blockId);
         if (!key) return Promise.resolve();
         this.pendingDidaIdWrites.set(key, buildCreatingIntent(blockId, itemID));
-        return this.persistPendingDidaIdWrites();
+        return this.persistPendingDidaIdWrites(true);
     }
 
     /** 查找该行是否存在"创建意图"记录（远端可能已建成、只是响应丢失）。 */
@@ -737,15 +742,16 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
      * 避免去重键未落盘时重建重复任务。写入串行化，避免并发写同一文件导致快照乱序。
      * 返回落盘完成的 Promise，便于销毁时等待写完再清内存。
      */
-    private persistPendingDidaIdWrites(): Promise<void> {
+    private persistPendingDidaIdWrites(throwOnFailure = false): Promise<void> {
         const entries = Array.from(this.pendingDidaIdWrites.values());
-        this.pendingPersistChain = this.pendingPersistChain
-            .then(() => this.savePendingDidaIdWrites(entries))
-            .then(() => undefined)
+        const write = this.pendingPersistChain.then(() => this.savePendingDidaIdWrites(entries));
+        // 后台补偿路径不能产生未处理拒绝，但创建前的关键路径需要知道落盘失败。
+        this.pendingPersistChain = write
             .catch(error => {
                 console.warn("[滴答同步] 持久化待补写去重键失败", error);
-            });
-        return this.pendingPersistChain;
+            })
+            .then(() => undefined);
+        return throwOnFailure ? write : this.pendingPersistChain;
     }
 
     /**
@@ -774,7 +780,7 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
                         this.pendingSaveFailureNotified = true;
                         showMessage("滴答同步：待补写去重键保存失败，重启后可能出现重复任务", 10000, "error", "dida-sync-critical");
                     }
-                    return;
+                    throw error;
                 }
                 console.warn("[滴答同步] 待补写去重键落盘失败，准备重试", { attempt }, error);
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -782,12 +788,27 @@ export class DidaTaskSyncFeature implements DidaSyncFeature {
         }
     }
 
-    /** 带超时的 saveData：避免内核异常导致 Promise 永久挂起。 */
+    /** 带超时的 saveData：避免内核异常导致当前写入永久挂起。 */
     private async saveDataWithTimeout(fileName: string, data: any): Promise<any> {
+        // 超时不会取消内核请求；在它结束前禁止重试，避免旧请求晚到时覆盖新快照。
+        // 直接失败而不是等待，避免内核请求永久挂起时阻塞整个持久化链。
+        if (this.pendingSaveInFlight) {
+            throw new Error(`保存 ${fileName} 的上一次请求仍在执行`);
+        }
+        const savePromise = Promise.resolve().then(() => this.plugin.saveData(fileName, data));
+        let trackedSave!: Promise<void>;
+        trackedSave = savePromise
+            .then(() => undefined, () => undefined)
+            .finally(() => {
+                if (this.pendingSaveInFlight === trackedSave) {
+                    this.pendingSaveInFlight = null;
+                }
+            });
+        this.pendingSaveInFlight = trackedSave;
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
             return await Promise.race([
-                this.plugin.saveData(fileName, data),
+                savePromise,
                 new Promise((_, reject) => {
                     timer = setTimeout(() => reject(new Error(`保存 ${fileName} 超时`)), PENDING_WRITE_SAVE_TIMEOUT_MS);
                 }),
